@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- SSO Provider Section -->
     <div class="q-mb-lg">
-      <div class="sso-provider-card q-pa-md">
+      <div class="sso-provider-card q-pa-md" :class="{ 'dark-card': isDark }">
         <div class="row items-center justify-between q-mb-md">
           <div class="row items-center q-gutter-sm">
             <q-icon name="lock" size="sm" color="primary" />
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div v-if="isProviderEnabled" class="restriction-controls">
+        <div v-if="isProviderEnabled" class="restriction-controls" :class="{ 'dark-border': isDark }">
           <div class="q-mb-md">
             <q-radio
               v-model="restrictionMode"
@@ -92,7 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             outlined
             dense
             :rules="[
-              (val) => !!val || t('common.required'),
               (val) => isValidDomain(val) || t('settings.invalidDomain')
             ]"
           />
@@ -119,8 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="(domain, index) in domains" 
         :key="domain.name"
         class="domain-card q-mb-md"
+        :class="{ 'dark-card': isDark }"
       >
-        <div class="domain-header row items-center justify-between q-pa-md">
+        <div class="domain-header row items-center justify-between q-pa-md" :class="{ 'dark-header': isDark }">
           <div class="text-body1 text-bold">{{ domain.name }}</div>
           <q-btn
             icon="close"
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from "vue";
+import { ref, reactive, onMounted, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -179,6 +179,9 @@ const isProviderEnabled = ref(true);
 const restrictionMode = ref("allow-all");
 
 const emit = defineEmits(["cancel", "saved"]);
+
+// Detect dark mode
+const isDark = computed(() => q.dark.isActive);
 
 // Watch for changes in restriction mode and clear domains when "allow-all" is selected
 watch(restrictionMode, (newMode) => {
@@ -232,7 +235,7 @@ const loadDomainSettings = async () => {
 };
 
 const isValidDomain = (domain: string): boolean => {
-  if (!domain) return false;
+  if (!domain) return true;
   // Basic domain validation - can be enhanced
   const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.([a-zA-Z]{2,}\.?)+$/;
   return domainRegex.test(domain);
@@ -364,7 +367,23 @@ const saveChanges = async () => {
   border: 1px solid #e0e0e0;
 }
 
-.body--dark {
+/* Dark theme utility classes */
+.dark-card {
+  border-color: #444 !important;
+  background: #1e1e1e !important;
+}
+
+.dark-header {
+  background: #2a2a2a !important;
+  border-bottom-color: #444 !important;
+}
+
+.dark-border {
+  border-top-color: #444 !important;
+}
+
+/* Dark theme styles */
+:deep(.body--dark) {
   .domain-card {
     border-color: #444;
     background: #1e1e1e;
@@ -375,9 +394,43 @@ const saveChanges = async () => {
     border-bottom-color: #444;
   }
 
+  .sso-provider-card {
+    border-color: #444;
+    background: #1e1e1e;
+  }
+
+  .restriction-controls {
+    border-top-color: #444;
+  }
+
   .email-item {
     background: #2a2a2a;
     border-color: #444;
   }
+}
+
+/* Alternative: Use Quasar's dark mode classes */
+.body--dark .domain-card {
+  border-color: #444 !important;
+  background: #1e1e1e !important;
+}
+
+.body--dark .domain-header {
+  background: #2a2a2a !important;
+  border-bottom-color: #444 !important;
+}
+
+.body--dark .sso-provider-card {
+  border-color: #444 !important;
+  background: #1e1e1e !important;
+}
+
+.body--dark .restriction-controls {
+  border-top-color: #444 !important;
+}
+
+.body--dark .email-item {
+  background: #2a2a2a !important;
+  border-color: #444 !important;
 }
 </style>
