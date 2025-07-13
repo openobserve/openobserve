@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-radio
               v-model="domain.allowAllUsers"
               :val="true"
-              :label="t('settings.allowAllUsersFromDomain', { domain: domain.name })"
+              :label="t('settings.allowAllUsersFromDomain', { domain: '@'+domain.name })"
               color="primary"
             />
           </div>
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-radio
               v-model="domain.allowAllUsers"
               :val="false"
-              :label="t('settings.allowOnlySpecificUsers', { domain: domain.name })"
+              :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
               color="primary"
             />
           </div>
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="domain.allowAllUsers"
             class="q-pa-sm bg-blue-1 text-blue-8 rounded-borders q-mb-md"
           >
-            {{ t("settings.allUsersAllowedMessage", { domain: domain.name }) }}
+            {{ t("settings.allUsersAllowedMessage", { domain: '@'+domain.name }) }}
           </div>
 
           <!-- Specific users section -->
@@ -228,20 +228,7 @@ const loadDomainSettings = async () => {
     // If the API doesn't exist yet or returns an error, use example data
     console.warn("Domain restrictions API not available, using example data:", error);
     
-    const existingDomains = [
-      {
-        name: "prosegur.com",
-        allowAllUsers: true,
-        allowedEmails: [],
-        newEmail: ""
-      },
-      {
-        name: "prosegurcontractor.com",
-        allowAllUsers: false,
-        allowedEmails: ["user1@prosegurcontractor.com"],
-        newEmail: ""
-      }
-    ];
+    const existingDomains = [];
     
     domains.splice(0, domains.length, ...existingDomains);
   }

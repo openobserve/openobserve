@@ -1152,7 +1152,7 @@
     "domainConfiguredCount": "{count} domain(s) configured",
     "allowAllUsersFromDomain": "Allow all users from {domain}",
     "allowOnlySpecificUsers": "Allow only specific users from {domain}",
-    "allUsersAllowedMessage": "All users with email addresses ending in @{domain} will be allowed to login.",
+    "allUsersAllowedMessage": "All users with email addresses ending in {domain} will be allowed to login.",
     "emailPlaceholder": "e.g. user@example.com",
     "addEmail": "Add Email",
     "saveChanges": "Save Changes",
