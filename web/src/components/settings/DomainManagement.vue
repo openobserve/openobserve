@@ -23,10 +23,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("settings.ssoDomainRestrictionsDescription") }}
     </div>
 
-    <!-- Domain Input Section -->
+    <!-- SSO Provider Section -->
     <div class="q-mb-lg">
+      <div class="sso-provider-card q-pa-md">
+        <div class="row items-center justify-between q-mb-md">
+          <div class="row items-center q-gutter-sm">
+            <q-icon name="lock" size="sm" color="primary" />
+            <q-input
+              v-model="ssoProvider"
+              :label="t('settings.ssoProviderName')"
+              color="input-border"
+              bg-color="input-bg"
+              class="sso-provider-input"
+              outlined
+              dense
+              :placeholder="t('settings.ssoProviderPlaceholder')"
+            />
+          </div>
+          <q-badge 
+            :color="isProviderEnabled ? 'positive' : 'grey'" 
+            :label="isProviderEnabled ? t('common.enabled') : t('common.disabled')"
+          />
+        </div>
+
+        <div v-if="isProviderEnabled" class="restriction-controls">
+          <div class="q-mb-md">
+            <q-radio
+              v-model="restrictionMode"
+              val="allow-all"
+              :label="t('settings.allowAllUsers')"
+              color="primary"
+            />
+            <div class="text-caption text-grey-6 q-ml-lg">
+              {{ t("settings.allowAllUsersDescription") }}
+            </div>
+          </div>
+          
+          <div class="q-mb-md">
+            <q-radio
+              v-model="restrictionMode"
+              val="domain-restricted"
+              :label="t('settings.restrictToSpecificDomains')"
+              color="primary"
+            />
+            <div class="text-caption text-grey-6 q-ml-lg">
+              {{ t("settings.restrictToSpecificDomainsDescription") }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Domain Input Section -->
+    <div v-if="restrictionMode === 'domain-restricted'" class="q-mb-lg">
       <div class="text-body1 text-bold q-mb-md">
-        {{ t("settings.domainAndAllowedUsers") }}
+        {{ t("settings.allowedDomains") }}
       </div>
       
       <div class="row q-gutter-md items-center q-mb-md">
@@ -34,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             v-model="newDomain"
             :label="t('settings.domainPlaceholder')"
-            :hint="t('settings.domainHint')"
+            :hint="t('settings.domainHint', {'at-sign': '@ symbol'})"
             color="input-border"
             bg-color="input-bg"
             class="domain-input"
@@ -63,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Domain List -->
-    <div v-if="domains.length > 0" class="q-mb-lg">
+    <div v-if="domains.length > 0 && restrictionMode === 'domain-restricted'" class="q-mb-lg">
       <div 
         v-for="(domain, index) in domains" 
         :key="domain.name"
@@ -80,86 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="removeDomain(index)"
             :title="t('common.delete')"
           />
-        </div>
-
-        <div class="q-pa-md">
-          <!-- Radio Button Options -->
-          <div class="q-mb-md">
-            <q-radio
-              v-model="domain.allowAllUsers"
-              :val="true"
-              :label="t('settings.allowAllUsersFromDomain', { domain: '@'+domain.name })"
-              color="primary"
-            />
-          </div>
-          
-          <div class="q-mb-md">
-            <q-radio
-              v-model="domain.allowAllUsers"
-              :val="false"
-              :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
-              color="primary"
-            />
-          </div>
-
-          <!-- Info message for all users -->
-          <div 
-            v-if="domain.allowAllUsers"
-            class="q-pa-sm bg-blue-1 text-blue-8 rounded-borders q-mb-md"
-          >
-            {{ t("settings.allUsersAllowedMessage", { domain: '@'+domain.name }) }}
-          </div>
-
-          <!-- Specific users section -->
-          <div v-if="!domain.allowAllUsers" class="specific-users-section">
-            <div class="row q-gutter-md items-center q-mb-md">
-              <div class="col">
-                <q-input
-                  v-model="domain.newEmail"
-                  :label="t('settings.emailPlaceholder')"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="email-input"
-                  outlined
-                  dense
-                  :rules="[
-                    (val) => !val || isValidEmail(val, domain.name) || t('settings.invalidEmail')
-                  ]"
-                />
-              </div>
-              <div class="col-auto">
-                <q-btn
-                  :label="t('settings.addEmail')"
-                  color="secondary"
-                  @click="addEmail(domain)"
-                  :disabled="!domain.newEmail || !isValidEmail(domain.newEmail, domain.name)"
-                  unelevated
-                  dense
-                />
-              </div>
-            </div>
-
-            <!-- Email List -->
-            <div v-if="domain.allowedEmails && domain.allowedEmails.length > 0">
-              <div 
-                v-for="(email, emailIndex) in domain.allowedEmails"
-                :key="email"
-                class="email-item row items-center justify-between q-pa-sm q-mb-xs"
-              >
-                <div class="text-body2">{{ email }}</div>
-                <q-btn
-                  icon="close"
-                  flat
-                  round
-                  dense
-                  size="sm"
-                  color="negative"
-                  @click="removeEmail(domain, emailIndex)"
-                  :title="t('common.delete')"
-                />
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -184,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -193,9 +164,6 @@ import domainManagement from "@/services/domainManagement";
 
 interface Domain {
   name: string;
-  allowAllUsers: boolean;
-  allowedEmails: string[];
-  newEmail: string;
 }
 
 const { t } = useI18n();
@@ -206,8 +174,19 @@ const router = useRouter();
 const newDomain = ref("");
 const domains = reactive<Domain[]>([]);
 const saving = ref(false);
+const ssoProvider = ref("Microsoft SSO");
+const isProviderEnabled = ref(true);
+const restrictionMode = ref("allow-all");
 
 const emit = defineEmits(["cancel", "saved"]);
+
+// Watch for changes in restriction mode and clear domains when "allow-all" is selected
+watch(restrictionMode, (newMode) => {
+  if (newMode === "allow-all") {
+    // Clear all domains when "Allow all users" is selected
+    domains.splice(0, domains.length);
+  }
+});
 
 onMounted(() => {
   if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
@@ -228,12 +207,19 @@ const loadDomainSettings = async () => {
       store.state.selectedOrganization.identifier
     );
     
-    if (response.data && response.data.domains) {
-      const loadedDomains = response.data.domains.map((domain: any) => ({
-        ...domain,
-        newEmail: ""
-      }));
-      domains.splice(0, domains.length, ...loadedDomains);
+    if (response.data) {
+      if (response.data.provider) {
+        ssoProvider.value = response.data.provider;
+      }
+      if (response.data.restrictionMode) {
+        restrictionMode.value = response.data.restrictionMode;
+      }
+      if (response.data.domains) {
+        const loadedDomains = response.data.domains.map((domain: any) => ({
+          name: domain.name || domain
+        }));
+        domains.splice(0, domains.length, ...loadedDomains);
+      }
     }
   } catch (error: any) {
     // If the API doesn't exist yet or returns an error, use example data
@@ -252,15 +238,6 @@ const isValidDomain = (domain: string): boolean => {
   return domainRegex.test(domain);
 };
 
-const isValidEmail = (email: string, domain: string): boolean => {
-  if (!email) return false;
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) return false;
-  
-  // Check if email belongs to the domain
-  return email.toLowerCase().endsWith(`@${domain.toLowerCase()}`);
-};
-
 const addDomain = () => {
   if (!newDomain.value || !isValidDomain(newDomain.value)) return;
   
@@ -275,10 +252,7 @@ const addDomain = () => {
   }
 
   domains.push({
-    name: newDomain.value,
-    allowAllUsers: true,
-    allowedEmails: [],
-    newEmail: ""
+    name: newDomain.value
   });
 
   newDomain.value = "";
@@ -306,76 +280,27 @@ const removeDomain = (index: number) => {
   });
 };
 
-const addEmail = (domain: Domain) => {
-  if (!domain.newEmail || !isValidEmail(domain.newEmail, domain.name)) return;
-
-  // Check if email already exists
-  if (domain.allowedEmails.includes(domain.newEmail.toLowerCase())) {
-    q.notify({
-      type: "negative",
-      message: t("settings.emailAlreadyExists"),
-      timeout: 3000,
-    });
-    return;
-  }
-
-  domain.allowedEmails.push(domain.newEmail.toLowerCase());
-  domain.newEmail = "";
-
-  q.notify({
-    type: "positive",
-    message: t("settings.emailAdded"),
-    timeout: 3000,
-  });
-};
-
-const removeEmail = (domain: Domain, emailIndex: number) => {
-  q.dialog({
-    title: t("common.confirm"),
-    message: t("settings.confirmRemoveEmail", { email: domain.allowedEmails[emailIndex] }),
-    cancel: true,
-    persistent: true,
-  }).onOk(() => {
-    domain.allowedEmails.splice(emailIndex, 1);
-    q.notify({
-      type: "positive",
-      message: t("settings.emailRemoved"),
-      timeout: 3000,
-    });
-  });
-};
-
 const saveChanges = async () => {
   saving.value = true;
   
   try {
-    // Validate all domains have proper configuration
-    for (const domain of domains) {
-      if (!domain.allowAllUsers && domain.allowedEmails.length === 0) {
-        q.notify({
-          type: "negative",
-          message: t("settings.domainNeedsEmails", { domain: domain.name }),
-          timeout: 3000,
-        });
-        saving.value = false;
-        return;
-      }
-    }
-
     // Prepare data for API
     const domainData = {
+      provider: ssoProvider.value,
+      restrictionMode: restrictionMode.value,
       domains: domains.map(domain => ({
-        name: domain.name,
-        allowAllUsers: domain.allowAllUsers,
-        allowedEmails: domain.allowedEmails
+        name: domain.name
       }))
     };
 
-    // Save to backend API
-    await domainManagement.updateDomainRestrictions(
-      store.state.selectedOrganization.identifier,
-      domainData
-    );
+    // Save to backend API (simplified for now)
+    console.log('Saving domain settings:', domainData);
+    
+    // TODO: Replace with actual API call when backend is ready
+    // await domainManagement.updateDomainRestrictions(
+    //   store.state.selectedOrganization.identifier,
+    //   domainData
+    // );
 
     q.notify({
       type: "positive",
@@ -383,7 +308,7 @@ const saveChanges = async () => {
       timeout: 3000,
     });
 
-    emit("saved", domains);
+    emit("saved", domainData);
   } catch (error: any) {
     q.notify({
       type: "negative",
@@ -401,8 +326,20 @@ const saveChanges = async () => {
   width: 300px;
 }
 
-.email-input {
-  min-width: 250px;
+.sso-provider-input {
+  min-width: 200px;
+}
+
+.sso-provider-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+}
+
+.restriction-controls {
+  border-top: 1px solid #e0e0e0;
+  padding-top: 16px;
+  margin-top: 16px;
 }
 
 .domain-card {
