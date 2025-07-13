@@ -48,8 +48,7 @@ use crate::service::{
     search::{
         datafusion::{
             distributed_plan::{
-                NewEmptyExecVisitor, ReplaceTableScanExec,
-                codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
+                NewEmptyExecVisitor, ReplaceTableScanExec, codec::get_physical_extension_codec,
                 empty_exec::NewEmptyExec,
             },
             exec::{prepare_datafusion_context, register_udf},
@@ -94,9 +93,7 @@ pub async fn search(
     datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
-    let proto = ComposedPhysicalExtensionCodec {
-        codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
-    };
+    let proto = get_physical_extension_codec();
     let mut physical_plan =
         physical_plan_from_bytes_with_extension_codec(&req.search_info.plan, &ctx, &proto)?;
 

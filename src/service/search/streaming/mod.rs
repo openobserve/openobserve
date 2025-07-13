@@ -26,16 +26,13 @@ use config::meta::{
     stream::StreamType,
 };
 use log;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::{
+    auditor::{AuditMessage, Protocol, ResponseMeta},
+    config::get_config as get_o2_config,
+};
 use tokio::sync::mpsc;
 use tracing::Instrument;
-#[cfg(feature = "enterprise")]
-use {
-    o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, Protocol, ResponseMeta},
-        config::get_config as get_o2_config,
-    },
-    o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec,
-};
 
 use crate::{
     common::{
