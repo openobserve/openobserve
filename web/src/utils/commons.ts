@@ -566,7 +566,6 @@ export const getDashboard = async (
       dashboardId,
       folderId,
     );
-    console.log("apiResponse", apiResponse);
 
     dashboardJson = await retrieveAndStoreDashboardData(
       store,

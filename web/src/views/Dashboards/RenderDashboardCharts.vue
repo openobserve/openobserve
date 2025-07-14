@@ -193,7 +193,6 @@ import useNotifications from "@/composables/useNotifications";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import "gridstack/dist/gridstack.min.css";
-import { s } from "msw/lib/core/HttpResponse-CCdkF1fJ";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");
@@ -442,12 +441,6 @@ export default defineComponent({
     // save the dashboard value
     const saveDashboardData = useLoading(async () => {
       try {
-        console.log(
-          "Saving dashboard...",
-          props.dashboardData.dashboardId,
-          props.dashboardData,
-          route.query.folder ?? "default",
-        );
         await updateDashboard(
           store,
           store.state.selectedOrganization.identifier,
@@ -456,7 +449,6 @@ export default defineComponent({
           route.query.folder ?? "default",
         );
 
-        console.log("Dashboard updated successfully");
         showPositiveNotification("Dashboard updated successfully");
       } catch (error: any) {
         console.error("Error while saving dashboard:", error);
@@ -473,10 +465,8 @@ export default defineComponent({
         }
 
         // refresh dashboard
-        console.log("Refreshing dashboard...");
         refreshDashboard();
       } finally {
-        console.log("Save operation completed");
       }
     });
 
@@ -496,7 +486,6 @@ export default defineComponent({
     
     let gridStackUpdateInProgress = false;
     const initGridStack = () => {
-      console.log("GridStack layout changed: Initializing GridStack...");
 
       if (!gridStackContainer.value || gridStackInstance) return;
 
@@ -525,26 +514,15 @@ export default defineComponent({
       );
 
       // Event listeners for GridStack interactions
-      console.log(
-        "GridStack layout changed: initialized with options:",
-        gridStackInstance.opts,
-      );
 
       // Handle layout changes (drag/resize) - only update layout data, don't save during operations
       gridStackInstance.on("change", async (event, items) => {
-        console.log("GridStack layout changed: Items changed:", items);
-        // console.log(
-        //   "GridStack layout changed: dashboard Details:",
-        //   JSON.stringify(props.dashboardData, null, 2),
-        // );
-
+    
         if(gridStackUpdateInProgress) {
-          console.log("GridStack layout changed: Update in progress, skipping update");
           return;
         }
 
         if (items && items.length > 0) {
-          console.log("GridStack layout changed:", items);
           updatePanelLayouts(items); // Update panel layout data
           saveDashboardData.execute(); // Save changes to backend
         }
@@ -552,16 +530,11 @@ export default defineComponent({
 
       // Trigger window resize after panel resize to update charts
       gridStackInstance.on("resizestop", (event, element) => {
-        console.log("GridStack resize completed");
         window.dispatchEvent(new Event("resize"));
       });
     }; // Update panel layout data from GridStack items
     const updatePanelLayouts = (items) => {
-      // console.log("Updating panel layouts with items:", JSON.stringify(items, null, 2));
       items.forEach((item) => {
-        console.log(
-          `Panel layout before update: ${item}, ${panels.value.length} panels`,
-        );
         const panelId = item.id;
         const panel = panels.value.find((p) => p.id === panelId);
         if (panel && panel.layout) {
@@ -575,15 +548,11 @@ export default defineComponent({
     }; // Optimized GridStack refresh function
     const refreshGridStack = async () => {
       if (!gridStackInstance || !gridStackContainer.value) {
-        console.log(
-          "Skipping refreshGridStack as GridStack or container is not initialized",
-        );
         return;
       }
 
       gridStackUpdateInProgress = true;
 
-      console.log("refreshGridStack: Starting refresh operation");
       // Wait for Vue to finish DOM updates
       await nextTick();
       await nextTick();
@@ -591,51 +560,24 @@ export default defineComponent({
       const grid = gridStackInstance;
 
       // IMPORTANT: Disable animation and floating during reconstruction for better performance
-      console.log(
-        "refreshGridStack: Disabling animation and floating during reconstruction",
-      );
       grid.float(false);
       grid.setAnimation(false);
 
       // Clear all existing widgets completely to prevent stale references
       const existingElements = grid.getGridItems();
-      console.log(
-        `refreshGridStack: Removing ${existingElements.length} existing widgets`,
-        existingElements,
-      );
-      // existingElements.forEach((element) => {
-      //   console.log(
-      //     `refreshGridStack: Removing widget with gs-id=${element.getAttribute("gs-id")}`,
-      //   );
-      //   grid.removeWidget(element, false);
-      // });
-
-      console.log(
-        "refreshGridStack: All existing widgets removed, proceeding with reconstruction",
-      );
-
+    
       // Force clear any remaining grid state
       grid.removeAll(false);
       // Wait for DOM cleanup to complete
-      console.log("refreshGridStack: Waiting for DOM cleanup to complete");
       await nextTick(); // Ensure DOM is ready
 
       if (panels.value.length === 0) {
-        console.log("refreshGridStack: No panels to render, skipping");
         return;
       }
-
-      // Sort panels by their Y position first, then X position for optimal layout
-      console.log(
-        "refreshGridStack: Sorting panels by Y position and then X position",
-      );
 
       // Add panels in sorted order to maintain proper layout
       for (const panel of panels.value) {
         // Wait for the element to be available in DOM
-        console.log(
-          `refreshGridStack: Waiting for element ${panel.id} to be available in DOM`,
-        );
         await nextTick();
         const element = gridStackContainer.value.querySelector(
           `[gs-id="${panel.id}"]`,
@@ -656,10 +598,6 @@ export default defineComponent({
             };
 
             // Make widget with explicit layout
-            console.log(
-              `refreshGridStack: Adding widget with explicit layout for ${panel.id}`,
-              layoutConfig,
-            );
             grid.makeWidget(element, layoutConfig);
           } catch (error) {
             // Error adding widget, skip this panel
@@ -672,16 +610,10 @@ export default defineComponent({
       }
 
       // Wait for all widgets to be added
-      console.log("refreshGridStack: Waiting for all widgets to be added");
       await nextTick(); // Ensure DOM is updated
 
-      console.log("refreshGridStack: Refresh operation completed");
 
       // Trigger window resize to ensure charts render correctly
-      console.log(
-        "refreshGridStack: Triggering window resize to ensure charts render correctly",
-      );
-
       gridStackUpdateInProgress = false;
       window.dispatchEvent(new Event("resize"));
     };
