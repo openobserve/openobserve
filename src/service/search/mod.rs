@@ -869,7 +869,7 @@ pub async fn search_partition(
     });
 
     #[cfg(feature = "enterprise")]
-    let streaming_aggs = is_streaming_aggregate && req.streaming_output;
+    let streaming_aggs = is_streaming_aggregate && req.streaming_output && streaming_id.is_some();
 
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
