@@ -2313,7 +2313,7 @@ export default defineComponent({
     };
 
     const resetFunctionContent = () => {
-      fnEditorRef.value.setValue("");
+      fnEditorRef?.value?.setValue("");
       store.dispatch("setSavedFunctionDialog", false);
       isSavedFunctionAction.value = "create";
       savedFunctionName.value = "";
