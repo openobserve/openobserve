@@ -1408,7 +1408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
           <!-- new section section  -->
-          <div class=" tw-bg-[#F4F4F5] tw-w-[40%] tw-px-2 tw-py-2 tw-flex tw-flex-col tw-h-[100%] tw-flex-1"
+          <div class=" tw-w-[40%] tw-px-2 tw-py-2 tw-flex tw-flex-col tw-h-[100%] tw-flex-1"
           :class="store.state.theme === 'dark' ? 'tw-bg-[#374151]' : 'tw-bg-[#F4F4F5]'"
           >
             <div class="tw-flex tw-items-center tw-justify-between tw-w-[100%] tw-gap-2">
