@@ -101,7 +101,6 @@ const usePromlqSuggestions = () => {
         const value = hasCurlyBraces[0][cursorIndex - start];
         const nextValue = hasCurlyBraces[0][cursorIndex - start + 1];
 
-        console.log("value", value);
         // Check is value
         if ((value === '"' && nextValue !== "}") || value === "=") {
           labelMeta["focusOn"] = "value";

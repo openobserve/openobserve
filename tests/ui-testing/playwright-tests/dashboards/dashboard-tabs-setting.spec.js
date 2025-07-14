@@ -1,13 +1,13 @@
 import { test, expect } from "../baseFixtures";
-import { login } from "../utils/dashLogin";
-import { ingestion } from "../utils/dashIngestion";
+import { login } from "./utils/dashLogin.js";
+import { ingestion } from "./utils/dashIngestion.js";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
 import DashboardSetting from "../../pages/dashboardPages/dashboard-settings";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
 import {
   waitForDashboardPage,
   deleteDashboard,
-} from "../utils/dashCreation.js";
+} from "./utils/dashCreation.js";
 
 test.describe.configure({ mode: "parallel" });
 

@@ -1,7 +1,7 @@
-import { test, expect } from "../baseFixtures";
+import { test, expect } from "../baseFixtures.js";
 import LogsVisualise from "../../pages/dashboardPages/visualise.js";
-import { login } from "../utils/dashLogin.js";
-import { ingestion } from "../utils/dashIngestion.js";
+import { login } from "./utils/dashLogin.js";
+import { ingestion } from "./utils/dashIngestion.js";
 import logData from "../../cypress/fixtures/log.json";
 
 test.describe.configure({ mode: "parallel" });

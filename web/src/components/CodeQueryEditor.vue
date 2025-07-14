@@ -1185,4 +1185,16 @@ export default defineComponent({
   position: relative;
   top: -1px;
 }
+.body--light .cm-indent-markers {
+  --indent-marker-bg-color: #D0D1D2;
+  &::before {
+    left: -1px !important;
+  }
+}
+.body--dark .cm-indent-markers {
+  --indent-marker-bg-color: #2B3245;
+  &::before {
+    left: -1px !important;
+  }
+}
 </style>
