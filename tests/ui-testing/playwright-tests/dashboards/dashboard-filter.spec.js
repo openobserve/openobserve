@@ -1,14 +1,14 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
-import { login } from "../utils/dashLogin.js";
-import { ingestion } from "../utils/dashIngestion.js";
-import { waitForDateTimeButtonToBeEnabled } from "./dashboard.utils";
+import { login } from "./utils/dashLogin.js";
+import { ingestion } from "./utils/dashIngestion.js";
+import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
 import DashboardTimeRefresh from "../../pages/dashboardPages/dashboard-refresh";
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
-import { waitForDashboardPage } from "../utils/dashCreation.js";
+import { waitForDashboardPage } from "./utils/dashCreation.js";
 import DashboardSetting from "../../pages/dashboardPages/dashboard-settings.js";
 import DashboardVariables from "../../pages/dashboardPages/dashboard-variables.js";
 import Dashboardfilter from "../../pages/dashboardPages/dashboard-filter.js";

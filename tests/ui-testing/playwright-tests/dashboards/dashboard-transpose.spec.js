@@ -3,13 +3,13 @@ import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
 import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
-import { ingestion } from "../utils/dashIngestion";
-import { login } from "../utils/dashLogin";
+import { ingestion } from "./utils/dashIngestion.js";
+import { login } from "./utils/dashLogin.js";
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
 import {
   waitForDashboardPage,
   deleteDashboard,
-} from "../utils/dashCreation.js";
+} from "./utils/dashCreation.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).slice(2, 11);

@@ -19,7 +19,6 @@ use datafusion::{
     common::{Result, internal_err},
     error::DataFusionError,
     execution::FunctionRegistry,
-    logical_expr::ScalarUDF,
     physical_plan::ExecutionPlan,
 };
 use datafusion_proto::{
@@ -33,7 +32,7 @@ use datafusion_proto::{
 use prost::Message;
 use proto::cluster_rpc;
 
-use super::empty_exec::NewEmptyExec;
+use super::super::empty_exec::NewEmptyExec;
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
 #[derive(Debug)]
@@ -108,64 +107,6 @@ impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
     }
 }
 
-/// A PhysicalExtensionCodec that tries one of multiple inner codecs
-/// until one works
-#[derive(Debug)]
-pub struct ComposedPhysicalExtensionCodec {
-    pub codecs: Vec<Arc<dyn PhysicalExtensionCodec>>,
-}
-
-impl PhysicalExtensionCodec for ComposedPhysicalExtensionCodec {
-    fn try_decode(
-        &self,
-        buf: &[u8],
-        inputs: &[Arc<dyn ExecutionPlan>],
-        registry: &dyn FunctionRegistry,
-    ) -> Result<Arc<dyn ExecutionPlan>> {
-        let mut last_err = None;
-        for codec in &self.codecs {
-            match codec.try_decode(buf, inputs, registry) {
-                Ok(plan) => return Ok(plan),
-                Err(e) => last_err = Some(e),
-            }
-        }
-        Err(last_err.unwrap())
-    }
-
-    fn try_encode(&self, node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
-        let mut last_err = None;
-        for codec in &self.codecs {
-            match codec.try_encode(node.clone(), buf) {
-                Ok(_) => return Ok(()),
-                Err(e) => last_err = Some(e),
-            }
-        }
-        Err(last_err.unwrap())
-    }
-
-    fn try_decode_udf(&self, name: &str, _buf: &[u8]) -> Result<Arc<ScalarUDF>> {
-        let mut last_err = None;
-        for codec in &self.codecs {
-            match codec.try_decode_udf(name, _buf) {
-                Ok(plan) => return Ok(plan),
-                Err(e) => last_err = Some(e),
-            }
-        }
-        Err(last_err.unwrap())
-    }
-
-    fn try_encode_udf(&self, _node: &ScalarUDF, _buf: &mut Vec<u8>) -> Result<()> {
-        let mut last_err = None;
-        for codec in &self.codecs {
-            match codec.try_encode_udf(_node, _buf) {
-                Ok(_) => return Ok(()),
-                Err(e) => last_err = Some(e),
-            }
-        }
-        Err(last_err.unwrap())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
@@ -189,7 +130,7 @@ mod tests {
         ));
 
         // encode
-        let proto = ComposedPhysicalExtensionCodec {
+        let proto = super::super::ComposedPhysicalExtensionCodec {
             codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
         };
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();

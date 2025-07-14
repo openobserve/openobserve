@@ -576,6 +576,7 @@ export default defineComponent({
       initialLogsState,
       clearSearchObj,
       setCommunicationMethod,
+      cancelQuery,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -671,7 +672,8 @@ export default defineComponent({
       if (store.state.refreshIntervalID)
         clearInterval(store.state.refreshIntervalID);
 
-      cancelOnGoingSearchQueries();
+      cancelQuery();
+
       removeAiContextHandler();
 
       try {
@@ -710,6 +712,9 @@ export default defineComponent({
           !type
         ) {
           searchObj.meta.pageType = "logs";
+          if(prev === "stream_explorer" && (type == undefined || type !== "stream_explorer")) {
+            searchObj.meta.refreshHistogram = true;
+          }
           loadLogsData();
         }
       },
