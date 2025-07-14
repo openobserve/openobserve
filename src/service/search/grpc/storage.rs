@@ -638,16 +638,9 @@ pub async fn filter_file_list_by_tantivy_index(
         if no_more_files {
             // delete the rest of the files
             for i in 0..group_num {
-                let Some(file) = index_parquet_files.get_mut(i).and_then(|g| {
-                    if g.is_empty() {
-                        None
-                    } else {
-                        Some(g.remove(g.len() - 1))
-                    }
-                }) else {
-                    continue;
-                };
-                file_list_map.remove(&file.key);
+                if let Some(file) = extract_file_from_group(&mut index_parquet_files, i) {
+                    file_list_map.remove(&file.key);
+                }
             }
             continue;
         }
@@ -656,13 +649,7 @@ pub async fn filter_file_list_by_tantivy_index(
         let mut tasks = Vec::new();
         let semaphore = std::sync::Arc::new(Semaphore::new(target_partitions));
         for i in 0..group_num {
-            let Some(file) = index_parquet_files.get_mut(i).and_then(|g| {
-                if g.is_empty() {
-                    None
-                } else {
-                    Some(g.remove(g.len() - 1))
-                }
-            }) else {
+            let Some(file) = extract_file_from_group(&mut index_parquet_files, i) else {
                 continue;
             };
             let trace_id = query.trace_id.to_string();
@@ -1161,6 +1148,20 @@ fn find_max_group_index(groups: &[Vec<FileKey>]) -> usize {
                 max_index
             }
         })
+}
+
+// Helper function to extract a file from a group at the specified index
+fn extract_file_from_group(
+    index_parquet_files: &mut [Vec<FileKey>],
+    group_index: usize,
+) -> Option<FileKey> {
+    index_parquet_files.get_mut(group_index).and_then(|g| {
+        if g.is_empty() {
+            None
+        } else {
+            Some(g.remove(g.len() - 1))
+        }
+    })
 }
 
 #[cfg(test)]
