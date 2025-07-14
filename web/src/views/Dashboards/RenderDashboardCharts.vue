@@ -629,18 +629,9 @@ export default defineComponent({
       console.log(
         "refreshGridStack: Sorting panels by Y position and then X position",
       );
-      const sortedPanels = [...panels.value].sort((a, b) => {
-        const aY = getPanelLayout(a, "y");
-        const bY = getPanelLayout(b, "y");
-        if (aY !== bY) return aY - bY;
-        return getPanelLayout(a, "x") - getPanelLayout(b, "x");
-      });
-      console.log(
-        `refreshGridStack: Sorted panels: ${sortedPanels.map((p) => p.id).join(", ")}`,
-      );
 
       // Add panels in sorted order to maintain proper layout
-      for (const panel of sortedPanels) {
+      for (const panel of panels.value) {
         // Wait for the element to be available in DOM
         console.log(
           `refreshGridStack: Waiting for element ${panel.id} to be available in DOM`,
