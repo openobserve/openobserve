@@ -960,9 +960,11 @@ async fn search_tantivy_index(
         entry.insert(term.clone(), need_position);
     });
 
-    let need_fast_field = idx_optimize_rule
-        .as_ref()
-        .is_some_and(|rule| matches!(rule, InvertedIndexOptimizeMode::SimpleHistogram(..)));
+    let need_fast_field = idx_optimize_rule.as_ref().and_then(|rule| match rule {
+        InvertedIndexOptimizeMode::SimpleHistogram(..) => Some(TIMESTAMP_COL_NAME.to_string()),
+        InvertedIndexOptimizeMode::SimpleTopN(field, ..) => Some(field.to_string()),
+        _ => None,
+    });
     warm_up_terms(
         &searcher,
         &warm_terms,
