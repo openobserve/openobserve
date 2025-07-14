@@ -84,10 +84,10 @@ test.describe("dashboard UI testcases", () => {
   test("should create a dashboard and add the breakdown", async ({ page }) => {
     // Initialize Page Objects
     const pm = new PageManager(page);
-    const dashboardActions = new DashboardactionPage(page);
+  
 
     // Generate a unique panel name
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    const panelName = pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboard list
     await pm.dashboardList.menuItem("dashboards-item");
@@ -116,9 +116,9 @@ test.describe("dashboard UI testcases", () => {
     );
 
     // Apply panel changes
-    await dashboardActions.applyDashboardBtn();
-    await dashboardActions.addPanelName(panelName);
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
 
     // Return to dashboard list
     await pm.dashboardCreate.backToDashboardList();
@@ -132,10 +132,9 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Initialize only the used Page Objects
     const pm = new PageManager(page);
-    const dashboardActions = new DashboardactionPage(page);
 
     // Generate a unique panel name
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    const panelName = pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await pm.dashboardList.menuItem("dashboards-item");
@@ -162,9 +161,9 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardTimeRefresh.setRelative("3", "h");
 
     // Apply and save the panel
-    await dashboardActions.applyDashboardBtn();
-    await dashboardActions.addPanelName(panelName);
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
 
     // Return to dashboard list
     await pm.dashboardCreate.backToDashboardList();
@@ -177,10 +176,9 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
-    const dashboardActions = new DashboardactionPage(page);
 
     // Generate unique panel name
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    const panelName = pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to Dashboards page
     await pm.dashboardList.menuItem("dashboards-item");
@@ -189,7 +187,7 @@ test.describe("dashboard UI testcases", () => {
     // Create a new dashboard and add a panel
     await pm.dashboardCreate.createDashboard(randomDashboardName);
     await pm.dashboardCreate.addPanel();
-    await dashboardActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.addPanelName(panelName);
 
     // Open Custom SQL editor
     await page.locator('[data-test="dashboard-customSql"]').click();
@@ -213,9 +211,9 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.searchAndAddField("breakdown_1", "b");
 
     // Apply and save the panel
-    await dashboardActions.applyDashboardBtn();
-    await dashboardActions.addPanelName(panelName);
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
 
     // Return to dashboard list and clean up
     await pm.dashboardCreate.backToDashboardList();
@@ -227,10 +225,9 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Initialize Page Objects
     const pm = new PageManager(page);
-    const dashboardActions = new DashboardactionPage(page);
 
     // Generate a unique panel name
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    const panelName = pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to the dashboards list
     await pm.dashboardList.menuItem("dashboards-item");
@@ -239,7 +236,7 @@ test.describe("dashboard UI testcases", () => {
     // Create a new dashboard and add a panel
     await pm.dashboardCreate.createDashboard(randomDashboardName);
     await pm.dashboardCreate.addPanel();
-    await dashboardActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.addPanelName(panelName);
 
     // Select stream and add fields to chart
     await pm.chartTypeSelector.selectStream("e2e_automate");
@@ -258,8 +255,8 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectChartType("gauge");
 
     // Apply and save the panel
-    await dashboardActions.applyDashboardBtn();
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.savePanel();
 
     // Return to dashboards list
     await pm.dashboardCreate.backToDashboardList();
@@ -272,8 +269,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
-    const dashboardActions = new DashboardactionPage(page);
-    const panelName = dashboardActions.generateUniquePanelName("panel-test");
+    const panelName = pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await pm.dashboardList.menuItem("dashboards-item");
@@ -298,7 +294,7 @@ test.describe("dashboard UI testcases", () => {
       "y"
     );
 
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Add drilldown to another dashboard
     const drilldownName = pm.dashboardDrilldown.generateUniqueDrilldownName();
@@ -313,11 +309,11 @@ test.describe("dashboard UI testcases", () => {
       tabName
     );
 
-    await dashboardActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Save the panel
-    await dashboardActions.addPanelName(panelName);
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
     await pm.dashboardCreate.backToDashboardList();
 
     //Delete the created dashboard
@@ -377,7 +373,7 @@ test.describe("dashboard UI testcases", () => {
 
     await pm.dashboardPanelActions.savePanel();
 
-    await pm.dashboardeditPanel.editPanel(panelName);
+    await pm.dashboardPanelEdit.editPanel(panelName);
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.savePanel();
     await pm.dashboardPanelActions.deletePanel(panelName);
@@ -738,7 +734,7 @@ test.describe("dashboard UI testcases", () => {
     // Set date-time filter and timezone
     await waitForDateTimeButtonToBeEnabled(page);
     await pm.dashboardTimeRefresh.setRelative("5", "w");
-    // await dashboardActions.applyDashboardBtn();
+    // await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Verify the gauge chart is visible
     await pm.dashboardPanelActions.waitForChartToRender();
