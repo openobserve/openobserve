@@ -35,9 +35,9 @@ use tantivy::{
 pub enum TantivyResult {
     RowIds(HashSet<u32>),
     RowIdsBitVec(usize, BitVec),
-    Count(usize),
-    Histogram(Vec<u64>),
-    TopN(Vec<(String, u64)>),
+    Count(usize),             // simple count optimization
+    Histogram(Vec<u64>),      // simple histogram optimization
+    TopN(Vec<(String, u64)>), // simple top n optimization
 }
 
 impl TantivyResult {

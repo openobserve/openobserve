@@ -757,7 +757,7 @@ pub async fn filter_file_list_by_tantivy_index(
                         }
                         TantivyResult::Count(count) => {
                             total_hits += count;
-                            file_list_map.remove(&file_name);
+                            file_list_map.remove(&file_name); // maybe we do not need to remove it?
                         }
                         TantivyResult::Histogram(histogram) => {
                             let histogram_len = histogram.len();
@@ -777,7 +777,7 @@ pub async fn filter_file_list_by_tantivy_index(
                             file_list_map.remove(&file_name);
                         }
                         TantivyResult::RowIds(_) => {
-                            unreachable!("unsupported tantivy search result");
+                            unreachable!("RowIds should not be returned");
                         }
                     }
                 }
