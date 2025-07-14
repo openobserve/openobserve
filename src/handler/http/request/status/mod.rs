@@ -73,8 +73,7 @@ use crate::{
         },
     },
     service::{
-        db,
-        domain_management,
+        db, domain_management,
         search::datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
         tantivy::puffin_directory::reader_cache,
     },
@@ -567,9 +566,8 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                                 audit_message.response_meta.http_response_code = 403;
                                 audit_message._timestamp = now_micros();
                                 audit(audit_message).await;
-                                return Ok(
-                                    HttpResponse::Forbidden().json("Domain access not allowed".to_string())
-                                );
+                                return Ok(HttpResponse::Forbidden()
+                                    .json("Domain access not allowed".to_string()));
                             }
                         }
                         Err(e) => {

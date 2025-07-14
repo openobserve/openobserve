@@ -20,8 +20,7 @@ use infra::errors::Error;
 
 use crate::{
     common::{
-        infra::config::DOMAIN_MANAGEMENT_CONFIG,
-        meta::domain_management::DomainManagementConfig,
+        infra::config::DOMAIN_MANAGEMENT_CONFIG, meta::domain_management::DomainManagementConfig,
     },
     service::db,
 };
@@ -56,24 +55,31 @@ pub async fn get_domain_management_config() -> Result<DomainManagementConfig, Er
 pub async fn set_domain_management_config(config: &DomainManagementConfig) -> Result<(), Error> {
     let data = json::to_vec(config)?;
     db::put(DOMAIN_MANAGEMENT_KEY, data.into(), db::NEED_WATCH, None).await?;
-    
+
     // Update cache
     DOMAIN_MANAGEMENT_CONFIG.insert(DOMAIN_MANAGEMENT_KEY.to_string(), config.clone());
-    
+
     Ok(())
 }
 
 /// Upsert a domain configuration in the system-wide config
-pub async fn upsert_domain_config(domain: &str, config: &crate::common::meta::domain_management::DomainConfig) -> Result<(), Error> {
+pub async fn upsert_domain_config(
+    domain: &str,
+    config: &crate::common::meta::domain_management::DomainConfig,
+) -> Result<(), Error> {
     let mut domain_mgmt_config = get_domain_management_config().await?;
-    
+
     // Find and update existing domain or add new one
-    if let Some(existing) = domain_mgmt_config.domains.iter_mut().find(|d| d.domain == domain) {
+    if let Some(existing) = domain_mgmt_config
+        .domains
+        .iter_mut()
+        .find(|d| d.domain == domain)
+    {
         *existing = config.clone();
     } else {
         domain_mgmt_config.domains.push(config.clone());
     }
-    
+
     domain_mgmt_config.updated_at = config::utils::time::now_micros();
     set_domain_management_config(&domain_mgmt_config).await
 }
@@ -81,20 +87,20 @@ pub async fn upsert_domain_config(domain: &str, config: &crate::common::meta::do
 /// Remove a domain configuration from the system-wide config
 pub async fn remove_domain_config(domain: &str) -> Result<(), Error> {
     let mut domain_mgmt_config = get_domain_management_config().await?;
-    
+
     domain_mgmt_config.domains.retain(|d| d.domain != domain);
     domain_mgmt_config.updated_at = config::utils::time::now_micros();
-    
+
     set_domain_management_config(&domain_mgmt_config).await
 }
 
 /// Delete the entire system-wide domain management configuration
 pub async fn delete_domain_management_config() -> Result<(), Error> {
     db::delete(DOMAIN_MANAGEMENT_KEY, false, db::NEED_WATCH, None).await?;
-    
+
     // Remove from cache
     DOMAIN_MANAGEMENT_CONFIG.remove(DOMAIN_MANAGEMENT_KEY);
-    
+
     Ok(())
 }
 
@@ -104,9 +110,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
-    
+
     log::info!("Start watching domain management configuration");
-    
+
     loop {
         let ev = match events.recv().await {
             Some(ev) => ev,
@@ -172,9 +178,9 @@ mod tests {
         // For now, just test serialization/deserialization
         let serialized = json::to_vec(&config).unwrap();
         let deserialized: DomainManagementConfig = json::from_slice(&serialized).unwrap();
-        
+
         assert_eq!(config.enabled, deserialized.enabled);
         assert_eq!(config.domains.len(), deserialized.domains.len());
         assert_eq!(config.domains[0].domain, deserialized.domains[0].domain);
     }
-} 
+}

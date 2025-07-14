@@ -18,8 +18,8 @@ use regex::Regex;
 
 use crate::{
     common::meta::domain_management::{
-        DomainManagementConfig, DomainManagementRequest,
-        DomainManagementResponse, DomainOperationResponse,
+        DomainManagementConfig, DomainManagementRequest, DomainManagementResponse,
+        DomainOperationResponse,
     },
     service::db::domain_management as db_domain_management,
 };
@@ -36,11 +36,11 @@ pub async fn set_domain_management_config(
 ) -> Result<DomainOperationResponse, Error> {
     // Validate the request
     validate_domain_management_request(&request)?;
-    
+
     let config = DomainManagementConfig::from(request);
-    
+
     db_domain_management::set_domain_management_config(&config).await?;
-    
+
     Ok(DomainOperationResponse {
         message: "Domain management configuration updated successfully".to_string(),
         domain: None,
@@ -61,26 +61,29 @@ fn validate_domain_format(domain: &str) -> Result<(), Error> {
 
     // Basic domain validation regex
     let domain_regex = Regex::new(r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$")
-        .map_err(|e| Error::Message(format!("Invalid regex: {}", e)))?;
+        .map_err(|e| Error::Message(format!("Invalid regex: {e}")))?;
 
     if !domain_regex.is_match(domain) {
-        return Err(Error::Message(format!(
-            "Invalid domain format: '{}'",
-            domain
-        )));
+        return Err(Error::Message(format!("Invalid domain format: '{domain}'")));
     }
 
     // Additional checks
     if domain.len() > 253 {
-        return Err(Error::Message("Domain too long (max 253 characters)".to_string()));
+        return Err(Error::Message(
+            "Domain too long (max 253 characters)".to_string(),
+        ));
     }
 
     if domain.starts_with('.') || domain.ends_with('.') {
-        return Err(Error::Message("Domain cannot start or end with a dot".to_string()));
+        return Err(Error::Message(
+            "Domain cannot start or end with a dot".to_string(),
+        ));
     }
 
     if domain.contains("..") {
-        return Err(Error::Message("Domain cannot contain consecutive dots".to_string()));
+        return Err(Error::Message(
+            "Domain cannot contain consecutive dots".to_string(),
+        ));
     }
 
     Ok(())
@@ -88,25 +91,24 @@ fn validate_domain_format(domain: &str) -> Result<(), Error> {
 
 /// Validate allowed emails for a domain
 fn validate_emails(emails: &[String], domain: &str) -> Result<(), Error> {
+    // Basic email validation
+    let email_regex = Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+        .map_err(|e| Error::Message(format!("Invalid email regex: {e}")))?;
+
     for email in emails {
         if email.is_empty() {
             return Err(Error::Message("Email cannot be empty".to_string()));
         }
 
-        // Basic email validation
-        let email_regex = Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
-            .map_err(|e| Error::Message(format!("Invalid email regex: {}", e)))?;
-
         if !email_regex.is_match(email) {
-            return Err(Error::Message(format!("Invalid email format: '{}'", email)));
+            return Err(Error::Message(format!("Invalid email format: '{email}'")));
         }
 
         // Check if email domain matches the domain config
         let email_domain = email.split('@').nth(1).unwrap_or("");
         if !email_domain.eq_ignore_ascii_case(domain) {
             return Err(Error::Message(format!(
-                "Email '{}' does not belong to domain '{}'",
-                email, domain
+                "Email '{email}' does not belong to domain '{domain}'"
             )));
         }
     }
@@ -126,7 +128,9 @@ fn validate_domain_management_request(request: &DomainManagementRequest) -> Resu
 }
 
 /// Validate that allow_all_users and allowed_emails are mutually exclusive
-fn validate_domain_config_exclusivity(domain_request: &crate::common::meta::domain_management::DomainConfigRequest) -> Result<(), Error> {
+fn validate_domain_config_exclusivity(
+    domain_request: &crate::common::meta::domain_management::DomainConfigRequest,
+) -> Result<(), Error> {
     if domain_request.allow_all_users && !domain_request.allowed_emails.is_empty() {
         return Err(Error::Message(format!(
             "Domain '{}': allow_all_users and allowed_emails are mutually exclusive. Use either allow_all_users=true OR provide specific emails in allowed_emails, not both.",
@@ -166,7 +170,16 @@ mod tests {
     #[test]
     fn test_validate_emails() {
         assert!(validate_emails(&["test@example.com".to_string()], "example.com").is_ok());
-        assert!(validate_emails(&["user1@example.com".to_string(), "user2@example.com".to_string()], "example.com").is_ok());
+        assert!(
+            validate_emails(
+                &[
+                    "user1@example.com".to_string(),
+                    "user2@example.com".to_string()
+                ],
+                "example.com"
+            )
+            .is_ok()
+        );
         assert!(validate_emails(&[], "example.com").is_ok());
 
         assert!(validate_emails(&["".to_string()], "example.com").is_err());
@@ -191,7 +204,10 @@ mod tests {
         let valid_specific_emails = DomainConfigRequest {
             domain: "example.com".to_string(),
             allow_all_users: false,
-            allowed_emails: vec!["user1@example.com".to_string(), "user2@example.com".to_string()],
+            allowed_emails: vec![
+                "user1@example.com".to_string(),
+                "user2@example.com".to_string(),
+            ],
             enabled: true,
         };
         assert!(validate_domain_config_exclusivity(&valid_specific_emails).is_ok());
@@ -205,7 +221,12 @@ mod tests {
         };
         let result = validate_domain_config_exclusivity(&invalid_both);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("mutually exclusive"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("mutually exclusive")
+        );
 
         // Invalid case: allow_all_users=false with empty allowed_emails
         let invalid_neither = DomainConfigRequest {
@@ -216,12 +237,19 @@ mod tests {
         };
         let result = validate_domain_config_exclusivity(&invalid_neither);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("must provide at least one email"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("must provide at least one email")
+        );
     }
 
     #[test]
     fn test_validate_domain_management_request() {
-        use crate::common::meta::domain_management::{DomainConfigRequest, DomainManagementRequest};
+        use crate::common::meta::domain_management::{
+            DomainConfigRequest, DomainManagementRequest,
+        };
 
         // Valid request
         let valid_request = DomainManagementRequest {
@@ -245,16 +273,15 @@ mod tests {
 
         // Invalid request with mutual exclusivity violation
         let invalid_request = DomainManagementRequest {
-            domains: vec![
-                DomainConfigRequest {
-                    domain: "example.com".to_string(),
-                    allow_all_users: true,
-                    allowed_emails: vec!["user@example.com".to_string()], // This violates mutual exclusivity
-                    enabled: true,
-                },
-            ],
+            domains: vec![DomainConfigRequest {
+                domain: "example.com".to_string(),
+                allow_all_users: true,
+                allowed_emails: vec!["user@example.com".to_string()], /* This violates mutual
+                                                                       * exclusivity */
+                enabled: true,
+            }],
             enabled: true,
         };
         assert!(validate_domain_management_request(&invalid_request).is_err());
     }
-} 
+}

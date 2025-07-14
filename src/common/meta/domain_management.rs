@@ -17,15 +17,13 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 /// Domain management configuration for SSO login restrictions
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct DomainManagementConfig {
     /// List of allowed domains with their specific configurations
     pub domains: Vec<DomainConfig>,
     /// Whether domain restrictions are enabled
-    #[serde(default = "default_disabled")]
     pub enabled: bool,
     /// Timestamp when this configuration was last updated
-    #[serde(default)]
     pub updated_at: i64,
 }
 
@@ -101,16 +99,6 @@ pub struct DomainOperationResponse {
     pub domain: Option<String>,
 }
 
-impl Default for DomainManagementConfig {
-    fn default() -> Self {
-        Self {
-            domains: Vec::new(),
-            enabled: false,
-            updated_at: 0,
-        }
-    }
-}
-
 impl Default for DomainConfig {
     fn default() -> Self {
         Self {
@@ -153,9 +141,10 @@ impl DomainManagementConfig {
                 if domain_config.allow_all_users {
                     return true;
                 }
-                
+
                 // Check if specific email is allowed
-                return domain_config.allowed_emails
+                return domain_config
+                    .allowed_emails
                     .iter()
                     .any(|allowed_email| allowed_email.to_lowercase() == email.to_lowercase());
             }
@@ -180,8 +169,12 @@ impl DomainManagementConfig {
     /// Add or update a domain configuration
     pub fn upsert_domain(&mut self, domain_config: DomainConfig) {
         let now = config::utils::time::now_micros();
-        
-        if let Some(existing) = self.domains.iter_mut().find(|d| d.domain == domain_config.domain) {
+
+        if let Some(existing) = self
+            .domains
+            .iter_mut()
+            .find(|d| d.domain == domain_config.domain)
+        {
             existing.allow_all_users = domain_config.allow_all_users;
             existing.allowed_emails = domain_config.allowed_emails;
             existing.enabled = domain_config.enabled;
@@ -192,7 +185,7 @@ impl DomainManagementConfig {
             new_domain.updated_at = now;
             self.domains.push(new_domain);
         }
-        
+
         self.updated_at = now;
     }
 
@@ -201,11 +194,11 @@ impl DomainManagementConfig {
         let initial_len = self.domains.len();
         self.domains.retain(|d| d.domain != domain);
         let removed = self.domains.len() != initial_len;
-        
+
         if removed {
             self.updated_at = config::utils::time::now_micros();
         }
-        
+
         removed
     }
 }
@@ -213,8 +206,9 @@ impl DomainManagementConfig {
 impl From<DomainManagementRequest> for DomainManagementConfig {
     fn from(request: DomainManagementRequest) -> Self {
         let now = config::utils::time::now_micros();
-        
-        let domains = request.domains
+
+        let domains = request
+            .domains
             .into_iter()
             .map(|req| DomainConfig {
                 domain: req.domain,
@@ -248,10 +242,6 @@ fn default_enabled() -> bool {
     true
 }
 
-fn default_disabled() -> bool {
-    false
-}
-
 fn default_allow_all() -> bool {
     true
 }
@@ -267,7 +257,7 @@ mod tests {
             domains: vec![],
             updated_at: 0,
         };
-        
+
         assert!(config.is_email_allowed("user@example.com"));
         assert!(config.is_email_allowed("user@anydomain.com"));
     }
@@ -279,7 +269,7 @@ mod tests {
             domains: vec![],
             updated_at: 0,
         };
-        
+
         assert!(config.is_email_allowed("user@example.com"));
     }
 
@@ -297,7 +287,7 @@ mod tests {
             }],
             updated_at: 0,
         };
-        
+
         assert!(config.is_email_allowed("user@example.com"));
         assert!(config.is_email_allowed("another@example.com"));
         assert!(!config.is_email_allowed("user@other.com"));
@@ -320,7 +310,7 @@ mod tests {
             }],
             updated_at: 0,
         };
-        
+
         assert!(config.is_email_allowed("user1@example.com"));
         assert!(config.is_email_allowed("user2@example.com"));
         assert!(!config.is_email_allowed("user3@example.com"));
@@ -341,7 +331,7 @@ mod tests {
             }],
             updated_at: 0,
         };
-        
+
         assert!(config.is_email_allowed("user1@example.com"));
         assert!(config.is_email_allowed("USER1@EXAMPLE.COM"));
     }
@@ -349,7 +339,7 @@ mod tests {
     #[test]
     fn test_upsert_domain() {
         let mut config = DomainManagementConfig::default();
-        
+
         let domain_config = DomainConfig {
             domain: "example.com".to_string(),
             allow_all_users: true,
@@ -358,11 +348,11 @@ mod tests {
             created_at: 0,
             updated_at: 0,
         };
-        
+
         config.upsert_domain(domain_config);
         assert_eq!(config.domains.len(), 1);
         assert_eq!(config.domains[0].domain, "example.com");
-        
+
         // Update existing domain
         let updated_domain = DomainConfig {
             domain: "example.com".to_string(),
@@ -372,7 +362,7 @@ mod tests {
             created_at: 0,
             updated_at: 0,
         };
-        
+
         config.upsert_domain(updated_domain);
         assert_eq!(config.domains.len(), 1);
         assert!(!config.domains[0].allow_all_users);
@@ -403,11 +393,11 @@ mod tests {
             ],
             updated_at: 0,
         };
-        
+
         assert!(config.remove_domain("example.com"));
         assert_eq!(config.domains.len(), 1);
         assert_eq!(config.domains[0].domain, "test.com");
-        
+
         assert!(!config.remove_domain("nonexistent.com"));
         assert_eq!(config.domains.len(), 1);
     }
@@ -416,7 +406,7 @@ mod tests {
     fn test_mutual_exclusivity_behavior() {
         let mut config = DomainManagementConfig::default();
         config.enabled = true;
-        
+
         // Test allow_all_users=true with empty allowed_emails
         let domain_config_allow_all = DomainConfig {
             domain: "example.com".to_string(),
@@ -427,12 +417,12 @@ mod tests {
             updated_at: 123456789,
         };
         config.upsert_domain(domain_config_allow_all);
-        
+
         // Should allow any email from the domain
         assert!(config.is_email_allowed("anyone@example.com"));
         assert!(config.is_email_allowed("user1@example.com"));
         assert!(config.is_email_allowed("user2@example.com"));
-        
+
         // Test allow_all_users=false with specific emails
         let domain_config_specific = DomainConfig {
             domain: "other.com".to_string(),
@@ -443,14 +433,14 @@ mod tests {
             updated_at: 123456789,
         };
         config.upsert_domain(domain_config_specific);
-        
+
         // Should allow only specific emails
         assert!(config.is_email_allowed("user1@other.com"));
         assert!(config.is_email_allowed("user2@other.com"));
         assert!(!config.is_email_allowed("user3@other.com"));
         assert!(!config.is_email_allowed("anyone@other.com"));
-        
+
         // Emails from other domains should not be allowed
         assert!(!config.is_email_allowed("user@different.com"));
     }
-} 
+}

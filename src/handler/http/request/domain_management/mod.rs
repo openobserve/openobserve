@@ -16,15 +16,13 @@
 use std::io::Error;
 
 use actix_web::{HttpResponse, get, put, web};
-use utoipa::OpenApi;
 use config::META_ORG_ID;
+use utoipa::OpenApi;
 
 use crate::{
     common::meta::{
         domain_management::{
-            DomainManagementRequest,
-            DomainManagementResponse,
-            DomainOperationResponse,
+            DomainManagementRequest, DomainManagementResponse, DomainOperationResponse,
         },
         http::HttpResponse as MetaHttpResponse,
     },
@@ -35,8 +33,7 @@ use crate::{
 fn validate_meta_org_access(org_id: &str) -> Result<(), infra::errors::Error> {
     if org_id != META_ORG_ID {
         return Err(infra::errors::Error::Message(format!(
-            "Domain management APIs are only available for meta organization. Provided org_id: {}, expected: {}",
-            org_id, META_ORG_ID
+            "Domain management APIs are only available for meta organization. Provided org_id: {org_id}, expected: {META_ORG_ID}"
         )));
     }
     Ok(())
@@ -76,16 +73,14 @@ pub struct ApiDoc;
     )
 )]
 #[get("/{org_id}/domain_management")]
-pub async fn get_domain_management_config(
-    path: web::Path<String>,
-) -> Result<HttpResponse, Error> {
+pub async fn get_domain_management_config(path: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    
+
     // Validate that only meta org can access domain management APIs
     if let Err(e) = validate_meta_org_access(&org_id) {
         return Ok(MetaHttpResponse::forbidden(e));
     }
-    
+
     match domain_management::get_domain_management_config().await {
         Ok(response) => Ok(MetaHttpResponse::json(response)),
         Err(e) => {
@@ -124,12 +119,12 @@ pub async fn set_domain_management_config(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let request = body.into_inner();
-    
+
     // Validate that only meta org can access domain management APIs
     if let Err(e) = validate_meta_org_access(&org_id) {
         return Ok(MetaHttpResponse::forbidden(e));
     }
-    
+
     match domain_management::set_domain_management_config(request).await {
         Ok(response) => Ok(MetaHttpResponse::json(response)),
         Err(e) => {
@@ -140,4 +135,4 @@ pub async fn set_domain_management_config(
             }
         }
     }
-} 
+}
