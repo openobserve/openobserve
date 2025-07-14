@@ -1579,6 +1579,8 @@ import O2AIChat from "../O2AIChat.vue";
 
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 
+import useParser from "@/composables/useParser";
+
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
@@ -1660,6 +1662,8 @@ const functionEditorPlaceholderFlag = ref(true);
 const queryEditorPlaceholderFlag = ref(true);
 
 const isFunctionErrorExpanded = ref(false);
+
+const { sqlParser } = useParser();
 
 const tempTestFunction = ref(false);
 const metricFunctions = ["p50", "p75", "p90", "p95", "p99"];
@@ -2285,6 +2289,10 @@ const routeToCreateDestination = () => {
   };
 
   const triggerQuery = async (fn: boolean = false) => {
+    const isAllColumnsSelected = await checkIfAllColumnsAreSelected(query.value);
+    if(!isAllColumnsSelected){
+      return;
+    }
     const queryReq = buildQueryPayload({
         sqlMode: true,
         streamName: selectedStream.value,
@@ -2374,6 +2382,7 @@ const routeToCreateDestination = () => {
     expandCombinedOutput.value = true;
     await triggerQuery(true);
   }
+
 
 
 // Method to handle the emitted changes and update the structure
@@ -2552,6 +2561,20 @@ const routeToCreateDestination = () => {
         );
       });
     };
+
+    const checkIfAllColumnsAreSelected = async (query: string) => {
+      const parser = await sqlParser();
+      const regex = /\bdefault\b/g;
+      const columns = parser.astify(
+        query.replace(regex, "default1"),
+      ).columns;
+      for (const column of columns) {
+        if (column.expr.column === "*") {
+          return false;
+        }
+      }
+      return true;
+    }
 
 
 defineExpose({
