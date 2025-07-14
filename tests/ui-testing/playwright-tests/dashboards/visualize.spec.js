@@ -18,6 +18,23 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page.locator("div.q-item").getByText(`${stream}`).first().click();
 };
 
+const initialQuery = `SELECT
+kubernetes_namespace_name,
+kubernetes_pod_name,
+kubernetes_container_name,
+COUNT(*) AS log_count
+FROM
+e2e_automate
+WHERE
+kubernetes_container_name = 'ziox'
+GROUP BY
+kubernetes_namespace_name,
+kubernetes_pod_name,
+kubernetes_container_name
+ORDER BY
+log_count DESC
+LIMIT 100
+`;
 test.describe("logs testcases", () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
@@ -659,9 +676,7 @@ test.describe("logs testcases", () => {
     await expect(queryEditor).toBeVisible();
 
     // Fill query in the query editor
-    await queryEditor.fill(
-      "SELECT k8s_object_name, COUNT(k8s_event_uid) AS event_count, AVG(k8s_event_count) AS avg_events_per_job, MAX(k8s_event_start_time) AS last_event_time FROM e2e_automate WHERE k8s_object_kind = 'Job' GROUP BY k8s_object_name ORDER BY event_count DESC LIMIT 20"
-    );
+    await queryEditor.fill(initialQuery);
 
     await logsVisualise.setRelative("1", "m");
 
@@ -693,27 +708,22 @@ test.describe("logs testcases", () => {
   }) => {
     const logsVisualise = new LogsVisualise(page);
 
-    const initialQuery = `
-      SELECT k8s_object_name, COUNT(k8s_event_uid) AS event_count, 
-             AVG(k8s_event_count) AS avg_events_per_job, 
-             MAX(k8s_event_start_time) AS last_event_time 
-      FROM e2e_automate 
-      WHERE k8s_object_kind = 'Job' 
-      GROUP BY k8s_object_name 
-      ORDER BY event_count DESC 
-      LIMIT 20
-    `;
-
-    const updatedQuery = `
-      SELECT k8s_object_testname, COUNT(k8s_event_uid) AS event_count, 
-             AVG(k8s_event_count) AS avg_events_per_job, 
-             MAX(k8s_event_start_time) AS last_event_time 
-      FROM e2e_automate 
-      WHERE k8s_object_kind = 'Job' 
-      GROUP BY k8s_object_testname 
-      ORDER BY event_count DESC 
-      LIMIT 20
-    `;
+    const updatedQuery = `SELECT
+    kubernetes_namespace_testname,
+    kubernetes_pod_name,
+    kubernetes_container_name,
+    COUNT(*) AS log_count
+FROM
+    e2e_automate
+WHERE
+    kubernetes_container_name = 'ziox'
+GROUP BY
+    kubernetes_namespace_testname,
+    kubernetes_pod_name,
+    kubernetes_container_name
+ORDER BY
+    log_count DESC
+LIMIT 100`;
 
     // Step 1: Open Logs page and query editor
     await logsVisualise.openLogs();
@@ -734,20 +744,52 @@ test.describe("logs testcases", () => {
     await logsVisualise.openVisualiseTab();
 
     await expect(
-      page.locator('[data-test="dashboard-x-item-k8s_object_name"]')
+      page.locator('[data-test="dashboard-x-item-kubernetes_namespace_name"]')
     ).toBeVisible();
 
     // Step 4: Update the query
     await queryEditor.click();
-    await queryEditor.press("Control+a");
+    await queryEditor.press(
+      process.platform === "darwin" ? "Meta+A" : "Control+A"
+    );
     await queryEditor.fill(updatedQuery.trim());
 
     // Activate the function editor to trigger reprocessing
-    await page.locator("#fnEditor").getByRole("textbox").click();
+    await page.locator("#fnEditor").getByRole("textbox").locator("div").click();
 
+    await page.waitForTimeout(2000);
     // Step 5: Assert updated field is visible
     await expect(
-      page.locator('[data-test="dashboard-x-item-k8s_object_testname"]')
+      page.locator(
+        '[data-test="dashboard-x-item-kubernetes_namespace_testname"]'
+      )
     ).toBeVisible();
+  });
+
+  test("Should redirect to the table chart in visualization when the query includes more than two fields on the X-axis.", async ({
+    page,
+  }) => {
+    const logsVisualise = new LogsVisualise(page);
+
+    // Step 1: Open Logs page and query editor
+    await logsVisualise.openLogs();
+    await logsVisualise.openQueryEditor();
+
+    const queryEditor = page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox");
+    await expect(queryEditor).toBeVisible();
+
+    // Step 2: Fill and apply the initial query
+    await queryEditor.fill(initialQuery.trim());
+    await logsVisualise.setRelative("1", "m");
+    await logsVisualise.logsApplyQueryButton();
+    await page.waitForTimeout(3000); // Optional: Replace with proper wait if possible
+
+    // Step 3: Open the Visualization tab
+    await logsVisualise.openVisualiseTab();
+    await expect(
+      page.locator('[data-test="selected-chart-table-item"]').locator("..")
+    ).toHaveClass(/bg-grey-3|5/); // matches light (3) or dark (5) theme
   });
 });
