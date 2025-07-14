@@ -74,6 +74,7 @@ use crate::{
     },
     service::{
         db,
+        domain_management,
         search::datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
         tantivy::puffin_directory::reader_cache,
     },
@@ -559,17 +560,23 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                             .json("Service accounts are not allowed to login".to_string()));
                     }
 
-                    // get domain from email
-                    let domain = res.0.user_email.split('@').nth(1).unwrap_or_default();
-                    if !get_dex_config().allowed_domains.is_empty()
-                        && !get_dex_config().allowed_domains.contains(domain)
-                    {
-                        audit_message.response_meta.http_response_code = 400;
-                        audit_message._timestamp = now_micros();
-                        audit(audit_message).await;
-                        return Ok(
-                            HttpResponse::Unauthorized().json("Unauthorized access".to_string())
-                        );
+                    // Check if email is allowed by domain management system
+                    match domain_management::is_email_allowed(&res.0.user_email).await {
+                        Ok(allowed) => {
+                            if !allowed {
+                                audit_message.response_meta.http_response_code = 403;
+                                audit_message._timestamp = now_micros();
+                                audit(audit_message).await;
+                                return Ok(
+                                    HttpResponse::Forbidden().json("Domain access not allowed".to_string())
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Failed to check domain management: {}", e);
+                            // Fail open - allow access if domain management check fails
+                            // This prevents system lockouts due to configuration errors
+                        }
                     }
 
                     audit_message.user_email = res.0.user_email.clone();

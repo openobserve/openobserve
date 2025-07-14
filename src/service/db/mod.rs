@@ -25,6 +25,7 @@ pub mod alerts;
 pub mod compact;
 pub mod dashboards;
 pub mod distinct_values;
+pub mod domain_management;
 pub mod enrichment_table;
 pub mod file_list;
 pub mod functions;
