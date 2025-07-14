@@ -575,7 +575,7 @@ test.describe("logs testcases", () => {
     // Open the visualization tab and add fields
     await pm.logsVisualise.openVisualiseTab();
 
-    chartTypeSelector.searchAndAddField(
+    await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubernetes_io_psp",
       "b"
     );
@@ -618,7 +618,7 @@ test.describe("logs testcases", () => {
 
     //redirecting to the dashboard and edit panel and save it
 
-    awaitpm.dashboardPanelEdit.editPanel(panelName);
+    await pm.dashboardPanelEdit.editPanel(panelName);
     await page
       .locator('[data-test="dashboard-panel-name"]')
       .waitFor({ state: "visible" });
@@ -634,11 +634,11 @@ test.describe("logs testcases", () => {
         .first()
     ).toBeVisible();
     await page.locator('[data-test="query-inspector-close-btn"]').click();
-    await dashboardActions.applyDashboardBtn();
-    await dashboardActions.savePanel();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.savePanel();
 
     // Return to dashboards list and delete the dashboard
-    awaitpm.dashboardCreate.backToDashboardList();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 });
