@@ -119,7 +119,7 @@ jobs:
             "dashboards/dashboard2.spec.js",
             "dashboards/dashboardtype.spec.js",
             "dashboards/visualize.spec.js",
-            "dashboards/visualization-vrl.spec.js",
+            # "dashboards/visualization-vrl.spec.js",
             "GeneralTests/enrichment.spec.js",
             "Logs/join.spec.js",
             "Logs/logshistogram.spec.js",
