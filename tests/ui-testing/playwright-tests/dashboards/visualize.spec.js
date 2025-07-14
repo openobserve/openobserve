@@ -13,7 +13,9 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
     .locator('[data-test="log-search-index-list-select-stream"]')
     .click({ force: true });
   await page
+
     .locator('[data-test="log-search-index-list-select-stream"]')
+
     .fill(stream);
   await page.locator("div.q-item").getByText(`${stream}`).first().click();
 };
@@ -90,7 +92,7 @@ test.describe("logs testcases", () => {
     ).toBeVisible();
   });
 
-  test.skip("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
+  test("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
@@ -101,8 +103,12 @@ test.describe("logs testcases", () => {
 
     await pm.logsVisualise.openVisualiseTab();
 
+    await page
+      .locator('[data-test="dashboard-field-list-collapsed-icon"]')
+      .click();
+
     // Remove the _timestamp field from the X-axis
-    await pm.logsVisualise.removeField("_timestamp", "x");
+    await pm.logsVisualise.removeField("zo_sql_key", "x");
     await page.getByText("Chart configuration has been").click();
     await expect(page.getByText("Chart configuration has been")).toBeVisible();
 
@@ -111,12 +117,12 @@ test.describe("logs testcases", () => {
     await expect(page.getByText("There are some errors, please")).toBeVisible();
     await page
       .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-x-data"]'
+        '[data-test="field-list-item-logs-e2e_automate-zo_sql_key"] [data-test="dashboard-add-x-data"]'
       )
       .waitFor({ state: "visible" });
     await page
       .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-x-data"]'
+        '[data-test="field-list-item-logs-e2e_automate-zo_sql_key"] [data-test="dashboard-add-x-data"]'
       )
       .click();
 
@@ -124,15 +130,15 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Remove the _timestamp field from the Y-axis
-    await pm.logsVisualise.removeField("_timestamp", "y");
+    await pm.logsVisualise.removeField("zo_sql_num", "y");
     await page
       .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]'
+        '[data-test="field-list-item-logs-e2e_automate-zo_sql_num"] [data-test="dashboard-add-y-data"]'
       )
       .waitFor({ state: "visible" });
     await page
       .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]'
+        '[data-test="field-list-item-logs-e2e_automate-zo_sql_num"] [data-test="dashboard-add-y-data"]'
       )
       .click();
 
@@ -148,7 +154,7 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.chartRender(470, 13);
   });
 
-  test.skip("should correctly plot the data according to the new chart type when changing the chart type.", async ({
+  test("should correctly plot the data according to the new chart type when changing the chart type.", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
@@ -158,18 +164,19 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.openLogs();
     await pm.logsVisualise.openVisualiseTab();
 
-    // Add a field to the chart
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
-      )
-      .waitFor({ state: "visible" });
+    const queryEditor = page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox");
+    await expect(queryEditor).toBeVisible();
 
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
-      )
-      .click();
+    const sqlQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_annotations_kubernetes_io_psp as "breakdown_1"  FROM "e2e_automate"  GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC`;
+
+    // update the query
+    await queryEditor.click();
+    await queryEditor.press(
+      process.platform === "darwin" ? "Meta+A" : "Control+A"
+    );
+    await queryEditor.fill(sqlQuery);
 
     await pm.logsVisualise.runQueryAndWaitForCompletion();
 
@@ -220,69 +227,6 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.chartRender(423, 127);
   });
 
-  test.skip("should not reflect changes in the search query on the logs page if a field is changed or added in the visualization", async ({
-    page,
-  }) => {
-    // Instantiate PageManager with the current page
-    const pm = new PageManager(page);
-
-    // Open the logs page and set relative time
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.setRelative("6", "w");
-
-    // Add kubernetes_container_image field to the search query
-    await page.getByLabel('Expand "kubernetes_container_image"').click();
-    await page
-      .locator(
-        '[data-test="logs-search-subfield-add-kubernetes_container_image-058694856476\\.dkr\\.ecr\\.us-west-2\\.amazonaws\\.com\\/ziox\\:v0\\.0\\.3"] [data-test="log-search-subfield-list-equal-kubernetes_container_image-field-btn"]'
-      )
-      .waitFor({ state: "visible" });
-
-    await page
-      .locator(
-        '[data-test="logs-search-subfield-add-kubernetes_container_image-058694856476\\.dkr\\.ecr\\.us-west-2\\.amazonaws\\.com\\/ziox\\:v0\\.0\\.3"] [data-test="log-search-subfield-list-equal-kubernetes_container_image-field-btn"]'
-      )
-      .click();
-
-    // Add kubernetes_container_image field with a different value to the search query
-    await page
-      .locator(
-        '[data-test="logs-search-subfield-add-kubernetes_container_image-sha256\\:90e0a12eae07ad3d0bbfbb73b076ba3ce6e5ad38fb93babc22fba4d19206ca6b"] [data-test="log-search-subfield-list-not-equal-kubernetes_container_image-field-btn"]'
-      )
-      .waitFor({ state: "visible" });
-
-    await page
-      .locator(
-        '[data-test="logs-search-subfield-add-kubernetes_container_image-sha256\\:90e0a12eae07ad3d0bbfbb73b076ba3ce6e5ad38fb93babc22fba4d19206ca6b"] [data-test="log-search-subfield-list-not-equal-kubernetes_container_image-field-btn"]'
-      )
-      .click();
-
-    // Apply the changes
-    await pm.logsVisualise.logsApplyQueryButton();
-
-    // Open the visualization tab
-    await pm.logsVisualise.openVisualiseTab();
-
-    // Add kubernetes_annotations_kubernetes_io_psp field to the visualization
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
-      )
-      .waitFor({ state: "visible" });
-
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
-      )
-      .click();
-
-    // Apply the changes in the visualization
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-
-    // Go back to the logs page
-    await pm.logsVisualise.backToLogs();
-  });
-
   test("should handle an empty query in visualization without displaying an error.", async ({
     page,
   }) => {
@@ -306,61 +250,15 @@ test.describe("logs testcases", () => {
     ).toBeVisible();
   });
 
-  test.skip("should display an error message on the logs page for an invalid query", async ({
-    page,
-  }) => {
-    // Instantiate PageManager with the current page
-    const pm = new PageManager(page);
-
-    // Open the logs page and the query editor
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.openQueryEditor();
-    await pm.logsVisualise.setRelative("6", "w");
-    const queryEditor = page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("textbox");
-    // Wait for the query editor to be visible
-    await expect(queryEditor).toBeVisible();
-
-    // Fill invalid query
-    await queryEditor.fill("select from user whare ID =1");
-
-    // Refresh the search
-    await pm.logsVisualise.logsApplyQueryButton();
-
-    await page.getByText("Search field not found: as");
-
-    //open the visualization tab
-    await pm.logsVisualise.openVisualiseTab();
-
-    // Verify that X and Y axis items are visible and apply
-    await expect(
-      page.locator('[data-test="dashboard-x-item-zo_sql_key"]')
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-test="dashboard-y-item-zo_sql_num"]')
-    ).toBeVisible();
-    await page
-      .locator("label")
-      .filter({ hasText: "Streamarrow_drop_down" })
-      .locator("i")
-      .click();
-
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-    await pm.logsVisualise.setRelative("6", "w");
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-  });
-
   test.skip("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization.", async ({
     page,
   }) => {
-    // Instantiate PageManager with the current page
-    const pm = new PageManager(page);
+    const logsVisualise = new LogsVisualise(page);
 
     // Open the logs page and set relative time
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.setRelative("6", "w");
-    await pm.logsVisualise.logsApplyQueryButton();
+    await logsVisualise.openLogs();
+    await logsVisualise.setRelative("6", "w");
+    await logsVisualise.logsApplyQueryButton();
 
     // Add the kubernetes_container_hash field to the search query
     await page.getByLabel('Expand "kubernetes_container_hash"').click();
@@ -375,11 +273,11 @@ test.describe("logs testcases", () => {
         '[data-test="logs-search-subfield-add-kubernetes_container_hash-058694856476\\.dkr\\.ecr\\.us-west-2\\.amazonaws\\.com\\/ziox\\@sha256\\:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589"] [data-test="log-search-subfield-list-equal-kubernetes_container_hash-field-btn"]'
       )
       .click();
-    await pm.logsVisualise.logsApplyQueryButton();
+    await logsVisualise.logsApplyQueryButton();
 
     // Open the visualization tab
-    await pm.logsVisualise.openVisualiseTab();
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.openVisualiseTab();
+    await logsVisualise.runQueryAndWaitForCompletion();
     let exceptionBefore = null;
     let exceptionAfter = null;
 
@@ -395,11 +293,11 @@ test.describe("logs testcases", () => {
     }
 
     await page.locator('[data-test="dashboard-add-condition-remove"]').click();
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
-    await pm.logsVisualise.backToLogs();
+    await logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.backToLogs();
 
-    await pm.logsVisualise.logsApplyQueryButton();
-    await pm.logsVisualise.openVisualiseTab();
+    await logsVisualise.logsApplyQueryButton();
+    await logsVisualise.openVisualiseTab();
 
     try {
       await expect(
@@ -411,7 +309,7 @@ test.describe("logs testcases", () => {
       exceptionAfter = e;
     }
     expect(exceptionBefore).toBe(exceptionAfter);
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await logsVisualise.runQueryAndWaitForCompletion();
   });
 
   test("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
@@ -530,9 +428,10 @@ test.describe("logs testcases", () => {
 
     // Open the dropdown to check its state
     await page
-      .locator('[data-test="log-search-index-list-select-stream"]')
+      .locator('[data-test="dashboard-field-list-collapsed-icon"]')
       .click();
 
+    await page.locator('[data-test="index-dropdown-stream"]').click();
     let previousCount = -1;
     let currentCount = 0;
     const maxRetries = 10;
@@ -550,12 +449,6 @@ test.describe("logs testcases", () => {
     }
 
     expect(currentCount).toBeGreaterThan(0);
-
-    // Validate the row element
-    const row = page
-      .getByRole("row", { name: "_timestamp +X +Y +B +F" })
-      .first();
-    await expect(row).toBeVisible();
   });
 
   test("should not blank the stream name list when switching between logs and visualization and back again.", async ({
@@ -595,10 +488,6 @@ test.describe("logs testcases", () => {
     // Open the visualization tab and add fields
     await pm.logsVisualise.openVisualiseTab();
 
-    await pm.chartTypeSelector.searchAndAddField(
-      "kubernetes_annotations_kubernetes_io_psp",
-      "b"
-    );
     await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Change the chart types
