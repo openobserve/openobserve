@@ -15,6 +15,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import http from "./http";
+import { useStore } from "vuex";
 
 interface DomainRestriction {
   name: string;
@@ -28,28 +29,14 @@ interface DomainSettings {
 
 const domainManagement = {
   // Get SSO domain restrictions for an organization
-  getDomainRestrictions: (orgIdentifier: string) => {
-    return http().get(`/api/${orgIdentifier}/sso/domain-restrictions`);
+  getDomainRestrictions: (metaOrg: string) => {
+    const store = useStore();
+    return http().get(`/api/${metaOrg}/domain_management`);
   },
-
-  // Update SSO domain restrictions for an organization
-  updateDomainRestrictions: (orgIdentifier: string, data: DomainSettings) => {
-    return http().post(`/api/${orgIdentifier}/sso/domain-restrictions`, data);
-  },
-
-  // Add a new domain restriction
-  addDomainRestriction: (orgIdentifier: string, domain: DomainRestriction) => {
-    return http().post(`/api/${orgIdentifier}/sso/domain-restrictions/domain`, domain);
-  },
-
-  // Remove a domain restriction
-  removeDomainRestriction: (orgIdentifier: string, domainName: string) => {
-    return http().delete(`/api/${orgIdentifier}/sso/domain-restrictions/domain/${domainName}`);
-  },
-
   // Update specific domain settings
-  updateDomainSettings: (orgIdentifier: string, domainName: string, domain: DomainRestriction) => {
-    return http().put(`/api/${orgIdentifier}/sso/domain-restrictions/domain/${domainName}`, domain);
+  updateDomainRestrictions: (metaOrg: string, domain: DomainRestriction) => {
+    const store = useStore();
+    return http().put(`/api/${metaOrg}/domain_management`, domain);
   },
 };
 

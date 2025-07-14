@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
             v-model="newDomain"
             :label="t('settings.domainPlaceholder')"
-            :hint="t('settings.domainHint')"
+            :hint="t('settings.domainHint', { 'at_sign': '@' })"
             color="input-border"
             bg-color="input-bg"
             class="domain-input"
@@ -192,11 +192,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import domainManagement from "@/services/domainManagement";
+import { useRouter } from "vue-router";
 import { add } from "date-fns";
 
 interface Domain {
@@ -209,6 +210,7 @@ interface Domain {
 const { t } = useI18n();
 const q = useQuasar();
 const store = useStore();
+const router = useRouter();
 
 const newDomain = ref("");
 const domains = reactive<Domain[]>([]);
@@ -217,14 +219,34 @@ const saving = ref(false);
 const emit = defineEmits(["cancel", "saved"]);
 
 onMounted(() => {
-  loadDomainSettings();
+  if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
+    loadDomainSettings();
+  } else {
+    router.replace({
+      name: "general",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    })
+  }
+});
+
+onActivated(() => {
+  if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
+    loadDomainSettings();
+  } else {
+    router.replace({
+      name: "general",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    })
+  }
 });
 
 const loadDomainSettings = async () => {
   try {
-    const response = await domainManagement.getDomainRestrictions(
-      store.state.selectedOrganization.identifier
-    );
+    const response = await domainManagement.getDomainRestrictions(store.state.zoConfig.meta_org);
     
     if (response.data && response.data.domains) {
       const loadedDomains = response.data.domains.map((domain: any) => ({
@@ -361,7 +383,7 @@ const saveChanges = async () => {
     }
 
     // Prepare data for API
-    const domainData = {
+    const domainData: any = {
       domains: domains.map(domain => ({
         name: domain.name,
         allowAllUsers: domain.allowAllUsers,
@@ -370,10 +392,7 @@ const saveChanges = async () => {
     };
 
     // Save to backend API
-    await domainManagement.updateDomainRestrictions(
-      store.state.selectedOrganization.identifier,
-      domainData
-    );
+    await domainManagement.updateDomainRestrictions(store.state.zoConfig.meta_org, domainData);
 
     q.notify({
       type: "positive",

@@ -1147,7 +1147,7 @@
     "ssoDomainRestrictionsDescription": "Control which domains and specific users are allowed to login using SSO providers",
     "domainAndAllowedUsers": "Domain and allowed users",
     "domainPlaceholder": "e.g. example.com",
-    "domainHint": "Enter domain names without the @ symbol",
+    "domainHint": "Enter domain names without the {at_sign} symbol",
     "addDomain": "Add Domain",
     "domainConfiguredCount": "{count} domain(s) configured",
     "allowAllUsersFromDomain": "Allow all users from {domain}",
