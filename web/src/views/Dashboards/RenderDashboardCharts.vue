@@ -827,8 +827,6 @@ export default defineComponent({
 
 /* Optimized GridStack layout styles for better performance and visual feedback */
 .grid-stack {
-  min-height: 0 !important;
-  height: auto !important;
   background: transparent;
   margin: 2px;
   
