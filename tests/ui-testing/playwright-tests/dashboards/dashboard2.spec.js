@@ -320,7 +320,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Delete the panel and confirm
-    await pm.pm.dashboardPanelEdit.deletePanel(panelName);
+    await pm.dashboardPanelEdit.deletePanel(panelName);
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
@@ -397,7 +397,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Delete the panel and confirm
-    await pm.pm.dashboardPanelEdit.deletePanel(panelName);
+    await pm.dashboardPanelEdit.deletePanel(panelName);
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
@@ -446,7 +446,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Delete the panel and confirm
-    await pm.pm.dashboardPanelEdit.deletePanel(panelName);
+    await pm.dashboardPanelEdit.deletePanel(panelName);
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
