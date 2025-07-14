@@ -76,7 +76,7 @@ async fn register() -> Result<()> {
     let locker = dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64).await?;
 
     // 2. watch node list
-    tokio::task::spawn(async move { super::watch_node_list().await });
+    tokio::task::spawn(super::watch_node_list());
 
     // 3. get node list
     let node_list = match super::list_nodes().await {
