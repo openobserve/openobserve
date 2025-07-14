@@ -671,9 +671,9 @@ export default {
       })
 
     const createRegexPatternFromLogs = (key: string, value: string) => {
-      store.state.organizationData.regexPatternFromLogs.key = key;
-      store.state.organizationData.regexPatternFromLogs.value = value;
-      store.state.organizationData.regexPatternFromLogs.stream = searchObj.data.stream.selectedStream[0];
+      emit("closeTable");
+      const promptToBeAdded = `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`
+
       router.push({
         path: '/settings/regex_patterns',
         query: {
@@ -681,28 +681,25 @@ export default {
           from: 'logs'
         },
       })
+      store.state.organizationData.regexPatternPrompt = promptToBeAdded;
+      emit("sendToAiChat", promptToBeAdded);
+
 
     }
 
     const handleCreateRegex = () => {
-      console.log('Create regex for:', selectedText.value || 'No selection');
       showMenu.value = false;
       typeOfRegexPattern.value = true;
     };
 
     const confirmRegexPatternType = () => {
       typeOfRegexPattern.value = false;
-      store.state.organizationData.customRegexPatternFromLogs.key = regexPatternType.value;
-      store.state.organizationData.customRegexPatternFromLogs.value = selectedText.value;
-      store.state.organizationData.customRegexPatternFromLogs.stream = searchObj.data.stream.selectedStream[0];
-      store.state.organizationData.customRegexPatternFromLogs.type = regexPatternType.value;
-      $q.notify({
-        message: 'Redirecting to regex pattern page',
-        spinner: true,
-        timeout: 1000
-      }
-      )
-      setTimeout(() => {
+      emit("closeTable");
+      // inputMessage.value = `Create a regex pattern for ${store.state.organizationData.customRegexPatternFromLogs.key} field that contains the following value: "${store.state.organizationData.customRegexPatternFromLogs.value}" which should be a type of ${store.state.organizationData.customRegexPatternFromLogs.type} from the ${store.state.organizationData.customRegexPatternFromLogs.stream} stream`;
+
+      const PromptToBeAdded =  `Create a regex pattern for ${regexPatternType.value} field that contains the following value: "${selectedText.value}" which should be a type of ${regexPatternType.value} from the ${searchObj.data.stream.selectedStream[0]} stream`
+
+      store.state.organizationData.regexPatternPrompt = PromptToBeAdded;
       router.push({
         path: '/settings/regex_patterns',
         query: {
@@ -710,7 +707,8 @@ export default {
           from: 'logs'
         },
       })
-    }, 1000);
+    emit("sendToAiChat", PromptToBeAdded);
+
     }
 
 

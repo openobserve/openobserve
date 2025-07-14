@@ -291,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             </div>
             <div  class="q-ml-sm" v-if="store.state.isAiChatEnabled " style="width:35%; max-width: 100%; min-width: 75px; height: calc(100vh - 90px) !important;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-                <O2AIChat style="height: calc(100vh - 90px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
+                <O2AIChat :aiChatInputContext="inputContext" style="height: calc(100vh - 90px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
             </div>
        </div>
 
@@ -360,6 +360,8 @@ setup(props, {emit}) {
 
     const outputString = ref("");
 
+    const inputContext = ref("");
+
     const regexPatternInputs: any = ref({
         name: "",
         pattern: "",
@@ -386,12 +388,8 @@ setup(props, {emit}) {
                 description: ""
             }
         }
-        if(router.currentRoute.value.query.from == 'logs'){
-            let value = store.state.organizationData.customRegexPatternFromLogs.value ? store.state.organizationData.customRegexPatternFromLogs.value : store.state.organizationData.regexPatternFromLogs.value;
-            if(value){
-                testString.value = value;
-            }
-            store.dispatch('setIsAiChatEnabled',true);
+        if(store.state.organizationData.regexPatternPrompt && router.currentRoute.value.query.from == 'logs'){
+            inputContext.value = store.state.organizationData.regexPatternPrompt;
         }
     })
 
@@ -517,7 +515,8 @@ setup(props, {emit}) {
         testStringOutput,
         outlinedLightbulb,
         testLoading,
-        goToAILogo
+        goToAILogo,
+        inputContext
         }
 }
 });
