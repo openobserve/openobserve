@@ -644,7 +644,8 @@ LIMIT 100`;
     await queryEditor.fill(updatedQuery.trim());
 
     // Activate the function editor to trigger reprocessing
-    await page.locator("#fnEditor").getByRole("textbox").locator("div").click();
+    // await page.locator("#fnEditor").getByRole("textbox").locator("div").click();
+    await logsVisualise.openVisualiseTab();
 
     await page.waitForTimeout(2000);
     // Step 5: Assert updated field is visible
