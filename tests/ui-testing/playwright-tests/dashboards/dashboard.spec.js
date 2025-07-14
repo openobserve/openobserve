@@ -604,7 +604,7 @@ test.describe("dashboard UI testcases", () => {
     // Save and delete panel
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
-    await pm.dashboardEditPanel.deletePanel(panelName);
+    await pm.dashboardPanelEdit.deletePanel(panelName);
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
