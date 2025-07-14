@@ -1565,12 +1565,12 @@ export default defineComponent({
             searchResponseForVisualization.value = {
               ...searchObj.data.queryResults,
               hits: searchObj.data.queryResults.aggs,
-              histogram_interval: searchObj?.data?.queryResults?.histogram_interval_for_visualization,
+              histogram_interval: searchObj?.data?.queryResults?.visualization_histogram_interval,
             };
           } else {
             searchResponseForVisualization.value = {
               ...searchObj.data.queryResults,
-              histogram_interval: searchObj?.data?.queryResults?.histogram_interval_for_visualization,
+              histogram_interval: searchObj?.data?.queryResults?.visualization_histogram_interval,
             };
           }
 

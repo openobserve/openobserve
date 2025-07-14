@@ -3128,8 +3128,10 @@ const useLogs = () => {
 
             // check if histogram interval is undefined, then set current response as histogram response
             // for visualization, will require to set histogram interval to fill missing values
-            if(searchObj.data.queryResults.histogram_interval_for_visualization == undefined && res.data?.histogram_interval) {
-              searchObj.data.queryResults.histogram_interval_for_visualization = res.data?.histogram_interval;
+            // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+            // created new attribute visualization_histogram_interval to avoid this issue
+            if(searchObj.data.queryResults.visualization_histogram_interval == undefined && res.data?.histogram_interval) {
+              searchObj.data.queryResults.visualization_histogram_interval = res.data?.histogram_interval;
             }
 
             // if (hasAggregationFlag) {
@@ -5829,11 +5831,13 @@ const useLogs = () => {
 
     // check if histogram interval is undefined, then set current response as histogram response
     // for visualization, will require to set histogram interval to fill missing values
+    // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+    // created new attribute visualization_histogram_interval to avoid this issue
     if (
-      searchObj.data.queryResults.histogram_interval_for_visualization == undefined &&
+      searchObj.data.queryResults.visualization_histogram_interval == undefined &&
       response.content?.results?.histogram_interval
     ) {
-      searchObj.data.queryResults.histogram_interval_for_visualization  =
+      searchObj.data.queryResults.visualization_histogram_interval  =
         response.content?.results?.histogram_interval;
     }
   }
