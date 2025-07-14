@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw-flex tw-items-center tw-justify-between">
                 <q-btn
                     data-test="add-regex-pattern-back-btn"
-                    v-close-popup="true"
+                    @click="closeAddRegexPatternDialog"
                     round
                     flat
                     icon="arrow_back"
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             data-test="add-regex-pattern-close-btn"
-            v-close-popup="true"
+            @click="closeAddRegexPatternDialog"
             round
             flat
             icon="close"
@@ -493,6 +493,10 @@ setup(props, {emit}) {
         }
     }
 
+    const closeAddRegexPatternDialog = () => {
+        emit("close");
+    }
+
 
     return {
         t,
@@ -517,7 +521,8 @@ setup(props, {emit}) {
         outlinedLightbulb,
         testLoading,
         goToAILogo,
-        inputContext
+        inputContext,
+        closeAddRegexPatternDialog
         }
 }
 });

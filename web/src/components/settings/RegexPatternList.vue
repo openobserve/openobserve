@@ -157,7 +157,7 @@
           @update:cancel="deleteDialog.show = false"
         />
         <q-dialog v-model="showAddRegexPatternDialog.show" position="right" full-height maximized>
-          <AddRegexPattern :data="showAddRegexPatternDialog.data" :is-edit="showAddRegexPatternDialog.isEdit" @update:list="getRegexPatterns" @close="showAddRegexPatternDialog.show = false" />
+          <AddRegexPattern :data="showAddRegexPatternDialog.data" :is-edit="showAddRegexPatternDialog.isEdit" @update:list="getRegexPatterns" @close="closeAddRegexPatternDialog" />
         </q-dialog>
     </q-page>
   </template>
@@ -424,6 +424,19 @@
       });
     }
   }
+  const closeAddRegexPatternDialog = () => {
+    //reset the values if any before closing the dialog
+    //this will make sure that the values are not set in the ai chat input context when user clicks on the create regex pattern button again
+    showAddRegexPatternDialog.value.show = false;
+    store.state.organizationData.regexPatternPrompt = "";
+    store.state.organizationData.regexPatternTestValue = "";
+    router.push({
+      path: '/settings/regex_patterns',
+      query:{
+        org_identifier: store.state.selectedOrganization.identifier,
+      }
+    })
+  }
 
     return {
         t,
@@ -450,7 +463,8 @@
         selectedPerPage,
         showImportRegexPatternDialog,
         importRegexPattern,
-        exportRegexPattern
+        exportRegexPattern,
+        closeAddRegexPatternDialog
     }
     }
 })
