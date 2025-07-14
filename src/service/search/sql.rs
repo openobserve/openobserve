@@ -1421,14 +1421,11 @@ fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
     }
 
     // First projection should be a simple field (not a function)
-    let first_projection = &select.projection[0];
-    let field_name = match first_projection {
-        SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. } => {
-            if matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_)) {
-                get_field_name(expr)
-            } else {
-                return None;
-            }
+    let field_name = match &select.projection[0] {
+        SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. }
+            if matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_)) =>
+        {
+            get_field_name(expr)
         }
         _ => return None,
     };
@@ -1439,14 +1436,10 @@ fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
     }
 
     // Must have GROUP BY with exactly one expression
-    let has_group_by = match &select.group_by {
-        GroupByExpr::Expressions(exprs, _) => exprs.len() == 1,
-        _ => false,
+    match &select.group_by {
+        GroupByExpr::Expressions(exprs, _) if exprs.len() == 1 => {}
+        _ => return None,
     };
-
-    if !has_group_by {
-        return None;
-    }
 
     // Check if ORDER BY references the count(*) function (with alias support)
     let count_alias = match &select.projection[1] {
@@ -1491,11 +1484,8 @@ fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
             value: Value::Number(v, _b),
             ..
         })) => {
-            let mut v: i64 = v.parse().unwrap_or(0);
-            if v > MAX_LIMIT {
-                v = MAX_LIMIT;
-            }
-            v as usize
+            let v: i64 = v.parse().unwrap_or(0);
+            std::cmp::min(v, MAX_LIMIT) as usize
         }
         _ => return None,
     };
