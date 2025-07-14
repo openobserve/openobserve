@@ -447,7 +447,7 @@ pub async fn cache_files(
     let files_num = files.len() as i64;
     if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
         // all files are cached
-        return Ok((file_data::CacheType::None, cache_hits, cache_misses));
+        return Ok((file_data::CacheType::Disk, cache_hits, cache_misses));
     }
 
     // check cache size

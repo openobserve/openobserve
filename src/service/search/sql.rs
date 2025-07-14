@@ -153,7 +153,7 @@ impl Sql {
             .pop()
             .unwrap();
 
-        //********************Change the sql here*********************************//
+        //********************Change the sql start*********************************//
         // 2. rewrite track_total_hits
         if query.track_total_hits {
             let mut trace_total_hits_visitor = TrackTotalHitsVisitor::new();
@@ -163,7 +163,7 @@ impl Sql {
         // 3. rewrite all filter that include DASHBOARD_ALL with true
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
         let _ = statement.visit(&mut remove_dashboard_all_visitor);
-        //********************Change the sql here*********************************//
+        //********************Change the sql end*********************************//
 
         // 4. get column name, alias, group by, order by
         let mut column_visitor = ColumnVisitor::new(&total_schemas);
@@ -191,7 +191,6 @@ impl Sql {
         let need_sort_by_time = order_by.len() == 1
             && order_by[0].0 == TIMESTAMP_COL_NAME
             && order_by[0].1 == OrderBy::Desc;
-        let use_inverted_index = column_visitor.use_inverted_index;
 
         // check if need exact limit and offset
         if (limit == -1 || limit == 0)
@@ -263,7 +262,7 @@ impl Sql {
             histogram_interval_visitor.interval
         };
 
-        //********************Change the sql here*********************************//
+        //********************Change the sql start*********************************//
         // 11. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
@@ -277,7 +276,7 @@ impl Sql {
         // 12. generate tantivy query
         let mut index_condition = None;
         let mut can_optimize = false;
-        if stream_names.len() == 1 && cfg.common.inverted_index_enabled && use_inverted_index {
+        if stream_names.len() == 1 && cfg.common.inverted_index_enabled {
             let mut index_visitor = IndexVisitor::new(
                 &used_schemas,
                 cfg.common.feature_query_remove_filter_with_index,
@@ -289,14 +288,16 @@ impl Sql {
         }
 
         // use all condition for histogram without filter
-        if use_inverted_index && can_optimize && index_condition.is_none() {
+        if can_optimize && index_condition.is_none() {
             index_condition = Some(IndexCondition {
                 conditions: vec![Condition::All()],
             });
         }
 
-        //********************Change the sql here*********************************//
+        // set use_inverted_index use index_condition
+        let use_inverted_index = index_condition.is_some();
 
+        //********************Change the sql end*********************************//
         // 13. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
@@ -314,7 +315,7 @@ impl Sql {
         // `select count(*) from table where match_all` -> SimpleCount
         // or `select histogram(..), count(*) from table where match_all` -> SimpleHistogram
         if can_optimize && index_optimize_mode.is_none() {
-            let mut visitor = OtherIndexOptimizeModeVisitor::new();
+            let mut visitor = IndexOptimizeModeVisitor::new();
             let _ = statement.visit(&mut visitor);
             if visitor.is_simple_count {
                 index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
@@ -331,6 +332,8 @@ impl Sql {
                     bucket_width,
                     num_buckets,
                 ));
+            } else if visitor.is_simple_topn {
+                println!("\nis_simple_topn\n");
             }
         }
 
@@ -890,6 +893,8 @@ impl VisitorMut for IndexVisitor {
             if let Some(expr) = select.selection.as_mut() {
                 let (index, other_expr) = get_index_condition_from_expr(&self.index_fields, expr);
                 self.index_condition = index;
+                // if all filter is secondary index or full text index that term is simple, we can
+                // always remove the filter
                 let can_remove_filter = self
                     .index_condition
                     .as_ref()
@@ -905,7 +910,10 @@ impl VisitorMut for IndexVisitor {
                 if self.is_remove_filter || can_remove_filter {
                     select.selection = other_expr;
                 }
-            } else if is_simple_count_query(select) || is_simple_histogram_query(select) {
+            } else if is_simple_count_query(select)
+                || is_simple_histogram_query(select)
+                || is_simple_topn_query(query)
+            {
                 // if there is no selection, but have histogram, also can use inverted index
                 self.can_optimize = true;
             }
@@ -1287,21 +1295,26 @@ impl VisitorMut for AddO2IdVisitor {
 //
 // either only has count(*) -> SimpleCount
 // or has histogram(...) and count(*) -> SimpleHistogram
-struct OtherIndexOptimizeModeVisitor {
+// or select id, count(*) as cnt from stream group by id order by cnt -> SimpleTopN
+struct IndexOptimizeModeVisitor {
     pub is_simple_count: bool,
     pub is_simple_histogram: bool,
+    pub is_simple_topn: bool,
+    pub is_simple_topn_asc: bool,
 }
 
-impl OtherIndexOptimizeModeVisitor {
+impl IndexOptimizeModeVisitor {
     fn new() -> Self {
         Self {
             is_simple_count: false,
             is_simple_histogram: false,
+            is_simple_topn: false,
+            is_simple_topn_asc: false,
         }
     }
 }
 
-impl VisitorMut for OtherIndexOptimizeModeVisitor {
+impl VisitorMut for IndexOptimizeModeVisitor {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
@@ -1326,9 +1339,15 @@ impl VisitorMut for OtherIndexOptimizeModeVisitor {
                 self.is_simple_count = is_simple_count_query(select);
             } else if is_simple_histogram_query(select) {
                 self.is_simple_histogram = true;
+            } else if is_simple_topn_query(query)
+                && let Some(order_by) = &query.order_by
+                && let OrderByKind::Expressions(exprs) = &order_by.kind
+            {
+                self.is_simple_topn = true;
+                self.is_simple_topn_asc = exprs[0].options.asc == Some(true);
             }
         }
-        if self.is_simple_count || self.is_simple_histogram {
+        if self.is_simple_count || self.is_simple_histogram || self.is_simple_topn {
             return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
@@ -1363,6 +1382,88 @@ fn is_simple_histogram_query(select: &Select) -> bool {
     select.projection.len() == 2
         && is_sql_func(&select.projection[0], "histogram", false)
         && is_sql_func(&select.projection[1], "count", true)
+}
+
+// check if the query is only topn query
+// the topn query like select id, count(*) as cnt from stream group by id order by cnt desc limit 10
+fn is_simple_topn_query(query: &Query) -> bool {
+    let select = match query.body.as_ref() {
+        sqlparser::ast::SetExpr::Select(select) => select,
+        _ => return false,
+    };
+
+    // Must have exactly 2 projections: a field and count(*)
+    if select.projection.len() != 2 {
+        return false;
+    }
+
+    // First projection should be a simple field (not a function)
+    let first_projection = &select.projection[0];
+    let is_first_field = match first_projection {
+        SelectItem::UnnamedExpr(expr) => {
+            matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
+        }
+        SelectItem::ExprWithAlias { expr, .. } => {
+            matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
+        }
+        _ => false,
+    };
+
+    // Second projection should be count(*)
+    let is_second_count = is_sql_func(&select.projection[1], "count", true);
+
+    if !is_first_field || !is_second_count {
+        return false;
+    }
+
+    // Must have GROUP BY with exactly one expression
+    let has_group_by = match &select.group_by {
+        GroupByExpr::Expressions(exprs, _) => exprs.len() == 1,
+        _ => false,
+    };
+
+    if !has_group_by {
+        return false;
+    }
+
+    // Check if ORDER BY references the count(*) function (with alias support)
+    let count_alias = match &select.projection[1] {
+        SelectItem::ExprWithAlias { alias, .. } => Some(alias.value.clone()),
+        _ => None,
+    };
+
+    let mut order_by_references_count = false;
+    if let Some(order_by) = &query.order_by
+        && let OrderByKind::Expressions(exprs) = &order_by.kind
+        && exprs.len() == 1
+    {
+        match &exprs[0].expr {
+            Expr::Identifier(ident) => {
+                // Check if it's the count alias
+                if let Some(alias) = &count_alias
+                    && ident.value == *alias
+                    && exprs[0].options.asc == Some(false)
+                {
+                    order_by_references_count = true;
+                }
+            }
+            Expr::Function(func) => {
+                // Check if it's count(*) function directly
+                let name = trim_quotes(&func.name.to_string().to_lowercase());
+                if name == "count"
+                    && let FunctionArguments::List(list) = &func.args
+                    && list.args.len() == 1
+                    && trim_quotes(&list.args[0].to_string()) == "*"
+                    && exprs[0].options.asc == Some(false)
+                {
+                    order_by_references_count = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    order_by_references_count
 }
 
 // Check if the query is a simple `select sql_func(*)` without modifiers
@@ -2461,7 +2562,7 @@ mod tests {
     }
 
     fn is_simple_count_query(statement: &mut Statement) -> bool {
-        let mut visitor = OtherIndexOptimizeModeVisitor::new();
+        let mut visitor = IndexOptimizeModeVisitor::new();
         let _ = statement.visit(&mut visitor);
         visitor.is_simple_count
     }
@@ -2527,7 +2628,7 @@ mod tests {
     }
 
     fn is_simple_histogram_query(statement: &mut Statement) -> bool {
-        let mut visitor = OtherIndexOptimizeModeVisitor::new();
+        let mut visitor = IndexOptimizeModeVisitor::new();
         let _ = statement.visit(&mut visitor);
         visitor.is_simple_histogram
     }
@@ -3301,5 +3402,88 @@ mod tests {
         // Should add ORDER BY clause
         let expected = "SELECT * FROM users ORDER BY name ASC";
         assert_eq!(statement.to_string(), expected);
+    }
+
+    fn is_simple_topn_query(statement: &mut Statement) -> bool {
+        let mut visitor = IndexOptimizeModeVisitor::new();
+        let _ = statement.visit(&mut visitor);
+        visitor.is_simple_topn
+    }
+
+    #[test]
+    fn test_is_simple_topn_visit1() {
+        // Test basic topn query
+        let sql = "select id, count(*) as cnt from stream group by id order by cnt desc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_topn_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_topn_visit2() {
+        // Test with additional where clause
+        let sql = "select name, count(*) from t where status = 'active' group by name order by count(*) desc limit 5";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_topn_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_topn_visit3() {
+        // test with count(*) asc
+        let sql = "select id, count(*) from stream group by id order by count(*) asc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(!is_simple_topn_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_topn_visit4() {
+        // Test without group by - should fail
+        let sql = "select id, count(*) from stream order by count(*) desc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(!is_simple_topn_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_topn_visit5() {
+        // Test without order by - should fail
+        let sql = "select id, count(*) from stream group by id limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(!is_simple_topn_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_topn_visit6() {
+        // Test with function as first projection - should fail
+        let sql = "select upper(name), count(*) from stream group by upper(name) order by count(*) desc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(!is_simple_topn_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_topn_visit7() {
+        // Test with non-count function as second projection - should fail
+        let sql = "select id, sum(value) from stream group by id order by sum(value) desc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(!is_simple_topn_query(&mut statement));
     }
 }
