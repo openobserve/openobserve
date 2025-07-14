@@ -374,7 +374,7 @@ test.describe("dashboard filter testcases", () => {
         state: "visible",
       });
     await pm.dashboardSetting.openSetting();
-    await pm.variableName.addDashboardVariable(
+    await pm.dashboardVariables.addDashboardVariable(
       "variablename",
       "logs",
       "e2e_automate",
