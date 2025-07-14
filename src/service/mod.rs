@@ -22,7 +22,6 @@ pub mod cluster_info;
 pub mod compact;
 pub mod dashboards;
 pub mod db;
-pub mod domain_management;
 pub mod enrichment;
 pub mod enrichment_table;
 pub mod exporter;

@@ -76,9 +76,6 @@ pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Defau
 pub static DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
 pub static SYSLOG_ROUTES: Lazy<RwHashMap<String, SyslogRoute>> = Lazy::new(Default::default);
 pub static SYSLOG_ENABLED: Lazy<Arc<RwLock<bool>>> = Lazy::new(|| Arc::new(RwLock::new(false)));
-pub static DOMAIN_MANAGEMENT_CONFIG: Lazy<
-    RwHashMap<String, crate::common::meta::domain_management::DomainManagementConfig>,
-> = Lazy::new(Default::default);
 pub static ENRICHMENT_TABLES: Lazy<RwHashMap<String, StreamTable>> = Lazy::new(Default::default);
 pub static ENRICHMENT_REGISTRY: Lazy<Arc<TableRegistry>> =
     Lazy::new(|| Arc::new(TableRegistry::default()));

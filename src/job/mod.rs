@@ -171,7 +171,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::realtime_triggers::watch().await });
     tokio::task::spawn(async move { db::alerts::alert::watch().await });
     tokio::task::spawn(async move { db::organization::org_settings_watch().await });
-    tokio::task::spawn(async move { db::domain_management::watch().await });
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { o2_dex::db::domain_management::watch().await });
 
     // pipeline not used on compactors
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
@@ -217,7 +218,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::syslog::cache_syslog_settings()
         .await
         .expect("syslog settings cache failed");
-    db::domain_management::cache()
+    #[cfg(feature = "enterprise")]
+    o2_dex::db::domain_management::cache()
         .await
         .expect("domain management cache failed");
 

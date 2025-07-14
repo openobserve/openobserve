@@ -73,7 +73,7 @@ use crate::{
         },
     },
     service::{
-        db, domain_management,
+        db,
         search::datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
         tantivy::puffin_directory::reader_cache,
     },
@@ -560,7 +560,10 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     }
 
                     // Check if email is allowed by domain management system
-                    match domain_management::is_email_allowed(&res.0.user_email).await {
+                    #[cfg(feature = "enterprise")]
+                    match o2_dex::service::domain_management::is_email_allowed(&res.0.user_email)
+                        .await
+                    {
                         Ok(allowed) => {
                             if !allowed {
                                 audit_message.response_meta.http_response_code = 403;

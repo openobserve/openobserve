@@ -17,17 +17,10 @@ use std::io::Error;
 
 use actix_web::{HttpResponse, get, put, web};
 use config::META_ORG_ID;
-use utoipa::OpenApi;
+#[cfg(feature = "enterprise")]
+use o2_dex::{meta::domain_management::DomainManagementRequest, service::domain_management};
 
-use crate::{
-    common::meta::{
-        domain_management::{
-            DomainManagementRequest, DomainManagementResponse, DomainOperationResponse,
-        },
-        http::HttpResponse as MetaHttpResponse,
-    },
-    service::domain_management,
-};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Helper function to validate that only meta org can access domain management APIs
 fn validate_meta_org_access(org_id: &str) -> Result<(), infra::errors::Error> {
@@ -38,23 +31,6 @@ fn validate_meta_org_access(org_id: &str) -> Result<(), infra::errors::Error> {
     }
     Ok(())
 }
-
-#[derive(OpenApi)]
-#[openapi(
-    paths(
-        get_domain_management_config,
-        set_domain_management_config,
-    ),
-    components(schemas(
-        DomainManagementRequest,
-        DomainManagementResponse,
-        DomainOperationResponse,
-    )),
-    tags(
-        (name = "Domain Management", description = "Domain management operations")
-    )
-)]
-pub struct ApiDoc;
 
 /// Get domain management configuration
 #[utoipa::path(
