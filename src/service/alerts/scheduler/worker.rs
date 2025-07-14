@@ -140,7 +140,6 @@ impl SchedulerWorker {
         if let Err(e) = handler_job.await {
             return Err(anyhow::anyhow!("Error in handler: {}", e));
         }
-
         Ok(())
     }
 }
