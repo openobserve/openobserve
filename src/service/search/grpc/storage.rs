@@ -1048,6 +1048,11 @@ async fn search_tantivy_index(
                     )
                     .map(|ret| (HashSet::new(), 0, ret))
             }
+            (true, Some(InvertedIndexOptimizeMode::SimpleTopN(_field, _limit, _ascend))) => {
+                tantivy_searcher
+                    .search(&query, &tantivy::collector::DocSetCollector)
+                    .map(|ret| (ret, 0, vec![]))
+            }
         })
         .await??;
 

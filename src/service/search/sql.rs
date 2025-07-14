@@ -21,7 +21,9 @@ use config::{
     meta::{
         inverted_index::InvertedIndexOptimizeMode,
         search::SearchEventType,
-        sql::{OrderBy, Sql as MetaSql, TableReferenceExt, resolve_stream_names_with_type},
+        sql::{
+            MAX_LIMIT, OrderBy, Sql as MetaSql, TableReferenceExt, resolve_stream_names_with_type,
+        },
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
@@ -74,6 +76,7 @@ use crate::service::search::{
         },
     },
     index::get_arg_name,
+    utils::get_field_name,
 };
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
@@ -314,8 +317,9 @@ impl Sql {
         // 14. check other inverted index optimize modes
         // `select count(*) from table where match_all` -> SimpleCount
         // or `select histogram(..), count(*) from table where match_all` -> SimpleHistogram
+        // or `select id, count(*) from t group by id order by cnt desc limit 10` -> SimpleTopN
         if can_optimize && index_optimize_mode.is_none() {
-            let mut visitor = IndexOptimizeModeVisitor::new();
+            let mut visitor = IndexOptimizeModeVisitor::new(&used_schemas);
             let _ = statement.visit(&mut visitor);
             if visitor.is_simple_count {
                 index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
@@ -332,8 +336,9 @@ impl Sql {
                     bucket_width,
                     num_buckets,
                 ));
-            } else if visitor.is_simple_topn {
-                println!("\nis_simple_topn\n");
+            } else if let Some((field, limit, asc)) = visitor.simple_topn {
+                index_optimize_mode =
+                    Some(InvertedIndexOptimizeMode::SimpleTopN(field, limit, asc));
             }
         }
 
@@ -869,7 +874,7 @@ impl IndexVisitor {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     fn new_from_index_fields(
         index_fields: HashSet<String>,
         is_remove_filter: bool,
@@ -910,11 +915,13 @@ impl VisitorMut for IndexVisitor {
                 if self.is_remove_filter || can_remove_filter {
                     select.selection = other_expr;
                 }
-            } else if is_simple_count_query(select)
-                || is_simple_histogram_query(select)
-                || is_simple_topn_query(query)
+            } else if is_simple_count_query(select) || is_simple_histogram_query(select) {
+                // if there is no filter, but have histogram or count, also can use index
+                self.can_optimize = true;
+            } else if let Some(topn) = is_simple_topn_query(query)
+                && self.index_fields.contains(&topn.0)
             {
-                // if there is no selection, but have histogram, also can use inverted index
+                // if there is no filter, but have topn, also can use index
                 self.can_optimize = true;
             }
         }
@@ -1297,19 +1304,37 @@ impl VisitorMut for AddO2IdVisitor {
 // or has histogram(...) and count(*) -> SimpleHistogram
 // or select id, count(*) as cnt from stream group by id order by cnt -> SimpleTopN
 struct IndexOptimizeModeVisitor {
+    index_fields: HashSet<String>,
     pub is_simple_count: bool,
     pub is_simple_histogram: bool,
-    pub is_simple_topn: bool,
-    pub is_simple_topn_asc: bool,
+    pub simple_topn: Option<(String, usize, bool)>,
 }
 
 impl IndexOptimizeModeVisitor {
-    fn new() -> Self {
+    fn new(schemas: &HashMap<TableReference, Arc<SchemaCache>>) -> Self {
+        let index_fields = if let Some((_, schema)) = schemas.iter().next() {
+            let stream_settings = unwrap_stream_settings(schema.schema());
+            let index_fields = get_stream_setting_index_fields(&stream_settings);
+            index_fields.into_iter().collect::<HashSet<_>>()
+        } else {
+            HashSet::new()
+        };
+
         Self {
+            index_fields,
             is_simple_count: false,
             is_simple_histogram: false,
-            is_simple_topn: false,
-            is_simple_topn_asc: false,
+            simple_topn: None,
+        }
+    }
+
+    #[cfg(test)]
+    fn new_from_index_fields(index_fields: HashSet<String>) -> Self {
+        Self {
+            index_fields,
+            is_simple_count: false,
+            is_simple_histogram: false,
+            simple_topn: None,
         }
     }
 }
@@ -1339,15 +1364,13 @@ impl VisitorMut for IndexOptimizeModeVisitor {
                 self.is_simple_count = is_simple_count_query(select);
             } else if is_simple_histogram_query(select) {
                 self.is_simple_histogram = true;
-            } else if is_simple_topn_query(query)
-                && let Some(order_by) = &query.order_by
-                && let OrderByKind::Expressions(exprs) = &order_by.kind
+            } else if let Some(topn) = is_simple_topn_query(query)
+                && self.index_fields.contains(&topn.0)
             {
-                self.is_simple_topn = true;
-                self.is_simple_topn_asc = exprs[0].options.asc == Some(true);
+                self.simple_topn = Some(topn);
             }
         }
-        if self.is_simple_count || self.is_simple_histogram || self.is_simple_topn {
+        if self.is_simple_count || self.is_simple_histogram || self.simple_topn.is_some() {
             return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
@@ -1386,34 +1409,33 @@ fn is_simple_histogram_query(select: &Select) -> bool {
 
 // check if the query is only topn query
 // the topn query like select id, count(*) as cnt from stream group by id order by cnt desc limit 10
-fn is_simple_topn_query(query: &Query) -> bool {
+fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
     let select = match query.body.as_ref() {
         sqlparser::ast::SetExpr::Select(select) => select,
-        _ => return false,
+        _ => return None,
     };
 
     // Must have exactly 2 projections: a field and count(*)
     if select.projection.len() != 2 {
-        return false;
+        return None;
     }
 
     // First projection should be a simple field (not a function)
     let first_projection = &select.projection[0];
-    let is_first_field = match first_projection {
-        SelectItem::UnnamedExpr(expr) => {
-            matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
+    let field_name = match first_projection {
+        SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. } => {
+            if matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_)) {
+                get_field_name(expr)
+            } else {
+                return None;
+            }
         }
-        SelectItem::ExprWithAlias { expr, .. } => {
-            matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
-        }
-        _ => false,
+        _ => return None,
     };
 
     // Second projection should be count(*)
-    let is_second_count = is_sql_func(&select.projection[1], "count", true);
-
-    if !is_first_field || !is_second_count {
-        return false;
+    if !is_sql_func(&select.projection[1], "count", true) {
+        return None;
     }
 
     // Must have GROUP BY with exactly one expression
@@ -1423,7 +1445,7 @@ fn is_simple_topn_query(query: &Query) -> bool {
     };
 
     if !has_group_by {
-        return false;
+        return None;
     }
 
     // Check if ORDER BY references the count(*) function (with alias support)
@@ -1463,7 +1485,26 @@ fn is_simple_topn_query(query: &Query) -> bool {
         }
     }
 
-    order_by_references_count
+    // check if limit is present
+    let limit = match &query.limit {
+        Some(Expr::Value(ValueWithSpan {
+            value: Value::Number(v, _b),
+            ..
+        })) => {
+            let mut v: i64 = v.parse().unwrap_or(0);
+            if v > MAX_LIMIT {
+                v = MAX_LIMIT;
+            }
+            v as usize
+        }
+        _ => return None,
+    };
+
+    if order_by_references_count {
+        Some((field_name, limit, order_by_references_count))
+    } else {
+        None
+    }
 }
 
 // Check if the query is a simple `select sql_func(*)` without modifiers
@@ -2562,7 +2603,8 @@ mod tests {
     }
 
     fn is_simple_count_query(statement: &mut Statement) -> bool {
-        let mut visitor = IndexOptimizeModeVisitor::new();
+        let index_fields = ["name".to_string()].into_iter().collect();
+        let mut visitor = IndexOptimizeModeVisitor::new_from_index_fields(index_fields);
         let _ = statement.visit(&mut visitor);
         visitor.is_simple_count
     }
@@ -2628,7 +2670,8 @@ mod tests {
     }
 
     fn is_simple_histogram_query(statement: &mut Statement) -> bool {
-        let mut visitor = IndexOptimizeModeVisitor::new();
+        let index_fields = ["_timestamp".to_string()].into_iter().collect();
+        let mut visitor = IndexOptimizeModeVisitor::new_from_index_fields(index_fields);
         let _ = statement.visit(&mut visitor);
         visitor.is_simple_histogram
     }
@@ -3405,9 +3448,10 @@ mod tests {
     }
 
     fn is_simple_topn_query(statement: &mut Statement) -> bool {
-        let mut visitor = IndexOptimizeModeVisitor::new();
+        let index_fields = ["id".to_string()].into_iter().collect();
+        let mut visitor = IndexOptimizeModeVisitor::new_from_index_fields(index_fields);
         let _ = statement.visit(&mut visitor);
-        visitor.is_simple_topn
+        visitor.simple_topn.is_some()
     }
 
     #[test]

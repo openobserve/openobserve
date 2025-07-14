@@ -48,11 +48,14 @@ use super::{
     datafusion::udf::fuzzy_match_udf,
     utils::{is_field, is_value, split_conjunction, trim_quotes},
 };
-use crate::service::search::datafusion::udf::{
-    MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
-    STR_MATCH_UDF_NAME,
-    match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
-    str_match_udf,
+use crate::service::search::{
+    datafusion::udf::{
+        MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+        STR_MATCH_UDF_NAME,
+        match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+        str_match_udf,
+    },
+    utils::get_field_name,
 };
 
 pub fn get_index_condition_from_expr(
@@ -734,15 +737,6 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
         _ => return false,
     }
     true
-}
-
-// Note: the expr should be Identifier or CompoundIdentifier
-fn get_field_name(expr: &Expr) -> String {
-    match expr {
-        Expr::Identifier(ident) => trim_quotes(ident.to_string().as_str()),
-        Expr::CompoundIdentifier(ident) => trim_quotes(ident[1].to_string().as_str()),
-        _ => unreachable!(),
-    }
 }
 
 fn get_value(expr: &Expr) -> String {
