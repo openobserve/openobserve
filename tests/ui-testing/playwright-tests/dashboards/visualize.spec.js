@@ -12,6 +12,9 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page
     .locator('[data-test="log-search-index-list-select-stream"]')
     .click({ force: true });
+  await page
+    .locator('[data-test="log-search-index-list-select-stream"]')
+    .fill(stream);
   await page.locator("div.q-item").getByText(`${stream}`).first().click();
 };
 
@@ -62,13 +65,11 @@ test.describe("logs testcases", () => {
 
     //open the Visualize tab and check the default chart type and axes
     await pm.logsVisualise.openVisualiseTab();
-    await pm.logsVisualise.selectChartType("bar");
-    await page.locator('[data-test="dashboard-x-item-_timestamp"]').click();
     await expect(
-      page.locator('[data-test="dashboard-x-item-_timestamp"]')
+      page.locator('[data-test="dashboard-x-item-zo_sql_key"]')
     ).toBeVisible();
     await expect(
-      page.locator('[data-test="dashboard-y-item-_timestamp"]')
+      page.locator('[data-test="dashboard-y-item-zo_sql_num"]')
     ).toBeVisible();
   });
 
