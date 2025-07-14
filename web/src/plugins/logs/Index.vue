@@ -1565,9 +1565,13 @@ export default defineComponent({
             searchResponseForVisualization.value = {
               ...searchObj.data.queryResults,
               hits: searchObj.data.queryResults.aggs,
+              histogram_interval: searchObj?.data?.queryResults?.histogram_interval_for_visualization,
             };
           } else {
-            searchResponseForVisualization.value = searchObj.data.queryResults;
+            searchResponseForVisualization.value = {
+              ...searchObj.data.queryResults,
+              histogram_interval: searchObj?.data?.queryResults?.histogram_interval_for_visualization,
+            };
           }
 
           // run query

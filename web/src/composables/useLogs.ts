@@ -3128,9 +3128,9 @@ const useLogs = () => {
 
             // check if histogram interval is undefined, then set current response as histogram response
             // for visualization, will require to set histogram interval to fill missing values
-            // if(searchObj.data.queryResults.histogram_interval == undefined && res.data?.histogram_interval) {
-            //   searchObj.data.queryResults.histogram_interval = res.data?.histogram_interval;
-            // }
+            if(searchObj.data.queryResults.histogram_interval_for_visualization == undefined && res.data?.histogram_interval) {
+              searchObj.data.queryResults.histogram_interval_for_visualization = res.data?.histogram_interval;
+            }
 
             // if (hasAggregationFlag) {
             //   searchObj.data.queryResults.total = res.data.total;
@@ -5829,13 +5829,13 @@ const useLogs = () => {
 
     // check if histogram interval is undefined, then set current response as histogram response
     // for visualization, will require to set histogram interval to fill missing values
-    // if (
-    //   searchObj.data.queryResults.histogram_interval == undefined &&
-    //   response.content?.results?.histogram_interval
-    // ) {
-    //   searchObj.data.queryResults.histogram_interval =
-    //     response.content?.results?.histogram_interval;
-    // }
+    if (
+      searchObj.data.queryResults.histogram_interval_for_visualization == undefined &&
+      response.content?.results?.histogram_interval
+    ) {
+      searchObj.data.queryResults.histogram_interval_for_visualization  =
+        response.content?.results?.histogram_interval;
+    }
   }
 
   const handlePageCountStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
