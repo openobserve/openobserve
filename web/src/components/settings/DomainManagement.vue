@@ -250,8 +250,9 @@ const loadDomainSettings = async () => {
     
     if (response.data && response.data.domains) {
       const loadedDomains = response.data.domains.map((domain: any) => ({
-        ...domain,
-        newEmail: ""
+        name: domain.domain,
+        allowAllUsers: domain.allowed_all_users,
+        allowedEmails: domain.allowed_emails || []
       }));
       domains.splice(0, domains.length, ...loadedDomains);
     }
@@ -385,9 +386,9 @@ const saveChanges = async () => {
     // Prepare data for API
     const domainData: any = {
       domains: domains.map(domain => ({
-        name: domain.name,
-        allowAllUsers: domain.allowAllUsers,
-        allowedEmails: domain.allowedEmails
+        domain: domain.name,
+        allowed_all_users: domain.allowAllUsers,
+        allowed_emails: domain.allowedEmails
       }))
     };
 
