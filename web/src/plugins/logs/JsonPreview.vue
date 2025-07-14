@@ -682,6 +682,7 @@ export default {
         },
       })
       store.state.organizationData.regexPatternPrompt = promptToBeAdded;
+      store.state.organizationData.regexPatternTestValue = value;
       emit("sendToAiChat", promptToBeAdded);
 
 
@@ -697,9 +698,10 @@ export default {
       emit("closeTable");
       // inputMessage.value = `Create a regex pattern for ${store.state.organizationData.customRegexPatternFromLogs.key} field that contains the following value: "${store.state.organizationData.customRegexPatternFromLogs.value}" which should be a type of ${store.state.organizationData.customRegexPatternFromLogs.type} from the ${store.state.organizationData.customRegexPatternFromLogs.stream} stream`;
 
-      const PromptToBeAdded =  `Create a regex pattern for ${regexPatternType.value} field that contains the following value: "${selectedText.value}" which should be a type of ${regexPatternType.value} from the ${searchObj.data.stream.selectedStream[0]} stream`
+      const PromptToBeAdded =  `Create a regex pattern for the following value: "${selectedText.value}" which should be a type of ${regexPatternType.value} from the ${searchObj.data.stream.selectedStream[0]} stream`
 
       store.state.organizationData.regexPatternPrompt = PromptToBeAdded;
+      store.state.organizationData.regexPatternTestValue = selectedText.value;
       router.push({
         path: '/settings/regex_patterns',
         query: {

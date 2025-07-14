@@ -58,7 +58,8 @@ const organizationObj = {
   },
   isDataIngested: false,
   regexPatterns: [],
-  regexPatternPrompt: ""
+  regexPatternPrompt: "",
+  regexPatternTestValue: ""
 };
 
 export default createStore({

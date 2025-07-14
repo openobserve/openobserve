@@ -390,6 +390,7 @@ setup(props, {emit}) {
         }
         if(store.state.organizationData.regexPatternPrompt && router.currentRoute.value.query.from == 'logs'){
             inputContext.value = store.state.organizationData.regexPatternPrompt;
+            testString.value = store.state.organizationData.regexPatternTestValue;
         }
     })
 
