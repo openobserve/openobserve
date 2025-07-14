@@ -148,12 +148,14 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         if field == TIMESTAMP_COL_NAME {
             continue;
         }
-        let index_opts = tantivy::schema::TextOptions::default().set_indexing_options(
-            tantivy::schema::TextFieldIndexing::default()
-                .set_index_option(tantivy::schema::IndexRecordOption::Basic)
-                .set_tokenizer("raw")
-                .set_fieldnorms(false),
-        );
+        let index_opts = tantivy::schema::TextOptions::default()
+            .set_indexing_options(
+                tantivy::schema::TextFieldIndexing::default()
+                    .set_index_option(tantivy::schema::IndexRecordOption::Basic)
+                    .set_tokenizer("raw")
+                    .set_fieldnorms(false),
+            )
+            .set_fast(None);
         tantivy_schema_builder.add_text_field(field, index_opts);
     }
     // add _timestamp field to tantivy schema
