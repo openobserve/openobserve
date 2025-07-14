@@ -1153,7 +1153,7 @@
     "allowAllUsersFromDomain": "Allow all users from {domain}",
     "allowOnlySpecificUsers": "Allow only specific users from {domain}",
     "allUsersAllowedMessage": "All users with email addresses ending in {domain} will be allowed to login.",
-    "emailPlaceholder": "e.g. user@example.com",
+    "emailPlaceholder": "e.g. user{domain}",
     "addEmail": "Add Email",
     "saveChanges": "Save Changes",
     "invalidDomain": "Please enter a valid domain name",
@@ -1168,7 +1168,8 @@
     "emailRemoved": "Email address removed successfully",
     "domainNeedsEmails": "Domain '{domain}' must have at least one email address when not allowing all users",
     "domainSettingsSaved": "Domain settings saved successfully",
-    "errorSavingDomainSettings": "Error saving domain settings"
+    "errorSavingDomainSettings": "Error saving domain settings",
+    "noDomainMessage": "No domains configured. Add domains above to restrict access."
   },
   "reports": {
     "header": "Reports",

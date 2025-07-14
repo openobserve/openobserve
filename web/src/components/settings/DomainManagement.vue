@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-px-md q-py-md">
-    <div class="text-h6 text-bold q-mb-md">
+  <div class="q-px-md q-py-md domain_management">
+    <div class="text-h6 text-bold q-mb-xs">
       {{ t("settings.ssoDomainRestrictions") }}
     </div>
     <div class="text-body2 text-grey-7 q-mb-lg">
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Domain Input Section -->
-    <div class="q-mb-lg">
+    <div class="q-mb-xs">
       <div class="text-body1 text-bold q-mb-md">
         {{ t("settings.domainAndAllowedUsers") }}
       </div>
@@ -40,16 +40,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="domain-input"
             outlined
             dense
+            @keydown.enter="addDomain"
             :rules="[
-              (val) => !!val || t('common.required'),
               (val) => isValidDomain(val) || t('settings.invalidDomain')
             ]"
           />
         </div>
-        <div class="col-auto">
+        <div class="col-auto q-my-none">
           <q-btn
             :label="t('settings.addDomain')"
             color="primary"
+            class="text-bold text-capitalize no-border"
             @click="addDomain"
             :disabled="!newDomain || !isValidDomain(newDomain)"
             unelevated
@@ -57,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="text-caption text-grey-6 q-mb-md">
+      <div class="text-caption text-grey-6 q-mb-md" v-if="domains.length > 0">
         {{ t("settings.domainConfiguredCount", { count: domains.length }) }}
       </div>
     </div>
@@ -67,9 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div 
         v-for="(domain, index) in domains" 
         :key="domain.name"
-        class="domain-card q-mb-md"
+        class="domain-card q-mb-xs"
       >
-        <div class="domain-header row items-center justify-between q-pa-md">
+        <div class="domain-header row items-center justify-between q-px-md q-py-sm">
           <div class="text-body1 text-bold">{{ domain.name }}</div>
           <q-btn
             icon="close"
@@ -84,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="q-pa-md">
           <!-- Radio Button Options -->
-          <div class="q-mb-md">
+          <div class="q-mb-xs">
             <q-radio
               v-model="domain.allowAllUsers"
               :val="true"
@@ -116,21 +117,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="col">
                 <q-input
                   v-model="domain.newEmail"
-                  :label="t('settings.emailPlaceholder')"
+                  :label="t('settings.emailPlaceholder', { domain: '@' + domain.name })"
                   color="input-border"
                   bg-color="input-bg"
                   class="email-input"
                   outlined
                   dense
+                  @keydown.enter="addEmail(domain)"
                   :rules="[
                     (val) => !val || isValidEmail(val, domain.name) || t('settings.invalidEmail')
                   ]"
                 />
               </div>
-              <div class="col-auto">
+              <div class="col-auto q-my-none">
                 <q-btn
                   :label="t('settings.addEmail')"
                   color="secondary"
+                  class="text-bold text-capitalize no-border"
                   @click="addEmail(domain)"
                   :disabled="!domain.newEmail || !isValidEmail(domain.newEmail, domain.name)"
                   unelevated
@@ -163,11 +166,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    <div v-else class="text-h6 text-grey-6 q-mt-md q-mb-lg tw-w-full text-center q-pa-lg domain-card">
+      {{ t("settings.noDomainMessage") }}
+    </div>
 
     <!-- Action Buttons -->
     <div class="row q-gutter-md">
       <q-btn
         :label="t('common.cancel')"
+        class="text-bold text-capitalize no-border"
         flat
         color="grey-7"
         @click="$emit('cancel')"
@@ -175,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-btn
         :label="t('settings.saveChanges')"
         color="secondary"
+        class="text-bold text-capitalize no-border"
         unelevated
         @click="saveChanges"
         :loading="saving"
@@ -189,6 +197,7 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import domainManagement from "@/services/domainManagement";
+import { add } from "date-fns";
 
 interface Domain {
   name: string;
@@ -235,7 +244,7 @@ const loadDomainSettings = async () => {
 };
 
 const isValidDomain = (domain: string): boolean => {
-  if (!domain) return false;
+  if (!domain) return true;
   // Basic domain validation - can be enhanced
   const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.([a-zA-Z]{2,}\.?)+$/;
   return domainRegex.test(domain);
@@ -272,11 +281,11 @@ const addDomain = () => {
 
   newDomain.value = "";
 
-  q.notify({
-    type: "positive",
-    message: t("settings.domainAdded"),
-    timeout: 3000,
-  });
+  // q.notify({
+  //   type: "positive",
+  //   message: t("settings.domainAdded"),
+  //   timeout: 3000,
+  // });
 };
 
 const removeDomain = (index: number) => {
@@ -431,5 +440,10 @@ const saveChanges = async () => {
     background: #2a2a2a;
     border-color: #444;
   }
+}
+</style>
+<style lang="scss">
+.domain_management .q-field__bottom {
+  padding-left: 0px;
 }
 </style>
