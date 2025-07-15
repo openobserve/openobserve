@@ -91,8 +91,9 @@ impl DisplayAs for TantivyOptimizeExec {
             .join(", ");
         write!(
             f,
-            "TantivyOptimizeExec: files: {}, file_list: [{file_keys}]",
-            self.file_list.len()
+            "TantivyOptimizeExec: files: {}, optimize_mode: {:?}, file_list: [{file_keys}]",
+            self.file_list.len(),
+            self.index_optimize_mode,
         )
     }
 }
@@ -193,9 +194,12 @@ async fn adapt_tantivy_result(
                 num_buckets,
             )?
         }
+        InvertedIndexOptimizeMode::SimpleTopN(field, limit, _ascend) => {
+            create_top_n_arrow_array(&schema, result.top_n(), &field, limit)?
+        }
         _ => {
             return internal_err!(
-                "Only count and histogram optimize modes are supported by TantivyOptimizeExec"
+                "Only count, histogram and topn optimize modes are supported by TantivyOptimizeExec"
             );
         }
     };
@@ -322,4 +326,74 @@ fn create_histogram_arrow_array(
     };
 
     Ok(vec![timestamp_array, count_array])
+}
+
+fn create_top_n_arrow_array(
+    schema: &SchemaRef,
+    top_n: Vec<(String, u64)>,
+    _field: &str,
+    _limit: usize,
+) -> Result<Vec<Arc<dyn arrow::array::Array>>, DataFusionError> {
+    // Validate inputs
+    if schema.fields().len() != 2 {
+        return Err(DataFusionError::Internal(format!(
+            "Expected schema with 2 fields for TopN, got {}",
+            schema.fields().len()
+        )));
+    }
+
+    // Extract field values and counts
+    let (field_values, count_values): (Vec<String>, Vec<u64>) = top_n.into_iter().unzip();
+
+    // Get field data types from schema to ensure we create the right array types
+    let field_field = &schema.fields()[0];
+    let count_field = &schema.fields()[1];
+
+    // Create field value array with proper type based on schema
+    let field_array = match field_field.data_type() {
+        arrow_schema::DataType::Utf8 => {
+            Arc::new(arrow::array::StringArray::from(field_values)) as Arc<dyn Array>
+        }
+        arrow_schema::DataType::LargeUtf8 => {
+            Arc::new(arrow::array::LargeStringArray::from(field_values)) as Arc<dyn Array>
+        }
+        arrow_schema::DataType::Utf8View => {
+            Arc::new(arrow::array::StringViewArray::from(field_values)) as Arc<dyn Array>
+        }
+        // Handle other string types as needed
+        _ => {
+            return Err(DataFusionError::Internal(format!(
+                "Unexpected field type in TopN schema: {:?}",
+                field_field.data_type()
+            )));
+        }
+    };
+
+    // Create count array with proper type based on schema
+    let count_array = match count_field.data_type() {
+        arrow_schema::DataType::Int64 => {
+            let i64_values = count_values.iter().map(|&c| c as i64).collect::<Vec<_>>();
+            Arc::new(Int64Array::from(i64_values)) as Arc<dyn Array>
+        }
+        arrow_schema::DataType::UInt64 => {
+            Arc::new(UInt64Array::from(count_values)) as Arc<dyn Array>
+        }
+        arrow_schema::DataType::Int32 => {
+            let i32_values = count_values.iter().map(|&c| c as i32).collect::<Vec<_>>();
+            Arc::new(arrow::array::Int32Array::from(i32_values)) as Arc<dyn Array>
+        }
+        arrow_schema::DataType::UInt32 => {
+            let u32_values = count_values.iter().map(|&c| c as u32).collect::<Vec<_>>();
+            Arc::new(arrow::array::UInt32Array::from(u32_values)) as Arc<dyn Array>
+        }
+        // Add other numeric types as needed
+        _ => {
+            return Err(DataFusionError::Internal(format!(
+                "Unexpected count type in TopN schema: {:?}",
+                count_field.data_type()
+            )));
+        }
+    };
+
+    Ok(vec![field_array, count_array])
 }

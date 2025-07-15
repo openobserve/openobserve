@@ -252,7 +252,14 @@ impl TantivyMultiResult {
 
     pub fn histogram(self) -> Vec<u64> {
         match self {
-            Self::Histogram(a) => a.clone(),
+            Self::Histogram(a) => a,
+            _ => vec![],
+        }
+    }
+
+    pub fn top_n(self) -> Vec<(String, u64)> {
+        match self {
+            Self::TopN(a) => a,
             _ => vec![],
         }
     }
