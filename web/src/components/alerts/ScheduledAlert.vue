@@ -1185,13 +1185,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
                     <span class="editor-text-title">{{  tab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
                     <div class="tw-flex tw-gap-2 tw-items-center tw-h-6 ">
-                      <div style="border: 1px solid #7980cc; border-radius: 4px;">
+                      <div style="border: 1px solid #7980cc; border-radius: 4px; height: 32px;">
                         <q-btn
                           data-test="alert-variables-add-btn"
                           size="sm"
                           no-caps
                           dense
-                          style="height: 32px;"
                           flat
                           class="text-bold no-border"
                             @click="toggleAIChat"
@@ -1205,10 +1204,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >Generate SQL</span>
                       </q-btn>
                       </div>
-                       <div class="tw-h-full tw-flex tw-justify-center tw-items-center">
+                      <div class="tw-h-full tw-flex tw-justify-center tw-items-center o2-select-input o2-input tw-w-full col"
+                      style="padding-top: 0"                       >
                         <q-select
                           v-model="selectedColumn"
-                          label="Search for a field"
                           :options="filteredFields"
                           data-test="dashboard-use-saved-vrl-function"
                           input-debounce="0"
@@ -1218,15 +1217,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           borderless
                           dense
                           hide-selected
-                          hide-bottom-space
-                          menu-anchor="top left"
+                          menu-anchor="bottom left"
                           fill-input
                           @filter="
                               (val: string, update: any) => filterFields(val, update)
                             "
                           @update:modelValue="onColumnSelect"
-                          input-style="width: 120px; "
                           class="mini-select "
+                          input-style="height: 12px; min-height: 8px; margin: 0px; width: 120px;  "
+                          placeholder="Search for a field"
+                          style="width: 150px;"
                     >
                         <template #no-option>
                           <q-item dense>
@@ -1321,7 +1321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       
                       <span class="editor-text-title">VRL Editor</span>
                       <div class="tw-flex tw-gap-2 tw-items-center">
-                        <div style="border: 1px solid #7980cc; border-radius: 4px;">
+                        <div style="border: 1px solid #7980cc; border-radius: 4px; height: 32px;">
                           <q-btn
                           data-test="alert-variables-add-btn"
                           size="sm"
@@ -1340,10 +1340,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >Generate VRL</span>
                       </q-btn>
                       </div>
-                        <div>
+                        <div class="tw-h-full tw-flex tw-justify-center tw-items-center o2-select-input o2-input tw-w-full col"
+                        style="padding-top: 0;"                       >
                           <q-select
                           v-model="selectedFunction"
-                          label="Saved functions"
                           :options="functionOptions"
                           data-test="dashboard-use-saved-vrl-function"
                           input-debounce="0"
@@ -1353,7 +1353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           borderless
                           dense
                           hide-selected
-                          menu-anchor="top left"
+                          menu-anchor="bottom left"
                           fill-input
                           option-label="name"
                           option-value="name"
@@ -1362,7 +1362,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="mini-select"
                           clearable
                           @clear="onFunctionClear"
-                          input-style="height: 8px; min-height: 8px; margin: 0px; width: 120px;  "
+                          style="width: 150px;"
+                          placeholder="Saved functions"
+                          input-style="height: 12px; min-height: 8px; margin: 0px; width: 120px;  "
                                                 >
                           <template #no-option>
                         <q-item>
@@ -1380,6 +1382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             no-caps
                             @click="runTestFunction"
                             :disable="vrlFunctionContent == ''"
+                            style="height: 32px;"
                           >
                             <q-icon name="search" size="18px" />
                             <span class="tw-text-[12px] tw-font-[400]">Apply VRL</span>
@@ -2266,7 +2269,10 @@ const routeToCreateDestination = () => {
     if(selectedColumn.value.value){
       query.value += ` ${selectedColumn.value.value} `
     }
-    selectedColumn.value = ""
+    // selectedColumn.value = {
+    //   label: "",
+    //   value: ""
+    // }
   };
   const buildMulitWindowQuery = (sql: any, fn: boolean = false, periodInMicroseconds: number) => {
   const queryToSend: any = [
@@ -2867,10 +2873,13 @@ defineExpose({
 .dark-mode .mini-select .q-field__control {
   background-color: #181a1b !important;
   border: 1px solid #7c7b7b !important;
+  border-radius: 4px !important;
 }
+
 .light-mode .mini-select .q-field__control {
   background-color: #ffffff !important;
   border: 1px solid #e0e0e0 !important;
+  border-radius: 4px !important;
 }
 
 .dark-mode .sql-output-section{
@@ -2934,7 +2943,12 @@ defineExpose({
 .light-mode-editor {
   border: 1px solid #e0e0e0 !important;
 }
-
-
-
+.o2-select-input {
+  .q-field{
+    .q-field__control{
+      min-height: 32px !important;
+      max-height: 32px !important;
+    }
+  }
+}
 </style>
