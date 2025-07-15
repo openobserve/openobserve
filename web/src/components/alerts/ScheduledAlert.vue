@@ -1181,7 +1181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- first sub section -->
           <div class="tw-flex-[3] tw-w-full">
             <div class="tw-w-full tw-h-full " :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-                <div  class="tw-flex tw-items-center tw-justify-between tw-h-12 q-py-sm">
+                <div  class="tw-flex tw-items-center tw-justify-between tw-pb-2 tw-pt-1">
   
                     <span class="editor-text-title">{{  tab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
                     <div class="tw-flex tw-gap-2 tw-items-center tw-h-6 ">
@@ -1281,7 +1281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         query === '' && queryEditorPlaceholderFlag ? 'empty-query' : '',
                         store.state.theme === 'dark' ? 'dark-mode dark-mode-editor' : 'light-mode light-mode-editor',
-                        !!sqlQueryErrorMsg ? 'tw-h-[calc(100%-120px)]' : 'tw-h-[calc(100%-82px)]'
+                        !!sqlQueryErrorMsg ? 'tw-h-[calc(100%-100px)]' : 'tw-h-[calc(100%-62px)]'
                       ]"
                       @update:query="updateQueryValue"
                       @focus="queryEditorPlaceholderFlag = false"
@@ -1307,7 +1307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         promqlQuery === '' ? 'empty-query' : '',
                         store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode',
-                        'tw-h-[calc(99%-70px)]'
+                        'tw-h-[calc(100%-62px)]'
                       ]"
                       @blur="onBlurQueryEditor"
                       style="min-height: 10rem;"
@@ -1317,7 +1317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- second sub section -->
           <div v-if="tab !== 'promql'" class="tw-flex-[2] tw-w-full">
             <div class="tw-w-full tw-h-full " :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-              <div  class="tw-flex tw-items-center tw-justify-between tw-h-12 q-py-sm">
+              <div  class="tw-flex tw-items-center tw-justify-between tw-pb-1 tw-pt-1">
                       
                       <span class="editor-text-title">VRL Editor</span>
                       <div class="tw-flex tw-gap-2 tw-items-center">
@@ -1426,7 +1426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class=" tw-w-full"
           :class="expandCombinedOutput ? 
-          expandSqlOutput ?  'tw-flex-1 tw-h-[calc(50%-24px)]' : 'tw-h-[24px]' : 
+          expandSqlOutput && tab == 'sql' ?  'tw-flex-1 tw-h-[calc(50%-24px)]' : tab != 'sql' ? 'tw-flex-1 tw-h-[calc(100%-24px)]' : 'tw-h-[24px]' : 
           expandSqlOutput ? 'tw-flex-1 tw-h-[calc(100%-24px)]' : 'tw-h-[24px]'"
           >
             <div class="tw-flex tw-items-center tw-justify-between tw-w-[100%] tw-gap-2">
