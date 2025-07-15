@@ -23,10 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ]"
     :style="{
       zIndex: 2,
-      borderBottom:
-        (isSpanSelected && `2px solid ${span.style.color}`) || 'none',
     }"
     :id="span.spanId"
+    data-test="span-block-container"
   >
     <div
       class="flex justify-between items-end cursor-pointer span-block relative-position"
@@ -39,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="spanBlock"
       @click="selectSpan(span.spanId)"
       @mouseover="onSpanHover"
+      data-test="span-block"
     >
       <div
         :style="{
@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="cursor-pointer flex items-center no-wrap position-relative"
         :class="defocusSpan ? 'defocus' : ''"
         @click="selectSpan(span.spanId)"
+        data-test="span-block-select-trigger"
       >
         <div
           :style="{
@@ -58,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           class="flex justify-start items-center no-wrap"
           ref="spanMarkerRef"
+          data-test="span-marker"
         >
           <div
             :style="{
@@ -84,18 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-resize-observer debounce="300" @resize="onResize" />
       </div>
     </div>
-    <template v-if="isSpanSelected">
-      <span-details
-        :style="{
-          borderTop: `2px solid ${span.style.color}`,
-        }"
-        :span="span"
-        :spanData="spanData"
-        :baseTracePosition="baseTracePosition"
-        @view-logs="viewSpanLogs"
-        @select-span="selectSpan"
-      />
-    </template>
   </div>
 </template>
 
@@ -162,9 +152,9 @@ export default defineComponent({
     const spanBlockWidth = ref(0);
     const onePixelPercent = ref(0);
     const defocusSpan = computed(() => {
-      if (!searchObj.data.traceDetails.selectedSpanId) return false;
-      return searchObj.data.traceDetails.selectedSpanId !== props.span.spanId;
+      return searchObj.data?.traceDetails?.selectedSpanId !== props.span.spanId;
     });
+
     const durationStyle = ref({});
     const router = useRouter();
     const { t } = useI18n();
@@ -176,15 +166,6 @@ export default defineComponent({
     const selectSpan = (spanId: string) => {
       emit("selectSpan", spanId);
     };
-    const toggleSpanCollapse = () => {
-      emit("toggleCollapse", props.span.spanId);
-    };
-
-    const isSpanSelected = computed(() => {
-      return searchObj.data.traceDetails.expandedSpans.includes(
-        props.span.spanId,
-      );
-    });
 
     const spanMarkerRef = ref(null);
 
@@ -298,21 +279,6 @@ export default defineComponent({
       spanBlockWidth.value = spanBlock.value.clientWidth;
     };
 
-    const toggleSpanDetails = () => {
-      if (!isSpanSelected.value) {
-        searchObj.data.traceDetails.expandedSpans.push(props.span.spanId);
-      } else {
-        searchObj.data.traceDetails.expandedSpans =
-          searchObj.data.traceDetails.expandedSpans.filter(
-            (val) => props.span.spanId !== val,
-          );
-      }
-    };
-
-    const viewSpanLogs = () => {
-      emit("view-logs");
-    };
-
     const onSpanHover = () => {
       emit("hover");
     };
@@ -321,7 +287,6 @@ export default defineComponent({
       t,
       formatTimeWithSuffix,
       selectSpan,
-      toggleSpanCollapse,
       getImageURL,
       leftPosition,
       spanWidth,
@@ -331,13 +296,11 @@ export default defineComponent({
       onePixelPercent,
       getSpanStartTime,
       spanMarkerRef,
-      toggleSpanDetails,
       defocusSpan,
-      isSpanSelected,
       store,
-      viewSpanLogs,
       onSpanHover,
       durationStyle,
+      searchObj,
     };
   },
 });
