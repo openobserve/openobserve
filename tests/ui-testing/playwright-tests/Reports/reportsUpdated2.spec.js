@@ -1,7 +1,7 @@
 import { test, expect } from "../baseFixtures.js";
 import { LoginPage } from '../../pages/loginPage.js';
 import { DashboardPage } from '../../pages/dashboardPages/dashboardPage.js';
-import { ReportsPage } from '../../pages/reportsPage.js';
+import { ReportsPage } from '../../pages/reportsPages/reportsPage.js';
 import { IngestionPage } from '../../pages/ingestionPage.js';
 
 function reportName() {

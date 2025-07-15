@@ -9,7 +9,7 @@ import { RumPage } from "../../pages/rumPage.js";
 import { PipelinesPage } from "../../pages/pipelinesPages/pipelinesPage.js";
 import { DashboardPage } from "../../pages/dashboardPages/dashboardPage.js";
 import { StreamsPage } from "../../pages/streamsPages/streamsPage.js";
-import { ReportsPage } from "../../pages/reportsPage.js";
+import { ReportsPage } from "../../pages/reportsPages/reportsPage.js";
 import { AlertsPage } from "../../pages/alertsPages/alertsPage.js";
 import { DataPage } from "../../pages/dataPage.js";
 import { IamPage } from "../../pages/iamPage.js";
