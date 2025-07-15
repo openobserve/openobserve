@@ -318,9 +318,6 @@ export default createStore({
       context.commit("setQuotaThresholdMsg", payload);
     },
     setConfig(context, payload) {
-      if(Object.hasOwn(payload, "ingestion_url") && payload.ingestion_url != "") {
-        context.commit("endpoint", payload.ingestion_url);  
-      }
       context.commit("setConfig", payload);
     },
     appTheme(context, payload) {
