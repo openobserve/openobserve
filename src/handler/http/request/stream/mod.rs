@@ -77,18 +77,19 @@ async fn schema(
             "stream not found",
         )));
     };
-    if let Some(uds_fields) = schema.settings.defined_schema_fields.as_ref() {
+    if !schema.settings.defined_schema_fields.is_empty() {
         let mut schema_fields = schema
             .schema
             .iter()
             .map(|f| (&f.name, f))
             .collect::<HashMap<_, _>>();
-        schema.uds_schema = Some(
-            uds_fields
-                .iter()
-                .filter_map(|f| schema_fields.remove(f).map(|f| f.to_owned()))
-                .collect::<Vec<_>>(),
-        );
+        schema.uds_schema = schema
+            .settings
+            .defined_schema_fields
+            .iter()
+            .filter_map(|f| schema_fields.remove(f))
+            .cloned()
+            .collect::<Vec<_>>();
     }
 
     // filter by keyword

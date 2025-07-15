@@ -179,7 +179,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_cache() {
         let (tx, rx) = mpsc::channel(100);
-        tokio::spawn(async move { update_cache(rx).await });
+        tokio::spawn(update_cache(rx));
         tx.send(infra::db::nats::NatsEvent::Connected)
             .await
             .unwrap();
