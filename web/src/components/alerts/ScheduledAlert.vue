@@ -1067,7 +1067,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else>
         <!-- view section -->
         <div class="tw-w-full tw-flex lg:tw-flex-col tw-flex-col tw-gap-2" :class="store.state.theme === 'dark' ? 'dark-mode-view' : 'light-mode-view'">
-          <div class="tw-flex tw-justify-between tw-items-center tw-w-full editor-container tw-px-2 q-py-sm">
+          <div class="tw-flex tw-justify-between tw-items-center tw-w-full editor-container tw-px-2 tw-py-3 ">
           <div class="tw-flex tw-items-start">
             <div :class="[
               store.state.theme === 'dark' ? 'tw-bg-gray-600' : 'tw-bg-gray-200'
@@ -2330,7 +2330,7 @@ const routeToCreateDestination = () => {
       const endTime = new Date().getTime() * 1000; // ← Use 1000 to get microseconds
       const startTime = endTime - periodInMicroseconds;
       queryReq.query.query_fn = null;
-      
+      //this is for single window query but we will deprecate this in future
       if(selectedMultiWindowOffset.value.length == 0){
         queryReq.query.start_time = startTime;
         queryReq.query.end_time = endTime;
