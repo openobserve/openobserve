@@ -1433,12 +1433,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <FullViewContainer
                 name="Output"
                 label="Output"
+                class="tw-w-full"
                 :isExpanded="expandSqlOutput"
-                class="tw-flex tw-w-full tw-flex tw-justify-between tw-pl-2"
                 @update:isExpanded="expandSqlOutput = $event"
                 
               >
-            </FullViewContainer>
+              <template #right>
+              <div class="tw-flex tw-items-center tw-justify-center tw-text-[12px] tw-font-semibold tw-mr-2"
+              :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-[#6B7280]'"
+              >
+              Results include all multi-window additions
+              </div>
+            </template>
+          </FullViewContainer>
             </div>
           <div v-if="expandSqlOutput" class="tw-h-[calc(100%-0px)] tw-overflow-y-hidden" >
             <!-- no output before run query section --> 
@@ -1498,9 +1505,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="Combined Output"
               label="Combined Output"
               :isExpanded="expandCombinedOutput"
-                class="tw-flex tw-w-full tw-pl-2"
+                class="tw-w-full tw-pl-2"
               @update:isExpanded="expandCombinedOutput = $event"
-            ></FullViewContainer>
+            >
+            <template #right>
+              <div class="tw-flex tw-items-center tw-justify-center tw-text-[12px] tw-font-semibold tw-mr-2"
+              :class="store.state.theme === 'dark' ? 'tw-text-white' : 'tw-text-[#6B7280]'"
+              >
+                SQL + VRL
+              </div>
+            </template>
+          </FullViewContainer>
           </div>
           <div v-if="expandCombinedOutput && tab !== 'promql'" class="tw-h-full">
             <div v-if="!tempTestFunction && !runQueryLoading"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[calc(100%-24px)] tw-w-full  no-output-before-run-query">
