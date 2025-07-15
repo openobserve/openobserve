@@ -3,9 +3,7 @@ import path from "path";
 import fs from "fs";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
-import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
-import { DashboardPage } from "../../pages/dashboardPages/dashboardPage.js";
-import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
+import PageManager from "../../pages/page-manager";
 
 // Function to read JSON test files
 function readJsonFile(filename) {
@@ -18,10 +16,7 @@ function readJsonFile(filename) {
 }
 
 test.describe("Custom Charts Tests", () => {
-  let dashboardPanel;
   let pictorialJSON, lineJSON;
-  let dashboardPage;
-  let dashboardPageActions;
 
   test.beforeAll(() => {
     pictorialJSON = readJsonFile("pictorial.json");
@@ -29,22 +24,21 @@ test.describe("Custom Charts Tests", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    dashboardPanel = new DashboardPanel(page);
-    dashboardPage = new DashboardPage(page);
-    dashboardPageActions = new DashboardactionPage(page);
-
     await login(page);
     await page.waitForTimeout(1000);
     await ingestion(page);
   });
 
   test("Add Pictorial JSON in Monaco Editor", async ({ page }) => {
+    //initialize the page manager
+    const pm = new PageManager(page);
+
     if (!pictorialJSON) {
       console.error("Skipping test: pictorial.json not found");
       return;
     }
 
-    await dashboardPage.addCustomChart();
+    await pm.dashboardPage.addCustomChart();
 
     // Type the content with raw modifier to bypass autocomplete
     await page.keyboard.insertText(pictorialJSON);
@@ -56,7 +50,7 @@ test.describe("Custom Charts Tests", () => {
       .getByRole("textbox")
       .fill('select * from "e2e_automate"');
     await page.waitForTimeout(2000);
-    await dashboardPageActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
     await page.waitForTimeout(3000);
     await expect(
       page.getByText(
@@ -66,12 +60,14 @@ test.describe("Custom Charts Tests", () => {
   });
 
   test("Add line JSON in Monaco Editor", async ({ page }) => {
+    //initialize the page manager
+    const pm = new PageManager(page);
     if (!lineJSON) {
       console.error("Skipping test: line.json not found");
       return;
     }
 
-    await dashboardPage.addCustomChart();
+    await pm.dashboardPage.addCustomChart();
 
     // Type the content with raw modifier to bypass autocomplete
     await page.keyboard.insertText(lineJSON);
@@ -82,7 +78,7 @@ test.describe("Custom Charts Tests", () => {
       .getByRole("textbox")
       .fill('select * from "e2e_automate"');
     await page.waitForTimeout(3000);
-    await dashboardPageActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
     await page.waitForTimeout(3000);
   });
 });
