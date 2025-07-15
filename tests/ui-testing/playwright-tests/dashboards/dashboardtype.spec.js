@@ -5,10 +5,6 @@ import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
 import PageManager from "../../pages/page-manager";
-// import pm.dashboardCreate from "../../pages/dashboardPages/dashboard-create";
-// import pm.dashboardListPage from "../../pages/dashboardPages/dashboard-list";
-import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
-// import pm.chartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -32,9 +28,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
-    // const pm.dashboardList = new pm.dashboardListPage(page);
-    // const pm.dashboardPanelActions = new DashboardactionPage(page);
-    // const pm.chartTypeSelector = new pm.chartTypeSelector(page);
+
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
     const dashboardName = randomDashboardName;

@@ -4,11 +4,6 @@ import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage } from "./utils/dashCreation.js";
 import PageManager from "../../pages/page-manager";
-// import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
-// import DashboardFolder from "../../pages/dashboardPages/dashboard-folder.js";
-// import pm.dashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
-// import { pm.dashboardPage } from "../../pages/pm.dashboardPage.js";
-// import { pm.alertsPage } from "../../pages/alertsPages/pm.alertsPage.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
