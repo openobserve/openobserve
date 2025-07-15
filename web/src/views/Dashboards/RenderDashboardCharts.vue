@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div
           v-for="item in panels"
-          :key="item.id"
+          :key="item.id + selectedTabId"
           :gs-id="item.id"
           :gs-x="getPanelLayout(item, 'x')"
           :gs-y="getPanelLayout(item, 'y')"
@@ -465,6 +465,7 @@ export default defineComponent({
 
         // refresh dashboard
         refreshDashboard();
+      } finally {
       }
     });
 
@@ -479,8 +480,12 @@ export default defineComponent({
           tab: route.query.tab ?? props.dashboardData.panels[0]?.tabId,
         },
       });
-    };    // GridStack initialization and methods
+    };    
+    // GridStack initialization and methods
+    
+    let gridStackUpdateInProgress = false;
     const initGridStack = () => {
+
       if (!gridStackContainer.value || gridStackInstance) return;
 
       // Initialize GridStack with optimal configuration
@@ -508,9 +513,14 @@ export default defineComponent({
       );
 
       // Event listeners for GridStack interactions
-      
-      // Handle layout changes (drag/resize)
-      gridStackInstance.on("change", (event, items) => {
+
+      // Handle layout changes (drag/resize) - only update layout data, don't save during operations
+      gridStackInstance.on("change", async (event, items) => {
+    
+        if(gridStackUpdateInProgress) {
+          return;
+        }
+
         if (items && items.length > 0) {
           updatePanelLayouts(items); // Update panel layout data
           saveDashboardData.execute(); // Save changes to backend
@@ -521,7 +531,7 @@ export default defineComponent({
       gridStackInstance.on("resizestop", (event, element) => {
         window.dispatchEvent(new Event("resize"));
       });
-    };    // Update panel layout data from GridStack items
+    }; // Update panel layout data from GridStack items
     const updatePanelLayouts = (items) => {
       items.forEach((item) => {
         const panelId = item.id;
@@ -534,9 +544,13 @@ export default defineComponent({
           panel.layout.h = item.h;
         }
       });
-    };    // Optimized GridStack refresh function
+    }; // Optimized GridStack refresh function
     const refreshGridStack = async () => {
-      if (!gridStackInstance || !gridStackContainer.value) return;
+      if (!gridStackInstance || !gridStackContainer.value) {
+        return;
+      }
+
+      gridStackUpdateInProgress = true;
 
       // Wait for Vue to finish DOM updates
       await nextTick();
@@ -546,35 +560,24 @@ export default defineComponent({
 
       // IMPORTANT: Disable animation and floating during reconstruction for better performance
       grid.float(false);
-      grid.setAnimation(false);      // Clear all existing widgets completely to prevent stale references
+      grid.setAnimation(false);
+
+      // Clear all existing widgets completely to prevent stale references
       const existingElements = grid.getGridItems();
-
-      existingElements.forEach((element) => {
-        grid.removeWidget(element, false);
-      });
-
+    
       // Force clear any remaining grid state
       grid.removeAll(false);
-
       // Wait for DOM cleanup to complete
       await nextTick(); // Ensure DOM is ready
-      
+
       if (panels.value.length === 0) {
         return;
       }
 
-      // Sort panels by their Y position first, then X position for optimal layout
-      const sortedPanels = [...panels.value].sort((a, b) => {
-        const aY = getPanelLayout(a, "y");
-        const bY = getPanelLayout(b, "y");
-        if (aY !== bY) return aY - bY;
-        return getPanelLayout(a, "x") - getPanelLayout(b, "x");
-      });
-
       // Add panels in sorted order to maintain proper layout
-      for (const panel of sortedPanels) {
+      for (const panel of panels.value) {
         // Wait for the element to be available in DOM
-        await nextTick();        
+        await nextTick();
         const element = gridStackContainer.value.querySelector(
           `[gs-id="${panel.id}"]`,
         );
@@ -590,7 +593,7 @@ export default defineComponent({
               minH: getMinimumHeight(panel.type),
               id: panel.id,
               noMove: props.viewOnly,
-              noResize: props.viewOnly,            
+              noResize: props.viewOnly,
             };
 
             // Make widget with explicit layout
@@ -604,10 +607,12 @@ export default defineComponent({
       // Wait for all widgets to be added
       await nextTick(); // Ensure DOM is updated
 
+
       // Trigger window resize to ensure charts render correctly
+      gridStackUpdateInProgress = false;
       window.dispatchEvent(new Event("resize"));
-    };    
-    
+    };
+
     // Add a method to reset grid layout
     const resetGridLayout = async () => {
       if (!gridStackInstance) return;
@@ -635,8 +640,8 @@ export default defineComponent({
         return panelData?.layout?.i || panelData.id;
       }
       return 0;
-    };    
-    
+    };
+
     // Get minimum height based on panel type for optimal display
     const getMinimumHeight = (type) => {
       switch (type) {
@@ -654,7 +659,7 @@ export default defineComponent({
       }
     };
 
-    // Get minimum width based on panel type for optimal display  
+    // Get minimum width based on panel type for optimal display
     const getMinimumWidth = (type) => {
       switch (type) {
         case "area":
@@ -685,13 +690,14 @@ export default defineComponent({
 
     watch(
       () => [selectedTabId.value],
-      async (newPanels, oldPanels) => {        
+      async (newPanels, oldPanels) => {
         // Only refresh if the number of tab changes
+        await nextTick();
         await refreshGridStack();
       },
       { deep: true }, // Deep watch to catch layout changes within panels
     );
-    
+
     // Initialize GridStack when component is mounted
     onMounted(async () => {
       await nextTick(); // Wait for DOM to be ready
@@ -701,7 +707,6 @@ export default defineComponent({
 
     // Clean up GridStack instance before component unmounts to prevent memory leaks
     onBeforeUnmount(() => {
-
       // Clean up GridStack instance
       if (gridStackInstance) {
         gridStackInstance.off("change");
@@ -783,7 +788,7 @@ export default defineComponent({
       isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
       currentQueryTraceIds,
       openEditLayout,
-      saveDashboardData,      
+      saveDashboardData,
       currentVariablesDataRef,
       resetGridLayout,
       refreshGridStack,
@@ -829,7 +834,7 @@ export default defineComponent({
 .grid-stack {
   background: transparent;
   margin: 2px;
-  
+
   /* When grid is static (disabled), hide resize handles */
   &.grid-stack-static {
     .ui-resizable-handle {
@@ -846,7 +851,7 @@ export default defineComponent({
   }
   .grid-stack-item-content {
     border: 1px solid #c2c2c27a;
-    border-radius: 4px; 
+    border-radius: 4px;
     overflow: visible;
     border-radius: inherit;
   }
@@ -855,7 +860,6 @@ export default defineComponent({
 /* GridStack theme overrides */
 :deep(.grid-stack) {
   .grid-stack-item {
-
     .drag-allow {
       cursor: move;
     }
@@ -869,10 +873,10 @@ export default defineComponent({
     &.ui-resizable-resizing {
       opacity: 0.9;
     }
-    
+
     > .ui-resizable-handle {
-      background: none;      
-      
+      background: none;
+
       &.ui-resizable-se {
         background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='%23999999' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
           no-repeat center;
