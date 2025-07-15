@@ -1,10 +1,10 @@
 // Implementation test.spec.js
-import { test, expect } from "./baseFixtures";
-import { LoginPage } from '../pages/loginPage.js';
-import { LogsPage } from '../pages/logsPages/logsPage.js';
+import { test, expect } from "../baseFixtures.js";
+import { LoginPage } from '../../pages/loginPage.js';
+import { LogsPage } from '../../pages/logsPages/logsPage.js';
 
 
-import { startTimeValue, endTimeValue } from '../pages/CommonLocator.js';
+import { startTimeValue, endTimeValue } from '../../pages/CommonLocator.js';
 
 test('Relative Seconds on Logs page', async ({ page }) => {
   // Create page object instances

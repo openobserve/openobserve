@@ -1,8 +1,8 @@
-import { test, expect } from "./baseFixtures";
-import logData from "../../ui-testing/cypress/fixtures/log.json";
-import logsdata from "../../test-data/logs_data.json";
-import UnflattenedPage from "../pages/unflattened";
-import { LogsPage } from '../pages/logsPages/logsPage.js';
+import { test, expect } from "../baseFixtures.js";
+import logData from "../../cypress/fixtures/log.json";
+import logsdata from "../../../test-data/logs_data.json";
+import UnflattenedPage from "../../pages/unflattened.js";
+import { LogsPage } from '../../pages/logsPages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 const streamName = `stream${Date.now()}`;

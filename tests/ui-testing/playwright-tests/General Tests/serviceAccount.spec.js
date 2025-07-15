@@ -1,6 +1,6 @@
-import { test, expect } from "./baseFixtures.js";
-import { LoginPage } from '../pages/loginPage.js';
-import { IamPage } from "../pages/iamPage.js";
+import { test, expect } from "../baseFixtures.js";
+import { LoginPage } from '../../pages/loginPage.js';
+import { IamPage } from "../../pages/iamPage.js";
 
 
 

@@ -1,8 +1,8 @@
-import { test, expect } from "./baseFixtures";
-import { LoginPage } from '../pages/loginPage';
-import { DashboardPage } from '../pages/dashboardPages/dashboardPage.js';
-import { ReportsPage } from '../pages/reportsPage';
-import { IngestionPage } from '../pages/ingestionPage';
+import { test, expect } from "../baseFixtures.js";
+import { LoginPage } from '../../pages/loginPage.js';
+import { DashboardPage } from '../../pages/dashboardPages/dashboardPage.js';
+import { ReportsPage } from '../../pages/reportsPage.js';
+import { IngestionPage } from '../../pages/ingestionPage.js';
 
 function reportName() {
     const characters = 'abcdefghijklmnopqrstuvwxyz';

@@ -1,9 +1,9 @@
-import { test, expect } from "./baseFixtures";
-import logData from "../../ui-testing/cypress/fixtures/log.json";
+import { test, expect } from "../baseFixtures.js";
+import logData from "../../cypress/fixtures/log.json";
 // import { log } from "console";
-import logsdata from "../../test-data/logs_data.json";
-import PipelinePage from "../pages/pipelinePage";
-import { LogsPage } from '../pages/logsPages/logsPage.js';
+import logsdata from "../../../test-data/logs_data.json";
+import PipelinePage from "../../pages/pipelinePage.js";
+import { LogsPage } from '../../pages/logsPages/logsPage.js';
 
 
 test.describe.configure({ mode: "parallel" });

@@ -1,8 +1,8 @@
-import { test, expect } from './baseFixtures';
-import logData from "../cypress/fixtures/log.json";
-import logsdata from "../../test-data/logs_data.json";
+import { test, expect } from '../baseFixtures.js';
+import logData from "../../cypress/fixtures/log.json";
+import logsdata from "../../../test-data/logs_data.json";
 import { toZonedTime } from "date-fns-tz";
-import { LogsPage } from '../pages/logsPages/logsPage.js';
+import { LogsPage } from '../../pages/logsPages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
 const folderName = `Folder ${Date.now()}`;

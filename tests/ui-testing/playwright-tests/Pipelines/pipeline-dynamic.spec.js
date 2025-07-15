@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import PipelinePage from '../pages/pipelinePage.js';
-import logsdata from '../../test-data/logs_data.json';
-import { getHeaders, getIngestionUrl, sendRequest } from '../utils/apiUtils.js';
+import PipelinePage from '../../pages/pipelinePage.js';
+import logsdata from '../../../test-data/logs_data.json';
+import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
 
 test.describe('Pipeline Dynamic Stream Names', () => {
   let page;

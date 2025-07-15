@@ -1,7 +1,7 @@
-import { test, expect } from "./baseFixtures.js";
-import { LoginPage } from '../pages/loginPage.js';
-import { UserPage } from "../pages/userPage.js";
-import { CreateOrgPage } from "../pages/createOrgPage.js";
+import { test, expect } from "../baseFixtures.js";
+import { LoginPage } from '../../pages/loginPage.js';
+import { UserPage } from "../../pages/userPage.js";
+import { CreateOrgPage } from "../../pages/createOrgPage.js";
 
 
 

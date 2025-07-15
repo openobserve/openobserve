@@ -1,7 +1,7 @@
-import { test, expect } from "./baseFixtures";
-import { LoginPage } from '../pages/loginPage';
-import { LogsPage } from '../pages/logsPages/logsPage.js';
-import { IngestionPage } from '../pages/ingestionPage';
+import { test, expect } from "../baseFixtures.js";
+import { LoginPage } from '../../pages/loginPage.js';
+import { LogsPage } from '../../pages/logsPages/logsPage.js';
+import { IngestionPage } from '../../pages/ingestionPage.js';
 
 test.describe.configure({ mode: 'parallel' });
 

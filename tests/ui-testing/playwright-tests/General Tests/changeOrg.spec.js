@@ -1,22 +1,22 @@
-import { test, expect } from "./baseFixtures.js";
-import { LoginPage } from '../pages/loginPage.js';
-import { LogsPage } from '../pages/logsPages/logsPage.js';
-import { IngestionPage } from '../pages/ingestionPage.js';
-import { HomePage } from "../pages/homePage.js";
-import { MetricsPage } from "../pages/metricsPage.js";
-import { TracesPage } from "../pages/tracesPage.js";
-import { RumPage } from "../pages/rumPage.js";
-import { PipelinesPage } from "../pages/pipelinesPage.js";
-import { DashboardPage } from "../pages/dashboardPages/dashboardPage.js";
-import { StreamsPage } from "../pages/streamsPage.js";
-import { ReportsPage } from "../pages/reportsPage.js";
-import { AlertsPage } from "../pages/alertsPages/alertsPage.js";
-import { DataPage } from "../pages/dataPage.js";
-import { IamPage } from "../pages/iamPage.js";
-import { ManagementPage } from "../pages/managementPage.js";
-import { AboutPage } from "../pages/aboutPage.js";
-import { CreateOrgPage } from "../pages/createOrgPage.js";
-import { CommonActions } from "../pages/commonActions.js";
+import { test, expect } from "../baseFixtures.js";
+import { LoginPage } from '../../pages/loginPage.js';
+import { LogsPage } from '../../pages/logsPages/logsPage.js';
+import { IngestionPage } from '../../pages/ingestionPage.js';
+import { HomePage } from "../../pages/homePage.js";
+import { MetricsPage } from "../../pages/metricsPage.js";
+import { TracesPage } from "../../pages/tracesPage.js";
+import { RumPage } from "../../pages/rumPage.js";
+import { PipelinesPage } from "../../pages/pipelinesPage.js";
+import { DashboardPage } from "../../pages/dashboardPages/dashboardPage.js";
+import { StreamsPage } from "../../pages/streamsPage.js";
+import { ReportsPage } from "../../pages/reportsPage.js";
+import { AlertsPage } from "../../pages/alertsPages/alertsPage.js";
+import { DataPage } from "../../pages/dataPage.js";
+import { IamPage } from "../../pages/iamPage.js";
+import { ManagementPage } from "../../pages/managementPage.js";
+import { AboutPage } from "../../pages/aboutPage.js";
+import { CreateOrgPage } from "../../pages/createOrgPage.js";
+import { CommonActions } from "../../pages/commonActions.js";
 
 
 test.describe("Change Organisation", () => {
