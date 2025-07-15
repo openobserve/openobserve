@@ -18,10 +18,7 @@ use std::io::Error;
 use actix_web::{HttpResponse, get, put, web};
 use config::META_ORG_ID;
 #[cfg(feature = "enterprise")]
-use o2_dex::{
-    meta::domain_management::DomainManagementRequest,
-    service::domain_management,
-};
+use o2_enterprise::enterprise::domain_management::{self, meta::DomainManagementRequest};
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 

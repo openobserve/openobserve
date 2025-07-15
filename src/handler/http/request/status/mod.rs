@@ -561,8 +561,10 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
 
                     // Check if email is allowed by domain management system
                     #[cfg(feature = "enterprise")]
-                    match o2_dex::service::domain_management::is_email_allowed(&res.0.user_email)
-                        .await
+                    match o2_enterprise::enterprise::domain_management::is_email_allowed(
+                        &res.0.user_email,
+                    )
+                    .await
                     {
                         Ok(allowed) => {
                             if !allowed {
