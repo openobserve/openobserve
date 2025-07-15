@@ -1177,7 +1177,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- new section updated -->
       <div class="tw-grid tw-h-[calc(100vh-100px)] tw-w-full tw-grid-cols-[60%_40%] tw-gap-x-2">
         <!-- Left Section (60%) -->
-        <div class="tw-flex tw-flex-col tw-h-full tw-gap-y-2">
+         <div class="tw-flex tw-w-full">
+        <div class="tw-flex tw-w-full tw-flex-col tw-h-full tw-gap-y-2">
           <!-- first sub section -->
           <div class="tw-flex-[3] tw-w-full">
             <div class="tw-w-full tw-h-full " :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
@@ -1418,8 +1419,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
           </div>
+          
         </div>
-
+        <q-separator vertical class="q-ml-sm" />
+        </div>
         <!-- Right Section (40%) -->
         <div class="tw-flex tw-flex-col tw-h-full tw-p-2 tw-gap-y-2 tw-overflow-y-hidden"
         :class="store.state.theme === 'dark' ? 'tw-bg-[#374151]' : 'tw-bg-[#F4F4F5]'"
@@ -1505,7 +1508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="Combined Output"
               label="Combined Output"
               :isExpanded="expandCombinedOutput"
-                class="tw-w-full tw-pl-2"
+                class="tw-w-full"
               @update:isExpanded="expandCombinedOutput = $event"
             >
             <template #right>
