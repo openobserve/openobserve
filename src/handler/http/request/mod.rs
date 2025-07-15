@@ -22,6 +22,7 @@ pub mod authz;
 pub mod cloud;
 pub mod clusters;
 pub mod dashboards;
+#[cfg(feature = "enterprise")]
 pub mod domain_management;
 pub mod enrichment_table;
 #[allow(deprecated)]
