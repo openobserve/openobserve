@@ -78,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             zIndex: 1,
           }"
           class="text-caption flex items-center"
+          data-test="span-block-duration"
         >
           <div>
             {{ formatTimeWithSuffix(span.durationUs) }}
@@ -152,7 +153,8 @@ export default defineComponent({
     const spanBlockWidth = ref(0);
     const onePixelPercent = ref(0);
     const defocusSpan = computed(() => {
-      return searchObj.data?.traceDetails?.selectedSpanId !== props.span.spanId;
+      if (!searchObj.data.traceDetails.selectedSpanId) return false;
+      return searchObj.data.traceDetails.selectedSpanId !== props.span.spanId;
     });
 
     const durationStyle = ref({});
