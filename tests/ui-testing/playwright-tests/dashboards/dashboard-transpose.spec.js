@@ -1,12 +1,7 @@
 import { test, expect } from "../baseFixtures";
 import PageManager from "../../pages/dashboardPages/page-manager.js";
-import DashboardCreate from "../../pages/dashboardPages/dashboard-create";
-import DashboardListPage from "../../pages/dashboardPages/dashboard-list";
-import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
-import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-configs";
 import { ingestion } from "./utils/dashIngestion.js";
 import { login } from "./utils/dashLogin.js";
-import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
 const randomDashboardName =
@@ -26,11 +21,6 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
-    // const pm.dashboardCreate = new DashboardCreate(page);
-    // const pm.dashboardList = new DashboardListPage(page);
-    // const pm.chartTypeSelector = new ChartTypeSelector(page);
-    // const pm.dashboardPanelActions = new DashboardactionPage(page);
-    // const pm.dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -94,7 +84,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelConfigs.selectTranspose();
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    await page.waitForTimeout(2000);
+    // await page.waitForTimeout(2000);
     // Validate data consistency before and after transpose
     await validateTableDataBeforeAndAfterTranspose(page);
 
@@ -128,7 +118,7 @@ test.describe("dashboard UI testcases", () => {
         .nth(2)
         .click();
       await page.locator('[data-test="dashboard-apply"]').click();
-      await page.waitForTimeout(2000);
+      // await page.waitForTimeout(2000);
 
       // Step 3: Capture transposed data from the table
       const transposedData = await page.$$eval(
