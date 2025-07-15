@@ -275,7 +275,7 @@ test.describe("dashboard variables settings", () => {
   test("should verify that hide on constant variable dashboard is working", async ({
     page,
   }) => {
-    //Initialize page manager
+    // Initialize page manager
     const pm = new PageManager(page);
     const variableName = pm.dashboardSetting.variableName();
 
@@ -305,7 +305,7 @@ test.describe("dashboard variables settings", () => {
       .waitFor({ state: "visible" });
     await pm.dashboardSetting.closeSettingWindow();
 
-    //delete the dashboard
+    // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
   });
@@ -421,10 +421,6 @@ test.describe("dashboard variables settings", () => {
 
     // Save the added variable
     await pm.dashboardSetting.saveVariable();
-
-    // await page
-    //   .locator('[data-test="dashboard-variable-add-btn"]')
-    //   .waitFor({ state: "visible" });
     await pm.dashboardSetting.closeSettingWindow();
 
     // Ensure the panel is visible

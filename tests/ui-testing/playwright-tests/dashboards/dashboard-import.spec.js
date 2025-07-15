@@ -19,7 +19,7 @@ test.describe("dashboard Import testcases", () => {
     );
     await orgNavigation;
   });
-  test("should import the dashbaord", async ({ page }) => {
+  test("should import the dashboard", async ({ page }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
 
@@ -383,7 +383,7 @@ test.describe("dashboard Import testcases", () => {
         .nth(0)
     ).toBeVisible();
 
-    //is used for setting the file to be importedad
+    //is used for setting the file to be imported
 
     await pm.dashboardImport.clickImportButton();
     await waitForDashboardPage(page);
@@ -398,7 +398,7 @@ test.describe("dashboard Import testcases", () => {
     expect(errorMessage).toBe("");
   });
 
-  test("should import the 'Kubernetes _ Compute Resources _ Cluster' dashbaord using URL import", async ({
+  test("should import the 'Kubernetes _ Compute Resources _ Cluster' dashboard using URL import", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page

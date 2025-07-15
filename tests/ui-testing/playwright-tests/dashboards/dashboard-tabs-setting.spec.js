@@ -76,9 +76,7 @@ test.describe("dashboard tabs setting", () => {
     await pm.dashboardSetting.addTabSetting(newTabName);
     await pm.dashboardSetting.saveTabSetting();
     await pm.dashboardSetting.closeSettingDashboard();
-    // await expect(page.getByText("Dashboard added successfully.")).toBeVisible({
-    //   timeout: 3000,
-    // });
+
     await expect(page.getByText("Tab added successfully")).toBeVisible({
       timeout: 2000,
     });

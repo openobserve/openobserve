@@ -74,7 +74,6 @@ test.describe("dashboard folder testcases", () => {
   }) => {
     const pm = new PageManager(page);
 
-    // Navigate to dashboards (dashboardList is the correct property)
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
 
