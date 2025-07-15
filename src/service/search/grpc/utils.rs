@@ -158,16 +158,14 @@ pub enum TantivyMultiResultBuilder {
     RowNums(u64),
     Histogram(Vec<Vec<u64>>),
     TopN(Vec<(String, u64)>),
-    None,
 }
 
 impl TantivyMultiResultBuilder {
     pub fn new(optimize_rule: &Option<InvertedIndexOptimizeMode>) -> Self {
         match optimize_rule {
-            Some(InvertedIndexOptimizeMode::SimpleCount) => Self::RowNums(0),
             Some(InvertedIndexOptimizeMode::SimpleHistogram(..)) => Self::Histogram(vec![]),
             Some(InvertedIndexOptimizeMode::SimpleTopN(..)) => Self::TopN(vec![]),
-            _ => Self::None,
+            _ => Self::RowNums(0),
         }
     }
 
@@ -219,7 +217,6 @@ impl TantivyMultiResultBuilder {
                 TantivyMultiResult::Histogram(histogram)
             }
             Self::TopN(a) => TantivyMultiResult::TopN(a),
-            _ => unreachable!("unsupported tantivy multi result"),
         }
     }
 }
