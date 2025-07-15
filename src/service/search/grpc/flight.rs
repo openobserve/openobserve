@@ -26,7 +26,7 @@ use config::{
         inverted_index::InvertedIndexOptimizeMode,
         search::ScanStats,
         sql::TableReferenceExt,
-        stream::{FileKey, StreamPartition, StreamType},
+        stream::{FileKey, StreamType},
     },
     utils::json,
 };
@@ -66,7 +66,6 @@ pub async fn search(
     trace_id: &str,
     req: &FlightSearchRequest,
 ) -> Result<(SessionContext, Arc<dyn ExecutionPlan>, ScanStats), Error> {
-    // let start = std::time::Instant::now();
     let cfg = get_config();
 
     let org_id = req.query_identifier.org_id.to_string();
@@ -146,9 +145,6 @@ pub async fn search(
         latest_schema_map.insert(field.name(), field);
     }
 
-    // construct index condition
-    let index_condition = generate_index_condition(&req.index_info.index_condition)?;
-
     let db_schema = infra::schema::get(&org_id, &stream_name, stream_type)
         .await
         .unwrap_or(arrow_schema::Schema::empty());
@@ -156,16 +152,9 @@ pub async fn search(
     let stream_created_at = unwrap_stream_created_at(&db_schema);
     let fst_fields = get_stream_setting_fts_fields(&stream_settings)
         .into_iter()
-        .filter_map(|v| {
-            if latest_schema_map.contains_key(&v) {
-                Some(v)
-            } else {
-                None
-            }
-        })
+        .filter_map(|v| latest_schema_map.contains_key(&v).then_some(v))
         .collect_vec();
-    let mut index_updated_at =
-        get_stream_setting_index_updated_at(&stream_settings, stream_created_at);
+    let index_updated_at = get_stream_setting_index_updated_at(&stream_settings, stream_created_at);
 
     // construct partition filters
     let search_partition_keys: Vec<(String, String)> = req
@@ -173,11 +162,9 @@ pub async fn search(
         .equal_keys
         .iter()
         .filter_map(|v| {
-            if latest_schema_map.contains_key(&v.key) {
-                Some((v.key.to_string(), v.value.to_string()))
-            } else {
-                None
-            }
+            latest_schema_map
+                .contains_key(&v.key)
+                .then_some((v.key.to_string(), v.value.to_string()))
         })
         .collect::<Vec<_>>();
 
@@ -191,6 +178,8 @@ pub async fn search(
         use_inverted_index: req.index_info.use_inverted_index,
     });
 
+    // construct tantivy related params
+    let index_condition = generate_index_condition(&req.index_info.index_condition)?;
     let idx_optimize_rule: Option<InvertedIndexOptimizeMode> =
         req.index_info.index_optimize_mode.clone().map(|x| x.into());
 
@@ -202,16 +191,12 @@ pub async fn search(
     // search in object storage
     let mut tantivy_file_list = Vec::new();
     if !req.search_info.file_id_list.is_empty() {
-        let stream_settings = infra::schema::get_settings(&org_id, &stream_name, stream_type)
-            .await
-            .unwrap_or_default();
         let (mut file_list, file_list_took) = get_file_list_by_ids(
             &trace_id,
             &org_id,
             stream_type,
             &stream_name,
             query_params.time_range,
-            &stream_settings.partition_keys,
             &search_partition_keys,
             &req.search_info.file_id_list,
         )
@@ -234,40 +219,15 @@ pub async fn search(
             )
         );
 
-        let mut storage_search_idx_optimize_rule = idx_optimize_rule.clone();
-        let is_aggregate_exec = physical_plan.name() == "AggregateExec";
-        let is_simple_count = physical_plan.schema().fields().len() == 1
-            && matches!(
-                idx_optimize_rule,
-                Some(InvertedIndexOptimizeMode::SimpleCount)
-            );
-        let is_simple_histogram = matches!(
-            idx_optimize_rule,
-            Some(InvertedIndexOptimizeMode::SimpleHistogram(..))
-        );
-        if is_simple_histogram {
-            let ttv_timestamp_updated_at =
-                db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
-            index_updated_at = index_updated_at.max(ttv_timestamp_updated_at);
-        }
-        if is_aggregate_exec && (is_simple_count || is_simple_histogram) {
-            let (tantivy_files, datafusion_files) = split_file_list_by_time_range(
-                file_list,
-                req.search_info.start_time,
-                req.search_info.end_time,
-                index_updated_at,
-            );
-            tantivy_file_list = tantivy_files;
-            file_list = datafusion_files;
-            storage_search_idx_optimize_rule = None;
-            log::debug!(
-                "[trace_id {}] flight->search: after_split_file idx: {}, datafusion_files: {}, optimize_rule: {:?}",
-                trace_id,
-                tantivy_file_list.len(),
-                file_list.len(),
-                storage_search_idx_optimize_rule
-            );
-        }
+        let mut storage_idx_optimize_rule = idx_optimize_rule.clone();
+        (tantivy_file_list, file_list) = handle_tantivy_optimize(
+            &trace_id,
+            req,
+            &mut storage_idx_optimize_rule, // pass by mutable reference
+            file_list,
+            index_updated_at,
+        )
+        .await?;
 
         // sort by max_ts, the latest file should be at the top
         if empty_exec.sorted_by_time() {
@@ -282,7 +242,7 @@ pub async fn search(
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
-            storage_search_idx_optimize_rule,
+            storage_idx_optimize_rule,
         )
         .await
         {
@@ -402,11 +362,14 @@ async fn get_file_list_by_ids(
     stream_type: StreamType,
     stream_name: &str,
     time_range: Option<(i64, i64)>,
-    partition_keys: &[StreamPartition],
     equal_items: &[(String, String)],
     ids: &[i64],
 ) -> Result<(Vec<FileKey>, usize), Error> {
     let start = std::time::Instant::now();
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or_default();
+    let partition_keys = stream_settings.partition_keys;
     let file_list = crate::service::file_list::query_by_ids(
         trace_id,
         ids,
@@ -425,7 +388,7 @@ async fn get_file_list_by_ids(
             stream_name,
             time_range,
             &file,
-            partition_keys,
+            &partition_keys,
             equal_items,
         )
         .await
@@ -452,6 +415,54 @@ fn generate_index_condition(index_condition: &str) -> Result<Option<IndexConditi
     } else {
         None
     })
+}
+
+async fn handle_tantivy_optimize(
+    trace_id: &str,
+    req: &FlightSearchRequest,
+    idx_optimize_rule: &mut Option<InvertedIndexOptimizeMode>,
+    file_list: Vec<FileKey>,
+    index_updated_at: i64,
+) -> Result<(Vec<FileKey>, Vec<FileKey>), Error> {
+    // early return if not simple count, histogram or topn
+    if !matches!(
+        idx_optimize_rule,
+        Some(InvertedIndexOptimizeMode::SimpleCount)
+            | Some(InvertedIndexOptimizeMode::SimpleHistogram(..))
+            | Some(InvertedIndexOptimizeMode::SimpleTopN(..))
+    ) {
+        return Ok((vec![], file_list));
+    }
+
+    // TODO: topn should have this
+    let mut index_updated_at = index_updated_at;
+    if matches!(
+        idx_optimize_rule,
+        Some(InvertedIndexOptimizeMode::SimpleHistogram(..))
+    ) {
+        let ttv_timestamp_updated_at =
+            db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
+        index_updated_at = index_updated_at.max(ttv_timestamp_updated_at);
+    }
+
+    let (tantivy_files, datafusion_files) = split_file_list_by_time_range(
+        file_list,
+        req.search_info.start_time,
+        req.search_info.end_time,
+        index_updated_at,
+    );
+    // set optimize rule to None, because datafusion should not use it
+    *idx_optimize_rule = None;
+
+    log::debug!(
+        "[trace_id {}] flight->search: after_split_file tantivy_files: {}, datafusion_files: {}, optimize_rule: {:?}",
+        trace_id,
+        tantivy_files.len(),
+        datafusion_files.len(),
+        idx_optimize_rule
+    );
+
+    Ok((tantivy_files, datafusion_files))
 }
 
 // if the file in the [start_time, end_time], it will be in tantivy group
