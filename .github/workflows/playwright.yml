@@ -141,7 +141,7 @@ jobs:
             "Streams/streaming.spec.js",
             "Logs/unflattened.spec.js",
             "General Tests/usersOrg.spec.js",
-            "Logswebsocket.spec.js",
+            "Logs/websocket.spec.js",
             "Pipelines/pipeline-dynamic.spec.js",
             "Logs/searchpartition.spec.js",
             "Pipelines/pipeline-core.spec.js",
