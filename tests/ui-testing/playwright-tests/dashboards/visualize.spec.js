@@ -644,8 +644,8 @@ LIMIT 100`;
     await queryEditor.fill(updatedQuery.trim());
 
     // Activate the function editor to trigger reprocessing
-    // await page.locator("#fnEditor").getByRole("textbox").locator("div").click();
-    await logsVisualise.openVisualiseTab();
+    await page.locator("#fnEditor").getByRole("textbox").locator("div").click();
+    // await logsVisualise.openVisualiseTab();
 
     await page.waitForTimeout(5000);
     // Step 5: Assert updated field is visible
@@ -653,7 +653,7 @@ LIMIT 100`;
       page.locator(
         '[data-test="dashboard-x-item-kubernetes_namespace_testname"]'
       )
-    ).toBeVisible();
+    ).toHaveCount(1, { timeout: 10000 });
   });
 
   test("Should redirect to the table chart in visualization when the query includes more than two fields on the X-axis.", async ({
