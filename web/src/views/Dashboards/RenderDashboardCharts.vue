@@ -451,7 +451,6 @@ export default defineComponent({
 
         showPositiveNotification("Dashboard updated successfully");
       } catch (error: any) {
-        console.error("Error while saving dashboard:", error);
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
@@ -601,10 +600,6 @@ export default defineComponent({
             grid.makeWidget(element, layoutConfig);
           } catch (error) {
             // Error adding widget, skip this panel
-            console.error(
-              `refreshGridStack: Error adding widget for ${panel.id}`,
-              error,
-            );
           }
         }
       }
