@@ -3438,7 +3438,7 @@ mod tests {
     }
 
     fn is_simple_topn_query(statement: &mut Statement) -> bool {
-        let index_fields = ["id".to_string()].into_iter().collect();
+        let index_fields = ["id".to_string(), "name".to_string()].into_iter().collect();
         let mut visitor = IndexOptimizeModeVisitor::new_from_index_fields(index_fields);
         let _ = statement.visit(&mut visitor);
         visitor.simple_topn.is_some()
@@ -3458,7 +3458,7 @@ mod tests {
     #[test]
     fn test_is_simple_topn_visit2() {
         // Test with additional where clause
-        let sql = "select name, count(*) from t where status = 'active' group by name order by count(*) desc limit 5";
+        let sql = "select name, count(*) as cnt from t where status = 'active' group by name order by cnt desc limit 10";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
