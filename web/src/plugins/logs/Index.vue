@@ -1501,6 +1501,8 @@ export default defineComponent({
 
     const searchResponseForVisualization = ref({});
 
+    let fieldsExtractionPromise = new Promise((resolve)=>resolve(true));
+
     const copyLogsQueryToDashboardPanel = async () => {
       // Check should use histogram query
       // If true, then set histogram query
@@ -1557,7 +1559,9 @@ export default defineComponent({
           // extract custom fields from query
           // identify x axis, y axis and breakdown fields
           // push on query fields
-          setCustomQueryFields();
+          fieldsExtractionPromise = setCustomQueryFields();
+
+          await fieldsExtractionPromise;
 
           // set logs page data to searchResponseForVisualization
           if (shouldUseHistogram === true) {
@@ -1616,7 +1620,9 @@ export default defineComponent({
         // extract custom fields from query
         // identify x axis, y axis and breakdown fields
         // push on query fields
-        setCustomQueryFields();
+        fieldsExtractionPromise = setCustomQueryFields();
+
+        await fieldsExtractionPromise;
 
         // run query
         // visualizeChartData.value = JSON.parse(
@@ -1683,8 +1689,12 @@ export default defineComponent({
       { deep: true },
     );
 
-    const handleRunQueryFn = () => {
+    const handleRunQueryFn = async () => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
+
+        // wait to extract fields if its ongoing
+        await fieldsExtractionPromise;
+
         if (!isValid(true, true)) {
           // return;
         }
@@ -1885,7 +1895,7 @@ export default defineComponent({
       processInterestingFiledInSQLQuery,
       removeFieldByName,
       setFieldsAndConditions,
-      dashboardPanelData
+      dashboardPanelData,
       searchResponseForVisualization,
     };
   },

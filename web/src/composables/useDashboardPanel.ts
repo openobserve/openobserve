@@ -3106,8 +3106,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   // logic will be take timestamp field as x axis if available, else first group by field will go to x axis
   // 2nd group by field will go to breakdown
   // all other fields will go to y axis
-  const setCustomQueryFields = () => {
+  const setCustomQueryFields = async () => {
     resetFields();
+
+    // CAUTION: make sure to remove this delay before merging
+    // add two second delay
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
     const extractedFields = extractTimestampAndGroupBy(
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
