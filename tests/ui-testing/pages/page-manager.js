@@ -1,29 +1,28 @@
 // Centralized PageManager for dashboard-related page objects
-import DashboardCreate from "./dashboard-create";
-import DashboardListPage from "./dashboard-list";
-import DashboardFolder from "./dashboard-folder";
-import DashboardPanelActions from "./dashboard-panel-actions";
-import DashboardPanelConfigs from "./dashboard-panel-configs";
-import DashboardPanelEdit from "./dashboard-panel-edit";
-import DashboardSetting from "./dashboard-settings";
-import DashboardVariables from "./dashboard-variables";
-import ChartTypeSelector from "./dashboard-chart";
-import DashboardDrilldownPage from "./dashboard-drilldown";
-import DashboardFilter from "./dashboard-filter";
-import DashboardImport from "./dashboard.import";
-import DashboardShareExportPage from "./dashboard-share-export";
-import DashboardTimeRefresh from "./dashboard-refresh";
-import DateTimeHelper from "./dashboard-time";
-import LogsVisualise from "./visualise";
-import { DashboardPage } from "../../pages/dashboardPage.js";
-import { AlertsPage } from "../../pages/alertsPages/alertsPage.js";
-
+import DashboardCreate from "./dashboardPages/dashboard-create";
+import DashboardListPage from "./dashboardPages/dashboard-list";
+import DashboardFolder from "./dashboardPages/dashboard-folder";
+import DashboardPanelActions from "./dashboardPages/dashboard-panel-actions";
+import DashboardPanelConfigs from "./dashboardPages/dashboard-panel-configs";
+import DashboardPanelEdit from "./dashboardPages/dashboard-panel-edit";
+import DashboardSetting from "./dashboardPages/dashboard-settings";
+import DashboardVariables from "./dashboardPages/dashboard-variables";
+import ChartTypeSelector from "./dashboardPages/dashboard-chart";
+import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
+import DashboardFilter from "./dashboardPages/dashboard-filter";
+import DashboardImport from "./dashboardPages/dashboard.import";
+import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
+import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
+import DateTimeHelper from "./dashboardPages/dashboard-time";
+import LogsVisualise from "./dashboardPages/visualise";
+import { DashboardPage } from "./dashboardPage.js";
+import { AlertsPage } from "./alertsPages/alertsPage.js";
 
 /**
  * PageManager provides a single access point for all dashboard page objects.
  *
  * Usage in your test file:
- *   import PageManager from './pages/dashboardPages/page-manager';
+ *   import PageManager from './pages/page-manager';
  *   const pm = new PageManager(page);
  *   await pm.dashboardCreate.createDashboard('My Dashboard');
  *   await pm.dashboardPanelActions.addPanelName('Panel 1');
@@ -53,7 +52,6 @@ class PageManager {
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
     this.alertsPage = new AlertsPage(page);
-    
   }
 }
 

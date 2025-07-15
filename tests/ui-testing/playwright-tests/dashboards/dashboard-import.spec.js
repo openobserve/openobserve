@@ -3,7 +3,7 @@ import logData from "../../cypress/fixtures/log.json";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage } from "./utils/dashCreation.js";
-import PageManager from "../../pages/dashboardPages/page-manager.js";
+import PageManager from "../../pages/page-manager";
 test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard Import testcases", () => {

@@ -1,5 +1,5 @@
 import { test, expect } from "../baseFixtures";
-import PageManager from "../../pages/dashboardPages/page-manager.js";
+import PageManager from "../../pages/page-manager";
 import { ingestion } from "./utils/dashIngestion.js";
 import { login } from "./utils/dashLogin.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
@@ -197,7 +197,7 @@ test.describe("dashboard UI testcases", () => {
   test("should not show an error when both the Transpose and Dynamic Column toggle buttons are enabled", async ({
     page,
   }) => {
-     // Instantiate PageManager with the current page
+    // Instantiate PageManager with the current page
     const pm = new PageManager(page);
 
     const panelName =

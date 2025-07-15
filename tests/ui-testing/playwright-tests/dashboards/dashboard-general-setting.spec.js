@@ -1,7 +1,7 @@
 import { test, expect } from "../baseFixtures";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
-import PageManager from "../../pages/dashboardPages/page-manager.js";
+import PageManager from "../../pages/page-manager";
 import { time } from "console";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 

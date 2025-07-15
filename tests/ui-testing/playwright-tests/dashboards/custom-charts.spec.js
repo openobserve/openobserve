@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
-import PageManager from "../../pages/dashboardPages/page-manager";
+import PageManager from "../../pages/page-manager";
 
 // Function to read JSON test files
 function readJsonFile(filename) {
@@ -24,7 +24,6 @@ test.describe("Custom Charts Tests", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-  
     await login(page);
     await page.waitForTimeout(1000);
     await ingestion(page);

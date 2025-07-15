@@ -3,7 +3,7 @@ import { login } from "./utils/dashLogin.js";
 import { ingestionForMaps } from "./utils/dashIngestion.js";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
-import PageManager from "../../pages/dashboardPages/page-manager.js";
+import PageManager from "../../pages/page-manager";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);

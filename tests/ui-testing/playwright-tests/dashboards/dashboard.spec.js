@@ -5,7 +5,7 @@ import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
-import PageManager from "../../pages/dashboardPages/page-manager.js";
+import PageManager from "../../pages/page-manager";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -84,10 +84,10 @@ test.describe("dashboard UI testcases", () => {
   test("should create a dashboard and add the breakdown", async ({ page }) => {
     // Initialize Page Objects
     const pm = new PageManager(page);
-  
 
     // Generate a unique panel name
-    const panelName = pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboard list
     await pm.dashboardList.menuItem("dashboards-item");
@@ -134,7 +134,8 @@ test.describe("dashboard UI testcases", () => {
     const pm = new PageManager(page);
 
     // Generate a unique panel name
-    const panelName = pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await pm.dashboardList.menuItem("dashboards-item");
@@ -178,7 +179,8 @@ test.describe("dashboard UI testcases", () => {
     const pm = new PageManager(page);
 
     // Generate unique panel name
-    const panelName = pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to Dashboards page
     await pm.dashboardList.menuItem("dashboards-item");
@@ -227,7 +229,8 @@ test.describe("dashboard UI testcases", () => {
     const pm = new PageManager(page);
 
     // Generate a unique panel name
-    const panelName = pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to the dashboards list
     await pm.dashboardList.menuItem("dashboards-item");
@@ -269,7 +272,8 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
-    const panelName = pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
     // Navigate to dashboards
     await pm.dashboardList.menuItem("dashboards-item");

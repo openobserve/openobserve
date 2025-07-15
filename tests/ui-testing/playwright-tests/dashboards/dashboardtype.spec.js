@@ -4,7 +4,7 @@ import logsdata from "../../../test-data/logs_data.json";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
-import PageManager from "../../pages/dashboardPages/page-manager";
+import PageManager from "../../pages/page-manager";
 // import pm.dashboardCreate from "../../pages/dashboardPages/dashboard-create";
 // import pm.dashboardListPage from "../../pages/dashboardPages/dashboard-list";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";

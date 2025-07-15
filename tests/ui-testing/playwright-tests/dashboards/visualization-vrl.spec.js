@@ -3,7 +3,7 @@ import LogsVisualise from "../../pages/dashboardPages/visualise.js";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import logData from "../../cypress/fixtures/log.json";
-import PageManager from "../../pages/dashboardPages/page-manager";
+import PageManager from "../../pages/page-manager";
 
 test.describe.configure({ mode: "parallel" });
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {

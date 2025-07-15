@@ -2,7 +2,7 @@ import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
-import PageManager from "../../pages/dashboardPages/page-manager";
+import PageManager from "../../pages/page-manager";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
 import { waitForDashboardPage } from "./utils/dashCreation.js";
 const randomDashboardName =
