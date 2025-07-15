@@ -116,15 +116,16 @@ impl TantivyResult {
         _ascend: bool, // TODO: support ascend
     ) -> anyhow::Result<Self> {
         // collector
+        let limit = (limit * 4).max(1000) as u32;
         let aggregation = Aggregation {
             agg: AggregationVariants::Terms(TermsAggregation {
                 field: field.to_string(),
-                size: Some(limit as u32),
+                size: Some(limit),
                 order: None,
                 missing: None,
                 min_doc_count: Some(0),
                 show_term_doc_count_error: Some(false),
-                segment_size: Some(1000),
+                segment_size: Some(limit),
             }),
             sub_aggregation: HashMap::new(),
         };
