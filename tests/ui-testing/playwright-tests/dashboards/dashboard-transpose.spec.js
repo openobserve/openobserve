@@ -6,10 +6,7 @@ import DashboardPanelConfigs from "../../pages/dashboardPages/dashboard-panel-co
 import { ingestion } from "./utils/dashIngestion.js";
 import { login } from "./utils/dashLogin.js";
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart";
-import {
-  waitForDashboardPage,
-  deleteDashboard,
-} from "./utils/dashCreation.js";
+import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).slice(2, 11);
@@ -89,6 +86,72 @@ test.describe("dashboard UI testcases", () => {
     await dashboardPanelConfigs.selectTranspose();
     await dashboardActions.applyDashboardBtn();
 
+    await page.waitForTimeout(2000);
+    // Validate data consistency before and after transpose
+    await validateTableDataBeforeAndAfterTranspose(page);
+
+    // Helper function to validate table data before and after transposing
+    // Helper function to dynamically transpose data and validate it
+    async function validateTableDataBeforeAndAfterTranspose(page) {
+      // Step 1: Capture headers and initial data from the table
+      const headers = await page.$$eval(
+        '[data-test="dashboard-panel-table"] thead tr th',
+        (headerCells) =>
+          headerCells.map((cell) =>
+            cell.textContent.trim().replace(/^arrow_upward/, "")
+          ) // Remove "arrow_upward" prefix
+      );
+
+      const initialData = await page.$$eval(
+        '[data-test="dashboard-panel-table"] tbody tr',
+        (rows) =>
+          rows
+            .map((row) =>
+              Array.from(row.querySelectorAll("td"), (cell) =>
+                cell.textContent.trim()
+              )
+            )
+            .filter((row) => row.length > 0 && row.some((cell) => cell !== ""))
+      );
+
+      // Step 2: Perform transpose by simulating the transpose button click
+      await page
+        .locator('[data-test="dashboard-config-table_transpose"] div')
+        .nth(2)
+        .click();
+      await page.locator('[data-test="dashboard-apply"]').click();
+      await page.waitForTimeout(2000);
+
+      // Step 3: Capture transposed data from the table
+      const transposedData = await page.$$eval(
+        '[data-test="dashboard-panel-table"] tr',
+        (rows) =>
+          rows
+            .map((row) =>
+              Array.from(row.querySelectorAll("td"), (cell) =>
+                cell.textContent.trim()
+              )
+            )
+            .filter((row) => row.length > 0 && row.some((cell) => cell !== ""))
+      );
+
+      // Step 4: Flatten `initialData` by pairing each namespace header with its value, excluding the empty namespace
+      const flattenedInitialData = headers
+        .slice(1)
+        .map((namespace, index) => [namespace, initialData[0][index + 1]]);
+
+      // Step 5: Sort both `flattenedInitialData` and `transposedData` for comparison
+      const sortedFlattenedInitialData = flattenedInitialData.sort((a, b) =>
+        a[0].localeCompare(b[0])
+      );
+      const sortedTransposedData = transposedData.sort((a, b) =>
+        a[0].localeCompare(b[0])
+      );
+
+      // Step 6: Directly compare sorted arrays
+      expect(sortedTransposedData).toEqual(sortedFlattenedInitialData);
+    }
+
     // Save the panel
     await dashboardActions.savePanel();
 
@@ -144,6 +207,14 @@ test.describe("dashboard UI testcases", () => {
     const dashboardPanelConfigs = new DashboardPanelConfigs(page);
     const panelName = dashboardActions.generateUniquePanelName("panel-test");
 
+    // Set up listener to catch console errors
+    let errorMessage = "";
+    page.on("console", (msg) => {
+      if (msg.type() === "error") {
+        errorMessage += msg.text() + "\n";
+      }
+    });
+
     // Navigate to the dashboards list
     await dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
@@ -168,6 +239,9 @@ test.describe("dashboard UI testcases", () => {
 
     // Save the panel
     await dashboardActions.savePanel();
+
+    // Assert no error occurred
+    expect(errorMessage).toBe("");
 
     // Delete the created dashboard
     await dashboardCreate.backToDashboardList();
