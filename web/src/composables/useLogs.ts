@@ -6745,8 +6745,11 @@ const useLogs = () => {
     router,
     $q,
     getPageCount,
-    clearSearchObj
-  };
+    initialLogsState,
+    clearSearchObj,
+    setCommunicationMethod,
+    hasAggregation,
+    };
 };
 
 export default useLogs;
