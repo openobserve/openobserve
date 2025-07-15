@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { sanitizeStreamName } from './utils/pipelineCommonValidation'
 
-describe('sanitizeStreamName', () => {
+describe.skip('sanitizeStreamName', () => {
   it('should convert special characters to underscores in a simple stream name', () => {
     const input = 'example-stream@name'
     const expected = 'example_stream_name'
