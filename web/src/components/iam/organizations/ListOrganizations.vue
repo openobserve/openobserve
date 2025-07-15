@@ -70,7 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="col-3">
             <q-btn
-              v-if="config.isEnterprise == 'true' || config.isCloud == 'true'"
               class="q-ml-md q-mb-xs text-bold no-border float-right"
               padding="sm lg"
               color="secondary"
@@ -280,9 +279,9 @@ export default defineComponent({
         resultTotal.value = res.data.data.length;
         let counter = 1;
         const billingPlans = {
-          0: "Free Forever",
-          1: "Pay As You Go",
-          2: "Enterprise",
+          "0": "Free",
+          "1": "Pay as you go",
+          "2": "Enterprise"
         };
         organizations.value = res.data.data.map((data) => {
           // Common fields for all configurations

@@ -59,11 +59,11 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
 
     // 2. check if there is a .wal file with same name, delete it and rename the .par to .parquet
     for lock_file in lock_files.iter() {
-        log::warn!("found uncompleted wal file: {:?}", lock_file);
+        log::warn!("found uncompleted wal file: {lock_file:?}");
         let wal_file = lock_file.with_extension("wal");
         if wal_file.exists() {
             // delete the .wal file
-            log::warn!("delete processed wal file: {:?}", wal_file);
+            log::warn!("delete processed wal file: {wal_file:?}");
             std::fs::remove_file(&wal_file).context(DeleteFileSnafu { path: wal_file })?;
         }
         // read all the .par files
@@ -77,14 +77,14 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
         for par_file in par_files.iter() {
             let par_file = PathBuf::from(par_file);
             let parquet_file = par_file.with_extension("parquet");
-            log::warn!("rename par file: {:?} to parquet", par_file);
+            log::warn!("rename par file: {par_file:?} to parquet");
             if par_file.exists() {
                 std::fs::rename(&par_file, &parquet_file)
                     .context(RenameFileSnafu { path: par_file })?;
             }
         }
         // delete the .lock file
-        log::warn!("delete lock file: {:?}", lock_file);
+        log::warn!("delete lock file: {lock_file:?}");
         std::fs::remove_file(lock_file).context(DeleteFileSnafu {
             path: lock_file.clone(),
         })?;
@@ -98,7 +98,7 @@ pub(crate) async fn check_uncompleted_parquet_files() -> Result<()> {
     })?;
     let par_files = wal_scan_files(parquet_dir, "par").await.unwrap_or_default();
     for par_file in par_files.iter() {
-        log::warn!("delete uncompleted par file: {:?}", par_file);
+        log::warn!("delete uncompleted par file: {par_file:?}");
         std::fs::remove_file(par_file).context(DeleteFileSnafu { path: par_file })?;
     }
     Ok(())
@@ -110,7 +110,7 @@ pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) 
         return Ok(());
     }
     for wal_file in wal_files.iter() {
-        log::warn!("replay wal file: {:?} starting...", wal_file);
+        log::warn!("replay wal file: {wal_file:?} starting...");
         let file_str = wal_file
             .strip_prefix(&wal_dir)
             .unwrap()
@@ -129,7 +129,7 @@ pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) 
         let mut reader = match wal::Reader::from_path(wal_file) {
             Ok(v) => v,
             Err(e) => {
-                log::error!("Unable to open the wal file err: {}, skip", e);
+                log::error!("Unable to open the wal file err: {e}, skip");
                 continue;
             }
         };
@@ -137,32 +137,23 @@ pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) 
         let mut i = 0;
         loop {
             if i > 0 && i % 1000 == 0 {
-                log::warn!(
-                    "replay wal file: {:?}, entries: {}, records: {}",
-                    wal_file,
-                    i,
-                    total
-                );
+                log::warn!("replay wal file: {wal_file:?}, entries: {i}, records: {total}");
             }
             let entry = match reader.read_entry() {
                 Ok(entry) => entry,
                 Err(wal::Error::UnableToReadData { source }) => {
-                    log::error!("Unable to read entry from: {}, skip the entry", source);
+                    log::error!("Unable to read entry from: {source}, skip the entry");
                     continue;
                 }
                 Err(wal::Error::LengthMismatch { expected, actual }) => {
                     log::error!(
-                        "Unable to read entry: Length mismatch: expected {}, actual {}, skip the entry",
-                        expected,
-                        actual
+                        "Unable to read entry: Length mismatch: expected {expected}, actual {actual}, skip the entry"
                     );
                     continue;
                 }
                 Err(wal::Error::ChecksumMismatch { expected, actual }) => {
                     log::error!(
-                        "Unable to read entry: Checksum mismatch: expected {}, actual {}, skip the entry",
-                        expected,
-                        actual
+                        "Unable to read entry: Checksum mismatch: expected {expected}, actual {actual}, skip the entry"
                     );
                     continue;
                 }
@@ -176,7 +167,7 @@ pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) 
             let mut entry = match super::Entry::from_bytes(&entry_bytes) {
                 Ok(v) => v,
                 Err(Error::ReadDataError { source }) => {
-                    log::error!("Unable to read entry from: {}, skip the entry", source);
+                    log::error!("Unable to read entry from: {source}, skip the entry");
                     continue;
                 }
                 Err(e) => {
@@ -206,7 +197,7 @@ pub(crate) async fn replay_wal_files(wal_dir: PathBuf, wal_files: Vec<PathBuf>) 
         let stat = match immutable.persist(&wal_path).await {
             Ok(v) => v,
             Err(e) => {
-                log::error!("persist wal file: {:?} to disk error: {}", wal_file, e);
+                log::error!("persist wal file: {wal_file:?} to disk error: {e}");
                 continue;
             }
         };

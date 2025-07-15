@@ -208,6 +208,24 @@
             </q-tooltip>
           </q-icon>
         </template>
+        <template #right>
+          <q-btn
+            :ripple="false"
+            @click.prevent.stop="sendToAiChat(JSON.stringify(inputEvents))"
+            data-test="menu-link-ai-item"
+            no-caps
+            :borderless="true"
+            flat
+            size="6px"
+            class="tw-px-2 tw-mr-4 "
+            dense
+            style="border-radius: 100%;"
+          >
+            <div class="row items-center no-wrap">
+              <img height="16" width="16" :src="getBtnLogo" class="header-icon ai-icon" />
+            </div>
+          </q-btn>
+          </template>
       </FullViewContainer>
       <div
         v-show="expandState.events"
@@ -310,15 +328,15 @@ import {
   computed,
   nextTick,
   onMounted,
+  defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import QueryEditor from "@/components/QueryEditor.vue";
 import DateTime from "@/components/DateTime.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
 import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 import useQuery from "@/composables/useQuery";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
 import { event, useQuasar } from "quasar";
@@ -337,7 +355,11 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["function-error"]);
+const emit = defineEmits(["function-error","sendToAiChat"]);
+
+const QueryEditor = defineAsyncComponent(
+  () => import("@/components/CodeQueryEditor.vue"),
+);
 
 const inputQuery = ref<string>("");
 const inputEvents = ref<string>("");
@@ -435,8 +457,13 @@ onMounted(() => {
 
 const setEventsEditor = () => {
   setTimeout(() => {
-    inputEvents.value = `[{"_timestamp":1735128523652186,"job":"test","level":"info","log":"test message for openobserve"},{"_timestamp":1735128522644223,"job":"test","level":"info","log":"test message for openobserve"}]`;
-    eventsEditorRef?.value?.formatDocument();
+    inputEvents.value = JSON.stringify(
+      JSON.parse(
+        `[{"_timestamp":1735128523652186,"job":"test","level":"info","log":"test message for openobserve"},{"_timestamp":1735128522644223,"job":"test","level":"info","log":"test message for openobserve"}]`,
+      ),
+      null,
+      2,
+    );
   }, 300);
 };
 
@@ -548,7 +575,11 @@ const getResults = async () => {
       expandState.value.stream = false;
       expandState.value.query = false;
       expandState.value.events = true;
-      inputEvents.value = JSON.stringify(res.data.hits, null, 2);
+      inputEvents.value = JSON.stringify(
+        JSON.parse(JSON.stringify(res.data.hits)),
+        null,
+        2,
+      );
       sqlQueryErrorMsg.value = "";
     })
     .catch((err: any) => {
@@ -592,11 +623,11 @@ const processTestResults = async (results: any) => {
     results?.data?.results.map((event: any) => event.event || event.events) ||
     [];
 
-  outputEvents.value = JSON.stringify(processedEvents);
-  await Promise.all([
-    eventsEditorRef.value?.formatDocument(),
-    outputEventsEditorRef.value?.formatDocument(),
-  ]);
+  outputEvents.value = JSON.stringify(
+    JSON.parse(JSON.stringify(processedEvents)),
+    null,
+    2,
+  );
 
   await nextTick();
   setTimeout(() => {
@@ -605,7 +636,6 @@ const processTestResults = async (results: any) => {
 };
 
 const handleTestError = (err: any) => {
-  console.error("Error in testing function:", err);
   const errMsg = err.response?.data?.message || "Error in testing function";
   outputEventsErrorMsg.value = "Error while transforming results";
 
@@ -653,8 +683,6 @@ function getLineRanges(object: any) {
     // Convert object to JSON string for comparison
     const serializedObject = JSON.stringify(object.event, null, 4);
     const serializedLines = serializedObject.split("\n");
-
-    console.log("Serialized Lines:", serializedLines);
 
     let startLine = -1;
 
@@ -726,9 +754,20 @@ function highlightSpecificEvent() {
     console.log("Error in highlightSpecificEvent", e);
   }
 }
+const getBtnLogo = computed(() => {
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    });
+
+const sendToAiChat = (value: any) => {
+  emit("sendToAiChat", value);
+};
 
 defineExpose({
   testFunction,
+  sendToAiChat,
+  getBtnLogo
 });
 </script>
 

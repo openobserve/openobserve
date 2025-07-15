@@ -151,7 +151,7 @@ impl Metadata for TraceListIndex {
     }
     async fn stop(&self) -> infra::errors::Result<()> {
         if let Err(e) = self.flush().await {
-            log::error!("[TraceListIndex] flush error: {}", e);
+            log::error!("[TraceListIndex] flush error: {e}");
         }
         Ok(())
     }
@@ -196,7 +196,7 @@ impl TraceListIndex {
             )
             .await
             {
-                log::error!("[TraceListIndex] error while setting schema: {}", e);
+                log::error!("[TraceListIndex] error while setting schema: {e}");
             }
 
             let settings = StreamSettings {
@@ -208,7 +208,7 @@ impl TraceListIndex {
                 data_retention: 0,
                 flatten_level: None,
                 max_query_range: 0,
-                defined_schema_fields: None,
+                defined_schema_fields: vec![],
                 store_original_data: false,
                 approx_partition: false,
                 distinct_value_fields: vec![],
@@ -255,7 +255,7 @@ mod tests {
         let data = vec![MetadataItem::TraceListIndexer(TraceListItem::default())];
 
         let res = t.write("default", data).await;
-        assert_eq!((), res.unwrap());
+        assert!(res.is_ok());
     }
 
     #[tokio::test]
@@ -305,6 +305,6 @@ mod tests {
             );
         }
         let r = ingestion::write_file(&writer, STREAM_NAME, buf, false).await;
-        println!("r: {:?}", r);
+        println!("r: {r:?}");
     }
 }

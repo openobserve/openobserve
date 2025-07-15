@@ -87,14 +87,10 @@ pub async fn otlp_proto(
     let request = match ExportTraceServiceRequest::decode(body) {
         Ok(v) => v,
         Err(e) => {
-            log::error!(
-                "[TRACES:OTLP] Invalid proto: org_id: {}, error: {}",
-                org_id,
-                e
-            );
+            log::error!("[TRACES:OTLP] Invalid proto: org_id: {org_id}, error: {e}");
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("Invalid proto: {}", e),
+                format!("Invalid proto: {e}"),
             )));
         }
     };
@@ -109,9 +105,7 @@ pub async fn otlp_proto(
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!(
-                "[TRACES:OTLP] Error while handling grpc trace request: org_id: {}, error: {}",
-                org_id,
-                e
+                "[TRACES:OTLP] Error while handling grpc trace request: org_id: {org_id}, error: {e}"
             );
             Err(e)
         }
@@ -126,20 +120,17 @@ pub async fn otlp_json(
     let request = match serde_json::from_slice::<ExportTraceServiceRequest>(body.as_ref()) {
         Ok(req) => req,
         Err(e) => {
-            log::error!("[TRACES:OTLP] Invalid json: {}", e);
+            log::error!("[TRACES:OTLP] Invalid json: {e}");
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("Invalid json: {}", e),
+                format!("Invalid json: {e}"),
             )));
         }
     };
     match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson, in_stream_name).await {
         Ok(v) => Ok(v),
         Err(e) => {
-            log::error!(
-                "[TRACES:OTLP] Error while handling http trace request: {}",
-                e
-            );
+            log::error!("[TRACES:OTLP] Error while handling http trace request: {e}");
             Err(e)
         }
     }
@@ -152,7 +143,7 @@ pub async fn handle_otlp_request(
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
     // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None) {
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
         log::error!("[TRACES:OTLP] ingestion error: {e}");
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
@@ -160,6 +151,25 @@ pub async fn handle_otlp_request(
                 e,
             )),
         );
+    }
+
+    #[cfg(feature = "cloud")]
+    {
+        match super::organization::is_org_in_free_trial_period(org_id).await {
+            Ok(false) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    http::StatusCode::FORBIDDEN,
+                    format!("org {org_id} has expired its trial period"),
+                )));
+            }
+            Err(e) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    http::StatusCode::FORBIDDEN,
+                    e.to_string(),
+                )));
+            }
+            _ => {}
+        }
     }
 
     let start = std::time::Instant::now();
@@ -221,8 +231,7 @@ pub async fn handle_otlp_request(
                     TraceId::from_bytes(span.trace_id.try_into().unwrap()).to_string();
                 if span.span_id.len() != SPAN_ID_BYTES_COUNT {
                     log::error!(
-                        "[TRACES:OTLP] skipping span with invalid span id, trace_id: {}",
-                        trace_id
+                        "[TRACES:OTLP] skipping span with invalid span id, trace_id: {trace_id}"
                     );
                     partial_success.rejected_spans += 1;
                     continue;
@@ -246,7 +255,7 @@ pub async fn handle_otlp_request(
                 for span_att in span.attributes {
                     let mut key = span_att.key;
                     if BLOCK_FIELDS.contains(&key.as_str()) {
-                        key = format!("attr_{}", key);
+                        key = format!("attr_{key}");
                     }
                     span_att_map.insert(key, get_val(&span_att.value.as_ref()));
                 }
@@ -281,8 +290,7 @@ pub async fn handle_otlp_request(
                     }
                     if link.span_id.len() != SPAN_ID_BYTES_COUNT {
                         log::error!(
-                            "[TRACES:OTLP] skipping link with invalid span id, trace_id: {}",
-                            trace_id
+                            "[TRACES:OTLP] skipping link with invalid span id, trace_id: {trace_id}"
                         );
                         continue;
                     }
@@ -290,8 +298,7 @@ pub async fn handle_otlp_request(
                         SpanId::from_bytes(link.span_id.try_into().unwrap()).to_string();
                     if link.trace_id.len() != TRACE_ID_BYTES_COUNT {
                         log::error!(
-                            "[TRACES:OTLP] skipping link with invalid trace id, trace_id: {}",
-                            trace_id
+                            "[TRACES:OTLP] skipping link with invalid trace id, trace_id: {trace_id}"
                         );
                         continue;
                     }
@@ -312,16 +319,14 @@ pub async fn handle_otlp_request(
                 let timestamp = (start_time / 1000) as i64;
                 if timestamp < min_ts {
                     log::error!(
-                        "[TRACES:OTLP] skipping span with timestamp older than allowed retention period, trace_id: {}",
-                        trace_id
+                        "[TRACES:OTLP] skipping span with timestamp older than allowed retention period, trace_id: {trace_id}"
                     );
                     partial_success.rejected_spans += 1;
                     continue;
                 }
                 if timestamp > max_ts {
                     log::error!(
-                        "[TRACES:OTLP] skipping span with timestamp newer than allowed retention period, trace_id: {}",
-                        trace_id
+                        "[TRACES:OTLP] skipping span with timestamp newer than allowed retention period, trace_id: {trace_id}"
                     );
                     partial_success.rejected_spans += 1;
                     continue;
@@ -392,8 +397,7 @@ pub async fn handle_otlp_request(
                         }
                         _ => {
                             log::error!(
-                                "[TRACES:OTLP] stream did not receive a valid json object, trace_id: {}",
-                                trace_id
+                                "[TRACES:OTLP] stream did not receive a valid json object, trace_id: {trace_id}"
                             );
                             return Ok(HttpResponse::InternalServerError()
                             .append_header((ERROR_HEADER, format!("[trace_id: {trace_id}] stream did not receive a valid json object")))
@@ -432,13 +436,10 @@ pub async fn handle_otlp_request(
         {
             Err(e) => {
                 log::error!(
-                    "[TRACES:OTLP] pipeline({}/{}) batch execution error: {}.",
-                    org_id,
-                    traces_stream_name,
-                    e
+                    "[TRACES:OTLP] pipeline({org_id}/{traces_stream_name}) batch execution error: {e}."
                 );
                 partial_success.rejected_spans += records_count as i64;
-                partial_success.error_message = format!("Pipeline batch execution error: {}", e);
+                partial_success.error_message = format!("Pipeline batch execution error: {e}");
             }
             Ok(pl_results) => {
                 log::debug!(
@@ -448,8 +449,7 @@ pub async fn handle_otlp_request(
                 for (stream_params, stream_pl_results) in pl_results {
                     if stream_params.stream_type != StreamType::Traces {
                         log::warn!(
-                            "[TRACES:OTLP] stream {:?} returned by pipeline is not a Trace stream. Records dropped",
-                            stream_params
+                            "[TRACES:OTLP] stream {stream_params:?} returned by pipeline is not a Trace stream. Records dropped"
                         );
                         continue;
                     }
@@ -527,7 +527,7 @@ pub async fn handle_otlp_request(
 
     if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
     {
-        log::error!("Error while writing traces: {}", e);
+        log::error!("Error while writing traces: {e}");
         return Ok(HttpResponse::InternalServerError()
             .append_header((ERROR_HEADER, format!("error while writing trace data: {e}")))
             .json(MetaHttpResponse::error(
@@ -572,7 +572,7 @@ pub async fn ingest_json(
     traces_stream_name: &str,
 ) -> Result<HttpResponse, Error> {
     // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None) {
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
         log::error!("[TRACES:JSON] ingestion error: {e}");
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
@@ -663,7 +663,7 @@ pub async fn ingest_json(
 
     if let Err(e) = write_traces_by_stream(org_id, (started_at, &start), json_data_by_stream).await
     {
-        log::error!("Error while writing traces: {}", e);
+        log::error!("Error while writing traces: {e}");
         return Ok(HttpResponse::InternalServerError()
             .append_header((ERROR_HEADER, format!("error while writing trace data: {e}")))
             .json(MetaHttpResponse::error(
@@ -886,31 +886,30 @@ async fn write_traces(
         }));
 
         // Start check for alert trigger
-        if let Some(alerts) = cur_stream_alerts {
-            if triggers.len() < alerts.len() {
-                let alert_end_time = now_micros();
-                for alert in alerts {
-                    let key = format!(
-                        "{}/{}/{}/{}",
-                        org_id,
-                        StreamType::Traces,
-                        stream_name,
-                        alert.get_unique_key()
-                    );
-                    // check if alert already evaluated
-                    if evaluated_alerts.contains(&key) {
-                        continue;
-                    }
-                    match alert
-                        .evaluate(Some(&record_val), (None, alert_end_time), None)
-                        .await
-                    {
-                        Ok(res) if res.data.is_some() => {
-                            triggers.push((alert.clone(), res.data.unwrap()));
-                            evaluated_alerts.insert(key);
-                        }
-                        _ => {}
-                    }
+        if let Some(alerts) = cur_stream_alerts
+            && triggers.len() < alerts.len()
+        {
+            let alert_end_time = now_micros();
+            for alert in alerts {
+                let key = format!(
+                    "{}/{}/{}/{}",
+                    org_id,
+                    StreamType::Traces,
+                    stream_name,
+                    alert.get_unique_key()
+                );
+                // check if alert already evaluated
+                if evaluated_alerts.contains(&key) {
+                    continue;
+                }
+
+                if let Ok(Some(data)) = alert
+                    .evaluate(Some(&record_val), (None, alert_end_time), None)
+                    .await
+                    .map(|res| res.data)
+                {
+                    triggers.push((alert.clone(), data));
+                    evaluated_alerts.insert(key);
                 }
             }
         }
@@ -947,22 +946,23 @@ async fn write_traces(
     )
     .await
     .map_err(|e| {
-        log::error!("Error while writing traces: {}", e);
-        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+        log::error!("Error while writing traces: {e}");
+        std::io::Error::other(e.to_string())
     })?;
 
     // send distinct_values
-    if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {
-        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
-            log::error!("Error while writing distinct values: {}", e);
-        }
+    if !distinct_values.is_empty()
+        && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
+        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
+    {
+        log::error!("Error while writing distinct values: {e}");
     }
 
     // send trace metadata
-    if !trace_index_values.is_empty() {
-        if let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await {
-            log::error!("Error while writing trace_index values: {}", e);
-        }
+    if !trace_index_values.is_empty()
+        && let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await
+    {
+        log::error!("Error while writing trace_index values: {e}");
     }
 
     // only one trigger per request

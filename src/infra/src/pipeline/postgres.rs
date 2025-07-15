@@ -81,10 +81,7 @@ CREATE TABLE IF NOT EXISTS pipeline
 
         for query in queries {
             if let Err(e) = sqlx::query(query).execute(&pool).await {
-                log::error!(
-                    "[POSTGRES] create table index for pipeline table error: {}",
-                    e
-                );
+                log::error!("[POSTGRES] create table index for pipeline table error: {e}");
                 return Err(e.into());
             }
         }
@@ -162,13 +159,13 @@ INSERT INTO pipeline (id, version, enabled, name, description, org, source_type,
             }
         } {
             if let Err(e) = tx.rollback().await {
-                log::error!("[POSTGRES] rollback push pipeline error: {}", e);
+                log::error!("[POSTGRES] rollback push pipeline error: {e}");
             }
             return Err(e.into());
         }
 
         if let Err(e) = tx.commit().await {
-            log::error!("[POSTGRES] commit push pipeline error: {}", e);
+            log::error!("[POSTGRES] commit push pipeline error: {e}");
             return Err(e.into());
         }
         Ok(())
@@ -237,13 +234,13 @@ UPDATE pipeline
             }
         } {
             if let Err(e) = tx.rollback().await {
-                log::error!("[POSTGRES] rollback push pipeline error: {}", e);
+                log::error!("[POSTGRES] rollback push pipeline error: {e}");
             }
             return Err(e.into());
         }
 
         if let Err(e) = tx.commit().await {
-            log::error!("[POSTGRES] commit push pipeline error: {}", e);
+            log::error!("[POSTGRES] commit push pipeline error: {e}");
             return Err(e.into());
         }
         Ok(())
@@ -309,7 +306,7 @@ SELECT * FROM pipeline
         match sqlx::query_as::<_, Pipeline>(query).fetch_all(&pool).await {
             Ok(pipelines) => Ok(pipelines),
             Err(e) => {
-                log::debug!("[POSTGRES] list all pipelines  error: {}", e);
+                log::debug!("[POSTGRES] list all pipelines  error: {e}");
                 Ok(vec![]) // Return empty vector instead of error
             }
         }
@@ -325,7 +322,7 @@ SELECT * FROM pipeline
         {
             Ok(pipelines) => Ok(pipelines),
             Err(e) => {
-                log::debug!("[POSTGRES] list pipelines by org error: {}", e);
+                log::debug!("[POSTGRES] list pipelines by org error: {e}");
                 Ok(vec![])
             }
         }
@@ -344,7 +341,7 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
         {
             Ok(pipelines) => Ok(pipelines),
             Err(e) => {
-                log::debug!("[POSTGRES] list streams with pipelines error: {}", e);
+                log::debug!("[POSTGRES] list streams with pipelines error: {e}");
                 Ok(vec![])
             }
         }

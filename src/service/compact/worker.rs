@@ -186,8 +186,7 @@ impl MergeWorker {
                                 Ok((new_files, _)) => {
                                     if let Err(e) = tx.send(Ok((msg.batch_id, new_files))).await {
                                         log::error!(
-                                            "[COMPACTOR:WORKER:{thread_id}] Error sending file to merge_job: {}",
-                                            e
+                                            "[COMPACTOR:WORKER:{thread_id}] Error sending file to merge_job: {e}"
                                         );
                                     }
                                 }
@@ -201,8 +200,7 @@ impl MergeWorker {
                                     );
                                     if let Err(e) = tx.send(Err(e)).await {
                                         log::error!(
-                                            "[COMPACTOR:WORKER:{thread_id}] Error sending error to merge_job: {}",
-                                            e
+                                            "[COMPACTOR:WORKER:{thread_id}] Error sending error to merge_job: {e}"
                                         );
                                     }
                                 }

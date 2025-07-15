@@ -23,7 +23,6 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        bitvec::BitVec,
         inverted_index::InvertedIndexOptimizeMode,
         search::ScanStats,
         sql::TableReferenceExt,
@@ -42,7 +41,6 @@ use infra::{
     },
 };
 use itertools::Itertools;
-use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
 
 use crate::service::{
@@ -50,8 +48,7 @@ use crate::service::{
     search::{
         datafusion::{
             distributed_plan::{
-                NewEmptyExecVisitor, ReplaceTableScanExec,
-                codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
+                NewEmptyExecVisitor, ReplaceTableScanExec, codec::get_physical_extension_codec,
                 empty_exec::NewEmptyExec,
             },
             exec::{prepare_datafusion_context, register_udf},
@@ -81,18 +78,22 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] flight->search: start");
 
     // create datafusion context, just used for decode plan, the params can use default
-    let mut ctx =
-        prepare_datafusion_context(work_group.clone(), vec![], vec![], false, cfg.limit.cpu_num)
-            .await?;
+    let mut ctx = prepare_datafusion_context(
+        &trace_id,
+        work_group.clone(),
+        vec![],
+        vec![],
+        false,
+        cfg.limit.cpu_num,
+    )
+    .await?;
 
     // register udf
     register_udf(&ctx, &org_id)?;
     datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
-    let proto = ComposedPhysicalExtensionCodec {
-        codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
-    };
+    let proto = get_physical_extension_codec();
     let mut physical_plan =
         physical_plan_from_bytes_with_extension_codec(&req.search_info.plan, &ctx, &proto)?;
 
@@ -214,7 +215,6 @@ pub async fn search(
             &stream_settings.partition_keys,
             &search_partition_keys,
             &req.search_info.file_id_list,
-            &req.search_info.idx_file_list,
         )
         .await?;
         log::info!(
@@ -292,9 +292,7 @@ pub async fn search(
                 // clear session data
                 super::super::datafusion::storage::file_list::clear(&trace_id);
                 log::error!(
-                    "[trace_id {}] flight->search: search storage parquet error: {}",
-                    trace_id,
-                    e
+                    "[trace_id {trace_id}] flight->search: search storage parquet error: {e}"
                 );
                 return Err(e);
             }
@@ -320,11 +318,7 @@ pub async fn search(
             Err(e) => {
                 // clear session data
                 super::super::datafusion::storage::file_list::clear(&trace_id);
-                log::error!(
-                    "[trace_id {}] flight->search: search wal parquet error: {}",
-                    trace_id,
-                    e
-                );
+                log::error!("[trace_id {trace_id}] flight->search: search wal parquet error: {e}");
                 return Err(e);
             }
         };
@@ -347,9 +341,7 @@ pub async fn search(
             Ok(v) => v,
             Err(e) => {
                 log::error!(
-                    "[trace_id {}] flight->search: search wal memtable error: {:?}",
-                    trace_id,
-                    e
+                    "[trace_id {trace_id}] flight->search: search wal memtable error: {e:?}"
                 );
                 return Err(e);
             }
@@ -360,7 +352,7 @@ pub async fn search(
 
     // create a Union Plan to merge all tables
     let start = std::time::Instant::now();
-    let union_table = Arc::new(NewUnionTable::try_new(empty_exec.schema().clone(), tables)?);
+    let union_table = Arc::new(NewUnionTable::new(empty_exec.schema().clone(), tables));
 
     let union_exec = union_table
         .scan(
@@ -415,7 +407,6 @@ async fn get_file_list_by_ids(
     partition_keys: &[StreamPartition],
     equal_items: &[(String, String)],
     ids: &[i64],
-    idx_file_list: &[cluster_rpc::IdxFileName],
 ) -> Result<(Vec<FileKey>, usize), Error> {
     let start = std::time::Instant::now();
     let file_list = crate::service::file_list::query_by_ids(
@@ -427,26 +418,6 @@ async fn get_file_list_by_ids(
         time_range,
     )
     .await?;
-    // if there are any files in idx_files_list, use them to filter the files we got from ids,
-    // otherwise use all the files we got from ids
-    let file_list = if idx_file_list.is_empty() {
-        file_list
-    } else {
-        let mut files = Vec::with_capacity(idx_file_list.len());
-        let file_list_map: HashMap<_, _> =
-            file_list.into_iter().map(|f| (f.key.clone(), f)).collect();
-        for idx_file in idx_file_list.iter() {
-            if let Some(file) = file_list_map.get(&idx_file.key) {
-                let mut new_file = file.clone();
-                if let Some(segment_ids) = idx_file.segment_ids.as_ref() {
-                    let segment_ids = BitVec::from_slice(segment_ids);
-                    new_file.with_segment_ids(segment_ids);
-                }
-                files.push(new_file);
-            }
-        }
-        files
-    };
 
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {
@@ -475,8 +446,7 @@ fn generate_index_condition(index_condition: &str) -> Result<Option<IndexConditi
             Ok(cond) => cond,
             Err(e) => {
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(format!(
-                    "Invalid index condition JSON: {}",
-                    e
+                    "Invalid index condition JSON: {e}",
                 ))));
             }
         };

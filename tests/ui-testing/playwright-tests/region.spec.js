@@ -25,7 +25,7 @@ async function login(page) {
 }
 
 
-const selectStreamAndStreamTypeForLogs = async (page,stream) => {await page.waitForTimeout(
+const selectStream = async (page,stream) => {await page.waitForTimeout(
   4000);await page.locator(
   '[data-test="log-search-index-list-select-stream"]').click({ force: true });await page.locator(
   "div.q-item").getByText(`${stream}`).first().click({ force: true });
@@ -99,7 +99,7 @@ test.describe("Region testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page,logData.Stream);
+    await selectStream(page,logData.Stream);
     await applyQueryButton(page);
     const searchBarRegionBtn = await page.locator('[data-test="logs-search-bar-region-btn"]');
     if (!(await searchBarRegionBtn.isVisible())) {

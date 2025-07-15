@@ -381,7 +381,6 @@ import {
   computed,
   defineAsyncComponent,
   watch,
-  onBeforeMount,
   onBeforeUnmount,
 } from "vue";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
@@ -465,7 +464,6 @@ export default defineComponent({
 
     const limitNumberOfSeriesWarningMessage = ref("");
 
-
     const handleResultMetadataUpdate = (metadata: any) => {
       const combinedWarnings: any[] = [];
       metadata.forEach((query: any) => {
@@ -516,7 +514,9 @@ export default defineComponent({
 
     //check if dependent adhoc variable exists
     const dependentAdHocVariable = computed(() => {
-      if (!metaData.value) return false;
+      if (!metaData.value) {
+        return false;
+      }
 
       const adhocVariables = props.variablesData.values
         ?.filter((it: any) => it.type === "dynamic_filters")
@@ -530,6 +530,10 @@ export default defineComponent({
         );
         return vars?.length == adhocVariables?.length;
       });
+
+      if (adhocVariables?.length == 0 || adhocVariables == undefined) {
+        return false;
+      }
       return !metaDataDynamic;
     });
 
@@ -593,24 +597,6 @@ export default defineComponent({
 
       return logsUrl;
     };
-    let parser: any;
-    onBeforeMount(async () => {
-      await importSqlParser();
-    });
-
-    const importSqlParser = async () => {
-      const useSqlParser: any = await import("@/composables/useParser");
-      const { sqlParser }: any = useSqlParser.default();
-      parser = await sqlParser();
-    };
-    const parseQuery = async (originalQuery: string, parser: any) => {
-      try {
-        return parser.astify(originalQuery);
-      } catch (error) {
-        console.error("Failed to parse query:", error);
-        return null;
-      }
-    };
 
     const onLogPanel = async () => {
       const queryDetails = props.data;
@@ -622,13 +608,6 @@ export default defineComponent({
       const { originalQuery, streamName } =
         getOriginalQueryAndStream(queryDetails, metaData) || {};
       if (!originalQuery || !streamName) return;
-
-      if (!parser) {
-        await importSqlParser();
-      }
-
-      const ast = await parseQuery(originalQuery, parser);
-      if (!ast) return;
 
       let modifiedQuery = originalQuery;
 
@@ -816,7 +795,7 @@ export default defineComponent({
       // Reset refs to help with garbage collection
       metaData.value = null;
       errorData.value = "";
-      
+
       // Clear the PanelSchemaRenderer reference
       if (PanleSchemaRendererRef.value) {
         PanleSchemaRendererRef.value = null;

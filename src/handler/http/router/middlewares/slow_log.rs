@@ -120,13 +120,7 @@ where
                     _ => "".to_string(),
                 };
                 log::warn!(
-                    "slow request detected - remote_addr: {}, method: {}, path: {}, size: {},{} took: {} ms",
-                    remote_addr,
-                    method,
-                    path,
-                    body_size,
-                    wait_time_str,
-                    took_time
+                    "slow request detected - remote_addr: {remote_addr}, method: {method}, path: {path}, size: {body_size},{wait_time_str} took: {took_time} ms"
                 );
             }
 

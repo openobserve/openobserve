@@ -891,7 +891,7 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        println!("post user resp: {:?}", resp);
+        println!("post user resp: {resp:?}");
         assert!(resp.status().is_success());
     }
 
@@ -2020,7 +2020,7 @@ mod tests {
         assert!(resp.status().is_success());
         let body = test::read_body(resp).await;
         let alert_list_response: ListAlertsResponseBody = serde_json::from_slice(&body).unwrap();
-        assert!(alert_list_response.list.len() > 0);
+        assert!(!alert_list_response.list.is_empty());
         let alert = alert_list_response
             .list
             .iter()
@@ -2028,7 +2028,7 @@ mod tests {
         assert!(alert.is_some());
         let alert = alert.unwrap();
         assert_eq!(alert.name, "alertChk");
-        assert_eq!(alert.enabled, true);
+        assert!(alert.enabled);
         let id = alert.alert_id;
         let id = id.to_string();
 
@@ -2065,7 +2065,7 @@ mod tests {
         assert!(resp.status().is_success());
         let body = test::read_body(resp).await;
         let alert_list_response: ListAlertsResponseBody = serde_json::from_slice(&body).unwrap();
-        assert!(alert_list_response.list.len() > 0);
+        assert!(!alert_list_response.list.is_empty());
         let alert = alert_list_response
             .list
             .iter()
@@ -2073,7 +2073,7 @@ mod tests {
         assert!(alert.is_some());
         let alert = alert.unwrap();
         assert_eq!(alert.name, "alertChk");
-        assert_eq!(alert.enabled, true);
+        assert!(alert.enabled);
         let id = alert.alert_id;
         let id = id.to_string();
 
@@ -2093,7 +2093,7 @@ mod tests {
             openobserve::handler::http::models::alerts::StreamType::Logs
         );
         assert_eq!(alert_response.0.stream_name, "olympics_schema");
-        assert_eq!(alert_response.0.enabled, true);
+        assert!(alert_response.0.enabled);
     }
 
     async fn e2e_handle_alert_after_destination_retries() {

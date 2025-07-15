@@ -109,10 +109,10 @@ impl StorageClientFactory {
     /// Get the client for the given name.
     /// If the name is not found, return the default client.
     pub fn get_client_by_name(&self, name: &str) -> &dyn ObjectStore {
-        if !name.is_empty() {
-            if let Some(client) = self.accounts.get(name) {
-                return client;
-            }
+        if !name.is_empty()
+            && let Some(client) = self.accounts.get(name)
+        {
+            return client;
         }
         self.accounts
             .get(DEFAULT_ACCOUNT)
@@ -307,12 +307,7 @@ impl ObjectStoreExt for StorageClientFactory {
             .await
     }
 
-    async fn get_range(
-        &self,
-        account: &str,
-        location: &Path,
-        range: Range<usize>,
-    ) -> Result<Bytes> {
+    async fn get_range(&self, account: &str, location: &Path, range: Range<u64>) -> Result<Bytes> {
         self.get_client_by_name(account)
             .get_range(location, range)
             .await
@@ -322,7 +317,7 @@ impl ObjectStoreExt for StorageClientFactory {
         &self,
         account: &str,
         location: &Path,
-        ranges: &[Range<usize>],
+        ranges: &[Range<u64>],
     ) -> Result<Vec<Bytes>> {
         self.get_client_by_name(account)
             .get_ranges(location, ranges)
@@ -345,7 +340,7 @@ impl ObjectStoreExt for StorageClientFactory {
         self.get_client_by_name(account).delete_stream(locations)
     }
 
-    fn list(&self, account: &str, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
+    fn list(&self, account: &str, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         self.get_client_by_name(account).list(prefix)
     }
 
@@ -354,7 +349,7 @@ impl ObjectStoreExt for StorageClientFactory {
         account: &str,
         prefix: Option<&Path>,
         offset: &Path,
-    ) -> BoxStream<'_, Result<ObjectMeta>> {
+    ) -> BoxStream<'static, Result<ObjectMeta>> {
         self.get_client_by_name(account)
             .list_with_offset(prefix, offset)
     }

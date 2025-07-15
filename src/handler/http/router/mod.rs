@@ -227,13 +227,11 @@ async fn proxy(
         .request(method, &path.target_url)
         .send()
         .await
-        .map_err(|e| {
-            actix_web::error::ErrorInternalServerError(format!("Request failed: {}", e))
-        })?;
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Request failed: {e}")))?;
 
     let status = forwarded_resp.status().as_u16();
     let body = forwarded_resp.bytes().await.map_err(|e| {
-        actix_web::error::ErrorInternalServerError(format!("Failed to read the response: {}", e))
+        actix_web::error::ErrorInternalServerError(format!("Failed to read the response: {e}"))
     })?;
 
     Ok(HttpResponse::build(actix_web::http::StatusCode::from_u16(status).unwrap()).body(body))
@@ -246,7 +244,7 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
         .service(status::schedulez);
 
     #[cfg(feature = "cloud")]
-    svc.service(web::scope("/webhook").service(billings::handle_stripe_event));
+    svc.service(web::scope("/webhook").service(cloud::billings::handle_stripe_event));
 
     svc.service(
         web::scope("/auth")
@@ -558,8 +556,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(service_accounts::save)
         .service(service_accounts::delete)
         .service(service_accounts::update)
-        .service(service_accounts::get_api_token)
-        .service(ws::websocket);
+        .service(service_accounts::get_api_token);
 
     #[cfg(feature = "enterprise")]
     let service = service
@@ -597,14 +594,16 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(organization::org::get_org_invites)
         .service(organization::org::generate_org_invite)
         .service(organization::org::accept_org_invite)
-        .service(billings::create_checkout_session)
-        .service(billings::process_session_detail)
-        .service(billings::list_subscription)
-        .service(billings::list_invoices)
-        .service(billings::unsubscribe)
-        .service(billings::create_billing_portal_session)
-        .service(billings::org_usage::get_org_quota_threshold)
-        .service(billings::org_usage::get_org_usage);
+        .service(cloud::billings::create_checkout_session)
+        .service(cloud::billings::process_session_detail)
+        .service(cloud::billings::list_subscription)
+        .service(cloud::billings::list_invoices)
+        .service(cloud::billings::unsubscribe)
+        .service(cloud::billings::create_billing_portal_session)
+        .service(cloud::org_usage::get_org_usage)
+        .service(cloud::marketing::handle_new_attrition_event)
+        .service(organization::org::all_organizations)
+        .service(organization::org::extend_trial_period);
 
     svc.service(service);
 }
@@ -656,14 +655,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_proxy_routes() {
-        let mut app =
+        let app =
             init_service(App::new().configure(|cfg| get_proxy_routes_inner(cfg, false))).await;
 
         // Test GET request to /proxy/{org_id}/{target_url}
         let req = TestRequest::get()
             .uri("/proxy/org1/https://cloud.openobserve.ai/assets/flUhRq6tzZclQEJ-Vdg-IuiaDsNa.fd84f88b.woff")
             .to_request();
-        let resp = call_service(&mut app, req).await;
+        let resp = call_service(&app, req).await;
         assert_eq!(resp.status().as_u16(), 404);
     }
 }

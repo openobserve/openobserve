@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::min, sync::atomic::Ordering};
+use std::sync::atomic::Ordering;
 
 use config::{
     cluster::*,
@@ -31,7 +31,7 @@ use infra::{
 /// Register and keep alive the node to cluster
 pub(crate) async fn register_and_keep_alive() -> Result<()> {
     if let Err(e) = register().await {
-        log::error!("[CLUSTER] register failed: {}", e);
+        log::error!("[CLUSTER] register failed: {e}");
         return Err(e);
     }
 
@@ -45,7 +45,7 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
             }
         }
         // after the node is online, keep alive
-        let ttl_keep_alive = min(5, (get_config().limit.node_heartbeat_ttl / 2) as u64);
+        let ttl_keep_alive = std::cmp::max(1, (get_config().limit.node_heartbeat_ttl / 4) as u64);
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             loop {
@@ -57,7 +57,7 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
                         break;
                     }
                     Err(e) => {
-                        log::error!("[CLUSTER] keep alive failed: {}", e);
+                        log::error!("[CLUSTER] keep alive failed: {e}");
                         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                         continue;
                     }
@@ -76,7 +76,7 @@ async fn register() -> Result<()> {
     let locker = dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64).await?;
 
     // 2. watch node list
-    tokio::task::spawn(async move { super::watch_node_list().await });
+    tokio::task::spawn(super::watch_node_list());
 
     // 3. get node list
     let node_list = match super::list_nodes().await {
@@ -112,7 +112,7 @@ async fn register() -> Result<()> {
 
     node_ids.sort();
     node_ids.dedup();
-    log::debug!("node_ids: {:?}", node_ids);
+    log::debug!("node_ids: {node_ids:?}");
 
     let mut new_node_id = 1;
     for id in node_ids {
@@ -122,7 +122,7 @@ async fn register() -> Result<()> {
             break;
         }
     }
-    log::debug!("new_node_id: {:?}", new_node_id);
+    log::debug!("new_node_id: {new_node_id:?}");
     // update local id
     unsafe {
         LOCAL_NODE_ID = new_node_id;
@@ -150,7 +150,7 @@ async fn register() -> Result<()> {
         role_group: LOCAL_NODE.role_group,
         cpu_num: cfg.limit.cpu_num as u64,
         status: NodeStatus::Prepare,
-        scheduled: true,
+        scheduled: false,
         broadcasted: false,
         metrics: Default::default(),
         version: config::VERSION.to_string(),
@@ -194,7 +194,7 @@ async fn register() -> Result<()> {
     let opt = PutOptions::new().with_lease(id);
     if let Err(e) = client.put(key, val, Some(opt)).await {
         dist_lock::unlock(&locker).await?;
-        return Err(Error::Message(format!("register node error: {}", e)));
+        return Err(Error::Message(format!("register node error: {e}")));
     }
 
     // 7. register ok, release lock
@@ -242,7 +242,7 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
             role_group: LOCAL_NODE.role_group,
             cpu_num: cfg.limit.cpu_num as u64,
             status: status.clone(),
-            scheduled: true,
+            scheduled: false,
             broadcasted: false,
             metrics: Default::default(),
             version: config::VERSION.to_string(),
@@ -273,7 +273,7 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
     let opt = PutOptions::new().with_lease(unsafe { LOCAL_NODE_KEY_LEASE_ID });
     let mut client = etcd::get_etcd_client().await.clone();
     if let Err(e) = client.put(key, val, Some(opt)).await {
-        return Err(Error::Message(format!("online node error: {}", e)));
+        return Err(Error::Message(format!("online node error: {e}")));
     }
 
     Ok(())
@@ -284,7 +284,7 @@ pub(crate) async fn leave() -> Result<()> {
     let key = format!("{}nodes/{}", get_config().etcd.prefix, LOCAL_NODE.uuid);
     let mut client = etcd::get_etcd_client().await.clone();
     if let Err(e) = client.delete(key, None).await {
-        return Err(Error::Message(format!("leave node error: {}", e)));
+        return Err(Error::Message(format!("leave node error: {e}")));
     }
 
     Ok(())
@@ -296,7 +296,7 @@ pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
     let val = json::to_string(&node).unwrap();
     let mut client = etcd::get_etcd_client().await.clone();
     if let Err(e) = client.put(key, val, Some(opt)).await {
-        return Err(Error::Message(format!("update node error: {}", e)));
+        return Err(Error::Message(format!("update node error: {e}")));
     }
     Ok(())
 }

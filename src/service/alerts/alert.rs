@@ -406,20 +406,19 @@ async fn prepare_alert(
             // SQL may contain multiple stream names, check for each stream
             // if the alert period is greater than the max query range
             for stream in stream_names.iter() {
-                if !stream.eq(stream_name) {
-                    if let Some(settings) =
+                if !stream.eq(stream_name)
+                    && let Some(settings) =
                         infra::schema::get_settings(org_id, stream, stream_type).await
+                {
+                    let max_query_range = settings.max_query_range;
+                    if max_query_range > 0
+                        && !alert.is_real_time
+                        && alert.trigger_condition.period > max_query_range * 60
                     {
-                        let max_query_range = settings.max_query_range;
-                        if max_query_range > 0
-                            && !alert.is_real_time
-                            && alert.trigger_condition.period > max_query_range * 60
-                        {
-                            return Err(AlertError::PeriodExceedsMaxQueryRange {
-                                max_query_range_hours: max_query_range,
-                                stream_name: stream_name.to_owned(),
-                            });
-                        }
+                        return Err(AlertError::PeriodExceedsMaxQueryRange {
+                            max_query_range_hours: max_query_range,
+                            stream_name: stream_name.to_owned(),
+                        });
                     }
                 }
             }
@@ -583,9 +582,10 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
 
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
     #[cfg(feature = "enterprise")]
-    if _folder_info.is_some() && get_openfga_config().enabled {
+    if let Some((curr_folder_id, dst_folder_id)) = _folder_info
+        && get_openfga_config().enabled
+    {
         let alert_id = alert.id.unwrap().to_string();
-        let (curr_folder_id, dst_folder_id) = _folder_info.unwrap();
         set_parent_relation(
             &alert_id,
             &get_ofga_type("alerts"),
@@ -666,7 +666,7 @@ pub async fn list(
                     || permitted
                         .as_ref()
                         .unwrap()
-                        .contains(&format!("alert:_all_{}", org_id))
+                        .contains(&format!("alert:_all_{org_id}"))
                 {
                     if owner.is_some() && !owner.eq(&alert.owner) {
                         continue;
@@ -718,8 +718,7 @@ pub async fn list_v2<C: ConnectionTrait>(
                 || permissions.contains(&format!("alert:{}/{}", f.folder_id, a.id.as_ref().unwrap()))
                 // Include the alert if the alert is permitted with the new OpenFGA identifier.
                 || a.id
-                    .filter(|id| permissions.contains(&format!("alert:{id}")))
-                    .is_some()
+                    .is_some_and(|id| permissions.contains(&format!("alert:{id}")))
         })
         .collect_vec();
     Ok(alerts)
@@ -1084,10 +1083,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     );
     if !resp_status.is_success() {
         log::error!(
-            "Alert http notification failed with status: {}, body: {}, payload: {}",
-            resp_status,
-            resp_body,
-            msg
+            "Alert http notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
         );
         return Err(anyhow::anyhow!(
             "sent error status: {}, err: {}",
@@ -1096,7 +1092,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         ));
     }
 
-    Ok(format!("sent status: {}, body: {}", resp_status, resp_body))
+    Ok(format!("sent status: {resp_status}, body: {resp_body}"))
 }
 
 async fn send_email_notification(
@@ -1312,13 +1308,11 @@ async fn process_dest_template(
     }
 
     // Use only the main alert time range if multi_time_range is enabled
-    let use_given_time = alert.query_condition.multi_time_range.is_some()
-        && !alert
-            .query_condition
-            .multi_time_range
-            .as_ref()
-            .unwrap()
-            .is_empty();
+    let use_given_time = alert
+        .query_condition
+        .multi_time_range
+        .as_ref()
+        .is_some_and(|tr| !tr.is_empty());
     // calculate start and end time
     let (alert_start_time, alert_end_time) = get_alert_start_end_time(
         &vars,
@@ -1409,8 +1403,8 @@ async fn process_dest_template(
                 }
             }
             QueryType::Custom => {
-                if let Some(conditions) = &alert.query_condition.conditions {
-                    if let Ok(v) = build_sql(
+                if let Some(conditions) = &alert.query_condition.conditions
+                    && let Ok(v) = build_sql(
                         &alert.org_id,
                         &alert.stream_name,
                         alert.stream_type,
@@ -1418,9 +1412,8 @@ async fn process_dest_template(
                         conditions,
                     )
                     .await
-                    {
-                        alert_query = v;
-                    }
+                {
+                    alert_query = v;
                 }
             }
             _ => unreachable!(),
@@ -1856,8 +1849,8 @@ mod tests {
     async fn test_update_cron_expression_1() {
         let cron_exp = "* * * * * * *";
         let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(&cron_exp, now);
-        let updated = format!("{} * * * * * *", now);
+        let new_cron_exp = update_cron_expression(cron_exp, now);
+        let updated = format!("{now} * * * * * *");
         assert_eq!(new_cron_exp, updated);
     }
 
@@ -1865,7 +1858,7 @@ mod tests {
     async fn test_update_cron_expression_2() {
         let cron_exp = "47*/12 * * * * *";
         let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(&cron_exp, now);
+        let new_cron_exp = update_cron_expression(cron_exp, now);
         assert_eq!(new_cron_exp, "47*/12 * * * * *");
     }
 
@@ -1873,8 +1866,8 @@ mod tests {
     async fn test_update_cron_expression_3() {
         let cron_exp = "**/15 21-23,0-8 * * *";
         let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(&cron_exp, now);
-        let updated = format!("{} */15 21-23,0-8 * * *", now);
+        let new_cron_exp = update_cron_expression(cron_exp, now);
+        let updated = format!("{now} */15 21-23,0-8 * * *");
         assert_eq!(new_cron_exp, updated);
     }
 
@@ -1882,8 +1875,8 @@ mod tests {
     async fn test_update_cron_expression_4() {
         let cron_exp = "*10*****";
         let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(&cron_exp, now);
-        let updated = format!("{} 10*****", now);
+        let new_cron_exp = update_cron_expression(cron_exp, now);
+        let updated = format!("{now} 10*****");
         assert_eq!(new_cron_exp, updated);
     }
 
@@ -1891,8 +1884,8 @@ mod tests {
     async fn test_update_cron_expression_5() {
         let cron_exp = "* */10 2 * * * *";
         let now = Utc::now().second();
-        let new_cron_exp = update_cron_expression(&cron_exp, now);
-        let updated = format!("{} */10 2 * * * *", now);
+        let new_cron_exp = update_cron_expression(cron_exp, now);
+        let updated = format!("{now} */10 2 * * * *");
         assert_eq!(new_cron_exp, updated);
     }
 }

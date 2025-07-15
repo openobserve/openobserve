@@ -35,8 +35,8 @@ pub struct Stream {
     pub stats: StreamStats,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub schema: Vec<StreamProperty>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub uds_schema: Option<Vec<StreamProperty>>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub uds_schema: Vec<StreamProperty>,
     pub settings: StreamSettings,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics_meta: Option<Metadata>,
@@ -149,7 +149,7 @@ mod tests {
                 name: "field1".to_string(),
                 prop_type: "string".to_string(),
             }],
-            uds_schema: None,
+            uds_schema: vec![],
             settings: StreamSettings::default(),
             metrics_meta: None,
             total_fields: 1,
@@ -201,7 +201,7 @@ mod tests {
         };
 
         assert_eq!(schema_records.schema_key, "test_key");
-        assert_eq!(Arc::ptr_eq(&schema_records.schema, &schema), true);
+        assert!(Arc::ptr_eq(&schema_records.schema, &schema));
         assert_eq!(schema_records.records.len(), 1);
         assert_eq!(schema_records.records_size, 1);
     }
@@ -225,16 +225,21 @@ mod tests {
             stream_type: StreamType::Logs,
             stats: StreamStats::default(),
             schema: vec![],
-            uds_schema: Some(vec![StreamProperty {
+            uds_schema: vec![StreamProperty {
                 name: "uds_field".to_string(),
                 prop_type: "string".to_string(),
-            }]),
+            }],
             settings: StreamSettings::default(),
             metrics_meta: None,
             total_fields: 1,
         };
 
-        assert!(stream.uds_schema.is_some());
-        assert_eq!(stream.uds_schema.unwrap().len(), 1);
+        assert!(stream.uds_schema.len() == 1);
+    }
+
+    #[test]
+    fn test_empty_stream_delete_fields_default() {
+        let delete_fields = StreamDeleteFields::default();
+        assert!(delete_fields.fields.is_empty());
     }
 }

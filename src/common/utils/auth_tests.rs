@@ -46,7 +46,6 @@ mod tests {
     const GROUP_NAME: &str = "TEST_GROUP_NAME";
     const PIPELINE_ID: &str = "TEST_PIPELINE_ID";
     const SHORT_URL_ID: &str = "TEST_SHORT_URL_ID";
-    const WS_REQUEST_ID: &str = "TEST_WS_REQUEST_ID";
     const ACTION_KSUID: &str = "TEST_ACTION_KSUID";
     const CIPHER_KEY_ID: &str = "TEST_CIPHER_KEY_ID";
 
@@ -2675,25 +2674,6 @@ mod tests {
         .await
     }
 
-    // Tests for routes defined in handler::http::request::websocket.
-
-    #[tokio::test]
-    async fn websocket() {
-        test_auth(
-            Method::GET,
-            format!("api{ORG_ID}/ws/{WS_REQUEST_ID}"),
-            AuthExtractor {
-                auth: AUTH_HEADER_VAL.to_string(),
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
-                bypass_check: true,
-                parent_id: format!("default"),
-            },
-        )
-        .await
-    }
-
     // Tests for routes defined in handler::http::request::actions.
 
     #[tokio::test]
@@ -3000,21 +2980,13 @@ mod tests {
                 tls_cert_path: String::default(),
                 tls_key_path: String::default(),
             },
-            websocket: config::WebSocket {
-                enabled: bool::default(),
-                session_idle_timeout_secs: i64::default(),
-                session_max_lifetime_secs: i64::default(),
-                session_gc_interval_secs: i64::default(),
-                ping_interval_secs: i64::default(),
-                max_frame_size: usize::default(),
-                max_continuation_size: usize::default(),
-                max_channel_buffer_size: usize::default(),
-                streaming_response_chunk_size: usize::default(),
-                streaming_enabled: bool::default(),
-            },
             route: config::Route {
                 timeout: u64::default(),
                 max_connections: usize::default(),
+            },
+            http_streaming: config::HttpStreaming {
+                streaming_response_chunk_size: usize::default(),
+                streaming_enabled: bool::default(),
             },
             common: config::Common {
                 app_name: String::default(),
@@ -3105,11 +3077,7 @@ mod tests {
                 restricted_routes_on_empty_data: bool::default(),
                 inverted_index_enabled: bool::default(),
                 inverted_index_cache_enabled: bool::default(),
-                inverted_index_split_chars: String::default(),
                 inverted_index_old_format: bool::default(),
-                inverted_index_store_format: String::default(),
-                inverted_index_search_format: String::default(),
-                inverted_index_tantivy_mode: String::default(),
                 inverted_index_count_optimizer_enabled: bool::default(),
                 inverted_index_camel_case_tokenizer_disabled: bool::default(),
                 full_text_search_type: String::default(),
@@ -3145,13 +3113,17 @@ mod tests {
                 feature_ingester_none_compression: bool::default(),
                 meta_ddl_dsn: Default::default(),
                 format_stream_name_to_lower: Default::default(),
-                websocket_enabled: Default::default(),
-                websocket_close_frame_delay: Default::default(),
                 file_list_dump_enabled: Default::default(),
                 file_list_dump_dual_write: Default::default(),
                 file_list_dump_min_hour: Default::default(),
                 file_list_dump_debug_check: Default::default(),
+                aggregation_cache_enabled: bool::default(),
+                aggregation_topk_enabled: bool::default(),
                 use_stream_settings_for_partitions_enabled: Default::default(),
+                dashboard_placeholder: Default::default(),
+                search_inspector_enabled: bool::default(),
+                utf8_view_enabled: bool::default(),
+                dashboard_show_symbol_enabled: bool::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
@@ -3260,11 +3232,11 @@ mod tests {
                 max_query_range_for_sa: i64::default(),
                 db_text_data_type: String::default(),
                 search_mini_partition_duration_secs: u64::default(),
-                file_download_priority_queue_thread_num: Default::default(),
-                file_download_priority_queue_window_secs: Default::default(),
-                file_download_enable_priority_queue: Default::default(),
-                histogram_enabled: Default::default(),
-                calculate_stats_step_limit: Default::default(),
+                file_download_priority_queue_thread_num: usize::default(),
+                file_download_priority_queue_window_secs: i64::default(),
+                file_download_enable_priority_queue: bool::default(),
+                calculate_stats_step_limit: i64::default(),
+                histogram_enabled: bool::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),
@@ -3287,6 +3259,7 @@ mod tests {
                 job_clean_wait_time: i64::default(),
                 pending_jobs_metric_interval: u64::default(),
                 max_group_files: usize::default(),
+                old_data_streams: String::default(),
             },
             cache_latest_files: config::CacheLatestFiles {
                 enabled: bool::default(),
@@ -3320,6 +3293,8 @@ mod tests {
                 gc_size: usize::default(),
                 gc_interval: u64::default(),
                 multi_dir: String::default(),
+                aggregation_max_size: usize::default(),
+                delay_window_mins: i64::default(),
             },
             log: config::Log {
                 level: String::default(),
@@ -3380,9 +3355,9 @@ mod tests {
                 max_idle_per_host: usize::default(),
                 keepalive_timeout: u64::default(),
                 multi_part_upload_size: usize::default(),
+                feature_bulk_delete: bool::default(),
                 accounts: Default::default(),
                 stream_strategy: Default::default(),
-                feature_bulk_delete: Default::default(),
             },
             sns: config::Sns {
                 endpoint: String::default(),
@@ -3392,6 +3367,10 @@ mod tests {
             tcp: config::TCP {
                 tcp_port: u16::default(),
                 udp_port: u16::default(),
+                tcp_tls_enabled: bool::default(),
+                tcp_tls_cert_path: String::default(),
+                tcp_tls_key_path: String::default(),
+                tcp_tls_ca_cert_path: String::default(),
             },
             prom: config::Prometheus {
                 ha_cluster_label: String::default(),
@@ -3457,6 +3436,11 @@ mod tests {
                 remote_request_max_retry_time: u64::default(),
                 max_connections: usize::default(),
                 wal_size_limit: u64::default(),
+                batch_size: usize::default(),
+                batch_enabled: bool::default(),
+                batch_size_bytes: usize::default(),
+                batch_timeout_ms: u64::default(),
+                use_shared_http_client: bool::default(),
             },
             encryption: config::Encryption {
                 algorithm: String::default(),

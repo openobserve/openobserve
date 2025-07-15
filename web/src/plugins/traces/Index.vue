@@ -491,8 +491,6 @@ function buildSearch() {
     req.query.start_time = timestamps.startTime;
     req.query.end_time = timestamps.endTime;
 
-    req.query["sql_mode"] = "full";
-
     let parseQuery = query.split("|");
     let queryFunctions = "";
     let whereClause = "";
@@ -530,9 +528,6 @@ function buildSearch() {
       "[INDEX_NAME]",
       searchObj.data.stream.selectedStream.value,
     );
-    // const parsedSQL = parser.astify(req.query.sql);
-    // const unparsedSQL = parser.sqlify(parsedSQL);
-    // console.log(unparsedSQL);
 
     req.query.sql = b64EncodeUnicode(req.query.sql);
 
@@ -776,7 +771,8 @@ async function extractFields() {
       );
       searchObj.data.datetime.queryRangeRestrictionInHour = -1;
       if (
-        (stream.settings.max_query_range > 0 || store.state.zoConfig.max_query_range > 0) &&
+        (stream.settings.max_query_range > 0 ||
+          store.state.zoConfig.max_query_range > 0) &&
         (searchObj.data.datetime.queryRangeRestrictionInHour >
           stream.settings.max_query_range ||
           stream.settings.max_query_range == 0 ||
@@ -784,7 +780,9 @@ async function extractFields() {
         searchObj.data.datetime.queryRangeRestrictionInHour != 0
       ) {
         searchObj.data.datetime.queryRangeRestrictionInHour =
-          stream.settings.max_query_range > 0 ? stream.settings.max_query_range : store.state.zoConfig.max_query_range;
+          stream.settings.max_query_range > 0
+            ? stream.settings.max_query_range
+            : store.state.zoConfig.max_query_range;
         searchObj.data.datetime.queryRangeRestrictionMsg = t(
           "search.queryRangeRestrictionMsg",
           {
@@ -959,7 +957,7 @@ function generateHistogramData() {
     autosize: true,
   };
 
-  if (searchObj.data.queryResults.hits) {
+  if (searchObj.data?.queryResults?.hits?.length) {
     searchObj.data.queryResults.hits.forEach(
       (bucket: {
         zo_sql_timestamp: string | number | Date;
@@ -978,10 +976,7 @@ function generateHistogramData() {
     layout: layout,
   };
 
-  if (
-    searchObj.meta.showHistogram == true &&
-    searchResultRef.value?.reDrawChart
-  ) {
+  if (searchResultRef.value?.reDrawChart) {
     searchResultRef.value.reDrawChart();
   }
 }
@@ -1038,10 +1033,7 @@ onActivated(() => {
     loadPageData();
   }
 
-  if (
-    searchObj.meta.showHistogram == true &&
-    router.currentRoute.value.path.indexOf("/traces") > -1
-  ) {
+  if (router.currentRoute.value.path.indexOf("/traces") > -1) {
     setTimeout(() => {
       if (searchResultRef.value) searchResultRef.value.reDrawChart();
     }, 300);

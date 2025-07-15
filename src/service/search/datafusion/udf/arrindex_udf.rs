@@ -87,23 +87,23 @@ pub fn arr_index_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Colum
                     let arr_field1: json::Value =
                         json::from_str(arr_field1).expect("Failed to deserialize arrzip field1");
                     // This field is assumed to be an array field
-                    if let json::Value::Array(field1) = arr_field1 {
-                        if field1.len() > start {
-                            if let Some(end) = end {
-                                // end is min(end, field1.len)
-                                let end = if end.as_usize() < field1.len() {
-                                    end as usize
-                                } else {
-                                    field1.len() - 1
-                                };
-                                if start <= end && end < field1.len() {
-                                    for item in field1.into_iter().take(end + 1).skip(start) {
-                                        index_arrs.push(item);
-                                    }
-                                }
+                    if let json::Value::Array(field1) = arr_field1
+                        && field1.len() > start
+                    {
+                        if let Some(end) = end {
+                            // end is min(end, field1.len)
+                            let end = if end.as_usize() < field1.len() {
+                                end as usize
                             } else {
-                                index_arrs.push(field1[start].clone());
+                                field1.len() - 1
+                            };
+                            if start <= end && end < field1.len() {
+                                for item in field1.into_iter().take(end + 1).skip(start) {
+                                    index_arrs.push(item);
+                                }
                             }
+                        } else {
+                            index_arrs.push(field1[start].clone());
                         }
                     }
                     let index_arrs =

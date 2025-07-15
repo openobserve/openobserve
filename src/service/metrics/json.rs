@@ -58,7 +58,7 @@ use crate::{
 
 pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse> {
     // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None) {
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
         log::error!("Metrics ingestion error: {e}");
         return Ok(IngestionResponse {
             code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
@@ -194,8 +194,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         if let Some(exec_pl) = exec_pl_option {
             let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
                 log::error!(
-                    "[Ingestion]: Stream {} has pipeline, but inputs failed to be buffered. BUG",
-                    stream_name
+                    "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG"
                 );
                 continue;
             };
@@ -208,8 +207,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             {
                 Err(e) => {
                     let err_msg = format!(
-                        "[Ingestion]: Stream {} pipeline batch processing failed: {}",
-                        stream_name, e,
+                        "[Ingestion]: Stream {stream_name} pipeline batch processing failed: {e}",
                     );
                     log::error!("{err_msg}");
                     // update status
@@ -417,14 +415,12 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     let alert_end_time = now_micros();
                     for alert in alerts {
-                        match alert
+                        if let Ok(Some(data)) = alert
                             .evaluate(Some(record), (None, alert_end_time), None)
                             .await
+                            .map(|res| res.data)
                         {
-                            Ok(res) if res.data.is_some() => {
-                                trigger_alerts.push((alert.clone(), res.data.unwrap()))
-                            }
-                            _ => {}
+                            trigger_alerts.push((alert.clone(), data))
                         }
                     }
                     stream_trigger_map.insert(stream_name.clone(), Some(trigger_alerts));

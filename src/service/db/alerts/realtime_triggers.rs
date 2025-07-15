@@ -48,12 +48,12 @@ async fn handle_format_conversion(
             let alert =
                 db::alerts::alert::get_by_name(org_id, stream_type.into(), stream_name, alert_name)
                     .await?;
-            if let Some(alert) = alert {
-                if let Some(id) = alert.id {
-                    let alert_id = id.to_string();
-                    item_key = format!("{}/{}", org_id, &alert_id);
-                    return Ok((item_key, alert_id));
-                }
+            if let Some(alert) = alert
+                && let Some(id) = alert.id
+            {
+                let alert_id = id.to_string();
+                item_key = format!("{}/{}", org_id, &alert_id);
+                return Ok((item_key, alert_id));
             }
             return Err(anyhow::anyhow!("Failed to get alert ID for old format"));
         }
@@ -94,7 +94,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     match handle_format_conversion(item_key, &org_id, &module_key).await {
                         Ok(result) => result,
                         Err(e) => {
-                            log::error!("Error handling format conversion: {}", e);
+                            log::error!("Error handling format conversion: {e}");
                             continue;
                         }
                     };
@@ -112,7 +112,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         {
                             Ok(val) => val,
                             Err(e) => {
-                                log::error!("Error getting value: {}", e);
+                                log::error!("Error getting value: {e}");
                                 continue;
                             }
                         }
@@ -120,7 +120,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         match json::from_slice(&ev.value.unwrap()) {
                             Ok(val) => val,
                             Err(e) => {
-                                log::error!("Error parsing trigger value: {}", e);
+                                log::error!("Error parsing trigger value: {e}");
                                 continue;
                             }
                         }
@@ -140,7 +140,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     match handle_format_conversion(item_key, &org_id, &module_key).await {
                         Ok(result) => result,
                         Err(e) => {
-                            log::error!("Error handling format conversion: {}", e);
+                            log::error!("Error handling format conversion: {e}");
                             continue;
                         }
                     };
@@ -166,4 +166,31 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     }
     log::info!("Alert realtime triggers Cached");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_item_key() {
+        let key_prefix = "alerts/";
+        let event_key = "alerts/123/456";
+        let (item_key, org_id, module_key) = parse_item_key(key_prefix, event_key);
+        assert_eq!(item_key, "123/456");
+        assert_eq!(org_id, "123");
+        assert_eq!(module_key, "456");
+    }
+
+    #[tokio::test]
+    async fn test_handle_format_conversion() {
+        let item_key = "alerts/123/456".to_string();
+        let org_id = "123".to_string();
+        let module_key = "456".to_string();
+        let (updated_item_key, alert_id) = handle_format_conversion(item_key, &org_id, &module_key)
+            .await
+            .unwrap();
+        assert_eq!(updated_item_key, "alerts/123/456".to_string());
+        assert_eq!(alert_id, "456".to_string());
+    }
 }

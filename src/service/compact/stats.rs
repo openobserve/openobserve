@@ -23,21 +23,23 @@ use crate::{
 };
 
 pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow::Error> {
+    let latest_pk = infra_file_list::get_max_pk_value()
+        .await
+        .map_err(|e| anyhow::anyhow!("get max pk value error: {:?}", e))?;
     loop {
-        let Some(offset) = update_stats_from_file_list_inner().await? else {
+        let Some(offset) = update_stats_from_file_list_inner(latest_pk).await? else {
             break;
         };
-        log::info!(
-            "keep updating stream stats from file list, offset: {:?} ...",
-            offset
-        );
+        log::info!("keep updating stream stats from file list, offset: {offset:?} ...");
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
     }
-    log::info!("done updating stream stats from file list");
+    log::debug!("done updating stream stats from file list");
     Ok(None)
 }
 
-async fn update_stats_from_file_list_inner() -> Result<Option<(i64, i64)>, anyhow::Error> {
+async fn update_stats_from_file_list_inner(
+    latest_pk: i64,
+) -> Result<Option<(i64, i64)>, anyhow::Error> {
     // get last offset
     let (mut offset, node) = db::compact::stats::get_offset().await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
@@ -53,11 +55,8 @@ async fn update_stats_from_file_list_inner() -> Result<Option<(i64, i64)>, anyho
         }
     }
 
-    // get latest offset and apply step limit
+    // apply step limit
     let step_limit = config::get_config().limit.calculate_stats_step_limit;
-    let latest_pk = infra_file_list::get_max_pk_value()
-        .await
-        .map_err(|e| anyhow::anyhow!("get max pk value error: {e}"))?;
     let latest_pk = std::cmp::min(offset + step_limit, latest_pk);
     let pk_value = if offset == 0 && latest_pk == 0 {
         None
@@ -131,5 +130,28 @@ async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
         Err(e)
     } else {
         Ok(Some(offset))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn setup() {
+        infra::db::init().await.unwrap();
+        // setup the offset
+        _ = db::compact::stats::set_offset(1024, Some(&LOCAL_NODE.uuid.clone())).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_stats_from_file_list() {
+        setup().await;
+        let latest_pk = 1002000;
+        let ret = update_stats_from_file_list_inner(latest_pk).await.unwrap();
+        assert_eq!(ret, Some((1024, 1001024)));
+        let ret = update_stats_from_file_list_inner(latest_pk).await.unwrap();
+        assert_eq!(ret, Some((1001024, 1002000)));
+        let ret = update_stats_from_file_list_inner(latest_pk).await.unwrap();
+        assert_eq!(ret, None);
     }
 }

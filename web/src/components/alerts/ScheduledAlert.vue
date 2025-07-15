@@ -773,11 +773,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div data-test="add-alert-destination-select">
                 <q-select
-                 :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+                  ref="destinationSelectRef"
+                  :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                   v-model="destinations"
-                  :options="formattedDestinations"
+                  :options="filteredDestinations"
+                  :input-debounce="300"
                   color="input-border"
-                  bg-color="input-bg "
+                  bg-color="input-bg"
                   class="no-case"
                   stack-label
                   outlined
@@ -791,8 +793,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }]"
                   :required="true"
                   style="width: 200px"
+                  @filter="filterDestinations"
                   @update:model-value="updateDestinations"
+                  @popup-show="isDestinationDropdownOpen = true"
+                  @popup-hide="isDestinationDropdownOpen = false"
                 >
+                  <q-tooltip
+                    v-if="!isDestinationDropdownOpen && destinations.length > 0"
+                    anchor="top middle"
+                    self="bottom middle"
+                    :offset="[0, 8]"
+                    max-width="300px"
+                  >
+                    {{ destinations }}
+                  </q-tooltip>
                   <template v-slot:option="option">
                     <q-list dense>
                       <q-item
@@ -1532,7 +1546,7 @@ import config from "@/aws-exports";
 import O2AIChat from "../O2AIChat.vue";
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue"),
+  () => import("@/components/CodeQueryEditor.vue"),
 );
 
 const props = defineProps([
@@ -1637,6 +1651,8 @@ const aggregationData = ref(props.aggregation);
 
 const destinations = ref(props.destinations);
 
+const destinationSelectRef = ref<any>(null);
+
 const isFullScreen = ref(false);
 
 const viewSqlEditor = ref(false);
@@ -1647,7 +1663,7 @@ const expandSqlOutput = ref(true);
 
 const expandCombinedOutput = ref(false);
 
-const formattedDestinations = ref(props.formattedDestinations);
+const filteredDestinations = ref(props.formattedDestinations)
 
 const filteredFields = ref(props.columns);
 
@@ -1680,6 +1696,7 @@ const cronJobError = ref("");
 
 const expandState = ref(props.expandState);
 
+const isDestinationDropdownOpen = ref(false);
 
 onMounted(()=>{
   if(dateTimePicker.value.length > 0){
@@ -1712,8 +1729,6 @@ const addConditionGroup = (groupId: string) => {
 
 const updateDateTimePicker = (data: any) => {
   emits("update:multi_time_range", dateTimePicker.value);
-
-
 };
 
 const removeTimeShift = (index: any) => {
@@ -1855,6 +1870,15 @@ watch(
     functionOptions.value = [...functions];
   },
 );
+watch(()=> destinations.value, (newVal, oldVal)=>{
+  //check if the newVal length is greater than oldVal length
+  //then if any filter is applied then clear the input
+  if(newVal.length > oldVal.length){
+    //have to clear the input
+    //this runs every time if users types or not because setting the previous value ('') to ('') is same
+    destinationSelectRef.value.updateInputValue('');
+  }
+})
 
 const vrlFunctionContent = computed({
   get() {
@@ -1966,7 +1990,6 @@ const filterColumns = (options: string[], val: string, update: Function) => {
       filteredOptions = [...options];
     });
   }
-
 
   update(() => {
     const value = val.toLowerCase();
@@ -2108,7 +2131,7 @@ const validateFrequency = (frequency: {
 
     if (frequency.frequency < intervalInMins) {
       cronJobError.value =
-        "Minimum frequency should be " + (intervalInMins) + " minutes";
+        "Minimum frequency should be " + intervalInMins + " minutes";
       return;
     }
   }
@@ -2481,10 +2504,21 @@ const routeToCreateDestination = () => {
       vrlFunctionContent.value = "";
     };
 
+    const filterDestinations = (val: string, update: Function) => {
+      if (val === "") {
+        update(() => {
+          filteredDestinations.value = [...props.formattedDestinations];
+        });
+        return;
+      }
 
-
-
-
+      update(() => {
+        const needle = val.toLowerCase();
+        filteredDestinations.value = props.formattedDestinations.filter(
+          (destination: string) => destination.toLowerCase().includes(needle)
+        );
+      });
+    };
 
 
 defineExpose({
@@ -2517,7 +2551,10 @@ defineExpose({
   isHovered,
   getBtnLogo,
   convertMinutesToDisplayValue,
-  scheduledAlertRef
+  scheduledAlertRef,
+  filterDestinations,
+  filteredDestinations,
+  destinationSelectRef
 });
 </script>
 
@@ -2527,7 +2564,7 @@ defineExpose({
   overflow: hidden;
 }
 </style>
-<style lang="scss" >
+<style lang="scss">
 .scheduled-alert-tabs {
   .q-tab--active {
     background-color: $primary;

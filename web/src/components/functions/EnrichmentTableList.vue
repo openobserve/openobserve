@@ -179,7 +179,11 @@ import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
-import { formatSizeFromMB, getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
+import {
+  formatSizeFromMB,
+  getImageURL,
+  verifyOrganizationStatus,
+} from "../../utils/zincutils";
 import streamService from "@/services/stream";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
@@ -187,7 +191,13 @@ import EnrichmentSchema from "./EnrichmentSchema.vue";
 
 export default defineComponent({
   name: "EnrichmentTableList",
-  components: { QTablePagination, AddEnrichmentTable, NoData, ConfirmDialog, EnrichmentSchema },
+  components: {
+    QTablePagination,
+    AddEnrichmentTable,
+    NoData,
+    ConfirmDialog,
+    EnrichmentSchema,
+  },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
@@ -237,7 +247,7 @@ export default defineComponent({
         align: "left",
         sortable: true,
         sort: (a, b, rowA, rowB) => {
-          return rowA.original_storage_size- rowB.original_storage_size
+          return rowA.original_storage_size - rowB.original_storage_size;
         },
       },
       {
@@ -247,7 +257,7 @@ export default defineComponent({
         align: "left",
         sortable: false,
         sort: (a, b, rowA, rowB) =>
-          rowA.original_compressed_size- rowB.original_compressed_size,
+          rowA.original_compressed_size - rowB.original_compressed_size,
       },
       {
         name: "actions",
@@ -263,15 +273,14 @@ export default defineComponent({
       getLookupTables();
     });
 
-    const getLookupTables = () => {
+    const getLookupTables = (force: boolean = false) => {
       const dismiss = $q.notify({
         spinner: true,
-        message: "Please wait while loading functions...",
+        message: "Please wait while loading enrichment tables...",
       });
 
-      getStreams("enrichment_tables", false)
+      getStreams("enrichment_tables", false, false, force)
         .then((res: any) => {
-
           let counter = 1;
           resultTotal.value = res.list.length;
           jsTransforms.value = res.list.map((data: any) => {
@@ -304,7 +313,7 @@ export default defineComponent({
           dismiss();
         })
         .catch((err) => {
-          console.log("--", err);
+          console.info("Error while fetching enrichment tables", err);
           dismiss();
           if (err.response.status != 403) {
             $q.notify({
@@ -388,7 +397,7 @@ export default defineComponent({
       });
       showAddJSTransformDialog.value = false;
       resetStreamType("enrichment_tables");
-      getLookupTables();
+      getLookupTables(true);
     };
 
     const hideForm = () => {
@@ -415,7 +424,7 @@ export default defineComponent({
               message: `${selectedDelete.value.name} deleted successfully.`,
             });
             resetStreamType("enrichment_tables");
-            getLookupTables();
+            getLookupTables(true);
           }
         })
         .catch((err: any) => {
@@ -494,6 +503,7 @@ export default defineComponent({
     };
 
     const exploreEnrichmentTable = async (props: any) => {
+      store.dispatch("logs/setIsInitialized", false);
       const timestamps = await getTimeRange(props.row);
       router.push({
         name: "logs",
@@ -574,7 +584,7 @@ export default defineComponent({
       ) {
         this.resultTotal = 0;
         this.jsTransforms = [];
-        this.getLookupTables();
+        this.getLookupTables(true);
       }
     },
   },

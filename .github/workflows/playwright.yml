@@ -100,9 +100,9 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: [
-            "alerts.spec.js",
-            "alertImportTDA.spec.js",
-            "alertsfolders.spec.js",
+            "alerts/alerts-e2e-flow.spec.js",
+            "alerts/alerts-ui-operations.spec.js",
+            "alerts/alerts-import.spec.js",
             "changeOrg.spec.js",
             "dashboards/custom-charts.spec.js",
             "dashboards/dashboard.spec.js",
@@ -122,11 +122,12 @@ jobs:
             "dashboards/visualization-vrl.spec.js",
             "enrichment.spec.js",
             "join.spec.js",
-            "logshistogram.spec.js",
-            "logspage.spec.js",
-            "logsqueries.spec.js",
-            "logsquickmode.spec.js",
+            "Logs/logshistogram.spec.js",
+            "Logs/logspage.spec.js",
+            "Logs/logsqueries.spec.js",
+            "Logs/logsquickmode.spec.js",
             "multiselect-stream.spec.js",
+            "pagination.spec.js",
             "pipelines.spec.js",
             "reportsUpdated.spec.js",
             "reportsUpdated2.spec.js",
@@ -136,12 +137,15 @@ jobs:
             "schemaload.spec.js",
             "secondsPrecisionAdded.spec.js",
             "serviceAccount.spec.js",
-            "streamname.spec.js",
-            "streaming.spec.js",
+            "Streams/streamname.spec.js",
+            "Streams/streaming.spec.js",
             "unflattened.spec.js",
             "usersOrg.spec.js",
             "websocket.spec.js",
-             # "remotepipeline.spec.js",
+            "pipeline-dynamic.spec.js",
+            "searchpartition.spec.js",
+            "pipeline-core.spec.js",
+            # "remotepipeline.spec.js",
 
           ]
 

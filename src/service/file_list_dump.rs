@@ -17,7 +17,7 @@ use arrow::array::{BooleanArray, Int64Array, RecordBatch, StringArray};
 use chrono::Utc;
 use config::{
     get_config,
-    meta::stream::{FileKey, FileListDeleted, StreamStats, StreamType},
+    meta::stream::{ALL_STREAM_TYPES, FileKey, FileListDeleted, StreamStats, StreamType},
     utils::time::hour_micros,
 };
 use hashbrown::HashMap;
@@ -185,7 +185,7 @@ async fn inner_exec(
         false,
     )
     .await?;
-    let ctx = prepare_datafusion_context(None, vec![], vec![], false, partitions).await?;
+    let ctx = prepare_datafusion_context(trace_id, None, vec![], vec![], false, partitions).await?;
     ctx.register_table("file_list", tbl)?;
     let df = ctx.sql(query).await?;
     let ret = df.collect().await?;
@@ -333,18 +333,14 @@ async fn move_and_delete(
     let mut inserted_into_deleted = false;
 
     for _ in 0..5 {
-        if !inserted_into_deleted {
-            if let Err(e) =
+        if !inserted_into_deleted
+            && let Err(e) =
                 infra::file_list::batch_add_deleted(org, Utc::now().timestamp_micros(), &del_items)
                     .await
-            {
-                log::error!(
-                    "[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {}",
-                    e
-                );
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
+        {
+            log::error!("[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {e}");
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
         }
         inserted_into_deleted = true;
         let items: Vec<_> = list
@@ -358,10 +354,7 @@ async fn move_and_delete(
             })
             .collect();
         if let Err(e) = infra::file_list::batch_process(&items).await {
-            log::error!(
-                "[FILE_LIST_DUMP] batch_delete to db failed, retrying: {}",
-                e
-            );
+            log::error!("[FILE_LIST_DUMP] batch_delete to db failed, retrying: {e}");
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
@@ -395,6 +388,37 @@ pub async fn stats(
     stream_name: Option<&str>,
     pk_value: Option<(i64, i64)>,
 ) -> Result<Vec<(String, StreamStats)>, errors::Error> {
+    let stream_types = match stream_type {
+        Some(stype) => vec![stype],
+        None => ALL_STREAM_TYPES.to_vec(),
+    };
+
+    let mut ret = HashMap::new();
+    for stream_type in stream_types {
+        if stream_type == StreamType::Filelist {
+            continue;
+        }
+        let stream_names = match stream_name {
+            Some(name) => vec![name.to_string()],
+            None => crate::service::db::schema::list_streams_from_cache(org_id, stream_type).await,
+        };
+        for stream_name in stream_names {
+            let stats = stats_inner(org_id, stream_type, &stream_name, pk_value).await?;
+            ret.extend(stats);
+            log::debug!(
+                "[FILE_LIST_DUMP] stats for {org_id}/{stream_type}/{stream_name}: pk: {pk_value:?}",
+            );
+        }
+    }
+    Ok(ret.into_iter().collect())
+}
+
+async fn stats_inner(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    pk_value: Option<(i64, i64)>,
+) -> Result<Vec<(String, StreamStats)>, errors::Error> {
     let cfg = get_config();
 
     // in case of dual write, we have no way of de-duping with ids for stats.
@@ -410,34 +434,17 @@ pub async fn stats(
         _ => None,
     };
 
-    let (field, value, dump_files) = match (stream_type, stream_name) {
-        (Some(stype), Some(sname)) => {
-            let stream_key = format!("{org_id}/{}/{org_id}_{stype}_{sname}", StreamType::Filelist);
-            let dump_files = get_dump_files_in_range(
-                org_id,
-                Some(&stream_key),
-                (0, Utc::now().timestamp_micros()),
-                min_id,
-            )
-            .await?;
-            (
-                "stream",
-                format!(
-                    "{}/{}/{}",
-                    org_id,
-                    stream_type.unwrap(),
-                    stream_name.unwrap()
-                ),
-                dump_files,
-            )
-        }
-        _ => {
-            let dump_files =
-                get_dump_files_in_range(org_id, None, (0, Utc::now().timestamp_micros()), min_id)
-                    .await?;
-            ("org", org_id.to_string(), dump_files)
-        }
-    };
+    let stream_key = format!(
+        "{org_id}/{}/{org_id}_{stream_type}_{stream_name}",
+        StreamType::Filelist
+    );
+    let dump_files = get_dump_files_in_range(
+        org_id,
+        Some(&stream_key),
+        (0, Utc::now().timestamp_micros()),
+        min_id,
+    )
+    .await?;
 
     if dump_files.is_empty() {
         return Ok(vec![]);
@@ -445,6 +452,8 @@ pub async fn stats(
 
     let dump_files: Vec<_> = dump_files.iter().map(|f| f.into()).collect();
 
+    let field = "stream";
+    let value = format!("{org_id}/{stream_type}/{stream_name}");
     let sql = format!(
         r#"
 SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS file_num, 
@@ -454,17 +463,17 @@ WHERE {field} = '{value}'
         "#
     );
     let sql = match pk_value {
-        None => format!("{} GROUP BY stream", sql),
-        Some((0, 0)) => format!("{} GROUP BY stream", sql),
+        None => format!("{sql} GROUP BY stream"),
+        Some((0, 0)) => format!("{sql} GROUP BY stream"),
         Some((min, max)) => {
-            format!("{} AND id > {} AND id <= {} GROUP BY stream", sql, min, max)
+            format!("{sql} AND id > {min} AND id <= {max} GROUP BY stream")
         }
     };
 
     let task_id = tokio::task::try_id()
         .map(|id| id.to_string())
         .unwrap_or_else(|| rand::random::<u64>().to_string());
-    let fake_trace_id = format!("stats_on_dump-{}", task_id);
+    let fake_trace_id = format!("stats_on_dump-{task_id}");
     let t = exec(&fake_trace_id, cfg.limit.cpu_num, &dump_files, &sql).await?;
     let ret = t.into_iter().flat_map(record_batch_to_stats).collect();
     Ok(ret)

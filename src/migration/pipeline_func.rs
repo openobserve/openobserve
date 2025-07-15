@@ -375,10 +375,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
             .delete("/pipeline/", true, infra_db::NO_NEED_WATCH, None)
             .await
         {
-            log::error!(
-                "[Migration-Pipeline] error deleting all pipelines from meta table: {}",
-                e
-            );
+            log::error!("[Migration-Pipeline] error deleting all pipelines from meta table: {e}");
         }
         // update the functions by removing the stream associations
         for (org_id, trans) in func_to_update {

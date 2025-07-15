@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -51,56 +51,49 @@ impl From<cloud_billings::CustomerBilling> for ListSubscriptionResponseBody {
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct GetOrgUsageResponseBody {
-    pub data: OrgUserData,
-    pub message: String,
+    pub data: Vec<OrgUserData>,
+    pub range: String,
+}
+
+impl GetOrgUsageResponseBody {
+    pub fn convert_to_unit(&mut self, unit: &str) {
+        let target_unit = unit.to_ascii_lowercase();
+        for usage_data in self.data.iter_mut() {
+            let current_unit = usage_data.unit.to_ascii_lowercase();
+            match (current_unit.as_str(), target_unit.as_str()) {
+                ("gb", "mb") => {
+                    usage_data.value *= 1024.0;
+                    usage_data.unit = "MB".to_string();
+                }
+                ("mb", "gb") => {
+                    usage_data.value /= 1024.0;
+                    usage_data.unit = "GB".to_string();
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, ToSchema, Default)]
 pub struct OrgUserData {
-    ingestion: f64,
-    search: f64,
-    functions: f64,
-    other: f64,
+    pub event: String,
+    pub value: f64,
+    pub unit: String,
 }
 
-impl From<cloud_billings::org_usage::OrgUsage> for GetOrgUsageResponseBody {
-    fn from(value: cloud_billings::org_usage::OrgUsage) -> Self {
+impl From<cloud_billings::org_usage::OrgUsageQueryResult> for OrgUserData {
+    fn from(value: cloud_billings::org_usage::OrgUsageQueryResult) -> Self {
         Self {
-            data: OrgUserData {
-                ingestion: value.ingestion,
-                search: value.search,
-                functions: value.functions,
-                other: value.other,
-            },
-            message: "Data usage retried successfully".to_string(),
+            event: value.event.to_string(),
+            value: value.size,
+            unit: value.unit.to_string(),
         }
     }
 }
 
-#[derive(Clone, Debug, Serialize, ToSchema)]
-pub struct GetQuotaThresholdResponseBody {
-    pub data: OrgQuotaThreshold,
-    pub message: String,
-}
-
-#[derive(Clone, Debug, Serialize, ToSchema, Default)]
-pub struct OrgQuotaThreshold {
-    ingestion: f64,
-    search: f64,
-    functions: f64,
-    other: f64,
-}
-
-impl From<cloud_billings::org_usage::OrgUsageThreshold> for GetQuotaThresholdResponseBody {
-    fn from(value: cloud_billings::org_usage::OrgUsageThreshold) -> Self {
-        Self {
-            data: OrgQuotaThreshold {
-                ingestion: value.ingestion,
-                search: value.search,
-                functions: value.functions,
-                other: value.other,
-            },
-            message: "Organization monthly quota pulled successfully".to_string(),
-        }
-    }
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct NewUserAttrition {
+    pub from: String,
+    pub company: String,
 }

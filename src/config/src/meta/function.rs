@@ -28,6 +28,11 @@ use crate::{meta::stream::StreamType, utils::json};
 pub static RESULT_ARRAY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#").unwrap());
 
+// Checks for #ResultArray#SkipVRL#
+pub static RESULT_ARRAY_SKIP_VRL: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#[ \s]*Skip[ \s]*VRL[ \s]*#").unwrap()
+});
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Transform {
@@ -49,9 +54,13 @@ impl Transform {
     pub fn is_vrl(&self) -> bool {
         self.trans_type == Some(0)
     }
-
     pub fn is_result_array_vrl(&self) -> bool {
-        self.is_vrl() && RESULT_ARRAY.is_match(&self.function)
+        self.is_vrl()
+            && RESULT_ARRAY.is_match(&self.function)
+            && !RESULT_ARRAY_SKIP_VRL.is_match(&self.function)
+    }
+    pub fn is_result_array_skip_vrl(&self) -> bool {
+        self.is_vrl() && RESULT_ARRAY_SKIP_VRL.is_match(&self.function)
     }
 }
 

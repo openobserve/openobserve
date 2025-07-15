@@ -69,10 +69,7 @@ pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "get_env_var is not supported",
-        ));
+        return Err(std::io::Error::other("get_env_var is not supported"));
     }
 
     let external = state::ExternalEnv::default();
@@ -92,8 +89,7 @@ pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig
             config,
             fields: vec![],
         }),
-        Err(e) => Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        Err(e) => Err(std::io::Error::other(
             vrl::diagnostic::Formatter::new(func, e).to_string(),
         )),
     }
@@ -136,13 +132,12 @@ pub fn apply_vrl_fn(
                     .with_label_values(&[
                         org_id,
                         StreamType::Logs.as_str(),
-                        &format!("{:?}", stream_name),
+                        &format!("{stream_name:?}"),
                         TRANSFORM_FAILED,
                     ])
                     .inc();
                 let err_msg = format!(
-                    "{}/{:?} vrl failed at processing result {:?} on record {:?}. Returning original row.",
-                    org_id, stream_name, err, row
+                    "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row.",
                 );
                 log::warn!("{err_msg}");
                 (row, Some(err_msg))
@@ -153,13 +148,12 @@ pub fn apply_vrl_fn(
                 .with_label_values(&[
                     org_id,
                     StreamType::Logs.as_str(),
-                    &format!("{:?}", stream_name),
+                    &format!("{stream_name:?}"),
                     TRANSFORM_FAILED,
                 ])
                 .inc();
             let err_msg = format!(
-                "{}/{:?} vrl runtime failed at getting result {:?} on record {:?}. Returning original row.",
-                org_id, stream_name, err, row
+                "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row.",
             );
             log::warn!("{err_msg}");
             (row, Some(err_msg))
@@ -235,7 +229,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     if triggers.is_empty() {
         return;
     }
-    log::debug!("Evaluating triggers: {:?}", triggers);
+    log::debug!("Evaluating triggers: {triggers:?}");
     let mut trigger_usage_reports = vec![];
     for (alert, val) in triggers.iter() {
         let module_key = scheduler_key(alert.id);
@@ -264,7 +258,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
         };
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
-                log::error!("Failed to send notification: {}", e);
+                log::error!("Failed to send notification: {e}");
                 trigger_data_stream.status = TriggerDataStatus::Failed;
                 trigger_data_stream.error =
                     Some(format!("error sending notification for alert: {e}"));
@@ -305,7 +299,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
                     })
                     .await
                     {
-                        log::error!("Failed to update trigger: {}", e);
+                        log::error!("Failed to update trigger: {e}");
                     }
                     trigger_data_stream.next_run_at = next_run_at;
                 }
@@ -407,7 +401,7 @@ pub async fn write_file(
     Ok(req_stats)
 }
 
-pub fn check_ingestion_allowed(
+pub async fn check_ingestion_allowed(
     org_id: &str,
     stream_type: StreamType,
     stream_name: Option<&str>,
@@ -426,13 +420,22 @@ pub fn check_ingestion_allowed(
     }
 
     // check if we are allowed to ingest
-    if let Some(stream_name) = stream_name {
-        if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
+    if let Some(stream_name) = stream_name
+        && db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None)
+    {
+        return Err(Error::IngestionError(format!(
+            "stream [{stream_name}] is being deleted"
+        )));
+    }
+
+    #[cfg(feature = "cloud")]
+    {
+        if !super::organization::is_org_in_free_trial_period(org_id).await? {
             return Err(Error::IngestionError(format!(
-                "stream [{stream_name}] is being deleted"
+                "org {org_id} has expired its trial period"
             )));
         }
-    };
+    }
 
     // check memory circuit breaker
     ingester::check_memory_circuit_breaker().map_err(|e| Error::ResourceError(e.to_string()))?;
@@ -546,23 +549,22 @@ pub async fn get_uds_and_original_data_streams(
             stream.stream_name.to_string(),
             stream_settings.index_all_values,
         );
-        if let Some(fields) = &stream_settings.defined_schema_fields {
-            if !fields.is_empty() {
-                let mut fields: HashSet<_> = fields.iter().cloned().collect();
-                if !fields.contains(TIMESTAMP_COL_NAME) {
-                    fields.insert(TIMESTAMP_COL_NAME.to_string());
-                }
-                user_defined_schema_map.insert(stream.stream_name.to_string(), Some(fields));
-            } else {
-                user_defined_schema_map.insert(stream.stream_name.to_string(), None);
+
+        if !stream_settings.defined_schema_fields.is_empty() {
+            let mut fields = HashSet::<_>::from_iter(stream_settings.defined_schema_fields);
+            if !fields.contains(TIMESTAMP_COL_NAME) {
+                fields.insert(TIMESTAMP_COL_NAME.to_string());
             }
+            user_defined_schema_map.insert(stream.stream_name.to_string(), Some(fields));
+        } else {
+            user_defined_schema_map.insert(stream.stream_name.to_string(), None);
         }
     }
 }
 
 /// Calls the SnowflakeIdGenerator instance associated with this stream to generate a new i64 ID.
 pub fn generate_record_id(org_id: &str, stream_name: &str, stream_type: &StreamType) -> i64 {
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
     STREAM_RECORD_ID_GENERATOR
         .entry(key)
         .or_insert_with(|| SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }))

@@ -109,7 +109,7 @@ impl Default for DistinctValues {
 
 impl DistinctValues {
     pub fn new() -> Self {
-        tokio::task::spawn(async move { run_flush().await });
+        tokio::task::spawn(run_flush());
         Self {
             channel: handle_channel(),
             shutdown: Arc::new(AtomicBool::new(false)),
@@ -131,7 +131,7 @@ fn handle_channel() -> Arc<mpsc::Sender<DvEvent>> {
             };
             if let DvEventType::Shutudown = event.ev_type {
                 if let Err(e) = INSTANCE.flush().await {
-                    log::error!("[DISTINCT_VALUES] flush error: {}", e);
+                    log::error!("[DISTINCT_VALUES] flush error: {e}");
                 }
                 INSTANCE.shutdown.store(true, Ordering::Release);
                 break;
@@ -225,7 +225,7 @@ impl Metadata for DistinctValues {
                 )
                 .await
                 {
-                    log::error!("[DISTINCT_VALUES] error while setting schema: {}", e);
+                    log::error!("[DISTINCT_VALUES] error while setting schema: {e}");
                     return Err(Error::Message(e.to_string()));
                 }
             }
@@ -346,7 +346,7 @@ async fn run_flush() {
     loop {
         interval.tick().await;
         if let Err(e) = INSTANCE.flush().await {
-            log::error!("[DISTINCT_VALUES] error flush data to wal: {}", e);
+            log::error!("[DISTINCT_VALUES] error flush data to wal: {e}");
         }
     }
 }

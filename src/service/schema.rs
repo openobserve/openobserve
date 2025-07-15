@@ -104,7 +104,7 @@ pub async fn check_for_schema(
             ])
             .inc();
         return Err(get_request_columns_limit_error(
-            &format!("{}/{}/{}", org_id, stream_type, stream_name),
+            &format!("{org_id}/{stream_type}/{stream_name}"),
             inferred_schema.fields.len(),
         ));
     }
@@ -120,7 +120,7 @@ pub async fn check_for_schema(
             let (defined_schema_fields, need_original, index_original_data, index_all_values) =
                 match stream_setting {
                     Some(s) => (
-                        s.defined_schema_fields.unwrap_or_default(),
+                        s.defined_schema_fields,
                         s.store_original_data,
                         s.index_original_data,
                         s.index_all_values,
@@ -233,24 +233,20 @@ async fn handle_diff_schema(
     let cfg = get_config();
 
     log::debug!(
-        "handle_diff_schema start for [{}/{}/{}] start_dt: {}",
-        org_id,
-        stream_type,
-        stream_name,
-        record_ts
+        "handle_diff_schema start for [{org_id}/{stream_type}/{stream_name}] start_dt: {record_ts}"
     );
 
     // acquire a local_lock to ensure only one thread can update schema
-    let cache_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let cache_key = format!("{org_id}/{stream_type}/{stream_name}");
     let local_lock = infra::local_lock::lock(&cache_key).await?;
     let _guard = local_lock.lock().await;
 
     // check if the schema has been updated by another thread
     let read_cache = STREAM_SCHEMAS_LATEST.read().await;
-    if let Some(updated_schema) = read_cache.get(&cache_key) {
-        if let (false, _) = get_schema_changes(updated_schema, inferred_schema) {
-            return Ok(None);
-        }
+    if let Some(updated_schema) = read_cache.get(&cache_key)
+        && let (false, _) = get_schema_changes(updated_schema, inferred_schema)
+    {
+        return Ok(None);
     }
     drop(read_cache);
 
@@ -328,10 +324,7 @@ async fn handle_diff_schema(
 
     // check defined_schema_fields
     let mut stream_setting = unwrap_stream_settings(&final_schema).unwrap_or_default();
-    let mut defined_schema_fields = stream_setting
-        .defined_schema_fields
-        .clone()
-        .unwrap_or_default();
+    let mut defined_schema_fields = stream_setting.defined_schema_fields.clone();
 
     // Automatically enable User-defined schema when
     // 1. allow_user_defined_schemas is enabled
@@ -394,7 +387,7 @@ async fn handle_diff_schema(
         }
 
         defined_schema_fields = uds_fields.into_iter().collect::<Vec<_>>();
-        stream_setting.defined_schema_fields = Some(defined_schema_fields.clone());
+        stream_setting.defined_schema_fields = defined_schema_fields.clone();
         final_schema.metadata.insert(
             "settings".to_string(),
             json::to_string(&stream_setting).unwrap(),
@@ -409,13 +402,7 @@ async fn handle_diff_schema(
         )
         .await
         {
-            log::error!(
-                "save_stream_settings [{}/{}/{}] error: {}",
-                org_id,
-                stream_type,
-                stream_name,
-                e
-            );
+            log::error!("save_stream_settings [{org_id}/{stream_type}/{stream_name}] error: {e}");
         }
     }
 
@@ -427,10 +414,10 @@ async fn handle_diff_schema(
     let need_original = stream_setting.store_original_data;
     let index_original_data = stream_setting.index_original_data;
     let index_all_values = stream_setting.index_all_values;
-    if need_original || index_original_data {
-        if let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone()) {
-            entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
-        }
+    if (need_original || index_original_data)
+        && let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone())
+    {
+        entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
     }
     let mut w = STREAM_SETTINGS.write().await;
     w.insert(cache_key.clone(), stream_setting);
@@ -522,7 +509,7 @@ pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bo
 
     let stream_setting = unwrap_stream_settings(schema.schema());
     let defined_schema_fields = stream_setting
-        .and_then(|s| s.defined_schema_fields)
+        .map(|s| s.defined_schema_fields)
         .unwrap_or_default();
 
     for item in inferred_schema.fields.iter() {
@@ -587,10 +574,10 @@ pub async fn stream_schema_exists(
     }
 
     let settings = unwrap_stream_settings(&schema);
-    if let Some(stream_setting) = settings {
-        if !stream_setting.partition_keys.is_empty() {
-            schema_chk.has_partition_keys = true;
-        }
+    if let Some(stream_setting) = settings
+        && !stream_setting.partition_keys.is_empty()
+    {
+        schema_chk.has_partition_keys = true;
     }
     if schema.metadata().contains_key(METADATA_LABEL) {
         schema_chk.has_metadata = true;

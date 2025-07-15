@@ -91,7 +91,7 @@ pub async fn get_streams(
         };
         match permitted_streams {
             Some(permitted_streams) => {
-                if permitted_streams.contains(&format!("{}:_all_{}", s_type, org_id)) {
+                if permitted_streams.contains(&format!("{s_type}:_all_{org_id}")) {
                     indices
                 } else {
                     indices
@@ -199,7 +199,7 @@ pub fn stream_res(
         stream_type,
         total_fields: mappings.len(),
         schema: mappings,
-        uds_schema: None,
+        uds_schema: vec![],
         stats,
         settings,
         metrics_meta,
@@ -228,10 +228,7 @@ pub async fn save_stream_settings(
     }
 
     // only allow setting user defined schema for logs stream
-    if stream_type != StreamType::Logs
-        && settings.defined_schema_fields.is_some()
-        && !settings.defined_schema_fields.as_ref().unwrap().is_empty()
-    {
+    if stream_type != StreamType::Logs && !settings.defined_schema_fields.is_empty() {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,
             "only logs stream can have user defined schema",
@@ -243,7 +240,7 @@ pub async fn save_stream_settings(
         if key == &cfg.common.column_all {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("field [{}] can't be used for full text search", key),
+                format!("field [{key}] can't be used for full text search"),
             )));
         }
     }
@@ -251,7 +248,7 @@ pub async fn save_stream_settings(
         if key == &cfg.common.column_all {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("field [{}] can't be used for secondary index", key),
+                format!("field [{key}] can't be used for secondary index"),
             )));
         }
     }
@@ -288,13 +285,13 @@ pub async fn save_stream_settings(
         let Some(field) = schema_fields.get(key) else {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("field [{}] not found in schema", key),
+                format!("field [{key}] not found in schema"),
             )));
         };
         if field.data_type() != &DataType::Utf8 {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("full text search field [{}] must be text field", key),
+                format!("full text search field [{key}] must be text field"),
             )));
         }
     }
@@ -402,30 +399,23 @@ pub async fn update_stream_settings(
                         "user defined schema is not allowed, you need to set ZO_ALLOW_USER_DEFINED_SCHEMAS=true",
                     )));
                 }
-                settings.defined_schema_fields =
-                    if let Some(mut schema_fields) = settings.defined_schema_fields {
-                        schema_fields.extend(new_settings.defined_schema_fields.add);
-                        Some(schema_fields)
-                    } else {
-                        Some(new_settings.defined_schema_fields.add)
-                    }
+                settings
+                    .defined_schema_fields
+                    .extend(new_settings.defined_schema_fields.add);
             }
             if !new_settings.defined_schema_fields.remove.is_empty() {
-                if let Some(schema_fields) = settings.defined_schema_fields.as_mut() {
-                    schema_fields
-                        .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
-                }
+                settings
+                    .defined_schema_fields
+                    .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
             }
-            if let Some(schema_fields) = settings.defined_schema_fields.as_ref() {
-                if schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
-                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                        http::StatusCode::BAD_REQUEST,
-                        format!(
-                            "user defined schema fields count exceeds the limit: {}",
-                            cfg.limit.user_defined_schema_max_fields
-                        ),
-                    )));
-                }
+            if settings.defined_schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST,
+                    format!(
+                        "user defined schema fields count exceeds the limit: {}",
+                        cfg.limit.user_defined_schema_max_fields
+                    ),
+                )));
             }
 
             // check for bloom filter fields
@@ -536,15 +526,15 @@ pub async fn update_stream_settings(
                         ));
                     }
                     // here we can be sure that usage is at most 1 record
-                    if let Some(entry) = usage.first() {
-                        if entry.origin != OriginType::Stream {
-                            return Ok(HttpResponse::BadRequest().json(
+                    if let Some(entry) = usage.first()
+                        && entry.origin != OriginType::Stream
+                    {
+                        return Ok(HttpResponse::BadRequest().json(
                                 MetaHttpResponse::error(
                                     http::StatusCode::BAD_REQUEST,
                                     format!("error in removing distinct field : field {f} if used in dashboards/reports"),
                                 ),
-                            ));
-                        }
+                        ));
                     }
                 }
                 // here we are sure that all fields to be removed can be removed,
@@ -623,24 +613,23 @@ pub async fn delete_stream(
     // delete associated pipelines
     if let Some(pipeline) =
         db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
+        && let Err(e) = db::pipeline::delete(&pipeline.id).await
     {
-        if let Err(e) = db::pipeline::delete(&pipeline.id).await {
-            return Ok(HttpResponse::InternalServerError()
-                .append_header((
-                    ERROR_HEADER,
-                    format!(
-                        "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
-                        pipeline.name
-                    ),
-                ))
-                .json(MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!(
-                        "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
-                        pipeline.name
-                    ),
-                )));
-        }
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((
+                ERROR_HEADER,
+                format!(
+                    "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
+                    pipeline.name
+                ),
+            ))
+            .json(MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!(
+                    "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
+                    pipeline.name
+                ),
+            )));
     }
 
     // delete related resource
@@ -674,11 +663,7 @@ pub async fn stream_delete_inner(
         db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
     {
         log::error!(
-            "Failed to create retention job for stream: {}/{}/{}, error: {}",
-            org_id,
-            stream_type,
-            stream_name,
-            e
+            "Failed to create retention job for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
         );
         return Err(e);
     }
@@ -706,11 +691,7 @@ pub async fn stream_delete_inner(
     // delete stream compaction offset
     if let Err(e) = db::compact::files::del_offset(org_id, stream_type, stream_name).await {
         log::error!(
-            "Failed to delete stream compact offset for stream: {}/{}/{}, error: {}",
-            org_id,
-            stream_type,
-            stream_name,
-            e
+            "Failed to delete stream compact offset for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
         );
         return Err(e);
     }
@@ -727,11 +708,11 @@ async fn transform_stats(
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
     stats.index_size /= SIZE_IN_MB;
-    if stream_type == StreamType::EnrichmentTables {
-        if let Some(meta) = enrichment_table::get_meta_table_stats(org_id, stream_name).await {
-            stats.doc_time_min = meta.start_time;
-            stats.doc_time_max = meta.end_time;
-        }
+    if stream_type == StreamType::EnrichmentTables
+        && let Some(meta) = enrichment_table::get_meta_table_stats(org_id, stream_name).await
+    {
+        stats.doc_time_min = meta.start_time;
+        stats.doc_time_max = meta.end_time;
     }
 }
 

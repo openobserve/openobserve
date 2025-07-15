@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     no-caps
     icon="download"
     @click="downloadDashboard()"
+    data-test="export-dashboard"
   >
     <q-tooltip>{{ t("dashboard.export") }}</q-tooltip>
   </q-btn>

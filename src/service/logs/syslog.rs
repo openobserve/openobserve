@@ -64,7 +64,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let route = match matching_route {
         Some(matching_route) => matching_route,
         None => {
-            log::warn!("Syslogs from the IP {} are not allowed", ip);
+            log::warn!("Syslogs from the IP {ip} are not allowed");
             return Ok(HttpResponse::InternalServerError()
                 .append_header((
                     ERROR_HEADER,
@@ -83,7 +83,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
 
     // check stream
     let stream_name = format_stream_name(in_stream_name);
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)) {
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await {
         log::error!("Syslogs ingestion error: {e}");
         return Ok(map_error_to_http_response(&e, None));
     };
@@ -145,11 +145,11 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             streams_need_original_map
                 .get(&stream_name)
                 .is_some_and(|v| *v)
-                .then_some(value.to_string())
+                .then(|| value.to_string())
         } else {
             // 3. with pipeline, storing original as long as streams_need_original_set is not empty
             // because not sure the pipeline destinations
-            store_original_when_pipeline_exists.then_some(value.to_string())
+            store_original_when_pipeline_exists.then(|| value.to_string())
         }
     } else {
         None // `item` won't be flattened, no need to store original
@@ -201,12 +201,9 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         if streams_need_original_map
             .get(&stream_name)
             .is_some_and(|v| *v)
-            && original_data.is_some()
+            && let Some(original_data) = original_data
         {
-            local_val.insert(
-                ORIGINAL_DATA_COL_NAME.to_string(),
-                original_data.unwrap().into(),
-            );
+            local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
             let record_id = crate::service::ingestion::generate_record_id(
                 org_id,
                 &stream_name,
@@ -259,13 +256,10 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         {
             Err(e) => {
                 log::error!(
-                    "[Pipeline] for stream {}/{}: Batch execution error: {}.",
-                    org_id,
-                    stream_name,
-                    e
+                    "[Pipeline] for stream {org_id}/{stream_name}: Batch execution error: {e}.",
                 );
                 stream_status.status.failed += records_count as u32;
-                stream_status.status.error = format!("Pipeline batch execution error: {}", e);
+                stream_status.status.error = format!("Pipeline batch execution error: {e}");
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
@@ -452,7 +446,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
         match write_result {
             Ok(_) => ("200", stream_status),
             Err(e) => {
-                log::error!("Error while writing logs: {}", e);
+                log::error!("Error while writing logs: {e}");
                 ("500", stream_status)
             }
         }

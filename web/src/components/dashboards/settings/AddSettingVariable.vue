@@ -20,12 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DashboardHeader :title="title" backButton @back="close">
       </DashboardHeader>
 
-      <div>
+      <div class="scrollable-content">
         <q-form greedy ref="addVariableForm" @submit="onSubmit">
           <div class="col">
             <div>
               <q-select
-                class="textbox showLabelOnTop"
+                class="showLabelOnTop"
                 filled
                 stack-label
                 input-debounce="0"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-type-select"
               ></q-select>
             </div>
-            <div class="text-body1 text-bold q-mt-lg">
+            <div class="text-body1 text-bold q-mt-sm">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
             <div class="row">
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
-              class="tw-flex tw-justify-between tw-w-full text-body1 text-bold q-mt-lg"
+              class="tw-flex tw-justify-between tw-w-full text-body1 text-bold q-mt-sm"
               v-if="variableData.type !== 'dynamic_filters'"
             >
               <span>{{ t("dashboard.extraOptions") }}</span>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderless
                   dense
                   stack-label
-                  class="textbox showLabelOnTop col no-case q-mr-sm"
+                  class="showLabelOnTop col no-case q-mr-sm"
                   @update:model-value="streamTypeUpdated"
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   data-test="dashboard-variable-stream-type-select"
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   option-value="name"
                   option-label="name"
                   emit-value
-                  class="textbox showLabelOnTop col no-case"
+                  class="showLabelOnTop col no-case"
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   data-test="dashboard-variable-stream-select"
                 >
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 input-debounce="0"
                 :options="fieldsFilteredOptions"
                 @filter="fieldsFilterFn"
-                class="textbox showLabelOnTop no-case"
+                class="showLabelOnTop no-case"
                 option-value="name"
                 option-label="name"
                 emit-value
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-query-values-filter-name-selector"
                       @filter="fieldsFilterFn"
                       :placeholder="filter.name ? '' : 'Select Field'"
-                      class="textbox col no-case q-ml-sm"
+                      class="col no-case q-ml-sm"
                       :rules="[
                         (val: any) => !!val.trim() || 'Field is required!',
                       ]"
@@ -277,7 +277,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       searchRegex="(?:^|[^$])\$?(\w+)"
                       :rules="[(val: any) => val?.length > 0 || 'Required']"
                       debounce="1000"
-                      style="margin-top: none !important; width: 41% !important"
+                      style="
+                        margin-top: none !important;
+                        width: 41% !important;
+                        padding-bottom: 0px !important;
+                      "
                       placeholder="Enter Value"
                     ></CommonAutoComplete>
                     <q-btn
@@ -297,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     no-caps
                     icon="add"
                     no-outline
-                    class="q-mt-md"
+                    class="q-mt-sm"
                     @click="addFilter"
                     data-test="dashboard-add-filter-btn"
                   >
@@ -436,10 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- default value for multi select variables -->
           <!-- it can be first value or all values -->
           <div v-if="['query_values'].includes(variableData.type)">
-            <div
-              class="button-group multi-select-default-value-toggle q-mt-md"
-              style="margin-bottom: 12px"
-            >
+            <div class="button-group multi-select-default-value-toggle">
               <div class="multi-select-default-value">By Default Select:</div>
               <div class="row">
                 <div>
@@ -452,7 +453,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     class="button button-left"
                     type="button"
-                    style="padding: 8px"
                     @click="variableData.selectAllValueForMultiSelect = 'first'"
                   >
                     First value
@@ -469,7 +469,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     type="button"
                     class="button button-middle"
-                    style="padding: 8px"
                     @click="variableData.selectAllValueForMultiSelect = 'all'"
                   >
                     All values
@@ -486,7 +485,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     type="button"
                     class="button button-right"
-                    style="padding: 8px"
                     @click="
                       variableData.selectAllValueForMultiSelect = 'custom'
                     "
@@ -508,7 +506,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? variableData.customMultiSelectValue
                   : [variableData.customMultiSelectValue[0]]"
                 :key="index"
-                class="q-mb-sm q-mt-md"
+                class="q-mt-md"
                 style="flex-wrap: wrap"
               >
                 <div class="flex q-mr-sm" style="width: 50%">
@@ -589,30 +587,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-          <div class="flex justify-center q-mt-lg">
-            <q-btn
-              class="q-mb-md text-bold"
-              :label="t('dashboard.cancel')"
-              text-color="light-text"
-              padding="sm md"
-              no-caps
-              @click="close"
-              data-test="dashboard-variable-cancel-btn"
-            />
-            <div>
-              <q-btn
-                type="submit"
-                :loading="saveVariableApiCall.isLoading.value"
-                class="q-mb-md text-bold no-border q-ml-md"
-                color="secondary"
-                padding="sm xl"
-                no-caps
-                data-test="dashboard-variable-save-btn"
-                >Save</q-btn
-              >
-            </div>
-          </div>
         </q-form>
+      </div>
+      <div class="sticky-footer">
+        <q-btn
+          class="text-bold"
+          :label="t('dashboard.cancel')"
+          text-color="light-text"
+          no-caps
+          @click="close"
+          data-test="dashboard-variable-cancel-btn"
+        />
+        <q-btn
+          type="submit"
+          :loading="saveVariableApiCall.isLoading.value"
+          class="text-bold no-border q-ml-md"
+          color="secondary"
+          no-caps
+          @click="addVariableForm?.submit()"
+          data-test="dashboard-variable-save-btn"
+          >Save</q-btn
+        >
       </div>
     </div>
   </div>
@@ -1262,10 +1257,10 @@ export default defineComponent({
   text-transform: none !important;
 }
 
-.textbox {
-  margin-top: 5px;
-  margin-bottom: 5px;
-}
+// .textbox {
+//   margin-top: 5px;
+//   margin-bottom: 5px;
+// }
 
 .theme-dark .bg-highlight {
   background-color: #747474;
@@ -1313,5 +1308,36 @@ export default defineComponent({
   font-size: 14px;
   font-weight: 600;
   color: #666666;
+}
+
+.q-field--with-bottom {
+  padding-bottom: 0 !important;
+}
+.scrollable-content {
+  overflow-y: auto;
+  max-height: calc(100vh - 190px);
+  &::-webkit-scrollbar {
+    width: 6px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 4px;
+  }
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+.sticky-footer {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  padding: 12px 0 8px 0;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  z-index: 10;
+  border-top: 1px solid #eee;
+  box-shadow: rgb(240, 240, 240) 0px -4px 7px 0px;
 }
 </style>

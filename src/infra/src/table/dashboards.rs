@@ -22,15 +22,16 @@ use config::meta::{
     folder::{Folder, FolderType},
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set, TryIntoModel, prelude::Expr, sea_query::Func,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
+    IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
+    TryIntoModel, prelude::Expr, sea_query::Func,
 };
 use serde_json::Value as JsonValue;
 use svix_ksuid::KsuidLike;
 
 use super::{
     distinct_values::{self, OriginType},
-    entity::{dashboards, folders},
+    entity::{dashboards, folders, reports},
     folders::folder_type_into_i16,
 };
 use crate::{
@@ -288,15 +289,26 @@ pub async fn delete_from_folder(
     folder_id: &str,
     dashboard_id: &str,
 ) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let model = get_model_from_folder(client, org_id, folder_id, dashboard_id)
+    let txn = ORM_CLIENT.get_or_init(connect_to_orm).await.begin().await?;
+    let maybe_dashboard_model = get_model_from_folder(&txn, org_id, folder_id, dashboard_id)
         .await?
         .and_then(|(_folder, maybe_dash)| maybe_dash);
+    let Some(dashboard_model) = maybe_dashboard_model else {
+        return Ok(());
+    };
+    let report_models = dashboard_model
+        .find_related(reports::Entity)
+        .all(&txn)
+        .await?;
 
-    if let Some(model) = model {
-        let _ = model.delete(client).await?;
+    // Delete any report that referenced the dashboard.
+    for r in report_models {
+        let rslt = r.delete(&txn).await;
+        println!("delete report result: {rslt:?}");
     }
 
+    let _ = dashboard_model.delete(&txn).await?;
+    txn.commit().await?;
     Ok(())
 }
 
@@ -319,8 +331,8 @@ pub async fn delete_all() -> Result<(), errors::Error> {
 }
 
 /// Tries to get a dashboard ORM entity and its parent folder ORM entity.
-async fn get_model_from_folder(
-    db: &DatabaseConnection,
+pub async fn get_model_from_folder<C: ConnectionTrait>(
+    db: &C,
     org_id: &str,
     folder_id: &str,
     dashboard_id: &str,

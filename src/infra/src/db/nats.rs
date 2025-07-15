@@ -56,7 +56,7 @@ pub async fn init_nats_client(nats_event_sender: mpsc::Sender<async_nats::Event>
 
     NATS_CLIENT
         .set(client)
-        .map_err(|e| Error::Message(format!("[NATS:init] failed to set global client: {}", e)))
+        .map_err(|e| Error::Message(format!("[NATS:init] failed to set global client: {e}")))
 }
 
 pub async fn get_nats_client() -> Result<Client> {
@@ -78,7 +78,7 @@ async fn get_bucket_by_key<'a>(
     let key = key.trim_start_matches('/');
     let bucket_name = key.split('/').next().unwrap();
     let mut bucket = jetstream::kv::Config {
-        bucket: format!("{}{}", prefix, bucket_name),
+        bucket: format!("{prefix}{bucket_name}"),
         num_replicas: cfg.nats.replicas,
         history: cfg.nats.history,
         ..Default::default()
@@ -90,8 +90,7 @@ async fn get_bucket_by_key<'a>(
     }
     let kv = jetstream.create_key_value(bucket).await.map_err(|e| {
         Error::Message(format!(
-            "[NATS:get_bucket_by_key] create jetstream kv error: {}",
-            e
+            "[NATS:get_bucket_by_key] create jetstream kv error: {e}"
         ))
     })?;
     Ok((kv, key.trim_start_matches(bucket_name)))
@@ -122,13 +121,13 @@ impl NatsDb {
         if let Some(v) = bucket
             .get(&en_key)
             .await
-            .map_err(|e| Error::Message(format!("[NATS:get_key_value] bucket.get error: {}", e)))?
+            .map_err(|e| Error::Message(format!("[NATS:get_key_value] bucket.get error: {e}")))?
         {
             return Ok((key.to_string(), v));
         }
-        let keys = keys(&bucket, new_key).await.map_err(|e| {
-            Error::Message(format!("[NATS:get_key_value] bucket.keys error: {}", e))
-        })?;
+        let keys = keys(&bucket, new_key)
+            .await
+            .map_err(|e| Error::Message(format!("[NATS:get_key_value] bucket.keys error: {e}")))?;
         if keys.is_empty() {
             return Err(Error::from(DbError::KeyNotExists(key.to_string())));
         }
@@ -137,7 +136,7 @@ impl NatsDb {
         match bucket
             .get(&en_key)
             .await
-            .map_err(|e| Error::Message(format!("[NATS:get_key_value] bucket.get error: {}", e)))?
+            .map_err(|e| Error::Message(format!("[NATS:get_key_value] bucket.get error: {e}")))?
         {
             None => Err(Error::from(DbError::KeyNotExists(key.to_string()))),
             Some(v) => {
@@ -183,13 +182,13 @@ impl super::Db for NatsDb {
         if let Some(v) = bucket
             .get(&key)
             .await
-            .map_err(|e| Error::Message(format!("[NATS:get] bucket.get error: {}", e)))?
+            .map_err(|e| Error::Message(format!("[NATS:get] bucket.get error: {e}")))?
         {
             return Ok(v);
         }
         let keys = keys(&bucket, new_key)
             .await
-            .map_err(|e| Error::Message(format!("[NATS:get] bucket.keys error: {}", e)))?;
+            .map_err(|e| Error::Message(format!("[NATS:get] bucket.keys error: {e}")))?;
         if keys.is_empty() {
             return Err(Error::from(DbError::KeyNotExists(key.to_string())));
         }
@@ -197,7 +196,7 @@ impl super::Db for NatsDb {
         match bucket
             .get(key)
             .await
-            .map_err(|e| Error::Message(format!("[NATS:get] bucket.get error: {}", e)))?
+            .map_err(|e| Error::Message(format!("[NATS:get] bucket.get error: {e}")))?
         {
             None => Err(Error::from(DbError::KeyNotExists(key.to_string()))),
             Some(v) => Ok(v),
@@ -221,7 +220,7 @@ impl super::Db for NatsDb {
         _ = bucket
             .put(&key, value)
             .await
-            .map_err(|e| Error::Message(format!("[NATS:put] bucket.put error: {}", e)))?;
+            .map_err(|e| Error::Message(format!("[NATS:put] bucket.put error: {e}")))?;
         Ok(())
     }
 
@@ -238,8 +237,7 @@ impl super::Db for NatsDb {
             Ok(v) => v,
             Err(e) => {
                 return Err(Error::Message(format!(
-                    "dist_lock key: {}, acquire error: {}",
-                    lock_key, e
+                    "dist_lock key: {lock_key}, acquire error: {e}"
                 )));
             }
         };
@@ -253,26 +251,25 @@ impl super::Db for NatsDb {
             Err(e) => Err(e),
             Ok(None) => Ok(()),
             Ok(Some((value, new_value))) => {
-                if let Some(value) = value {
-                    if let Err(e) = self.put(&old_key.unwrap(), value, need_watch, None).await {
-                        if let Err(e) = dist_lock::unlock(&locker).await {
-                            log::error!("dist_lock unlock err: {}", e);
-                        }
-                        log::info!("Released lock for cluster key: {}", lock_key);
-                        return Err(e);
+                if let Some(value) = value
+                    && let Err(e) = self.put(&old_key.unwrap(), value, need_watch, None).await
+                {
+                    if let Err(e) = dist_lock::unlock(&locker).await {
+                        log::error!("dist_lock unlock err: {e}");
                     }
+                    log::info!("Released lock for cluster key: {lock_key}");
+                    return Err(e);
                 }
-                if let Some((new_key, new_value, new_start_dt)) = new_value {
-                    if let Err(e) = self
+                if let Some((new_key, new_value, new_start_dt)) = new_value
+                    && let Err(e) = self
                         .put(&new_key, new_value, need_watch, new_start_dt)
                         .await
-                    {
-                        if let Err(e) = dist_lock::unlock(&locker).await {
-                            log::error!("dist_lock unlock err: {}", e);
-                        }
-                        log::info!("Released lock for cluster key: {}", lock_key);
-                        return Err(e);
+                {
+                    if let Err(e) = dist_lock::unlock(&locker).await {
+                        log::error!("dist_lock unlock err: {e}");
                     }
+                    log::info!("Released lock for cluster key: {lock_key}");
+                    return Err(e);
                 }
                 Ok(())
             }
@@ -280,9 +277,9 @@ impl super::Db for NatsDb {
 
         // release lock
         if let Err(e) = dist_lock::unlock(&locker).await {
-            log::error!("dist_lock unlock err: {}", e);
+            log::error!("dist_lock unlock err: {e}");
         }
-        log::info!("Released lock for cluster key: {}", lock_key);
+        log::info!("Released lock for cluster key: {lock_key}");
         ret
     }
 
@@ -309,17 +306,17 @@ impl super::Db for NatsDb {
             bucket
                 .purge(key)
                 .await
-                .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {}", e)))?;
+                .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {e}")))?;
             return Ok(());
         }
         let keys = keys(&bucket, &new_key)
             .await
-            .map_err(|e| Error::Message(format!("[NATS:delete] bucket.keys error: {}", e)))?;
+            .map_err(|e| Error::Message(format!("[NATS:delete] bucket.keys error: {e}")))?;
         for key in keys {
             bucket
                 .purge(key)
                 .await
-                .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {}", e)))?;
+                .map_err(|e| Error::Message(format!("[NATS:delete] bucket.purge error: {e}")))?;
         }
         Ok(())
     }
@@ -330,7 +327,7 @@ impl super::Db for NatsDb {
         let bucket = &bucket;
         let keys = keys(bucket, new_key)
             .await
-            .map_err(|e| Error::Message(format!("[NATS:list] bucket.keys error: {}", e)))?;
+            .map_err(|e| Error::Message(format!("[NATS:list] bucket.keys error: {e}")))?;
         if keys.is_empty() {
             return Ok(HashMap::new());
         }
@@ -341,7 +338,7 @@ impl super::Db for NatsDb {
                 let value = bucket
                     .get(&encoded_key)
                     .await
-                    .map_err(|e| Error::Message(format!("[NATS:list] bucket.get error: {}", e)))?;
+                    .map_err(|e| Error::Message(format!("[NATS:list] bucket.get error: {e}")))?;
                 Ok::<(String, Option<Bytes>), Error>((key, value))
             })
             .buffer_unordered(get_config().limit.cpu_num)
@@ -360,7 +357,7 @@ impl super::Db for NatsDb {
         let bucket = &bucket;
         let keys = keys(bucket, new_key)
             .await
-            .map_err(|e| Error::Message(format!("[NATS:list_keys] bucket.keys error: {}", e)))?;
+            .map_err(|e| Error::Message(format!("[NATS:list_keys] bucket.keys error: {e}")))?;
         let keys = keys
             .into_iter()
             .map(|k| bucket_prefix.to_string() + &k)
@@ -373,7 +370,7 @@ impl super::Db for NatsDb {
         let bucket = &bucket;
         let keys = keys(bucket, new_key)
             .await
-            .map_err(|e| Error::Message(format!("[NATS:list_values] bucket.keys error: {}", e)))?;
+            .map_err(|e| Error::Message(format!("[NATS:list_values] bucket.keys error: {e}")))?;
         if keys.is_empty() {
             return Ok(vec![]);
         }
@@ -383,7 +380,7 @@ impl super::Db for NatsDb {
             .map(|key| async move {
                 let encoded_key = key_encode(&key);
                 let value = bucket.get(&encoded_key).await.map_err(|e| {
-                    Error::Message(format!("[NATS:list_values] bucket.get error: {}", e))
+                    Error::Message(format!("[NATS:list_values] bucket.get error: {e}"))
                 })?;
                 Ok::<Option<Bytes>, Error>(value)
             })
@@ -410,8 +407,7 @@ impl super::Db for NatsDb {
         let bucket = &bucket;
         let keys = keys(bucket, new_key).await.map_err(|e| {
             Error::Message(format!(
-                "[NATS:list_values_by_start_dt] bucket.keys error: {}",
-                e
+                "[NATS:list_values_by_start_dt] bucket.keys error: {e}"
             ))
         })?;
         let keys = keys
@@ -441,8 +437,7 @@ impl super::Db for NatsDb {
                     .unwrap_or_default();
                 let value = bucket.get(&encoded_key).await.map_err(|e| {
                     Error::Message(format!(
-                        "[NATS:list_values_by_start_dt] bucket.get error: {}",
-                        e
+                        "[NATS:list_values_by_start_dt] bucket.get error: {e}"
                     ))
                 })?;
                 Ok::<Option<(i64, Bytes)>, Error>(value.map(|value| (start_dt, value)))
@@ -472,7 +467,7 @@ impl super::Db for NatsDb {
                 let (bucket, new_key) = match get_bucket_by_key(&self_prefix, &prefix).await {
                     Ok(v) => v,
                     Err(e) => {
-                        log::error!("[NATS:watch] prefix: {}, get bucket error: {}", prefix, e);
+                        log::error!("[NATS:watch] prefix: {prefix}, get bucket error: {e}");
                         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                         continue;
                     }
@@ -482,11 +477,7 @@ impl super::Db for NatsDb {
                 let mut entries = match bucket.watch_all().await {
                     Ok(v) => v,
                     Err(e) => {
-                        log::error!(
-                            "[NATS:watch] prefix: {}, bucket.watch_all error: {}",
-                            prefix,
-                            e
-                        );
+                        log::error!("[NATS:watch] prefix: {prefix}, bucket.watch_all error: {e}");
                         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                         continue;
                     }
@@ -494,7 +485,7 @@ impl super::Db for NatsDb {
                 loop {
                     match entries.next().await {
                         None => {
-                            log::error!("[NATS:watch] prefix: {}, get message error", prefix);
+                            log::error!("[NATS:watch] prefix: {prefix}, get message error");
                             break;
                         }
                         Some(entry) => {
@@ -502,9 +493,7 @@ impl super::Db for NatsDb {
                                 Ok(entry) => entry,
                                 Err(e) => {
                                     log::error!(
-                                        "[NATS:watch] prefix: {}, get message error: {}",
-                                        prefix,
-                                        e
+                                        "[NATS:watch] prefix: {prefix}, get message error: {e}"
                                     );
                                     break;
                                 }
@@ -533,10 +522,7 @@ impl super::Db for NatsDb {
                             };
                             if let Err(e) = ret {
                                 log::warn!(
-                                    "[NATS:watch] prefix: {}, key: {}, send error: {}",
-                                    prefix,
-                                    new_key,
-                                    e
+                                    "[NATS:watch] prefix: {prefix}, key: {new_key}, send error: {e}"
                                 );
                             }
                         }
@@ -578,10 +564,7 @@ pub async fn connect(nats_event_sender: mpsc::Sender<async_nats::Event>) -> asyn
         let sender = nats_event_sender.clone();
         async move {
             if let Err(e) = sender.send(event).await {
-                log::error!(
-                    "NATs client event callback channel failed to send event: {}",
-                    e
-                );
+                log::error!("NATs client event callback channel failed to send event: {e}");
             }
         }
     });
@@ -594,11 +577,7 @@ pub async fn connect(nats_event_sender: mpsc::Sender<async_nats::Event>) -> asyn
     match async_nats::connect_with_options(addrs.clone(), opts).await {
         Ok(client) => client,
         Err(e) => {
-            log::error!(
-                "NATS connect failed for address(es): {:?}, err: {}",
-                addrs,
-                e
-            );
+            log::error!("NATS connect failed for address(es): {addrs:?}, err: {e}");
             panic!("NATS connect failed");
         }
     }
@@ -619,10 +598,10 @@ async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {
         .await?;
 
     let mut keys = Vec::new();
-    if let Ok(info) = consumer.info().await {
-        if info.num_pending == 0 {
-            return Ok(keys);
-        }
+    if let Ok(info) = consumer.info().await
+        && info.num_pending == 0
+    {
+        return Ok(keys);
     }
     let mut messages = consumer.messages().await?;
     while let Ok(Some(message)) = messages.try_next().await {
@@ -636,10 +615,10 @@ async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {
         if key.starts_with(prefix) {
             keys.push(key);
         }
-        if let Ok(info) = message.info() {
-            if info.pending == 0 {
-                break;
-            }
+        if let Ok(info) = message.info()
+            && info.pending == 0
+        {
+            break;
         }
     }
     keys.sort();
@@ -664,7 +643,7 @@ pub(crate) struct Locker {
 impl Locker {
     pub(crate) fn new(key: &str) -> Self {
         Self {
-            key: format!("/locker{}", key),
+            key: format!("/locker{key}"),
             lock_id: ider::uuid(),
             state: Arc::new(AtomicU8::new(0)),
             tx: None,
@@ -719,7 +698,7 @@ impl Locker {
                     // created error, means the key locked by other thread, wait and retry
                     last_err = Some(err.to_string());
                     if let Err(e) = wait_for_delete(&bucket, &key, &self.key).await {
-                        log::error!("nats wait_for_delete key: {}, error: {}", key, e);
+                        log::error!("nats wait_for_delete key: {key}, error: {e}");
                     }
                 }
             };
@@ -748,7 +727,7 @@ impl Locker {
             if let Err(e) =
                 keep_alive_lock(&mut rx, &bucket, &bucket_key, &lock_key, &lock_id).await
             {
-                log::error!("nats keep alive for key: {}, error: {}", lock_key, e);
+                log::error!("nats keep alive for key: {lock_key}, error: {e}");
             }
         });
 
@@ -811,10 +790,10 @@ async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str, orig_key: &st
                                 if matches!(entry.operation, jetstream::kv::Operation::Delete | jetstream::kv::Operation::Purge) {
                                      return Ok(());
                                 }
-                                log::debug!("nats event was not delete, continuing to wait the key: {}", orig_key);
+                                log::debug!("nats event was not delete, continuing to wait the key: {orig_key}");
                              }
                             Err(e) => {
-                                log::error!("nats got error from key watcher, will wait for next event, key: {}, error: {}", orig_key, e);
+                                log::error!("nats got error from key watcher, will wait for next event, key: {orig_key}, error: {e}");
                              }
                         }
                     }
@@ -834,14 +813,14 @@ async fn check_exist_lock(
 ) -> Result<bool> {
     Ok(match bucket.get(key).await {
         Ok(Some(body)) => {
-            log::debug!("nats another process is locking the key: {}", orig_key);
+            log::debug!("nats another process is locking the key: {orig_key}");
             let ret = String::from_utf8_lossy(&body).to_string();
             let ret_parts = ret.split(':').collect::<Vec<_>>();
             let expiration = ret_parts.last().unwrap();
             let expiration = expiration.parse::<i64>().unwrap();
             if expiration < now_micros() {
                 if let Err(err) = bucket.purge(&key).await {
-                    log::error!("nats purge lock for key: {}, error: {}", orig_key, err);
+                    log::error!("nats purge lock for key: {orig_key}, error: {err}");
                     return Err(Error::Message("nats purge lock error".to_string()));
                 };
                 true
@@ -851,7 +830,7 @@ async fn check_exist_lock(
         }
         Ok(None) => true,
         Err(e) => {
-            log::error!("nats got error for key: {}, error: {}", orig_key, e);
+            log::error!("nats got error for key: {orig_key}, error: {e}");
             false
         }
     })
@@ -882,12 +861,12 @@ async fn keep_alive_lock(
             now_micros() + second_micros(LOCKER_WATCHER_UPDATE_TTL),
         ));
         if let Err(e) = bucket.put(&key, value).await {
-            log::error!("nats keep alive for key: {}, error: {}", orig_key, e);
+            log::error!("nats keep alive for key: {orig_key}, error: {e}");
         }
-        log::debug!("nats keep alive for key: {} updated", orig_key);
+        log::debug!("nats keep alive for key: {orig_key} updated");
     }
 
-    log::debug!("nats keep alive for key: {} exit", orig_key);
+    log::debug!("nats keep alive for key: {orig_key} exit");
 
     Ok(())
 }

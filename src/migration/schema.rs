@@ -28,7 +28,7 @@ use config::{
 };
 use datafusion::arrow::datatypes::Schema;
 use infra::{
-    db::{self as infra_db, NO_NEED_WATCH},
+    db::{self as infra_db, NO_NEED_WATCH, ORM_CLIENT, connect_to_orm},
     dist_lock,
     errors::{DbError, Error},
     scheduler,
@@ -59,10 +59,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             return Ok(());
         }
         Err(err) => {
-            log::error!(
-                "[Schema:Migration]: Error checking schema migration status: {}",
-                err
-            );
+            log::error!("[Schema:Migration]: Error checking schema migration status: {err}");
             return Err(err);
         }
     };
@@ -81,10 +78,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             return Ok(());
         }
         Err(err) => {
-            log::error!(
-                "[Schema:Migration]: Error checking schema migration status: {}",
-                err
-            );
+            log::error!("[Schema:Migration]: Error checking schema migration status: {err}");
             dist_lock::unlock(&locker).await?;
             return Err(err);
         }
@@ -141,7 +135,7 @@ async fn upgrade_meta() -> Result<(), anyhow::Error> {
     log::info!("[Schema:Migration]: Listing all schemas");
     let data = db.list(&db_key).await?;
     for (key, val) in data {
-        log::info!("[Schema:Migration]: Start migrating schema: {}", key);
+        log::info!("[Schema:Migration]: Start migrating schema: {key}");
         let schemas: Vec<Schema> = json::from_slice(&val).unwrap();
         let versions_count = schemas.len();
         let mut prev_end_dt: i64 = 0;
@@ -179,14 +173,11 @@ async fn upgrade_meta() -> Result<(), anyhow::Error> {
                 return Err(e.into());
             }
         }
-        log::info!(
-            "[Schema:Migration]: Done creating row per version of schema: {}",
-            key
-        );
+        log::info!("[Schema:Migration]: Done creating row per version of schema: {key}");
         if let Err(e) = db.delete(&key, false, infra_db::NEED_WATCH, Some(0)).await {
             return Err(e.into());
         }
-        log::info!("[Schema:Migration]: Done migrating schema: {}", key);
+        log::info!("[Schema:Migration]: Done migrating schema: {key}");
     }
 
     Ok(())
@@ -201,7 +192,7 @@ async fn upgrade_trigger() -> Result<(), anyhow::Error> {
     for (key, val) in data {
         let db_key = key;
         let key = db_key.strip_prefix(&db_key_prefix).unwrap();
-        log::info!("[Trigger:Migration]: Start migrating trigger: {}", key);
+        log::info!("[Trigger:Migration]: Start migrating trigger: {key}");
         let (org_id, module_key) = match key.split_once('/') {
             Some(columns) => columns,
             None => {
@@ -223,7 +214,7 @@ async fn upgrade_trigger() -> Result<(), anyhow::Error> {
             ..Default::default()
         })
         .await?;
-        log::info!("[Schema:Migration]: Done migrating trigger: {}", key);
+        log::info!("[Schema:Migration]: Done migrating trigger: {key}");
     }
 
     Ok(())
@@ -331,7 +322,7 @@ async fn migrate_report_names() -> Result<(), anyhow::Error> {
     for (key, val) in data {
         let db_key = key;
         let key = db_key.strip_prefix(&db_key_prefix).unwrap();
-        log::info!("[Report:Migration]: Start migrating report: {}", key);
+        log::info!("[Report:Migration]: Start migrating report: {key}");
         let keys: Vec<&str> = key.split('/').collect();
         let report_name = keys[keys.len() - 1];
         if is_ofga_unsupported(report_name) && keys.len() == 2 {
@@ -340,10 +331,13 @@ async fn migrate_report_names() -> Result<(), anyhow::Error> {
             #[cfg(feature = "enterprise")]
             get_ownership_tuple(keys[0], "reports", &report.name, &mut write_tuples);
             // First create an report copy with formatted report name
-            match db::dashboards::reports::set(keys[0], &report, true).await {
+            let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            match db::dashboards::reports::create(conn, "default", report).await {
                 // Delete report with unsupported report name
                 Ok(_) => {
-                    if let Err(e) = db::dashboards::reports::delete(keys[0], report_name).await {
+                    if let Err(e) =
+                        db::dashboards::reports::delete(conn, keys[0], "default", report_name).await
+                    {
                         log::error!(
                             "[Report:Migration]: Error deleting report with unsupported report name: {report_name}: {e}"
                         );
@@ -356,7 +350,7 @@ async fn migrate_report_names() -> Result<(), anyhow::Error> {
                 }
             }
         }
-        log::info!("[Report:Migration]: Done migrating report: {}", key);
+        log::info!("[Report:Migration]: Done migrating report: {key}");
     }
     #[cfg(feature = "enterprise")]
     if !write_tuples.is_empty() && get_openfga_config().enabled {
@@ -376,7 +370,7 @@ async fn migrate_alert_template_names() -> Result<(), anyhow::Error> {
     for (key, val) in data {
         let db_key = key;
         let key = db_key.strip_prefix(&db_key_prefix).unwrap();
-        log::info!("[Template:Migration]: Start migrating template: {}", key);
+        log::info!("[Template:Migration]: Start migrating template: {key}");
         let keys: Vec<&str> = key.split('/').collect();
         let temp_name = keys[keys.len() - 1];
         if is_ofga_unsupported(temp_name) && keys.len() == 2 {
@@ -401,7 +395,7 @@ async fn migrate_alert_template_names() -> Result<(), anyhow::Error> {
                 }
             }
         }
-        log::info!("[Template:Migration]: Done migrating template: {}", key);
+        log::info!("[Template:Migration]: Done migrating template: {key}");
     }
     #[cfg(feature = "enterprise")]
     if !write_tuples.is_empty() && get_openfga_config().enabled {
@@ -421,10 +415,7 @@ async fn migrate_alert_destination_names() -> Result<(), anyhow::Error> {
     for (key, val) in data {
         let db_key = key;
         let key = db_key.strip_prefix(&db_key_prefix).unwrap();
-        log::info!(
-            "[Destination:Migration]: Start migrating destination: {}",
-            key
-        );
+        log::info!("[Destination:Migration]: Start migrating destination: {key}");
         let keys: Vec<&str> = key.split('/').collect();
         let dest_name = keys[keys.len() - 1];
         let mut dest: meta::Destination = json::from_slice(&val).unwrap();
@@ -448,12 +439,12 @@ async fn migrate_alert_destination_names() -> Result<(), anyhow::Error> {
                 // Delete destination with unsupported destination name
                 Ok(_) => {
                     // New destination created, delete the old one
-                    if create {
-                        if let Err(e) = db::alerts::destinations::delete(keys[0], dest_name).await {
-                            log::error!(
-                                "Destination:Migration]: Error updating unsupported destination name {dest_name}: {e}"
-                            );
-                        }
+                    if create
+                        && let Err(e) = db::alerts::destinations::delete(keys[0], dest_name).await
+                    {
+                        log::error!(
+                            "Destination:Migration]: Error updating unsupported destination name {dest_name}: {e}"
+                        );
                     }
                 }
                 Err(e) => {
@@ -463,10 +454,7 @@ async fn migrate_alert_destination_names() -> Result<(), anyhow::Error> {
                 }
             }
         }
-        log::info!(
-            "[Destination:Migration]: Done migrating destination: {}",
-            key
-        );
+        log::info!("[Destination:Migration]: Done migrating destination: {key}");
     }
     #[cfg(feature = "enterprise")]
     if !write_tuples.is_empty() && get_openfga_config().enabled {
@@ -486,7 +474,7 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
     for (key, val) in data {
         let db_key = key;
         let key = db_key.strip_prefix(&db_key_prefix).unwrap();
-        log::info!("[Alert:Migration]: Start migrating alert: {}", key);
+        log::info!("[Alert:Migration]: Start migrating alert: {key}");
         let keys: Vec<&str> = key.split('/').collect();
         let alert_name = keys[keys.len() - 1];
         let mut need_update = false;
@@ -556,7 +544,7 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
                 }
             }
         }
-        log::info!("[Alert:Migration]: Done migrating alert: {}", key);
+        log::info!("[Alert:Migration]: Done migrating alert: {key}");
     }
 
     #[cfg(feature = "enterprise")]
@@ -616,7 +604,7 @@ mod meta {
                     match db::scheduler::push(trigger).await {
                         Ok(_) => Ok(()),
                         Err(e) => {
-                            log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+                            log::error!("Failed to save trigger for alert {schedule_key}: {e}");
                             Ok(())
                         }
                     }
@@ -630,7 +618,7 @@ mod meta {
                     match db::scheduler::update_trigger(trigger).await {
                         Ok(_) => Ok(()),
                         Err(e) => {
-                            log::error!("Failed to update trigger for alert {schedule_key}: {}", e);
+                            log::error!("Failed to update trigger for alert {schedule_key}: {e}");
                             Ok(())
                         }
                     }
@@ -638,7 +626,7 @@ mod meta {
                     match db::scheduler::push(trigger).await {
                         Ok(_) => Ok(()),
                         Err(e) => {
-                            log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+                            log::error!("Failed to save trigger for alert {schedule_key}: {e}");
                             Ok(())
                         }
                     }
@@ -668,7 +656,7 @@ mod meta {
                 {
                     Ok(_) => Ok(()),
                     Err(e) => {
-                        log::error!("Failed to delete trigger: {}", e);
+                        log::error!("Failed to delete trigger: {e}");
                         Ok(())
                     }
                 }

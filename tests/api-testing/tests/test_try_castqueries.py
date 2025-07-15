@@ -73,8 +73,7 @@ def test_e2e_try_cast_queries(create_session, base_url, test_name, sql_query, ex
             "end_time": end_time,
             "from": 0,
             "size": expected_size,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         }
     }
     

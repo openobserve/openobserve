@@ -102,6 +102,8 @@ pub struct UsageData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_ratio: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub scan_files: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub compressed_size: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_ts: Option<i64>,
@@ -186,6 +188,8 @@ pub enum UsageType {
     Multi,
     #[serde(rename = "/logs/_hec")]
     Hec,
+    #[serde(rename = "/logs/_loki")]
+    Loki,
     #[serde(rename = "/_kinesis_firehose")]
     KinesisFirehose,
     #[serde(rename = "/gcp/_sub")]
@@ -239,8 +243,9 @@ impl UsageType {
             self,
             UsageType::Bulk
                 | UsageType::Json
-                | UsageType::Hec
                 | UsageType::Multi
+                | UsageType::Hec
+                | UsageType::Loki
                 | UsageType::KinesisFirehose
                 | UsageType::GCPSubscription
                 | UsageType::Logs
@@ -266,6 +271,7 @@ impl std::fmt::Display for UsageType {
             UsageType::Json => write!(f, "/logs/_json"),
             UsageType::Multi => write!(f, "/logs/_multi"),
             UsageType::Hec => write!(f, "/logs/_hec"),
+            UsageType::Loki => write!(f, "/logs/_loki"),
             UsageType::KinesisFirehose => write!(f, "/_kinesis_firehose"),
             UsageType::GCPSubscription => write!(f, "/gcp/_sub"),
             UsageType::Logs => write!(f, "/otlp/v1/logs"),
@@ -300,6 +306,8 @@ pub struct RequestStats {
     pub function: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cached_ratio: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scan_files: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compressed_size: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -336,6 +344,7 @@ impl Default for RequestStats {
             request_body: None,
             function: None,
             cached_ratio: None,
+            scan_files: None,
             compressed_size: None,
             min_ts: None,
             max_ts: None,
@@ -362,6 +371,7 @@ impl From<FileMeta> for RequestStats {
             function: None,
             request_body: None,
             cached_ratio: None,
+            scan_files: None,
             compressed_size: Some(meta.compressed_size as f64 / SIZE_IN_MB),
             min_ts: Some(meta.min_ts),
             max_ts: Some(meta.max_ts),

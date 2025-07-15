@@ -3,9 +3,9 @@ set -eu -o pipefail
 # set -x
 export PS4='+ [${BASH_SOURCE[0]##*/}:${LINENO}${FUNCNAME[0]:+:${FUNCNAME[0]}}] '
 
-export COVERAGE_FUNCTIONS=${COVERAGE_FUNCTIONS:-47}
-export COVERAGE_LINES=${COVERAGE_LINES:-47}
-export COVERAGE_REGIONS=${COVERAGE_REGIONS:-35}
+export COVERAGE_FUNCTIONS=${COVERAGE_FUNCTIONS:-52}
+export COVERAGE_LINES=${COVERAGE_LINES:-48}
+export COVERAGE_REGIONS=${COVERAGE_REGIONS:-47}
 
 usage() {
     cat <<EOF
@@ -26,6 +26,7 @@ EOF
 
 _cov_test() {
     cargo llvm-cov --version >/dev/null || cargo install cargo-llvm-cov
+    cargo nextest --version >/dev/null || cargo install cargo-nextest
     cargo llvm-cov nextest \
         --workspace \
         --verbose \

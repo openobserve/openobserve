@@ -69,7 +69,7 @@ function findNearestIndex(sortedArray: any, target: any) {
   return nearestIndex; // Return the index of the nearest value
 }
 
-import { throttle } from 'lodash-es';
+import { throttle } from "lodash-es";
 import {
   defineComponent,
   ref,
@@ -219,22 +219,22 @@ export default defineComponent({
     const store = useStore();
 
     const cleanupChart = () => {
+      // Remove all event listeners from chart
+      chart?.off("mousemove");
+      chart?.off("mouseout");
+      chart?.off("globalout");
+      chart?.off("legendselectchanged");
+      chart?.off("highlight");
+      chart?.off("dataZoom");
+      chart?.off("click");
+      chart?.off("mouseover");
+
       //dispose
       if (chart) {
         chart.dispose();
       }
-      // Remove all event listeners from chart
-      chart?.off('mousemove');
-      chart?.off('mouseout');
-      chart?.off('globalout');
-      chart?.off('legendselectchanged');
-      chart?.off('highlight');
-      chart?.off('dataZoom');
-      chart?.off('click');
-      chart?.off('mouseover');
 
       chart = null;
-      chartRef.value = null;
     };
 
     const windowResizeEventCallback = async () => {
@@ -258,9 +258,12 @@ export default defineComponent({
     }, DEBOUNCE_TIMEOUT);
 
     // Create a stable throttled function that persists between renders
-    const throttledSetHoveredSeriesIndex = throttle((arg1, arg2, arg3, arg4) => {
-      hoveredSeriesState?.value?.setIndex(arg1, arg2, arg3, arg4);
-    }, DEBOUNCE_TIMEOUT);
+    const throttledSetHoveredSeriesIndex = throttle(
+      (arg1, arg2, arg3, arg4) => {
+        hoveredSeriesState?.value?.setIndex(arg1, arg2, arg3, arg4);
+      },
+      DEBOUNCE_TIMEOUT,
+    );
 
     const mouseHoverEffectFn = (params: any) => {
       // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
@@ -326,7 +329,7 @@ export default defineComponent({
         legendOption.selected = params.selected;
 
         // set options with selected object
-        chart?.setOption({ legend: [legendOption] });
+        chart?.setOption({ legend: [legendOption] }, { lazyUpdate: true });
       }
     };
 
@@ -351,12 +354,13 @@ export default defineComponent({
       chart?.on("mouseout", (params: any) => {
         emit("mouseout", params);
         mouseOutEffectFn();
-      });      
-      
+      });
+
       chart?.on("globalout", () => {
-        mouseHoverEffectFn({});
-        throttledSetHoveredSeriesIndex(-1, -1, -1, null);
-        throttledSetHoveredSeriesName("");
+        mouseOutEffectFn();
+        // flush any pending throttled calls to ensure immediate reset
+        throttledSetHoveredSeriesIndex.flush();
+        throttledSetHoveredSeriesName.flush();
       });
 
       chart?.on("legendselectchanged", legendSelectChangedFn);
@@ -373,7 +377,7 @@ export default defineComponent({
           const seriesIndex = params?.batch?.[0]?.seriesIndex;
           const dataIndex = Math.max(params?.batch?.[0]?.dataIndex, 0);
 
-          // set current hovered series name in state          
+          // set current hovered series name in state
           if (chart?.getOption()?.series[seriesIndex]?.data[dataIndex]) {
             throttledSetHoveredSeriesIndex(
               dataIndex,
@@ -383,10 +387,6 @@ export default defineComponent({
             );
           }
         }
-      });
-      emit("updated:chart", {
-        start: chart?.getOption()?.dataZoom[0]?.startValue || 0,
-        end: chart?.getOption()?.dataZoom[0]?.endValue || 0,
       });
 
       //on dataZoom emit an event of start x and end x
@@ -517,8 +517,8 @@ export default defineComponent({
             theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)");
         options.animation = false;
         try {
-          chart?.setOption(options, true);
-          chart?.setOption({ animation: true });
+          chart?.setOption(options, { lazyUpdate: true, notMerge: true });
+          chart?.setOption({ animation: true }, { lazyUpdate: true });
         } catch (e: any) {
           emit("error", {
             message: e,
@@ -541,11 +541,15 @@ export default defineComponent({
         await nextTick();
         const theme = store.state.theme === "dark" ? "dark" : "light";
         if (chartRef.value) {
+          cleanupChart();
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
         }
-        chart?.setOption(props?.data?.options || {}, true);
+        chart?.setOption(props?.data?.options || {}, {
+          lazyUpdate: true,
+          notMerge: true,
+        });
         chartInitialSetUp();
       } catch (e: any) {
         emit("error", {
@@ -557,11 +561,11 @@ export default defineComponent({
     onUnmounted(() => {
       // Clean up event listeners
       window.removeEventListener("resize", windowResizeEventCallback);
-      
+
       // Cancel throttled functions
       throttledSetHoveredSeriesName.cancel();
       throttledSetHoveredSeriesIndex.cancel();
-      
+
       // Clean up chart instance
       chart?.dispose();
       chart = null;
@@ -572,7 +576,7 @@ export default defineComponent({
         isChartVisibleObserver.disconnect();
         isChartVisibleObserver = null;
       }
-      
+
       // Clear chart reference
       if (chartRef.value) {
         chartRef.value = null;
@@ -603,7 +607,6 @@ export default defineComponent({
         // observe chart
         isChartVisibleObserver.observe(chartRef.value);
       }
-
     });
 
     onUnmounted(() => {
@@ -617,15 +620,41 @@ export default defineComponent({
     });
 
     //need to resize chart on activated
-    onActivated(() => {
-      windowResizeEventCallback();
+    onActivated(async () => {
+      try {
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        const theme = store.state.theme === "dark" ? "dark" : "light";
+        if (chartRef.value) {
+          cleanupChart();
+          chart = echarts.init(chartRef.value, theme, {
+            renderer: props.renderType,
+          });
+        }
+        chart?.setOption(props?.data?.options || {}, {
+          lazyUpdate: true,
+          notMerge: true,
+        });
+        chartInitialSetUp();
+        windowResizeEventCallback();
 
-      // we need that toolbox datazoom button initially selected
-      chart?.dispatchAction({
-        type: "takeGlobalCursor",
-        key: "dataZoomSelect",
-        dataZoomSelectActive: true,
-      });
+        // we need that toolbox datazoom button initially selected
+        chart?.dispatchAction({
+          type: "takeGlobalCursor",
+          key: "dataZoomSelect",
+          dataZoomSelectActive: true,
+        });
+      } catch (e: any) {
+        emit("error", {
+          message: e,
+          code: "",
+        });
+      }
     });
 
     // Clean up on deactivate
@@ -652,7 +681,10 @@ export default defineComponent({
           await nextTick();
           chart?.resize();
           try {
-            chart?.setOption(props?.data?.options || {}, true);
+            chart?.setOption(props?.data?.options || {}, {
+              lazyUpdate: true,
+              notMerge: true,
+            });
           } catch (error) {
             console.error("Error during setOption", error);
           }

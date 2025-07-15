@@ -22,7 +22,7 @@ export class AboutPage {
     async aboutPageDefaultOrg() {
 
         await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
-        await this.page.getByText('default', { exact: true }).click();
+        await this.page.getByText('default', { exact: true }).first().click();
 
 
     }
@@ -47,7 +47,7 @@ export class AboutPage {
 
         try {
             if (orgName === 'default') {
-                await this.page.getByText('default', { exact: true }).click();
+                await this.page.getByText('default', { exact: true }).first().click();
             } else {
                 await this.page.getByRole('option', { name: orgName }).locator('div').nth(2).click();
             }

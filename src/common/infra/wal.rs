@@ -77,7 +77,7 @@ impl SearchingFileLocker {
     }
 
     pub fn exist(&self, file: &str) -> bool {
-        self.inner.get(file).is_some()
+        self.inner.contains_key(file)
     }
 
     pub fn clean(&mut self) {
@@ -159,12 +159,8 @@ impl Manager {
         );
         let locker = self.data.get(thread_id)?;
         let manager = locker.read().await;
-        let file = match manager.get(&full_key) {
-            Some(file) => file.clone(),
-            None => {
-                return None;
-            }
-        };
+        let file = manager.get(&full_key)?.clone();
+
         drop(manager);
 
         // check size & ttl
@@ -220,19 +216,19 @@ impl Manager {
     }
 
     pub async fn check_in_use(&self, stream: StreamParams, file_name: &str) -> bool {
-        let columns = file_name.split('/').collect::<Vec<&str>>();
+        let mut columns = file_name.split('/');
         let thread_id: usize = columns
-            .first()
+            .next()
             .unwrap()
             .parse()
             .unwrap_or_else(|_| panic!("need a thread id, but the file is: {file_name}"));
-        let key = columns[1..columns.len() - 1].join("/");
-        if let Some(file) = self.get(thread_id, stream, &key).await {
-            if file.name() == file_name {
-                return true;
-            }
-        }
-        false
+        // Remove the last element which is the file name
+        // and join the rest to form the key
+        columns.next_back();
+        let key = itertools::Itertools::join(&mut columns, "/");
+        self.get(thread_id, stream, &key)
+            .await
+            .is_some_and(|file| file.name() == file_name)
     }
 }
 
@@ -254,7 +250,7 @@ impl RwFile {
             dir_path = dir_path.replace(file_list_prefix, "/file_list/");
         }
         let id = ider::generate();
-        let file_name = format!("{thread_id}/{key}/{id}{}", FILE_EXT_JSON);
+        let file_name = format!("{thread_id}/{key}/{id}{FILE_EXT_JSON}");
         let file_path = format!("{dir_path}{file_name}");
         create_dir_all(Path::new(&file_path).parent().unwrap())
             .await
@@ -404,7 +400,7 @@ pub fn clean_lock_files() {
 }
 
 pub fn lock_request(trace_id: &str, files: &[String]) {
-    log::info!("[trace_id: {}] lock_request for wal files", trace_id);
+    log::info!("[trace_id: {trace_id}] lock_request for wal files");
     let mut locker = SEARCHING_REQUESTS.write();
     locker.insert(trace_id.to_string(), files.to_vec());
 }
@@ -413,7 +409,7 @@ pub fn release_request(trace_id: &str) {
     if !config::cluster::LOCAL_NODE.is_ingester() {
         return;
     }
-    log::info!("[trace_id: {}] release_request for wal files", trace_id);
+    log::info!("[trace_id: {trace_id}] release_request for wal files");
     let mut locker = SEARCHING_REQUESTS.write();
     let files = locker.remove(trace_id);
     locker.shrink_to_fit();
@@ -441,7 +437,7 @@ mod tests {
         file.write(&data).await;
         assert_eq!(file.read().await.unwrap(), data);
         assert_eq!(file.size().await, data.len() as i64);
-        assert!(file.name().contains(&format!("{}/{}", thread_id, key)));
+        assert!(file.name().contains(&format!("{thread_id}/{key}")));
     }
 
     #[tokio::test]
@@ -457,7 +453,7 @@ mod tests {
         file.write(&data).await;
         assert_eq!(file.read().await.unwrap(), data);
         assert_eq!(file.size().await, data.len() as i64);
-        assert!(file.name().contains(&format!("{}/{}", thread_id, key)));
+        assert!(file.name().contains(&format!("{thread_id}/{key}")));
     }
 
     #[tokio::test]
@@ -576,8 +572,8 @@ mod tests {
         assert_eq!(file.read().await.unwrap(), data);
 
         // Test file names
-        assert!(file.name().contains(&format!("{}/{}", thread_id, key)));
-        assert!(file.wal_name().contains(&format!("{}/{}", thread_id, key)));
-        assert!(file.full_name().contains(&format!("{}/{}", thread_id, key)));
+        assert!(file.name().contains(&format!("{thread_id}/{key}")));
+        assert!(file.wal_name().contains(&format!("{thread_id}/{key}")));
+        assert!(file.full_name().contains(&format!("{thread_id}/{key}")));
     }
 }

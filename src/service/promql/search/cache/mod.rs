@@ -74,7 +74,7 @@ pub async fn init() -> Result<()> {
         let items = std::mem::take(&mut *w);
         for item in items.iter() {
             if let Err(e) = load(item).await {
-                log::error!("load disk metrics cache error: {}", e);
+                log::error!("load disk metrics cache error: {e}");
             }
         }
         log::info!(
@@ -145,7 +145,7 @@ pub async fn get(
     let mut resp = match proto::cluster_rpc::MetricsQueryResponse::decode(data) {
         Ok(resp) => resp,
         Err(e) => {
-            log::error!("decode metrics query response error: {}", e);
+            log::error!("decode metrics query response error: {e}");
             return Ok(None);
         }
     };
@@ -257,10 +257,8 @@ pub async fn set(
     let need_gc = r.cacher.len() >= r.max_entries - METRICS_INDEX_CACHE_GC_TRIGGER_NUM;
     drop(r);
 
-    if need_gc {
-        if let Err(e) = gc(bucket_id).await {
-            log::error!("[trace_id {trace_id}] promql->search->cache: gc err: {e}");
-        }
+    if need_gc && let Err(e) = gc(bucket_id).await {
+        log::error!("[trace_id {trace_id}] promql->search->cache: gc err: {e}");
     }
 
     // filter the samples
@@ -385,7 +383,7 @@ async fn gc(bucket_id: usize) -> Result<()> {
 }
 
 fn get_hash_key(query: &str, step: i64) -> String {
-    config::utils::md5::hash(&format!("{}-{}", query, step))
+    config::utils::md5::hash(&format!("{query}-{step}"))
 }
 
 fn get_cache_item_key(prefix: &str, org: &str, start: i64, end: i64) -> String {

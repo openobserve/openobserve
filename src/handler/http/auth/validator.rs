@@ -105,14 +105,13 @@ pub async fn validator(
                 );
 
                 #[cfg(feature = "enterprise")]
-                if let Some(role) = &res.user_role {
-                    if role.eq(&UserRole::Viewer)
-                        && req.method().eq(&Method::PUT)
-                        && path.ends_with(&format!("users/{}", res.user_email))
-                    {
-                        // Viewer should be able to update its own details
-                        return Ok(req);
-                    }
+                if let Some(role) = &res.user_role
+                    && role.eq(&UserRole::Viewer)
+                    && req.method().eq(&Method::PUT)
+                    && path.ends_with(&format!("users/{}", res.user_email))
+                {
+                    // Viewer should be able to update its own details
+                    return Ok(req);
                 }
 
                 if auth_info.bypass_check
@@ -133,7 +132,7 @@ pub async fn validator(
             }
         }
         Err(err) => {
-            log::debug!("Token Validation Error: {:#?}", err);
+            log::debug!("Token Validation Error: {err:#?}");
             Err((err, req))
         }
     }
@@ -158,10 +157,10 @@ pub async fn validate_credentials(
     path: &str,
 ) -> Result<TokenValidationResponse, Error> {
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
-    if let Some(v) = path_columns.last() {
-        if v.is_empty() {
-            path_columns.pop();
-        }
+    if let Some(v) = path_columns.last()
+        && v.is_empty()
+    {
+        path_columns.pop();
     }
 
     let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
@@ -176,7 +175,7 @@ pub async fn validate_credentials(
                 }
             }
             Err(e) => {
-                log::debug!("Error getting user in validate_credentials: {}", e);
+                log::debug!("Error getting user in validate_credentials: {e}");
                 None
             }
         }
@@ -312,10 +311,10 @@ pub async fn validate_credentials_ext(
     let config = get_config();
     let password_ext_salt = config.auth.ext_auth_salt.as_str();
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
-    if let Some(v) = path_columns.last() {
-        if v.is_empty() {
-            path_columns.pop();
-        }
+    if let Some(v) = path_columns.last()
+        && v.is_empty()
+    {
+        path_columns.pop();
     }
 
     let user = if path_columns.last().unwrap_or(&"").eq(&"organizations") {
@@ -664,11 +663,6 @@ async fn oo_validator_internal(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    // Check if the ws request is using internal grpc token
-    if get_config().websocket.enabled && auth_info.auth.eq(&get_config().grpc.internal_grpc_token) {
-        return validate_http_internal(req).await;
-    }
-
     if auth_info.auth.starts_with("Basic") {
         let decoded = match base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim()) {
             Ok(val) => val,
@@ -852,7 +846,7 @@ pub async fn validate_http_internal(
         let node_url = match Url::parse(&node.http_addr) {
             Ok(node_url) => node_url,
             Err(e) => {
-                log::error!("Failed to parse node URL: {}", e);
+                log::error!("Failed to parse node URL: {e}");
                 return false;
             }
         };
@@ -865,7 +859,7 @@ pub async fn validate_http_internal(
         {
             Some(ip) => ip,
             None => {
-                log::debug!("Failed to parse peer IP from: {}", peer);
+                log::debug!("Failed to parse peer IP from: {peer}");
                 return false;
             }
         };
@@ -904,7 +898,7 @@ pub(crate) async fn check_permissions(
     }
 
     let object_str = auth_info.o2_type;
-    log::debug!("Role of user {user_id} is {:#?}", role);
+    log::debug!("Role of user {user_id} is {role:#?}");
     let obj_str = if object_str.contains("##user_id##") {
         object_str.replace("##user_id##", user_id)
     } else {
@@ -960,8 +954,10 @@ async fn list_objects(
     permission: &str,
     object_type: &str,
     org_id: &str,
+    role: &str,
 ) -> Result<Vec<String>, anyhow::Error> {
-    o2_openfga::authorizer::authz::list_objects(user_id, permission, object_type, org_id).await
+    o2_openfga::authorizer::authz::list_objects(user_id, permission, object_type, org_id, role)
+        .await
 }
 
 #[cfg(feature = "enterprise")]
@@ -973,18 +969,14 @@ pub(crate) async fn list_objects_for_user(
 ) -> Result<Option<Vec<String>>, Error> {
     let openfga_config = get_openfga_config();
     if !is_root_user(user_id) && openfga_config.enabled && openfga_config.list_only_permitted {
-        match crate::handler::http::auth::validator::list_objects(
-            user_id,
-            permission,
-            object_type,
-            org_id,
-        )
-        .await
-        {
+        let role = match users::get_user(Some(org_id), user_id).await {
+            Some(user) => user.role.to_string(),
+            None => "".to_string(),
+        };
+        match list_objects(user_id, permission, object_type, org_id, &role).await {
             Ok(resp) => {
                 log::debug!(
-                    "list_objects_for_user for user {user_id} from {org_id} org returns: {:#?}",
-                    resp
+                    "list_objects_for_user for user {user_id} from {org_id} org returns: {resp:#?}"
                 );
                 Ok(Some(resp))
             }
@@ -998,7 +990,7 @@ pub(crate) async fn list_objects_for_user(
 /// Helper function to extract the relative path after the base URI and path prefix
 fn extract_relative_path(full_path: &str, path_prefix: &str) -> String {
     let base_uri = config::get_config().common.base_uri.clone();
-    let full_prefix = format!("{}{}", base_uri, path_prefix);
+    let full_prefix = format!("{base_uri}{path_prefix}");
     full_path
         .strip_prefix(&full_prefix)
         .unwrap_or(full_path)
@@ -1043,7 +1035,7 @@ fn extract_full_url(req: &ServiceRequest) -> String {
         .map(|pq| pq.as_str())
         .unwrap_or("");
 
-    format!("{}://{}{}", scheme, host, path)
+    format!("{scheme}://{host}{path}")
 }
 
 #[cfg(test)]

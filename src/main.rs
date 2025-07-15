@@ -43,7 +43,6 @@ use openobserve::{
         utils::zo_logger,
     },
     handler::{
-        self,
         grpc::{
             auth::check_auth,
             flight::FlightServiceImpl,
@@ -206,7 +205,7 @@ async fn main() -> Result<(), anyhow::Error> {
     );
     log::info!(
         "Caches info: Disk max size {}, MEM max size {}, Datafusion pool size: {}",
-        bytes_to_human_readable(cfg.disk_cache.max_size as f64),
+        bytes_to_human_readable((cfg.disk_cache.max_size * cfg.disk_cache.bucket_num) as f64),
         bytes_to_human_readable((cfg.memory_cache.max_size * cfg.memory_cache.bucket_num) as f64),
         bytes_to_human_readable(cfg.memory_cache.datafusion_max_size as f64),
     );
@@ -240,48 +239,48 @@ async fn main() -> Result<(), anyhow::Error> {
             // it must be initialized before the server starts
             if let Err(e) = cluster::register_and_keep_alive().await {
                 job_init_tx.send(false).ok();
-                panic!("cluster init failed: {}", e);
+                panic!("cluster init failed: {e}");
             }
             // init config
             if let Err(e) = config::init().await {
                 job_init_tx.send(false).ok();
-                panic!("config init failed: {}", e);
+                panic!("config init failed: {e}");
             }
 
             // db related inits
             if let Err(e) = migration::init_db().await {
                 job_init_tx.send(false).ok();
-                panic!("db init failed: {}", e);
+                panic!("db init failed: {e}");
             }
 
             // init infra
             if let Err(e) = infra::init().await {
                 job_init_tx.send(false).ok();
-                panic!("infra init failed: {}", e);
+                panic!("infra init failed: {e}");
             }
 
             if let Err(e) = common_infra::init().await {
                 job_init_tx.send(false).ok();
-                panic!("common infra init failed: {}", e);
+                panic!("common infra init failed: {e}");
             }
 
             // init enterprise
             #[cfg(feature = "enterprise")]
             if let Err(e) = crate::init_enterprise().await {
                 job_init_tx.send(false).ok();
-                panic!("enterprise init failed: {}", e);
+                panic!("enterprise init failed: {e}");
             }
 
             // ingester init
             if let Err(e) = ingester::init().await {
                 job_init_tx.send(false).ok();
-                panic!("ingester init failed: {}", e);
+                panic!("ingester init failed: {e}");
             }
 
             // init job
             if let Err(e) = job::init().await {
                 job_init_tx.send(false).ok();
-                panic!("job init failed: {}", e);
+                panic!("job init failed: {e}");
             }
 
             // init meter provider
@@ -289,15 +288,6 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("meter provider init failed");
             };
-
-            // init websocket gc
-            if cfg.websocket.enabled {
-                log::info!("Initializing WebSocket session garbage collector");
-                if let Err(e) = handler::http::request::ws::init().await {
-                    job_init_tx.send(false).ok();
-                    panic!("websocket gc init failed: {}", e);
-                }
-            }
 
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
@@ -369,7 +359,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .expect("Deferred jobs failed to init");
 
     if cfg.log.events_enabled {
-        tokio::task::spawn(async move { zo_logger::send_logs().await });
+        tokio::task::spawn(zo_logger::send_logs());
     }
     if cfg.common.telemetry_enabled {
         tokio::task::spawn(async move {
@@ -379,20 +369,38 @@ async fn main() -> Result<(), anyhow::Error> {
         });
     }
 
+    // let node schedulable
+    let mut start_ok = false;
+    for _ in 0..10 {
+        match cluster::set_schedulable().await {
+            Ok(_) => {
+                start_ok = true;
+                break;
+            }
+            Err(e) => {
+                log::error!("set node schedulable failed: {e}");
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+        }
+    }
+    if !start_ok {
+        return Err(anyhow::anyhow!("set node schedulable failed"));
+    }
+
     // init http server
     if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         if let Err(e) = init_http_server_without_tracing().await {
-            log::error!("HTTP server runs failed: {}", e);
+            log::error!("HTTP server runs failed: {e}");
         }
     } else if let Err(e) = init_http_server().await {
-        log::error!("HTTP server runs failed: {}", e);
+        log::error!("HTTP server runs failed: {e}");
     }
     log::info!("HTTP server stopped");
 
     // stop tracing
     if let Some(tracer_provider) = tracer_provider {
         let result = tracer_provider.shutdown();
-        log::info!("Tracer provider shutdown result: {:?}", result);
+        log::info!("Tracer provider shutdown result: {result:?}");
     }
 
     // flush usage report
@@ -670,12 +678,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         } else {
             "HTTP"
         };
-        log::info!(
-            "Starting {} server at: {}, thread_id: {}",
-            scheme,
-            haddr,
-            local_id
-        );
+        log::info!("Starting {scheme} server at: {haddr}, thread_id: {local_id}");
         let mut app = App::new();
         if config::cluster::LOCAL_NODE.is_router() {
             let http_client =
@@ -750,9 +753,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         .disable_signals()
         .run();
     let handle = server.handle();
-    tokio::task::spawn(async move {
-        graceful_shutdown(handle).await;
-    });
+    tokio::task::spawn(graceful_shutdown(handle));
     server.await?;
     Ok(())
 }
@@ -783,12 +784,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         } else {
             "HTTP"
         };
-        log::info!(
-            "Starting {} server at: {}, thread_id: {}",
-            scheme,
-            haddr,
-            local_id
-        );
+        log::info!("Starting {scheme} server at: {haddr}, thread_id: {local_id}");
 
         let mut app = App::new();
         if config::cluster::LOCAL_NODE.is_router() {
@@ -863,9 +859,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         .disable_signals()
         .run();
     let handle = server.handle();
-    tokio::task::spawn(async move {
-        graceful_shutdown(handle).await;
-    });
+    tokio::task::spawn(graceful_shutdown(handle));
     server.await?;
     Ok(())
 }
@@ -907,7 +901,7 @@ async fn graceful_shutdown(handle: ServerHandle) {
 
     // offline the node
     if let Err(e) = cluster::set_offline(true).await {
-        log::error!("set offline failed: {}", e);
+        log::error!("set offline failed: {e}");
     }
     log::info!("Node is offline");
 
@@ -1074,12 +1068,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
         } else {
             "HTTP"
         };
-        log::info!(
-            "Starting Script Server {} server at: {}, thread_id: {}",
-            scheme,
-            haddr,
-            local_id
-        );
+        log::info!("Starting Script Server {scheme} server at: {haddr}, thread_id: {local_id}");
         let mut app = App::new();
         app = app.service(web::scope(&cfg.common.base_uri).configure(get_script_server_routes));
         app.app_data(web::JsonConfig::default().limit(cfg.limit.req_json_limit))
@@ -1111,9 +1100,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
         .disable_signals()
         .run();
     let handle = server.handle();
-    tokio::task::spawn(async move {
-        graceful_shutdown(handle).await;
-    });
+    tokio::task::spawn(graceful_shutdown(handle));
     server.await?;
 
     log::info!("HTTP server stopped");
@@ -1186,8 +1173,10 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         o2_ratelimit::init(openobserve::handler::http::router::openapi::openapi_info().await)
             .await?;
     }
+
     Ok(())
 }
+
 #[cfg(feature = "enterprise")]
 fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::Error> {
     if o2cfg.rate_limit.rate_limit_enabled {

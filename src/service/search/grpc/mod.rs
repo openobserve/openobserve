@@ -21,6 +21,7 @@ use infra::errors::Result;
 
 pub mod flight;
 pub mod storage;
+pub(crate) mod utils;
 pub mod wal;
 
 pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats)>;

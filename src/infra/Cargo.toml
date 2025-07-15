@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[features]
+default = []
+cloud = []
+
 [dependencies]
 aes-siv.workspace = true
 ahash.workspace = true

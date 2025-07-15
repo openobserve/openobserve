@@ -183,9 +183,7 @@ impl QueryConditionExt for QueryCondition {
                 };
                 let promql::value::Value::Matrix(value) = resp else {
                     log::warn!(
-                        "Alert evaluate: trace_id: {trace_id}, PromQL query {} returned unexpected response: {:?}",
-                        v,
-                        resp
+                        "Alert evaluate: trace_id: {trace_id}, PromQL query {v} returned unexpected response: {resp:?}"
                     );
                     return Ok(eval_results);
                 };
@@ -200,12 +198,10 @@ impl QueryConditionExt for QueryCondition {
                             .iter()
                             .map(|v| {
                                 let mut val = Map::with_capacity(v.labels.len() + 2);
-                                for label in v.labels.iter() {
-                                    val.insert(
-                                        label.name.to_string(),
-                                        label.value.to_string().into(),
-                                    );
-                                }
+                                val.extend(v.labels.iter().map(|label| {
+                                    (label.name.to_string(), label.value.to_string().into())
+                                }));
+
                                 let last_sample = v.samples.last().unwrap();
                                 val.insert("_timestamp".to_string(), last_sample.timestamp.into());
                                 val.insert("value".to_string(), last_sample.value.into());
@@ -218,14 +214,8 @@ impl QueryConditionExt for QueryCondition {
             }
         };
 
-        let stream_names = match resolve_stream_names(&sql) {
-            Ok(stream_names) => stream_names,
-            Err(e) => {
-                return Err(anyhow::anyhow!(
-                    "Error resolving stream names in SQL query: {e}"
-                ));
-            }
-        };
+        let stream_names = resolve_stream_names(&sql)
+            .map_err(|e| anyhow::anyhow!("Error resolving stream names in SQL query: {e}"))?;
 
         // SQL may contain multiple stream names, check for each stream
         // if the query period is greater than the max query range
@@ -257,8 +247,10 @@ impl QueryConditionExt for QueryCondition {
         };
 
         let req_start = std::time::Instant::now();
-        let resp = if self.multi_time_range.is_some()
-            && !self.multi_time_range.as_ref().unwrap().is_empty()
+        let resp = if self
+            .multi_time_range
+            .as_ref()
+            .is_some_and(|mtr| !mtr.is_empty())
         {
             let req = config::meta::search::MultiStreamRequest {
                 sql: {
@@ -344,8 +336,7 @@ impl QueryConditionExt for QueryCondition {
                 per_query_response: false, // Will return results in single array
             };
             log::debug!(
-                "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search_multi, {:?}",
-                req
+                "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search_multi, {req:?}"
             );
             SearchService::grpc_search::grpc_search_multi(
                 &trace_id,
@@ -388,6 +379,7 @@ impl QueryConditionExt for QueryCondition {
                     skip_wal: false,
                     streaming_output: false,
                     streaming_id: None,
+                    histogram_interval: 0,
                 },
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],
@@ -395,12 +387,11 @@ impl QueryConditionExt for QueryCondition {
                 timeout: 0,
                 search_type,
                 search_event_context,
-                use_cache: None,
+                use_cache: false,
                 local_mode: None,
             };
             log::debug!(
-                "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search, {:?}",
-                req
+                "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search, {req:?}"
             );
             // SearchService::search(&trace_id, org_id, stream_type, None, &req).await
             SearchService::grpc_search::grpc_search(
@@ -700,10 +691,7 @@ async fn build_sql(
         .await
         .map_err(|err| anyhow::anyhow!("Error building SQL on stream {}: {}", &stream_name, err))?;
     if query_condition.aggregation.is_none() {
-        return Ok(format!(
-            "SELECT * FROM \"{}\" WHERE {}",
-            stream_name, where_sql
-        ));
+        return Ok(format!("SELECT * FROM \"{stream_name}\" WHERE {where_sql}"));
     }
 
     // handle aggregation
@@ -737,25 +725,24 @@ async fn build_sql(
         AggFunction::P99 => format!("approx_percentile_cont(\"{}\", 0.99)", agg.having.column),
     };
 
-    if let Some(group) = agg.group_by.as_ref() {
-        if !group.is_empty() {
-            sql = format!(
-                "SELECT {}, {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
-                group.join(", "),
-                func_expr,
-                TIMESTAMP_COL_NAME,
-                TIMESTAMP_COL_NAME,
-                stream_name,
-                where_sql,
-                group.join(", "),
-                having_expr
-            );
-        }
+    if let Some(group) = agg.group_by.as_ref()
+        && !group.is_empty()
+    {
+        sql = format!(
+            "SELECT {}, {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
+            group.join(", "),
+            func_expr,
+            TIMESTAMP_COL_NAME,
+            TIMESTAMP_COL_NAME,
+            stream_name,
+            where_sql,
+            group.join(", "),
+            having_expr
+        );
     }
     if sql.is_empty() {
         sql = format!(
-            "SELECT {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} HAVING {}",
-            func_expr, TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME, stream_name, where_sql, having_expr
+            "SELECT {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\" {where_sql} HAVING {having_expr}"
         );
     }
     Ok(sql)

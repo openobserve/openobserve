@@ -192,7 +192,7 @@ interface Session {
 }
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue")
+  () => import("@/components/CodeQueryEditor.vue"),
 );
 
 const props = defineProps({
@@ -400,7 +400,7 @@ const getSessions = () => {
 
   const interval = getTimeInterval(
     dateTime.value.startTime,
-    dateTime.value.endTime
+    dateTime.value.endTime,
   );
   const parsedQuery = parseQuery(sessionState.data.editorValue, false);
 
@@ -429,7 +429,6 @@ const getSessions = () => {
       ? " where " + sessionState.data.editorValue.trim()
       : ""
   } group by session_id order by zo_sql_timestamp DESC`;
-  req.query.sql_mode = "full";
   delete req.aggs;
   isLoading.value.push(true);
 
@@ -442,7 +441,7 @@ const getSessions = () => {
         query: req,
         page_type: "logs",
       },
-      "RUM"
+      "RUM",
     )
     .then((res) => {
       res.data.hits.forEach((hit: any) => {
@@ -490,8 +489,8 @@ const getSessionLogs = (req: any) => {
 
   let whereClause = "";
   const sessionsKeys = Object.keys(sessionState.data.sessions);
-  if(sessionsKeys.length > 0) {
-    whereClause = `where session_id IN (${sessionsKeys.map(item => `'${item}'`).join(', ')})`;
+  if (sessionsKeys.length > 0) {
+    whereClause = `where session_id IN (${sessionsKeys.map((item) => `'${item}'`).join(", ")})`;
   }
 
   req.query.sql = `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(type) as type, SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count, SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events, ${userFields} ${geoFields} session_id from "_rumdata" ${whereClause} group by session_id order by zo_sql_timestamp DESC`;
@@ -504,7 +503,7 @@ const getSessionLogs = (req: any) => {
         query: req,
         page_type: "logs",
       },
-      "RUM"
+      "RUM",
     )
     .then((res) => {
       const hits = res.data.hits;
@@ -602,7 +601,7 @@ const runQuery = () => {
   sessionState.data.sessions = {};
   if (dateTime.value.valueType === "relative") {
     const newDate = getConsumableRelativeTime(
-      dateTime.value.relativeTimePeriod
+      dateTime.value.relativeTimePeriod,
     );
 
     if (newDate?.startTime && newDate?.endTime) {

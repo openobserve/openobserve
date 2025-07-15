@@ -36,8 +36,12 @@ use o2_enterprise::enterprise::common::auditor;
 use proto::cluster_rpc;
 use tokio::sync::oneshot;
 
+#[cfg(feature = "cloud")]
+pub mod cloud_events;
 mod ingestion;
 mod queues;
+#[cfg(feature = "cloud")]
+pub mod search;
 
 pub async fn run() {
     let cfg = get_config();
@@ -120,6 +124,7 @@ pub async fn report_request_usage_stats(
             request_body: request_body.to_owned(),
             function: None,
             size: stats.size,
+            scan_files: stats.scan_files,
             unit: "MB".to_owned(),
             user_email: user_email.to_owned(),
             response_time: stats.response_time,
@@ -159,6 +164,7 @@ pub async fn report_request_usage_stats(
         org_id: org_id.to_owned(),
         request_body: request_body.to_owned(),
         size: stats.size,
+        scan_files: stats.scan_files,
         unit: "MB".to_owned(),
         user_email,
         response_time: stats.response_time,
@@ -327,7 +333,7 @@ pub fn http_report_metrics(
     search_group: &str,
 ) {
     let time = start.elapsed().as_secs_f64();
-    let uri = format!("/api/org/{}", uri);
+    let uri = format!("/api/org/{uri}");
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
             &uri,

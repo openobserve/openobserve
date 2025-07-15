@@ -15,17 +15,17 @@
 
 use std::{
     hint::spin_loop,
+    sync::LazyLock,
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rand::Rng;
 use svix_ksuid::{Ksuid, KsuidLike};
 
-static IDER: Lazy<Mutex<SnowflakeIdGenerator>> = Lazy::new(|| {
+static IDER: LazyLock<Mutex<SnowflakeIdGenerator>> = LazyLock::new(|| {
     let machine_id = unsafe { super::cluster::LOCAL_NODE_ID };
-    log::info!("init ider with machine_id: {}", machine_id);
+    log::info!("init ider with machine_id: {machine_id}");
     Mutex::new(SnowflakeIdGenerator::new(machine_id))
 });
 
@@ -152,10 +152,7 @@ impl SnowflakeIdGenerator {
             if now_millis == self.last_time_millis {
                 now_millis = biding_time_conditions(self.last_time_millis, self.epoch);
                 if now_millis == self.last_time_millis {
-                    panic!(
-                        "Clock is moving backwards.  Rejecting requests until {}.",
-                        now_millis
-                    );
+                    panic!("Clock is moving backwards.  Rejecting requests until {now_millis}.");
                 }
             }
 

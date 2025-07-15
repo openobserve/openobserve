@@ -25,7 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       name="Alert Settings"
       v-model:is-expanded="expandState.thresholds"
       label="Alert Settings"
-      subLabel=""
+      subLabel="Set your alert rules and choose how you'd like to be notified."
+      icon="tune"
       class="tw-mt-1 tw-w-full col-12"
       @update:is-expanded="()=>emits('update:expandState', expandState)"
     />
@@ -125,12 +126,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div data-test="add-alert-destination-select">
                 <q-select
+                  ref="destinationSelectRef"
                   v-model="destinations"
-                  :options="formattedDestinations"
+                  :options="filteredDestinations"
+                  :input-debounce="300"
                   color="input-border"
                   class="no-case"
                   :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-
                   stack-label
                   outlined
                   filled
@@ -143,8 +145,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }]"
                   :required="true"
                   style="width: 200px"
+                  @filter="filterDestinations"
                   @update:model-value="updateDestinations"
+                  @popup-show="isDestinationDropdownOpen = true"
+                  @popup-hide="isDestinationDropdownOpen = false"
                 >
+                  <q-tooltip
+                    v-if="!isDestinationDropdownOpen && destinations.length > 0"
+                    anchor="top middle"
+                    self="bottom middle"
+                    :offset="[0, 8]"
+                    max-width="300px"
+                  >
+                    {{ destinations }}
+                  </q-tooltip>
                   <template v-slot:option="option">
                     <q-list dense>
                       <q-item
@@ -203,7 +217,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AlertsContainer 
       name="query"
       v-model:is-expanded="expandState.realTimeMode"
-      label="Query Mode - Quick"
+      label="Conditions"
+      :image="conditionsImage"
       subLabel="What should trigger the alert."
       class="tw-mt-1 tw-w-full col-12    "
       @update:is-expanded="()=>emits('update:expandState', expandState)"
@@ -217,13 +232,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import FieldsInput from "./FieldsInput.vue";
 import AlertsContainer from "./AlertsContainer.vue";
-import { ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { useStore } from "vuex";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { useRouter } from "vue-router";
 import FilterGroup from "./FilterGroup.vue";
+import { getImageURL } from "@/utils/zincutils";
 
 const { t } = useI18n();
 
@@ -239,8 +255,24 @@ const triggerData = ref(props.trigger);
 
 const destinations = ref(props.destinations);
 
-const formattedDestinations = ref(props.formattedDestinations);
+
+const filteredDestinations = ref(props.formattedDestinations)
+
 const inputData = ref(props.conditions);
+
+const destinationSelectRef = ref(null);
+
+const isDestinationDropdownOpen = ref(false);
+
+watch(()=> destinations.value, (newVal, oldVal)=>{
+  //check if the newVal length is greater than oldVal length
+  //then if any filter is applied then clear the input
+  if(newVal.length > oldVal.length){
+    //have to clear the input
+    //this runs every time if users types or not because setting the previous value ('') to ('') is same
+    destinationSelectRef.value.updateInputValue('');
+  }
+})
 
 
 const updateTrigger = () => {
@@ -279,6 +311,30 @@ function updateGroup(updatedGroup:any) {
 
   const removeConditionGroup = (targetGroupId: string, currentGroup: any = inputData.value) => {
     emits('remove:group', targetGroupId)
+  };
+  const conditionsImage = computed(() => {
+    if(store.state.theme === 'dark'){
+      return getImageURL('images/alerts/conditions_image.svg')
+    }
+    else{
+      return getImageURL('images/alerts/conditions_image_light.svg')
+    }
+  })
+
+  const filterDestinations = (val: string, update: Function) => {
+    if (val === "") {
+      update(() => {
+        filteredDestinations.value = [...props.formattedDestinations];
+      });
+      return;
+    }
+
+    update(() => {
+      const needle = val.toLowerCase();
+      filteredDestinations.value = props.formattedDestinations.filter(
+        (destination: string) => destination.toLowerCase().includes(needle)
+      );
+    });
   };
 </script>
 

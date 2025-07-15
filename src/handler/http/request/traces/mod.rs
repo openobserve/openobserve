@@ -16,7 +16,12 @@
 use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, get, http, post, web};
-use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType, metrics, utils::json};
+use config::{
+    TIMESTAMP_COL_NAME, get_config,
+    meta::{search::default_use_cache, stream::StreamType},
+    metrics,
+    utils::json,
+};
 use hashbrown::HashMap;
 use serde::Serialize;
 use tracing::{Instrument, Span};
@@ -223,7 +228,7 @@ pub async fn get_latest_traces(
     }
 
     let max_query_range = crate::common::utils::stream::get_max_query_range(
-        &[stream_name.clone()],
+        std::slice::from_ref(&stream_name),
         org_id.as_str(),
         &user_id,
         StreamType::Traces,
@@ -233,8 +238,7 @@ pub async fn get_latest_traces(
     if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
         start_time = end_time - max_query_range * 3600 * 1_000_000;
         range_error = format!(
-            "Query duration is modified due to query range restriction of {} hours",
-            max_query_range
+            "Query duration is modified due to query range restriction of {max_query_range} hours"
         );
     }
 
@@ -244,8 +248,7 @@ pub async fn get_latest_traces(
 
     // search
     let query_sql = format!(
-        "SELECT trace_id, min({}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM {stream_name}",
-        TIMESTAMP_COL_NAME
+        "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM {stream_name}"
     );
     let query_sql = if filter.is_empty() {
         format!("{query_sql} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
@@ -268,6 +271,7 @@ pub async fn get_latest_traces(
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
+            histogram_interval: 0,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
@@ -275,14 +279,11 @@ pub async fn get_latest_traces(
         timeout,
         search_type: None,
         search_event_context: None,
-        use_cache: None,
+        use_cache: default_use_cache(),
         local_mode: None,
     };
 
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-    if use_cache {
-        req.use_cache = Some(use_cache);
-    }
+    req.use_cache = get_use_cache_from_request(&query);
 
     let stream_type = StreamType::Traces;
     let user_id = in_req
@@ -300,6 +301,7 @@ pub async fn get_latest_traces(
         user_id.clone(),
         &req,
         "".to_string(),
+        false,
     )
     .instrument(http_span.clone())
     .await;
@@ -328,7 +330,7 @@ pub async fn get_latest_traces(
                     "",
                 ])
                 .inc();
-            log::error!("get traces latest data error: {:?}", err);
+            log::error!("get traces latest data error: {err:?}");
             return Ok(map_error_to_http_response(&err, Some(trace_id)));
         }
     };
@@ -370,8 +372,7 @@ pub async fn get_latest_traces(
         .collect::<Vec<String>>()
         .join("','");
     let query_sql = format!(
-        "SELECT {}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM {stream_name} WHERE trace_id IN ('{}') ORDER BY {} ASC",
-        TIMESTAMP_COL_NAME, trace_ids, TIMESTAMP_COL_NAME,
+        "SELECT {TIMESTAMP_COL_NAME}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM {stream_name} WHERE trace_id IN ('{trace_ids}') ORDER BY {TIMESTAMP_COL_NAME} ASC"
     );
     req.query.from = 0;
     req.query.size = 9999;
@@ -388,6 +389,7 @@ pub async fn get_latest_traces(
             user_id.clone(),
             &req,
             "".to_string(),
+            false,
         )
         .instrument(http_span.clone())
         .await;
@@ -416,7 +418,7 @@ pub async fn get_latest_traces(
                         "",
                     ])
                     .inc();
-                log::error!("get traces latest data error: {:?}", err);
+                log::error!("get traces latest data error: {err:?}");
                 return Ok(map_error_to_http_response(&err, Some(trace_id)));
             }
         };

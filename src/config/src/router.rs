@@ -24,7 +24,6 @@ const QUERIER_ROUTES: [(&str, usize); 23] = [
     ("traces/latest", 3),                     // /api/{org_id}/{stream_name}/traces/latest
     ("clusters", 1),                          // /api/clusters
     ("query_manager", 2),                     // /api/{org_id}/query_manager/...
-    ("ws", 2),                                // /api/{org_id}/ws
     ("_search", 2),                           // /api/{org_id}/_search
     ("_search_stream", 2),                    // /api/{org_id}/_search_stream
     ("_values_stream", 2),                    // /api/{org_id}/_values_stream
@@ -37,7 +36,8 @@ const QUERIER_ROUTES: [(&str, usize); 23] = [
     ("prometheus/api/v1/query_exemplars", 2), // /api/{org_id}/prometheus/api/v1/query_exemplars
     ("prometheus/api/v1/metadata", 2),        // /api/{org_id}/prometheus/api/v1/metadata
     ("prometheus/api/v1/labels", 2),          // /api/{org_id}/prometheus/api/v1/labels
-    ("prometheus/api/v1/label/", 2),          /* /api/{org_id}/prometheus/api/v1/label/
+    ("prometheus/api/v1/label/", 2),          // /api/{org_id}/prometheus/api/v1/label/
+    ("chat_stream", 3),                       /* /api/{org_id}/ai/chat_stream
                                                * {label_name}/
                                                * values */
 ];
@@ -57,7 +57,7 @@ pub const INGESTER_ROUTES: [&str; 12] = [
     "/_kinesis_firehose",
     "/_sub",
     "/v1/logs",
-    "/loki/v1/push",
+    "/loki/api/v1/push",
     "/ingest/metrics/_json",
     "/v1/metrics",
     "/traces",
@@ -99,22 +99,6 @@ pub fn is_querier_route_by_body(path: &str) -> bool {
 pub fn is_fixed_querier_route(path: &str) -> bool {
     let path = remove_base_uri(path);
     FIXED_QUERIER_ROUTES.iter().any(|x| path.contains(x))
-}
-
-#[inline]
-pub fn is_ws_route(path: &str) -> bool {
-    let path = remove_base_uri(path);
-    let mut segments = path.split('/').filter(|s| !s.is_empty());
-    // Skip first 3 segments
-    for _ in 0..3 {
-        if segments.next().is_none() {
-            return false;
-        }
-    }
-    segments.next() == Some("ws")
-        && INGESTER_ROUTES
-            .iter()
-            .all(|ingest_route| !path.ends_with(ingest_route))
 }
 
 #[inline]
@@ -175,17 +159,5 @@ mod tests {
 
         assert!(!is_fixed_querier_route("/other_route"));
         assert!(is_fixed_querier_route("/summary_other"));
-    }
-
-    #[test]
-    fn test_is_ws_route() {
-        // Valid WS routes
-        assert!(is_ws_route("/api/org1/stream1/ws"));
-        assert!(is_ws_route("/api/org1/stream1/ws/"));
-
-        // Invalid WS routes
-        assert!(!is_ws_route("/ws")); // Missing org and stream
-        assert!(!is_ws_route("/api/org1/ws")); // Missing stream
-        assert!(!is_ws_route("/api/org1/stream1/ws/_json")); // Contains ingester route
     }
 }

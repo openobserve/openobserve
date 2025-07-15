@@ -326,7 +326,7 @@ pub static QUERY_DISK_RESULT_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| 
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream_type"],
+        &["organization", "stream_type", "cache_type"],
     )
     .expect("Metric created")
 });
@@ -788,7 +788,6 @@ pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
-
 pub static NODE_CONSISTENT_HASH: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new("node_consistent_hash", "Consistent hash")
@@ -899,6 +898,58 @@ pub static PIPELINE_WAL_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
         Opts::new(
             "pipeline_wal_files",
             "Total number of wal files across all pipelines",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static PIPELINE_WAL_INGESTION_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "pipeline_wal_ingestion_bytes",
+            "Bytes ingested across all pipelines",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static PIPELINE_EXPORTED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "pipeline_http_exported_bytes",
+            "Bytes exported across all pipelines",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static QUERY_AGGREGATION_CACHE_ITEMS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_aggregation_cache_items",
+            "Total number of aggregation cache items",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_aggregation_cache_bytes",
+            "Total number of aggregation cache bytes",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -1146,6 +1197,18 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(PIPELINE_WAL_FILES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_WAL_INGESTION_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(PIPELINE_EXPORTED_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_AGGREGATION_CACHE_ITEMS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_AGGREGATION_CACHE_BYTES.clone()))
         .expect("Metric registered");
 }
 

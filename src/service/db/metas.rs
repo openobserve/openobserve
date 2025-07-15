@@ -74,20 +74,16 @@ pub mod tantivy_index {
     async fn get_or_create_idx_updated_at() -> i64 {
         let key = "/tantivy/_timestamp/updated_at";
         match db::get(key).await {
-            Ok(ret) if !ret.is_empty() => {
-                let timestamp = String::from_utf8_lossy(&ret)
-                    .to_string()
-                    .parse::<i64>()
-                    .unwrap();
-                timestamp
-            }
+            Ok(ret) if !ret.is_empty() => String::from_utf8_lossy(&ret)
+                .to_string()
+                .parse::<i64>()
+                .unwrap(),
             _ => {
                 let timestamp = config::utils::time::now_micros();
                 let data = bytes::Bytes::from(timestamp.to_string());
                 if let Err(e) = db::put(key, data, db::NO_NEED_WATCH, None).await {
                     log::warn!(
-                        "[db::metas] Error storing tantivy _timestamp index updated_at: {}",
-                        e
+                        "[db::metas] Error storing tantivy _timestamp index updated_at: {e}"
                     );
                 }
                 timestamp

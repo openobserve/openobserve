@@ -22,6 +22,10 @@ exceptions = [
     { name = "mach", allow = ["BSD-2-Clause"] },
     { name = "fastdivide", allow = ["zlib-acknowledgement"] },
     { name = "foldhash", allow = ["Zlib"] },
+    { name = "adler32", allow = ["Zlib"] },
+    { name = "libz-rs-sys", allow = ["Zlib"] },
+    { name = "libz-rs", allow = ["Zlib"] },
+    { name = "zlib-rs", allow = ["Zlib"] },
     # These two are transitive deps of vrl via dep rustyline.
     # However, rustyline is needed only when we enable feature cli
     # which we haven't. Probably in Cargo.lock due to old code, need
@@ -32,7 +36,6 @@ exceptions = [
     { name = "tiny-keccak", allow = ["CC0-1.0"] },
     { name = "quoted_printable", allow = ["0BSD"] },
     { name = "ring", allow = ["BSD-4-Clause", "OpenSSL"] },
-    { name = "adler32", allow = ["Zlib"] },
     { name = "inferno", allow = ["CDDL-1.0"] },
 ]
 

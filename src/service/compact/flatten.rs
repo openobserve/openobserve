@@ -62,8 +62,7 @@ pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow
                     infra::schema::get_settings(&org_id, &stream_name, stream_type)
                         .await
                         .unwrap_or_default();
-                let defined_schema_fields =
-                    stream_setting.defined_schema_fields.unwrap_or_default();
+                let defined_schema_fields = stream_setting.defined_schema_fields;
                 if defined_schema_fields.is_empty() {
                     continue;
                 }
@@ -87,11 +86,7 @@ pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow
                         generate_by_stream(worker_tx, &org_id, stream_type, &stream_name).await
                     {
                         log::error!(
-                            "[FLATTEN_COMPACTOR] generate_by_stream [{}/{}/{}] error: {}",
-                            org_id,
-                            stream_type,
-                            stream_name,
-                            e
+                            "[FLATTEN_COMPACTOR] generate_by_stream [{org_id}/{stream_type}/{stream_name}] error: {e}"
                         );
                     }
                     drop(permit);

@@ -1,6 +1,6 @@
 use chromiumoxide::{
     Page,
-    browser::{Browser, BrowserConfig},
+    browser::{Browser, BrowserConfig, BrowserConfigBuilder},
     cdp::browser_protocol::page::PrintToPdfParams,
     detection::{DetectionOptions, default_executable},
     fetcher::{BrowserFetcher, BrowserFetcherOptions},
@@ -21,16 +21,16 @@ use tokio::time::{Duration, sleep};
 
 use crate::models::{self, ReportType};
 
-static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<BrowserConfig> =
+static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<BrowserConfigBuilder> =
     tokio::sync::OnceCell::const_new();
 
-pub async fn get_chrome_launch_options() -> &'static BrowserConfig {
+pub async fn get_chrome_launch_options() -> &'static BrowserConfigBuilder {
     CHROME_LAUNCHER_OPTIONS
         .get_or_init(init_chrome_launch_options)
         .await
 }
 
-async fn init_chrome_launch_options() -> BrowserConfig {
+async fn init_chrome_launch_options() -> BrowserConfigBuilder {
     let cfg = get_config();
     let mut browser_config = BrowserConfig::builder()
         .window_size(
@@ -108,7 +108,7 @@ async fn init_chrome_launch_options() -> BrowserConfig {
             }
         }
     }
-    browser_config.build().unwrap()
+    browser_config
 }
 
 pub static SMTP_CLIENT: Lazy<AsyncSmtpTransport<Tokio1Executor>> = Lazy::new(|| {
@@ -150,6 +150,9 @@ pub async fn generate_report(
     let dashboard_id = &dashboard.dashboard;
     let folder_id = &dashboard.folder;
 
+    let user_tmp_dir = tempfile::tempdir()
+        .map_err(|e| anyhow::anyhow!("Error creating temporary directory: {e}"))?;
+
     let mut dashb_vars = "".to_string();
     for variable in dashboard.variables.iter() {
         dashb_vars = format!("{}&var-{}={}", dashb_vars, variable.key, variable.value);
@@ -162,8 +165,13 @@ pub async fn generate_report(
     let tab_id = &dashboard.tabs[0];
 
     log::info!("launching browser for dashboard {dashboard_id}");
-    let (mut browser, mut handler) =
-        Browser::launch(get_chrome_launch_options().await.clone()).await?;
+    let browser_config = get_chrome_launch_options()
+        .await
+        .clone()
+        .user_data_dir(user_tmp_dir.path())
+        .build()
+        .map_err(|e| anyhow::anyhow!("Error building browser config: {e}"))?;
+    let (mut browser, mut handler) = Browser::launch(browser_config).await?;
     log::info!("browser launched");
 
     let handle = tokio::task::spawn(async move {
@@ -305,8 +313,7 @@ pub async fn generate_report(
     if let Err(e) = page.goto(&dashb_url).await {
         let page_url = page.url().await;
         log::error!(
-            "Error navigating to dashboard url {dashb_url}: current uri: {:#?} error: {e}",
-            page_url
+            "Error navigating to dashboard url {dashb_url}: current uri: {page_url:#?} error: {e}"
         );
         return Err(anyhow::anyhow!("{e}"));
     }
@@ -337,6 +344,9 @@ pub async fn generate_report(
         browser.close().await?;
         browser.wait().await?;
         handle.await?;
+        if let Err(e) = user_tmp_dir.close() {
+            log::error!("Error closing temporary directory: {e}");
+        }
         return Err(anyhow::anyhow!(
             "[REPORT] main html element not rendered yet for dashboard {dashboard_id}; most likely login failed: current url: {:#?} error: {e}",
             page_url
@@ -347,6 +357,9 @@ pub async fn generate_report(
         browser.close().await?;
         browser.wait().await?;
         handle.await?;
+        if let Err(e) = user_tmp_dir.close() {
+            log::error!("Error closing temporary directory: {e}");
+        }
         return Err(anyhow::anyhow!(
             "[REPORT] div.displayDiv element not rendered yet for dashboard {dashboard_id}: current url: {:#?} error: {e}",
             page_url
@@ -371,6 +384,9 @@ pub async fn generate_report(
     browser.wait().await?;
     handle.await?;
     log::debug!("done with headless browser");
+    if let Err(e) = user_tmp_dir.close() {
+        log::error!("Error closing temporary directory: {e}");
+    }
 
     Ok((pdf_data, email_dashb_url))
 }
