@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import PipelinePage from '../../pages/pipelinePage.js';
+import { PipelinesPage } from '../../pages/pipelinesPages/pipelinesPage.js';
 import logsdata from '../../../test-data/logs_data.json';
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
 
@@ -9,7 +9,7 @@ test.describe('Pipeline Dynamic Stream Names', () => {
 
   test.beforeAll(async ({ browser }) => {
     page = await browser.newPage();
-    pipelinePage = new PipelinePage(page);
+    pipelinePage = new PipelinesPage(page);
 
     // Login - happens only once before all tests
     await page.goto(process.env["ZO_BASE_URL"]);

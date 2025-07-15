@@ -2,7 +2,7 @@ import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../../test-data/logs_data.json";
-import PipelinePage from "../../pages/pipelinePage.js";
+import { PipelinesPage } from "../../pages/pipelinesPages/pipelinesPage.js";
 import { LogsPage } from '../../pages/logsPages/logsPage.js';
 // import { pipeline } from "stream";
 // import fs from "fs";
@@ -125,7 +125,7 @@ test.describe("Enrichment data testcases", () => {
   test("should upload an enrichment table under functions", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinePage(page);
+    const pipelinePage = new PipelinesPage(page);
     await pipelinePage.navigateToAddEnrichmentTable();
   
     // Generate a unique file name and replace hyphens with underscores
@@ -165,7 +165,7 @@ test.describe("Enrichment data testcases", () => {
   test("should upload an enrichment table under functions with VRL", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinePage(page);
+    const pipelinePage = new PipelinesPage(page);
     await pipelinePage.navigateToAddEnrichmentTable();
 
     // Generate a unique file name
@@ -256,7 +256,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
   test("should display error when CSV not added in enrichment table", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinePage(page);
+    const pipelinePage = new PipelinesPage(page);
     await pipelinePage.navigateToAddEnrichmentTable();
     await page.getByLabel('Name').fill('test')
   
@@ -266,7 +266,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
 
   test("should append an enrichment table under functions", async ({ page }) => {
-    const pipelinePage = new PipelinePage(page);
+    const pipelinePage = new PipelinesPage(page);
     await pipelinePage.navigateToAddEnrichmentTable();
   
     // Generate a unique file name and replace hyphens with underscores

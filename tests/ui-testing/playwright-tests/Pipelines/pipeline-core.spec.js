@@ -1,7 +1,7 @@
 import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import PipelinePage from "../../pages/pipelinePage.js";
+import { PipelinesPage } from "../../pages/pipelinesPages/pipelinesPage.js";
 import { LogsPage } from '../../pages/logsPages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
@@ -116,7 +116,7 @@ test.describe("Core Pipeline Tests", () => {
   });
 
   test("should add source & destination node and then delete the pipeline", async ({ page }) => {
-    const pipelinePage = new PipelinePage(page);
+    const pipelinePage = new PipelinesPage(page);
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -157,7 +157,7 @@ test.describe("Core Pipeline Tests", () => {
   });
 
   test("should add source, function, destination and then delete pipeline", async ({ page }) => {
-    const pipelinePage = new PipelinePage(page);
+    const pipelinePage = new PipelinesPage(page);
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -212,7 +212,7 @@ test.describe("Core Pipeline Tests", () => {
   });
 
   test("should add source, condition & destination node and then delete the pipeline", async ({ page }) => {
-    const pipelinePage = new PipelinePage(page);
+    const pipelinePage = new PipelinesPage(page);
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);

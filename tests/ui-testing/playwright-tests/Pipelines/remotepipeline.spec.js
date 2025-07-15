@@ -2,7 +2,7 @@ import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../../test-data/logs_data.json";
-import PipelinePage from "../../pages/pipelinePage";
+import { PipelinesPage } from "../../pages/pipelinesPages/pipelinesPage.js";
 // import { pipeline } from "stream";
 // import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
@@ -276,7 +276,7 @@ test.describe("Pipeline testcases", () => {
   test.skip("should add source & remote destination node and then delete the pipeline", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinePage(page);
+    const pipelinePage = new PipelinesPage(page);
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -316,7 +316,7 @@ test.describe("Pipeline testcases", () => {
   test.skip("should add source, function, remote destination and then delete pipeline", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinePage(page);
+    const pipelinePage = new PipelinesPage(page);
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -378,7 +378,7 @@ test.describe("Pipeline testcases", () => {
   test.skip("should add source, condition & remote destination node and then delete the pipeline", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinePage(page);
+    const pipelinePage = new PipelinesPage(page);
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -430,7 +430,7 @@ test.describe("Pipeline testcases", () => {
   test("should add source, function,destination and then delete pipeline", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinePage(page);
+    const pipelinePage = new PipelinesPage(page);
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pipelinePage.addPipeline();
