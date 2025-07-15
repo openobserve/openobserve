@@ -647,7 +647,7 @@ LIMIT 100`;
     // await page.locator("#fnEditor").getByRole("textbox").locator("div").click();
     await logsVisualise.openVisualiseTab();
 
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(5000);
     // Step 5: Assert updated field is visible
     await expect(
       page.locator(
