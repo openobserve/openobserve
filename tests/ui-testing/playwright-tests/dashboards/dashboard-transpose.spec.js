@@ -84,7 +84,6 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelConfigs.selectTranspose();
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    // await page.waitForTimeout(2000);
     // Validate data consistency before and after transpose
     await validateTableDataBeforeAndAfterTranspose(page);
 
@@ -118,7 +117,6 @@ test.describe("dashboard UI testcases", () => {
         .nth(2)
         .click();
       await page.locator('[data-test="dashboard-apply"]').click();
-      // await page.waitForTimeout(2000);
 
       // Step 3: Capture transposed data from the table
       const transposedData = await page.$$eval(
