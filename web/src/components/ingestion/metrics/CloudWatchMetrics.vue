@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, type Ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
-import { getImageURL, getIngestionURL } from "../../../utils/zincutils";
+import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 
 export default defineComponent({
@@ -69,14 +69,7 @@ export default defineComponent({
     });
 
     const ingestionURL = getIngestionURL();
-    const url = new URL(ingestionURL);
-    endpoint.value = {
-      url: ingestionURL,
-      host: url.hostname,
-      port: url.port || (url.protocol === "https:" ? "443" : "80"),
-      protocol: url.protocol.replace(":", ""),
-      tls: url.protocol === "https:" ? "On" : "Off",
-    };
+    endpoint.value = getEndPoint(ingestionURL);
 
     const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/cloudwatch_metrics/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]`;

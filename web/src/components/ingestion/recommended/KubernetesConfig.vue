@@ -147,7 +147,7 @@ import { computed, ref, type Ref } from "vue";
 import type { Endpoint } from "@/ts/interfaces";
 import ContentCopy from "@/components/CopyContent.vue";
 import { useStore } from "vuex";
-import { b64EncodeStandard, getIngestionURL } from "../../../utils/zincutils";
+import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
 
@@ -171,17 +171,10 @@ const endpoint: any = ref({
 });
 
 const ingestionURL = getIngestionURL();
-const url = new URL(ingestionURL);
 const tab = ref("external");
 const { t } = useI18n();
 
-endpoint.value = {
-  url: ingestionURL,
-  host: url.hostname,
-  port: url.port || (url.protocol === "https:" ? "443" : "80"),
-  protocol: url.protocol.replace(":", ""),
-  tls: url.protocol === "https:" ? "On" : "Off",
-};
+endpoint.value = getEndPoint(ingestionURL);
 
 const accessKey = computed(() => {
   return b64EncodeStandard(

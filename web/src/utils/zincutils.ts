@@ -1094,4 +1094,18 @@ export const getIngestionURL = () => {
     ingestionURL = store.state.zoConfig.ingestion_url;
   }
   return ingestionURL;
+};
+
+export const getEndPoint = (ingestionURL: string) => {
+  //here we need to get the endpoint from the ingestionURL
+  //we need to get the hostname, port, protocol, tls from the ingestionURL
+  const url = new URL(ingestionURL);
+  const endpoint = {
+    url: ingestionURL,
+      host: url.hostname,
+      port: url.port || (url.protocol === "https:" ? "443" : "80"),
+      protocol: url.protocol.replace(":", ""),
+      tls: url.protocol === "https:" ? "On" : "Off",
+  }
+  return endpoint;
 }

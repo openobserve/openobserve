@@ -15,7 +15,7 @@
 
 import { useStore } from "vuex";
 import { ref } from "vue";
-import { getIngestionURL } from "@/utils/zincutils";
+import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 
 const useIngestion = () => {
   const store = useStore();
@@ -28,14 +28,7 @@ const useIngestion = () => {
     tls: "",
   });
   const ingestionURL = getIngestionURL();
-  const url = new URL(ingestionURL);
-  endpoint.value = {
-    url: ingestionURL,
-    host: url.hostname,
-    port: url.port || (url.protocol === "https:" ? "443" : "80"),
-    protocol: url.protocol.replace(":", ""),
-    tls: url.protocol === "https:" ? "On" : "Off",
-  };
+  endpoint.value = getEndPoint(ingestionURL);
 
   const databaseContent = `exporters:
   otlphttp/openobserve:
