@@ -1518,7 +1518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </FullViewContainer>
           </div>
           <div v-if="expandCombinedOutput && tab !== 'promql'" class="tw-h-full">
-            <div v-if="!tempTestFunction && !runQueryLoading"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[calc(100%-24px)] tw-w-full  no-output-before-run-query">
+            <div v-if="!tempTestFunction && !runFnQueryLoading"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[calc(100%-24px)] tw-w-full  no-output-before-run-query">
               <div class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-gap-2">
                 <q-icon
                   :name="outlinedLightbulb"
@@ -1530,7 +1530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div v-else-if="(outputFnEvents == '') && !runQueryLoading && tempTestFunction"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[calc(100%-24px)]  no-output-before-run-query">
+            <div v-else-if="(outputFnEvents == '') && !runFnQueryLoading && tempTestFunction"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[calc(100%-24px)]  no-output-before-run-query">
               <div class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-gap-2">
                 <q-icon
                   :name="outlinedWarning"
@@ -1542,7 +1542,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div v-else-if="runQueryLoading"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[calc(100%-24px)] ">
+            <div v-else-if="runFnQueryLoading"  class="tw-flex tw-flex-col tw-justify-center tw-items-center tw-h-[calc(100%-24px)] ">
                 <q-spinner-hourglass color="primary" size="40px" />
                 <div class="tw-text-sm tw-text-gray-500">
                   Fetching Search Results...
@@ -1757,6 +1757,8 @@ const isHovered = ref(false);
 const runPromqlError = ref("");
 
 const scheduledAlertRef = ref<any>(null);
+
+const runFnQueryLoading = ref(false);
 
 const selectedColumn = ref<any>({
   label: "",
@@ -2335,6 +2337,7 @@ const routeToCreateDestination = () => {
     if(!isAllColumnsSelected){
       return;
     }
+    try{
     const queryReq = buildQueryPayload({
         sqlMode: true,
         streamName: selectedStream.value,
@@ -2345,44 +2348,48 @@ const routeToCreateDestination = () => {
       const endTime = new Date().getTime() * 1000; // ← Use 1000 to get microseconds
       const startTime = endTime - periodInMicroseconds;
       queryReq.query.query_fn = null;
-      //this is for single window query but we will deprecate this in future
-      if(selectedMultiWindowOffset.value.length == 0){
-        queryReq.query.start_time = startTime;
-        queryReq.query.end_time = endTime;
-        runQueryLoading.value = true;
-        if(fn){
-          queryReq.query.query_fn = b64EncodeUnicode(vrlFunctionContent.value);
-          outputFnEvents.value = "";
-        }
-        else{
-          outputEvents.value = "";
-        }
-        if(queryReq.aggs){
-          delete queryReq.aggs;
-        }
-        try {
-          const res = await searchService.search({
-            org_identifier: store.state.selectedOrganization.identifier,
-            query: queryReq,
-            page_type: selectedStreamType.value,
-          })
-          if(res.data.hits.length > 0){
-            if(fn){
-              outputFnEvents.value = JSON.stringify(res.data.hits,null,2);
-            }
-            else{
-              outputEvents.value = JSON.stringify(res.data.hits,null,2);
-            }
-          }
-          runQueryLoading.value = false;
-        } catch (err) {
-          console.log(err,"err")
-          runQueryLoading.value = false;
-        }
-      }
-      else{
+      // //this is for single window query but we will deprecate this in future
+      //as we show any ways array in array so we will call multi search call always
+      // if(selectedMultiWindowOffset.value.length == 0){
+      //   queryReq.query.start_time = startTime;
+      //   queryReq.query.end_time = endTime;
+      //   runQueryLoading.value = true;
+      //   if(fn){
+      //     queryReq.query.query_fn = b64EncodeUnicode(vrlFunctionContent.value);
+      //     outputFnEvents.value = "";
+      //   }
+      //   else{
+      //     outputEvents.value = "";
+      //   }
+      //   if(queryReq.aggs){
+      //     delete queryReq.aggs;
+      //   }
+      //   try {
+      //     const res = await searchService.search({
+      //       org_identifier: store.state.selectedOrganization.identifier,
+      //       query: queryReq,
+      //       page_type: selectedStreamType.value,
+      //     })
+      //     if(res.data.hits.length > 0){
+      //       if(fn){
+      //         outputFnEvents.value = JSON.stringify(res.data.hits,null,2);
+      //       }
+      //       else{
+      //         outputEvents.value = JSON.stringify(res.data.hits,null,2);
+      //       }
+      //     }
+      //     runQueryLoading.value = false;
+      //   } catch (err) {
+      //     console.log(err,"err")
+      //     runQueryLoading.value = false;
+      //   }
+      // }
         queryReq.query.sql_mode = true;
         queryReq.query.per_query_response = true;
+        //initial query to send like with period for suppose we have 10minutes of period then we will send 10 minutes of data
+        //so we will send 10 minutes of data in initial query
+        //and then if any multi window offset is selected then we will call buildMulitWindowQuery function to get the query to send
+        //and then we will push the query to send to the queryReq.query.sql
         let queryTosend = [
           {
             start_time: startTime,
@@ -2407,6 +2414,13 @@ const routeToCreateDestination = () => {
           }
         }
       }
+    catch(err){
+      q.notify({
+        type: "negative",
+        message:err.response.data.message ?? "Error while fetching results",
+        timeout: 1500,
+      });
+    }
   }
 
 
@@ -2415,14 +2429,28 @@ const routeToCreateDestination = () => {
     runPromqlError.value = "";
     tempRunQuery.value = true;
     expandSqlOutput.value = true;
-    await triggerQuery();
+    try{
+      runQueryLoading.value = true;
+      await triggerQuery();
+      runQueryLoading.value = false;
+    }
+    catch(err){
+      runQueryLoading.value = false;
+    }
   };
 
   const runTestFunction = async () => {
     runPromqlError.value = "";
     tempTestFunction.value = true;
     expandCombinedOutput.value = true;
-    await triggerQuery(true);
+    runFnQueryLoading.value = true;
+    try{
+      await triggerQuery(true);
+      runFnQueryLoading.value = false;
+    }
+    catch(err){
+      runFnQueryLoading.value = false;
+    }
   }
 
 
@@ -2483,7 +2511,6 @@ const routeToCreateDestination = () => {
 
         queryReq.query.start_time = startTime;
         queryReq.query.end_time = endTime;
-        runQueryLoading.value = true;
           outputEvents.value = "";
         try {
           const res = await searchService.metrics_query_range({
@@ -2496,10 +2523,8 @@ const routeToCreateDestination = () => {
           if(res.data.hits.length > 0){
               outputEvents.value = JSON.stringify(res.data.hits,null,2);
           }
-          runQueryLoading.value = false;
         } catch (err: any) {
           runPromqlError.value = err.response.data.error ?? "Something went wrong";
-          runQueryLoading.value = false;
         }
   }
 
@@ -2653,7 +2678,8 @@ defineExpose({
   filterDestinations,
   filteredDestinations,
   destinationSelectRef,
-  getBtnO2Logo
+  getBtnO2Logo,
+  runFnQueryLoading
 });
 </script>
 
