@@ -979,7 +979,7 @@ async fn search_tantivy_index(
         TantivyResult::TopN(top_n) => Ok((key, TantivyResult::TopN(top_n))),
         TantivyResult::RowIds(row_ids) => {
             if row_ids.is_empty() {
-                return Ok((key, TantivyResult::RowIds(HashSet::new())));
+                return Ok((key, TantivyResult::RowIdsBitVec(0, BitVec::EMPTY)));
             }
             // return early if the number of matched docs is too large
             if cfg.limit.inverted_index_skip_threshold > 0
@@ -996,7 +996,11 @@ async fn search_tantivy_index(
                     cfg.limit.inverted_index_skip_threshold,
                     parquet_file.key
                 );
-                return Ok(("".to_string(), TantivyResult::RowIds(HashSet::new())));
+                // return empty file name means we need to add filter back
+                return Ok((
+                    "".to_string(),
+                    TantivyResult::RowIdsBitVec(0, BitVec::EMPTY),
+                ));
             }
             let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
             let max_doc_id = *row_ids.iter().max().unwrap_or(&0) as i64;
