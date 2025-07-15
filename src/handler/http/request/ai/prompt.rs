@@ -81,7 +81,7 @@ pub async fn get_prompt(path: web::Path<(String, String)>) -> Result<HttpRespons
                 .with_id(prompt.id)
                 .with_name(prompt.name),
         )),
-        Err(err) => Ok(MetaHttpResponse::not_found(err.to_string())),
+        Err(err) => Ok(MetaHttpResponse::not_found(err)),
     }
 }
 
@@ -135,7 +135,7 @@ pub async fn update_prompt(
                 .with_id(prompt.id)
                 .with_name(prompt.name),
         )),
-        Err(err) => Ok(MetaHttpResponse::bad_request(err.to_string())),
+        Err(err) => Ok(MetaHttpResponse::bad_request(err)),
     }
 }
 
@@ -216,7 +216,7 @@ pub async fn delete_prompt(path: web::Path<(String, String)>) -> Result<HttpResp
     }
     match prompt_service::delete_prompt(&id).await {
         Ok(()) => Ok(HttpResponse::NoContent().finish()),
-        Err(err) => Ok(MetaHttpResponse::not_found(err.to_string())),
+        Err(err) => Ok(MetaHttpResponse::not_found(err)),
     }
 }
 

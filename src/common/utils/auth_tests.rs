@@ -3441,6 +3441,9 @@ mod tests {
                 batch_size_bytes: usize::default(),
                 batch_timeout_ms: u64::default(),
                 use_shared_http_client: bool::default(),
+                remove_file_after_max_retry: true,
+                max_retry_count: 3,
+                max_retry_time_in_hours: 1,
             },
             encryption: config::Encryption {
                 algorithm: String::default(),

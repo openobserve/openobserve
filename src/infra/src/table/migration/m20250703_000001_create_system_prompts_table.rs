@@ -67,9 +67,8 @@ fn create_system_prompts_table_statement() -> TableCreateStatement {
         .if_not_exists()
         .col(
             ColumnDef::new(SystemPrompts::Id)
-                .big_integer()
+                .char_len(27)
                 .not_null()
-                .auto_increment()
                 .primary_key(),
         )
         .col(
@@ -83,13 +82,10 @@ fn create_system_prompts_table_statement() -> TableCreateStatement {
                 .small_integer()
                 .not_null(),
         )
-        .col(ColumnDef::new(SystemPrompts::IsActive).boolean().not_null())
-        .col(
-            ColumnDef::new(SystemPrompts::CreatedAt)
-                .timestamp()
-                .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp))
-                .not_null(),
-        )
+        .col(ColumnDef::new(SystemPrompts::IsActive).boolean().not_null().default(false))
+        .col(ColumnDef::new(SystemPrompts::CreatedAt).big_integer())
+        .col(ColumnDef::new(SystemPrompts::UpdatedAt).big_integer())
+        .col(ColumnDef::new(SystemPrompts::Tags).json())
         .to_owned()
 }
 
@@ -128,6 +124,8 @@ enum SystemPrompts {
     Version,
     IsActive,
     CreatedAt,
+    UpdatedAt,
+    Tags,
 }
 
 #[cfg(test)]
@@ -142,12 +140,14 @@ mod tests {
             &create_system_prompts_table_statement().to_string(PostgresQueryBuilder),
             r#"
                 CREATE TABLE IF NOT EXISTS "system_prompts" (
-                "id" bigserial NOT NULL PRIMARY KEY,
+                "id" text NOT NULL PRIMARY KEY,
                 "name" varchar(256) NOT NULL,
                 "content" text NOT NULL,
                 "version" smallint NOT NULL,
                 "is_active" boolean NOT NULL,
-                "created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
+                "created_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                "updated_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                "tags" jsonb NOT NULL
             )"#
         );
         assert_eq!(
