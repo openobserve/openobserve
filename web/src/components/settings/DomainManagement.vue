@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-bold text-capitalize no-border"
         flat
         color="grey-7"
-        @click="$emit('cancel')"
+        @click="resetForm"
       />
       <q-btn
         :label="t('settings.saveChanges')"
@@ -251,7 +251,7 @@ const loadDomainSettings = async () => {
     if (response.data && response.data.domains) {
       const loadedDomains = response.data.domains.map((domain: any) => ({
         name: domain.domain,
-        allowAllUsers: domain.allowed_all_users,
+        allowAllUsers: domain.allow_all_users,
         allowedEmails: domain.allowed_emails || []
       }));
       domains.splice(0, domains.length, ...loadedDomains);
@@ -387,8 +387,8 @@ const saveChanges = async () => {
     const domainData: any = {
       domains: domains.map(domain => ({
         domain: domain.name,
-        allowed_all_users: domain.allowAllUsers,
-        allowed_emails: domain.allowedEmails
+        allow_all_users: domain.allowAllUsers,
+        allowed_emails: !domain.allowAllUsers ? domain.allowedEmails : []
       }))
     };
 
@@ -411,6 +411,11 @@ const saveChanges = async () => {
   } finally {
     saving.value = false;
   }
+};
+
+const resetForm = () => {
+  newDomain.value = "";
+  loadDomainSettings();
 };
 </script>
 
