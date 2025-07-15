@@ -434,16 +434,7 @@ async fn handle_tantivy_optimize(
         return Ok((vec![], file_list));
     }
 
-    // TODO: topn should have this
-    let mut index_updated_at = index_updated_at;
-    if matches!(
-        idx_optimize_rule,
-        Some(InvertedIndexOptimizeMode::SimpleHistogram(..))
-    ) {
-        let ttv_timestamp_updated_at =
-            db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
-        index_updated_at = index_updated_at.max(ttv_timestamp_updated_at);
-    }
+    let index_updated_at = update_index_updated_at(idx_optimize_rule, index_updated_at).await;
 
     let (tantivy_files, datafusion_files) = split_file_list_by_time_range(
         file_list,
@@ -463,6 +454,32 @@ async fn handle_tantivy_optimize(
     );
 
     Ok((tantivy_files, datafusion_files))
+}
+
+/// update index_updated_at if needed
+async fn update_index_updated_at(
+    idx_optimize_rule: &Option<InvertedIndexOptimizeMode>,
+    index_updated_at: i64,
+) -> i64 {
+    if matches!(
+        idx_optimize_rule,
+        Some(InvertedIndexOptimizeMode::SimpleHistogram(..))
+    ) {
+        let ttv_timestamp_updated_at =
+            db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
+        return index_updated_at.max(ttv_timestamp_updated_at);
+    }
+
+    if matches!(
+        idx_optimize_rule,
+        Some(InvertedIndexOptimizeMode::SimpleTopN(..))
+    ) {
+        let ttv_secondary_index_updated_at =
+            db::metas::tantivy_index::get_ttv_secondary_index_updated_at().await;
+        return index_updated_at.max(ttv_secondary_index_updated_at);
+    }
+
+    index_updated_at
 }
 
 // if the file in the [start_time, end_time], it will be in tantivy group
