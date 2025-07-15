@@ -55,94 +55,7 @@ const mockSpan = {
   spanStatus: "UNSET",
   spanKind: "Client",
   parentId: "6702b0494b2b6e57",
-  spans: [
-    {
-      _timestamp: 1752490492843190,
-      startTimeMs: 1752490492843,
-      endTimeMs: 1752490493164,
-      durationMs: 321.226,
-      durationUs: 321226,
-      idleMs: 321.19,
-      busyMs: 0.03,
-      spanId: "1e64466529f7397f",
-      operationName: "service:search:grpc_search",
-      serviceName: "alertmanager",
-      spanStatus: "UNSET",
-      spanKind: "Client",
-      parentId: "d9603ec7f76eb499",
-      spans: [
-        {
-          _timestamp: 1752490492843201,
-          startTimeMs: 1752490492843,
-          endTimeMs: 1752490493164,
-          durationMs: 321.169,
-          durationUs: 321169,
-          idleMs: 321.01,
-          busyMs: 0.16,
-          spanId: "42bea569ba723076",
-          operationName: "service:search:cluster:grpc_search",
-          serviceName: "alertmanager",
-          spanStatus: "UNSET",
-          spanKind: "Client",
-          parentId: "1e64466529f7397f",
-          spans: [
-            {
-              _timestamp: 1752490492843220,
-              startTimeMs: 1752490492843,
-              endTimeMs: 1752490492843,
-              durationMs: 0.015,
-              durationUs: 15,
-              idleMs: 0,
-              busyMs: 0.01,
-              spanId: "cbc6b6043201492d",
-              operationName: "grpc:search::make_client",
-              serviceName: "alertmanager",
-              spanStatus: "UNSET",
-              spanKind: "Client",
-              parentId: "42bea569ba723076",
-              spans: [],
-              index: 3,
-              style: {
-                color: "#1ab8be",
-                backgroundColor: "#1ab8be33",
-                top: "90px",
-                left: "45px",
-              },
-              links: [],
-              depth: 3,
-              hasChildSpans: true,
-              currentIndex: 3,
-              totalSpans: 85,
-            },
-          ],
-          index: 2,
-          style: {
-            color: "#1ab8be",
-            backgroundColor: "#1ab8be33",
-            top: "60px",
-            left: "30px",
-          },
-          links: [],
-          depth: 2,
-          hasChildSpans: true,
-          currentIndex: 2,
-          totalSpans: 87,
-        },
-      ],
-      index: 1,
-      style: {
-        color: "#1ab8be",
-        backgroundColor: "#1ab8be33",
-        top: "30px",
-        left: "15px",
-      },
-      links: [],
-      depth: 1,
-      hasChildSpans: true,
-      currentIndex: 1,
-      totalSpans: 89,
-    },
-  ],
+  spans: [],
   index: 0,
   style: {
     color: "#1ab8be",
@@ -268,6 +181,8 @@ describe("SpanBlock", () => {
         },
       },
     });
+
+    wrapper.find('[data-test="span-block"]').element.style.width = "1024px";
   });
 
   afterEach(() => {
@@ -315,6 +230,12 @@ describe("SpanBlock", () => {
     await spanBlock.trigger("mouseover");
 
     expect(wrapper.emitted("hover")).toBeTruthy();
+  });
+
+
+  it("should should be defocused when selectedSpanId is not present", async () => {
+    const spanBlock = wrapper.find('[data-test="span-block-container"]');
+    expect(spanBlock.attributes("style")).not.toContain("opacity: 0.3");
   });
 
   describe("When span is not selected", async () => {
@@ -378,6 +299,7 @@ describe("SpanBlock", () => {
     });
 
     it("should apply defocus class when span is not selected", async () => {
+      await flushPromises();
       const spanBlock = newWrapper.find(
         '[data-test="span-block-select-trigger"]',
       );
@@ -401,6 +323,85 @@ describe("SpanBlock", () => {
         expect(newWrapper.emitted("selectSpan")).toBeTruthy();
         expect(newWrapper.emitted("selectSpan")[0]).toEqual([mockSpan.spanId]);
       });
+    });
+  });
+
+  describe("When start time is greater than 50% of the trace starttime", async () => {
+    let newWrapper: any;
+    beforeEach(async () => {
+      // This is to reset the modules, as modules are cached and not re-imported. This resets the imports of the module.
+      vi.resetModules();
+
+      vi.doMock("@/composables/useTraces", () => ({
+        default: () => ({
+          searchObj: {
+            data: {
+              traceDetails: {
+                selectedTrace: null as {
+                  trace_id: string;
+                  trace_start_time: number;
+                  trace_end_time: number;
+                } | null,
+                traceId: "",
+                spanList: [],
+                isLoadingTraceMeta: false,
+                isLoadingTraceDetails: false,
+                selectedSpanId: "avc" as String,
+                expandedSpans: [] as String[],
+                showSpanDetails: false,
+                selectedLogStreams: [] as String[],
+              },
+            },
+          },
+        }),
+      }));
+
+      let SpanBlock = (await import("@/plugins/traces/SpanBlock.vue")).default;
+
+      newWrapper = mount(SpanBlock, {
+        props: {
+          span: {
+            ...mockSpan,
+            startTimeMs: 1752490492843 + 220,
+            durationMs: 100,
+            durationUs: 100000,
+          },
+          baseTracePosition: mockBaseTracePosition,
+          depth: 0,
+          styleObj: mockStyle,
+          showCollapse: true,
+          isCollapsed: false,
+          spanDimensions: mockSpanDimensions,
+          spanData: {
+            ...mockSpanData,
+            start_time: 1752490492843 + 220,
+          },
+        },
+        global: {
+          plugins: [i18n, router],
+          provide: {
+            store: mockStore,
+          },
+        },
+      });
+
+      const el = newWrapper.find('[data-test="span-block"]').element;
+      Object.defineProperty(el, 'clientWidth', {
+        configurable: true,
+        value: 1024, // Set to expected mock width
+      });
+      await newWrapper.vm.onResize(); // trigger manually
+    });
+
+    afterEach(() => {
+      vi.clearAllMocks();
+      newWrapper.unmount();
+    });
+
+    it("should apply defocus class when span is not selected", async () => {
+      const spanBlock = newWrapper.find('[data-test="span-block-duration"]');
+      expect(spanBlock.exists()).toBe(true);
+      expect(spanBlock.attributes("style")).toContain(`left:`);
     });
   });
 });
