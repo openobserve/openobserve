@@ -15,11 +15,15 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    fmt::Display,
     sync::Arc,
 };
 
 use arrow_schema::{DataType, Field, Schema};
-use config::{TIMESTAMP_COL_NAME, get_config, meta::bitvec::BitVec};
+use config::{
+    TIMESTAMP_COL_NAME, get_config,
+    meta::{bitvec::BitVec, inverted_index::InvertedIndexOptimizeMode},
+};
 use tantivy::{
     Searcher,
     aggregation::{
@@ -145,6 +149,111 @@ impl TantivyResult {
             Ok(Self::TopN(top_n))
         } else {
             anyhow::bail!("Failed to get top n results from tantivy");
+        }
+    }
+}
+
+// TantivyMultiResultBuilder is used to build a TantivyMultiResult from multiple TantivyResult
+pub enum TantivyMultiResultBuilder {
+    RowNums(u64),
+    Histogram(Vec<Vec<u64>>),
+    TopN(Vec<(String, u64)>),
+    None,
+}
+
+impl TantivyMultiResultBuilder {
+    pub fn new(optimize_rule: &Option<InvertedIndexOptimizeMode>) -> Self {
+        match optimize_rule {
+            Some(InvertedIndexOptimizeMode::SimpleCount) => Self::RowNums(0),
+            Some(InvertedIndexOptimizeMode::SimpleHistogram(..)) => Self::Histogram(vec![]),
+            Some(InvertedIndexOptimizeMode::SimpleTopN(..)) => Self::TopN(vec![]),
+            _ => Self::None,
+        }
+    }
+
+    pub fn add_row_nums(&mut self, row_nums: u64) {
+        match self {
+            Self::RowNums(a) => *a += row_nums,
+            _ => unreachable!("unsupported tantivy multi result"),
+        }
+    }
+
+    pub fn add_histogram(&mut self, histogram: Vec<u64>) {
+        match self {
+            Self::Histogram(a) => {
+                if !histogram.is_empty() {
+                    a.push(histogram);
+                }
+            }
+            _ => unreachable!("unsupported tantivy multi result"),
+        }
+    }
+
+    pub fn add_top_n(&mut self, top_n: Vec<(String, u64)>) {
+        match self {
+            Self::TopN(a) => a.extend(top_n),
+            _ => unreachable!("unsupported tantivy multi result"),
+        }
+    }
+
+    pub fn num_rows(&self) -> usize {
+        match self {
+            Self::RowNums(a) => *a as usize,
+            _ => 0,
+        }
+    }
+
+    pub fn build(self) -> TantivyMultiResult {
+        match self {
+            Self::RowNums(a) => TantivyMultiResult::RowNums(a),
+            Self::Histogram(histograms_hits) => {
+                let len = histograms_hits[0].len();
+                let histogram = (0..len)
+                    .map(|i| {
+                        histograms_hits
+                            .iter()
+                            .map(|v| v.get(i).unwrap_or(&0))
+                            .sum::<u64>()
+                    })
+                    .collect();
+                TantivyMultiResult::Histogram(histogram)
+            }
+            Self::TopN(a) => TantivyMultiResult::TopN(a),
+            _ => unreachable!("unsupported tantivy multi result"),
+        }
+    }
+}
+
+pub enum TantivyMultiResult {
+    RowNums(u64),
+    Histogram(Vec<u64>),
+    TopN(Vec<(String, u64)>),
+}
+
+impl Display for TantivyMultiResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RowNums(num) => write!(f, "row_nums: {}", num),
+            Self::Histogram(histogram) => {
+                write!(f, "histogram hits:{}", histogram.iter().sum::<u64>())
+            }
+            Self::TopN(top_n) => write!(f, "top_n hits:{}", top_n.len()),
+        }
+    }
+}
+
+impl TantivyMultiResult {
+    pub fn num_rows(&self) -> usize {
+        match self {
+            Self::RowNums(a) => *a as usize,
+            _ => 0,
+        }
+    }
+
+    pub fn histogram(self) -> Vec<u64> {
+        match self {
+            Self::Histogram(a) => a.clone(),
+            _ => vec![],
         }
     }
 }

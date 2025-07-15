@@ -158,7 +158,7 @@ async fn adapt_tantivy_result(
     schema: SchemaRef,
     idx_optimize_mode: InvertedIndexOptimizeMode,
 ) -> Result<RecordBatch> {
-    let (idx_took, error, total_hits, histogram_counts) = filter_file_list_by_tantivy_index(
+    let (idx_took, error, result) = filter_file_list_by_tantivy_index(
         query.clone(),
         &mut file_list,
         index_condition,
@@ -182,12 +182,12 @@ async fn adapt_tantivy_result(
 
     let array = match idx_optimize_mode {
         InvertedIndexOptimizeMode::SimpleCount => {
-            vec![Arc::new(Int64Array::from(vec![total_hits as i64])) as Arc<dyn Array>]
+            vec![Arc::new(Int64Array::from(vec![result.num_rows() as i64])) as Arc<dyn Array>]
         }
         InvertedIndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
             create_histogram_arrow_array(
                 &schema,
-                histogram_counts,
+                result.histogram(),
                 min_value,
                 bucket_width,
                 num_buckets,

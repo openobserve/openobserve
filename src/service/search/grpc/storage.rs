@@ -52,7 +52,7 @@ use crate::service::{
     search::{
         datafusion::exec,
         generate_search_schema_diff,
-        grpc::utils::{self, TantivyResult},
+        grpc::utils::{self, TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
@@ -174,6 +174,7 @@ pub async fn search(
         );
     }
 
+    // set index_condition to None, means we do not need to add filter back
     if !is_add_filter_back {
         index_condition = None;
         fst_fields = vec![];
@@ -524,7 +525,7 @@ pub async fn filter_file_list_by_tantivy_index(
     file_list: &mut Vec<FileKey>,
     index_condition: Option<IndexCondition>,
     idx_optimize_mode: Option<InvertedIndexOptimizeMode>,
-) -> Result<(usize, bool, usize, Vec<u64>), Error> {
+) -> Result<(usize, bool, TantivyMultiResult), Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
@@ -626,8 +627,7 @@ pub async fn filter_file_list_by_tantivy_index(
         partition_tantivy_files(index_parquet_files, &idx_optimize_mode, target_partitions);
 
     let mut no_more_files = false;
-    let mut total_hits = 0;
-    let mut total_histogram_hits = vec![];
+    let mut tantivy_result_builder = TantivyMultiResultBuilder::new(&idx_optimize_mode);
     let group_num = index_parquet_files.len();
     let max_group_len = index_parquet_files
         .iter()
@@ -653,44 +653,28 @@ pub async fn filter_file_list_by_tantivy_index(
                 continue;
             };
             let trace_id = query.trace_id.to_string();
-            // Spawn a task for each file, wherein full text search and
-            // secondary index search queries are executed
             let index_condition_clone = index_condition.clone();
             let idx_optimize_rule_clone = idx_optimize_mode.clone();
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let task = tokio::task::spawn(async move {
-                // spawn a new task for catching the panic error
-                let inner_trace_id = trace_id.clone();
-                let parquet_file = file.clone();
-                let ret = tokio::task::spawn(async move {
-                    let ret = search_tantivy_index(
-                        &inner_trace_id,
-                        time_range,
-                        index_condition_clone,
-                        idx_optimize_rule_clone,
-                        &parquet_file,
-                    )
-                    .await;
-                    drop(permit);
-                    ret
-                })
+                let ret = search_tantivy_index(
+                    &trace_id,
+                    time_range,
+                    index_condition_clone,
+                    idx_optimize_rule_clone,
+                    &file,
+                )
                 .await;
+                drop(permit);
                 match ret {
-                    Ok(Ok(ret)) => Ok(ret),
-                    Ok(Err(e)) => {
-                        log::error!(
-                            "[trace_id {trace_id}] search->tantivy: error filtering via index: {}, error: {e:?}",
-                            file.key,
-                        );
-                        Err(e)
-                    }
+                    Ok(ret) => Ok(ret),
                     Err(e) => {
                         log::error!(
                             "[trace_id {trace_id}] search->tantivy: error filtering via index: {}, index_size: {}, error: {e:?}",
                             file.key,
                             file.meta.index_size,
                         );
-                        Err(e.into())
+                        Err(e)
                     }
                 }
             });
@@ -706,7 +690,11 @@ pub async fn filter_file_list_by_tantivy_index(
                     query.trace_id,
                 );
                 // search error, need add filter back
-                return Ok((start.elapsed().as_millis() as usize, true, 0, vec![]));
+                return Ok((
+                    start.elapsed().as_millis() as usize,
+                    true,
+                    TantivyMultiResult::RowNums(0),
+                ));
             }
         };
         for result in tasks {
@@ -725,7 +713,6 @@ pub async fn filter_file_list_by_tantivy_index(
                     }
                     match result {
                         TantivyResult::RowIdsBitVec(num_rows, bitvec) => {
-                            total_hits += num_rows;
                             log::debug!(
                                 "[trace_id {}] search->tantivy: hits for index_condition: {:?} found {} in {}",
                                 query.trace_id,
@@ -738,29 +725,35 @@ pub async fn filter_file_list_by_tantivy_index(
                                 file_list_map.remove(&file_name);
                             } else {
                                 // Replace the segment IDs in the existing `FileKey` with the found
+                                tantivy_result_builder.add_row_nums(num_rows as u64);
                                 let file = file_list_map.get_mut(&file_name).unwrap();
                                 file.with_segment_ids(bitvec);
                             }
                         }
                         TantivyResult::Count(count) => {
-                            total_hits += count;
+                            tantivy_result_builder.add_row_nums(count as u64);
                             file_list_map.remove(&file_name); // maybe we do not need to remove it?
                         }
                         TantivyResult::Histogram(histogram) => {
-                            let histogram_len = histogram.len();
-                            if !histogram.is_empty() {
-                                total_histogram_hits.push(histogram);
-                            }
                             log::debug!(
                                 "[trace_id {}] search->tantivy: histogram hits for index_condition {:?} found {} in {}",
                                 query.trace_id,
                                 index_condition,
-                                histogram_len,
+                                histogram.len(),
                                 file_name
                             );
+                            tantivy_result_builder.add_histogram(histogram);
                             file_list_map.remove(&file_name);
                         }
-                        TantivyResult::TopN(_top_n) => {
+                        TantivyResult::TopN(top_n) => {
+                            log::debug!(
+                                "[trace_id {}] search->tantivy: top_n hits for index_condition {:?} found {} in {}",
+                                query.trace_id,
+                                index_condition,
+                                top_n.len(),
+                                file_name
+                            );
+                            tantivy_result_builder.add_top_n(top_n);
                             file_list_map.remove(&file_name);
                         }
                         TantivyResult::RowIds(_) => {
@@ -779,36 +772,22 @@ pub async fn filter_file_list_by_tantivy_index(
             }
         }
         // if limit is set and total hits exceed the limit, we stop searching
-        if query_limit > 0 && total_hits > query_limit {
+        if query_limit > 0 && tantivy_result_builder.num_rows() > query_limit {
             no_more_files = true;
         }
     }
 
-    let final_histogram_hits = if total_histogram_hits.is_empty() {
-        Vec::new()
-    } else {
-        // note: all histogram_hits should have the same length
-        let len = total_histogram_hits[0].len();
-        (0..len)
-            .map(|i| {
-                total_histogram_hits
-                    .iter()
-                    .map(|v| v.get(i).unwrap_or(&0))
-                    .sum::<u64>()
-            })
-            .collect()
-    };
-    let histogram_hits_sum = final_histogram_hits.iter().sum::<u64>();
+    // get the result
+    let tantivy_result = tantivy_result_builder.build();
 
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} rows, {} histogram_hits, is_add_filter_back: {}, file_num: {}, took: {} ms",
+                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} , is_add_filter_back: {}, file_num: {}, took: {} ms",
                 query.trace_id,
                 index_condition,
-                total_hits,
-                histogram_hits_sum,
+                tantivy_result,
                 is_add_filter_back,
                 file_list_map.len(),
                 search_start.elapsed().as_millis()
@@ -819,9 +798,8 @@ pub async fn filter_file_list_by_tantivy_index(
                 .search_role("follower".to_string())
                 .duration(search_start.elapsed().as_millis() as usize)
                 .desc(format!(
-                    "found {} rows, {} histogram_hits, is_add_filter_back: {}, file_num: {}",
-                    total_hits,
-                    histogram_hits_sum,
+                    "found {} , is_add_filter_back: {}, file_num: {}",
+                    tantivy_result,
                     is_add_filter_back,
                     file_list_map.len(),
                 ))
@@ -833,8 +811,7 @@ pub async fn filter_file_list_by_tantivy_index(
     Ok((
         start.elapsed().as_millis() as usize,
         is_add_filter_back,
-        total_hits,
-        final_histogram_hits,
+        tantivy_result,
     ))
 }
 
