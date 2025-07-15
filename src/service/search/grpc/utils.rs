@@ -233,7 +233,7 @@ pub enum TantivyMultiResult {
 impl Display for TantivyMultiResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::RowNums(num) => write!(f, "row_nums: {}", num),
+            Self::RowNums(num) => write!(f, "row_nums: {num}"),
             Self::Histogram(histogram) => {
                 write!(f, "histogram hits:{}", histogram.iter().sum::<u64>())
             }

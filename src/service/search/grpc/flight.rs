@@ -30,7 +30,7 @@ use config::{
     },
     utils::json,
 };
-use datafusion::{common::TableReference, physical_plan::union::UnionExec};
+use datafusion::common::TableReference;
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use hashbrown::HashMap;
 use infra::{
@@ -49,10 +49,9 @@ use crate::service::{
         datafusion::{
             distributed_plan::{
                 NewEmptyExecVisitor, ReplaceTableScanExec, codec::get_physical_extension_codec,
-                empty_exec::NewEmptyExec,
+                empty_exec::NewEmptyExec, rewrite::tantivy_optimize_rewrite,
             },
             exec::{prepare_datafusion_context, register_udf},
-            plan::tantivy_optimize_exec::TantivyOptimizeExec,
             table_provider::uniontable::NewUnionTable,
         },
         index::IndexCondition,
@@ -367,14 +366,13 @@ pub async fn search(
 
     if !tantivy_file_list.is_empty() {
         scan_stats.add(&collect_stats(&tantivy_file_list));
-        let tantivy_exec = Arc::new(TantivyOptimizeExec::new(
-            query_params,
-            physical_plan.schema(),
+        physical_plan = tantivy_optimize_rewrite(
+            query_params.clone(),
             tantivy_file_list,
             index_condition,
             idx_optimize_rule.unwrap(), // guaranteed Some, if tantivy_file_list is not empty
-        ));
-        physical_plan = Arc::new(UnionExec::new(vec![physical_plan, tantivy_exec as _]));
+            physical_plan,
+        )?;
     }
 
     log::info!(
