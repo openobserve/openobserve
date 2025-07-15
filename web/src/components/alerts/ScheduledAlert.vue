@@ -1111,10 +1111,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     maximized
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
-  <div class="tw-flex tw-h-full editor-dialog-card tw-px-4">
+  <div class="tw-flex tw-h-full editor-dialog-card tw-pl-1">
 
 
-    <div  class="tw-h-full  tw-flex "
+    <div  class="tw-h-full  tw-flex tw-pr-1 "
     :style="{
       width: isFullScreen  ? '100vw' : store.state.isAiChatEnabled ? '65vw' : '90vw'
     }"
@@ -1191,18 +1191,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           size="sm"
                           no-caps
                           dense
+                          style="height: 32px;"
                           flat
                           class="text-bold no-border"
                             @click="toggleAIChat"
                         >
                           <img :style="{
-                            width: store.state.isAiChatEnabled ? '16px' : '24px',
-                            height: store.state.isAiChatEnabled ? '16px' : '24px',
+                            width: '16px',
+                            height: '16px',
                           }" :src="getBtnO2Logo" />
                           <span  
-                          class=" tw-font-[400] tw-pl-[4px] tw-pr-[6px] tw-py-[4px] tw-text-[#7980cc]" 
-                          :class="store.state.isAiChatEnabled ? 'tw-text-[11px]' : 'tw-text-[12px]'"
-                          >Generate With AI</span>
+                          class=" tw-font-[400] tw-pl-[4px] tw-text-[12px] tw-pr-[6px] tw-py-[4px] tw-text-[#7980cc]" 
+                          >Generate SQL</span>
                       </q-btn>
                       </div>
                        <div class="tw-h-full tw-flex tw-justify-center tw-items-center">
@@ -1218,21 +1218,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           borderless
                           dense
                           hide-selected
+                          hide-bottom-space
                           menu-anchor="top left"
                           fill-input
                           @filter="
                               (val: string, update: any) => filterFields(val, update)
                             "
                           @update:modelValue="onColumnSelect"
-                          input-style="width: 200px; "
-                          class="mini-select"
+                          input-style="width: 120px; "
+                          class="mini-select "
                     >
                         <template #no-option>
-                          <q-item>
+                          <q-item dense>
                             <q-item-section> {{ t("search.noResult") }}</q-item-section>
                           </q-item>
                         </template>
-                  </q-select>
+                        </q-select>
 
                        </div>
    
@@ -1241,6 +1242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="alert-variables-add-btn"
                           size="sm"
                           no-caps
+                          style="height: 32px;"
                           class="text-bold add-variable no-border q-py-sm"
                           color="primary"
                           @click="tab === 'sql' ? runSqlQuery() : runPromqlQuery()"
@@ -1330,13 +1332,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click="toggleAIChat"
                         >
                           <img :style="{
-                            width: store.state.isAiChatEnabled ? '16px' : '24px',
-                            height: store.state.isAiChatEnabled ? '16px' : '24px',
+                            width: '16px',
+                            height: '16px',
                           }" :src="getBtnO2Logo" />
                           <span  
-                          class=" tw-font-[400] tw-pl-[4px] tw-pr-[6px] tw-py-[4px] tw-text-[#7980cc]" 
-                          :class="store.state.isAiChatEnabled ? 'tw-text-[11px]' : 'tw-text-[12px]'"
-                          >Generate With AI</span>
+                          class=" tw-font-[400] tw-pl-[4px] tw-text-[12px] tw-pr-[6px] tw-py-[4px] tw-text-[#7980cc]" 
+                          >Generate VRL</span>
                       </q-btn>
                       </div>
                         <div>
@@ -1361,7 +1362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="mini-select"
                           clearable
                           @clear="onFunctionClear"
-                          input-style="height: 8px; min-height: 8px; margin: 0px; width: 200px;  "
+                          input-style="height: 8px; min-height: 8px; margin: 0px; width: 120px;  "
                                                 >
                           <template #no-option>
                         <q-item>
