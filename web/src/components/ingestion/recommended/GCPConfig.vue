@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
-import { getImageURL } from "../../../utils/zincutils";
+import { getImageURL, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 import { useI18n } from "vue-i18n";
 
@@ -76,14 +76,8 @@ export default defineComponent({
       protocol: "",
       tls: "",
     });
-
-    let ingestionURL: string = store.state.API_ENDPOINT;
-    if (
-      Object.hasOwn(store.state.zoConfig, "ingestion_url") &&
-      store.state.zoConfig.ingestion_url !== ""
-    ) {
-      ingestionURL = store.state.zoConfig.ingestion_url;
-    }
+    
+    const ingestionURL = getIngestionURL();
     const url = new URL(ingestionURL);
     endpoint.value = {
       url: ingestionURL,

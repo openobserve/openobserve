@@ -15,6 +15,7 @@
 
 import { useStore } from "vuex";
 import { ref } from "vue";
+import { getIngestionURL } from "@/utils/zincutils";
 
 const useIngestion = () => {
   const store = useStore();
@@ -26,13 +27,7 @@ const useIngestion = () => {
     protocol: "",
     tls: "",
   });
-  let ingestionURL: string = store.state.API_ENDPOINT;
-  if (
-    Object.hasOwn(store.state.zoConfig, "ingestion_url") &&
-    store.state.zoConfig.ingestion_url !== ""
-  ) {
-    ingestionURL = store.state.zoConfig.ingestion_url;
-  }
+  const ingestionURL = getIngestionURL();
   const url = new URL(ingestionURL);
   endpoint.value = {
     url: ingestionURL,

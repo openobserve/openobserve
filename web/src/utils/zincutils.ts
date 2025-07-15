@@ -1081,3 +1081,17 @@ export function checkCallBackValues(url: string, key: string) {
     }
   }
 }
+
+export const getIngestionURL = () => {
+  const store = useStore();
+  //by default it will use the store.state.API_ENDPOINT
+  //if the store.state.zoConfig.ingestion_url is present and not empty, it will use the store.state.zoConfig.ingestion_url
+  let ingestionURL: string = store.state.API_ENDPOINT;
+  if (
+    Object.hasOwn(store.state.zoConfig, "ingestion_url") &&
+    store.state.zoConfig.ingestion_url !== ""
+  ) {
+    ingestionURL = store.state.zoConfig.ingestion_url;
+  }
+  return ingestionURL;
+}

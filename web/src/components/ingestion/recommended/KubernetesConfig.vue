@@ -147,7 +147,7 @@ import { computed, ref, type Ref } from "vue";
 import type { Endpoint } from "@/ts/interfaces";
 import ContentCopy from "@/components/CopyContent.vue";
 import { useStore } from "vuex";
-import { b64EncodeStandard } from "../../../utils/zincutils";
+import { b64EncodeStandard, getIngestionURL } from "../../../utils/zincutils";
 import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
 
@@ -170,13 +170,7 @@ const endpoint: any = ref({
   tls: "",
 });
 
-let ingestionURL: string = store.state.API_ENDPOINT;
-if (
-  Object.hasOwn(store.state.zoConfig, "ingestion_url") &&
-  store.state.zoConfig.ingestion_url !== ""
-) {
-  ingestionURL = store.state.zoConfig.ingestion_url;
-}
+const ingestionURL = getIngestionURL();
 const url = new URL(ingestionURL);
 const tab = ref("external");
 const { t } = useI18n();

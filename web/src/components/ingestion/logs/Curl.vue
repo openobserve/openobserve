@@ -25,7 +25,7 @@ import { defineComponent, ref } from "vue";
 import type { Ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
-import { getImageURL, maskText } from "../../../utils/zincutils";
+import { getImageURL, getIngestionURL, maskText } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 export default defineComponent({
   name: "curl-mechanism",
@@ -47,14 +47,9 @@ export default defineComponent({
       protocol: "",
       tls: "",
     });
-
-    let ingestionURL: string = store.state.API_ENDPOINT;
-    if (
-      Object.hasOwn(store.state.zoConfig, "ingestion_url") &&
-      store.state.zoConfig.ingestion_url !== ""
-    ) {
-      ingestionURL = store.state.zoConfig.ingestion_url;
-    }
+    //here we can use the getIngestionURL function to get the ingestion URL
+    //it calls the store.state.API_ENDPOINT if it is not present in the store.state.zoConfig.ingestion_url
+    const ingestionURL = getIngestionURL();
     const url = new URL(ingestionURL);
 
     endpoint.value = {
