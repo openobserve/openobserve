@@ -6,7 +6,7 @@ import { waitForDashboardPage } from "./utils/dashCreation.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
 import DashboardFolder from "../../pages/dashboardPages/dashboard-folder.js";
 import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
-import { DashboardPage } from "../../pages/dashboardPage.js";
+import { DashboardPage } from "../../pages/dashboardPages/dashboardPage.js";
 import { AlertsPage } from "../../pages/alertsPages/alertsPage.js";
 
 const randomDashboardName =

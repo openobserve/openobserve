@@ -7,7 +7,7 @@ import { MetricsPage } from "../pages/metricsPage.js";
 import { TracesPage } from "../pages/tracesPage.js";
 import { RumPage } from "../pages/rumPage.js";
 import { PipelinesPage } from "../pages/pipelinesPage.js";
-import { DashboardPage } from "../pages/dashboardPage.js";
+import { DashboardPage } from "../pages/dashboardPages/dashboardPage.js";
 import { StreamsPage } from "../pages/streamsPage.js";
 import { ReportsPage } from "../pages/reportsPage.js";
 import { AlertsPage } from "../pages/alertsPages/alertsPage.js";

@@ -4,7 +4,7 @@ import fs from "fs";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit";
-import { DashboardPage } from "../../pages/dashboardPage";
+import { DashboardPage } from "../../pages/dashboardPages/dashboardPage.js";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions";
 
 // Function to read JSON test files
