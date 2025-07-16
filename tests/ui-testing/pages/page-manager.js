@@ -18,22 +18,24 @@ import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
 
-/**
- * PageManager provides a single access point for all dashboard page objects.
- *
- * Usage in your test file:
- *   import PageManager from './pages/page-manager';
- *   const pm = new PageManager(page);
- *   await pm.dashboardCreate.createDashboard('My Dashboard');
- *   await pm.dashboardPanelActions.addPanelName('Panel 1');
- *   // ...and so on for all dashboard POMs
- */
+// ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
+import { LogsPage } from "./logsPages/logsPage.js";
+import { StreamsPage } from "./streamsPages/streamsPage.js";
+import { AlertTemplatesPage } from "./alertsPages/alertTemplatesPage.js";
+import { AlertDestinationsPage } from "./alertsPages/alertDestinationsPage.js";
+import { PipelinesPage } from "./pipelinesPages/pipelinesPage.js";
+import { LoginPage } from "./generalPages/loginPage.js";
+import { IngestionPage } from "./generalPages/ingestionPage.js";
+
+
 class PageManager {
   /**
    * @param {import('@playwright/test').Page} page - Playwright page instance
    */
   constructor(page) {
     this.page = page;
+    
+    // ===== EXISTING DASHBOARD PAGE OBJECTS =====
     this.dashboardCreate = new DashboardCreate(page);
     this.dashboardList = new DashboardListPage(page);
     this.dashboardFolder = new DashboardFolder(page);
@@ -51,7 +53,18 @@ class PageManager {
     this.dateTimeHelper = new DateTimeHelper(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
+    
+    // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
+    
+    // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
+    this.logsPage = new LogsPage(page);
+    this.streamsPage = new StreamsPage(page);
+    this.alertTemplatesPage = new AlertTemplatesPage(page);
+    this.alertDestinationsPage = new AlertDestinationsPage(page);
+    this.pipelinesPage = new PipelinesPage(page);
+    this.loginPage = new LoginPage(page);
+    this.ingestionPage = new IngestionPage(page);
   }
 }
 
