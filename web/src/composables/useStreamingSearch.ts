@@ -476,6 +476,18 @@ const useHttpStreaming = () => {
     closeStreamWithError,
     closeStream,
     resetAuthToken,
+    onData,
+    abortControllers,
+    traceMap,
+    activeStreamId,
+    streamConnections,
+    errorOccurred,
+    convertToWsResponse,
+    convertToWsError,
+    convertToWsEventProgress,
+    convertToWsEnd,
+    wsMapper,
+    onError,
   };
 };
 

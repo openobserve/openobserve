@@ -199,7 +199,7 @@ pub fn stream_res(
         stream_type,
         total_fields: mappings.len(),
         schema: mappings,
-        uds_schema: None,
+        uds_schema: vec![],
         stats,
         settings,
         metrics_meta,
@@ -228,10 +228,7 @@ pub async fn save_stream_settings(
     }
 
     // only allow setting user defined schema for logs stream
-    if stream_type != StreamType::Logs
-        && settings.defined_schema_fields.is_some()
-        && !settings.defined_schema_fields.as_ref().unwrap().is_empty()
-    {
+    if stream_type != StreamType::Logs && !settings.defined_schema_fields.is_empty() {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,
             "only logs stream can have user defined schema",
@@ -402,23 +399,16 @@ pub async fn update_stream_settings(
                         "user defined schema is not allowed, you need to set ZO_ALLOW_USER_DEFINED_SCHEMAS=true",
                     )));
                 }
-                settings.defined_schema_fields =
-                    if let Some(mut schema_fields) = settings.defined_schema_fields {
-                        schema_fields.extend(new_settings.defined_schema_fields.add);
-                        Some(schema_fields)
-                    } else {
-                        Some(new_settings.defined_schema_fields.add)
-                    }
+                settings
+                    .defined_schema_fields
+                    .extend(new_settings.defined_schema_fields.add);
             }
-            if !new_settings.defined_schema_fields.remove.is_empty()
-                && let Some(schema_fields) = settings.defined_schema_fields.as_mut()
-            {
-                schema_fields
+            if !new_settings.defined_schema_fields.remove.is_empty() {
+                settings
+                    .defined_schema_fields
                     .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
             }
-            if let Some(schema_fields) = settings.defined_schema_fields.as_ref()
-                && schema_fields.len() > cfg.limit.user_defined_schema_max_fields
-            {
+            if settings.defined_schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST,
                     format!(
