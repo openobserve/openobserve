@@ -90,7 +90,6 @@ test.describe("Change Organisation", () => {
         await pageManager.homePage.homePageDefaultOrg();
         await pageManager.homePage.homePageURLValidationDefaultOrg();
         await pageManager.rumPage.rumURLValidation();
-        await pageManager.rumPage.rumURLValidation();
     });
 
     test("RUM Page change organisation validation", async ({ page }) => {
@@ -105,7 +104,6 @@ test.describe("Change Organisation", () => {
         await pageManager.pipelinesPage.gotoPipelinesPage();
         await pageManager.homePage.homePageDefaultOrg();
         await pageManager.homePage.homePageURLValidationDefaultOrg();
-        await pageManager.pipelinesPage.pipelinesURLValidation();
         await pageManager.pipelinesPage.pipelinesURLValidation();
     });
 
