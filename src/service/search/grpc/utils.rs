@@ -206,6 +206,9 @@ impl TantivyMultiResultBuilder {
         match self {
             Self::RowNums(a) => TantivyMultiResult::RowNums(a),
             Self::Histogram(histograms_hits) => {
+                if histograms_hits.is_empty() {
+                    return TantivyMultiResult::Histogram(vec![]);
+                }
                 let len = histograms_hits[0].len();
                 let histogram = (0..len)
                     .map(|i| {
