@@ -62,6 +62,15 @@ vi.stubGlobal("server", server);
 
 global.document.queryCommandSupported = vi.fn().mockReturnValue(true);
 
+// Mock clipboard API for test environment
+const mockClipboard = {
+  writeText: vi.fn().mockResolvedValue(undefined),
+};
+Object.defineProperty(navigator, 'clipboard', {
+  value: mockClipboard,
+  writable: true,
+});
+
 beforeAll(() => server.listen())
 
 // Reset any request handlers after each test (for test isolation)

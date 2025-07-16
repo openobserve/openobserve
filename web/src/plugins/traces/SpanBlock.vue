@@ -102,7 +102,6 @@ import {
 } from "vue";
 import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
-import SpanDetails from "./SpanDetails.vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { b64EncodeStandard } from "@/utils/zincutils";
@@ -145,7 +144,6 @@ export default defineComponent({
     },
   },
   emits: ["toggleCollapse", "selectSpan", "hover", "view-logs"],
-  components: { SpanDetails },
   setup(props, { emit }) {
     const store = useStore();
     const { searchObj } = useTraces();
