@@ -588,7 +588,6 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(actions::operations::test_action)
         .service(ai::chat)
         .service(ai::chat_stream)
-        // Domain Management routes
         .service(domain_management::get_domain_management_config)
         .service(domain_management::set_domain_management_config);
 

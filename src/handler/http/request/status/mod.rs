@@ -571,8 +571,8 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                                 audit_message.response_meta.http_response_code = 403;
                                 audit_message._timestamp = now_micros();
                                 audit(audit_message).await;
-                                return Ok(HttpResponse::Forbidden()
-                                    .json("Domain access not allowed".to_string()));
+                                return Ok(HttpResponse::Unauthorized()
+                                    .json("Unauthorized".to_string()));
                             }
                         }
                         Err(e) => {
