@@ -15,7 +15,7 @@ import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
 import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
 import DateTimeHelper from "./dashboardPages/dashboard-time";
 import LogsVisualise from "./dashboardPages/visualise";
-import { DashboardPage } from "./dashboardPage.js";
+import { DashboardPage } from "./dashboardPages/dashboardPage.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
 
 /**
