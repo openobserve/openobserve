@@ -60,7 +60,7 @@ fn is_ts_hist_udf(e: &Expr) -> bool {
     match e {
         Expr::ScalarFunction(f) => {
             f.name() == "histogram"
-                && f.args.get(0).map(|e| get_col_name(e)) == Some("_timestamp".to_string())
+                && f.args.first().map(get_col_name) == Some("_timestamp".to_string())
         }
         _ => false,
     }
@@ -100,10 +100,8 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                             // without an alias, or using it in group by clause. In such case,
                             // it shows up as a scalar udf in projection exprs, so we need to handle
                             // and set the ts_hist_alias correctly
-                            if is_ts_hist_udf(expr) {
-                                if self.ts_hist_alias.is_none() {
-                                    self.ts_hist_alias = Some(get_col_name(expr))
-                                }
+                            if is_ts_hist_udf(expr) && self.ts_hist_alias.is_none() {
+                                self.ts_hist_alias = Some(get_col_name(expr))
                             }
                         }
                         Expr::Alias(alias) => {
@@ -161,7 +159,7 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                         }
                         Expr::ScalarFunction(f) => {
                             if f.name() == "histogram"
-                                && f.args.get(0).map(|e| get_col_name(e))
+                                && f.args.first().map(get_col_name)
                                     == Some("_timestamp".to_string())
                             {
                                 self.ts_hist_alias = Some(get_col_name(expr));
