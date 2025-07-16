@@ -11,7 +11,7 @@ import { DashboardPage } from "../../pages/dashboardPages/dashboardPage.js";
 import { StreamsPage } from "../../pages/streamsPages/streamsPage.js";
 import { ReportsPage } from "../../pages/reportsPages/reportsPage.js";
 import { AlertsPage } from "../../pages/alertsPages/alertsPage.js";
-import { DataPage } from "../../pages/dataPage.js";
+import { DataPage } from "../../pages/generalPages/dataPage.js";
 import { IamPage } from "../../pages/iamPage.js";
 import { ManagementPage } from "../../pages/managementPage.js";
 import { AboutPage } from "../../pages/aboutPage.js";

@@ -1,7 +1,7 @@
 // tracesPage.js
 import { expect } from '@playwright/test';
 
-import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../pages/CommonLocator.js';
+import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../pages/commonActions.js';
 
 
 export

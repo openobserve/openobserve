@@ -4,7 +4,7 @@ import { LoginPage } from '../../pages/loginPage.js';
 import { LogsPage } from '../../pages/logsPages/logsPage.js';
 
 
-import { startTimeValue, endTimeValue } from '../../pages/CommonLocator.js';
+import { startTimeValue, endTimeValue } from '../../pages/commonActions.js';
 
 test('Relative Seconds on Logs page', async ({ page }) => {
   // Create page object instances

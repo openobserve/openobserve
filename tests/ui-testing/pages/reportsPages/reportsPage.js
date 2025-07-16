@@ -2,7 +2,7 @@ import { expect } from '@playwright/test';
 import {
   dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator,
   Past30SecondsValue
-} from '../CommonLocator.js';
+} from '../commonActions.js';
 
 export class ReportsPage {
   constructor(page) {
