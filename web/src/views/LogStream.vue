@@ -612,7 +612,8 @@ export default defineComponent({
             dismiss();
           })
           .catch((err) => {
-            if (err.response.status != 403) {
+            alert(err)
+            if (err.response?.status != 403) {
               $q.notify({
                 type: "negative",
                 message:
@@ -621,6 +622,10 @@ export default defineComponent({
                 timeout: 2000,
               });
             }
+            loadingState.value = false;
+            dismiss();
+          })
+          .finally(() => {
             loadingState.value = false;
             dismiss();
           });
