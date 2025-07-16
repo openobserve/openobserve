@@ -20,6 +20,7 @@ pub enum InvertedIndexOptimizeMode {
     SimpleSelect(usize, bool),
     SimpleCount,
     SimpleHistogram(i64, u64, usize),
+    SimpleTopN(String, usize, bool),
 }
 
 impl std::fmt::Display for InvertedIndexOptimizeMode {
@@ -33,6 +34,12 @@ impl std::fmt::Display for InvertedIndexOptimizeMode {
                 write!(
                     f,
                     "simple_histogram(min_value: {min_value}, bucket_width: {bucket_width}, num_buckets: {num_buckets})"
+                )
+            }
+            InvertedIndexOptimizeMode::SimpleTopN(field, limit, ascend) => {
+                write!(
+                    f,
+                    "simple_topn(field_name: {field}, limit: {limit}, ascend: {ascend})"
                 )
             }
         }
@@ -53,6 +60,13 @@ impl From<cluster_rpc::IdxOptimizeMode> for InvertedIndexOptimizeMode {
                     select.min_value,
                     select.bucket_width,
                     select.num_buckets as usize,
+                )
+            }
+            Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopn(select)) => {
+                InvertedIndexOptimizeMode::SimpleTopN(
+                    select.field,
+                    select.limit as usize,
+                    select.asc,
                 )
             }
             None => panic!("Invalid InvertedIndexOptimizeMode"),
@@ -83,6 +97,17 @@ impl From<InvertedIndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
                             min_value,
                             bucket_width,
                             num_buckets: num_buckets as u32,
+                        },
+                    )),
+                }
+            }
+            InvertedIndexOptimizeMode::SimpleTopN(field, limit, asc) => {
+                cluster_rpc::IdxOptimizeMode {
+                    mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopn(
+                        cluster_rpc::SimpleTopN {
+                            field,
+                            limit: limit as u32,
+                            asc,
                         },
                     )),
                 }
