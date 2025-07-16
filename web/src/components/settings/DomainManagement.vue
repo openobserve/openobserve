@@ -65,11 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Domain List -->
     <div v-if="domains.length > 0" class="q-mb-lg">
-      <div 
-        v-for="(domain, index) in domains" 
-        :key="domain.name"
-        class="domain-card q-mb-xs"
-      >
+      <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
+        <div 
+          v-if="domain && domain.name"
+          class="domain-card q-mb-xs"
+        >
         <div class="domain-header row items-center justify-between q-px-md q-py-sm">
           <div class="text-body1 text-bold">{{ domain.name }}</div>
           <q-btn
@@ -165,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
+      </template>
     </div>
     <div v-else class="text-h6 text-grey-6 q-mt-md q-mb-lg tw-w-full text-center q-pa-lg domain-card">
       {{ t("settings.noDomainMessage") }}
@@ -249,11 +250,13 @@ const loadDomainSettings = async () => {
     const response = await domainManagement.getDomainRestrictions(store.state.zoConfig.meta_org);
     
     if (response.data && response.data.domains) {
-      const loadedDomains = response.data.domains.map((domain: any) => ({
-        name: domain.domain,
-        allowAllUsers: domain.allow_all_users,
-        allowedEmails: domain.allowed_emails || []
-      }));
+      const loadedDomains = response.data.domains
+        .filter((domain: any) => domain && typeof domain === 'object' && domain.domain) // Filter out invalid entries
+        .map((domain: any) => ({
+          name: domain.domain,
+          allowAllUsers: domain.allow_all_users,
+          allowedEmails: domain.allowed_emails || []
+        }));
       domains.splice(0, domains.length, ...loadedDomains);
     }
   } catch (error: any) {
@@ -266,20 +269,77 @@ const loadDomainSettings = async () => {
   }
 };
 
-const isValidDomain = (domain: string): boolean => {
-  if (!domain) return true;
-  // Basic domain validation - can be enhanced
-  const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.([a-zA-Z]{2,}\.?)+$/;
-  return domainRegex.test(domain);
+const isValidDomain = (domain: any): boolean => {
+  // Handle null, undefined, and non-string inputs
+  if (domain === null || domain === undefined) return true; // Empty is valid
+  if (typeof domain !== 'string') return false; // Non-strings are invalid
+  
+  // Handle empty strings - empty is valid, but whitespace-only is not
+  const trimmed = domain.trim();
+  if (!trimmed) return domain.length === 0; // Empty string is valid, whitespace-only is not
+  
+  // Security: Check for potentially malicious content (more targeted patterns)
+  const maliciousPatterns = [
+    '<script', '</script', 'javascript:', 'DROP TABLE', 'SELECT FROM', 'INSERT INTO', 
+    'UPDATE SET', 'DELETE FROM', 'UNION SELECT', '--', '/*', '*/', '\0', '\n', '\r'
+  ];
+  
+  const upperDomain = trimmed.toUpperCase();
+  if (maliciousPatterns.some(pattern => upperDomain.includes(pattern.toUpperCase()))) {
+    return false;
+  }
+  
+  // Length validation (DNS limit is 253 characters)
+  if (trimmed.length > 253) return false;
+  
+  // Remove trailing dot if present (valid in DNS)
+  const cleanDomain = trimmed.endsWith('.') ? trimmed.slice(0, -1) : trimmed;
+  
+  // Improved domain validation that properly handles hyphens and edge cases
+  // Domain parts can contain letters, numbers, and hyphens (but not start/end with hyphens)
+  // Each label can be 1-63 characters, and the domain must have at least one dot
+  const domainRegex = /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+  
+  try {
+    return domainRegex.test(cleanDomain);
+  } catch (error) {
+    return false; // Any regex error means invalid
+  }
 };
 
-const isValidEmail = (email: string, domain: string): boolean => {
-  if (!email) return false;
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) return false;
+const isValidEmail = (email: any, domain: any): boolean => {
+  // Handle null, undefined, and non-string inputs
+  if (email === null || email === undefined || typeof email !== 'string') return false;
+  if (domain === null || domain === undefined || typeof domain !== 'string') return false;
   
-  // Check if email belongs to the domain
-  return email.toLowerCase().endsWith(`@${domain.toLowerCase()}`);
+  // Handle empty strings
+  if (!email.trim() || !domain.trim()) return false;
+  
+  // Security: Check for potentially malicious content
+  const maliciousPatterns = [
+    '<', '>', 'script', 'javascript:', 'DROP', 'SELECT', 'INSERT', 'UPDATE', 'DELETE',
+    'UNION', 'CREATE', 'ALTER', 'TABLE', 'FROM', '--', '/*', '*/', "'", '"',
+    '\0', '\n', '\r', '\t'
+  ];
+  
+  const upperEmail = email.toUpperCase();
+  if (maliciousPatterns.some(pattern => upperEmail.includes(pattern.toUpperCase()))) {
+    return false;
+  }
+  
+  // Length validation (practical email limit)
+  if (email.length > 254 || domain.length > 253) return false;
+  
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  
+  try {
+    if (!emailRegex.test(email)) return false;
+    
+    // Check if email belongs to the domain
+    return email.toLowerCase().endsWith(`@${domain.toLowerCase()}`);
+  } catch (error) {
+    return false; // Any error means invalid
+  }
 };
 
 const addDomain = () => {
