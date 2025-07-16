@@ -1,8 +1,8 @@
 import { expect } from '@playwright/test';
 import { LogsQueryPage } from './logsQueryPage.js';
-import { LoginPage } from '../loginPage.js';
+import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
-import { ManagementPage } from '../managementPage.js';
+import { ManagementPage } from '../generalPages/managementPage.js';
 
 export class LogsPage {
     constructor(page) {

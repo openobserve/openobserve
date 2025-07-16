@@ -1,21 +1,21 @@
 import { test, expect } from "../baseFixtures.js";
-import { LoginPage } from '../../pages/loginPage.js';
+import { LoginPage } from '../../pages/generalPages/loginPage.js';
 import { LogsPage } from '../../pages/logsPages/logsPage.js';
 import { IngestionPage } from '../../pages/generalPages/ingestionPage.js';
-import { HomePage } from "../../pages/homePage.js";
+import { HomePage } from "../../pages/generalPages/homePage.js";
 import { MetricsPage } from "../../pages/metricsPages/metricsPage.js";
 import { TracesPage } from "../../pages/tracesPages/tracesPage.js";
-import { RumPage } from "../../pages/rumPage.js";
+import { RumPage } from "../../pages/logsPages/rumPage.js";
 import { PipelinesPage } from "../../pages/pipelinesPages/pipelinesPage.js";
 import { DashboardPage } from "../../pages/dashboardPages/dashboardPage.js";
 import { StreamsPage } from "../../pages/streamsPages/streamsPage.js";
 import { ReportsPage } from "../../pages/reportsPages/reportsPage.js";
 import { AlertsPage } from "../../pages/alertsPages/alertsPage.js";
 import { DataPage } from "../../pages/generalPages/dataPage.js";
-import { IamPage } from "../../pages/iamPage.js";
-import { ManagementPage } from "../../pages/managementPage.js";
+import { IamPage } from "../../pages/iamPages/iamPage.js";
+import { ManagementPage } from "../../pages/generalPages/managementPage.js";
 import { AboutPage } from "../../pages/generalPages/aboutPage.js";
-import { CreateOrgPage } from "../../pages/createOrgPage.js";
+import { CreateOrgPage } from "../../pages/generalPages/createOrgPage.js";
 import { CommonActions } from "../../pages/commonActions.js";
 
 

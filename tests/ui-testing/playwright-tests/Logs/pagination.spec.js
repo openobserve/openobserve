@@ -1,8 +1,8 @@
 import { test, expect } from "../baseFixtures.js";
-import { LoginPage } from '../../pages/loginPage.js';
+import { LoginPage } from '../../pages/generalPages/loginPage.js';
 import { LogsPage } from '../../pages/logsPages/logsPage.js';
 import { IngestionPage } from '../../pages/generalPages/ingestionPage.js';
-import { ManagementPage } from '../../pages/managementPage.js';
+import { ManagementPage } from '../../pages/generalPages/managementPage.js';
 
 // Function to generate a random 9-character alphabetic name
 function generateRandomStreamName() {

@@ -1,6 +1,6 @@
 // Implementation test.spec.js
 import { test, expect } from "../baseFixtures.js";
-import { LoginPage } from '../../pages/loginPage.js';
+import { LoginPage } from '../../pages/generalPages/loginPage.js';
 import { LogsPage } from '../../pages/logsPages/logsPage.js';
 
 

@@ -1,7 +1,7 @@
 import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import UnflattenedPage from "../../pages/unflattened.js";
+import UnflattenedPage from "../../pages/logsPages/unflattened.js";
 import { LogsPage } from '../../pages/logsPages/logsPage.js';
 
 test.describe.configure({ mode: "parallel" });
