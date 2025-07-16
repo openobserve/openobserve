@@ -379,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center q-mr-sm">
         <div
           data-test="scheduled-alert-period-title"
-          class="text-bold flex items-center"
+          class="tw-font-semibold flex items-center"
           style="width: 190px"
         >
           {{ t("alerts.period") + " *" }}
@@ -459,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center q-mr-sm">
         <div
           data-test="scheduled-alert-cron-toggle-title"
-          class="text-bold flex items-center"
+          class="tw-font-semibold flex items-center"
           style="width: 172px"
         >
           {{ t("alerts.crontitle") + " *" }}
@@ -505,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center q-mr-sm " style="min-height: 78px;">
         <div
           data-test="scheduled-alert-frequency-title"
-          class="text-bold flex items-center"
+          class="tw-font-semibold flex items-center"
           style="width: 190px;"
         >
           {{ t("alerts.frequency") + " *" }}
@@ -679,7 +679,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="col-12 flex justify-start items-center tw-pb-1">
               <div
-                class="q-py-sm showLabelOnTop text-bold text-h7  flex items-center"
+                class="q-py-sm showLabelOnTop tw-font-semibold text-h7  flex items-center"
                 data-test="add-alert-delay-title"
                 style="width: 190px"
               >
@@ -765,7 +765,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="o2-input flex justify-start q-mt-xs items-start">
               <div
                 data-test="add-alert-destination-title"
-                class="text-bold"
+                class="tw-font-semibold"
                 style="width: 190px"
               >
                 {{ t("alerts.destination") + " *" }}

@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="expandState.thresholds">
     <div class="col-12 flex justify-start items-center q-mt-xs">
               <div
-                class="q-py-sm showLabelOnTop text-bold text-h7 q-pb-md flex items-center"
+                class="q-py-sm showLabelOnTop tw-font-semibold text-h7 q-pb-md flex items-center"
                 data-test="add-alert-delay-title"
                 style="width: 190px"
               >
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="o2-input flex justify-start items-start">
               <div
                 data-test="add-alert-destination-title"
-                class="text-bold q-pb-sm"
+                class="tw-font-semibold q-pb-sm"
                 style="width: 190px"
               >
                 {{ t("alerts.destination") + " *" }}
