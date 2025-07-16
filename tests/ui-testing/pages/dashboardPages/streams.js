@@ -4,9 +4,10 @@ export default class StreamSettingsPage {
 
     // Global locators
     this.searchInput = page.getByPlaceholder("Search Stream");
-    this.streamDetailButton = page.getByRole("button", {
-      name: "Stream Detail",
-    });
+    // Select the first "Stream Detail" button to avoid strict mode violations
+    this.streamDetailButton = page
+      .getByRole("button", { name: "Stream Detail" })
+      .first();
     this.maxQueryInput = page.locator(
       '[data-test="stream-details-max-query-range-input"]'
     );
