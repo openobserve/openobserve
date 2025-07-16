@@ -245,6 +245,7 @@ import { useStore } from 'vuex';
 import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { getImageURL } from '@/utils/zincutils';
+import { useRouter } from 'vue-router';
 import { ChatMessage, ChatHistoryEntry } from '@/types/chat';
 
 // Add IndexedDB setup
@@ -340,6 +341,7 @@ export default defineComponent({
 
     const currentChatTimestamp = ref<string | null>(null);
     const saveHistoryLoading = ref(false);
+    const router = useRouter();
     const historySearchTerm = ref('');
     
     const modelConfig: any = {

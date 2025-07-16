@@ -33,12 +33,7 @@
         <slot name="left" />
       </div>
       <div>
-        <slot name="right" />
-        <!-- <q-icon
-          name="fullscreen"
-          size="18px"
-          class="tw-mr-1 tw-cursor-pointer tw-transition-all tw-text-gray-500"
-        /> -->
+        <slot name="right" />  
       </div>
     </div>
     <slot v-if="expanded" />
