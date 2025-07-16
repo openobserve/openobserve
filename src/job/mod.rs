@@ -122,6 +122,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // check tantivy _timestamp update time
     _ = db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
+    // check tantivy secondary index update time
+    _ = db::metas::tantivy_index::get_ttv_secondary_index_updated_at().await;
 
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]
