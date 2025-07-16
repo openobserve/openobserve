@@ -637,7 +637,7 @@ impl Condition {
             Condition::StrMatch(..) => true,
             Condition::In(..) => true,
             Condition::Regex(..) => false,
-            Condition::MatchAll(v) => is_blank_or_alphanumeric(v),
+            Condition::MatchAll(v) => is_alphanumeric(v),
             Condition::FuzzyMatchAll(..) => false,
             Condition::All() => true,
             Condition::Or(left, right) => left.can_remove_filter() && right.can_remove_filter(),
@@ -806,7 +806,11 @@ pub(crate) fn get_arg_name(args: &FunctionArg) -> String {
     }
 }
 
-fn is_blank_or_alphanumeric(s: &str) -> bool {
+fn is_alphanumeric(s: &str) -> bool {
+    s.chars().all(|c| c.is_ascii_alphanumeric())
+}
+
+fn _is_blank_or_alphanumeric(s: &str) -> bool {
     s.chars()
         .all(|c| c.is_ascii_whitespace() || c.is_ascii_alphanumeric())
 }
@@ -1050,5 +1054,21 @@ mod tests {
 
         assert_eq!(fields.len(), 1);
         assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_is_alphanumeric() {
+        assert!(is_alphanumeric("123"));
+        assert!(is_alphanumeric("123abc"));
+        assert!(!is_alphanumeric("123 abc"));
+        assert!(!is_alphanumeric("123 abc 123"));
+    }
+
+    #[test]
+    fn test_is_blank_or_alphanumeric() {
+        assert!(_is_blank_or_alphanumeric("123"));
+        assert!(_is_blank_or_alphanumeric("123abc"));
+        assert!(_is_blank_or_alphanumeric("123 abc"));
+        assert!(_is_blank_or_alphanumeric("123 abc 123"));
     }
 }
