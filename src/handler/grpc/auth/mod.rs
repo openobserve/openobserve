@@ -53,6 +53,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         o2_enterprise::enterprise::super_cluster::kv::cluster::get_grpc_token();
     #[cfg(not(feature = "enterprise"))]
     let super_cluster_token = get_internal_grpc_token();
+
     if token.eq(get_internal_grpc_token().as_str()) || token.eq(super_cluster_token.as_str()) {
         Ok(req)
     } else {

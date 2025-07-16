@@ -263,12 +263,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // additional for cloud
     #[cfg(feature = "cloud")]
-    {
-        // OpenFGA migration
-        o2_enterprise::enterprise::cloud::ofga_migrate()
-            .await
-            .expect("cloud ofga migrations failed");
+    // OpenFGA migration
+    o2_enterprise::enterprise::cloud::ofga_migrate()
+        .await
+        .expect("cloud ofga migrations failed");
 
+    #[cfg(any(feature = "cloud", feature = "marketplace"))]
+    {
         use crate::service::self_reporting::search::get_usage;
         o2_enterprise::enterprise::metering::init(get_usage)
             .await

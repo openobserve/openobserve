@@ -25,6 +25,7 @@ publish = false
 default = []
 enterprise = []
 cloud = []
+marketplace = []
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = ["dep:pprof"]
@@ -85,8 +86,8 @@ clap = { version = "4.1", default-features = false, features = [
     "cargo",
 ] }
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
-cron.workspace = true
 csv = "1.3"
+cron.workspace = true
 dashmap.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
