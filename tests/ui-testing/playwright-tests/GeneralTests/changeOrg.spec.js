@@ -1,10 +1,10 @@
 import { test, expect } from "../baseFixtures.js";
 import { LoginPage } from '../../pages/loginPage.js';
 import { LogsPage } from '../../pages/logsPages/logsPage.js';
-import { IngestionPage } from '../../pages/ingestionPage.js';
+import { IngestionPage } from '../../pages/generalPages/ingestionPage.js';
 import { HomePage } from "../../pages/homePage.js";
-import { MetricsPage } from "../../pages/metricsPage.js";
-import { TracesPage } from "../../pages/tracesPage.js";
+import { MetricsPage } from "../../pages/metricsPages/metricsPage.js";
+import { TracesPage } from "../../pages/tracesPages/tracesPage.js";
 import { RumPage } from "../../pages/rumPage.js";
 import { PipelinesPage } from "../../pages/pipelinesPages/pipelinesPage.js";
 import { DashboardPage } from "../../pages/dashboardPages/dashboardPage.js";
@@ -14,7 +14,7 @@ import { AlertsPage } from "../../pages/alertsPages/alertsPage.js";
 import { DataPage } from "../../pages/generalPages/dataPage.js";
 import { IamPage } from "../../pages/iamPage.js";
 import { ManagementPage } from "../../pages/managementPage.js";
-import { AboutPage } from "../../pages/aboutPage.js";
+import { AboutPage } from "../../pages/generalPages/aboutPage.js";
 import { CreateOrgPage } from "../../pages/createOrgPage.js";
 import { CommonActions } from "../../pages/commonActions.js";
 

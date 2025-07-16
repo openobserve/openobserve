@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 import { LoginPage } from '../loginPage.js';
 import { LogsPage } from '../logsPages/logsPage.js';
-import { IngestionPage } from '../ingestionPage.js';
+import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../managementPage.js';
 
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';

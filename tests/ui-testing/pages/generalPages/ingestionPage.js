@@ -1,5 +1,5 @@
 
-import logsdata from "../../test-data/logs_data.json";
+import logsdata from "../../../test-data/logs_data.json";
 export class IngestionPage {
   constructor(page) {
     this.page = page;

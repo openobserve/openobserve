@@ -2,7 +2,7 @@ import { test, expect } from "../baseFixtures.js";
 import { LoginPage } from '../../pages/loginPage.js';
 import { DashboardPage } from '../../pages/dashboardPages/dashboardPage.js';
 import { ReportsPage } from '../../pages/reportsPages/reportsPage.js';
-import { IngestionPage } from '../../pages/ingestionPage.js';
+import { IngestionPage } from '../../pages/generalPages/ingestionPage.js';
 
 function reportName() {
     const characters = 'abcdefghijklmnopqrstuvwxyz';
