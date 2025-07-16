@@ -444,7 +444,8 @@ export class AlertsPage {
         await this.page.waitForTimeout(2000);
 
         // Close dialog
-        await this.page.locator('div').filter({ hasText: /^closeAdd Conditions$/ }).locator('i').click();
+        //this is modified according to the new dialog structure and new close icon
+        await this.page.locator('#q-portal--dialog--9').getByText('arrow_back_ios_new').click();
         await this.page.waitForTimeout(1000);
 
         // Submit alert

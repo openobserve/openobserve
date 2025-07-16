@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="preview-alert-container q-mt-lg" :class="{'preview-alert-container-light': store.state.theme !== 'dark'}" ref="chartPanelRef" style="height: 100%; position: relative">
+  <div class="preview-alert-container tw-mt-2 " :class="{'preview-alert-container-light': store.state.theme !== 'dark'}" ref="chartPanelRef" style="height: 100%; position: relative">
     <div class="text-bold"
     style="width: 100%; padding: 16px 10px; "
     :style="{ backgroundColor: store.state.theme === 'dark' ? '#212121' : '#ffffff',
