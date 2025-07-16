@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="col" style="height: 100%">
                 <div class="layout-panel-container col" style="height: 100%">
-                  <DashboardQueryBuilder :dashboardData="{}" />
+                  <!-- <DashboardQueryBuilder :dashboardData="{}" /> -->
                   <q-separator />
 
                   <div

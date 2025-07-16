@@ -1501,14 +1501,16 @@ export default defineComponent({
 
     const searchResponseForVisualization = ref({});
 
-    let fieldsExtractionPromise = new Promise((resolve)=>resolve(true));
+    let fieldsExtractionPromise = new Promise((resolve) => resolve(true));
 
     const copyLogsQueryToDashboardPanel = async () => {
       // Check should use histogram query
       // If true, then set histogram query
       // If false, set logs page query
       // If null, do not do anything
-      const shouldUseHistogram = await shouldUseHistogramQuery(searchObj.data.query);
+      const shouldUseHistogram = await shouldUseHistogramQuery(
+        searchObj.data.query,
+      );
 
       if (shouldUseHistogram === true) {
         // set histogram query
@@ -1536,12 +1538,64 @@ export default defineComponent({
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
-        if (searchObj.meta.logsVisualizeToggle == "visualize") {
+        try {
+          if (searchObj.meta.logsVisualizeToggle == "visualize") {
+            // close field list and splitter
+            dashboardPanelData.layout.splitter = 0;
+            dashboardPanelData.layout.showFieldList = false;
 
-          // close field list and splitter
-          dashboardPanelData.layout.splitter = 0;
-          dashboardPanelData.layout.showFieldList = false;
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].customQuery = true;
 
+            const shouldUseHistogram = await copyLogsQueryToDashboardPanel();
+
+            // if not able to parse query, do not do anything
+            if (shouldUseHistogram === null) {
+              return;
+            }
+
+            // reset old rendered chart
+            visualizeChartData.value = {};
+
+            await extractVisualizationFields();
+
+            // set logs page data to searchResponseForVisualization
+            if (shouldUseHistogram === true) {
+              // replace hits with histogram query data
+              searchResponseForVisualization.value = {
+                ...searchObj.data.queryResults,
+                hits: searchObj.data.queryResults.aggs,
+                histogram_interval:
+                  searchObj?.data?.queryResults
+                    ?.visualization_histogram_interval,
+              };
+            } else {
+              searchResponseForVisualization.value = {
+                ...searchObj.data.queryResults,
+                histogram_interval:
+                  searchObj?.data?.queryResults
+                    ?.visualization_histogram_interval,
+              };
+            }
+
+            // run query
+            visualizeChartData.value = JSON.parse(
+              JSON.stringify(dashboardPanelData.data),
+            );
+
+            // emit resize event
+            // this will rerender/call resize method of already rendered chart to resize
+            window.dispatchEvent(new Event("resize"));
+          }
+        } catch (error) {}
+      },
+    );
+
+    // Create debounced function for visualization updates
+    const updateVisualization = async () => {
+      try {
+        if (searchObj?.meta?.logsVisualizeToggle == "visualize") {
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery = true;
@@ -1553,100 +1607,16 @@ export default defineComponent({
             return;
           }
 
-          // reset old rendered chart
-          visualizeChartData.value = {};
-
-          // extract custom fields from query
-          // identify x axis, y axis and breakdown fields
-          // push on query fields
-          fieldsExtractionPromise = setCustomQueryFields();
-
-          await fieldsExtractionPromise;
-
-          // set logs page data to searchResponseForVisualization
-          if (shouldUseHistogram === true) {
-            // replace hits with histogram query data
-            searchResponseForVisualization.value = {
-              ...searchObj.data.queryResults,
-              hits: searchObj.data.queryResults.aggs,
-              histogram_interval: searchObj?.data?.queryResults?.visualization_histogram_interval,
-            };
-          } else {
-            searchResponseForVisualization.value = {
-              ...searchObj.data.queryResults,
-              histogram_interval: searchObj?.data?.queryResults?.visualization_histogram_interval,
-            };
-          }
-
-          // run query
-          visualizeChartData.value = JSON.parse(
-            JSON.stringify(dashboardPanelData.data),
-          );
+          await extractVisualizationFields();
 
           // emit resize event
           // this will rerender/call resize method of already rendered chart to resize
           window.dispatchEvent(new Event("resize"));
-
-          // TODO: extract custom fields from query
-          // above one will be done via query watcher on useDashboardPanelData hook
-          // TODO: On visualization toggle, extract which field will go to x axis, y axis and breakdown
-          // console.log(
-          //   "custom fields",
-          //   dashboardPanelData.meta.stream.customQueryFields,
-          // );
-          // console.log("logs page query results", searchObj.data.queryResults);
         }
-      },
-    );
-
-    // Create debounced function for visualization updates
-    const debouncedVisualizeUpdate = debounce(async () => {
-      if (searchObj?.meta?.logsVisualizeToggle == "visualize") {
-
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery = true;
-
-        const shouldUseHistogram = await copyLogsQueryToDashboardPanel();
-
-        // if not able to parse query, do not do anything
-        if (shouldUseHistogram === null) {
-          return;
-        }
-
-        // reset old rendered chart
-        // visualizeChartData.value = {};
-
-        // extract custom fields from query
-        // identify x axis, y axis and breakdown fields
-        // push on query fields
-        fieldsExtractionPromise = setCustomQueryFields();
-
-        await fieldsExtractionPromise;
-
-        // run query
-        // visualizeChartData.value = JSON.parse(
-        //   JSON.stringify(dashboardPanelData.data),
-        // );
-
-        // emit resize event
-        // this will rerender/call resize method of already rendered chart to resize
-        window.dispatchEvent(new Event("resize"));
+      } catch (error) {
+        throw error;
       }
-    }, 15000); // 15 seconds debounce
-
-    watch(
-      () => [searchObj.data.query, searchObj.meta.logsVisualizeToggle, searchObj?.meta?.queryEditorPlaceholderFlag],
-      async () => {
-        // If queryEditorPlaceholderFlag becomes true, flush the debounced function immediately
-        if (searchObj?.meta?.queryEditorPlaceholderFlag == true) {
-          debouncedVisualizeUpdate.flush();
-        } else {
-          // Otherwise, call the debounced function
-          debouncedVisualizeUpdate();
-        }
-      },
-    );
+    };
 
     watch(
       () => dashboardPanelData.data.type,
@@ -1680,7 +1650,6 @@ export default defineComponent({
               )
             : cloneDeep(searchObj.data.datetime);
 
-        console.log("New dateTime");
         dashboardPanelData.meta.dateTime = {
           start_time: new Date(dateTime.startTime),
           end_time: new Date(dateTime.endTime),
@@ -1691,9 +1660,13 @@ export default defineComponent({
 
     const handleRunQueryFn = async () => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
-
-        // wait to extract fields if its ongoing
-        await fieldsExtractionPromise;
+        // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
+        try {
+          await updateVisualization();
+        } catch (err: any) {
+          // Extraction was cancelled, so do not proceed further
+          return;
+        }
 
         if (!isValid(true, true)) {
           // return;
@@ -1726,6 +1699,53 @@ export default defineComponent({
       variablesData: {},
       panels: {},
       searchRequestTraceIds: {},
+      fieldsExtractionLoading: false, // track custom field extraction progress
+    });
+
+    // Abort controller reference for field extraction so that it can be cancelled from outside (e.g. Cancel button)
+    const fieldsExtractionAbortController = ref<AbortController | null>(null);
+
+    const extractVisualizationFields = async () => {
+      // mark extraction as in-progress so that cancel button is shown
+      variablesAndPanelsDataLoadingState.fieldsExtractionLoading = true;
+
+      // Abort any previous extraction if still running
+      if (fieldsExtractionAbortController.value) {
+        fieldsExtractionAbortController.value.abort();
+      }
+
+      // Create a fresh AbortController for this extraction cycle
+      fieldsExtractionAbortController.value = new AbortController();
+      const signal = fieldsExtractionAbortController.value.signal;
+
+      // Start extraction with abort support
+      fieldsExtractionPromise = setCustomQueryFields(signal);
+
+      try {
+        await fieldsExtractionPromise;
+      } catch (err: any) {
+        throw err;
+      } finally {
+        variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+      }
+    };
+
+    // Helper to abort any ongoing field-extraction operation
+    const cancelFieldExtraction = () => {
+      if (fieldsExtractionAbortController.value) {
+        fieldsExtractionAbortController.value.abort();
+        fieldsExtractionAbortController.value = null;
+      }
+      variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+    };
+
+    // Listen to global cancelQuery event (fired by useCancelQuery composable)
+    onMounted(() => {
+      window.addEventListener("cancelQuery", cancelFieldExtraction);
+    });
+
+    onBeforeUnmount(() => {
+      window.removeEventListener("cancelQuery", cancelFieldExtraction);
     });
 
     // provide variablesAndPanelsDataLoadingState to share data between components

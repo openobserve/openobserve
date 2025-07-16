@@ -3267,9 +3267,15 @@ export default defineComponent({
     const visualizeSearchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
         variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
-      ).filter((item: any) => item.length > 0);
+      ).filter((item: any) => item.length > 0)
+        .flat() as string[];
 
-      return searchIds.flat() as string[];
+      // If custom field extraction is in progress, push a dummy trace id so that cancel button is visible.
+      if (variablesAndPanelsDataLoadingState?.fieldsExtractionLoading) {
+        searchIds.push("fieldExtraction");
+      }
+
+      return searchIds;
     });
     const backgroundColorStyle = computed(() => {
       const isDarkMode = store.state.theme === "dark";
@@ -3306,7 +3312,11 @@ export default defineComponent({
     const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery();
 
     const cancelVisualizeQueries = () => {
-      traceIdRef.value = visualizeSearchRequestTraceIds.value;
+      // Filter out the dummy id before sending to backend cancel API
+      traceIdRef.value = visualizeSearchRequestTraceIds.value.filter(
+        (id: any) => id !== "fieldExtraction",
+      );
+
       cancelVisualizeQuery();
     };
 

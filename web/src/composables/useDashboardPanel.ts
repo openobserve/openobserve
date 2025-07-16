@@ -17,11 +17,16 @@ import { reactive, computed, watch, onBeforeMount, onUnmounted } from "vue";
 import StreamService from "@/services/stream";
 import { useStore } from "vuex";
 import useNotifications from "./useNotifications";
-import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
+import {
+  splitQuotedString,
+  escapeSingleQuotes,
+  b64EncodeUnicode,
+} from "@/utils/zincutils";
 import { extractFields } from "@/utils/query/sqlUtils";
 import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
 import { extractTimestampAndGroupBy } from "@/utils/query/extractFields";
+import queryService from "@/services/search";
 
 const colors = [
   "#5960b2",
@@ -3102,64 +3107,119 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     };
   };
 
-  // TODO: will need to select custom fields from query to x axis, y axis and breakdown
-  // logic will be take timestamp field as x axis if available, else first group by field will go to x axis
-  // 2nd group by field will go to breakdown
-  // all other fields will go to y axis
-  const setCustomQueryFields = async () => {
+  // For visualization, we need to set the custom query fields
+  const setCustomQueryFields = async (abortSignal?: AbortSignal) => {
     resetFields();
 
-    // CAUTION: make sure to remove this delay before merging
-    // add two second delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const timestamps = dashboardPanelData.meta.dateTime;
+    let startISOTimestamp: any;
+    let endISOTimestamp: any;
+    if (
+      timestamps?.start_time &&
+      timestamps?.end_time &&
+      timestamps.start_time != "Invalid Date" &&
+      timestamps.end_time != "Invalid Date"
+    ) {
+      startISOTimestamp = new Date(
+        timestamps.start_time.toISOString(),
+      ).getTime();
+      endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
+    } else {
+      return;
+    }
 
-    const extractedFields = extractTimestampAndGroupBy(
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].query,
+    // get extracted fields from the query
+    const searchRes = await queryService.result_schema(
+      {
+        org_identifier: store.state.selectedOrganization.identifier,
+        query: {
+          query: {
+            sql: store.state.zoConfig.sql_base64_enabled
+              ? b64EncodeUnicode(
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].query,
+                )
+              : dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].query,
+            // query funciton will be null for now
+            query_fn: null,
+            // if i == 0 ? then do gap of 7 days
+            start_time: startISOTimestamp,
+            end_time: endISOTimestamp,
+            size: -1,
+            histogram_interval: undefined,
+            streaming_output: false,
+            streaming_id: null,
+          },
+          // pass encodig if enabled,
+          // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+          ...(store.state.zoConfig.sql_base64_enabled
+            ? { encoding: "base64" }
+            : {}),
+        },
+        page_type: "dashboards",
+      },
+      "dashboards",
     );
-    console.log("extractedFields", extractedFields);
-    //  extractedFields = {
-    //     "timestamp": "x_axis_1",
-    //     "groupBy": [
-    //         "breakdown_1"
-    //     ],
-    //     "yAxisFields": [
-    //         "y_axis_1"
-    //     ]
-    // }
-    // based on extractedFields, we will set the custom query fields
-    // if timestamp is available and group by length is less than 2, then set timestamp as x axis and group by as breakdown and select line chart as default
-    // else select table chart as default
 
-    if (extractedFields.timestamp && extractedFields.groupBy.length < 2) {
+    // if abort signal is received, throw an error
+    if (abortSignal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
+    const extractedFields: {
+      group_by: string[];
+      projections: string[];
+      timeseries_field: string | null;
+    } = searchRes.data;
+
+    // remove group by and timeseries field from projections, while using it on y axis
+    const yAxisFields = extractedFields.projections.filter(
+      (field) =>
+        !extractedFields.group_by.includes(field) &&
+        field !== extractedFields.timeseries_field,
+    );
+
+    if (
+      extractedFields.timeseries_field &&
+      extractedFields.group_by.length <= 2
+    ) {
       // select line chart as default
       dashboardPanelData.data.type = "line";
 
       // add timestamp as x axis
-      addXAxisItem({ name: extractedFields.timestamp });
+      addXAxisItem({ name: extractedFields.timeseries_field });
       // here upto 1 group by will be available, add group by as breakdown
-      extractedFields.groupBy.forEach((field: any) => {
-        addBreakDownAxisItem({ name: field });
+      extractedFields.group_by.forEach((field: any) => {
+        // if field is not timeseries field, then add it as breakdown
+        if (field !== extractedFields.timeseries_field) {
+          addBreakDownAxisItem({ name: field });
+        }
       });
       // add all y axis fields
-      extractedFields.yAxisFields.forEach((field: any) => {
+      yAxisFields.forEach((field: any) => {
         addYAxisItem({ name: field });
       });
     } else {
       // select table chart as default
       dashboardPanelData.data.type = "table";
+
       // add timestamp as x axis if available
-      if (extractedFields.timestamp) {
-        addXAxisItem({ name: extractedFields.timestamp });
+      if (extractedFields.timeseries_field) {
+        addXAxisItem({ name: extractedFields.timeseries_field });
       }
 
       // add all group by fields as x axis
-      extractedFields.groupBy.forEach((field: any) => {
-        addXAxisItem({ name: field });
+      extractedFields.group_by.forEach((field: any) => {
+        if (field !== extractedFields.timeseries_field) {
+          addXAxisItem({ name: field });
+        }
       });
+
       // add all y axis fields
-      extractedFields.yAxisFields.forEach((field: any) => {
+      yAxisFields.forEach((field: any) => {
         addYAxisItem({ name: field });
       });
     }
@@ -3219,3 +3279,37 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 };
 export default useDashboardPanelData;
+
+/**
+ * Call a function with an AbortController, and propagate the abort
+ * signal to the function. This allows the function to be cancelled
+ * when the AbortController is aborted.
+ *
+ * @param fn The function to call
+ * @param signal The AbortSignal to use
+ * @returns A promise that resolves with the result of the function, or
+ * rejects with an error if the function is cancelled or throws an error
+ */
+const callWithAbortController = async <T>(
+  fn: () => Promise<T>,
+  signal: AbortSignal,
+): Promise<T> => {
+  return new Promise<T>((resolve, reject) => {
+    const result = fn();
+
+    // Listen to the abort signal and reject the promise if it is
+    // received
+    signal.addEventListener("abort", () => {
+      reject();
+    });
+
+    // Handle the result of the function
+    result
+      .then((res) => {
+        resolve(res);
+      })
+      .catch((error) => {
+        reject(error);
+      });
+  });
+};
