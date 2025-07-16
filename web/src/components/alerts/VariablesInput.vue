@@ -17,10 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-12 q-py-sm variables-input "
   :class="{
-    'flex tw-gap-2 items-center tw-w-1/2': variables.length == 0,
+    'flex tw-gap-2 items-center tw-w-full': variables.length == 0,
   }"
   >
-    <div class="q-pb-xs custom-input-label text-bold">Variable
+    <div class="q-pb-xs custom-input-label text-bold">
+      <span>
+        Variable
+      </span>
           <q-btn
           style="color: #A0A0A0;"
               no-caps
@@ -36,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-btn>
         </div>
     <template v-if="!variables.length">
-      <div class="flex justify-between items-center">
+      <div class="flex justify-between items-center tw-ml-auto">
 
         <q-btn
           data-test="alert-variables-add-btn"
