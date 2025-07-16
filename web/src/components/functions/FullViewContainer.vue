@@ -6,6 +6,7 @@
     <div class="tw-flex tw-justify-between">
       <div class="tw-flex tw-items-center">
         <q-icon
+          v-if="showExpandIcon"
           name="keyboard_arrow_up"
           @click.stop="expanded = !expanded"
           class="tw-mr-1 tw-cursor-pointer tw-transition-all"
@@ -18,7 +19,7 @@
           size="20px"
         />
         <div
-          @click="expanded = !expanded"
+          @click="showExpandIcon ? expanded = !expanded : null"
           class="tw-text-[14px] tw-font-bold"
           :class="[
             store.state.theme === 'dark'
@@ -67,6 +68,11 @@ const props = defineProps({
   labelClass: {
     type: String,
     default: "",
+  },
+  showExpandIcon: {
+    type: Boolean,
+    default: true,
+    required: false,
   },
 });
 
