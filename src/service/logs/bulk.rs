@@ -94,6 +94,7 @@ pub async fn ingest(
     let mut store_original_when_pipeline_exists = false;
 
     let mut json_data_by_stream = HashMap::new();
+    let mut derived_streams = HashSet::new();
     let mut size_by_stream = HashMap::new();
     let mut next_line_is_data = false;
     let reader = BufReader::new(body.as_ref());
@@ -408,6 +409,10 @@ pub async fn ingest(
                         }
 
                         let destination_stream = stream_params.stream_name.to_string();
+                        if !derived_streams.contains(&destination_stream) {
+                            derived_streams.insert(destination_stream.clone());
+                        }
+
                         if !user_defined_schema_map.contains_key(&destination_stream) {
                             // a new dynamically created stream. need to check the two maps again
                             crate::service::ingestion::get_uds_and_original_data_streams(
@@ -592,6 +597,7 @@ pub async fn ingest(
             &mut status,
             json_data_by_stream,
             size_by_stream,
+            derived_streams,
         )
         .await;
         let IngestionStatus::Bulk(mut bulk_res) = status else {
