@@ -27,6 +27,20 @@ import { PipelinesPage } from "./pipelinesPages/pipelinesPage.js";
 import { LoginPage } from "./generalPages/loginPage.js";
 import { IngestionPage } from "./generalPages/ingestionPage.js";
 
+// ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
+import { HomePage } from "./generalPages/homePage.js";
+import { MetricsPage } from "./metricsPages/metricsPage.js";
+import { TracesPage } from "./tracesPages/tracesPage.js";
+import { RumPage } from "./logsPages/rumPage.js";
+import { ReportsPage } from "./reportsPages/reportsPage.js";
+import { DataPage } from "./generalPages/dataPage.js";
+import { IamPage } from "./iamPages/iamPage.js";
+import { ManagementPage } from "./generalPages/managementPage.js";
+import { AboutPage } from "./generalPages/aboutPage.js";
+import { CreateOrgPage } from "./generalPages/createOrgPage.js";
+import { CommonActions } from "./commonActions.js";
+import { UserPage } from "./generalPages/userPage.js";
+
 
 class PageManager {
   /**
@@ -65,6 +79,20 @@ class PageManager {
     this.pipelinesPage = new PipelinesPage(page);
     this.loginPage = new LoginPage(page);
     this.ingestionPage = new IngestionPage(page);
+    
+    // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
+    this.homePage = new HomePage(page);
+    this.metricsPage = new MetricsPage(page);
+    this.tracesPage = new TracesPage(page);
+    this.rumPage = new RumPage(page);
+    this.reportsPage = new ReportsPage(page);
+    this.dataPage = new DataPage(page);
+    this.iamPage = new IamPage(page);
+    this.managementPage = new ManagementPage(page);
+    this.aboutPage = new AboutPage(page);
+    this.createOrgPage = new CreateOrgPage(page);
+    this.commonActions = new CommonActions(page);
+    this.userPage = new UserPage(page);
   }
 }
 
