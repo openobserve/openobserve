@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="tab === 'custom'"
-        class="flex justify-start items-center text-bold tw-pb-1"
+        class="flex justify-start items-center tw-font-semibold tw-pb-1"
       >
         <div data-test="scheduled-alert-aggregation-title" style="width: 172px">
           Aggregation
@@ -95,11 +95,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="_isAggregationEnabled && aggregationData"
-        class="flex items-center no-wrap q-mr-sm tw-pb-1"
+        class="flex items-center no-wrap q-mr-sm tw-pb-2"
       >
         <div
           data-test="scheduled-alert-group-by-title"
-          class="text-bold"
+          class="tw-font-semibold"
           style="width: 190px"
         >
           {{ t("alerts.groupBy") }}
@@ -132,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   placeholder="Select column"
                   fill-input
                   :input-debounce="400"
+                  hide-bottom-space
                   @filter="
                     (val: string, update: any) => filterFields(val, update)
                   "
@@ -178,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div
           data-test="scheduled-alert-threshold-title"
-          class="text-bold flex items-center"
+          class="tw-font-semibold flex items-center"
           style="width: 190px"
         >
           {{ t("alerts.threshold") + " *" }}
@@ -206,10 +207,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div style="width: calc(100% - 190px)" class="position-relative">
           <template v-if="_isAggregationEnabled && aggregationData">
-            <div class="flex justify-start items-center">
-              <div
+            <div class="flex tw-flex-col justify-start items-start">
+              <div class="tw-flex tw-items-center">
+                <div
                 data-test="scheduled-alert-threshold-function-select"
                 class=" q-mr-xs o2-input"
+                :class="isHavingError ? 'tw-mb-[12px]':''"
               >
                 <q-select
                   v-model="aggregationData.function"
@@ -235,7 +238,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="aggregationData.having.column"
                   :options="filteredNumericColumns"
                   color="input-border"
-                 :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+                 :class="[store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light',
+                 ]"
                   class="no-case q-py-none"
                   filled
                   borderless
@@ -247,9 +251,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @filter="filterNumericColumns"
                   style="width: 250px"
                   @update:model-value="updateAggregation"
+                  hide-bottom-space
+                  :error="isHavingError"
+                  error-message="Field is required!"
+
                 />
               </div>
-              <div class="flex items-center q-mt-sm">
+              </div>
+              <div class="flex items-center q-mt-xs">
                 <div
                 data-test="scheduled-alert-threshold-operator-select"
                 class="monaco-editor-test q-mr-xs o2-input tw-pb-1"
@@ -291,19 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
             </div>
-            <div
-              data-test="scheduled-alert-threshold-error-text"
-              v-if="
-                !aggregationData.function ||
-                !aggregationData.having.column ||
-                !aggregationData.having.operator ||
-                !aggregationData.having.value.toString().trim().length
-              "
-              class="text-red-8"
-              style="font-size: 11px; line-height: 12px"
-            >
-              Field is required!
-            </div>
+            
           </template>
           <template v-else>
             <div class="flex justify-start items-center">
@@ -2646,6 +2643,15 @@ const routeToCreateDestination = () => {
       return true;
     }
 
+    const isHavingError = computed(() => {
+      return (
+        !aggregationData.value.function ||
+        !aggregationData.value.having.column ||
+        !aggregationData.value.having.operator ||
+        !aggregationData.value.having.value?.toString().trim().length
+      );
+    });
+
 
 defineExpose({
   tab,
@@ -2682,7 +2688,8 @@ defineExpose({
   filteredDestinations,
   destinationSelectRef,
   getBtnO2Logo,
-  runFnQueryLoading
+  runFnQueryLoading,
+  isHavingError
 });
 </script>
 
