@@ -54,7 +54,6 @@ export class PipelinesPage {
         this.saveStreamButton = page.locator('[data-test="save-stream-btn"]');
         this.inputNodeStreamSaveButton = page.locator('[data-test="input-node-stream-save-btn"]')
         this.pipelineSearchInput = page.locator('[data-test="pipeline-list-search-input"]');
-        this.confirmDeleteButton = page.locator('[data-test="confirm-button"]');
         this.deletionSuccessMessage = page.getByText('Pipeline deleted successfully')
         this.sqlEditor = page.locator('[data-test="scheduled-pipeline-sql-editor"]');
         this.sqlQueryInput = page.locator('.cm-lines');
@@ -434,7 +433,6 @@ export class PipelinesPage {
         
         await this.headerValueInput.waitFor();
         await this.headerValueInput.fill(`Basic ${AuthorizationToken}`);
-        console.log("this is to test", AuthorizationToken)
 
         await this.submitButton.waitFor();
         await this.submitButton.click();
