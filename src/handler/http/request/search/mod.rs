@@ -788,7 +788,7 @@ pub async fn build_search_request_per_field(
     let mut query = config::meta::search::Query {
         sql: decoded_sql.clone(), // Will be populated per field in the loop below
         from: 0,
-        size: req.size.unwrap_or(config::meta::sql::MAX_LIMIT),
+        size: req.size.unwrap_or(10),
         start_time,
         end_time,
         query_fn: query_fn.clone(),
@@ -889,17 +889,19 @@ pub async fn build_search_request_per_field(
         stream_type
     };
 
+    let size = req.query.size;
+
     let mut requests = Vec::new();
     for field in fields {
         let sql = if no_count {
             // we use min(0) as a hack to do streaming aggregation but actually return 0,
             // essentially we are not counting the values
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
+                "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key limit {size}"
             )
         } else {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
+                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_num desc limit {size}"
             )
         };
 
@@ -1044,7 +1046,7 @@ async fn values_v1(
     let req_query = config::meta::search::Query {
         sql: query_sql,
         from: 0,
-        size: 10, // TODO: use a env?
+        size: 10,
         start_time,
         end_time,
         uses_zo_fn: uses_fn,
