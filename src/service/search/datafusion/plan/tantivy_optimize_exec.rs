@@ -426,7 +426,7 @@ fn parse_i64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusion
             }
         })
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| DataFusionError::Internal(format!("Failed to parse i64 in topn: {}", e)))?;
+        .map_err(|e| DataFusionError::Internal(format!("Failed to parse i64 in topn: {e}")))?;
 
     Ok(Arc::new(arrow::array::Int64Array::from(parsed_values)) as Arc<dyn Array>)
 }
@@ -443,7 +443,7 @@ fn parse_u64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusion
             }
         })
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| DataFusionError::Internal(format!("Failed to parse u64 in topn: {}", e)))?;
+        .map_err(|e| DataFusionError::Internal(format!("Failed to parse u64 in topn: {e}")))?;
 
     Ok(Arc::new(arrow::array::UInt64Array::from(parsed_values)) as Arc<dyn Array>)
 }
@@ -460,7 +460,7 @@ fn parse_f64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusion
             }
         })
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| DataFusionError::Internal(format!("Failed to parse f64 in topn: {}", e)))?;
+        .map_err(|e| DataFusionError::Internal(format!("Failed to parse f64 in topn: {e}")))?;
 
     Ok(Arc::new(arrow::array::Float64Array::from(parsed_values)) as Arc<dyn Array>)
 }
@@ -477,7 +477,7 @@ fn parse_bool_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusio
             }
         })
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| DataFusionError::Internal(format!("Failed to parse bool in topn: {}", e)))?;
+        .map_err(|e| DataFusionError::Internal(format!("Failed to parse bool in topn: {e}")))?;
 
     Ok(Arc::new(arrow::array::BooleanArray::from(parsed_values)) as Arc<dyn Array>)
 }
