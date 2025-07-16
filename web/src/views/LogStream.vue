@@ -612,7 +612,6 @@ export default defineComponent({
             dismiss();
           })
           .catch((err) => {
-            alert(err)
             if (err.response?.status != 403) {
               $q.notify({
                 type: "negative",
