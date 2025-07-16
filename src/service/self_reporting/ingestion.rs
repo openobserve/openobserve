@@ -212,7 +212,7 @@ pub(super) async fn ingest_reporting_data(
         );
         let bytes = bytes::Bytes::from(json::to_string(&reporting_data_json).unwrap());
         let req = ingestion::IngestionRequest::Usage(&bytes);
-        match service::logs::ingest::ingest(0, &org_id, &stream_name, req, "", None).await {
+        match service::logs::ingest::ingest(0, &org_id, &stream_name, req, "", None, false).await {
             Ok(resp) if resp.code == 200 => {
                 log::info!(
                     "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"

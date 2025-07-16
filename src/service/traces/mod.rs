@@ -831,6 +831,7 @@ async fn write_traces(
         &mut traces_schema_map,
         json_data.iter().map(|(_, v)| v).collect(),
         *min_timestamp,
+        false, // is_derived is false for traces
     )
     .await;
     let record_schema = traces_schema_map
