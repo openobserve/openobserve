@@ -426,9 +426,10 @@ pub async fn process_delta(
         trace_id
     );
 
-    // for dashboards & histograms
-    if req.search_type.expect("search_type is required") == SearchEventType::Dashboards
-        || req.query.size == -1
+    // for dashboards & histograms, expect for ui
+    let search_type = req.search_type.expect("populate search_type");
+    if search_type == SearchEventType::Dashboards
+        || (req.query.size == -1 && search_type != SearchEventType::UI)
     {
         // sort partitions by timestamp in desc
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
