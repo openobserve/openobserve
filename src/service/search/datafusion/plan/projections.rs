@@ -236,8 +236,8 @@ mod tests {
 
     async fn get_sql(sql: &str) -> Sql {
         let schema = Schema::new(get_fields());
-        infra::schema::init().await.unwrap();
-        infra::schema::merge("parse_test", "default", StreamType::Logs, &schema, None)
+        infra::db_init().await.unwrap();
+        infra::schema::merge("parse_test", "default", StreamType::Logs, &schema, Some(1752660674351000))
             .await
             .unwrap();
         let query = SearchQuery {
