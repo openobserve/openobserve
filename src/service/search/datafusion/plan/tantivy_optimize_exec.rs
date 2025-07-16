@@ -350,50 +350,155 @@ fn create_top_n_arrow_array(
     let count_field = &schema.fields()[1];
 
     // Create field value array with proper type based on schema
-    let field_array = match field_field.data_type() {
-        arrow_schema::DataType::Utf8 => {
-            Arc::new(arrow::array::StringArray::from(field_values)) as Arc<dyn Array>
-        }
-        arrow_schema::DataType::LargeUtf8 => {
-            Arc::new(arrow::array::LargeStringArray::from(field_values)) as Arc<dyn Array>
-        }
-        arrow_schema::DataType::Utf8View => {
-            Arc::new(arrow::array::StringViewArray::from(field_values)) as Arc<dyn Array>
-        }
-        // Handle other string types as needed
-        _ => {
-            return Err(DataFusionError::Internal(format!(
-                "Unexpected field type in TopN schema: {:?}",
-                field_field.data_type()
-            )));
-        }
-    };
+    let field_array = create_field_array(field_field, field_values)?;
 
     // Create count array with proper type based on schema
-    let count_array = match count_field.data_type() {
+    let count_array = create_count_array(count_field, count_values)?;
+
+    Ok(vec![field_array, count_array])
+}
+
+/// Helper function to create field arrays with proper type conversion
+fn create_field_array(
+    field: &arrow_schema::Field,
+    field_values: Vec<String>,
+) -> Result<Arc<dyn Array>, DataFusionError> {
+    match field.data_type() {
+        arrow_schema::DataType::Utf8 => {
+            Ok(Arc::new(arrow::array::StringArray::from(field_values)) as Arc<dyn Array>)
+        }
+        arrow_schema::DataType::LargeUtf8 => {
+            Ok(Arc::new(arrow::array::LargeStringArray::from(field_values)) as Arc<dyn Array>)
+        }
+        arrow_schema::DataType::Utf8View => {
+            Ok(Arc::new(arrow::array::StringViewArray::from(field_values)) as Arc<dyn Array>)
+        }
+        arrow_schema::DataType::Int64 => parse_i64_array(&field_values),
+        arrow_schema::DataType::UInt64 => parse_u64_array(&field_values),
+        arrow_schema::DataType::Float64 => parse_f64_array(&field_values),
+        arrow_schema::DataType::Boolean => parse_bool_array(&field_values),
+        // Handle other string types as needed
+        _ => Err(DataFusionError::Internal(format!(
+            "Unexpected field type in TopN schema: {:?}",
+            field.data_type()
+        ))),
+    }
+}
+
+/// Helper function to create count arrays with proper type conversion
+fn create_count_array(
+    field: &arrow_schema::Field,
+    count_values: Vec<u64>,
+) -> Result<Arc<dyn Array>, DataFusionError> {
+    match field.data_type() {
         arrow_schema::DataType::Int64 => {
             let i64_values = count_values.iter().map(|&c| c as i64).collect::<Vec<_>>();
-            Arc::new(Int64Array::from(i64_values)) as Arc<dyn Array>
+            Ok(Arc::new(Int64Array::from(i64_values)) as Arc<dyn Array>)
         }
         arrow_schema::DataType::UInt64 => {
-            Arc::new(UInt64Array::from(count_values)) as Arc<dyn Array>
+            Ok(Arc::new(UInt64Array::from(count_values)) as Arc<dyn Array>)
         }
         arrow_schema::DataType::Int32 => {
             let i32_values = count_values.iter().map(|&c| c as i32).collect::<Vec<_>>();
-            Arc::new(arrow::array::Int32Array::from(i32_values)) as Arc<dyn Array>
+            Ok(Arc::new(arrow::array::Int32Array::from(i32_values)) as Arc<dyn Array>)
         }
         arrow_schema::DataType::UInt32 => {
             let u32_values = count_values.iter().map(|&c| c as u32).collect::<Vec<_>>();
-            Arc::new(arrow::array::UInt32Array::from(u32_values)) as Arc<dyn Array>
+            Ok(Arc::new(arrow::array::UInt32Array::from(u32_values)) as Arc<dyn Array>)
         }
         // Add other numeric types as needed
-        _ => {
-            return Err(DataFusionError::Internal(format!(
-                "Unexpected count type in TopN schema: {:?}",
-                count_field.data_type()
-            )));
-        }
-    };
+        _ => Err(DataFusionError::Internal(format!(
+            "Unexpected count type in TopN schema: {:?}",
+            field.data_type()
+        ))),
+    }
+}
 
-    Ok(vec![field_array, count_array])
+/// Parse string values into i64 array
+fn parse_i64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusionError> {
+    let parsed_values = field_values
+        .iter()
+        .map(|v| {
+            if v.is_empty() {
+                Ok(0i64)
+            } else {
+                v.parse::<i64>()
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| DataFusionError::Internal(format!("Failed to parse i64 in topn: {}", e)))?;
+
+    Ok(Arc::new(arrow::array::Int64Array::from(parsed_values)) as Arc<dyn Array>)
+}
+
+/// Parse string values into u64 array
+fn parse_u64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusionError> {
+    let parsed_values = field_values
+        .iter()
+        .map(|v| {
+            if v.is_empty() {
+                Ok(0u64)
+            } else {
+                v.parse::<u64>()
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| DataFusionError::Internal(format!("Failed to parse u64 in topn: {}", e)))?;
+
+    Ok(Arc::new(arrow::array::UInt64Array::from(parsed_values)) as Arc<dyn Array>)
+}
+
+/// Parse string values into f64 array
+fn parse_f64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusionError> {
+    let parsed_values = field_values
+        .iter()
+        .map(|v| {
+            if v.is_empty() {
+                Ok(0.0f64)
+            } else {
+                v.parse::<f64>()
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| DataFusionError::Internal(format!("Failed to parse f64 in topn: {}", e)))?;
+
+    Ok(Arc::new(arrow::array::Float64Array::from(parsed_values)) as Arc<dyn Array>)
+}
+
+/// Parse string values into bool array
+fn parse_bool_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusionError> {
+    let parsed_values = field_values
+        .iter()
+        .map(|v| {
+            if v.is_empty() {
+                Ok(false)
+            } else {
+                v.parse::<bool>()
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| DataFusionError::Internal(format!("Failed to parse bool in topn: {}", e)))?;
+
+    Ok(Arc::new(arrow::array::BooleanArray::from(parsed_values)) as Arc<dyn Array>)
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow::array::Float64Array;
+
+    use super::*;
+
+    #[test]
+    fn test_parse_f64_array() {
+        let f64_values = vec![1.0, 0.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY];
+        let field_values = f64_values.iter().map(|v| v.to_string()).collect::<Vec<_>>();
+        let array = parse_f64_array(&field_values).unwrap();
+        let array_values = array.as_any().downcast_ref::<Float64Array>().unwrap();
+        assert_eq!(array_values.len(), 5);
+        assert_eq!(array_values.value(0), 1.0);
+        assert_eq!(array_values.value(1), 0.0);
+        assert!(array_values.value(2).is_nan());
+        assert_eq!(array_values.value(3), f64::INFINITY);
+        assert_eq!(array_values.value(4), f64::NEG_INFINITY);
+    }
 }
