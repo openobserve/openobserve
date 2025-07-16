@@ -717,11 +717,7 @@ const useStreams = () => {
   const isStreamExists = (streamName: string, streamType: string) => {
     try {
       // Check if the required objects exist before accessing them
-      if (!store.state?.streams?.streamsIndexMapping) {
-        return false;
-      }
-      
-      if (!store.state.streams.streamsIndexMapping[streamType]) {
+      if (!store.state?.streams?.streamsIndexMapping?.[streamType]) {
         return false;
       }
       
