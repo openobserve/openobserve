@@ -333,9 +333,12 @@ export const usePanelDataLoader = (
   };
 
   const cancelQueryAbort = () => {
+    // Only set isPartialData to true if the panel was still loading
+    if (state.loading) {
+      state.isPartialData = true; // Set to true when cancelled
+    }
     state.loading = false;
     state.isOperationCancelled = true;
-    state.isPartialData = true; // Set to true when cancelled
 
     if (
       isStreamingEnabled(store.state) &&
