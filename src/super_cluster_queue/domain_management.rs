@@ -15,7 +15,6 @@
 
 use infra::errors::{Error, Result};
 use o2_enterprise::enterprise::{
-    domain_management::db::DOMAIN_MANAGEMENT_KEY,
     super_cluster::queue::{Message, MessageType}
 };
 
