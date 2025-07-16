@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::Reverse, collections::BinaryHeap, io::Error};
+use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, get, post, web};
 use arrow_schema::Schema;
@@ -1044,7 +1044,7 @@ async fn values_v1(
     let req_query = config::meta::search::Query {
         sql: query_sql,
         from: 0,
-        size: config::meta::sql::MAX_LIMIT,
+        size: 10, // TODO: use a env?
         start_time,
         end_time,
         uses_zo_fn: uses_fn,
@@ -1087,6 +1087,12 @@ async fn values_v1(
     } else {
         format!("WHERE {where_str}")
     };
+
+    // Get the size from query parameter for limiting results
+    let size = query
+        .get("size")
+        .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
+
     for field in &fields {
         let http_span = http_span.clone();
         // skip values for field which aren't part of the schema
@@ -1121,11 +1127,11 @@ async fn values_v1(
 
         let sql = if no_count {
             format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
+                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC limit {size}"
             )
         } else {
             format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
+                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC limit {size}"
             )
         };
         let mut req = req.clone();
@@ -1165,13 +1171,8 @@ async fn values_v1(
     let mut hit_values: Vec<json::Value> = Vec::new();
     let mut work_group_set = Vec::with_capacity(query_results.len());
 
-    // Get the size from query parameter for limiting results
-    let size = query
-        .get("size")
-        .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
-
     for (key, ret) in query_results {
-        let mut top_hits: HashMap<String, i64> = HashMap::default();
+        let mut top_hits: Vec<(String, i64)> = Vec::with_capacity(ret.hits.len());
         for row in ret.hits {
             let key = row
                 .get("zo_sql_key")
@@ -1181,67 +1182,23 @@ async fn values_v1(
                 .get("zo_sql_num")
                 .map(|v| v.as_i64().unwrap_or(0))
                 .unwrap_or(0);
-            let key_num = top_hits.entry(key).or_insert(0);
-            *key_num += num;
+            top_hits.push((key, num))
         }
 
-        // Use a min heap (BinaryHeap with Reverse) to find top k elements
-        let mut min_heap: BinaryHeap<Reverse<(i64, String)>> =
-            BinaryHeap::with_capacity(size as usize);
+        let top_hits = top_hits
+            .into_iter()
+            .map(|(k, v)| {
+                let mut item = json::Map::new();
+                item.insert("zo_sql_key".to_string(), json::Value::String(k));
+                item.insert("zo_sql_num".to_string(), json::Value::Number(v.into()));
+                json::Value::Object(item)
+            })
+            .collect::<Vec<_>>();
 
-        if no_count {
-            // For alphabetical sorting, collect all entries first
-            let mut all_entries: Vec<_> = top_hits.into_iter().collect();
-            all_entries.sort_by(|a, b| a.0.cmp(&b.0));
-            all_entries.truncate(size as usize);
-
-            let top_hits = all_entries
-                .into_iter()
-                .map(|(k, v)| {
-                    let mut item = json::Map::new();
-                    item.insert("zo_sql_key".to_string(), json::Value::String(k));
-                    item.insert("zo_sql_num".to_string(), json::Value::Number(v.into()));
-                    json::Value::Object(item)
-                })
-                .collect::<Vec<_>>();
-
-            let mut field_value: json::Map<String, json::Value> = json::Map::new();
-            field_value.insert("field".to_string(), json::Value::String(key));
-            field_value.insert("values".to_string(), json::Value::Array(top_hits));
-            hit_values.push(json::Value::Object(field_value));
-        } else {
-            // For value-based sorting, use a min heap to get top k elements
-            for (k, v) in top_hits {
-                if min_heap.len() < size as usize {
-                    // If heap not full, just add
-                    min_heap.push(Reverse((v, k)));
-                } else if !min_heap.is_empty() && v > min_heap.peek().unwrap().0.0 {
-                    // If current value is larger than smallest in heap, replace it
-                    min_heap.pop();
-                    min_heap.push(Reverse((v, k)));
-                }
-            }
-
-            // Convert heap to vector and sort in descending order
-            let mut top_elements: Vec<_> =
-                min_heap.into_iter().map(|Reverse((v, k))| (k, v)).collect();
-            top_elements.sort_by(|a, b| b.1.cmp(&a.1));
-
-            let top_hits = top_elements
-                .into_iter()
-                .map(|(k, v)| {
-                    let mut item = json::Map::new();
-                    item.insert("zo_sql_key".to_string(), json::Value::String(k));
-                    item.insert("zo_sql_num".to_string(), json::Value::Number(v.into()));
-                    json::Value::Object(item)
-                })
-                .collect::<Vec<_>>();
-
-            let mut field_value: json::Map<String, json::Value> = json::Map::new();
-            field_value.insert("field".to_string(), json::Value::String(key));
-            field_value.insert("values".to_string(), json::Value::Array(top_hits));
-            hit_values.push(json::Value::Object(field_value));
-        }
+        let mut field_value: json::Map<String, json::Value> = json::Map::new();
+        field_value.insert("field".to_string(), json::Value::String(key));
+        field_value.insert("values".to_string(), json::Value::Array(top_hits));
+        hit_values.push(json::Value::Object(field_value));
 
         resp.scan_size = std::cmp::max(resp.scan_size, ret.scan_size);
         resp.scan_records = std::cmp::max(resp.scan_records, ret.scan_records);
