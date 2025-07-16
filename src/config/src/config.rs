@@ -1108,6 +1108,8 @@ pub struct Common {
         help = "Enable to show symbol in dashboard"
     )]
     pub dashboard_show_symbol_enabled: bool,
+    #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")] // use comma to split
+    pub default_hec_stream: String,
 }
 
 #[derive(EnvConfig)]
@@ -2232,6 +2234,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows == 0
     {
         cfg.common.feature_join_right_side_max_rows = 50_000;
+    }
+
+    if cfg.common.default_hec_stream.is_empty() {
+        cfg.common.default_hec_stream = "_hec".to_string();
     }
 
     Ok(())

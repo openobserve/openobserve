@@ -15,7 +15,7 @@
 use std::io::{BufRead, BufReader};
 
 use actix_web::web;
-use config::{meta::stream::StreamType, utils::json};
+use config::{get_config, meta::stream::StreamType, utils::json};
 use hashbrown::HashMap;
 use serde::Deserialize;
 
@@ -26,7 +26,7 @@ use crate::{
 
 #[derive(Deserialize, Clone)]
 struct HecEntry {
-    index: String,
+    index: Option<String>,
     time: Option<i64>,
     fields: Option<json::Value>,
     event: json::Value,
@@ -42,6 +42,10 @@ pub async fn ingest(
     if check_ingestion_allowed(org_id, StreamType::Logs, None).is_err() {
         return Ok(HecStatus::InvalidIndex.into());
     }
+
+    let cfg = get_config();
+
+    let default = &cfg.common.default_hec_stream;
 
     let reader = BufReader::new(body.as_ref());
     let mut streams: HashMap<String, Vec<json::Value>> = HashMap::new();
@@ -80,7 +84,16 @@ pub async fn ingest(
             }
         }
 
-        streams.entry(value.index).or_default().push(data);
+        let index = if let Some(idx) = value.index {
+            idx
+        } else if !default.is_empty() {
+            default.clone()
+        } else {
+            log::error!("expected default hec stream to always be present, found to be empty");
+            return Ok(HecStatus::InvalidIndex.into());
+        };
+
+        streams.entry(index).or_default().push(data);
     }
 
     for (stream, entries) in streams {
