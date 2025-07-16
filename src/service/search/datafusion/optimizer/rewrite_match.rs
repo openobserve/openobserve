@@ -193,16 +193,16 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
 
 fn create_like_expr_with_not_null(field: &str, item: Expr) -> Expr {
     Expr::BinaryExpr(BinaryExpr {
-        left: Box::new(Expr::Like(Like {
+        left: Box::new(Expr::IsNotNull(Box::new(Expr::Column(
+            Column::new_unqualified(field),
+        )))),
+        right: Box::new(Expr::Like(Like {
             negated: false,
             expr: Box::new(Expr::Column(Column::new_unqualified(field))),
             pattern: Box::new(item),
             escape_char: None,
             case_insensitive: true,
         })),
-        right: Box::new(Expr::IsNotNull(Box::new(Expr::Column(
-            Column::new_unqualified(field),
-        )))),
         op: Operator::And,
     })
 }
@@ -445,16 +445,16 @@ mod tests {
         assert_eq!(
             expr,
             Expr::BinaryExpr(BinaryExpr {
-                left: Box::new(Expr::Like(Like {
+                left: Box::new(Expr::IsNotNull(Box::new(Expr::Column(
+                    Column::new_unqualified(field),
+                )))),
+                right: Box::new(Expr::Like(Like {
                     negated: false,
                     expr: Box::new(Expr::Column(Column::new_unqualified(field))),
                     pattern: Box::new(item),
                     escape_char: None,
                     case_insensitive: true,
                 })),
-                right: Box::new(Expr::IsNotNull(Box::new(Expr::Column(
-                    Column::new_unqualified(field),
-                )))),
                 op: Operator::And,
             }),
         );
