@@ -21,7 +21,6 @@ use std::{
     sync::Arc,
 };
 
-use config::TIMESTAMP_COL_NAME;
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use tantivy::{
@@ -214,7 +213,7 @@ pub async fn warm_up_terms(
     searcher: &tantivy::Searcher,
     terms_grouped_by_field: &HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>>,
     need_all_term_fields: Vec<tantivy::schema::Field>,
-    need_fast_field: bool,
+    need_fast_field: Option<String>,
 ) -> anyhow::Result<()> {
     let mut warm_up_fields_futures = Vec::new();
     let mut warm_up_fields_term_futures = Vec::new();
@@ -235,20 +234,6 @@ pub async fn warm_up_terms(
         }
     }
 
-    // only warm up fast fields if needed
-    if need_fast_field {
-        for segment_reader in searcher.segment_readers() {
-            // only warm up fast fields once per segment
-            let segment_id = segment_reader.segment_id();
-            if !warmed_segments.contains(&segment_id) {
-                let fast_field_reader = segment_reader.fast_fields();
-                warm_up_fast_fields_futures
-                    .push(async move { warm_up_fastfield(fast_field_reader).await });
-                warmed_segments.insert(segment_id);
-            }
-        }
-    }
-
     // warn up the all term fields
     for field in need_all_term_fields {
         for segment_reader in searcher.segment_readers() {
@@ -258,6 +243,21 @@ pub async fn warm_up_terms(
                 .push(async move { inv_idx_clone.warm_postings_full(false).await });
             warm_up_fields_term_futures
                 .push(async move { inv_idx.terms().warm_up_dictionary().await });
+        }
+    }
+
+    // warm up fast fields if needed
+    if let Some(field_name) = need_fast_field {
+        for segment_reader in searcher.segment_readers() {
+            // only warm up fast fields once per segment
+            let field_name = field_name.clone();
+            let segment_id = segment_reader.segment_id();
+            if !warmed_segments.contains(&segment_id) {
+                let fast_field_reader = segment_reader.fast_fields();
+                warm_up_fast_fields_futures
+                    .push(async move { warm_up_fastfield(fast_field_reader, field_name).await });
+                warmed_segments.insert(segment_id);
+            }
         }
     }
 
@@ -279,9 +279,10 @@ pub async fn warm_up_terms(
 // warm up the fast field, only support _timestamp field
 async fn warm_up_fastfield(
     fast_field_reader: &tantivy::fastfield::FastFieldReaders,
+    field_name: String,
 ) -> anyhow::Result<()> {
     let columns = fast_field_reader
-        .list_dynamic_column_handles(TIMESTAMP_COL_NAME)
+        .list_dynamic_column_handles(field_name.as_str())
         .await?;
     futures::future::try_join_all(
         columns
