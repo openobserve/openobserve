@@ -1093,6 +1093,8 @@ pub struct Common {
     pub dashboard_placeholder: String,
     #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
     pub aggregation_cache_enabled: bool,
+    #[env_config(name = "ZO_AGGREGATION_TOPK_ENABLED", default = true)]
+    pub aggregation_topk_enabled: bool,
     #[env_config(name = "ZO_SEARCH_INSPECTOR_ENABLED", default = false)]
     pub search_inspector_enabled: bool,
     #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = true)]
@@ -1568,8 +1570,6 @@ pub struct DiskCache {
     pub result_max_size: usize,
     #[env_config(name = "ZO_DISK_AGGREGATION_CACHE_MAX_SIZE", default = 0)]
     pub aggregation_max_size: usize,
-    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
-    pub aggregation_cache_enabled: bool,
     // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
@@ -1870,6 +1870,24 @@ pub struct Pipeline {
         help = "Use shared HTTP client instances for better connection pooling"
     )]
     pub use_shared_http_client: bool,
+    #[env_config(
+        name = "ZO_PIPELINE_REMOVE_FILE_AFTER_MAX_RETRY",
+        default = true,
+        help = "Remove wal file after max retry"
+    )]
+    pub remove_file_after_max_retry: bool,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_RETRY_COUNT",
+        default = 10,
+        help = "pipeline exporter client max retry count"
+    )]
+    pub max_retry_count: u32,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_RETRY_TIME_IN_HOURS",
+        default = 24,
+        help = "pipeline exporter client max retry time in hours"
+    )]
+    pub max_retry_time_in_hours: u64,
 }
 
 #[derive(EnvConfig)]

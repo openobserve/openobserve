@@ -109,7 +109,7 @@ impl Default for DistinctValues {
 
 impl DistinctValues {
     pub fn new() -> Self {
-        tokio::task::spawn(async move { run_flush().await });
+        tokio::task::spawn(run_flush());
         Self {
             channel: handle_channel(),
             shutdown: Arc::new(AtomicBool::new(false)),

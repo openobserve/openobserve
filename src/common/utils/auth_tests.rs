@@ -46,7 +46,6 @@ mod tests {
     const GROUP_NAME: &str = "TEST_GROUP_NAME";
     const PIPELINE_ID: &str = "TEST_PIPELINE_ID";
     const SHORT_URL_ID: &str = "TEST_SHORT_URL_ID";
-    const WS_REQUEST_ID: &str = "TEST_WS_REQUEST_ID";
     const ACTION_KSUID: &str = "TEST_ACTION_KSUID";
     const CIPHER_KEY_ID: &str = "TEST_CIPHER_KEY_ID";
 
@@ -2985,6 +2984,10 @@ mod tests {
                 timeout: u64::default(),
                 max_connections: usize::default(),
             },
+            http_streaming: config::HttpStreaming {
+                streaming_response_chunk_size: usize::default(),
+                streaming_enabled: bool::default(),
+            },
             common: config::Common {
                 app_name: String::default(),
                 local_mode: bool::default(),
@@ -3115,6 +3118,7 @@ mod tests {
                 file_list_dump_min_hour: Default::default(),
                 file_list_dump_debug_check: Default::default(),
                 aggregation_cache_enabled: bool::default(),
+                aggregation_topk_enabled: bool::default(),
                 use_stream_settings_for_partitions_enabled: Default::default(),
                 dashboard_placeholder: Default::default(),
                 search_inspector_enabled: bool::default(),
@@ -3291,7 +3295,6 @@ mod tests {
                 multi_dir: String::default(),
                 aggregation_max_size: usize::default(),
                 delay_window_mins: i64::default(),
-                aggregation_cache_enabled: bool::default(),
             },
             log: config::Log {
                 level: String::default(),

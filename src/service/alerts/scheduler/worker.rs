@@ -140,7 +140,6 @@ impl SchedulerWorker {
         if let Err(e) = handler_job.await {
             return Err(anyhow::anyhow!("Error in handler: {}", e));
         }
-
         Ok(())
     }
 }
@@ -166,7 +165,7 @@ impl SchedulerJobPuller {
             // Check how many workers are available
             let trace_id = config::ider::uuid();
 
-            log::info!("[SCHEDULER][JobPuller-{trace_id}] Pulling jobs");
+            log::debug!("[SCHEDULER][JobPuller-{trace_id}] Pulling jobs");
 
             // Pull only as many jobs as we have workers
             let triggers = match self.pull().await {
@@ -177,7 +176,7 @@ impl SchedulerJobPuller {
                 }
             };
 
-            log::info!(
+            log::debug!(
                 "[SCHEDULER][JobPuller-{}] Pulled {} jobs from scheduler",
                 trace_id,
                 triggers.len()
@@ -198,7 +197,7 @@ impl SchedulerJobPuller {
 
                 // Print counts for each module
                 for (module, triggers) in grouped_triggers {
-                    log::info!(
+                    log::debug!(
                         "[SCHEDULER] [JobPuller-{}] Pulled {:?}: {} jobs",
                         trace_id,
                         module,

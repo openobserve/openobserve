@@ -3,6 +3,7 @@ import LogsVisualise from "../../pages/dashboardPages/visualise.js";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import logData from "../../cypress/fixtures/log.json";
+import PageManager from "../../pages/page-manager";
 
 test.describe.configure({ mode: "parallel" });
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
@@ -24,26 +25,26 @@ test.describe("visualization VRL testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
 
-    const logsVisualise = new LogsVisualise(page);
+    const pm = new PageManager(page);
     await selectStreamAndStreamTypeForLogs(page, logData.Stream);
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.logsApplyQueryButton();
   });
 
   test("should allow adding a VRL function in the visualization chart", async ({
     page,
   }) => {
     // Setup
-    const logsVisualise = new LogsVisualise(page);
+    const pm = new PageManager(page);
 
-    await logsVisualise.setRelative("4", "d");
+    await pm.logsVisualise.setRelative("4", "d");
 
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Open visualise tab and add Vrl
-    await logsVisualise.openVisualiseTab();
-    await logsVisualise.vrlFunctionEditor(".VRL=1000");
+    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.vrlFunctionEditor(".VRL=1000");
     await page.waitForTimeout(1000);
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Add VRL field to the chart
     await page
@@ -53,7 +54,7 @@ test.describe("visualization VRL testcases", () => {
       .click();
 
     // Wait for query to complete
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Check if VRL field is visible
     const vrlField = page.locator(
@@ -68,14 +69,14 @@ test.describe("visualization VRL testcases", () => {
   test.skip('should display an error message when the VRL field is not updated after closing the "Toggle function editor"', async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    const pm = new PageManager(page);
 
     // Set relative date and time
-    await logsVisualise.setRelative("6", "d");
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("6", "d");
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Open visualise tab and add VRL field to the chart
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
 
     // Add 'kubernetes_annotations_kubernetes_io_psp' field to the chart
     await page
@@ -85,11 +86,11 @@ test.describe("visualization VRL testcases", () => {
       .click();
 
     // Open the VRL function editor and add VRL function
-    await logsVisualise.vrlFunctionEditor(".vrL=1000");
+    await pm.logsVisualise.vrlFunctionEditor(".vrL=1000");
     await page.waitForTimeout(1000);
 
     // Run the query and wait for completion
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
@@ -97,40 +98,40 @@ test.describe("visualization VRL testcases", () => {
       .click();
 
     // Run the query and wait for completion
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Show query toggle
-    await logsVisualise.showQueryToggle();
+    await pm.logsVisualise.showQueryToggle();
 
     // Run the query and wait for completion
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Remove VRL field from the chart
     await page.locator('[data-test="dashboard-y-item-vrl-remove"]').click();
 
     // Run the query and wait for completion
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
   });
 
   test("should not show an error when adding a VRL function field to the Breakdown, X axis, or Y axis fields", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    const pm = new PageManager(page);
 
     // Set a relative time range and apply the query
-    await logsVisualise.setRelative("6", "d");
+    await pm.logsVisualise.setRelative("6", "d");
 
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Open the Visualise tab and enter a VRL function
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
 
-    await logsVisualise.vrlFunctionEditor(".VRL=1000");
+    await pm.logsVisualise.vrlFunctionEditor(".VRL=1000");
 
     await page.waitForTimeout(1000);
 
     // Run the query and wait for completion
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Add the VRL field to the Breakdown and Y axis fields
     // await page
@@ -149,7 +150,7 @@ test.describe("visualization VRL testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
       )
       .click();
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Remove the existing X axis field and add the VRL field to the X axis
     await page
@@ -161,7 +162,7 @@ test.describe("visualization VRL testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-x-data"]'
       )
       .click();
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Verify that the VRL field is visible in the Breakdown, Y axis, and X axis
     const breakdownField = await page
@@ -184,14 +185,14 @@ test.describe("visualization VRL testcases", () => {
   test("should display an error message if an invalid VRL function is added", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    const pm = new PageManager(page);
 
     // Set a relative time range and apply the query
-    await logsVisualise.setRelative("6", "d");
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("6", "d");
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Open the Visualise tab
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
 
     // Add the fields
     await page
@@ -204,17 +205,17 @@ test.describe("visualization VRL testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]'
       )
       .click();
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Enter an invalid VRL function (".vrl=11abc") and apply
-    await logsVisualise.vrlFunctionEditor(".vrl=11abc");
+    await pm.logsVisualise.vrlFunctionEditor(".vrl=11abc");
     await page.waitForTimeout(1000);
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Enter a valid VRL function
-    await logsVisualise.vrlFunctionEditor(".vrl=123");
+    await pm.logsVisualise.vrlFunctionEditor(".vrl=123");
     await page.waitForTimeout(1000);
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Add the 'vrl' field to the chart
     await page
@@ -222,26 +223,26 @@ test.describe("visualization VRL testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-y-data"]'
       )
       .click();
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
   });
 
   test("should not update the search query when adding or updating a VRL field", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    const pm = new PageManager(page);
 
     // Set a relative time range and apply the query
-    await logsVisualise.setRelative("6", "d");
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("6", "d");
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Open the Visualise tab and enable SQL mode
-    await logsVisualise.openVisualiseTab();
-    await logsVisualise.enableSQLMode();
+    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.enableSQLMode();
 
     // Set a new relative time range and apply the query
-    await logsVisualise.setRelative("6", "w");
-    await logsVisualise.runQueryAndWaitForCompletion();
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.openVisualiseTab();
 
     // Expect the search query to still be the same
     await expect(
@@ -251,9 +252,9 @@ test.describe("visualization VRL testcases", () => {
     ).toBeVisible();
 
     // Enter a valid VRL function and apply it
-    await logsVisualise.vrlFunctionEditor(".vrl=100");
+    await pm.logsVisualise.vrlFunctionEditor(".vrl=100");
     await page.waitForTimeout(1000);
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Add the 'vrl' field to the chart and apply
     await page
@@ -261,7 +262,7 @@ test.describe("visualization VRL testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Expect the search query to still be the same
     await expect(
@@ -274,16 +275,17 @@ test.describe("visualization VRL testcases", () => {
   test.skip("should display an error if the VRL field is not updated from the Breakdown", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
     // Set a relative time range and apply the query
-    await logsVisualise.setRelative("6", "d");
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("6", "d");
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Open the Visualise tab and enter a valid VRL function and apply
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
     await page.waitForTimeout(1000);
-    await logsVisualise.vrlFunctionEditor(".vrlsanity=100");
-    await logsVisualise.applyQueryButtonVisualise();
+    await pm.logsVisualise.vrlFunctionEditor(".vrlsanity=100");
+    await pm.logsVisualise.applyQueryButtonVisualise();
 
     // Wait for the VRL field to be added to the Breakdown
     await page.waitForTimeout(3000);
@@ -296,7 +298,7 @@ test.describe("visualization VRL testcases", () => {
       .click();
 
     // Apply the query again
-    await logsVisualise.applyQueryButtonVisualise();
+    await pm.logsVisualise.applyQueryButtonVisualise();
 
     await page
       .locator("div")
@@ -311,17 +313,17 @@ test.describe("visualization VRL testcases", () => {
   test("should update the data on the chart when changing the time after applying a VRL field", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    const pm = new PageManager(page);
 
     // Set a relative time range (6 weeks) and apply the query
-    await logsVisualise.setRelative("6", "w");
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Open the Visualise tab and add VRL  function and apply
-    await logsVisualise.openVisualiseTab();
-    await logsVisualise.vrlFunctionEditor(".vrl=123");
+    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.vrlFunctionEditor(".vrl=123");
     await page.waitForTimeout(1000);
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Add the 'vrl' field to the chart
     await page
@@ -339,25 +341,25 @@ test.describe("visualization VRL testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
-    await logsVisualise.setRelative("4", "w");
+    await pm.logsVisualise.setRelative("4", "w");
 
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
   });
 
   test("should not show an error when changing the chart type after adding a VRL function field", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    const pm = new PageManager(page);
 
     // Set a relative time range and apply the query
-    await logsVisualise.setRelative("6", "d");
+    await pm.logsVisualise.setRelative("6", "d");
 
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Open the Visualise tab
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
     let errorDetected = false;
 
     page.on("console", (msg) => {
@@ -374,11 +376,11 @@ test.describe("visualization VRL testcases", () => {
     await page.waitForTimeout(5000);
 
     // Enter a VRL function and apply it
-    await logsVisualise.vrlFunctionEditor(".VRLsanity=1000");
+    await pm.logsVisualise.vrlFunctionEditor(".VRLsanity=1000");
 
     await page.waitForTimeout(1000);
 
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // Add the VRL field to the Y axis
     await page
@@ -393,7 +395,7 @@ test.describe("visualization VRL testcases", () => {
       )
       .click();
 
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
 
     // List of chart types to test
 

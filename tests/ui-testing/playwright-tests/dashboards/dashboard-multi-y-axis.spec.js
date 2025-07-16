@@ -3,16 +3,8 @@ import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
-import {
-  waitForDashboardPage,
-  deleteDashboard,
-} from "./utils/dashCreation.js";
-import DashboardPanel from "../../pages/dashboardPages/dashboard-panel-edit.js";
-import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart.js";
-import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
-import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
-import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
-import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
+import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+import PageManager from "../../pages/page-manager";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -37,37 +29,40 @@ test.describe("dashboard multi y axis testcases", () => {
   test("Should correctly add multiple Y-axes to the stacked chart type.", async ({
     page,
   }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardPage = new DashboardListPage(page);
-    const dashboardPageActions = new DashboardactionPage(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dateTimeHelper = new DateTimeHelper(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // Generate a unique panel name
     const panelName =
-      dashboardPageActions.generateUniquePanelName("Test_Panel");
-    await dashboardPage.menuItem("dashboards-item");
+      pm.dashboardPanelActions.generateUniquePanelName("Test_Panel");
+    await pm.dashboardList.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     // Add a new panel and configure it
-    await dashboardCreate.addPanel();
-    await chartTypeSelector.selectChartType("stacked");
-    await chartTypeSelector.selectStreamType("logs");
-    await chartTypeSelector.selectStream("e2e_automate");
-    await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
-    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
-    await chartTypeSelector.searchAndAddField("kubernetes_labels_name", "b");
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectChartType("stacked");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_namespace_name",
+      "y"
+    );
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "y"
+    );
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_labels_name", "b");
 
     // Set the relative time range
-    await dateTimeHelper.setRelativeTimeRange("6-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
 
     // Apply the configuration and wait for the chart to render
-    await dashboardPageActions.applyDashboardBtn();
-    await dashboardPageActions.waitForChartToRender();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open the query inspector and verify the SQL query
     await page
@@ -85,8 +80,8 @@ test.describe("dashboard multi y axis testcases", () => {
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Add the panel name and save the panel
-    await dashboardPageActions.addPanelName(panelName);
-    await dashboardPageActions.savePanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
 
     // Go back to the dashboard list and delete the created dashboard
     await page.locator('[data-test="dashboard-back-btn"]').click();
@@ -96,37 +91,40 @@ test.describe("dashboard multi y axis testcases", () => {
   test("should correctly display and update multiple Y-axes in edit panel.", async ({
     page,
   }) => {
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardPage = new DashboardListPage(page);
-    const dashboardPageActions = new DashboardactionPage(page);
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardPanel = new DashboardPanel(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const panelName =
-      dashboardPageActions.generateUniquePanelName("Test_Panel");
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
-    await dashboardPage.menuItem("dashboards-item");
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("Test_Panel");
+
+    await pm.dashboardList.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     // Add a new panel and configure it
-    await dashboardCreate.addPanel();
-    await chartTypeSelector.selectChartType("stacked");
-    await chartTypeSelector.selectStreamType("logs");
-    await chartTypeSelector.selectStream("e2e_automate");
-    await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
-    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
-    await chartTypeSelector.searchAndAddField("kubernetes_labels_name", "b");
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectChartType("stacked");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_namespace_name",
+      "y"
+    );
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "y"
+    );
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_labels_name", "b");
 
     // Set the relative time range
-    await dateTimeHelper.setRelativeTimeRange("6-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
 
     // Apply the configuration and wait for the chart to render
-    await dashboardPageActions.applyDashboardBtn();
-    await dashboardPageActions.waitForChartToRender();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open the query inspector and verify the SQL query
     await page
@@ -144,18 +142,18 @@ test.describe("dashboard multi y axis testcases", () => {
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Edit the panel to add another field to Y-axis
-    await dashboardPageActions.addPanelName(panelName);
-    await dashboardPageActions.savePanel();
-    await dashboardPanel.editPanel(panelName);
-    await chartTypeSelector.searchAndAddField("kubernetes_labels_name", "y");
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
+    await pm.dashboardPanelEdit.editPanel(panelName);
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_labels_name", "y");
 
     // Apply the updated configuration and wait for the chart to render
-    await dashboardPageActions.applyDashboardBtn();
-    await dashboardPageActions.waitForChartToRender();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Add the panel name and save the panel
-    await dashboardPageActions.addPanelName(panelName);
-    await dashboardPageActions.savePanel();
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
 
     // Go back to the dashboard list and delete the created dashboard
     await page.locator('[data-test="dashboard-back-btn"]').click();
