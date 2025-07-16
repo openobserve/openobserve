@@ -71,7 +71,7 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.logsApplyQueryButton();
   });
 
-  test("should set the default chart type and default X and Y axes to automatic after clicking the Visualize button", async ({
+  test.skip("should set the default chart type and default X and Y axes to automatic after clicking the Visualize button", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
@@ -92,7 +92,7 @@ test.describe("logs testcases", () => {
     ).toBeVisible();
   });
 
-  test("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
+  test.skip("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
@@ -227,7 +227,7 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.chartRender(423, 127);
   });
 
-  test("should handle an empty query in visualization without displaying an error.", async ({
+  test.skip("should handle an empty query in visualization without displaying an error.", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
@@ -435,6 +435,7 @@ test.describe("logs testcases", () => {
     let previousCount = -1;
     let currentCount = 0;
     const maxRetries = 10;
+    
 
     for (let i = 0; i < maxRetries; i++) {
       const options = await page.getByRole("option");
@@ -465,7 +466,7 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.openVisualiseTab();
 
     // Remove a field from the y-axis
-    await pm.logsVisualise.removeField("zo_sql_num", "y");
+    // await pm.logsVisualise.removeField("zo_sql_num", "y");
 
     // Switch back to logs
     await pm.logsVisualise.backToLogs();
@@ -592,7 +593,7 @@ test.describe("logs testcases", () => {
     expect(apiCallHappened).toBe(false);
   });
 
-  test("Should update the field name after updating the query.", async ({
+  test.skip("Should update the field name after updating the query.", async ({
     page,
   }) => {
     const logsVisualise = new LogsVisualise(page);

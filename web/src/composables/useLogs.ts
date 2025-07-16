@@ -5600,9 +5600,15 @@ const useLogs = () => {
     if((isPagination && searchPartitionMap[payload.traceId] === 1) || !appendResult){
       searchObj.data.queryResults.hits = response.content.results.hits;
     } else if (appendResult) {
-      searchObj.data.queryResults.hits.push(
-        ...response.content.results.hits,
-      );
+      // if order by is desc, append new partition response at end
+      if (searchObj.data.queryResults.order_by?.toLowerCase() === "desc") {
+        searchObj.data.queryResults.hits.push(...response.content.results.hits);
+      } else {
+        // else append new partition response at start
+        searchObj.data.queryResults.hits.unshift(
+          ...response.content.results.hits,
+        );
+      }
     } 
     
     if (searchObj.meta.refreshInterval === 0) {

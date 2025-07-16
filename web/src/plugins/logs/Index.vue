@@ -1668,9 +1668,9 @@ export default defineComponent({
           return;
         }
 
-        if (!isValid(true, true)) {
+        // if (!isValid(true, true)) {
           // return;
-        }
+        // }
 
         // reset searchResponseForVisualization
         searchResponseForVisualization.value = {};
