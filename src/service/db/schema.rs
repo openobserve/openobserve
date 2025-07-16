@@ -138,11 +138,11 @@ pub async fn delete(
         // Since we are storing the current size of the table in bytes in the meta table,
         // when we delete enrichment table, we need to delete the size from the db as well.
         if let Err(e) = super::enrichment_table::delete_table_size(org_id, stream_name).await {
-            log::error!("Failed to delete table size: {}", e);
+            log::error!("Failed to delete table size: {e}");
         }
         if let Err(e) = super::enrichment_table::delete_meta_table_stats(org_id, stream_name).await
         {
-            log::error!("Failed to delete meta table stats: {}", e);
+            log::error!("Failed to delete meta table stats: {e}");
         }
     }
 
@@ -296,7 +296,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 break;
             }
         };
-        log::debug!("[Schema:watch] Received event: {:?}", ev);
+        log::debug!("[Schema:watch] Received event: {ev:?}");
         match ev {
             db::Event::Put(ev) => {
                 let key_columns = ev.key.split('/').collect::<Vec<&str>>();
@@ -334,7 +334,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     match db::list_values_by_start_dt(&format!("{ev_key}/"), ts_range).await {
                         Ok(val) => val,
                         Err(e) => {
-                            log::error!("[Schema:watch] Error getting value: {}", e);
+                            log::error!("[Schema:watch] Error getting value: {e}");
                             continue;
                         }
                     };
@@ -348,9 +348,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         Ok(val) => val,
                         Err(e) => {
                             log::error!(
-                                "[Schema:watch] Error parsing schema, key: {}, error: {}",
-                                item_key,
-                                e
+                                "[Schema:watch] Error parsing schema, key: {item_key}, error: {e}"
                             );
                             continue;
                         }
@@ -361,12 +359,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
                 let latest_schema = latest_schema.pop().unwrap();
                 let settings = unwrap_stream_settings(&latest_schema).unwrap_or_default();
-                if settings.store_original_data || settings.index_original_data {
-                    if let dashmap::Entry::Vacant(entry) =
+                if (settings.store_original_data || settings.index_original_data)
+                    && let dashmap::Entry::Vacant(entry) =
                         STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
-                    {
-                        entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
-                    }
+                {
+                    entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
                 }
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
@@ -429,10 +426,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     || cfg.common.usage_enabled
                     || audit_enabled)
                     && !ORGANIZATIONS.read().await.contains_key(org_id)
+                    && let Err(e) = check_and_create_org(org_id).await
                 {
-                    if let Err(e) = check_and_create_org(org_id).await {
-                        log::error!("Failed to save organization in database: {}", e);
-                    }
+                    log::error!("Failed to save organization in database: {e}");
                 }
             }
             db::Event::Delete(ev) => {
@@ -470,7 +466,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 if let Err(e) =
                     super::compact::files::del_offset(org_id, stream_type, stream_name).await
                 {
-                    log::error!("[Schema:watch] del_offset: {}", e);
+                    log::error!("[Schema:watch] del_offset: {e}");
                 }
 
                 if stream_type.eq(&StreamType::EnrichmentTables) && is_local_disk_storage() {
@@ -479,11 +475,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         get_config().common.data_wal_dir
                     );
                     let path = std::path::Path::new(&data_dir);
-                    if path.exists() {
-                        if let Err(e) = tokio::fs::remove_dir_all(path).await {
-                            log::error!("[Schema:watch] remove_dir_all: {}", e);
-                        };
-                    }
+                    if path.exists()
+                        && let Err(e) = tokio::fs::remove_dir_all(path).await
+                    {
+                        log::error!("[Schema:watch] remove_dir_all: {e}");
+                    };
                 }
             }
             db::Event::Empty => {}
@@ -498,7 +494,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let items_num = items.len();
     let mut schemas: HashMap<String, Vec<(i64, Bytes)>> = HashMap::with_capacity(items_num);
 
-    log::info!("Cache schema got {} items", items_num);
+    log::info!("Cache schema got {items_num} items");
     for (i, (key, val)) in items.into_iter().enumerate() {
         let key = key.strip_prefix(db_key).unwrap();
         let columns = key.split('/').take(4).collect::<Vec<_>>();
@@ -508,10 +504,10 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let entry = schemas.entry(item_key).or_insert(Vec::new());
         entry.push((start_dt, val));
         if i % 1000 == 0 {
-            log::info!("Cache schema progress: {}/{}", i, items_num);
+            log::info!("Cache schema progress: {i}/{items_num}");
         }
     }
-    log::info!("Stream schemas Cached {} schemas", items_num);
+    log::info!("Stream schemas Cached {items_num} schemas");
     let keys_num = schemas.keys().len();
     let keys = schemas.keys().map(|k| k.to_string()).collect::<Vec<_>>();
     for (i, item_key) in keys.iter().enumerate() {
@@ -531,12 +527,11 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         let latest_schema = latest_schema.last().unwrap();
         let settings = unwrap_stream_settings(latest_schema).unwrap_or_default();
-        if settings.store_original_data || settings.index_original_data {
-            if let dashmap::Entry::Vacant(entry) =
+        if (settings.store_original_data || settings.index_original_data)
+            && let dashmap::Entry::Vacant(entry) =
                 STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
-            {
-                entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
-            }
+        {
+            entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
         }
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key.to_string(), settings);
@@ -567,7 +562,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             log::info!("Stream schemas Cached progress: {}/{}", i, keys.len());
         }
     }
-    log::info!("Stream schemas Cached {} streams", keys_num);
+    log::info!("Stream schemas Cached {keys_num} streams");
     Ok(())
 }
 

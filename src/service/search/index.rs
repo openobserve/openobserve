@@ -18,7 +18,10 @@ use std::{
     sync::Arc,
 };
 
-use config::{INDEX_FIELD_NAME_FOR_ALL, utils::tantivy::tokenizer::o2_collect_tokens};
+use config::{
+    INDEX_FIELD_NAME_FOR_ALL, get_config,
+    utils::tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_tokens},
+};
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},
     logical_expr::Operator,
@@ -31,7 +34,7 @@ use datafusion::{
 };
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
-use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
+use sqlparser::ast::{BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments};
 use tantivy::{
     Term,
     query::{
@@ -44,6 +47,15 @@ use tantivy::{
 use super::{
     datafusion::udf::fuzzy_match_udf,
     utils::{is_field, is_value, split_conjunction, trim_quotes},
+};
+use crate::service::search::{
+    datafusion::udf::{
+        MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+        STR_MATCH_UDF_NAME,
+        match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+        str_match_udf,
+    },
+    utils::get_field_name,
 };
 
 pub fn get_index_condition_from_expr(
@@ -100,6 +112,8 @@ impl Debug for IndexCondition {
 pub enum Condition {
     // field, value
     Equal(String, String),
+    // field, value, case_sensitive
+    StrMatch(String, String, bool),
     In(String, Vec<String>),
     Regex(String, String),
     MatchAll(String),
@@ -165,6 +179,15 @@ impl IndexCondition {
         projection
     }
 
+    pub fn need_all_term_fields(&self) -> Vec<String> {
+        self.conditions
+            .iter()
+            .flat_map(|condition| condition.need_all_term_fields())
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect()
+    }
+
     pub fn to_physical_expr(
         &self,
         schema: &arrow_schema::Schema,
@@ -189,14 +212,20 @@ impl Condition {
     // this only use for display the query
     pub fn to_query(&self) -> String {
         match self {
-            Condition::Equal(field, value) => format!("{}={}", field, value),
+            Condition::Equal(field, value) => format!("{field}={value}"),
+            Condition::StrMatch(field, value, case_sensitive) => {
+                if *case_sensitive {
+                    format!("str_match({field}, '{value}')")
+                } else {
+                    format!("str_match_ignore_case({field}, '{value}')")
+                }
+            }
             Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
-            Condition::Regex(field, value) => format!("{}=~{}", field, value),
-            Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
-            Condition::FuzzyMatchAll(value, distance) => format!(
-                "{}:fuzzy({}, {})",
-                INDEX_FIELD_NAME_FOR_ALL, value, distance
-            ),
+            Condition::Regex(field, value) => format!("{field}=~{value}"),
+            Condition::MatchAll(value) => format!("{INDEX_FIELD_NAME_FOR_ALL}:{value}"),
+            Condition::FuzzyMatchAll(value, distance) => {
+                format!("{INDEX_FIELD_NAME_FOR_ALL}:fuzzy({value}, {distance})")
+            }
             Condition::All() => "ALL".to_string(),
             Condition::Or(left, right) => format!("({} OR {})", left.to_query(), right.to_query()),
             Condition::And(left, right) => {
@@ -232,7 +261,7 @@ impl Condition {
             }
             Expr::Function(func) => {
                 let fn_name = func.name.to_string().to_lowercase();
-                if fn_name == "match_all" {
+                if fn_name == MATCH_ALL_UDF_NAME {
                     if let FunctionArguments::List(list) = &func.args {
                         if list.args.len() != 1 {
                             unreachable!()
@@ -241,7 +270,7 @@ impl Condition {
                     } else {
                         unreachable!()
                     }
-                } else if fn_name == "fuzzy_match_all" {
+                } else if fn_name == FUZZY_MATCH_ALL_UDF_NAME {
                     if let FunctionArguments::List(list) = &func.args {
                         if list.args.len() != 2 {
                             unreachable!()
@@ -251,6 +280,30 @@ impl Condition {
                             .parse()
                             .unwrap_or(1);
                         Condition::FuzzyMatchAll(value, distance)
+                    } else {
+                        unreachable!()
+                    }
+                } else if fn_name == STR_MATCH_UDF_NAME || fn_name == MATCH_FIELD_UDF_NAME {
+                    if let FunctionArguments::List(list) = &func.args {
+                        if list.args.len() != 2 {
+                            unreachable!()
+                        }
+                        let field = get_arg_name(&list.args[0]);
+                        let value = trim_quotes(list.args[1].to_string().as_str());
+                        Condition::StrMatch(field, value, true)
+                    } else {
+                        unreachable!()
+                    }
+                } else if fn_name == STR_MATCH_UDF_IGNORE_CASE_NAME
+                    || fn_name == MATCH_FIELD_IGNORE_CASE_UDF_NAME
+                {
+                    if let FunctionArguments::List(list) = &func.args {
+                        if list.args.len() != 2 {
+                            unreachable!()
+                        }
+                        let field = get_arg_name(&list.args[0]);
+                        let value = trim_quotes(list.args[1].to_string().as_str());
+                        Condition::StrMatch(field, value, false)
                     } else {
                         unreachable!()
                     }
@@ -305,40 +358,55 @@ impl Condition {
                 let field = schema.get_field(field)?;
                 Box::new(RegexQuery::from_pattern(value, field)?)
             }
+            Condition::StrMatch(field, value, case_sensitive) => {
+                let field = schema.get_field(field)?;
+                Box::new(ContainsQuery::new(value, field, *case_sensitive)?)
+            }
             Condition::MatchAll(value) => {
                 let default_field = default_field.ok_or_else(|| {
                     anyhow::anyhow!("There's no FullTextSearch field for match_all() function")
                 })?;
-                if value.starts_with("*") && value.ends_with("*") {
+                if value.is_empty() || value == "*" {
+                    Box::new(AllQuery {})
+                } else if value.starts_with("*") && value.ends_with("*") {
                     let value = format!(".*{}.*", value.trim_matches('*'));
                     Box::new(RegexQuery::from_pattern(&value, default_field)?)
-                } else if value.to_lowercase().starts_with("re:") {
-                    let value = value[3..].trim();
-                    Box::new(RegexQuery::from_pattern(value, default_field)?)
-                } else if value.ends_with("*") {
-                    let value = value.strip_suffix("*").unwrap();
-                    Box::new(PhrasePrefixQuery::new_with_offset(vec![(
-                        0,
-                        Term::from_field_text(default_field, value),
-                    )]))
                 } else {
                     if value.is_empty() {
                         return Err(anyhow::anyhow!(
                             "The value of match_all() function can't be empty"
                         ));
                     }
-                    let mut terms: Vec<Box<dyn Query>> = o2_collect_tokens(value)
+                    let mut tokens = o2_collect_tokens(value);
+                    let last_prefix = if value.ends_with("*") {
+                        tokens.pop()
+                    } else {
+                        None
+                    };
+                    let mut terms: Vec<Box<dyn Query>> = tokens
                         .into_iter()
                         .map(|value| {
                             let term = Term::from_field_text(default_field, &value);
                             Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _
                         })
                         .collect();
-                    if terms.len() > 1 {
-                        Box::new(BooleanQuery::intersection(terms))
-                    } else {
-                        terms.remove(0)
+                    if let Some(value) = last_prefix {
+                        terms.push(Box::new(PhrasePrefixQuery::new_with_offset(vec![(
+                            0,
+                            Term::from_field_text(default_field, &value),
+                        )])));
                     }
+                    if !terms.is_empty() {
+                        Ok(if terms.len() > 1 {
+                            Box::new(BooleanQuery::intersection(terms))
+                        } else {
+                            terms.remove(0)
+                        })
+                    } else {
+                        Err(anyhow::anyhow!(
+                            "The value of match_all() function can't be empty"
+                        ))
+                    }?
                 }
             }
             Condition::FuzzyMatchAll(value, distance) => {
@@ -369,10 +437,31 @@ impl Condition {
         })
     }
 
+    pub fn need_all_term_fields(&self) -> Vec<String> {
+        match self {
+            Condition::StrMatch(field, ..) => vec![field.clone()],
+            Condition::Regex(field, _) => vec![field.clone()],
+            Condition::MatchAll(value) => {
+                if (value.len() > 1 && (value.starts_with("*") || value.ends_with("*")))
+                    || (value.len() > 3 && value.starts_with("re:"))
+                {
+                    vec![INDEX_FIELD_NAME_FOR_ALL.to_string()]
+                } else {
+                    vec![]
+                }
+            }
+            Condition::FuzzyMatchAll(..) => vec![INDEX_FIELD_NAME_FOR_ALL.to_string()],
+            _ => vec![],
+        }
+    }
+
     pub fn get_tantivy_fields(&self) -> HashSet<String> {
         let mut fields = HashSet::new();
         match self {
             Condition::Equal(field, _) => {
+                fields.insert(field.clone());
+            }
+            Condition::StrMatch(field, ..) => {
                 fields.insert(field.clone());
             }
             Condition::In(field, _) => {
@@ -400,6 +489,9 @@ impl Condition {
         let mut fields = HashSet::new();
         match self {
             Condition::Equal(field, _) => {
+                fields.insert(field.clone());
+            }
+            Condition::StrMatch(field, ..) => {
                 fields.insert(field.clone());
             }
             Condition::In(field, _) => {
@@ -436,6 +528,24 @@ impl Condition {
                 let right = get_scalar_value(value, field.data_type())?;
                 Ok(Arc::new(BinaryExpr::new(left, Operator::Eq, right)))
             }
+            Condition::StrMatch(name, value, case_sensitive) => {
+                let index = schema.index_of(name).unwrap();
+                let left = Arc::new(Column::new(name, index));
+                let field = schema.field(index);
+                let right = get_scalar_value(value, field.data_type())?;
+                let udf = if *case_sensitive {
+                    Arc::new(str_match_udf::STR_MATCH_UDF.clone())
+                } else {
+                    Arc::new(str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone())
+                };
+                let udf_expr = Arc::new(ScalarFunctionExpr::new(
+                    udf.name(),
+                    udf.clone(),
+                    vec![left, right],
+                    DataType::Boolean,
+                ));
+                Ok(udf_expr)
+            }
             Condition::In(name, values) => {
                 let index = schema.index_of(name).unwrap();
                 let left = Arc::new(Column::new(name, index));
@@ -455,7 +565,13 @@ impl Condition {
                     .trim_start_matches('*') // contains
                     .trim_end_matches('*') // prefix or contains
                     .to_string();
-                let term = Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))));
+                let term = if get_config().common.utf8_view_enabled {
+                    Arc::new(Literal::new(ScalarValue::Utf8View(Some(format!(
+                        "%{value}%"
+                    )))))
+                } else {
+                    Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))))
+                };
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
                     Vec::with_capacity(fst_fields.len());
                 for field in fst_fields.iter() {
@@ -476,7 +592,11 @@ impl Condition {
             }
             Condition::FuzzyMatchAll(value, distance) => {
                 let fuzzy_expr = Arc::new(fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
-                let term = Arc::new(Literal::new(ScalarValue::Utf8(Some(value.clone()))));
+                let term = if get_config().common.utf8_view_enabled {
+                    Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
+                } else {
+                    Arc::new(Literal::new(ScalarValue::Utf8(Some(value.to_string()))))
+                };
                 let distance = Arc::new(Literal::new(ScalarValue::Int64(Some(*distance as i64))));
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
                     Vec::with_capacity(fst_fields.len());
@@ -517,9 +637,10 @@ impl Condition {
     pub fn can_remove_filter(&self) -> bool {
         match self {
             Condition::Equal(..) => true,
+            Condition::StrMatch(..) => true,
             Condition::In(..) => true,
             Condition::Regex(..) => false,
-            Condition::MatchAll(v) => is_blank_or_alphanumeric(v),
+            Condition::MatchAll(v) => is_alphanumeric(v),
             Condition::FuzzyMatchAll(..) => false,
             Condition::All() => true,
             Condition::Or(left, right) => left.can_remove_filter() && right.can_remove_filter(),
@@ -577,7 +698,7 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
         }
         Expr::Function(func) => {
             let fn_name = func.name.to_string().to_lowercase();
-            if fn_name == "match_all" {
+            if fn_name == MATCH_ALL_UDF_NAME {
                 if let FunctionArguments::List(list) = &func.args {
                     if list.args.len() != 1 {
                         return false;
@@ -585,9 +706,24 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
                 } else {
                     return false;
                 }
-            } else if fn_name == "fuzzy_match_all" {
+            } else if fn_name == FUZZY_MATCH_ALL_UDF_NAME {
                 if let FunctionArguments::List(list) = &func.args {
                     if list.args.len() != 2 {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            } else if fn_name == STR_MATCH_UDF_NAME
+                || fn_name == STR_MATCH_UDF_IGNORE_CASE_NAME
+                || fn_name == MATCH_FIELD_UDF_NAME
+                || fn_name == MATCH_FIELD_IGNORE_CASE_UDF_NAME
+            {
+                if let FunctionArguments::List(list) = &func.args {
+                    if list.args.len() != 2 {
+                        return false;
+                    }
+                    if !index_fields.contains(&get_arg_name(&list.args[0])) {
                         return false;
                     }
                 } else {
@@ -601,15 +737,6 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
         _ => return false,
     }
     true
-}
-
-// Note: the expr should be Identifier or CompoundIdentifier
-fn get_field_name(expr: &Expr) -> String {
-    match expr {
-        Expr::Identifier(ident) => trim_quotes(ident.to_string().as_str()),
-        Expr::CompoundIdentifier(ident) => trim_quotes(ident[1].to_string().as_str()),
-        _ => unreachable!(),
-    }
 }
 
 fn get_value(expr: &Expr) -> String {
@@ -655,11 +782,29 @@ fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, a
         DataType::Binary => Arc::new(Literal::new(ScalarValue::Binary(Some(
             value.as_bytes().to_vec(),
         )))),
+        DataType::Utf8View => {
+            Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
+        }
         _ => unimplemented!(),
     })
 }
 
-fn is_blank_or_alphanumeric(s: &str) -> bool {
+pub(crate) fn get_arg_name(args: &FunctionArg) -> String {
+    match args {
+        FunctionArg::Named { name, .. } => name.to_string(),
+        FunctionArg::ExprNamed { name, .. } => get_field_name(name),
+        FunctionArg::Unnamed(arg) => match arg {
+            FunctionArgExpr::Expr(expr) => get_field_name(expr),
+            _ => unimplemented!("str_match not support filed type: {:?}", arg),
+        },
+    }
+}
+
+fn is_alphanumeric(s: &str) -> bool {
+    s.chars().all(|c| c.is_ascii_alphanumeric())
+}
+
+fn _is_blank_or_alphanumeric(s: &str) -> bool {
     s.chars()
         .all(|c| c.is_ascii_whitespace() || c.is_ascii_alphanumeric())
 }
@@ -893,5 +1038,31 @@ mod tests {
         // Should deduplicate the field names
         assert_eq!(fields.len(), 1);
         assert!(fields.contains("field1"));
+    }
+
+    // add some test for str_match
+    #[test]
+    fn test_str_match() {
+        let condition = Condition::StrMatch("field1".to_string(), "value1".to_string(), true);
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_is_alphanumeric() {
+        assert!(is_alphanumeric("123"));
+        assert!(is_alphanumeric("123abc"));
+        assert!(!is_alphanumeric("123 abc"));
+        assert!(!is_alphanumeric("123 abc 123"));
+    }
+
+    #[test]
+    fn test_is_blank_or_alphanumeric() {
+        assert!(_is_blank_or_alphanumeric("123"));
+        assert!(_is_blank_or_alphanumeric("123abc"));
+        assert!(_is_blank_or_alphanumeric("123 abc"));
+        assert!(_is_blank_or_alphanumeric("123 abc 123"));
     }
 }

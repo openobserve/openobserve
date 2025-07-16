@@ -52,7 +52,7 @@ pub async fn init() {
         return;
     }
     // enable keep alive for auth token
-    tokio::task::spawn(async move { keep_alive_connection().await });
+    tokio::task::spawn(keep_alive_connection());
 }
 
 pub struct Etcd {
@@ -163,12 +163,11 @@ impl super::Db for Etcd {
             Ok(v) => v,
             Err(e) => {
                 return Err(Error::Message(format!(
-                    "dist_lock key: {}, acquire error: {}",
-                    lock_key, e
+                    "dist_lock key: {lock_key}, acquire error: {e}",
                 )));
             }
         };
-        log::info!("Acquired lock for cluster key: {}", lock_key);
+        log::info!("Acquired lock for cluster key: {lock_key}");
 
         // get value and update
         let value = self.get_key_value(key).await.ok();
@@ -178,26 +177,25 @@ impl super::Db for Etcd {
             Err(e) => Err(e),
             Ok(None) => Ok(()),
             Ok(Some((value, new_value))) => {
-                if let Some(value) = value {
-                    if let Err(e) = self.put(&old_key.unwrap(), value, need_watch, None).await {
-                        if let Err(e) = dist_lock::unlock(&locker).await {
-                            log::error!("dist_lock unlock err: {}", e);
-                        }
-                        log::info!("Released lock for cluster key: {}", lock_key);
-                        return Err(e);
+                if let Some(value) = value
+                    && let Err(e) = self.put(&old_key.unwrap(), value, need_watch, None).await
+                {
+                    if let Err(e) = dist_lock::unlock(&locker).await {
+                        log::error!("dist_lock unlock err: {e}");
                     }
+                    log::info!("Released lock for cluster key: {lock_key}");
+                    return Err(e);
                 }
-                if let Some((new_key, new_value, new_start_dt)) = new_value {
-                    if let Err(e) = self
+                if let Some((new_key, new_value, new_start_dt)) = new_value
+                    && let Err(e) = self
                         .put(&new_key, new_value, need_watch, new_start_dt)
                         .await
-                    {
-                        if let Err(e) = dist_lock::unlock(&locker).await {
-                            log::error!("dist_lock unlock err: {}", e);
-                        }
-                        log::info!("Released lock for cluster key: {}", lock_key);
-                        return Err(e);
+                {
+                    if let Err(e) = dist_lock::unlock(&locker).await {
+                        log::error!("dist_lock unlock err: {e}");
                     }
+                    log::info!("Released lock for cluster key: {lock_key}");
+                    return Err(e);
                 }
                 Ok(())
             }
@@ -205,9 +203,9 @@ impl super::Db for Etcd {
 
         // release lock
         if let Err(e) = dist_lock::unlock(&locker).await {
-            log::error!("dist_lock unlock err: {}", e);
+            log::error!("dist_lock unlock err: {e}");
         }
-        log::info!("Released lock for cluster key: {}", lock_key);
+        log::info!("Released lock for cluster key: {lock_key}");
         ret
     }
 
@@ -444,12 +442,12 @@ impl super::Db for Etcd {
                 }
                 let mut client = get_etcd_client().await.clone();
                 let opt = etcd_client::WatchOptions::new().with_prefix();
-                log::debug!("[ETCD:watch] prefix: {}", prefix);
+                log::debug!("[ETCD:watch] prefix: {prefix}");
                 let (mut _watcher, mut stream) =
                     match client.watch(key.clone(), Some(opt.clone())).await {
                         Ok((watcher, stream)) => (watcher, stream),
                         Err(e) => {
-                            log::error!("[ETCD:watch] prefix: {}, error: {}", key, e);
+                            log::error!("[ETCD:watch] prefix: {key}, error: {e}");
                             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                             continue;
                         }
@@ -458,7 +456,7 @@ impl super::Db for Etcd {
                     let resp = match stream.message().await {
                         Ok(resp) => resp,
                         Err(e) => {
-                            log::error!("[ETCD:watch] prefix: {}, get message error: {}", key, e);
+                            log::error!("[ETCD:watch] prefix: {key}, get message error: {e}");
                             break;
                         }
                     };
@@ -481,10 +479,7 @@ impl super::Db for Etcd {
                             };
                             if let Err(e) = ret {
                                 log::warn!(
-                                    "[ETCD:watch] prefix: {}, key: {}, send error: {}",
-                                    prefix,
-                                    item_key,
-                                    e
+                                    "[ETCD:watch] prefix: {prefix}, key: {item_key}, send error: {e}"
                                 );
                             }
                         }
@@ -554,7 +549,7 @@ pub async fn keep_alive_connection() -> Result<()> {
             match client.get(key, None).await {
                 Ok(ret) => for _item in ret.kvs() {},
                 Err(e) => {
-                    log::error!("keep alive connection error: {:?}", e);
+                    log::error!("keep alive connection error: {e}");
                     break;
                 }
             };
@@ -578,7 +573,7 @@ where
         let (mut keeper, mut stream) = match client.lease_keep_alive(id).await {
             Ok((keeper, stream)) => (keeper, stream),
             Err(e) => {
-                log::error!("lease {:?} keep alive error: {:?}", id, e);
+                log::error!("lease {id:?} keep alive error: {e:?}");
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
@@ -591,7 +586,7 @@ where
             match keeper.keep_alive().await {
                 Ok(_) => {}
                 Err(e) => {
-                    log::error!("lease {:?} keep alive do keeper error: {:?}", id, e);
+                    log::error!("lease {id:?} keep alive do keeper error: {e:?}");
                     ttl_keep_alive = 1;
                     break;
                 }
@@ -599,7 +594,7 @@ where
             match stream.message().await {
                 Ok(v) => {
                     if v.unwrap().ttl() == 0 {
-                        log::error!("lease {:?} keep alive ttl is 0", id);
+                        log::error!("lease {id:?} keep alive ttl is 0");
                         return Err(Error::from(etcd_client::Error::LeaseKeepAliveError(
                             "lease expired or revoked".to_string(),
                         )));
@@ -607,7 +602,7 @@ where
                     ttl_keep_alive = min(10, (ttl / 2) as u64);
                 }
                 Err(e) => {
-                    log::error!("lease {:?} keep alive receive message: {:?}", id, e);
+                    log::error!("lease {id:?} keep alive receive message: {e:?}");
                     ttl_keep_alive = 1;
                     break;
                 }

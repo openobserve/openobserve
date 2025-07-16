@@ -84,7 +84,7 @@ pub async fn set(
             .content_type(ContentType::plaintext())
             .body("OK")),
         Err(e) => {
-            log::error!("Setting KV value: {}, error: {}", key, e);
+            log::error!("Setting KV value: {key}, error: {e}");
             Ok(HttpResponse::InternalServerError()
                 .content_type(ContentType::plaintext())
                 .body("Error".to_string()))
@@ -153,7 +153,7 @@ pub async fn list(org_id: web::Path<String>, in_req: HttpRequest) -> Result<Http
     match kv::list(&org_id, prefix).await {
         Ok(keys) => Ok(MetaHttpResponse::json(keys)),
         Err(err) => {
-            log::error!("list KV keys: {}, error: {}", prefix, err);
+            log::error!("list KV keys: {prefix}, error: {err}");
             let keys: Vec<String> = Vec::new();
             Ok(MetaHttpResponse::json(keys))
         }

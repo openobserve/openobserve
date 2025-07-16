@@ -74,3 +74,46 @@ pub(crate) fn label_replace(
         .collect();
     Ok(Value::Vector(rate_values))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_label_replace_function() {
+        let eval_ts = 1000;
+
+        // Create instant values with labels
+        let labels = vec![
+            Arc::new(Label::new("instance", "server-123.example.com")),
+            Arc::new(Label::new("job", "web")),
+        ];
+
+        let instant_value = InstantValue {
+            labels,
+            sample: crate::service::promql::value::Sample::new(eval_ts, 42.0),
+        };
+
+        let vector = Value::Vector(vec![instant_value]);
+        let result = label_replace(
+            vector,
+            "hostname",
+            "$1",
+            "instance",
+            r"server-(\d+)\.example\.com",
+        )
+        .unwrap();
+
+        // Should return a vector with replaced label
+        match result {
+            Value::Vector(v) => {
+                assert_eq!(v.len(), 1);
+                // Check that the hostname label was added
+                let hostname_label = v[0].labels.iter().find(|l| l.name == "hostname");
+                assert!(hostname_label.is_some());
+                assert_eq!(hostname_label.unwrap().value, "123");
+            }
+            _ => panic!("Expected Vector result"),
+        }
+    }
+}

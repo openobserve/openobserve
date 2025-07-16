@@ -38,14 +38,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="pipelineObj.currentSelectedPipeline.name"
           :label="t('pipeline.pipelineName')"
-          style="border: 1px solid #eaeaea; width: calc(30vw);"
+          style="border: 1px solid #eaeaea; width: calc(30vw)"
           filled
-          dense          
+          dense    
         />
       </div>
     </div>
 
     <div class="flex justify-end">
+        <q-btn
+
+              outline
+              class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode"
+              size="sm"
+              no-caps
+              icon="code"
+              data-test="pipeline-json-edit-btn"
+              @click="openJsonEditor"
+            >
+              <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
+            </q-btn>
       <q-btn
         data-test="add-pipeline-cancel-btn"
         label="Cancel"
@@ -83,7 +95,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator class="q-mb-md" />
 
       <div class="flex q-mt-sm">
-        <NodeSidebar v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'" :nodeTypes="nodeTypes"  />
+        <NodeSidebar
+          v-show="
+            !pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'
+          "
+          :nodeTypes="nodeTypes"
+        />
       </div>
     </div>
     <div
@@ -138,10 +155,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ExternalDestination
         v-if="pipelineObj.dialog.name === 'remote_stream'"
         @cancel:hideform="resetDialog"
-       />
-      
+      />
     </div>
   </q-dialog>
+  <q-dialog
+        v-model="showJsonEditorDialog"
+        position="right"
+        full-height
+        maximized
+        :persistent="true"
+      >
+        <JsonEditor
+          :data="pipelineObj.currentSelectedPipeline"
+          :title="'Edit Pipeline JSON'"
+          :type="'pipelines'"
+          :validation-errors="validationErrors"
+          @close="showJsonEditorDialog = false"
+          @saveJson="savePipelineJson"
+        />
+      </q-dialog>
   <confirm-dialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
@@ -168,6 +200,7 @@ import {
   watch,
   ref,
   type Ref,
+  defineEmits,
 } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import AssociateFunction from "@/components/pipeline/NodeForm/AssociateFunction.vue";
@@ -187,6 +220,8 @@ import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
 import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
 import { MarkerType } from "@vue-flow/core";
 import ExternalDestination from "./NodeForm/ExternalDestination.vue";
+import JsonEditor from "../common/JsonEditor.vue";
+import { validatePipeline as validatePipelineUtil, type ValidationResult } from '../../utils/validatePipeline';
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
@@ -195,6 +230,8 @@ const externalOutputImage = getImageURL("images/pipeline/externalOutput.svg");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
+import useStreams from "@/composables/useStreams";
+import usePipelines from "@/composables/usePipelines";
 
 import config from "@/aws-exports";
 
@@ -353,7 +390,7 @@ const nodeTypes: any = [
     icon: "img:" + streamOutputImage,
     tooltip: "Destination: Stream Node",
     isSectionHeader: false,
-  }
+  },
 ];
 const functions = ref<{ [key: string]: Function }>({});
 
@@ -374,7 +411,11 @@ const nodeLinks = ref<{ [key: string]: NodeLink }>({});
 const refreshFunctionList = () => {
   getFunctions();
 };
+const { getUsedStreamsList, getPipelineDestinations } = usePipelines();
 const functionOptions = ref<string[]>([]);
+const pipelineDestinationsList = ref<any[]>([]);
+const usedStreamsListResponse = ref<any[]>([]);
+
 
 const streamRoutes = ref<{ [key: string]: any }>({});
 
@@ -388,11 +429,14 @@ const chartContainerRef = ref(null);
 
 const isPipelineSaving = ref(false);
 
+const { getStreams } = useStreams();
+
 const nodeRows = ref<(string | null)[]>([]);
 
 const q = useQuasar();
 
 const confirmDialogBasicPipeline = ref(false);
+const showJsonEditorDialog = ref(false);
 const associatedFunctions: Ref<string[]> = ref([]);
 
 const { t } = useI18n();
@@ -404,6 +448,8 @@ const dialog = ref({
   message: "",
   okCallback: () => {},
 });
+
+const validationErrors = ref<string[]>([]);
 
 onBeforeMount(() => {
   if (config.isEnterprise == "true") {
@@ -427,8 +473,10 @@ onBeforeMount(() => {
   getFunctions();
 });
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
+  pipelineDestinationsList.value = await getPipelineDestinations();
+  usedStreamsListResponse.value = await getUsedStreamsList();
   const { path, query } = router.currentRoute.value; 
     if (path.includes("edit") && !query.id) {
       router.push({
@@ -438,12 +486,11 @@ onMounted(() => {
         }
       })
     }
-});
+  });
 
 onUnmounted(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
 });
-
 
 let forceSkipBeforeUnloadListener = false;
 
@@ -587,6 +634,9 @@ const savePipeline = async () => {
       position: "bottom",
       timeout: 3000,
     });
+    if(showJsonEditorDialog.value == true){
+      validationErrors.value = ["Source node is required"];
+    }
     return;
   } else if (outputNodeIndex === -1) {
     q.notify({
@@ -595,6 +645,9 @@ const savePipeline = async () => {
       position: "bottom",
       timeout: 3000,
     });
+    if(showJsonEditorDialog.value == true){
+      validationErrors.value = ["Destination node is required"];
+    }
     return;
   } else {
     pipelineObj.currentSelectedPipeline.nodes.map((node: any) => {
@@ -626,11 +679,14 @@ const savePipeline = async () => {
       position: "bottom",
       timeout: 3000,
     });
+    if(showJsonEditorDialog.value == true){
+      validationErrors.value = ["Please connect all nodes before saving"];
+    }
     return;
   }
 
   const isValid = isValidNodes(pipelineObj.currentSelectedPipeline.nodes);
-  if (!isValid) {
+  if (!isValid && showJsonEditorDialog.value == false) {
     confirmDialogBasicPipeline.value = true;
     return;
   }
@@ -644,15 +700,23 @@ const confirmSaveBasicPipeline = async () => {
 };
 const validatePipeline = () => {
   // Find input node
-  const inputNode = pipelineObj.currentSelectedPipeline.nodes?.find((node: any) => node.type === 'input');
+  const inputNode = pipelineObj.currentSelectedPipeline.nodes?.find(
+    (node: any) => node.type === "input",
+  );
 
-  const outputNode = pipelineObj.currentSelectedPipeline.nodes?.find((node: any) => node.type === 'output');
-  
+  const outputNode = pipelineObj.currentSelectedPipeline.nodes?.find(
+    (node: any) => node.type === "output",
+  );
 
   // If trying to use enrichment_tables with stream input, return false
-  if ( inputNode.data?.node_type === 'stream' && outputNode.data?.node_type === 'stream' && outputNode.data?.stream_type === 'enrichment_tables') {
+  if (
+    inputNode.data?.node_type === "stream" &&
+    outputNode.data?.node_type === "stream" &&
+    outputNode.data?.stream_type === "enrichment_tables"
+  ) {
     q.notify({
-      message: "Enrichment tables as destination stream is only available for scheduled pipelines",
+      message:
+        "Enrichment tables as destination stream is only available for scheduled pipelines",
       color: "negative",
       position: "bottom",
       timeout: 2000,
@@ -665,9 +729,15 @@ const validatePipeline = () => {
 
 const onSubmitPipeline = async () => {
   isPipelineSaving.value = true;
-  if(!validatePipeline()){
-    isPipelineSaving.value = false;
-    return;
+  // if(!validatePipeline()){
+  //   isPipelineSaving.value = false;
+  //   return;
+  // }
+  if(showJsonEditorDialog.value == false){
+    if(!validatePipeline()){
+      isPipelineSaving.value = false;
+      return;
+    }
   }
   const dismiss = q.notify({
     message: "Saving pipeline...",
@@ -687,21 +757,63 @@ const onSubmitPipeline = async () => {
 
   saveOperation
     .then(() => {
-      if (pipelineObj.isEditPipeline) {
+      if (pipelineObj.isEditPipeline && showJsonEditorDialog.value == false) {
         pipelineObj.isEditPipeline = false;
-      }
+
+        router.push({
+          name: "pipelines",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+      });
       q.notify({
-        message: "Pipeline saved successfully",
+        message: "Pipeline Updated successfully",
         color: "positive",
         position: "bottom",
         timeout: 3000,
       });
-      router.push({
-        name: "pipelines",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
+      }
+      else if (!pipelineObj.isEditPipeline && showJsonEditorDialog.value == false) {
+        showJsonEditorDialog.value = false;
+        router.push({
+          name: "pipelines",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
       });
+        q.notify({
+          message: "Pipeline saved successfully",
+          color: "positive",
+          position: "bottom",
+          timeout: 3000,
+        });
+      }
+      else if(pipelineObj.isEditPipeline && showJsonEditorDialog.value == true){
+        showJsonEditorDialog.value = false;
+        q.notify({
+          message: "Pipeline Updated successfully",
+          color: "positive",
+          position: "bottom",
+          timeout: 3000,
+        });
+      }
+      else{
+        showJsonEditorDialog.value = false;
+        router.push({
+          name: "pipelines",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+        q.notify({
+          message: "Pipeline Saved successfully",
+          color: "positive",
+          position: "bottom",
+          timeout: 3000,
+        });
+      }
+
+
     })
     .catch((error) => {
       if (pipelineObj.isEditPipeline) {
@@ -717,6 +829,9 @@ const onSubmitPipeline = async () => {
           position: "bottom",
           timeout: 3000,
         });
+        if(showJsonEditorDialog.value == true){
+          validationErrors.value = ["Please connect all nodes before saving"];
+        }
       } else {
         if (error.response.status != 403) {
           q.notify({
@@ -726,6 +841,9 @@ const onSubmitPipeline = async () => {
             position: "bottom",
             timeout: 3000,
           });
+          if(showJsonEditorDialog.value == true){
+            validationErrors.value = [error.response?.data?.message || "Error while saving pipeline"];
+          }
         }
       }
     })
@@ -805,7 +923,6 @@ const findMissingEdges = () => {
   });
 
   if (unconnectedNodes.length > 0) {
-    console.log(unconnectedNodes, "unconnectedNodes");
     return true; // There are unconnected nodes
   }
 
@@ -862,9 +979,54 @@ const beforeUnloadHandler = (e: any) => {
       !pipelineObj.isEditPipeline)
   ) {
     // Display a confirmation message
-    const confirmMessage = t("pipeline.unsavedMessage"); // Some browsers require a return statement to display the message
+    const confirmMessage = t("pipeline.unsavedMessage");
     e.returnValue = confirmMessage;
     return confirmMessage;
+  }
+};
+
+const openJsonEditor = () => {
+  showJsonEditorDialog.value = true;
+};
+
+const savePipelineJson = async (json: string) => {
+  try {
+    const parsedPipeline = JSON.parse(json);
+    let streamList: any = [];
+    let usedStreamsList: any = [];
+    if(pipelineObj.currentSelectedPipeline.source.source_type === "realtime"){
+      try{
+        //there are couple of scenarios that we need to take care of 
+        //if user gets error that this stream is not there 
+        //2. we dont know if user selects scheduled or realtime right so we need to do this check at the time of saving only 
+        //3. TODO: store these list in the store so that unnecessary api calls will be avoided.
+        const streamsListResponse: any = await getStreams(parsedPipeline.source.stream_type || "logs", false);
+        streamList = streamsListResponse.list.map((stream: any) => stream.name);
+        usedStreamsList = usedStreamsListResponse.value.filter((stream: any) => stream.stream_type == parsedPipeline.source.stream_type).map((stream: any) => stream.stream_name);
+      }
+      catch(error){
+        console.log(error,'error')
+      }
+    }
+
+    const validationResult = validatePipelineUtil(parsedPipeline, { streamList: streamList, usedStreamsList: usedStreamsList, originalPipeline: pipelineObj.currentSelectedPipeline, pipelineDestinations: pipelineDestinationsList.value, functionsList: functionOptions.value, selectedOrgId: store.state.selectedOrganization.identifier });
+    
+    if (!validationResult.isValid) {
+      // Set validation errors to be displayed in the JsonEditor
+      validationErrors.value = validationResult.errors;
+      return; // Don't save if validation fails
+    }
+    
+    // Clear any previous validation errors
+    validationErrors.value = [];
+    
+    // Only save if validation passes
+    pipelineObj.currentSelectedPipeline = parsedPipeline;
+    savePipeline();
+  } catch (error) {
+    console.log(error, 'error')
+    // Handle JSON parsing errors
+    validationErrors.value = ['Invalid JSON format'];
   }
 };
 </script>

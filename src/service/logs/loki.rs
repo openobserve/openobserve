@@ -15,11 +15,11 @@
 
 use std::collections::HashMap;
 
-use anyhow::Result;
 use config::{
     DEFAULT_STREAM_NAME, MESSAGE_COL_NAME, STREAM_NAME_LABEL, TIMESTAMP_COL_NAME,
     utils::{json, schema::format_stream_name},
 };
+use infra::errors::Result;
 use promql_parser::{
     label::MatchOp,
     parser::{self, Expr as PromExpr},
@@ -53,42 +53,24 @@ pub async fn handle_request(
     };
 
     for (stream_name, records) in streams_data {
-        let json_bytes = serde_json::to_vec(&records).map_err(|e| {
-            log::error!(
-                "[Loki] JSON serialization error for stream '{}' in org '{}': {}",
-                stream_name,
-                org_id,
-                e
-            );
-            LokiError::JsonParse { source: e }
-        })?;
-        let json_bytes = actix_web::web::Bytes::from(json_bytes);
-
         logs::ingest::ingest(
             thread_id,
             org_id,
             &stream_name,
-            IngestionRequest::JSON(&json_bytes),
+            IngestionRequest::Loki(&records),
             user_email,
             None,
         )
         .await
         .map_err(|e| {
-            log::error!(
-                "[Loki] Stream '{}' ingestion failed for org '{}': {}",
-                stream_name,
-                org_id,
-                e
-            );
+            log::error!("[Loki] Stream {stream_name} ingestion failed for org {org_id}: {e}");
             LokiError::from(anyhow::anyhow!(
-                "Stream '{}' ingestion failed: {:?}",
+                "Stream {} ingestion failed: {:?}",
                 stream_name,
                 e
             ))
         })?;
     }
-
-    log::info!("[Loki] Successfully processed streams for org '{}'", org_id);
     Ok(IngestionResponse::new(200, vec![]))
 }
 
@@ -104,13 +86,13 @@ fn validate_and_process_json_request(
     for (stream_idx, loki_stream) in request.streams.into_iter().enumerate() {
         if loki_stream.stream.is_empty() {
             return Err(LokiError::InvalidLabels {
-                message: format!("Stream {} has empty labels", stream_idx),
+                message: format!("Stream {stream_idx} has empty labels"),
             });
         }
 
         if loki_stream.values.is_empty() {
             return Err(LokiError::InvalidLabels {
-                message: format!("Stream {} has no log entries", stream_idx),
+                message: format!("Stream {stream_idx} has no log entries"),
             });
         }
 
@@ -119,10 +101,7 @@ fn validate_and_process_json_request(
         for (entry_idx, entry) in loki_stream.values.into_iter().enumerate() {
             if entry.line.trim().is_empty() {
                 return Err(LokiError::InvalidTimestamp {
-                    message: format!(
-                        "Stream {} entry {} has empty log line",
-                        stream_idx, entry_idx
-                    ),
+                    message: format!("Stream {stream_idx} entry {entry_idx} has empty log line"),
                 });
             }
 
@@ -181,13 +160,13 @@ fn validate_and_process_protobuf_request(
     for (stream_idx, loki_stream) in request.streams.into_iter().enumerate() {
         if loki_stream.labels.trim().is_empty() {
             return Err(LokiError::InvalidLabels {
-                message: format!("Stream {} has empty labels", stream_idx),
+                message: format!("Stream {stream_idx} has empty labels"),
             });
         }
 
         if loki_stream.entries.is_empty() {
             return Err(LokiError::InvalidLabels {
-                message: format!("Stream {} has no log entries", stream_idx),
+                message: format!("Stream {stream_idx} has no log entries"),
             });
         }
 
@@ -197,22 +176,18 @@ fn validate_and_process_protobuf_request(
         for (entry_idx, entry) in loki_stream.entries.into_iter().enumerate() {
             if entry.line.trim().is_empty() {
                 return Err(LokiError::InvalidTimestamp {
-                    message: format!(
-                        "Stream {} entry {} has empty log line",
-                        stream_idx, entry_idx
-                    ),
+                    message: format!("Stream {stream_idx} entry {entry_idx} has empty log line"),
                 });
             }
 
-            if let Some(ts) = &entry.timestamp {
-                if ts.seconds < 0 {
-                    return Err(LokiError::InvalidTimestamp {
-                        message: format!(
-                            "Stream {} entry {} has negative timestamp",
-                            stream_idx, entry_idx
-                        ),
-                    });
-                }
+            if let Some(ts) = &entry.timestamp
+                && ts.seconds < 0
+            {
+                return Err(LokiError::InvalidTimestamp {
+                    message: format!(
+                        "Stream {stream_idx} entry {entry_idx} has negative timestamp",
+                    ),
+                });
             }
 
             let timestamp_us = if let Some(ts) = entry.timestamp {
@@ -253,10 +228,10 @@ fn validate_and_process_protobuf_request(
 }
 
 fn parse_prometheus_labels(labels_str: &str) -> Result<HashMap<String, String>, LokiError> {
-    let full_query = format!("dummy{}", labels_str);
+    let full_query = format!("dummy{labels_str}");
 
     let ast = parser::parse(&full_query).map_err(|e| LokiError::InvalidLabels {
-        message: format!("Invalid Prometheus label format: {}", e),
+        message: format!("Invalid Prometheus label format: {e}"),
     })?;
 
     if let PromExpr::VectorSelector(vs) = ast {

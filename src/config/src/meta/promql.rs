@@ -241,7 +241,7 @@ impl From<&str> for Function {
             "max" => Self::Max,
             "last" => Self::Last,
             "first" => Self::First,
-            _ => panic!("invalid downsampling function: {}", s),
+            _ => panic!("invalid downsampling function: {s}"),
         }
     }
 }

@@ -220,7 +220,7 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
             Ok(())
         }
         Err(e) => {
-            log::error!("Error deleting user: {}", e);
+            log::error!("Error deleting user: {e}");
             Err(anyhow::anyhow!("Error deleting user: {}", e))
         }
     }
@@ -261,7 +261,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     match get_user_record(item_key).await {
                         Ok(val) => val,
                         Err(e) => {
-                            log::error!("Error getting value: {}", e);
+                            log::error!("Error getting value: {e}");
                             continue;
                         }
                     };
@@ -355,12 +355,12 @@ pub async fn get_user_by_email(email: &str) -> Option<DBUser> {
                 password_ext: user.password_ext,
             }),
             Err(e) => {
-                log::error!("Error getting orgs the user is member of: {}", e);
+                log::error!("Error getting orgs the user is member of: {e}");
                 None
             }
         },
         Err(e) => {
-            log::error!("Error getting user {email}: {}", e);
+            log::error!("Error getting user {email}: {e}");
             None
         }
     }
@@ -410,7 +410,7 @@ mod super_cluster {
     }
 
     pub async fn delete_user_from_super_cluster(email: &str) -> Result<(), infra::errors::Error> {
-        let key = format!("{USER_RECORD_KEY}{}", email);
+        let key = format!("{USER_RECORD_KEY}{email}");
         if get_o2_config().super_cluster.enabled {
             o2_enterprise::enterprise::super_cluster::queue::user_delete(
                 &key,

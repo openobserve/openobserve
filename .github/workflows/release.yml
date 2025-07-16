@@ -195,8 +195,8 @@ jobs:
 
           echo "Uploading artifacts to S3..."
           for file in $(find . -type f \( -name "openobserve*.tar.gz" -o -name "*.zip" -o -name "openobserve*.sha256sum" \)); do
-            echo "Uploading $file to s3://${BUCKET}/releases/${GITHUB_REF_NAME}/"
-            aws s3 cp "$file" "s3://${BUCKET}/releases/${GITHUB_REF_NAME}/$(basename "$file")"
+            echo "Uploading $file to s3://${BUCKET}/releases/openobserve/${GITHUB_REF_NAME}/"
+            aws s3 cp "$file" "s3://${BUCKET}/releases/openobserve/${GITHUB_REF_NAME}/$(basename "$file")"
           done
 
       - name: Publish release

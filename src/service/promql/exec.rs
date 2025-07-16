@@ -134,11 +134,11 @@ impl PromqlContext {
             let (result, result_type_exec) = match ret.await {
                 Ok(Ok((value, result_type))) => (value, result_type),
                 Ok(Err(e)) => {
-                    log::error!("Error executing query engine: {}", e);
+                    log::error!("Error executing query engine: {e}");
                     return Err(e);
                 }
                 Err(e) => {
-                    log::error!("Error executing query task: {}", e);
+                    log::error!("Error executing query task: {e}");
                     return Err(DataFusionError::Execution(e.to_string()));
                 }
             };
@@ -245,11 +245,11 @@ impl PromqlContext {
             let (result, _result_type_exec) = match ret.await {
                 Ok(Ok((value, result_type))) => (value, result_type),
                 Ok(Err(e)) => {
-                    log::error!("Error executing query engine: {}", e);
+                    log::error!("Error executing query engine: {e}");
                     return Err(e);
                 }
                 Err(e) => {
-                    log::error!("Error executing query task: {}", e);
+                    log::error!("Error executing query task: {e}");
                     return Err(DataFusionError::Execution(e.to_string()));
                 }
             };

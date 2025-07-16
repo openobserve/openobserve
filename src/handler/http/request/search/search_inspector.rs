@@ -157,8 +157,7 @@ pub async fn get_search_profile(
     let mut req: config::meta::search::Request = config::meta::search::Request {
         query: Query {
             sql: format!(
-                "SELECT _timestamp, events FROM default WHERE trace_id = '{}' ORDER BY start_time",
-                query_trace_id
+                "SELECT _timestamp, events FROM default WHERE trace_id = '{query_trace_id}' ORDER BY start_time"
             ),
             start_time,
             end_time,
@@ -173,11 +172,7 @@ pub async fn get_search_profile(
     if let Err(e) = req.decode() {
         return Ok(meta::http::HttpResponse::bad_request(e));
     }
-
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-    if use_cache {
-        req.use_cache = Some(use_cache);
-    }
+    req.use_cache = get_use_cache_from_request(&query);
 
     // get stream settings
     if let Some(settings) = infra::schema::get_settings(&org_id, &stream_name, stream_type).await {
@@ -188,8 +183,7 @@ pub async fn get_search_profile(
         {
             req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
             range_error = format!(
-                "Query duration is modified due to query range restriction of {} hours",
-                max_query_range
+                "Query duration is modified due to query range restriction of {max_query_range} hours"
             );
         }
     }
@@ -211,7 +205,7 @@ pub async fn get_search_profile(
             }
         };
         if !keys_used.is_empty() {
-            log::info!("keys used : {:?}", keys_used);
+            log::info!("keys used : {keys_used:?}");
         }
         for key in keys_used {
             // Check permissions on keys
@@ -227,7 +221,7 @@ pub async fn get_search_profile(
                 if !is_root_user(&user_id) {
                     let user =
                         match USERS
-                            .get(&format!("{org_id}/{}", user_id))
+                            .get(&format!("{org_id}/{user_id}"))
                             .and_then(|user_record| {
                                 DBUser::from(&(user_record.clone())).get_user(org_id.clone())
                             }) {
@@ -276,6 +270,7 @@ pub async fn get_search_profile(
         Some(user_id),
         &req,
         range_error,
+        false,
     )
     .instrument(http_span)
     .await;
@@ -291,33 +286,33 @@ pub async fn get_search_profile(
             };
 
             for hit in res.hits {
-                if let Some(events_str) = hit.get("events") {
-                    if let Ok(parsed_events) = serde_json::from_str::<Vec<SearchInspectorEvent>>(
+                if let Some(events_str) = hit.get("events")
+                    && let Ok(parsed_events) = serde_json::from_str::<Vec<SearchInspectorEvent>>(
                         events_str.as_str().unwrap_or("[]"),
-                    ) {
-                        let mut inspectors = vec![];
-                        let _: Vec<_> = parsed_events
-                            .into_iter()
-                            .map(|event| {
-                                if let Some(mut fields) =
-                                    extract_search_inspector_fields(event.name.as_str())
-                                {
-                                    if fields.component == Some("summary".to_string()) {
-                                        si.sql = fields.sql.unwrap();
-                                        let time_range = fields.time_range.unwrap_or_default();
-                                        si.start_time = time_range.0;
-                                        si.end_time = time_range.1;
-                                        si.total_duration = fields.duration.unwrap_or_default();
-                                    } else {
-                                        fields.timestamp = Some(event._timestamp.to_string());
-                                        inspectors.push(fields);
-                                    }
+                    )
+                {
+                    let mut inspectors = vec![];
+                    let _: Vec<_> = parsed_events
+                        .into_iter()
+                        .map(|event| {
+                            if let Some(mut fields) =
+                                extract_search_inspector_fields(event.name.as_str())
+                            {
+                                if fields.component == Some("summary".to_string()) {
+                                    si.sql = fields.sql.unwrap();
+                                    let time_range = fields.time_range.unwrap_or_default();
+                                    si.start_time = time_range.0;
+                                    si.end_time = time_range.1;
+                                    si.total_duration = fields.duration.unwrap_or_default();
+                                } else {
+                                    fields.timestamp = Some(event._timestamp.to_string());
+                                    inspectors.push(fields);
                                 }
-                            })
-                            .collect();
+                            }
+                        })
+                        .collect();
 
-                        events.extend(inspectors);
-                    }
+                    events.extend(inspectors);
                 }
             }
 
@@ -339,7 +334,7 @@ pub async fn get_search_profile(
                 &search_type,
                 "",
             );
-            log::error!("[trace_id {trace_id}] search error: {}", err);
+            log::error!("[trace_id {trace_id}] search error: {err}");
             Ok(error_utils::map_error_to_http_response(
                 &err,
                 Some(trace_id),

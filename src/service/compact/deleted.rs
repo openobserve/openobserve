@@ -15,7 +15,7 @@
 
 use config::{
     meta::stream::{FileKey, FileMeta},
-    utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
+    utils::inverted_index::convert_parquet_file_name_to_tantivy_file,
 };
 use infra::{file_list as infra_file_list, storage};
 
@@ -47,7 +47,7 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
     {
         // maybe the file already deleted, so we just skip the `not found` error
         if !e.to_string().to_lowercase().contains("not found") {
-            log::error!("[COMPACTOR] delete files from storage failed: {}", e);
+            log::error!("[COMPACTOR] delete files from storage failed: {e}");
             return Err(e.into());
         }
     }
@@ -57,28 +57,27 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
         .iter()
         .filter_map(|file| {
             if file.index_file {
-                convert_parquet_idx_file_name_to_tantivy_file(&file.file)
+                convert_parquet_file_name_to_tantivy_file(&file.file)
                     .map(|f| (file.account.to_string(), f))
             } else {
                 None
             }
         })
         .collect::<Vec<_>>();
-    if !inverted_index_files.is_empty() {
-        if let Err(e) = storage::del(
+    if !inverted_index_files.is_empty()
+        && let Err(e) = storage::del(
             inverted_index_files
                 .iter()
                 .map(|file| (file.0.as_str(), file.1.as_str()))
                 .collect::<Vec<_>>(),
         )
         .await
-        {
-            // maybe the file already deleted or there's not related index files,
-            // so we just skip the `not found` error
-            if !e.to_string().to_lowercase().contains("not found") {
-                log::error!("[COMPACTOR] delete files from storage failed: {}", e);
-                return Err(e.into());
-            }
+    {
+        // maybe the file already deleted or there's not related index files,
+        // so we just skip the `not found` error
+        if !e.to_string().to_lowercase().contains("not found") {
+            log::error!("[COMPACTOR] delete files from storage failed: {e}");
+            return Err(e.into());
         }
     }
 
@@ -100,20 +99,19 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
             }
         })
         .collect::<Vec<_>>();
-    if !flattened_files.is_empty() {
-        if let Err(e) = storage::del(
+    if !flattened_files.is_empty()
+        && let Err(e) = storage::del(
             flattened_files
                 .iter()
                 .map(|file| (file.0.as_str(), file.1.as_str()))
                 .collect::<Vec<_>>(),
         )
         .await
-        {
-            // maybe the file already deleted, so we just skip the `not found` error
-            if !e.to_string().to_lowercase().contains("not found") {
-                log::error!("[COMPACTOR] delete files from storage failed: {}", e);
-                return Err(e.into());
-            }
+    {
+        // maybe the file already deleted, so we just skip the `not found` error
+        if !e.to_string().to_lowercase().contains("not found") {
+            log::error!("[COMPACTOR] delete files from storage failed: {e}");
+            return Err(e.into());
         }
     }
 
@@ -134,7 +132,7 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
     )
     .await
     {
-        log::error!("[COMPACTOR] delete files from table failed: {}", e);
+        log::error!("[COMPACTOR] delete files from table failed: {e}");
         return Err(e.into());
     }
 

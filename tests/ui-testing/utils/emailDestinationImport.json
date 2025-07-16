@@ -1,0 +1,11 @@
+{
+  "name": "",
+  "url": "",
+  "method": "post",
+  "skip_tls_verify": false,
+  "template": "email",
+  "emails": [
+    "shnath@openobserve.ai"
+  ],
+  "type": "email"
+}

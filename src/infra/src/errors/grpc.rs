@@ -56,7 +56,7 @@ impl From<DataFusionError> for Error {
             };
         }
         if err.contains("parquet not found") {
-            log::error!("[Datafusion] Parquet file not found: {}", err);
+            log::error!("[Datafusion] Parquet file not found: {err}");
             return Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound);
         }
         if err.contains("Invalid function ") {

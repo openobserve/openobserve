@@ -69,7 +69,7 @@ pub async fn chat(body: web::Json<PromptRequest>) -> impl Responder {
         match response {
             Ok(response) => HttpResponse::Ok().json(PromptResponse::from(response)),
             Err(e) => {
-                log::error!("Error in chat: {}", e);
+                log::error!("Error in chat: {e}");
                 MetaHttpResponse::internal_error(e)
             }
         }
@@ -115,7 +115,6 @@ pub async fn chat_stream(
     body: web::Json<PromptRequest>,
     in_req: HttpRequest,
 ) -> impl Responder {
-    let config = get_o2_config();
     let user_id = in_req
         .headers()
         .get("user_id")
@@ -133,7 +132,7 @@ pub async fn chat_stream(
     let req_body = body.into_inner();
     let body_bytes = serde_json::to_string(&req_body).unwrap();
 
-    if !config.ai.enabled {
+    if !get_o2_config().ai.enabled {
         let error_message = Some("AI is not enabled".to_string());
         code = 400;
         report_to_audit(
@@ -174,7 +173,7 @@ pub async fn chat_stream(
             )
             .await;
 
-            log::error!("Error in chat_stream: {}", e);
+            log::error!("Error in chat_stream: {e}");
             return MetaHttpResponse::bad_request(e.to_string());
         }
     };

@@ -21,7 +21,6 @@ use config::{
 };
 
 pub mod broadcast;
-mod idx;
 pub mod parquet;
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -32,9 +31,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
     // load pending delete files to memory cache
     crate::service::db::file_list::local::load_pending_delete().await?;
 
-    tokio::task::spawn(async move { parquet::run().await });
-    tokio::task::spawn(async move { broadcast::run().await });
-    tokio::task::spawn(async move { clean_empty_dirs().await });
+    tokio::task::spawn(parquet::run());
+    tokio::task::spawn(broadcast::run());
+    tokio::task::spawn(clean_empty_dirs());
 
     Ok(())
 }
@@ -49,7 +48,7 @@ async fn clean_empty_dirs() -> Result<(), anyhow::Error> {
         let root = format!("{}files/", config::get_config().common.data_wal_dir);
         if let Err(e) = config::utils::async_file::clean_empty_dirs(&root, Some(last_updated)).await
         {
-            log::error!("clean_empty_dirs, err: {}", e);
+            log::error!("clean_empty_dirs, err: {e}");
         }
     }
     log::info!("job::files::clean_empty_dirs is stopped");
@@ -64,7 +63,7 @@ pub fn generate_storage_file_name(
 ) -> String {
     // eg: 0/2023/08/21/08/8b8a5451bbe1c44b/ip=1234/7099303408192061440f3XQ2p.json
     let file_columns = wal_file_name.splitn(7, '/').collect::<Vec<&str>>();
-    let stream_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
     let file_date = format!(
         "{}/{}/{}/{}",
         file_columns[1], file_columns[2], file_columns[3], file_columns[4]

@@ -124,8 +124,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         // check if the file is already being downloaded
                         if processing_files::is_processing(&file) {
                             log::warn!(
-                                "[trace_id {trace_id}] [thread {thread}] search->storage: file {} is already being downloaded, will skip it",
-                                file
+                                "[trace_id {trace_id}] [thread {thread}] search->storage: file {file} is already being downloaded, will skip it"
                             );
                             // update metrics
                             metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
@@ -146,19 +145,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
                             Ok(data_len) => {
                                 if data_len > 0 && data_len != file_size {
                                     log::warn!(
-                                        "[FILE_CACHE_DOWNLOAD:JOB:NORMAL] download file {} found size mismatch, expected: {}, actual: {}, will skip it",
-                                        file,
-                                        file_size,
-                                        data_len,
+                                        "[FILE_CACHE_DOWNLOAD:JOB:NORMAL] download file {file} found size mismatch, expected: {file_size}, actual: {data_len}, will skip it",
                                     );
                                 }
                             }
                             Err(e) => {
                                 log::error!(
-                                    "[FILE_CACHE_DOWNLOAD:JOB:NORMAL] download file {} to cache {:?} err: {}",
-                                    file,
-                                    cache,
-                                    e,
+                                    "[FILE_CACHE_DOWNLOAD:JOB:NORMAL] download file {file} to cache {cache:?} err: {e}",
                                 );
                             }
                         }
@@ -221,8 +214,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                  // check if the file is already being downloaded
                                 if processing_files::is_processing(&file) {
                                     log::warn!(
-                                        "[trace_id {trace_id}] [thread {thread}] search->storage: file {} is already being downloaded, will skip it",
-                                        file
+                                        "[trace_id {trace_id}] [thread {thread}] search->storage: file {file} is already being downloaded, will skip it"
                                     );
                                     // update metrics
                                     metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
@@ -239,19 +231,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                     Ok(data_len) => {
                                         if data_len > 0 && data_len != file_size {
                                             log::warn!(
-                                                "[FILE_CACHE_DOWNLOAD:JOB:PRIORITY] download file {} found size mismatch, expected: {}, actual: {}, will skip it",
-                                                file,
-                                                file_size,
-                                                data_len,
+                                                "[FILE_CACHE_DOWNLOAD:JOB:PRIORITY] download file {file} found size mismatch, expected: {file_size}, actual: {data_len}, will skip it",
                                             );
                                         }
                                     }
                                     Err(e) => {
                                         log::error!(
-                                            "[FILE_CACHE_DOWNLOAD:JOB:PRIORITY] download file {} to cache {:?} err: {}",
-                                            file,
-                                            cache,
-                                            e,
+                                            "[FILE_CACHE_DOWNLOAD:JOB:PRIORITY] download file {file} to cache {cache:?} err: {e}",
                                         );
                                     }
                                 }
@@ -288,14 +274,12 @@ async fn download_file(
     let cfg = get_config();
 
     // download file from node
-    if cfg.cache_latest_files.download_from_node {
-        if let Ok(ok) =
+    if cfg.cache_latest_files.download_from_node
+        && let Ok(ok) =
             download_file_with_consistent_hash(file_id, account, file_name, file_size).await
-        {
-            if ok {
-                return Ok(file_size);
-            }
-        }
+        && ok
+    {
+        return Ok(file_size);
     }
 
     // download from object store
@@ -462,25 +446,21 @@ pub async fn download_from_node(
     // Cache the file contents
     for (file, content) in file_contents {
         let data = content.freeze();
-        if let Some(size) = file_size_map.get(&file) {
-            if *size != data.len() {
-                log::warn!(
-                    "[FILE_CACHE_DOWNLOAD:gRPC] Failed to download file {} from {}: size mismatch, expected {} but got {}",
-                    file,
-                    addr,
-                    size,
-                    data.len()
-                );
-                downloaded_files.remove(&file);
-                continue;
-            }
+        if let Some(size) = file_size_map.get(&file)
+            && *size != data.len()
+        {
+            log::warn!(
+                "[FILE_CACHE_DOWNLOAD:gRPC] Failed to download file {} from {}: size mismatch, expected {} but got {}",
+                file,
+                addr,
+                size,
+                data.len()
+            );
+            downloaded_files.remove(&file);
+            continue;
         }
         if let Err(e) = infra::cache::file_data::set(&file, data).await {
-            log::error!(
-                "[FILE_CACHE_DOWNLOAD:gRPC] Failed to cache file {}: {}",
-                file,
-                e
-            );
+            log::error!("[FILE_CACHE_DOWNLOAD:gRPC] Failed to cache file {file}: {e}");
             downloaded_files.remove(&file);
         }
     }

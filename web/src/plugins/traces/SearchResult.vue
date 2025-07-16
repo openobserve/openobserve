@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-result-bar-chart"
         id="traces_scatter_chart"
         :data="plotChart"
-        v-show="searchObj.meta.showHistogram"
         style="height: 150px"
         @updated:dataZoom="onChartUpdate"
         @click="onChartClick"
@@ -59,7 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, defineComponent, nextTick, ref } from "vue";
+import {
+  defineAsyncComponent,
+  defineComponent,
+  nextTick,
+  onMounted,
+  ref,
+} from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -143,6 +148,10 @@ export default defineComponent({
     const searchTableRef: any = ref(null);
 
     const plotChart: any = ref({});
+
+    onMounted(() => {
+      reDrawChart();
+    });
 
     const reDrawChart = () => {
       if (

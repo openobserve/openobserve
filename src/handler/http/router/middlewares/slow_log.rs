@@ -27,15 +27,11 @@ use futures_util::future::LocalBoxFuture;
 
 pub struct SlowLog {
     threshold_secs: u64,
-    circuit_breaker_enabled: bool,
 }
 
 impl SlowLog {
-    pub fn new(threshold_secs: u64, circuit_breaker_enabled: bool) -> Self {
-        SlowLog {
-            threshold_secs,
-            circuit_breaker_enabled,
-        }
+    pub fn new(threshold_secs: u64) -> Self {
+        SlowLog { threshold_secs }
     }
 }
 
@@ -55,7 +51,6 @@ where
         ready(Ok(SlowLogMiddleware {
             service,
             threshold_secs: self.threshold_secs,
-            circuit_breaker_enabled: self.circuit_breaker_enabled,
         }))
     }
 }
@@ -63,7 +58,6 @@ where
 pub struct SlowLogMiddleware<S> {
     service: S,
     threshold_secs: u64,
-    circuit_breaker_enabled: bool,
 }
 
 impl<S, B> Service<ServiceRequest> for SlowLogMiddleware<S>
@@ -104,7 +98,6 @@ where
             None => 0,
         };
         let threshold = Duration::from_secs(self.threshold_secs);
-        let circuit_breaker_enabled = self.circuit_breaker_enabled;
 
         let fut = self.service.call(req);
 
@@ -114,9 +107,6 @@ where
 
             // watch the request duration
             let took_time = duration.as_millis();
-            if circuit_breaker_enabled {
-                crate::service::circuit_breaker::watch_request(took_time as u64);
-            }
 
             // log the slow request
             if duration > threshold {
@@ -130,13 +120,7 @@ where
                     _ => "".to_string(),
                 };
                 log::warn!(
-                    "slow request detected - remote_addr: {}, method: {}, path: {}, size: {},{} took: {} ms",
-                    remote_addr,
-                    method,
-                    path,
-                    body_size,
-                    wait_time_str,
-                    took_time
+                    "slow request detected - remote_addr: {remote_addr}, method: {method}, path: {path}, size: {body_size},{wait_time_str} took: {took_time} ms"
                 );
             }
 

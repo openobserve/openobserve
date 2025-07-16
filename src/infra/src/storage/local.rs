@@ -96,7 +96,7 @@ impl ObjectStore for Local {
                 })
             }
             Err(err) => {
-                log::error!("disk File upload error: {:?}", err);
+                log::error!("disk File upload error: {err:?}");
                 Err(err)
             }
         }
@@ -129,7 +129,7 @@ impl ObjectStore for Local {
             .get(&(format_key(&file, self.with_prefix).into()))
             .await
             .map_err(|e| {
-                log::error!("[STORAGE] get local file: {}, error: {:?}", file, e);
+                log::error!("[STORAGE] get local file: {file}, error: {e:?}");
                 e
             })?;
 
@@ -160,7 +160,7 @@ impl ObjectStore for Local {
             .get_opts(&(format_key(&file, self.with_prefix).into()), options)
             .await
             .map_err(|e| {
-                log::error!("[STORAGE] get_opts local file: {}, error: {:?}", file, e);
+                log::error!("[STORAGE] get_opts local file: {file}, error: {e:?}");
                 e
             })?;
 
@@ -183,7 +183,7 @@ impl ObjectStore for Local {
         Ok(result)
     }
 
-    async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
+    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
         let start = std::time::Instant::now();
         let file = location.to_string();
         let data = self
@@ -192,10 +192,7 @@ impl ObjectStore for Local {
             .await
             .map_err(|e| {
                 log::error!(
-                    "[STORAGE] get_range local file: {}, range: {:?}, error: {:?}",
-                    file,
-                    range,
-                    e
+                    "[STORAGE] get_range local file: {file}, range: {range:?}, error: {e:?}"
                 );
                 e
             })?;
@@ -243,7 +240,7 @@ impl ObjectStore for Local {
         result
     }
 
-    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
+    fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         let key = prefix.map(|p| p.as_ref());
         let prefix = format_key(key.unwrap_or(""), self.with_prefix);
         self.client.list(Some(&prefix.into()))

@@ -99,11 +99,6 @@ pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
     }
 }
 
-// TODO
-pub fn generate_invite_token() -> String {
-    "".to_string()
-}
-
 pub(crate) fn is_root_user(user_id: &str) -> bool {
     match ORG_USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
         Some(user) => user.role.eq(&UserRole::Root),
@@ -211,12 +206,12 @@ impl FromRequest for UserEmail {
     type Future = Ready<Result<Self, Error>>;
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        if let Some(auth_header) = req.headers().get("user_id") {
-            if let Ok(user_str) = auth_header.to_str() {
-                return ready(Ok(UserEmail {
-                    user_id: user_str.to_lowercase(),
-                }));
-            }
+        if let Some(auth_header) = req.headers().get("user_id")
+            && let Ok(user_str) = auth_header.to_str()
+        {
+            return ready(Ok(UserEmail {
+                user_id: user_str.to_lowercase(),
+            }));
         }
         ready(Err(actix_web::error::ErrorUnauthorized("No user found")))
     }
@@ -272,17 +267,17 @@ impl FromRequest for AuthExtractor {
         // This is case for ingestion endpoints where we need to check
         // permissions on the stream
         if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
-            if let Some(auth_header) = req.headers().get("Authorization") {
-                if let Ok(auth_str) = auth_header.to_str() {
-                    return ready(Ok(AuthExtractor {
-                        auth: auth_str.to_owned(),
-                        method,
-                        o2_type: format!("stream:{org_id}"),
-                        org_id,
-                        bypass_check: true,
-                        parent_id: folder,
-                    }));
-                }
+            if let Some(auth_header) = req.headers().get("Authorization")
+                && let Ok(auth_str) = auth_header.to_str()
+            {
+                return ready(Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method,
+                    o2_type: format!("stream:{org_id}"),
+                    org_id,
+                    bypass_check: true,
+                    parent_id: folder,
+                }));
             }
             return ready(Err(actix_web::error::ErrorUnauthorized(
                 "Unauthorized Access",
@@ -318,17 +313,20 @@ impl FromRequest for AuthExtractor {
             // this will take format of settings:{org_id} or pipelines:{org_id} etc
             let key = if path_columns[1].eq("invites") {
                 "users"
-            } else if path_columns[1].eq("rename") && method.eq("PUT") {
+            } else if (path_columns[1].eq("rename") || path_columns[1].eq("extend_trial_period"))
+                && method.eq("PUT")
+            {
                 "organizations"
             } else {
                 path_columns[1]
             };
 
             // for organization api changes we need perms on _all_{org}
-            let entity = if key == "organizations" {
-                format!("_all_{}", path_columns[0])
-            } else {
-                path_columns[0].to_string()
+            let entity = match (key, path_columns[1]) {
+                ("organizations", "extend_trial_period") => "_all__meta".to_string(),
+                ("organizations", "organizations") => path_columns[0].to_string(),
+                ("organizations", _) => format!("_all_{}", path_columns[0]),
+                _ => path_columns[0].to_string(),
             };
 
             format!(
@@ -641,23 +639,22 @@ impl FromRequest for AuthExtractor {
         };
 
         // Check if the ws request is using internal grpc token
-        if method.eq("GET") && path.contains("/ws") {
-            if let Some(auth_header) = req.headers().get("Authorization") {
-                if auth_header
-                    .to_str()
-                    .unwrap()
-                    .eq(&get_config().grpc.internal_grpc_token)
-                {
-                    return ready(Ok(AuthExtractor {
-                        auth: auth_header.to_str().unwrap().to_string(),
-                        method,
-                        o2_type: format!("stream:{org_id}"),
-                        org_id,
-                        bypass_check: true,
-                        parent_id: folder,
-                    }));
-                }
-            }
+        if method.eq("GET")
+            && path.contains("/ws")
+            && let Some(auth_header) = req.headers().get("Authorization")
+            && auth_header
+                .to_str()
+                .unwrap()
+                .eq(&get_config().grpc.internal_grpc_token)
+        {
+            return ready(Ok(AuthExtractor {
+                auth: auth_header.to_str().unwrap().to_string(),
+                method,
+                o2_type: format!("stream:{org_id}"),
+                org_id,
+                bypass_check: true,
+                parent_id: folder,
+            }));
         }
 
         let auth_str = extract_auth_str(req);
@@ -676,7 +673,6 @@ impl FromRequest for AuthExtractor {
                 || path.contains("/short")
                 || path.contains("/ws")
                 || path.contains("/_values_stream")
-                || (url_len > 1 && path_columns[1].eq("ai"))
             {
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
@@ -705,7 +701,7 @@ impl FromRequest for AuthExtractor {
                                 .as_str(),
                             )
                         } else {
-                            object_type.replace("stream:", format!("{}:", stream_type).as_str())
+                            object_type.replace("stream:", format!("{stream_type}:").as_str())
                         }
                     }
                     None => object_type,
@@ -775,7 +771,6 @@ impl FromRequest for AuthExtractor {
                 parent_id: folder,
             }));
         }
-        //}
         log::info!(
             "AuthExtractor::from_request took {} ms",
             start.elapsed().as_millis()
@@ -795,7 +790,7 @@ impl FromRequest for AuthExtractor {
             if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token
             } else {
-                format!("Bearer {}", access_token)
+                format!("Bearer {access_token}")
             }
         } else if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
@@ -856,7 +851,7 @@ pub fn extract_auth_str(req: &HttpRequest) -> String {
                 None => access_token,
             }
         } else {
-            format!("Bearer {}", access_token)
+            format!("Bearer {access_token}")
         }
     } else if let Some(cookie) = req.cookie("auth_ext") {
         let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
@@ -897,13 +892,10 @@ pub fn generate_presigned_url(
     let stage2 = get_hash(&format!("{}{}", &stage1, time), salt);
     let stage3 = get_hash(&format!("{}{}", &stage2, exp_in), salt);
 
-    let user_pass = format!("{}:{}", username, stage3);
+    let user_pass = format!("{username}:{stage3}");
     let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
 
-    format!(
-        "{}/auth/login?request_time={}&exp_in={}&auth={}",
-        base_url, time, exp_in, auth
-    )
+    format!("{base_url}/auth/login?request_time={time}&exp_in={exp_in}&auth={auth}")
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -976,7 +968,7 @@ pub async fn extract_auth_expiry_and_user_id(
             .and_then(|exp| exp.as_i64())
             .and_then(|exp_ts| chrono::DateTime::from_timestamp(exp_ts, 0)),
         Err(e) => {
-            log::error!("Error verifying token: {}", e);
+            log::error!("Error verifying token: {e}");
             None
         }
     };
@@ -997,12 +989,12 @@ pub async fn extract_auth_expiry_and_user_id(
         let stripped_bearer_token = match crate::service::db::session::get(session_key).await {
             Ok(bearer_token) => bearer_token,
             Err(e) => {
-                log::error!("Error getting session: {}", e);
+                log::error!("Error getting session: {e}");
                 return (None, None);
             }
         };
         let exp = decode(&stripped_bearer_token).await;
-        let bearer_full_token = format!("Bearer {}", stripped_bearer_token);
+        let bearer_full_token = format!("Bearer {stripped_bearer_token}");
         let user_id = get_user_email_from_auth_str(&bearer_full_token).await;
         return (exp, user_id);
     }
@@ -1059,6 +1051,39 @@ mod tests {
         common::meta::user::UserRequest,
         service::{self, organization, users},
     };
+
+    #[test]
+    fn test_valid_emails() {
+        assert!(is_valid_email("user@example.com"));
+        assert!(is_valid_email("john.doe+123@mail.co.in"));
+        assert!(is_valid_email("a_b-c.d+e@domain.org"));
+        assert!(!is_valid_email("no-at-symbol.com"));
+        assert!(!is_valid_email("@missing-user.com"));
+        assert!(!is_valid_email("user@.com"));
+        assert!(!is_valid_email("user@com"));
+        assert!(!is_valid_email("user@domain..com"));
+    }
+
+    #[test]
+    fn test_is_ofga_unsupported() {
+        assert!(is_ofga_unsupported("abc:123"));
+        assert!(is_ofga_unsupported("name with space"));
+        assert!(is_ofga_unsupported("foo&bar"));
+        assert!(!is_ofga_unsupported("valid_name"));
+        assert!(!is_ofga_unsupported("name_with_underscores"));
+    }
+
+    #[test]
+    fn test_into_ofga_supported_format() {
+        assert_eq!(into_ofga_supported_format("foo:bar"), "foo_bar");
+        assert_eq!(into_ofga_supported_format("foo bar"), "foo_bar");
+        assert_eq!(into_ofga_supported_format("foo#bar"), "foo_bar");
+        assert_eq!(into_ofga_supported_format("foo : bar"), "foo_bar");
+        assert_eq!(into_ofga_supported_format(" a  & b "), "_a_b_");
+        assert_eq!(into_ofga_supported_format("a   b"), "a_b");
+        assert_eq!(into_ofga_supported_format("a:b#c?d e"), "a_b_c_d_e");
+        assert_eq!(into_ofga_supported_format("foo & bar % baz"), "foo_bar_baz");
+    }
 
     #[test]
     fn test_generate_presigned_url() {
@@ -1133,14 +1158,13 @@ mod tests {
         let pass2 = get_hash(&format!("{}{}", &pass1, time), "openobserve");
         let exp_in = 600;
         let pass3 = get_hash(&format!("{}{}", &pass2, exp_in), "openobserve");
-        println!("time: {}", time);
-        println!("pass3: {}", pass3);
+        println!("time: {time}");
+        println!("pass3: {pass3}");
 
         let user_pass = format!("{}:{}", "b@b.com", pass3);
         let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
         println!(
-            "http://localhost:5080/auth/login?request_time={}&exp_in={}&auth={}",
-            time, exp_in, auth
+            "http://localhost:5080/auth/login?request_time={time}&exp_in={exp_in}&auth={auth}"
         );
     }
 }

@@ -15,70 +15,31 @@
 
 use proto::cluster_rpc;
 
-/// Supported inverted index formats:
-///  - Parquet (v2): Index is stored in parquet format
-///  - Tantivy (v3): Index is stored in custom puffin format files
-///  - both: Use both Parquet and Tantivy. Note that this will generate two inverted index files.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Default)]
-pub enum InvertedIndexFormat {
-    #[default]
-    Parquet,
-    Both,
-    Tantivy,
-}
-
-impl From<&String> for InvertedIndexFormat {
-    fn from(s: &String) -> Self {
-        match s.to_lowercase().as_str() {
-            "both" => InvertedIndexFormat::Both,
-            "tantivy" => InvertedIndexFormat::Tantivy,
-            _ => InvertedIndexFormat::Parquet,
-        }
-    }
-}
-
-impl std::fmt::Display for InvertedIndexFormat {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InvertedIndexFormat::Parquet => write!(f, "parquet"),
-            InvertedIndexFormat::Both => write!(f, "both"),
-            InvertedIndexFormat::Tantivy => write!(f, "tantivy"),
-        }
-    }
-}
-
-pub enum InvertedIndexTantivyMode {
-    Puffin,
-    Mmap,
-}
-
-impl std::fmt::Display for InvertedIndexTantivyMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InvertedIndexTantivyMode::Puffin => write!(f, "puffin"),
-            InvertedIndexTantivyMode::Mmap => write!(f, "mmap"),
-        }
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InvertedIndexOptimizeMode {
     SimpleSelect(usize, bool),
     SimpleCount,
     SimpleHistogram(i64, u64, usize),
+    SimpleTopN(String, usize, bool),
 }
 
 impl std::fmt::Display for InvertedIndexOptimizeMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             InvertedIndexOptimizeMode::SimpleSelect(limit, ascend) => {
-                write!(f, "simple_select(limit: {}, ascend: {})", limit, ascend)
+                write!(f, "simple_select(limit: {limit}, ascend: {ascend})")
             }
             InvertedIndexOptimizeMode::SimpleCount => write!(f, "simple_count"),
             InvertedIndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
                 write!(
                     f,
                     "simple_histogram(min_value: {min_value}, bucket_width: {bucket_width}, num_buckets: {num_buckets})"
+                )
+            }
+            InvertedIndexOptimizeMode::SimpleTopN(field, limit, ascend) => {
+                write!(
+                    f,
+                    "simple_topn(field_name: {field}, limit: {limit}, ascend: {ascend})"
                 )
             }
         }
@@ -99,6 +60,13 @@ impl From<cluster_rpc::IdxOptimizeMode> for InvertedIndexOptimizeMode {
                     select.min_value,
                     select.bucket_width,
                     select.num_buckets as usize,
+                )
+            }
+            Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopn(select)) => {
+                InvertedIndexOptimizeMode::SimpleTopN(
+                    select.field,
+                    select.limit as usize,
+                    select.asc,
                 )
             }
             None => panic!("Invalid InvertedIndexOptimizeMode"),
@@ -129,6 +97,17 @@ impl From<InvertedIndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
                             min_value,
                             bucket_width,
                             num_buckets: num_buckets as u32,
+                        },
+                    )),
+                }
+            }
+            InvertedIndexOptimizeMode::SimpleTopN(field, limit, asc) => {
+                cluster_rpc::IdxOptimizeMode {
+                    mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopn(
+                        cluster_rpc::SimpleTopN {
+                            field,
+                            limit: limit as u32,
+                            asc,
                         },
                     )),
                 }

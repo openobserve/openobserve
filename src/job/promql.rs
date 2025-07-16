@@ -51,7 +51,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 Ok(_) => {
                     let _ = last_leaders.insert(key.to_string(), value.clone());
                 }
-                Err(err) => log::error!("error updating leader to db {}", err),
+                Err(err) => log::error!("error updating leader to db {err}"),
             }
         }
     }

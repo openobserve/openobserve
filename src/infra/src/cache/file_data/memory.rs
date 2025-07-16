@@ -78,11 +78,11 @@ impl FileData {
         self.data.contains_key(file)
     }
 
-    async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+    async fn get(&self, file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
         let idx = get_bucket_idx(file);
         let data = DATA[idx].get(file)?;
         Some(if let Some(range) = range {
-            data.value().slice(range)
+            data.value().slice(range.start as usize..range.end as usize)
         } else {
             data.value().clone()
         })
@@ -97,10 +97,7 @@ impl FileData {
     async fn set(&mut self, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
         let data_size = file.len() + data.len();
         if self.cur_size + data_size >= self.max_size {
-            log::info!(
-                "File memory cache is full, can't cache extra {} bytes",
-                data_size
-            );
+            log::info!("File memory cache is full, can't cache extra {data_size} bytes");
             // cache is full, need release some space
             let need_release_size = min(
                 self.cur_size,
@@ -164,12 +161,12 @@ impl FileData {
         }
         self.cur_size -= release_size;
         let _ = DATA.iter().map(|c| c.shrink_to_fit()).collect::<Vec<_>>();
-        log::info!("File memory cache gc done, released {} bytes", release_size);
+        log::info!("File memory cache gc done, released {release_size} bytes");
         Ok(())
     }
 
     async fn remove(&mut self, file: &str) -> Result<(), anyhow::Error> {
-        log::debug!("File memory cache remove file {}", file);
+        log::debug!("File memory cache remove file {file}");
 
         let Some((key, data_size)) = self.data.remove_key(file) else {
             return Ok(());
@@ -224,7 +221,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         interval.tick().await; // the first tick is immediate
         loop {
             if let Err(e) = gc().await {
-                log::error!("memory cache gc error: {}", e);
+                log::error!("memory cache gc error: {e}");
             }
             interval.tick().await;
         }
@@ -233,7 +230,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 }
 
 #[inline]
-pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+pub async fn get(file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
     if !get_config().memory_cache.enabled {
         return None;
     }

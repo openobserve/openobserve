@@ -158,7 +158,6 @@ export default defineComponent({
           end_time: props.selectedDate.endTime,
           from: 0,
           size: 10,
-          sql_mode: "full",
         },
       };
 
@@ -197,7 +196,6 @@ export default defineComponent({
           end_time: props.selectedDate.endTime,
           from: 0,
           size: topCount,
-          sql_mode: "full",
         },
       };
 
@@ -236,7 +234,6 @@ export default defineComponent({
           end_time: props.selectedDate.endTime,
           from: 0,
           size: topCount,
-          sql_mode: "full",
         },
       };
 

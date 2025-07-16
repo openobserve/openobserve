@@ -34,3 +34,57 @@ pub fn avg(timestamp: i64, param: &Option<LabelModifier>, data: Value) -> Result
         .collect();
     Ok(Value::Vector(values))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+    use crate::service::promql::value::{InstantValue, Label, Sample, Value};
+
+    #[test]
+    fn test_avg_function() {
+        let timestamp = 1640995200; // 2022-01-01 00:00:00 UTC
+
+        // Create test data with multiple samples
+        let labels1 = vec![
+            Arc::new(Label::new("instance", "server1")),
+            Arc::new(Label::new("job", "node_exporter")),
+        ];
+
+        let labels2 = vec![
+            Arc::new(Label::new("instance", "server2")),
+            Arc::new(Label::new("job", "node_exporter")),
+        ];
+
+        let data = Value::Vector(vec![
+            InstantValue {
+                labels: labels1.clone(),
+                sample: Sample::new(timestamp, 10.0),
+            },
+            InstantValue {
+                labels: labels1.clone(),
+                sample: Sample::new(timestamp, 20.0),
+            },
+            InstantValue {
+                labels: labels2.clone(),
+                sample: Sample::new(timestamp, 30.0),
+            },
+        ]);
+
+        // Test avg without label grouping - all samples should be averaged together
+        let result = avg(timestamp, &None, data.clone()).unwrap();
+
+        match result {
+            Value::Vector(values) => {
+                assert_eq!(values.len(), 1);
+                // All samples are grouped together when no label modifier is provided
+                assert_eq!(values[0].sample.value, 20.0); // (10 + 20 + 30) / 3
+                assert_eq!(values[0].sample.timestamp, timestamp);
+                // Should have empty labels since all samples are grouped together
+                assert!(values[0].labels.is_empty());
+            }
+            _ => panic!("Expected Vector result"),
+        }
+    }
+}

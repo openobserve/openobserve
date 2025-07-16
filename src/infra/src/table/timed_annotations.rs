@@ -52,8 +52,7 @@ pub async fn get(
         .await?
         .ok_or_else(|| {
             errors::Error::DbError(errors::DbError::KeyNotExists(format!(
-                "Dashboard '{}' not found",
-                dashboard_id
+                "Dashboard '{dashboard_id}' not found"
             )))
         })?;
 
@@ -176,10 +175,10 @@ pub async fn get(
 
     // Map all panels to their respective annotations
     for panel in all_panels {
-        if let Some(annotation) = grouped_annotations.get_mut(&panel.timed_annotation_id) {
-            if !annotation.panels.contains(&panel.panel_id) {
-                annotation.panels.push(panel.panel_id.clone());
-            }
+        if let Some(annotation) = grouped_annotations.get_mut(&panel.timed_annotation_id)
+            && !annotation.panels.contains(&panel.panel_id)
+        {
+            annotation.panels.push(panel.panel_id.clone());
         }
     }
 
@@ -200,8 +199,7 @@ pub async fn delete(dashboard_id: &str, timed_annotation_id: &str) -> Result<(),
         .await?
         .ok_or_else(|| {
             errors::Error::DbError(errors::DbError::KeyNotExists(format!(
-                "Dashboard '{}' not found",
-                dashboard_id
+                "Dashboard '{dashboard_id}' not found"
             )))
         })?;
 
@@ -215,7 +213,7 @@ pub async fn delete(dashboard_id: &str, timed_annotation_id: &str) -> Result<(),
 
     if delete_result.rows_affected == 0 {
         return Err(errors::Error::DbError(errors::DbError::KeyNotExists(
-            format!("Annotation with ID {} does not exist", timed_annotation_id),
+            format!("Annotation with ID {timed_annotation_id} does not exist"),
         )));
     }
 
@@ -236,8 +234,7 @@ pub async fn delete_many(
         .await?
         .ok_or_else(|| {
             errors::Error::DbError(errors::DbError::KeyNotExists(format!(
-                "Dashboard '{}' not found",
-                dashboard_id
+                "Dashboard '{dashboard_id}' not found"
             )))
         })?;
 
@@ -283,8 +280,7 @@ pub async fn get_one(
         .await?
         .ok_or_else(|| {
             errors::Error::DbError(errors::DbError::KeyNotExists(format!(
-                "Dashboard '{}' not found",
-                dashboard_id
+                "Dashboard '{dashboard_id}' not found"
             )))
         })?;
 
@@ -298,8 +294,7 @@ pub async fn get_one(
         .await?
         .ok_or_else(|| {
             errors::Error::DbError(errors::DbError::KeyNotExists(format!(
-                "TimedAnnotation with ID {} not found in dashboard {}",
-                timed_annotation_id, dashboard_id
+                "TimedAnnotation with ID {timed_annotation_id} not found in dashboard {dashboard_id}"
             )))
         })?;
 
@@ -355,8 +350,7 @@ pub async fn update(
         .await?
         .ok_or_else(|| {
             errors::Error::DbError(errors::DbError::KeyNotExists(format!(
-                "Dashboard '{}' not found",
-                dashboard_id
+                "Dashboard '{dashboard_id}' not found"
             )))
         })?;
 
@@ -406,8 +400,8 @@ pub async fn update(
 
     // tags
     let tags_json = serde_json::to_value(&timed_annotation.tags).map_err(|e| {
-        let err_msg = format!("Failed to serialize tags: {}", e);
-        log::error!("{}", err_msg);
+        let err_msg = format!("Failed to serialize tags: {e}");
+        log::error!("{err_msg}");
         errors::Error::Message(err_msg)
     })?;
     update_query = update_query.col_expr(timed_annotations::Column::Tags, Expr::value(tags_json));
@@ -525,8 +519,7 @@ async fn insert_timed_annotation(
         .await?
         .ok_or_else(|| {
             errors::Error::DbError(errors::DbError::KeyNotExists(format!(
-                "Dashboard with ID {} not found",
-                dashboard_id
+                "Dashboard with ID {dashboard_id} not found"
             )))
         })?;
     let dashboard_pk = dashboard_record.id;
@@ -534,7 +527,7 @@ async fn insert_timed_annotation(
     let annotation_id: String = if use_given_id {
         timed_annotation.annotation_id.ok_or_else(|| {
             let err_msg = "Annotation ID is required when `use_given_id` is set to true";
-            log::error!("{}", err_msg);
+            log::error!("{err_msg}");
             errors::Error::Message(err_msg.to_string())
         })?
     } else {

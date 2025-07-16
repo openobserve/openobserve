@@ -41,6 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         no-route-dismiss
         @before-show="onBeforeShow"
         @before-hide="onBeforeHide"
+        @hide="onHide"
+        @show="onShow"
       >
         <div v-if="!disableRelative" class="flex justify-evenly q-py-sm">
           <q-btn
@@ -406,7 +408,7 @@ export default defineComponent({
     },
   },
 
-  emits: ["on:date-change", "on:timezone-change"],
+  emits: ["on:date-change", "on:timezone-change", "hide", "show"],
 
   setup(props, { emit }) {
     const store = useStore();
@@ -1068,6 +1070,14 @@ export default defineComponent({
       }
     }
 
+    const onHide = () => {
+      emit("hide")
+    }
+
+    const onShow = () => {
+      emit("show")
+    }
+
     return {
       t,
       datetimeBtn,
@@ -1106,6 +1116,8 @@ export default defineComponent({
       computeRelativePeriod,
       onBeforeHide,
       showOnlyAbsolute,
+      onShow,
+      onHide,
     };
   },
   computed: {

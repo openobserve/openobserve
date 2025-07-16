@@ -66,8 +66,10 @@ pub fn spath_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarV
                 // in arrow, any value can be null.
                 // Here we decide to make our UDF to return null when either argument is null.
                 (Some(field), Some(path)) => {
-                    let mut field: json::Value =
-                        json::from_str(field).expect("Failed to deserialize arrzip field1");
+                    let mut field: json::Value = match json::from_str(field) {
+                        Ok(value) => value,
+                        Err(_) => return None,
+                    };
                     let mut found = true;
                     let paths = path.split('.').collect::<Vec<&str>>();
                     for path in paths.into_iter() {
@@ -119,13 +121,27 @@ mod tests {
         let sqls = [
             (
                 // Should include values at index 0 to index 1 (inclusive)
-                "select spath(object, 'nested.value') as ret from t",
-                vec!["+------+", "| ret  |", "+------+", "| jene |", "+------+"],
+                "select spath(object, 'nested.value')  from t",
+                vec![
+                    "+--------------------------------------+",
+                    "| spath(t.object,Utf8(\"nested.value\")) |",
+                    "+--------------------------------------+",
+                    "| jene                                 |",
+                    "|                                      |",
+                    "+--------------------------------------+",
+                ],
             ),
             (
                 // Should include all the elements
-                "select spath(object, 'unnested') as ret from t",
-                vec!["+-----+", "| ret |", "+-----+", "| doe |", "+-----+"],
+                "select spath(object, 'unnested')  from t",
+                vec![
+                    "+----------------------------------+",
+                    "| spath(t.object,Utf8(\"unnested\")) |",
+                    "+----------------------------------+",
+                    "| doe                              |",
+                    "|                                  |",
+                    "+----------------------------------+",
+                ],
             ),
             (
                 "select spath(object, 'array') as ret from t",
@@ -134,6 +150,7 @@ mod tests {
                     "| ret        |",
                     "+------------+",
                     "| [34,54,45] |",
+                    "|            |",
                     "+------------+",
                 ],
             ),
@@ -151,6 +168,7 @@ mod tests {
             schema.clone(),
             vec![Arc::new(StringArray::from(vec![
                 "{\"nested\":{\"value\":\"jene\"},\"unnested\":\"doe\",\"array\":[34,54,45]}",
+                "",
             ]))],
         )
         .unwrap();

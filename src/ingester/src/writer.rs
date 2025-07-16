@@ -62,13 +62,27 @@ pub struct Writer {
     write_queue: Arc<mpsc::Sender<(WriterSignal, Vec<Entry>, bool)>>,
 }
 
-// check total memory size
+// check total memtable size
 pub fn check_memtable_size() -> Result<()> {
-    let total_mem_size = metrics::INGEST_MEMTABLE_ARROW_BYTES
+    let cur_mem = metrics::INGEST_MEMTABLE_ARROW_BYTES
         .with_label_values(&[])
         .get();
-    if total_mem_size >= get_config().limit.mem_table_max_size as i64 {
+    if cur_mem >= get_config().limit.mem_table_max_size as i64 {
         Err(Error::MemoryTableOverflowError {})
+    } else {
+        Ok(())
+    }
+}
+
+// check total memory size
+pub fn check_memory_circuit_breaker() -> Result<()> {
+    let cfg = get_config();
+    if !cfg.common.memory_circuit_breaker_enabled || cfg.common.memory_circuit_breaker_ratio == 0 {
+        return Ok(());
+    }
+    let cur_mem = metrics::NODE_MEMORY_USAGE.with_label_values(&[]).get() as usize;
+    if cur_mem > cfg.limit.mem_total / 100 * cfg.common.memory_circuit_breaker_ratio {
+        Err(Error::MemoryCircuitBreakerError {})
     } else {
         Ok(())
     }
@@ -78,7 +92,7 @@ fn get_table_idx(thread_id: usize, stream_name: &str) -> usize {
     if let Some(idx) = MEM_TABLE_INDIVIDUAL_STREAMS.get(stream_name) {
         *idx
     } else {
-        let hash_key = format!("{}_{}", thread_id, stream_name);
+        let hash_key = format!("{thread_id}_{stream_name}");
         let hash_id = gxhash::new().sum64(&hash_key);
         hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
     }
@@ -150,10 +164,10 @@ pub async fn read_from_memtable(
         }
         visited.insert(idx);
         let w = WRITERS[idx].read().await;
-        if let Some(r) = w.get(&key) {
-            if let Ok(data) = r.read(stream_name, time_range, partition_filters).await {
-                batches.extend(data);
-            }
+        if let Some(r) = w.get(&key)
+            && let Ok(data) = r.read(stream_name, time_range, partition_filters).await
+        {
+            batches.extend(data);
         }
     }
     Ok(batches)
@@ -168,7 +182,7 @@ pub async fn check_ttl() -> Result<()> {
                 .send((WriterSignal::Rotate, vec![], false))
                 .await
             {
-                log::error!("[INGESTER:MEM] writer queue rotate error: {}", e);
+                log::error!("[INGESTER:MEM] writer queue rotate error: {e}");
             }
         }
     }
@@ -201,7 +215,7 @@ impl Writer {
             .join(idx.to_string());
         log::info!(
             "[INGESTER:MEM:{idx}] create file: {}/{}/{}/{}.wal",
-            wal_dir.display().to_string(),
+            wal_dir.display(),
             &key.org_id,
             &key.stream_type,
             wal_id
@@ -239,15 +253,12 @@ impl Writer {
                         WriterSignal::Close => break,
                         WriterSignal::Rotate => {
                             if let Err(e) = writer.rotate(0, 0).await {
-                                log::error!("[INGESTER:MEM:{idx}] writer rotate error: {}", e);
+                                log::error!("[INGESTER:MEM:{idx}] writer rotate error: {e}");
                             }
                         }
                         WriterSignal::Produce => {
                             if let Err(e) = writer.consume(entries, fsync).await {
-                                log::error!(
-                                    "[INGESTER:MEM:{idx}] writer consume batch error: {}",
-                                    e
-                                );
+                                log::error!("[INGESTER:MEM:{idx}] writer consume batch error: {e}");
                             }
                         }
                     },
@@ -409,7 +420,7 @@ impl Writer {
             .join(self.idx.to_string());
         log::info!(
             "[INGESTER:MEM] create file: {}/{}/{}/{}.wal",
-            wal_dir.display().to_string(),
+            wal_dir.display(),
             &self.key.org_id,
             &self.key.stream_type,
             wal_id
@@ -448,9 +459,9 @@ impl Writer {
         let path = old_wal.path().clone();
         let path_str = path.display().to_string();
         let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
-        log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {}", path_str);
+        log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {path_str}");
         IMMUTABLES.write().await.insert(path, table);
-        log::info!("[INGESTER:MEM] dones add to IMMUTABLES, file: {}", path_str);
+        log::info!("[INGESTER:MEM] dones add to IMMUTABLES, file: {path_str}");
 
         Ok(())
     }

@@ -60,7 +60,7 @@ pub async fn exchange_token(
             match token_ver {
                 Ok(res) => {
                     audit_message.user_email = res.0.user_email.clone();
-                    process_token(res).await
+                    _ = process_token(res).await;
                 }
                 Err(e) => {
                     audit_message.response_meta.http_response_code = 401;
@@ -74,7 +74,7 @@ pub async fn exchange_token(
             Ok(HttpResponse::Ok().json(response))
         }
         Err(e) => {
-            log::error!("Error: {}", e);
+            log::error!("Error: {e}");
             audit_message.response_meta.http_response_code = 401;
             audit_message._timestamp = now_micros();
             audit(audit_message).await;

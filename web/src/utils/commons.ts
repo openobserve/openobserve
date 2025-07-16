@@ -57,6 +57,8 @@ export const modifySQLQuery = async (
   } else {
     modString = querySQL;
   }
+
+  moment = null;
   return modString;
 };
 
@@ -555,26 +557,93 @@ export const getDashboard = async (
   folderId: any,
 ) => {
   // check if dashboard data is present in store
-  if (store.state.organizationData.allDashboardData[dashboardId]) {
-    return store.state.organizationData.allDashboardData[dashboardId];
+  let dashboardJson =
+    store.state.organizationData.allDashboardData[dashboardId];
+
+  if (!dashboardJson && dashboardId) {
+    const apiResponse = await dashboardService.get_Dashboard(
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      folderId,
+    );
+
+    dashboardJson = await retrieveAndStoreDashboardData(
+      store,
+      dashboardId,
+      folderId,
+      apiResponse,
+    );
   }
 
-  if (!dashboardId) {
+  if (!dashboardJson) {
     return {};
   }
 
-  const apiResponse = await dashboardService.get_Dashboard(
-    store.state.selectedOrganization.identifier,
-    dashboardId,
-    folderId,
-  );
+  // Fix duplicate panel IDs and check if any were found
+  const hasDuplicates = fixDuplicatePanelIds(dashboardJson);
 
-  return await retrieveAndStoreDashboardData(
-    store,
-    dashboardId,
-    folderId,
-    apiResponse,
-  );
+  // If duplicates were found, save the dashboard and retrieve it with new IDs
+  if (hasDuplicates) {
+    // Save the dashboard with fixed IDs
+    await updateDashboard(
+      store,
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      dashboardJson,
+      folderId ?? "default",
+    );
+
+    // Retrieve the dashboard again to get the updated version with new IDs
+    const apiResponse = await dashboardService.get_Dashboard(
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      folderId,
+    );
+
+    dashboardJson = await retrieveAndStoreDashboardData(
+      store,
+      dashboardId,
+      folderId,
+      apiResponse,
+    );
+  }
+
+  return dashboardJson;
+};
+
+// Fix duplicate panel.id values by assigning unique ones
+const PANEL_ID_PREFIX = "Panel_ID";
+
+const fixDuplicatePanelIds = (dashboardJson: any): boolean => {
+  const panelIdSet = new Set<string>();
+  let hasDuplicates = false;
+
+  for (const tab of dashboardJson?.tabs || []) {
+    if (!Array.isArray(tab?.panels)) continue;
+
+    for (const panel of tab.panels) {
+      const originalId = panel?.id;
+      if (!originalId) continue;
+
+      if (panelIdSet.has(originalId)) {
+        const newId = generateUniquePanelId(panelIdSet);
+        panel.id = newId;
+        hasDuplicates = true;
+      }
+
+      panelIdSet.add(panel.id);
+    }
+  }
+
+  return hasDuplicates;
+};
+
+const generateUniquePanelId = (existingIds: Set<string>): string => {
+  let id;
+  do {
+    id = `${PANEL_ID_PREFIX}${Math.floor(1000000 + Math.random() * 9000000)}`;
+  } while (existingIds.has(id));
+  return id;
 };
 
 export const deleteDashboardById = async (

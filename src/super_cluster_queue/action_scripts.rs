@@ -28,16 +28,10 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 if current_cluster_action.origin_cluster_url != action.origin_cluster_url
                     && current_cluster_action.origin_cluster_url
                         == config::get_config().common.web_url
+                    && let Some(zip_path) = &current_cluster_action.zip_file_path
+                    && let Err(e) = infra::storage::del(vec![("", zip_path)]).await
                 {
-                    if let Some(zip_path) = &current_cluster_action.zip_file_path {
-                        if let Err(e) = infra::storage::del(vec![("", zip_path)]).await {
-                            log::error!(
-                                "failed to delete the zip file from s3 bucket {}: {}",
-                                zip_path,
-                                e
-                            );
-                        }
-                    }
+                    log::error!("failed to delete the zip file from s3 bucket {zip_path}: {e}");
                 }
                 infra::table::action_scripts::update(&action).await?;
             } else {
@@ -50,16 +44,10 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             {
                 // Delete zip file if we're the original cluster
                 if current_cluster_action.origin_cluster_url == config::get_config().common.web_url
+                    && let Some(zip_path) = &current_cluster_action.zip_file_path
+                    && let Err(e) = infra::storage::del(vec![("", zip_path)]).await
                 {
-                    if let Some(zip_path) = &current_cluster_action.zip_file_path {
-                        if let Err(e) = infra::storage::del(vec![("", zip_path)]).await {
-                            log::error!(
-                                "failed to delete the zip file from s3 bucket {}: {}",
-                                zip_path,
-                                e
-                            );
-                        }
-                    }
+                    log::error!("failed to delete the zip file from s3 bucket {zip_path}: {e}");
                 }
             }
             infra::table::action_scripts::remove(&org_id, &action_id).await?;

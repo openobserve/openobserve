@@ -35,7 +35,7 @@ pub async fn add(entry: CipherEntry) -> Result<(), anyhow::Error> {
             return Err(anyhow::anyhow!("Key with given name already exists"));
         }
         Err(e) => {
-            log::info!("error while saving cipher key to db : {}", e);
+            log::info!("error while saving cipher key to db : {e}");
             return Err(anyhow::anyhow!(e));
         }
     }
@@ -132,7 +132,7 @@ pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors
         let cluster_coordinator = get_coordinator().await;
         cluster_coordinator
             .delete(
-                &format!("{CIPHER_KEY_PREFIX}{}/{}", org, name),
+                &format!("{CIPHER_KEY_PREFIX}{org}/{name}"),
                 false,
                 true,
                 None,
@@ -196,7 +196,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                     Err(e) => {
-                        log::error!("Error getting value: {}", e);
+                        log::error!("Error getting value: {e}");
                         continue;
                     }
                 };

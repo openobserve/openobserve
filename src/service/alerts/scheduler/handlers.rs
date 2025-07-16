@@ -42,6 +42,8 @@ use infra::{
 };
 use proto::cluster_rpc;
 
+#[cfg(feature = "cloud")]
+use crate::service::organization::is_org_in_free_trial_period;
 use crate::service::{
     alerts::{
         alert::{AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map},
@@ -153,7 +155,7 @@ async fn handle_alert_triggers(
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     let query_trace_id = ider::generate_trace_id();
-    let scheduler_trace_id = format!("{}/{}", trace_id, query_trace_id);
+    let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_alert_triggers: processing trigger: {}",
@@ -174,8 +176,7 @@ async fn handle_alert_triggers(
             }
             Err(e) => {
                 log::error!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] Error getting alert by id: {}",
-                    e
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Error getting alert by id: {e}"
                 );
                 return Err(anyhow::anyhow!("Error getting alert by id: {}", e));
             }
@@ -190,6 +191,19 @@ async fn handle_alert_triggers(
             trigger.module_key
         ));
     };
+
+    #[cfg(feature = "cloud")]
+    {
+        if !is_org_in_free_trial_period(&trigger.org).await? {
+            log::info!(
+                "skipping alert {} id {} in org {} because free trial expiry",
+                alert.name,
+                trigger.module_key,
+                trigger.org
+            );
+            return Ok(());
+        }
+    }
 
     let is_realtime = trigger.is_realtime;
     let is_silenced = trigger.is_silenced;
@@ -453,14 +467,14 @@ async fn handle_alert_triggers(
             &new_trigger.module_key
         );
     }
-    if let Some(tolerance) = alert.trigger_condition.tolerance_in_secs {
+    if let Some(tolerance) = alert.trigger_condition.tolerance_in_secs
+        && tolerance > 0
+    {
+        let tolerance = Duration::seconds(get_rand_num_within(0, tolerance as u64) as i64)
+            .num_microseconds()
+            .unwrap();
         if tolerance > 0 {
-            let tolerance = Duration::seconds(get_rand_num_within(0, tolerance as u64) as i64)
-                .num_microseconds()
-                .unwrap();
-            if tolerance > 0 {
-                trigger_data.tolerance = tolerance;
-            }
+            trigger_data.tolerance = tolerance;
         }
     }
     if trigger_results.data.is_some() && alert.trigger_condition.silence > 0 {
@@ -622,6 +636,7 @@ async fn handle_report_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let scheduler_trace_id = format!("{}/{}", trace_id, ider::generate_trace_id());
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
@@ -631,9 +646,10 @@ async fn handle_report_triggers(
     );
     let org_id = &trigger.org;
     // For report, trigger.module_key is the report name
-    let report_name = &trigger.module_key;
+    let report_id = &trigger.module_key;
 
-    let mut report = db::dashboards::reports::get(org_id, report_name).await?;
+    let mut report = db::dashboards::reports::get_by_id(conn, report_id).await?;
+    let report_name = report.name.clone();
     let mut new_trigger = db::scheduler::Trigger {
         next_run_at: Utc::now().timestamp_micros(),
         is_realtime: false,
@@ -643,11 +659,21 @@ async fn handle_report_triggers(
         ..trigger.clone()
     };
 
+    #[cfg(feature = "cloud")]
+    {
+        if !is_org_in_free_trial_period(&trigger.org).await? {
+            log::info!(
+                "skipping report {}  in org {} because free trial expiry",
+                report_name,
+                trigger.org
+            );
+            return Ok(());
+        }
+    }
+
     if !report.enabled {
         log::debug!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] Report not enabled: org: {}, report: {}",
-            org_id,
-            report_name
+            "[SCHEDULER trace_id {scheduler_trace_id}] Report not enabled: org: {org_id}, report name: {report_name} id: {report_id}"
         );
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
@@ -730,7 +756,7 @@ async fn handle_report_triggers(
         } else {
             TriggerDataType::Report
         },
-        key: trigger.module_key.clone(),
+        key: format!("{report_name}/{report_id}"),
         next_run_at: new_trigger.next_run_at,
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
@@ -763,8 +789,7 @@ async fn handle_report_triggers(
     match report.send_subscribers().await {
         Ok(_) => {
             log::info!(
-                "[SCHEDULER trace_id {scheduler_trace_id}] Report {} sent to destination",
-                report_name
+                "[SCHEDULER trace_id {scheduler_trace_id}] Report name: {report_name} id: {report_id} sent to destination"
             );
             // Report generation successful, update the trigger
             if run_once {
@@ -772,8 +797,7 @@ async fn handle_report_triggers(
             }
             db::scheduler::update_trigger(new_trigger).await?;
             log::debug!(
-                "[SCHEDULER trace_id {scheduler_trace_id}] Update trigger for report: {}",
-                report_name
+                "[SCHEDULER trace_id {scheduler_trace_id}] Update trigger for report name: {report_name} id: {report_id}"
             );
             trigger_data_stream.end_time = now_micros();
         }
@@ -809,20 +833,6 @@ async fn handle_report_triggers(
             trigger_data_stream.error = Some(format!("error processing report: {e}"));
         }
     }
-
-    // Check if the report has been disabled in the mean time
-    let mut old_report = db::dashboards::reports::get(org_id, report_name).await?;
-    if old_report.enabled {
-        old_report.enabled = report.enabled;
-    }
-    old_report.last_triggered_at = Some(triggered_at);
-    let result = db::dashboards::reports::set_without_updating_trigger(org_id, &old_report).await;
-    if result.is_err() {
-        log::error!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] Failed to update report: {report_name} after trigger: {}",
-            result.err().unwrap()
-        );
-    }
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage for report: {}",
         &trigger_data_stream.key
@@ -841,7 +851,7 @@ async fn handle_derived_stream_triggers(
     let time_in_queue =
         Duration::microseconds(current_time - trigger.start_time.unwrap_or_default())
             .num_milliseconds();
-    let scheduler_trace_id = format!("{}/{}", trace_id, query_trace_id);
+    let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_derived_stream_triggers processing trigger: {}",
         trigger.module_key
@@ -879,8 +889,7 @@ async fn handle_derived_stream_triggers(
     };
     let Ok(pipeline) = db::pipeline::get_by_id(pipeline_id).await else {
         let err_msg = format!(
-            "Pipeline associated with trigger not found: {}/{}/{}/{}. Checking after 5 mins.",
-            org_id, stream_type, pipeline_name, pipeline_id
+            "Pipeline associated with trigger not found: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
         );
         // Check after 5 mins if the pipeline is created
         new_trigger.next_run_at += Duration::try_minutes(5)
@@ -910,7 +919,7 @@ async fn handle_derived_stream_triggers(
             time_in_queue_ms: Some(time_in_queue),
         };
 
-        log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {}", err_msg);
+        log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
         db::scheduler::update_trigger(new_trigger).await?;
@@ -921,11 +930,23 @@ async fn handle_derived_stream_triggers(
         ));
     };
 
+    #[cfg(feature = "cloud")]
+    {
+        if !is_org_in_free_trial_period(&trigger.org).await? {
+            log::info!(
+                "skipping pipeline {} id {} in org {} because free trial expiry",
+                pipeline.name,
+                pipeline_id,
+                trigger.org
+            );
+            return Ok(());
+        }
+    }
+
     if !pipeline.enabled {
         // Pipeline not enabled, check again in 5 mins
         let msg = format!(
-            "Pipeline associated with trigger not enabled: {}/{}/{}/{}. Checking after 5 mins.",
-            org_id, stream_type, pipeline_name, pipeline_id
+            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
         );
         new_trigger.next_run_at += Duration::try_minutes(5)
             .unwrap()
@@ -953,7 +974,7 @@ async fn handle_derived_stream_triggers(
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
         };
-        log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {}", msg);
+        log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
         db::scheduler::update_trigger(new_trigger).await?;
@@ -963,8 +984,7 @@ async fn handle_derived_stream_triggers(
 
     let Some(derived_stream) = pipeline.get_derived_stream() else {
         let err_msg = format!(
-            "DerivedStream associated with the trigger not found in pipeline: {}/{}/{}. Checking after 5 mins.",
-            org_id, pipeline_name, pipeline_id
+            "DerivedStream associated with the trigger not found in pipeline: {org_id}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
         );
         new_trigger.next_run_at += Duration::try_minutes(5)
             .unwrap()
@@ -992,7 +1012,7 @@ async fn handle_derived_stream_triggers(
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
         };
-        log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {}", err_msg);
+        log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
         db::scheduler::update_trigger(new_trigger).await?;
@@ -1036,13 +1056,31 @@ async fn handle_derived_stream_triggers(
         // 5:20pm. But, if the suppossed to be run at is 5:10pm, then we need ingest
         // data for the period from 5:05pm to 5:15pm. Which is to cover the skipped
         // period from 5:05pm to 5:15pm.
+        log::debug!(
+            "supposed_to_be_run_at: {}, t0 + supposed_to_be_run_at: {}, supposed_to_be_run_smaller: {}",
+            chrono::DateTime::from_timestamp_micros(supposed_to_be_run_at)
+                .unwrap()
+                .time(),
+            chrono::DateTime::from_timestamp_micros(t0 + period_num_microseconds)
+                .unwrap()
+                .time(),
+            supposed_to_be_run_at < t0 + period_num_microseconds,
+        );
         (
             Some(t0),
             if is_cron_frequency {
                 // For cron frequency, don't believe the period, the period can be dynamic for cron.
                 // For example, if cron expression evaluates to "run every weekend 12am", the period
                 // is dynamic here.
-                supposed_to_be_run_at
+                std::cmp::min(
+                    supposed_to_be_run_at,
+                    derived_stream.trigger_condition.get_next_trigger_time(
+                        false,
+                        derived_stream.tz_offset,
+                        false,
+                        Some(t0),
+                    )?,
+                )
             } else {
                 std::cmp::min(supposed_to_be_run_at, t0 + period_num_microseconds)
             },
@@ -1143,8 +1181,7 @@ async fn handle_derived_stream_triggers(
     {
         Err(e) => {
             let err_msg = format!(
-                "Source node DerivedStream QueryCondition error during query evaluation, caused by {}",
-                e
+                "Source node DerivedStream QueryCondition error during query evaluation, caused by {e}"
             );
             log::error!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] pipeline org/name({}/{}): source node DerivedStream failed at QueryCondition evaluation with error: {}",
@@ -1203,8 +1240,7 @@ async fn handle_derived_stream_triggers(
                 match ExecutablePipeline::new(&pipeline).await {
                     Err(e) => {
                         let err_msg = format!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to initialize to ExecutablePipeline. Caused by: {}",
-                            org_id, pipeline_name, e
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({org_id}/{pipeline_name}) failed to initialize to ExecutablePipeline. Caused by: {e}"
                         );
                         log::error!("{err_msg}");
                         ingestion_error_msg = Some(err_msg);
@@ -1212,8 +1248,7 @@ async fn handle_derived_stream_triggers(
                     Ok(exec_pl) => match exec_pl.process_batch(org_id, local_val, None).await {
                         Err(e) => {
                             let err_msg = format!(
-                                "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to process DerivedStream query results. Caused by: {}",
-                                org_id, pipeline_name, e
+                                "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({org_id}/{pipeline_name}) failed to process DerivedStream query results. Caused by: {e}"
                             );
                             log::error!("{err_msg}");
                             ingestion_error_msg = Some(err_msg);
@@ -1267,8 +1302,7 @@ async fn handle_derived_stream_triggers(
                         match ingestion_service::ingest(req).await {
                             Ok(resp) if resp.status_code == 200 => {
                                 log::info!(
-                                    "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}, records: {}",
-                                    records_len
+                                    "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}, records: {records_len}"
                                 );
                             }
                             error => {
@@ -1352,20 +1386,31 @@ async fn handle_derived_stream_triggers(
     if !(trigger_data_stream.status == TriggerDataStatus::Failed
         && new_trigger.retries < max_retries)
     {
-        // Go to the next nun at, but use the same trigger start time
-        new_trigger.next_run_at = derived_stream
-            .trigger_condition
-            .get_next_trigger_time_non_aligned(
-                false,
-                derived_stream.tz_offset,
-                false,
-                Some(trigger.next_run_at),
-            )?;
-
+        let need_to_catch_up = end < supposed_to_be_run_at;
         // If the trigger didn't fail, we need to reset the `retries` count.
         // Only cumulative failures should be used to check with `max_retries`
         if trigger_data_stream.status != TriggerDataStatus::Failed {
             new_trigger.retries = 0;
+        }
+
+        if trigger_data_stream.status != TriggerDataStatus::Failed && need_to_catch_up {
+            // Go to the next nun at, but use the same trigger start time
+            new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
+                false,
+                derived_stream.tz_offset,
+                false,
+                Some(end),
+            )?;
+        } else {
+            // Go to the next nun at, but use the same trigger start time
+            new_trigger.next_run_at = derived_stream
+                .trigger_condition
+                .get_next_trigger_time_non_aligned(
+                    false,
+                    derived_stream.tz_offset,
+                    false,
+                    Some(trigger.next_run_at),
+                )?;
         }
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;

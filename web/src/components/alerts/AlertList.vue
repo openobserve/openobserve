@@ -1405,14 +1405,17 @@ export default defineComponent({
           selectedDelete.value.alert_id,
           activeFolderId.value,
         )
-        .then((res: any) => {
+        .then(async (res: any) => {
           if (res.data.code == 200) {
             $q.notify({
               type: "positive",
               message: res.data.message,
               timeout: 2000,
             });
-            getAlertsFn(store, activeFolderId.value);
+            await getAlertsFn(store, activeFolderId.value);
+            if(filterQuery.value){
+              filterAlertsByQuery(filterQuery.value);
+            }
           } else {
             $q.notify({
               type: "negative",
@@ -1691,23 +1694,7 @@ export default defineComponent({
         filterAlertsByTab();
       }
       if (newVal) {
-        let tempResults = allAlerts.value.filter((alert: any) =>
-          alert.name.toLowerCase().includes(newVal.toLowerCase())
-        )
-        filteredResults.value = tempResults.filter((alert: any) => {
-          //here we are filtering the alerts by the activeTab
-          if(activeTab.value === "scheduled"){
-            return !alert.is_real_time;
-          } 
-          //we filter the alerts by the realTime tab
-          else if(activeTab.value === "realTime"){
-            return alert.is_real_time;
-          } 
-          //else we will return all the alerts
-          else {
-            return true;
-          }
-        })
+        filterAlertsByQuery(newVal);
       }
     });
     watch(searchAcrossFolders, (newVal) => {
@@ -1886,6 +1873,27 @@ export default defineComponent({
         const joined = parts.join(` ${label} `);
         return wrap ? `(${joined})` : joined;
       }
+      //this function is used to filter the alerts by the local search not the global search
+      //this will be used when the user is searching for the alerts in the same folder
+    const filterAlertsByQuery = (query: string) => {
+      let tempResults = allAlerts.value.filter((alert: any) =>
+          alert.name.toLowerCase().includes(query.toLowerCase())
+        )
+        filteredResults.value = tempResults.filter((alert: any) => {
+          //here we are filtering the alerts by the activeTab
+          if(activeTab.value === "scheduled"){
+            return !alert.is_real_time;
+          } 
+          //we filter the alerts by the realTime tab
+          else if(activeTab.value === "realTime"){
+            return alert.is_real_time;
+          } 
+          //else we will return all the alerts
+          else {
+            return true;
+          }
+        })
+    }
 
 
 
@@ -1993,6 +2001,7 @@ export default defineComponent({
       folderIdToBeCloned,
       updateFolderIdToBeCloned,
       transformToExpression,
+      filterAlertsByQuery,
     };
   },
 });

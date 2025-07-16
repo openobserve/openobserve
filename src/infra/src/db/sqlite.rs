@@ -146,7 +146,7 @@ impl SqliteDbChannel {
                     }
                 };
                 if config::get_config().common.print_key_event {
-                    log::info!("[SQLITE] watch event: {:?}", event);
+                    log::info!("[SQLITE] watch event: {event:?}");
                 }
                 for (prefix, tx) in WATCHERS.read().await.iter() {
                     match event.clone() {
@@ -155,7 +155,7 @@ impl SqliteDbChannel {
                                 let tx = tx.clone();
                                 tokio::task::spawn(async move {
                                     if let Err(e) = tx.send(Event::Put(e)).await {
-                                        log::error!("[SQLITE] send put event error: {}", e);
+                                        log::error!("[SQLITE] send put event error: {e}");
                                     }
                                 });
                             }
@@ -165,7 +165,7 @@ impl SqliteDbChannel {
                                 let tx = tx.clone();
                                 tokio::task::spawn(async move {
                                     if let Err(e) = tx.send(Event::Delete(e)).await {
-                                        log::error!("[SQLITE] send delete event error: {}", e);
+                                        log::error!("[SQLITE] send delete event error: {e}");
                                     }
                                 });
                             }
@@ -225,8 +225,7 @@ impl super::Db for SqliteDb {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT_RO.clone();
         let query = format!(
-            "SELECT value FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}' ORDER BY start_dt DESC;",
-            module, key1, key2
+            "SELECT value FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}' ORDER BY start_dt DESC;"
         );
         let value: String = match sqlx::query_scalar(&query).fetch_one(&pool).await {
             Ok(v) => v,
@@ -267,13 +266,13 @@ impl super::Db for SqliteDb {
         .await
         {
             if let Err(e) = tx.rollback().await {
-                log::error!("[SQLITE] rollback put meta error: {}", e);
+                log::error!("[SQLITE] rollback put meta error: {e}");
             }
             return Err(e.into());
         }
         // need commit it first to avoid the deadlock of insert and update
         if let Err(e) = tx.commit().await {
-            log::error!("[SQLITE] commit put meta error: {}", e);
+            log::error!("[SQLITE] commit put meta error: {e}");
             return Err(e.into());
         }
 
@@ -290,12 +289,12 @@ impl super::Db for SqliteDb {
         .await
         {
             if let Err(e) = tx.rollback().await {
-                log::error!("[SQLITE] rollback put meta error: {}", e);
+                log::error!("[SQLITE] rollback put meta error: {e}");
             }
             return Err(e.into());
         }
         if let Err(e) = tx.commit().await {
-            log::error!("[SQLITE] commit put meta error: {}", e);
+            log::error!("[SQLITE] commit put meta error: {e}");
             return Err(e.into());
         }
 
@@ -303,8 +302,8 @@ impl super::Db for SqliteDb {
         drop(client);
 
         // event watch
-        if need_watch {
-            if let Err(e) = CHANNEL
+        if need_watch
+            && let Err(e) = CHANNEL
                 .watch_tx
                 .clone()
                 .send(Event::Put(EventData {
@@ -313,9 +312,8 @@ impl super::Db for SqliteDb {
                     start_dt,
                 }))
                 .await
-            {
-                log::error!("[SQLITE] send event error: {}", e);
-            }
+        {
+            log::error!("[SQLITE] send event error: {e}");
         }
 
         Ok(())
@@ -349,7 +347,7 @@ impl super::Db for SqliteDb {
                     if e.to_string().contains("no rows returned") {
                         None
                     } else {
-                        return Err(Error::Message(format!("[SQLITE] get_for_update error: {}", e))); 
+                        return Err(Error::Message(format!("[SQLITE] get_for_update error: {e}"))); 
                     }
                 }
             }
@@ -368,7 +366,7 @@ impl super::Db for SqliteDb {
                     if e.to_string().contains("no rows returned") {
                         None
                     } else {
-                        return Err(Error::Message(format!("[SQLITE] get_for_update error: {}", e))); 
+                        return Err(Error::Message(format!("[SQLITE] get_for_update error: {e}"))); 
                     }
                 }
             }
@@ -379,13 +377,13 @@ impl super::Db for SqliteDb {
         let (value, new_value) = match update_fn(value) {
             Err(e) => {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[SQLITE] rollback get_for_update error: {}", e);
+                    log::error!("[SQLITE] rollback get_for_update error: {e}");
                 }
                 return Err(e);
             }
             Ok(None) => {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[SQLITE] rollback get_for_update error: {}", e);
+                    log::error!("[SQLITE] rollback get_for_update error: {e}");
                 }
                 return Ok(());
             }
@@ -414,7 +412,7 @@ impl super::Db for SqliteDb {
             };
             if let Err(e) = ret {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[SQLITE] rollback get_for_update error: {}", e);
+                    log::error!("[SQLITE] rollback get_for_update error: {e}");
                 }
                 return Err(e.into());
             }
@@ -436,14 +434,14 @@ impl super::Db for SqliteDb {
             .await
             {
                 if let Err(e) = tx.rollback().await {
-                    log::error!("[POSTGRES] rollback get_for_update error: {}", e);
+                    log::error!("[POSTGRES] rollback get_for_update error: {e}");
                 }
                 return Err(e.into());
             }
         }
 
         if let Err(e) = tx.commit().await {
-            log::error!("[SQLITE] commit get_for_update error: {}", e);
+            log::error!("[SQLITE] commit get_for_update error: {e}");
             return Err(e.into());
         }
 
@@ -457,8 +455,8 @@ impl super::Db for SqliteDb {
             } else {
                 None
             };
-            if new_value.is_some() || value.is_some() {
-                if let Err(e) = CHANNEL
+            if (new_value.is_some() || value.is_some())
+                && let Err(e) = CHANNEL
                     .watch_tx
                     .clone()
                     .send(Event::Put(EventData {
@@ -467,9 +465,8 @@ impl super::Db for SqliteDb {
                         start_dt,
                     }))
                     .await
-                {
-                    log::error!("[SQLITE] send event error: {}", e);
-                }
+            {
+                log::error!("[SQLITE] send event error: {e}");
             }
         }
 
@@ -513,7 +510,7 @@ impl super::Db for SqliteDb {
                         }))
                         .await
                     {
-                        log::error!("[SQLITE] send event error: {}", e);
+                        log::error!("[SQLITE] send event error: {e}");
                     }
                 }
             });
@@ -524,27 +521,22 @@ impl super::Db for SqliteDb {
         let (key1, key2) = (key1.replace("'", "''"), key2.replace("'", "''"));
         let sql = if with_prefix {
             if key1.is_empty() {
-                format!(r#"DELETE FROM meta WHERE module = '{}';"#, module)
+                format!(r#"DELETE FROM meta WHERE module = '{module}';"#)
             } else if key2.is_empty() {
-                format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}';"#,
-                    module, key1
-                )
+                format!(r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}';"#)
             } else {
                 format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND (key2 = '{}' OR key2 LIKE '{}/%');"#,
-                    module, key1, key2, key2
+                    r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND (key2 = '{key2}' OR key2 LIKE '{key2}/%');"#
                 )
             }
         } else {
             format!(
-                r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}';"#,
-                module, key1, key2
+                r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}';"#
             )
         };
 
         let sql = if let Some(start_dt) = start_dt {
-            sql.replace(';', &format!(" AND start_dt = {};", start_dt))
+            sql.replace(';', &format!(" AND start_dt = {start_dt};"))
         } else {
             sql
         };
@@ -559,15 +551,15 @@ impl super::Db for SqliteDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
-        sql = format!("{} ORDER BY start_dt ASC", sql);
+        sql = format!("{sql} ORDER BY start_dt ASC");
 
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
@@ -588,16 +580,16 @@ impl super::Db for SqliteDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
 
-        sql = format!("{} ORDER BY start_dt ASC", sql);
+        sql = format!("{sql} ORDER BY start_dt ASC");
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -632,19 +624,16 @@ impl super::Db for SqliteDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
-        sql = format!(
-            "{} AND start_dt >= {} AND start_dt <= {}",
-            sql, min_dt, max_dt
-        );
-        sql = format!("{} ORDER BY start_dt ASC", sql);
+        sql = format!("{sql} AND start_dt >= {min_dt} AND start_dt <= {max_dt}");
+        sql = format!("{sql} ORDER BY start_dt ASC");
 
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
@@ -660,13 +649,13 @@ impl super::Db for SqliteDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT COUNT(*) AS num FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
 
         let pool = CLIENT_RO.clone();
@@ -783,18 +772,12 @@ async fn create_meta_backup() -> Result<()> {
             .await
     {
         if let Err(e) = tx.rollback().await {
-            log::error!(
-                "[SQLITE] rollback create table meta_backup_20240330 error: {}",
-                e
-            );
+            log::error!("[SQLITE] rollback create table meta_backup_20240330 error: {e}");
         }
         return Err(e.into());
     }
     if let Err(e) = tx.commit().await {
-        log::error!(
-            "[SQLITE] commit create table meta_backup_20240330 error: {}",
-            e
-        );
+        log::error!("[SQLITE] commit create table meta_backup_20240330 error: {e}");
         return Err(e.into());
     }
     Ok(())
@@ -838,9 +821,9 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     }) {
         return Ok(());
     }
-    log::info!("[SQLITE] deleting index {} on table {}", idx_name, table);
-    let sql = format!("DROP INDEX IF EXISTS {};", idx_name);
+    log::info!("[SQLITE] deleting index {idx_name} on table {table}");
+    let sql = format!("DROP INDEX IF EXISTS {idx_name};");
     sqlx::query(&sql).execute(&*client).await?;
-    log::info!("[SQLITE] index {} deleted successfully", idx_name);
+    log::info!("[SQLITE] index {idx_name} deleted successfully");
     Ok(())
 }

@@ -68,7 +68,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         let credentials = match Credentials::from_header(token) {
             Ok(c) => c,
             Err(err) => {
-                log::error!("Err authenticating {}", err);
+                log::error!("Err authenticating {err}");
                 return Err(Status::unauthenticated("No valid auth token[3]"));
             }
         };

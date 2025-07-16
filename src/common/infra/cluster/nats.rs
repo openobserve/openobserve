@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use core::cmp::min;
 use std::sync::atomic::Ordering;
 
 use config::{
@@ -36,14 +35,14 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
     // first, init NATs client with channel communicating NATs events
     let (nats_event_tx, nats_event_rx) = mpsc::channel::<nats::NatsEvent>(10);
     if let Err(e) = nats::init_nats_client(nats_event_tx).await {
-        log::error!("[CLUSTER] NATs client init failed: {}", e);
+        log::error!("[CLUSTER] NATs client init failed: {e}");
         return Err(e);
     }
     // a child task to handle NATs event
     task::spawn(async move { update_cache(nats_event_rx).await });
 
     if let Err(e) = register().await {
-        log::error!("[CLUSTER] register failed: {}", e);
+        log::error!("[CLUSTER] register failed: {e}");
         return Err(e);
     }
 
@@ -57,7 +56,7 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
             }
         }
         // after the node is online, keep alive
-        let ttl_keep_alive = min(5, (get_config().limit.node_heartbeat_ttl / 2) as u64);
+        let ttl_keep_alive = std::cmp::max(1, (get_config().limit.node_heartbeat_ttl / 4) as u64);
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             loop {
@@ -69,7 +68,7 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
                         break;
                     }
                     Err(e) => {
-                        log::error!("[CLUSTER] keep alive failed: {}", e);
+                        log::error!("[CLUSTER] keep alive failed: {e}");
                         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                         continue;
                     }
@@ -88,7 +87,7 @@ async fn register() -> Result<()> {
     let locker = dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64)
         .await
         .map_err(|e| {
-            log::error!("[CLUSTER] nats register failed: {}", e);
+            log::error!("[CLUSTER] nats register failed: {e}");
             e
         })?;
 
@@ -100,7 +99,7 @@ async fn register() -> Result<()> {
         Ok(v) => v,
         Err(e) => {
             dist_lock::unlock(&locker).await.map_err(|e| {
-                log::error!("[CLUSTER] nats unlock failed: {}", e);
+                log::error!("[CLUSTER] nats unlock failed: {e}");
                 e
             })?;
             return Err(e);
@@ -132,7 +131,7 @@ async fn register() -> Result<()> {
 
     node_ids.sort();
     node_ids.dedup();
-    log::debug!("node_ids: {:?}", node_ids);
+    log::debug!("node_ids: {node_ids:?}");
 
     let mut new_node_id = 1;
     for id in node_ids {
@@ -142,7 +141,7 @@ async fn register() -> Result<()> {
             break;
         }
     }
-    log::debug!("new_node_id: {:?}", new_node_id);
+    log::debug!("new_node_id: {new_node_id:?}");
     // update local id
     unsafe {
         LOCAL_NODE_ID = new_node_id;
@@ -170,7 +169,7 @@ async fn register() -> Result<()> {
         role_group: LOCAL_NODE.role_group,
         cpu_num: cfg.limit.cpu_num as u64,
         status: NodeStatus::Prepare,
-        scheduled: true,
+        scheduled: false,
         broadcasted: false,
         metrics: Default::default(),
         version: config::VERSION.to_string(),
@@ -201,12 +200,12 @@ async fn register() -> Result<()> {
     let client = get_coordinator().await;
     if let Err(e) = client.put(&key, val.into(), NEED_WATCH, None).await {
         dist_lock::unlock(&locker).await?;
-        return Err(Error::Message(format!("register node error: {}", e)));
+        return Err(Error::Message(format!("register node error: {e}")));
     }
 
     // 7. register ok, release lock
     dist_lock::unlock(&locker).await.map_err(|e| {
-        log::error!("[CLUSTER] nats unlock failed: {}", e);
+        log::error!("[CLUSTER] nats unlock failed: {e}");
         e
     })?;
 
@@ -252,7 +251,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
             role_group: LOCAL_NODE.role_group,
             cpu_num: cfg.limit.cpu_num as u64,
             status: status.clone(),
-            scheduled: true,
+            scheduled: false,
             broadcasted: false,
             metrics: Default::default(),
             version: config::VERSION.to_string(),
@@ -269,7 +268,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     let key = format!("/nodes/{}", LOCAL_NODE.uuid);
     let client = get_coordinator().await;
     if let Err(e) = client.put(&key, val.into(), NEED_WATCH, None).await {
-        return Err(Error::Message(format!("online node error: {}", e)));
+        return Err(Error::Message(format!("online node error: {e}")));
     }
 
     Ok(())
@@ -280,7 +279,7 @@ pub(crate) async fn leave() -> Result<()> {
     let key = format!("/nodes/{}", LOCAL_NODE.uuid);
     let client = get_coordinator().await;
     if let Err(e) = client.delete(&key, false, NEED_WATCH, None).await {
-        return Err(Error::Message(format!("leave node error: {}", e)));
+        return Err(Error::Message(format!("leave node error: {e}")));
     }
 
     Ok(())
@@ -291,7 +290,7 @@ pub(crate) async fn update_local_node(node: &Node) -> Result<()> {
     let val = json::to_vec(&node).unwrap();
     let client = get_coordinator().await;
     if let Err(e) = client.put(&key, val.into(), NEED_WATCH, None).await {
-        return Err(Error::Message(format!("update node error: {}", e)));
+        return Err(Error::Message(format!("update node error: {e}")));
     }
     Ok(())
 }

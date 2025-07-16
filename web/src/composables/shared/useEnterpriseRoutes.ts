@@ -64,9 +64,19 @@ const useEnterpriseRoutes = () => {
             routeGuard(to, from, next);
           },
         },
+        {
+          path: "organizations",
+          name: "organizations",
+          component: Organizations,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
       ],
     },
   ];
+  //the below are the routes that we support for enterprise and cloud
+  //the above are the routes that we support for oss including both enterprise and cloud
 
   if (config.isCloud == "true" || config.isEnterprise == "true") {
     routes.push({
@@ -79,14 +89,6 @@ const useEnterpriseRoutes = () => {
     });
     routes[0].children.push(
       ...[
-        {
-          path: "organizations",
-          name: "organizations",
-          component: Organizations,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
         {
           path: "groups",
           name: "groups",

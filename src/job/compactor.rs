@@ -46,19 +46,19 @@ pub async fn run() -> Result<(), anyhow::Error> {
         log::error!("[COMPACTOR::JOB] start merge job scheduler error: {e}");
     }
 
-    tokio::task::spawn(async move { run_generate_job().await });
-    tokio::task::spawn(async move { run_generate_old_data_job().await });
+    tokio::task::spawn(run_generate_job());
+    tokio::task::spawn(run_generate_old_data_job());
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { run_generate_downsampling_job().await });
-    tokio::task::spawn(async move { run_merge(scheduler.tx()).await });
-    tokio::task::spawn(async move { run_retention().await });
-    tokio::task::spawn(async move { run_delay_deletion().await });
-    tokio::task::spawn(async move { run_sync_to_db().await });
+    tokio::task::spawn(run_generate_downsampling_job());
+    tokio::task::spawn(run_merge(scheduler.tx()));
+    tokio::task::spawn(run_retention());
+    tokio::task::spawn(run_delay_deletion());
+    tokio::task::spawn(run_sync_to_db());
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { run_downsampling_sync_to_db().await });
-    tokio::task::spawn(async move { run_check_running_jobs().await });
-    tokio::task::spawn(async move { run_clean_done_jobs().await });
-    tokio::task::spawn(async move { run_compactor_pending_jobs_metric().await });
+    tokio::task::spawn(run_downsampling_sync_to_db());
+    tokio::task::spawn(run_check_running_jobs());
+    tokio::task::spawn(run_clean_done_jobs());
+    tokio::task::spawn(run_compactor_pending_jobs_metric());
 
     Ok(())
 }
@@ -140,16 +140,13 @@ async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
 /// Generate downsampling job for compactor
 #[cfg(feature = "enterprise")]
 async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
-    if get_o2_config()
-        .downsampling
-        .metrics_downsampling_rules
-        .is_empty()
-    {
+    let cfg = get_o2_config();
+    if cfg.downsampling.metrics_downsampling_rules.is_empty() {
         return Ok(());
     }
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_o2_config().downsampling.downsampling_interval,
+            cfg.downsampling.downsampling_interval,
         ))
         .await;
         log::debug!("[COMPACTOR::JOB] Running generate downsampling job");
