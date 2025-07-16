@@ -26,9 +26,7 @@ import {
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SpanBlock from "@/plugins/traces/SpanBlock.vue";
-import SpanDetails from "@/plugins/traces/SpanDetails.vue";
 import i18n from "@/locales";
-import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
