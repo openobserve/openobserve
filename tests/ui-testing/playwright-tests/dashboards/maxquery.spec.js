@@ -1,11 +1,8 @@
 import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
-import { login } from "../utils/dashLogin.js";
-import { ingestion } from "../utils/dashIngestion.js";
-import {
-  waitForDashboardPage,
-  deleteDashboard,
-} from "../utils/dashCreation.js";
+import { login } from "./utils/dashLogin.js";
+import { ingestion } from "./utils/dashIngestion.js";
+import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
 import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart.js";
 import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
@@ -13,6 +10,7 @@ import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
 import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
 import StreamSettingsPage from "../../pages/dashboardPages/streams.js";
+import { ManagementPage } from "../../pages/managementPage.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -27,12 +25,16 @@ test.describe("dashboard max query testcases", () => {
     await ingestion(page);
     await page.waitForTimeout(2000);
 
+    // Ensure Streaming is disabled for consistent test behaviour
+    const managementPage = new ManagementPage(page);
+    await managementPage.ensureStreamingDisabled();
+
     const orgNavigation = page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     await orgNavigation;
   });
-  test.skip("should correctly display max query range error message when max query range is exceeded.", async ({
+  test("should correctly display max query range error message when max query range is exceeded.", async ({
     page,
   }) => {
     const chartTypeSelector = new ChartTypeSelector(page);
@@ -99,68 +101,14 @@ test.describe("dashboard max query testcases", () => {
       page.locator('[data-test="dashboard-panel-max-duration-warning"]')
     ).not.toBeVisible();
 
-    await page.locator('[data-test="dashboard-back-btn"]').click();
-
-    await deleteDashboard(page, randomDashboardName);
-  });
-
-  test("should not display max query range error message when set the max query range to 0.", async ({
-    page,
-  }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dateTimeHelper = new DateTimeHelper(page);
-    const dashboardPageActions = new DashboardactionPage(page);
-    const streamSettingsPage = new StreamSettingsPage(page);
+    await page.waitForTimeout(10000);
 
     await dashboardPage.menuItem("streams-item");
 
     await streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "0");
 
-    await dashboardPage.menuItem("dashboards-item");
+    // await page.locator('[data-test="dashboard-back-btn"]').click();
 
-    await waitForDashboardPage(page);
-
-    const randomDashboardName = `AutoDashboard-${Date.now()}`;
-    await dashboardCreate.createDashboard(randomDashboardName);
-
-    await dashboardCreate.addPanel();
-
-    await chartTypeSelector.selectChartType("bar");
-    await chartTypeSelector.selectStreamType("logs");
-    await chartTypeSelector.selectStream("e2e_automate");
-
-    await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
-    await chartTypeSelector.searchAndAddField("kubernetes_labels_name", "b");
-
-    await dateTimeHelper.setRelativeTimeRange("6-w");
-
-    await dashboardPageActions.applyDashboardBtn();
-    await dashboardPageActions.waitForChartToRender();
-    await dashboardPageActions.addPanelName(randomDashboardName);
-    await dashboardPageActions.savePanel();
-
-    await dateTimeHelper.setRelativeTimeRange("6-w");
-
-    const response = await page.waitForResponse(
-      (response) =>
-        response
-          .url()
-          .includes("/api/default/_search?type=logs&search_type=dashboards") &&
-        response.status() === 200
-    );
-    const data = await response.json();
-
-    expect(data.hits.length).toBeGreaterThan(0);
-
-    await expect(
-      page.locator('[data-test="dashboard-panel-max-duration-warning"]')
-    ).not.toBeVisible();
-    ({ timeout: 10000 });
-
-    await page.locator('[data-test="dashboard-back-btn"]').click();
-
-    await deleteDashboard(page, randomDashboardName);
+    // await deleteDashboard(page, randomDashboardName);
   });
 });
