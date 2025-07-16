@@ -48,11 +48,14 @@ use super::{
     datafusion::udf::fuzzy_match_udf,
     utils::{is_field, is_value, split_conjunction, trim_quotes},
 };
-use crate::service::search::datafusion::udf::{
-    MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
-    STR_MATCH_UDF_NAME,
-    match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
-    str_match_udf,
+use crate::service::search::{
+    datafusion::udf::{
+        MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+        STR_MATCH_UDF_NAME,
+        match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+        str_match_udf,
+    },
+    utils::get_field_name,
 };
 
 pub fn get_index_condition_from_expr(
@@ -637,7 +640,7 @@ impl Condition {
             Condition::StrMatch(..) => true,
             Condition::In(..) => true,
             Condition::Regex(..) => false,
-            Condition::MatchAll(v) => is_blank_or_alphanumeric(v),
+            Condition::MatchAll(v) => is_alphanumeric(v),
             Condition::FuzzyMatchAll(..) => false,
             Condition::All() => true,
             Condition::Or(left, right) => left.can_remove_filter() && right.can_remove_filter(),
@@ -736,15 +739,6 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
     true
 }
 
-// Note: the expr should be Identifier or CompoundIdentifier
-fn get_field_name(expr: &Expr) -> String {
-    match expr {
-        Expr::Identifier(ident) => trim_quotes(ident.to_string().as_str()),
-        Expr::CompoundIdentifier(ident) => trim_quotes(ident[1].to_string().as_str()),
-        _ => unreachable!(),
-    }
-}
-
 fn get_value(expr: &Expr) -> String {
     match expr {
         Expr::Value(value) => trim_quotes(value.to_string().as_str()),
@@ -806,7 +800,11 @@ pub(crate) fn get_arg_name(args: &FunctionArg) -> String {
     }
 }
 
-fn is_blank_or_alphanumeric(s: &str) -> bool {
+fn is_alphanumeric(s: &str) -> bool {
+    s.chars().all(|c| c.is_ascii_alphanumeric())
+}
+
+fn _is_blank_or_alphanumeric(s: &str) -> bool {
     s.chars()
         .all(|c| c.is_ascii_whitespace() || c.is_ascii_alphanumeric())
 }
@@ -1050,5 +1048,21 @@ mod tests {
 
         assert_eq!(fields.len(), 1);
         assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_is_alphanumeric() {
+        assert!(is_alphanumeric("123"));
+        assert!(is_alphanumeric("123abc"));
+        assert!(!is_alphanumeric("123 abc"));
+        assert!(!is_alphanumeric("123 abc 123"));
+    }
+
+    #[test]
+    fn test_is_blank_or_alphanumeric() {
+        assert!(_is_blank_or_alphanumeric("123"));
+        assert!(_is_blank_or_alphanumeric("123abc"));
+        assert!(_is_blank_or_alphanumeric("123 abc"));
+        assert!(_is_blank_or_alphanumeric("123 abc 123"));
     }
 }
