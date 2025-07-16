@@ -1699,10 +1699,7 @@ const useLogs = () => {
   }
 
   const setMultiStreamHistogramQuery = (queryReq: any) => {
-    let histogramQuery = `select histogram(
-            ${store.state.zoConfig.timestamp_column},
-            '${searchObj.meta.resultGrid.chartInterval}') AS zo_sql_key, 
-            count(*) AS zo_sql_num from "[INDEX_NAME]" GROUP BY zo_sql_key`;
+    let histogramQuery = `select histogram(${store.state.zoConfig.timestamp_column}, '${searchObj.meta.resultGrid.chartInterval}') AS zo_sql_key, count(*) AS zo_sql_num from "[INDEX_NAME]" GROUP BY zo_sql_key`;
     let multiSql = [];
 
     for (const stream of searchObj.data.stream.selectedStream) {
