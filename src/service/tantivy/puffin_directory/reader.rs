@@ -212,7 +212,7 @@ impl Directory for PuffinDirReader {
 pub async fn warm_up_terms(
     searcher: &tantivy::Searcher,
     terms_grouped_by_field: &HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>>,
-    need_all_term_fields: Vec<tantivy::schema::Field>,
+    need_all_term_fields: HashSet<tantivy::schema::Field>,
     need_fast_field: Option<String>,
 ) -> anyhow::Result<()> {
     let mut warm_up_fields_futures = Vec::new();
