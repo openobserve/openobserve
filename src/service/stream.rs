@@ -615,18 +615,17 @@ pub async fn delete_stream(
     if del_related_feature_resources {
         if let Some(pipeline) =
             db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
+            && let Err(e) = db::pipeline::delete(&pipeline.id).await
         {
-            if let Err(e) = db::pipeline::delete(&pipeline.id).await {
-                return Ok(
-                    HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        format!(
-                            "Error: failed to delete the associated pipeline \"{}\": {e}",
-                            pipeline.name
-                        ),
-                    )),
-                );
-            }
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!(
+                        "Error: failed to delete the associated pipeline \"{}\": {e}",
+                        pipeline.name
+                    ),
+                )),
+            );
         }
 
         if let Ok(alerts) =
