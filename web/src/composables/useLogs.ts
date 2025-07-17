@@ -6130,6 +6130,10 @@ const useLogs = () => {
 
         if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false) {
           payload.queryReq.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query);
+        } else {
+          payload.queryReq.query.sql = searchObj.data.histogramQuery.query.sql.replace("[INTERVAL]",
+            searchObj.meta.resultGrid.chartInterval,
+          );
         }
 
         payload.meta = {
