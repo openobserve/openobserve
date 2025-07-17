@@ -23,7 +23,7 @@ use config::{
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
-        inverted_index::InvertedIndexOptimizeMode,
+        inverted_index::IndexOptimizeMode,
         search::{ScanStats, StorageType},
         stream::{FileKey, StreamType},
     },
@@ -52,7 +52,7 @@ use crate::service::{
     search::{
         datafusion::exec,
         generate_search_schema_diff,
-        grpc::utils,
+        grpc::utils::{self, TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
@@ -75,7 +75,7 @@ pub async fn search(
     file_stat_cache: Option<FileStatisticsCache>,
     mut index_condition: Option<IndexCondition>,
     mut fst_fields: Vec<String>,
-    idx_optimize_rule: Option<InvertedIndexOptimizeMode>,
+    idx_optimize_rule: Option<IndexOptimizeMode>,
 ) -> super::SearchTable {
     let enter_span = tracing::span::Span::current();
     log::info!("[trace_id {}] search->storage: enter", query.trace_id);
@@ -125,8 +125,12 @@ pub async fn search(
         files.len(),
     );
 
-    // check inverted index
-    let use_inverted_index = query.use_inverted_index && index_condition.is_some();
+    // Condition:All() means search tantivy without filter,
+    // so we should not use inverted index in datafusion search
+    // Condition:All() is used for TantivyOptimizeExec
+    let use_inverted_index = query.use_inverted_index
+        && index_condition.is_some()
+        && !index_condition.as_ref().unwrap().is_condition_all();
     if use_inverted_index {
         log::info!(
             "[trace_id {}] flight->search: use_inverted_index with tantivy format {}",
@@ -174,6 +178,7 @@ pub async fn search(
         );
     }
 
+    // set index_condition to None, means we do not need to add filter back
     if !is_add_filter_back {
         index_condition = None;
         fst_fields = vec![];
@@ -189,9 +194,8 @@ pub async fn search(
             Ok(size) => size,
             Err(err) => {
                 log::error!(
-                    "[trace_id {}] calculate files size error: {}",
-                    query.trace_id,
-                    err
+                    "[trace_id {}] calculate files size error: {err}",
+                    query.trace_id
                 );
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     "calculate files size error".to_string(),
@@ -447,7 +451,7 @@ pub async fn cache_files(
     let files_num = files.len() as i64;
     if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
         // all files are cached
-        return Ok((file_data::CacheType::None, cache_hits, cache_misses));
+        return Ok((file_data::CacheType::Disk, cache_hits, cache_misses));
     }
 
     // check cache size
@@ -523,8 +527,8 @@ pub async fn filter_file_list_by_tantivy_index(
     query: Arc<super::QueryParams>,
     file_list: &mut Vec<FileKey>,
     index_condition: Option<IndexCondition>,
-    idx_optimize_mode: Option<InvertedIndexOptimizeMode>,
-) -> Result<(usize, bool, usize, Vec<u64>), Error> {
+    idx_optimize_mode: Option<IndexOptimizeMode>,
+) -> Result<(usize, bool, TantivyMultiResult), Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
@@ -623,28 +627,10 @@ pub async fn filter_file_list_by_tantivy_index(
     let time_range = query.time_range.unwrap_or((0, 0));
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
     let (mut index_parquet_files, query_limit) =
-        if let Some(InvertedIndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_mode {
-            if limit > 0 {
-                (
-                    group_files_by_time_range(index_parquet_files, target_partitions),
-                    limit,
-                )
-            } else {
-                (
-                    index_parquet_files.into_iter().map(|f| vec![f]).collect(),
-                    0,
-                )
-            }
-        } else {
-            (
-                index_parquet_files.into_iter().map(|f| vec![f]).collect(),
-                0,
-            )
-        };
+        partition_tantivy_files(index_parquet_files, &idx_optimize_mode, target_partitions);
 
     let mut no_more_files = false;
-    let mut total_hits = 0;
-    let mut total_histogram_hits = vec![];
+    let mut tantivy_result_builder = TantivyMultiResultBuilder::new(&idx_optimize_mode);
     let group_num = index_parquet_files.len();
     let max_group_len = index_parquet_files
         .iter()
@@ -655,16 +641,9 @@ pub async fn filter_file_list_by_tantivy_index(
         if no_more_files {
             // delete the rest of the files
             for i in 0..group_num {
-                let Some(file) = index_parquet_files.get_mut(i).and_then(|g| {
-                    if g.is_empty() {
-                        None
-                    } else {
-                        Some(g.remove(g.len() - 1))
-                    }
-                }) else {
-                    continue;
-                };
-                file_list_map.remove(&file.key);
+                if let Some(file) = extract_file_from_group(&mut index_parquet_files, i) {
+                    file_list_map.remove(&file.key);
+                }
             }
             continue;
         }
@@ -673,56 +652,32 @@ pub async fn filter_file_list_by_tantivy_index(
         let mut tasks = Vec::new();
         let semaphore = std::sync::Arc::new(Semaphore::new(target_partitions));
         for i in 0..group_num {
-            let Some(file) = index_parquet_files.get_mut(i).and_then(|g| {
-                if g.is_empty() {
-                    None
-                } else {
-                    Some(g.remove(g.len() - 1))
-                }
-            }) else {
+            let Some(file) = extract_file_from_group(&mut index_parquet_files, i) else {
                 continue;
             };
             let trace_id = query.trace_id.to_string();
-            // Spawn a task for each file, wherein full text search and
-            // secondary index search queries are executed
             let index_condition_clone = index_condition.clone();
             let idx_optimize_rule_clone = idx_optimize_mode.clone();
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let task = tokio::task::spawn(async move {
-                // spawn a new task for catching the panic error
-                let inner_trace_id = trace_id.clone();
-                let parquet_file = file.clone();
-                let ret = tokio::task::spawn(async move {
-                    let ret = search_tantivy_index(
-                        &inner_trace_id,
-                        time_range,
-                        index_condition_clone,
-                        idx_optimize_rule_clone,
-                        &parquet_file,
-                    )
-                    .await;
-                    drop(permit);
-                    ret
-                })
+                let ret = search_tantivy_index(
+                    &trace_id,
+                    time_range,
+                    index_condition_clone,
+                    idx_optimize_rule_clone,
+                    &file,
+                )
                 .await;
+                drop(permit);
                 match ret {
-                    Ok(Ok(ret)) => Ok(ret),
-                    Ok(Err(e)) => {
-                        log::error!(
-                            "[trace_id {trace_id}] search->tantivy: error filtering via index: {}, error: {:?}",
-                            file.key,
-                            e
-                        );
-                        Err(e)
-                    }
+                    Ok(ret) => Ok(ret),
                     Err(e) => {
                         log::error!(
-                            "[trace_id {trace_id}] search->tantivy: error filtering via index: {}, index_size: {}, error: {:?}",
+                            "[trace_id {trace_id}] search->tantivy: error filtering via index: {}, index_size: {}, error: {e:?}",
                             file.key,
                             file.meta.index_size,
-                            e
                         );
-                        Err(e.into())
+                        Err(e)
                     }
                 }
             });
@@ -734,24 +689,22 @@ pub async fn filter_file_list_by_tantivy_index(
             Ok(results) => results,
             Err(e) => {
                 log::error!(
-                    "[trace_id {}] search->tantivy: error filtering via index, error: {:?}",
+                    "[trace_id {}] search->tantivy: error filtering via index, error: {e:?}",
                     query.trace_id,
-                    e
                 );
                 // search error, need add filter back
-                return Ok((start.elapsed().as_millis() as usize, true, 0, vec![]));
+                return Ok((
+                    start.elapsed().as_millis() as usize,
+                    true,
+                    TantivyMultiResult::RowNums(0),
+                ));
             }
         };
         for result in tasks {
             // Each result corresponds to a file in the file list
             match result {
-                Ok((file_name, bitvec, hits_in_file, histogram_hits)) => {
-                    let histogram_hits_count = histogram_hits.iter().sum::<u64>();
-                    total_hits += hits_in_file;
-                    if !histogram_hits.is_empty() {
-                        total_histogram_hits.push(histogram_hits);
-                    }
-                    if file_name.is_empty() && bitvec.is_none() {
+                Ok((file_name, result)) => {
+                    if file_name.is_empty() {
                         // no need inverted index for this file, need add filter back
                         log::warn!(
                             "[trace_id {}] search->tantivy: no hits for index_condition: {:?}. Adding the parquet file back for Datafusion search",
@@ -761,55 +714,43 @@ pub async fn filter_file_list_by_tantivy_index(
                         is_add_filter_back = true;
                         continue;
                     }
-                    if let Some(res) = bitvec {
-                        log::debug!(
-                            "[trace_id {}] search->tantivy: hits for index_condition: {:?} found {} in {}",
-                            query.trace_id,
-                            index_condition,
-                            hits_in_file,
-                            file_name
-                        );
-                        if hits_in_file == 0 {
-                            // if the bitmap is empty then we remove the file from the list
+                    match result {
+                        TantivyResult::RowIdsBitVec(num_rows, bitvec) => {
+                            if num_rows == 0 {
+                                // if the bitmap is empty then we remove the file from the list
+                                file_list_map.remove(&file_name);
+                            } else {
+                                // Replace the segment IDs in the existing `FileKey` with the found
+                                tantivy_result_builder.add_row_nums(num_rows as u64);
+                                let file = file_list_map.get_mut(&file_name).unwrap();
+                                file.with_segment_ids(bitvec);
+                            }
+                        }
+                        TantivyResult::Count(count) => {
+                            tantivy_result_builder.add_row_nums(count as u64);
+                            file_list_map.remove(&file_name); // maybe we do not need to remove it?
+                        }
+                        TantivyResult::Histogram(histogram) => {
+                            tantivy_result_builder.add_histogram(histogram);
                             file_list_map.remove(&file_name);
-                        } else {
-                            // Replace the segment IDs in the existing `FileKey` with the found
-                            let file = file_list_map.get_mut(&file_name).unwrap();
-                            file.with_segment_ids(res);
                         }
-                    } else {
-                        // if the bitmap is empty then we remove the file from the list
-                        if hits_in_file > 0 {
-                            log::debug!(
-                                "[trace_id {}] search->tantivy: hits for index_condition: {:?} found {} in {}",
-                                query.trace_id,
-                                index_condition,
-                                hits_in_file,
-                                file_name
-                            );
-                        } else if histogram_hits_count > 0 {
-                            log::debug!(
-                                "[trace_id {}] search->tantivy: histogram hits for index_condition {:?} found {} in {}",
-                                query.trace_id,
-                                index_condition,
-                                hits_in_file,
-                                file_name
-                            );
-                        } else {
-                            log::debug!(
-                                "[trace_id {}] search->tantivy: no match found in index for file {}",
-                                query.trace_id,
-                                file_name
-                            );
+                        TantivyResult::TopN(top_n) => {
+                            tantivy_result_builder.add_top_n(top_n);
+                            file_list_map.remove(&file_name);
                         }
-                        file_list_map.remove(&file_name);
+                        TantivyResult::Distinct(distinct) => {
+                            tantivy_result_builder.add_distinct(distinct);
+                            file_list_map.remove(&file_name);
+                        }
+                        TantivyResult::RowIds(_) => {
+                            unreachable!("RowIds should not be returned");
+                        }
                     }
                 }
                 Err(e) => {
                     log::error!(
-                        "[trace_id {}] search->tantivy: error filtering via index. Keep file to search, error: {}",
+                        "[trace_id {}] search->tantivy: error filtering via index. Keep file to search, error: {e}",
                         query.trace_id,
-                        e
                     );
                     is_add_filter_back = true;
                     continue;
@@ -817,36 +758,22 @@ pub async fn filter_file_list_by_tantivy_index(
             }
         }
         // if limit is set and total hits exceed the limit, we stop searching
-        if query_limit > 0 && total_hits > query_limit {
+        if query_limit > 0 && tantivy_result_builder.num_rows() > query_limit {
             no_more_files = true;
         }
     }
 
-    let final_histogram_hits = if total_histogram_hits.is_empty() {
-        Vec::new()
-    } else {
-        // note: all histogram_hits should have the same length
-        let len = total_histogram_hits[0].len();
-        (0..len)
-            .map(|i| {
-                total_histogram_hits
-                    .iter()
-                    .map(|v| v.get(i).unwrap_or(&0))
-                    .sum::<u64>()
-            })
-            .collect()
-    };
-    let histogram_hits_sum = final_histogram_hits.iter().sum::<u64>();
+    // get the result
+    let tantivy_result = tantivy_result_builder.build();
 
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} rows, {} histogram_hits, is_add_filter_back: {}, file_num: {}, took: {} ms",
+                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} , is_add_filter_back: {}, file_num: {}, took: {} ms",
                 query.trace_id,
                 index_condition,
-                total_hits,
-                histogram_hits_sum,
+                tantivy_result,
                 is_add_filter_back,
                 file_list_map.len(),
                 search_start.elapsed().as_millis()
@@ -857,9 +784,8 @@ pub async fn filter_file_list_by_tantivy_index(
                 .search_role("follower".to_string())
                 .duration(search_start.elapsed().as_millis() as usize)
                 .desc(format!(
-                    "found {} rows, {} histogram_hits, is_add_filter_back: {}, file_num: {}",
-                    total_hits,
-                    histogram_hits_sum,
+                    "found {} , is_add_filter_back: {}, file_num: {}",
+                    tantivy_result,
                     is_add_filter_back,
                     file_list_map.len(),
                 ))
@@ -871,8 +797,7 @@ pub async fn filter_file_list_by_tantivy_index(
     Ok((
         start.elapsed().as_millis() as usize,
         is_add_filter_back,
-        total_hits,
-        final_histogram_hits,
+        tantivy_result,
     ))
 }
 
@@ -897,9 +822,9 @@ async fn search_tantivy_index(
     trace_id: &str,
     time_range: (i64, i64),
     index_condition: Option<IndexCondition>,
-    idx_optimize_rule: Option<InvertedIndexOptimizeMode>,
+    idx_optimize_rule: Option<IndexOptimizeMode>,
     parquet_file: &FileKey,
-) -> anyhow::Result<(String, Option<BitVec>, usize, Vec<u64>)> {
+) -> anyhow::Result<(String, TantivyResult)> {
     let file_account = parquet_file.account.clone();
     let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
         return Err(anyhow::anyhow!(
@@ -952,9 +877,19 @@ async fn search_tantivy_index(
         }
     };
 
-    let tantivy_searcher = tantivy_reader.searcher();
+    let searcher = tantivy_reader.searcher();
     let tantivy_schema = tantivy_index.schema();
     let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
+
+    // check if the index has multiple segments
+    let seg_metas = tantivy_index
+        .searchable_segment_metas()
+        .context("Count segments")?;
+    if seg_metas.len() > 1 {
+        return Err(anyhow::anyhow!(
+            "Multiple segments in tantivy index not supported"
+        ));
+    }
 
     // generate the tantivy query
     let condition: IndexCondition =
@@ -963,8 +898,9 @@ async fn search_tantivy_index(
     let need_all_term_fields = condition
         .need_all_term_fields()
         .into_iter()
+        .chain(get_simple_distinct_field(&idx_optimize_rule).into_iter())
         .filter_map(|filed| tantivy_schema.get_field(&filed).ok())
-        .collect::<Vec<_>>();
+        .collect::<HashSet<_>>();
 
     // warm up the terms in the query
     let mut warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> =
@@ -975,11 +911,13 @@ async fn search_tantivy_index(
         entry.insert(term.clone(), need_position);
     });
 
-    let need_fast_field = idx_optimize_rule
-        .as_ref()
-        .is_some_and(|rule| matches!(rule, InvertedIndexOptimizeMode::SimpleHistogram(..)));
+    let need_fast_field = idx_optimize_rule.as_ref().and_then(|rule| match rule {
+        IndexOptimizeMode::SimpleHistogram(..) => Some(TIMESTAMP_COL_NAME.to_string()),
+        IndexOptimizeMode::SimpleTopN(field, ..) => Some(field.to_string()),
+        _ => None,
+    });
     warm_up_terms(
-        &tantivy_searcher,
+        &searcher,
         &warm_terms,
         need_all_term_fields,
         need_fast_field,
@@ -990,121 +928,119 @@ async fn search_tantivy_index(
     let file_in_range =
         parquet_file.meta.min_ts >= time_range.0 && parquet_file.meta.max_ts < time_range.1;
     let idx_optimize_rule_clone = idx_optimize_rule.clone();
-    // TODO(taiming): refactor the return type throughout the tantivy index search
-    let matched_docs =
-        tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule_clone) {
-            (false, _) | (true, None) => tantivy_searcher
-                .search(&query, &tantivy::collector::DocSetCollector)
-                .map(|ret| (ret, 0, vec![])),
-            (true, Some(InvertedIndexOptimizeMode::SimpleSelect(limit, ascend))) => {
-                tantivy_searcher
-                    .search(
-                        &query,
-                        &tantivy::collector::TopDocs::with_limit(limit).tweak_score(
-                            move |_segment_reader: &tantivy::SegmentReader| {
-                                move |doc_id: tantivy::DocId, _original_score: tantivy::Score| {
-                                    if ascend {
-                                        doc_id as i64
-                                    } else {
-                                        -(doc_id as i64)
-                                    }
-                                }
-                            },
-                        ),
-                    )
-                    .map(|ret| {
-                        (
-                            ret.into_iter().map(|(_, doc)| doc).collect::<HashSet<_>>(),
-                            0,
-                            vec![],
-                        )
-                    })
+    let res = tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule_clone) {
+        (false, _) | (true, None) => TantivyResult::handle_matched_docs(&searcher, query),
+        (true, Some(IndexOptimizeMode::SimpleSelect(limit, ascend))) => {
+            TantivyResult::handle_simple_select(&searcher, query, limit, ascend)
+        }
+        (true, Some(IndexOptimizeMode::SimpleCount)) => {
+            TantivyResult::handle_simple_count(&searcher, query)
+        }
+        (true, Some(IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets))) => {
+            // fail the function if field not in tantivy schema
+            if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
+                log::warn!("_timestamp not index in tantivy file: {ttv_file_name}");
+                return Ok(TantivyResult::Histogram(vec![]));
             }
-            (true, Some(InvertedIndexOptimizeMode::SimpleCount)) => tantivy_searcher
-                .search(&query, &tantivy::collector::Count)
-                .map(|ret| (HashSet::new(), ret, vec![])),
-            (
-                true,
-                Some(InvertedIndexOptimizeMode::SimpleHistogram(
-                    min_value,
-                    bucket_width,
-                    num_buckets,
-                )),
-            ) => {
-                // fail the function if field not in tantivy schema
-                if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
-                    log::warn!("_timestamp not index in tantivy file: {ttv_file_name}");
-                    return Ok((HashSet::new(), 0, vec![]));
-                }
-                tantivy_searcher
-                    .search(
-                        &query,
-                        &tantivy::collector::HistogramCollector::new::<i64>(
-                            TIMESTAMP_COL_NAME.to_string(),
-                            min_value,
-                            bucket_width,
-                            num_buckets,
-                        ),
-                    )
-                    .map(|ret| (HashSet::new(), 0, ret))
+            TantivyResult::handle_simple_histogram(
+                &searcher,
+                query,
+                min_value,
+                bucket_width,
+                num_buckets,
+            )
+        }
+        (true, Some(IndexOptimizeMode::SimpleTopN(field, limit, ascend))) => {
+            TantivyResult::handle_simple_top_n(&searcher, query, &field, limit, ascend)
+        }
+        (true, Some(IndexOptimizeMode::SimpleDistinct(field, limit, ascend))) => {
+            if tantivy_schema.get_field(&field).is_err() {
+                log::warn!("search->tantivy: {field} not index in tantivy file: {ttv_file_name}");
+                Ok(TantivyResult::Distinct(HashSet::new()))
+            } else {
+                TantivyResult::handle_simple_distinct(&searcher, &condition, &field, limit, ascend)
             }
-        })
-        .await??;
+        }
+    })
+    .await??;
 
-    // return early if no matches in tantivy
-    let (matched_docs, total_hits, histogram_hits) = matched_docs;
-    if total_hits > 0 || !histogram_hits.is_empty() {
-        return Ok((
-            parquet_file.key.to_string(),
-            None,
-            total_hits,
-            histogram_hits,
-        ));
+    let key = parquet_file.key.to_string();
+    match res {
+        TantivyResult::Count(count) => Ok((key, TantivyResult::Count(count))),
+        TantivyResult::Histogram(histogram) => Ok((key, TantivyResult::Histogram(histogram))),
+        TantivyResult::TopN(top_n) => Ok((key, TantivyResult::TopN(top_n))),
+        TantivyResult::Distinct(distinct) => Ok((key, TantivyResult::Distinct(distinct))),
+        TantivyResult::RowIds(row_ids) => {
+            if row_ids.is_empty() {
+                return Ok((key, TantivyResult::RowIdsBitVec(0, BitVec::EMPTY)));
+            }
+            // return early if the number of matched docs is too large
+            if cfg.limit.inverted_index_skip_threshold > 0
+                && row_ids.len()
+                    > (parquet_file.meta.records as usize / 100
+                        * cfg.limit.inverted_index_skip_threshold)
+                && !matches!(idx_optimize_rule, Some(IndexOptimizeMode::SimpleCount))
+            {
+                log::debug!(
+                    "[trace_id {trace_id}] matched docs over [{}/100] in tantivy index, skip this file: {}",
+                    cfg.limit.inverted_index_skip_threshold,
+                    parquet_file.key
+                );
+                // return empty file name means we need to add filter back
+                return Ok((
+                    "".to_string(),
+                    TantivyResult::RowIdsBitVec(0, BitVec::EMPTY),
+                ));
+            }
+            let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
+            let max_doc_id = *row_ids.iter().max().unwrap_or(&0) as i64;
+            if max_doc_id >= parquet_file.meta.records {
+                return Err(anyhow::anyhow!(
+                    "doc_id {} is out of range, records {}",
+                    max_doc_id,
+                    parquet_file.meta.records,
+                ));
+            }
+            let num_rows = row_ids.len();
+            for id in row_ids {
+                res.set(id as usize, true);
+            }
+            Ok((key, TantivyResult::RowIdsBitVec(num_rows, res)))
+        }
+        TantivyResult::RowIdsBitVec(..) => {
+            unreachable!("unsupported tantivy search result in search_tantivy_index")
+        }
     }
-    if matched_docs.is_empty() {
-        return Ok((parquet_file.key.to_string(), None, 0, vec![]));
+}
+
+/// if simple distinct without filter, we need to warm up the field
+fn get_simple_distinct_field(idx_optimize_rule: &Option<IndexOptimizeMode>) -> Vec<String> {
+    if let Some(IndexOptimizeMode::SimpleDistinct(field, ..)) = idx_optimize_rule {
+        vec![field.to_string()]
+    } else {
+        vec![]
     }
-    // return early if the number of matched docs is too large
-    if cfg.limit.inverted_index_skip_threshold > 0
-        && matched_docs.len()
-            > (parquet_file.meta.records as usize / 100 * cfg.limit.inverted_index_skip_threshold)
-        && !matches!(
-            idx_optimize_rule,
-            Some(InvertedIndexOptimizeMode::SimpleCount)
-        )
+}
+
+// partition the tantivy files by time range
+fn partition_tantivy_files(
+    index_parquet_files: Vec<FileKey>,
+    idx_optimize_mode: &Option<IndexOptimizeMode>,
+    target_partitions: usize,
+) -> (Vec<Vec<FileKey>>, usize) {
+    if let Some(IndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_mode
+        && *limit > 0
     {
-        log::debug!(
-            "[trace_id {trace_id}] matched docs over [{}/100] in tantivy index, skip this file: {}",
-            cfg.limit.inverted_index_skip_threshold,
-            parquet_file.key
-        );
-        return Ok(("".to_string(), None, 0, vec![]));
+        (
+            group_files_by_time_range(index_parquet_files, target_partitions),
+            *limit,
+        )
+    } else {
+        (
+            index_parquet_files.into_iter().map(|f| vec![f]).collect(),
+            0,
+        )
     }
-
-    // Prepare a vec of segment offsets
-    // this is useful when there are more than one segments
-    let seg_metas = tantivy_index
-        .searchable_segment_metas()
-        .context("Count segments")?;
-    if seg_metas.len() > 1 {
-        return Err(anyhow::anyhow!(
-            "Multiple segments in tantivy index not supported"
-        ));
-    }
-    let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
-    let max_doc_id = matched_docs.iter().map(|doc| doc.doc_id).max().unwrap_or(0) as i64;
-    if max_doc_id >= parquet_file.meta.records {
-        return Err(anyhow::anyhow!(
-            "doc_id {} is out of range, records {}",
-            max_doc_id,
-            parquet_file.meta.records,
-        ));
-    }
-    let matched_num = matched_docs.len();
-    for doc in matched_docs {
-        res.set(doc.doc_id as usize, true);
-    }
-    Ok((parquet_file.key.to_string(), Some(res), matched_num, vec![]))
 }
 
 // Group files by time range
@@ -1194,6 +1130,20 @@ fn find_max_group_index(groups: &[Vec<FileKey>]) -> usize {
                 max_index
             }
         })
+}
+
+// Helper function to extract a file from a group at the specified index
+fn extract_file_from_group(
+    index_parquet_files: &mut [Vec<FileKey>],
+    group_index: usize,
+) -> Option<FileKey> {
+    index_parquet_files.get_mut(group_index).and_then(|g| {
+        if g.is_empty() {
+            None
+        } else {
+            Some(g.remove(g.len() - 1))
+        }
+    })
 }
 
 #[cfg(test)]

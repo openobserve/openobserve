@@ -46,19 +46,19 @@ pub async fn run() -> Result<(), anyhow::Error> {
         log::error!("[COMPACTOR::JOB] start merge job scheduler error: {e}");
     }
 
-    tokio::task::spawn(async move { run_generate_job().await });
-    tokio::task::spawn(async move { run_generate_old_data_job().await });
+    tokio::task::spawn(run_generate_job());
+    tokio::task::spawn(run_generate_old_data_job());
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { run_generate_downsampling_job().await });
-    tokio::task::spawn(async move { run_merge(scheduler.tx()).await });
-    tokio::task::spawn(async move { run_retention().await });
-    tokio::task::spawn(async move { run_delay_deletion().await });
-    tokio::task::spawn(async move { run_sync_to_db().await });
+    tokio::task::spawn(run_generate_downsampling_job());
+    tokio::task::spawn(run_merge(scheduler.tx()));
+    tokio::task::spawn(run_retention());
+    tokio::task::spawn(run_delay_deletion());
+    tokio::task::spawn(run_sync_to_db());
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { run_downsampling_sync_to_db().await });
-    tokio::task::spawn(async move { run_check_running_jobs().await });
-    tokio::task::spawn(async move { run_clean_done_jobs().await });
-    tokio::task::spawn(async move { run_compactor_pending_jobs_metric().await });
+    tokio::task::spawn(run_downsampling_sync_to_db());
+    tokio::task::spawn(run_check_running_jobs());
+    tokio::task::spawn(run_clean_done_jobs());
+    tokio::task::spawn(run_compactor_pending_jobs_metric());
     tokio::task::spawn(async move { run_enrichment_table_merge().await });
 
     Ok(())

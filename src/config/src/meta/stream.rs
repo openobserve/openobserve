@@ -553,8 +553,7 @@ pub struct UpdateSettingsWrapper<D> {
 pub struct UpdateStreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub partition_keys: UpdateSettingsWrapper<StreamPartition>,
     #[serde(default)]
     pub full_text_search_keys: UpdateSettingsWrapper<String>,
@@ -562,11 +561,9 @@ pub struct UpdateStreamSettings {
     pub index_fields: UpdateSettingsWrapper<String>,
     #[serde(default)]
     pub bloom_filter_fields: UpdateSettingsWrapper<String>,
-    #[serde(skip_serializing_if = "Option::None")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::None", default)]
     pub data_retention: Option<i64>,
-    #[serde(skip_serializing_if = "Option::None")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::None", default)]
     pub flatten_level: Option<i64>,
     #[serde(default)]
     pub defined_schema_fields: UpdateSettingsWrapper<String>,
@@ -681,14 +678,11 @@ impl TimeRange {
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub partition_keys: Vec<StreamPartition>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub full_text_search_keys: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub index_fields: Vec<String>,
     #[serde(default)]
     pub bloom_filter_fields: Vec<String>,
@@ -696,16 +690,15 @@ pub struct StreamSettings {
     pub data_retention: i64,
     #[serde(skip_serializing_if = "Option::None")]
     pub flatten_level: Option<i64>,
-    #[serde(skip_serializing_if = "Option::None")]
-    pub defined_schema_fields: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub defined_schema_fields: Vec<String>,
     #[serde(default)]
     pub max_query_range: i64, // hours
     #[serde(default)]
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub distinct_value_fields: Vec<DistinctField>,
     #[serde(default)]
     pub index_updated_at: i64,
@@ -745,20 +738,13 @@ impl Serialize for StreamSettings {
         state.serialize_field("index_original_data", &self.index_original_data)?;
         state.serialize_field("index_all_values", &self.index_all_values)?;
 
-        match self.defined_schema_fields.as_ref() {
-            Some(fields) => {
-                if !fields.is_empty() {
-                    let mut fields = fields.clone();
-                    fields.sort_unstable();
-                    fields.dedup();
-                    state.serialize_field("defined_schema_fields", &fields)?;
-                } else {
-                    state.skip_field("defined_schema_fields")?;
-                }
-            }
-            None => {
-                state.skip_field("defined_schema_fields")?;
-            }
+        if !self.defined_schema_fields.is_empty() {
+            let mut fields = self.defined_schema_fields.clone();
+            fields.sort_unstable();
+            fields.dedup();
+            state.serialize_field("defined_schema_fields", &fields)?;
+        } else {
+            state.skip_field("defined_schema_fields")?;
         }
         match self.flatten_level.as_ref() {
             Some(flatten_level) => {
@@ -837,7 +823,7 @@ impl From<&str> for StreamSettings {
             max_query_range = v.as_i64().unwrap();
         };
 
-        let mut defined_schema_fields: Option<Vec<String>> = None;
+        let mut defined_schema_fields = Vec::<String>::new();
         if let Some(value) = settings.get("defined_schema_fields") {
             let mut fields = value
                 .as_array()
@@ -845,11 +831,10 @@ impl From<&str> for StreamSettings {
                 .iter()
                 .map(|item| item.as_str().unwrap().to_string())
                 .collect::<Vec<_>>();
-            if !fields.is_empty() {
-                fields.sort_unstable();
-                fields.dedup();
-                defined_schema_fields = Some(fields);
-            }
+
+            fields.sort_unstable();
+            fields.dedup();
+            defined_schema_fields = fields;
         }
 
         let flatten_level = settings.get("flatten_level").map(|v| v.as_i64().unwrap());

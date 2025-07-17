@@ -21,7 +21,6 @@ use std::{
     sync::Arc,
 };
 
-use config::TIMESTAMP_COL_NAME;
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use tantivy::{
@@ -199,8 +198,8 @@ impl Directory for PuffinDirReader {
 pub async fn warm_up_terms(
     searcher: &tantivy::Searcher,
     terms_grouped_by_field: &HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>>,
-    need_all_term_fields: Vec<tantivy::schema::Field>,
-    need_fast_field: bool,
+    need_all_term_fields: HashSet<tantivy::schema::Field>,
+    need_fast_field: Option<String>,
 ) -> anyhow::Result<()> {
     let mut warm_up_fields_futures = Vec::new();
     let mut warm_up_fields_term_futures = Vec::new();
@@ -234,14 +233,15 @@ pub async fn warm_up_terms(
     }
 
     // warm up fast fields if needed
-    if need_fast_field {
+    if let Some(field_name) = need_fast_field {
         for segment_reader in searcher.segment_readers() {
             // only warm up fast fields once per segment
+            let field_name = field_name.clone();
             let segment_id = segment_reader.segment_id();
             if !warmed_segments.contains(&segment_id) {
                 let fast_field_reader = segment_reader.fast_fields();
                 warm_up_fast_fields_futures
-                    .push(async move { warm_up_fastfield(fast_field_reader).await });
+                    .push(async move { warm_up_fastfield(fast_field_reader, field_name).await });
                 warmed_segments.insert(segment_id);
             }
         }
@@ -265,9 +265,10 @@ pub async fn warm_up_terms(
 // warm up the fast field, only support _timestamp field
 async fn warm_up_fastfield(
     fast_field_reader: &tantivy::fastfield::FastFieldReaders,
+    field_name: String,
 ) -> anyhow::Result<()> {
     let columns = fast_field_reader
-        .list_dynamic_column_handles(TIMESTAMP_COL_NAME)
+        .list_dynamic_column_handles(field_name.as_str())
         .await?;
     futures::future::try_join_all(
         columns
@@ -282,6 +283,7 @@ async fn warm_up_fastfield(
 mod tests {
     use std::{collections::HashMap, io::ErrorKind, path::PathBuf, sync::Arc};
 
+    use config::TIMESTAMP_COL_NAME;
     use hashbrown::HashMap as HashbrownHashMap;
     use tantivy::{
         HasLen, Index, Term,
@@ -601,7 +603,7 @@ mod tests {
 
         // Test with empty terms
         let terms_grouped_by_field = HashbrownHashMap::new();
-        let result = warm_up_terms(&searcher, &terms_grouped_by_field, vec![], false).await;
+        let result = warm_up_terms(&searcher, &terms_grouped_by_field, HashSet::new(), None).await;
         assert!(result.is_ok());
     }
 
@@ -638,7 +640,7 @@ mod tests {
         field_terms.insert(term, false);
         terms_grouped_by_field.insert(text_field, field_terms);
 
-        let result = warm_up_terms(&searcher, &terms_grouped_by_field, vec![], false).await;
+        let result = warm_up_terms(&searcher, &terms_grouped_by_field, HashSet::new(), None).await;
         assert!(result.is_ok());
     }
 
@@ -670,8 +672,13 @@ mod tests {
 
         // Test with prefix field
         let terms_grouped_by_field = HashbrownHashMap::new();
-        let result =
-            warm_up_terms(&searcher, &terms_grouped_by_field, vec![text_field], false).await;
+        let result = warm_up_terms(
+            &searcher,
+            &terms_grouped_by_field,
+            HashSet::from([text_field]),
+            None,
+        )
+        .await;
         assert!(result.is_ok());
     }
 
@@ -703,7 +710,13 @@ mod tests {
 
         // Test with fast fields enabled
         let terms_grouped_by_field = HashbrownHashMap::new();
-        let result = warm_up_terms(&searcher, &terms_grouped_by_field, vec![], true).await;
+        let result = warm_up_terms(
+            &searcher,
+            &terms_grouped_by_field,
+            HashSet::new(),
+            Some(TIMESTAMP_COL_NAME.to_string()),
+        )
+        .await;
         // This might fail if _timestamp field is not present, which is expected in this simple test
         // The important thing is that the function doesn't panic
         let _ = result;
@@ -747,7 +760,7 @@ mod tests {
         terms_grouped_by_field.insert(text_field, field_terms);
 
         let start = Instant::now();
-        let result = warm_up_terms(&searcher, &terms_grouped_by_field, vec![], false).await;
+        let result = warm_up_terms(&searcher, &terms_grouped_by_field, HashSet::new(), None).await;
         let duration = start.elapsed();
 
         assert!(result.is_ok());

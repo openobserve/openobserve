@@ -1081,3 +1081,31 @@ export function checkCallBackValues(url: string, key: string) {
     }
   }
 }
+
+export const getIngestionURL = () => {
+  const store = useStore();
+  //by default it will use the store.state.API_ENDPOINT
+  //if the store.state.zoConfig.ingestion_url is present and not empty, it will use the store.state.zoConfig.ingestion_url
+  let ingestionURL: string = store.state.API_ENDPOINT;
+  if (
+    Object.hasOwn(store.state.zoConfig, "ingestion_url") &&
+    store.state.zoConfig.ingestion_url !== ""
+  ) {
+    ingestionURL = store.state.zoConfig.ingestion_url;
+  }
+  return ingestionURL;
+};
+
+export const getEndPoint = (ingestionURL: string) => {
+  //here we need to get the endpoint from the ingestionURL
+  //we need to get the hostname, port, protocol, tls from the ingestionURL
+  const url = new URL(ingestionURL);
+  const endpoint = {
+    url: ingestionURL,
+      host: url.hostname,
+      port: url.port || (url.protocol === "https:" ? "443" : "80"),
+      protocol: url.protocol.replace(":", ""),
+      tls: url.protocol === "https:" ? "On" : "Off",
+  }
+  return endpoint;
+}

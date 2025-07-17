@@ -60,14 +60,14 @@ pub async fn run() -> Result<(), anyhow::Error> {
         .await?;
     }
 
-    tokio::task::spawn(async move { run_schedule_jobs().await });
-    tokio::task::spawn(async move { watch_timeout_jobs().await });
+    tokio::task::spawn(run_schedule_jobs());
+    tokio::task::spawn(watch_timeout_jobs());
     for i in 0..cfg.limit.search_job_workers {
-        tokio::task::spawn(async move { run_search_jobs(i).await });
+        tokio::task::spawn(run_search_jobs(i));
     }
-    tokio::task::spawn(async move { run_check_running_search_jobs().await });
-    tokio::task::spawn(async move { run_delete_jobs_by_retention().await });
-    tokio::task::spawn(async move { run_delete_jobs().await });
+    tokio::task::spawn(run_check_running_search_jobs());
+    tokio::task::spawn(run_delete_jobs_by_retention());
+    tokio::task::spawn(run_delete_jobs());
 
     Ok(())
 }

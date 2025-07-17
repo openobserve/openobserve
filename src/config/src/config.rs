@@ -1106,6 +1106,8 @@ pub struct Common {
         help = "Enable to show symbol in dashboard"
     )]
     pub dashboard_show_symbol_enabled: bool,
+    #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")]
+    pub default_hec_stream: String,
 }
 
 #[derive(EnvConfig)]
@@ -1871,6 +1873,24 @@ pub struct Pipeline {
         help = "Use shared HTTP client instances for better connection pooling"
     )]
     pub use_shared_http_client: bool,
+    #[env_config(
+        name = "ZO_PIPELINE_REMOVE_FILE_AFTER_MAX_RETRY",
+        default = true,
+        help = "Remove wal file after max retry"
+    )]
+    pub remove_file_after_max_retry: bool,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_RETRY_COUNT",
+        default = 10,
+        help = "pipeline exporter client max retry count"
+    )]
+    pub max_retry_count: u32,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_RETRY_TIME_IN_HOURS",
+        default = 24,
+        help = "pipeline exporter client max retry time in hours"
+    )]
+    pub max_retry_time_in_hours: u64,
 }
 
 #[derive(EnvConfig)]
@@ -2261,6 +2281,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // incorrectly each time
     cfg.common.file_list_dump_debug_check =
         cfg.common.file_list_dump_dual_write && cfg.common.file_list_dump_debug_check;
+
+    if cfg.common.default_hec_stream.is_empty() {
+        cfg.common.default_hec_stream = "_hec".to_string();
+    }
 
     Ok(())
 }

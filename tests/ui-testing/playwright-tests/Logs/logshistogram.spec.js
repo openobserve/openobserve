@@ -1,7 +1,7 @@
 import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
-import { LogsPage } from '../../pages/logsPages/logsPage.js';
 import logsdata from "../../../test-data/logs_data.json";
+import PageManager from '../../pages/page-manager.js';
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -47,11 +47,11 @@ async function ingestion(page) {
 }
 
 test.describe("Logs Histogram testcases", () => {
-  let logsPage;
+  let pageManager;
 
   test.beforeEach(async ({ page }) => {
     await login(page);
-    logsPage = new LogsPage(page);
+    pageManager = new PageManager(page);
     await page.waitForTimeout(5000);
     await ingestion(page);
     await page.waitForTimeout(2000);
@@ -60,117 +60,117 @@ test.describe("Logs Histogram testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStream("e2e_automate"); 
+    await pageManager.logsPage.selectStream("e2e_automate"); 
   });
 
   test("Verify error handling and no results found with histogram", {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
     // Check if histogram is off and toggle it on if needed
-    const isHistogramOn = await logsPage.isHistogramOn();
+    const isHistogramOn = await pageManager.logsPage.isHistogramOn();
     if (!isHistogramOn) {
-      await logsPage.toggleHistogram();
+      await pageManager.logsPage.toggleHistogram();
     }
 
     // Type invalid query and verify error
-    await logsPage.typeQuery("match_all('invalid')");
-    await logsPage.setDateTimeFilter();
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickRefresh();
-    await logsPage.clickErrorMessage();
-    await logsPage.clickResetFilters();
+    await pageManager.logsPage.typeQuery("match_all('invalid')");
+    await pageManager.logsPage.setDateTimeFilter();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickRefresh();
+    await pageManager.logsPage.clickErrorMessage();
+    await pageManager.logsPage.clickResetFilters();
 
     // Type SQL query and verify no results
-    await logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate' where code > 500");
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickRefresh();
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickNoDataFound();
-    await logsPage.clickResultDetail();
+    await pageManager.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate' where code > 500");
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickRefresh();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickNoDataFound();
+    await pageManager.logsPage.clickResultDetail();
   });
 
   test("Verify error handling with histogram toggle off and on", {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
     // Check if histogram is on and toggle it off
-    const isHistogramOn = await logsPage.isHistogramOn();
+    const isHistogramOn = await pageManager.logsPage.isHistogramOn();
     if (isHistogramOn) {
-      await logsPage.toggleHistogram();
+      await pageManager.logsPage.toggleHistogram();
     }
 
     // Type invalid query and verify error
-    await logsPage.typeQuery("match_all('invalid')");
-    await logsPage.setDateTimeFilter();
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickRefresh();
-    await logsPage.clickErrorMessage();
-    await logsPage.clickResetFilters();
+    await pageManager.logsPage.typeQuery("match_all('invalid')");
+    await pageManager.logsPage.setDateTimeFilter();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickRefresh();
+    await pageManager.logsPage.clickErrorMessage();
+    await pageManager.logsPage.clickResetFilters();
 
     // Toggle histogram back on
-    await logsPage.toggleHistogram();
+    await pageManager.logsPage.toggleHistogram();
 
     // Type SQL query and verify no results
-    await logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate' where code > 500");
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickRefresh();
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickNoDataFound();
-    await logsPage.clickResultDetail();
+    await pageManager.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate' where code > 500");
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickRefresh();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickNoDataFound();
+    await pageManager.logsPage.clickResultDetail();
   });
 
   test("Verify histogram toggle persistence after multiple queries", {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
     // Start with histogram on
-    const isHistogramOn = await logsPage.isHistogramOn();
+    const isHistogramOn = await pageManager.logsPage.isHistogramOn();
     if (!isHistogramOn) {
-      await logsPage.toggleHistogram();
+      await pageManager.logsPage.toggleHistogram();
     }
 
     // Run first query
-    await logsPage.typeQuery("SELECT * FROM 'e2e_automate' LIMIT 10");
-    await logsPage.setDateTimeFilter();
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickRefresh();
-    await logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.typeQuery("SELECT * FROM 'e2e_automate' LIMIT 10");
+    await pageManager.logsPage.setDateTimeFilter();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickRefresh();
+    await pageManager.logsPage.waitForTimeout(2000);
 
     // Toggle histogram off
-    await logsPage.toggleHistogram();
-    await logsPage.enableSQLMode();
-    await logsPage.waitForTimeout(1000);
-    await logsPage.enableSQLMode();
+    await pageManager.logsPage.toggleHistogram();
+    await pageManager.logsPage.enableSQLMode();
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.enableSQLMode();
 
     // Run second query
-    await logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate'");
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickRefresh();
-    await logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate'");
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickRefresh();
+    await pageManager.logsPage.waitForTimeout(2000);
 
     // Verify histogram stays off
-    await logsPage.verifyHistogramState();
+    await pageManager.logsPage.verifyHistogramState();
   });
 
   test("Verify histogram toggle with empty query", {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
     // Start with histogram off
-    const isHistogramOn = await logsPage.isHistogramOn();
+    const isHistogramOn = await pageManager.logsPage.isHistogramOn();
     if (isHistogramOn) {
-      await logsPage.toggleHistogram();
+      await pageManager.logsPage.toggleHistogram();
     }
 
     // Clear query and refresh
-    await logsPage.typeQuery("");
-    await logsPage.setDateTimeFilter();
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickRefresh();
-    await logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.typeQuery("");
+    await pageManager.logsPage.setDateTimeFilter();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickRefresh();
+    await pageManager.logsPage.waitForTimeout(2000);
 
     // Toggle histogram on
-    await logsPage.toggleHistogram();
+    await pageManager.logsPage.toggleHistogram();
 
     // Verify histogram state
-    const isHistogramOnAfterToggle = await logsPage.isHistogramOn();
+    const isHistogramOnAfterToggle = await pageManager.logsPage.isHistogramOn();
     expect(isHistogramOnAfterToggle).toBeTruthy();
   });
 
@@ -178,30 +178,30 @@ test.describe("Logs Histogram testcases", () => {
     tag: ['@histogram', '@all', '@logs']
   }, async ({ page }) => {
     // Start with histogram on
-    const isHistogramOn = await logsPage.isHistogramOn();
+    const isHistogramOn = await pageManager.logsPage.isHistogramOn();
     if (!isHistogramOn) {
-      await logsPage.toggleHistogram();
+      await pageManager.logsPage.toggleHistogram();
     }
 
     // Run complex query
-    await logsPage.typeQuery("SELECT * FROM 'e2e_automate' WHERE timestamp > '2024-01-01' AND code < 400 GROUP BY code ORDER BY count(*) DESC LIMIT 5");
-    await logsPage.setDateTimeFilter();
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickRefresh();
-    await logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.typeQuery("SELECT * FROM 'e2e_automate' WHERE timestamp > '2024-01-01' AND code < 400 GROUP BY code ORDER BY count(*) DESC LIMIT 5");
+    await pageManager.logsPage.setDateTimeFilter();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickRefresh();
+    await pageManager.logsPage.waitForTimeout(2000);
 
     // Toggle histogram off and verify
-    await logsPage.toggleHistogram();
-    const isHistogramOff = await logsPage.isHistogramOn();
+    await pageManager.logsPage.toggleHistogram();
+    const isHistogramOff = await pageManager.logsPage.isHistogramOn();
     expect(!isHistogramOff).toBeTruthy();
 
     // Run another query and verify histogram stays off
-    await logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate'");
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickRefresh();
-    await logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate'");
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickRefresh();
+    await pageManager.logsPage.waitForTimeout(2000);
 
-    const isHistogramStillOff = await logsPage.isHistogramOn();
+    const isHistogramStillOff = await pageManager.logsPage.isHistogramOn();
     expect(!isHistogramStillOff).toBeTruthy();
   });
 }); 

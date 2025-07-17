@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode};
+use config::meta::{cluster::NodeInfo, inverted_index::IndexOptimizeMode, stream::FileKey};
 use datafusion::{
     common::{
         Result, TableReference,
@@ -24,16 +24,20 @@ use datafusion::{
     physical_expr::{LexOrdering, utils::collect_columns},
     physical_plan::{
         ExecutionPlan, ExecutionPlanProperties, Partitioning,
-        aggregates::AggregateExec,
+        aggregates::{AggregateExec, AggregateMode},
         repartition::RepartitionExec,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
+        union::UnionExec,
     },
 };
 use hashbrown::{HashMap, HashSet};
 use proto::cluster_rpc::KvItem;
 
 use super::{empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec};
-use crate::service::search::{index::IndexCondition, request::Request};
+use crate::service::search::{
+    datafusion::plan::tantivy_optimize_exec::TantivyOptimizeExec, grpc::QueryParams,
+    index::IndexCondition, request::Request,
+};
 
 // add remote scan to physical plan
 pub struct RemoteScanRewriter {
@@ -50,7 +54,7 @@ impl RemoteScanRewriter {
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
-        index_optimize_mode: Option<InvertedIndexOptimizeMode>,
+        index_optimize_mode: Option<IndexOptimizeMode>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
     ) -> Self {
@@ -224,6 +228,54 @@ impl<'n> TreeNodeVisitor<'n> for GroupByFieldVisitor {
             Ok(TreeNodeRecursion::Stop)
         } else {
             Ok(TreeNodeRecursion::Continue)
+        }
+    }
+}
+
+// rewrite the physical plan to add tantivy optimize exec
+pub fn tantivy_optimize_rewrite(
+    query: Arc<QueryParams>,
+    file_list: Vec<FileKey>,
+    index_condition: Option<IndexCondition>,
+    index_optimize_mode: IndexOptimizeMode,
+    mut physical_plan: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    let tantivy_exec = Arc::new(TantivyOptimizeExec::new(
+        query,
+        physical_plan.schema(),
+        file_list,
+        index_condition,
+        index_optimize_mode,
+    ));
+    let mut visitor = TantivyOptimizeRewriter::new(tantivy_exec);
+    physical_plan = physical_plan.rewrite(&mut visitor)?.data;
+    Ok(physical_plan)
+}
+
+pub struct TantivyOptimizeRewriter {
+    tantivy_exec: Arc<TantivyOptimizeExec>,
+}
+
+impl TantivyOptimizeRewriter {
+    pub fn new(tantivy_exec: Arc<TantivyOptimizeExec>) -> Self {
+        Self { tantivy_exec }
+    }
+}
+
+impl TreeNodeRewriter for TantivyOptimizeRewriter {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
+        if node.name() == "AggregateExec" {
+            let aggregate = node.as_any().downcast_ref::<AggregateExec>().unwrap();
+            if *aggregate.mode() == AggregateMode::Partial {
+                let new_node = Arc::new(UnionExec::new(vec![node, self.tantivy_exec.clone() as _]));
+                Ok(Transformed::new(new_node, true, TreeNodeRecursion::Stop))
+            } else {
+                unreachable!("AggregateExec should be partial mode");
+            }
+        } else {
+            Ok(Transformed::no(node))
         }
     }
 }

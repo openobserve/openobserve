@@ -97,7 +97,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         && (LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager())
     {
         // Try to download the mmdb files, if its not disabled.
-        tokio::task::spawn(async move { mmdb_downloader::run().await });
+        tokio::task::spawn(mmdb_downloader::run());
     }
 
     db::user::cache().await.expect("user cache failed");
@@ -111,9 +111,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("organization settings cache sync failed");
 
     // watch org users
-    tokio::task::spawn(async move { db::user::watch().await });
-    tokio::task::spawn(async move { db::org_users::watch().await });
-    tokio::task::spawn(async move { db::organization::watch().await });
+    tokio::task::spawn(db::user::watch());
+    tokio::task::spawn(db::org_users::watch());
+    tokio::task::spawn(db::organization::watch());
 
     // check version
     db::metas::version::set()
@@ -122,16 +122,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // check tantivy _timestamp update time
     _ = db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
+    // check tantivy secondary index update time
+    _ = db::metas::tantivy_index::get_ttv_secondary_index_updated_at().await;
 
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { self_reporting::run_audit_publish().await });
+    tokio::task::spawn(self_reporting::run_audit_publish());
     #[cfg(feature = "cloud")]
-    tokio::task::spawn(async move { self_reporting::cloud_events::flush_cloud_events().await });
+    tokio::task::spawn(self_reporting::cloud_events::flush_cloud_events());
 
     #[cfg(feature = "enterprise")]
     {
-        tokio::task::spawn(async move { db::ofga::watch().await });
+        tokio::task::spawn(db::ofga::watch());
         db::ofga::cache().await.expect("ofga model cache failed");
         o2_openfga::authorizer::authz::init_open_fga().await;
         // RBAC model
@@ -142,7 +144,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
-    tokio::task::spawn(async move { promql_self_consume::run().await });
+    tokio::task::spawn(promql_self_consume::run());
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
@@ -150,13 +152,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // telemetry run
     if cfg.common.telemetry_enabled && LOCAL_NODE.is_querier() {
-        tokio::task::spawn(async move { telemetry::run().await });
+        tokio::task::spawn(telemetry::run());
     }
 
-    tokio::task::spawn(async move { self_reporting::run().await });
+    tokio::task::spawn(self_reporting::run());
 
     // cache short_urls
-    tokio::task::spawn(async move { db::short_url::watch().await });
+    tokio::task::spawn(db::short_url::watch());
     db::short_url::cache()
         .await
         .expect("short url cache failed");
@@ -171,6 +173,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::alerts::realtime_triggers::watch().await });
     tokio::task::spawn(async move { db::alerts::alert::watch().await });
     tokio::task::spawn(async move { db::organization::org_settings_watch().await });
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(
+        async move { o2_enterprise::enterprise::domain_management::db::watch().await },
+    );
 
     // pipeline not used on compactors
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
@@ -179,10 +185,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
-        tokio::task::spawn(async move { db::session::watch().await });
+        tokio::task::spawn(db::session::watch());
     }
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        tokio::task::spawn(async move { db::enrichment_table::watch().await });
+        tokio::task::spawn(db::enrichment_table::watch());
     }
 
     tokio::task::yield_now().await;
@@ -216,6 +222,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::syslog::cache_syslog_settings()
         .await
         .expect("syslog settings cache failed");
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::domain_management::db::cache()
+        .await
+        .expect("domain management cache failed");
 
     infra_file_list::create_table_index().await?;
     infra_file_list::LOCAL_CACHE.create_table_index().await?;
@@ -235,31 +245,29 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
-    tokio::task::spawn(async move { files::run().await });
-    tokio::task::spawn(async move { stats::run().await });
-    tokio::task::spawn(async move { compactor::run().await });
-    tokio::task::spawn(async move { flatten_compactor::run().await });
-    tokio::task::spawn(async move { metrics::run().await });
-    tokio::task::spawn(async move { promql::run().await });
-    tokio::task::spawn(async move { alert_manager::run().await });
-    tokio::task::spawn(async move { file_downloader::run().await });
+    tokio::task::spawn(files::run());
+    tokio::task::spawn(stats::run());
+    tokio::task::spawn(compactor::run());
+    tokio::task::spawn(flatten_compactor::run());
+    tokio::task::spawn(metrics::run());
+    tokio::task::spawn(promql::run());
+    tokio::task::spawn(alert_manager::run());
+    tokio::task::spawn(file_downloader::run());
 
     if LOCAL_NODE.is_compactor() {
-        tokio::task::spawn(async move { file_list_dump::run().await });
+        tokio::task::spawn(file_list_dump::run());
     }
 
     // load metrics disk cache
-    tokio::task::spawn(async move { crate::service::promql::search::init().await });
+    tokio::task::spawn(crate::service::promql::search::init());
     // start pipeline data retention
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(
-        async move { o2_enterprise::enterprise::pipeline::pipeline_job::run().await },
-    );
+    tokio::task::spawn(o2_enterprise::enterprise::pipeline::pipeline_job::run());
 
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { cipher::run().await });
+    tokio::task::spawn(cipher::run());
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { db::keys::watch().await });
+    tokio::task::spawn(db::keys::watch());
 
     // additional for cloud
     #[cfg(feature = "cloud")]
@@ -279,8 +287,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     log::info!("Job initialization complete");
 
     // Syslog server start
-    tokio::task::spawn(async move { db::syslog::watch().await });
-    tokio::task::spawn(async move { db::syslog::watch_syslog_settings().await });
+    tokio::task::spawn(db::syslog::watch());
+    tokio::task::spawn(db::syslog::watch_syslog_settings());
 
     let start_syslog = *SYSLOG_ENABLED.read();
     if start_syslog {

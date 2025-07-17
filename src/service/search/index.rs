@@ -48,11 +48,14 @@ use super::{
     datafusion::udf::fuzzy_match_udf,
     utils::{is_field, is_value, split_conjunction, trim_quotes},
 };
-use crate::service::search::datafusion::udf::{
-    MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
-    STR_MATCH_UDF_NAME,
-    match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
-    str_match_udf,
+use crate::service::search::{
+    datafusion::udf::{
+        MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+        STR_MATCH_UDF_NAME,
+        match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+        str_match_udf,
+    },
+    utils::get_field_name,
 };
 
 pub fn get_index_condition_from_expr(
@@ -104,22 +107,6 @@ impl Debug for IndexCondition {
     }
 }
 
-// single condition
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Condition {
-    // field, value
-    Equal(String, String),
-    // field, value, case_sensitive
-    StrMatch(String, String, bool),
-    In(String, Vec<String>),
-    Regex(String, String),
-    MatchAll(String),
-    FuzzyMatchAll(String, u8),
-    All(),
-    Or(Box<Condition>, Box<Condition>),
-    And(Box<Condition>, Box<Condition>),
-}
-
 impl IndexCondition {
     // this only use for display the query
     pub fn to_query(&self) -> String {
@@ -130,6 +117,7 @@ impl IndexCondition {
             .join(" AND ")
     }
 
+    // get the tantivy query for the index condition
     pub fn to_tantivy_query(
         &self,
         schema: Schema,
@@ -147,6 +135,7 @@ impl IndexCondition {
         Ok(Box::new(BooleanQuery::from(queries)))
     }
 
+    // get the fields use for search in tantivy
     pub fn get_tantivy_fields(&self) -> HashSet<String> {
         self.conditions
             .iter()
@@ -156,6 +145,7 @@ impl IndexCondition {
             })
     }
 
+    // get the fields use for search in datafusion(for add filter back logical)
     pub fn get_schema_fields(&self, fst_fields: &[String]) -> HashSet<String> {
         self.conditions
             .iter()
@@ -203,6 +193,52 @@ impl IndexCondition {
             .iter()
             .all(|condition| condition.can_remove_filter())
     }
+
+    // check if the index condition is a simple str match condition
+    // the simple str match condition is like str_match(field, 'value')
+    // use for check if the distinct query can be optimized
+    pub fn is_simple_str_match(&self, field: &str) -> bool {
+        if self.conditions.len() != 1 {
+            return false;
+        }
+        matches!(
+            &self.conditions[0],
+            Condition::StrMatch(f, ..) if f == field
+        )
+    }
+
+    // use for simple distinct optimization
+    pub fn get_str_match_condition(&self) -> Option<(String, bool)> {
+        match &self.conditions[0] {
+            Condition::StrMatch(_, value, case_sensitive) => {
+                Some((value.to_string(), *case_sensitive))
+            }
+            Condition::All() => None, // for the condition that query without filter
+            _ => unreachable!("get_str_match_condition only support one str_match condition"),
+        }
+    }
+
+    // use for check if the index condition is only
+    // for the condition that query without filter
+    pub fn is_condition_all(&self) -> bool {
+        self.conditions.len() == 1 && matches!(self.conditions[0], Condition::All())
+    }
+}
+
+// single condition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Condition {
+    // field, value
+    Equal(String, String),
+    // field, value, case_sensitive
+    StrMatch(String, String, bool),
+    In(String, Vec<String>),
+    Regex(String, String),
+    MatchAll(String),
+    FuzzyMatchAll(String, u8),
+    All(),
+    Or(Box<Condition>, Box<Condition>),
+    And(Box<Condition>, Box<Condition>),
 }
 
 impl Condition {
@@ -637,7 +673,7 @@ impl Condition {
             Condition::StrMatch(..) => true,
             Condition::In(..) => true,
             Condition::Regex(..) => false,
-            Condition::MatchAll(v) => is_blank_or_alphanumeric(v),
+            Condition::MatchAll(v) => is_alphanumeric(v),
             Condition::FuzzyMatchAll(..) => false,
             Condition::All() => true,
             Condition::Or(left, right) => left.can_remove_filter() && right.can_remove_filter(),
@@ -736,15 +772,6 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
     true
 }
 
-// Note: the expr should be Identifier or CompoundIdentifier
-fn get_field_name(expr: &Expr) -> String {
-    match expr {
-        Expr::Identifier(ident) => trim_quotes(ident.to_string().as_str()),
-        Expr::CompoundIdentifier(ident) => trim_quotes(ident[1].to_string().as_str()),
-        _ => unreachable!(),
-    }
-}
-
 fn get_value(expr: &Expr) -> String {
     match expr {
         Expr::Value(value) => trim_quotes(value.to_string().as_str()),
@@ -806,7 +833,11 @@ pub(crate) fn get_arg_name(args: &FunctionArg) -> String {
     }
 }
 
-fn is_blank_or_alphanumeric(s: &str) -> bool {
+fn is_alphanumeric(s: &str) -> bool {
+    s.chars().all(|c| c.is_ascii_alphanumeric())
+}
+
+fn _is_blank_or_alphanumeric(s: &str) -> bool {
     s.chars()
         .all(|c| c.is_ascii_whitespace() || c.is_ascii_alphanumeric())
 }
@@ -1050,5 +1081,21 @@ mod tests {
 
         assert_eq!(fields.len(), 1);
         assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_is_alphanumeric() {
+        assert!(is_alphanumeric("123"));
+        assert!(is_alphanumeric("123abc"));
+        assert!(!is_alphanumeric("123 abc"));
+        assert!(!is_alphanumeric("123 abc 123"));
+    }
+
+    #[test]
+    fn test_is_blank_or_alphanumeric() {
+        assert!(_is_blank_or_alphanumeric("123"));
+        assert!(_is_blank_or_alphanumeric("123abc"));
+        assert!(_is_blank_or_alphanumeric("123 abc"));
+        assert!(_is_blank_or_alphanumeric("123 abc 123"));
     }
 }
