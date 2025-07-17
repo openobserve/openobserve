@@ -56,7 +56,10 @@ use crate::{
     service::{
         db::enrichment_table,
         metadata::distinct_values::DISTINCT_STREAM_PREFIX,
-        search::{self as SearchService, datafusion::plan::projections::get_result_schema},
+        search::{
+            self as SearchService, cache::cacher::handle_histogram,
+            datafusion::plan::projections::get_result_schema,
+        },
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
@@ -1808,7 +1811,8 @@ pub async fn result_schema(
     }
 
     let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
-    let sql =
+
+    let mut sql =
         match crate::service::search::sql::Sql::new(&query, &org_id, stream_type, req.search_type)
             .await
         {
@@ -1821,6 +1825,23 @@ pub async fn result_schema(
                 )));
             }
         };
+
+    // THis is a horrible hack!!! Please extract this logic in a function that is used
+    // at three places @YJDoc2
+    let mut req_time_range = (req.query.start_time, req.query.end_time);
+    if req_time_range.1 == 0 {
+        req_time_range.1 = config::utils::time::now_micros();
+    }
+
+    let meta_time_range_is_empty = sql.time_range.is_none() || sql.time_range == Some((0, 0));
+    let q_time_range = if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0)
+    {
+        Some(req_time_range)
+    } else {
+        sql.time_range
+    };
+
+    handle_histogram(&mut sql.sql, q_time_range, query.histogram_interval);
 
     let res_schema = match get_result_schema(sql).await {
         Ok(v) => v,
