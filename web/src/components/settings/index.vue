@@ -131,6 +131,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             content-class="tab_content"
           />
           <q-route-tab
+            v-if="config.isEnterprise == 'true' && isMetaOrg"
+            data-test="domain-management-tab"
+            name="domain_management"
+            :to="{
+              name: 'domainManagement',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            icon="domain"
+            :label="t('settings.ssoDomainRestrictions')"
+            content-class="tab_content"
+          />
+          <q-route-tab
             v-if="config.isCloud == 'true' && isMetaOrg"
             data-test="organization-management-tab"
             name="organization_management"
