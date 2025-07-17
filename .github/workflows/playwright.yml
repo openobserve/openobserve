@@ -3,11 +3,14 @@ name: Playwright UI Tests
 on:
   push:
     branches:
-      - main    # paths:
-    #   - "web/** pull_request:
+      - main
+    paths:
+      - "web/**"
+  pull_request:
     branches:
-      -*    # paths:
-    #   - "web/**
+      - main
+    paths:
+      - "web/**"
 
 env:
   COLUMNS: 150
@@ -91,63 +94,60 @@ jobs:
     name: playwright_ui_integration_tests
     needs: [build_binary]
     runs-on:
-      labels: ubicloud-standard-8  container:
-      image: mcr.microsoft.com/playwright:v1.5ammy
+      labels: ubicloud-standard-8
+    container:
+      image: mcr.microsoft.com/playwright:v1.50-jammy
       options: --user root
     strategy:
       matrix:
         browser: [chrome]
-        testfilename:           alerts/alerts-e2c.js,          alerts/alerts-ui-operations.spec.js,        alerts/alerts-import.spec.js",
-
-        GeneralTests/changeOrg.spec.js",
-          GeneralTests/enrichment.spec.js",
-         GeneralTests/sanity.spec.js",
-         GeneralTests/sanity2.spec.js",
-         GeneralTests/schema.spec.js",
-            GeneralTests/schemaload.spec.js",
-       GeneralTests/serviceAccount.spec.js",
-       GeneralTests/usersOrg.spec.js",
-            
-            dashboards/custom-charts.spec.js",
-       dashboards/dashboard.spec.js",
-       dashboards/dashboard-filter.spec.js",
-       dashboards/dashboard-folder.spec.js",
-       dashboards/dashboard-geoMap.spec.js",
-       dashboards/dashboard-general-setting.spec.js",
-       dashboards/dashboard-import.spec.js",
-       dashboards/dashboard-maps.spec.js",
-       dashboards/dashboard-multi-y-axis.spec.js",
-       dashboards/dashboard-tabs-setting.spec.js",
-       dashboards/dashboard-transpose.spec.js",
-       dashboards/dashboard-variables-setting.spec.js",
-       dashboards/dashboard2.spec.js",
-       dashboards/dashboardtype.spec.js",
-            dashboards/visualize.spec.js",
-            dashboards/visualization-vrl.spec.js",
-
-            Logs/join.spec.js",
-        Logs/logshistogram.spec.js",
-          Logs/logspage.spec.js",
-           Logs/logsqueries.spec.js",
-         Logs/logsquickmode.spec.js",
-            Logs/pagination.spec.js",
-          Logs/secondsPrecisionAdded.spec.js",
-           Logs/unflattened.spec.js",
-           Logs/websocket.spec.js",
-      Logs/searchpartition.spec.js",
-
-          Reports/reportsUpdated.spec.js",
-          Reports/reportsUpdated2.spec.js",
-
-         Streams/streamname.spec.js",
-            Streams/streaming.spec.js",
-          Streams/multiselect-stream.spec.js,
-
-      Pipelines/pipeline-dynamic.spec.js",
-      Pipelines/pipeline-core.spec.js",
-        Pipelines/pipelines.spec.js,            #remotepipeline.spec.js",
-
-          ]
+        testfilename: [
+          "alerts/alerts-e2e.js",
+          "alerts/alerts-ui-operations.spec.js",
+          "alerts/alerts-import.spec.js",
+          "GeneralTests/changeOrg.spec.js",
+          "GeneralTests/enrichment.spec.js",
+          "GeneralTests/sanity.spec.js",
+          "GeneralTests/sanity2.spec.js",
+          "GeneralTests/schema.spec.js",
+          "GeneralTests/schemaload.spec.js",
+          "GeneralTests/serviceAccount.spec.js",
+          "GeneralTests/usersOrg.spec.js",
+          "dashboards/custom-charts.spec.js",
+          "dashboards/dashboard.spec.js",
+          "dashboards/dashboard-filter.spec.js",
+          "dashboards/dashboard-folder.spec.js",
+          "dashboards/dashboard-geoMap.spec.js",
+          "dashboards/dashboard-general-setting.spec.js",
+          "dashboards/dashboard-import.spec.js",
+          "dashboards/dashboard-maps.spec.js",
+          "dashboards/dashboard-multi-y-axis.spec.js",
+          "dashboards/dashboard-tabs-setting.spec.js",
+          "dashboards/dashboard-transpose.spec.js",
+          "dashboards/dashboard-variables-setting.spec.js",
+          "dashboards/dashboard2.spec.js",
+          "dashboards/dashboardtype.spec.js",
+          "dashboards/visualize.spec.js",
+          "dashboards/visualization-vrl.spec.js",
+          "Logs/join.spec.js",
+          "Logs/logshistogram.spec.js",
+          "Logs/logspage.spec.js",
+          "Logs/logsqueries.spec.js",
+          "Logs/logsquickmode.spec.js",
+          "Logs/pagination.spec.js",
+          "Logs/secondsPrecisionAdded.spec.js",
+          "Logs/unflattened.spec.js",
+          "Logs/websocket.spec.js",
+          "Logs/searchpartition.spec.js",
+          "Reports/reportsUpdated.spec.js",
+          "Reports/reportsUpdated2.spec.js",
+          "Streams/streamname.spec.js",
+          "Streams/streaming.spec.js",
+          "Streams/multiselect-stream.spec.js",
+          "Pipelines/pipeline-dynamic.spec.js",
+          "Pipelines/pipeline-core.spec.js",
+          "Pipelines/pipelines.spec.js"
+        ]
 
     steps:
       - name: Clone the current repo
@@ -157,9 +157,13 @@ jobs:
         uses: actions/download-artifact@v4
 
       - name: Start OpenObserve
-        run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1      - name: Wait for start
-        run: sleep15    - name: Ensure we are getting a reply from the server
-        run: curl http://localhost:5080web/login
+        run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
+
+      - name: Wait for start
+        run: sleep 15
+
+      - name: Ensure we are getting a reply from the server
+        run: curl http://localhost:5080/web/login
 
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
@@ -172,12 +176,12 @@ jobs:
           touch .env
           echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
           echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}" >> .env
-          echoZO_BASE_URL=${ZO_BASE_URL}" >> .env
-          echo WS_ZO_BASE_URL=${WS_ZO_BASE_URL}" >> .env
-          echo ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
-          echo ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
-          echoINGESTION_URL=${INGESTION_URL}" >> .env
-          echo ORGNAME=$[object Object]ORGNAME}" >> .env
+          echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
+          echo "WS_ZO_BASE_URL=${WS_ZO_BASE_URL}" >> .env
+          echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
+          echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
+          echo "INGESTION_URL=${INGESTION_URL}" >> .env
+          echo "ORGNAME=${ORGNAME}" >> .env
           echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
@@ -194,7 +198,7 @@ jobs:
           # Replace all '/' characters with_'
           SANITIZED_FILENAME="${SANITIZED_FILENAME//\//_}"
           # Export as a GitHub Actions environment variable
-          echo "SANITIZED_FILENAME=$SANITIZED_FILENAME >>$GITHUB_ENV
+          echo "SANITIZED_FILENAME=$SANITIZED_FILENAME" >> $GITHUB_ENV
 
       - name: Upload Coverage Data
         uses: actions/upload-artifact@v4
@@ -211,7 +215,9 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
-          retention-days:30 generate_coverage_report:
+          retention-days: 30
+
+  generate_coverage_report:
     name: Generate Coverage Report
     needs: [build_binary, ui_integration_tests]
     runs-on: ubicloud-standard-8
@@ -234,7 +240,7 @@ jobs:
       - name: Move Coverage Files to .nyc_output
         run: |
           mkdir -p tests/ui-testing/.nyc_output
-          mv merged-coverage/* tests/ui-testing/.nyc_output/ || echoNo files to move"
+          mv merged-coverage/* tests/ui-testing/.nyc_output/ || echo "No files to move"
 
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npm ci && npx nyc report
