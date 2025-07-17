@@ -92,7 +92,7 @@ use crate::{
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    // add the pending delete files to processing list
+    // add the pending delete files to processing set
     let pending_delete_files = db::file_list::local::get_pending_delete().await;
     for file in pending_delete_files {
         PROCESSING_FILES.write().await.insert(file);
@@ -164,6 +164,9 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
         let Ok(file_size) = get_file_size(&file) else {
             continue;
         };
+        // delete metadata from cache
+        WAL_PARQUET_METADATA.write().await.remove(&file_key);
+        // delete file from disk
         if let Err(e) = remove_file(&file) {
             log::error!(
                 "[INGESTER:JOB] Failed to remove parquet file: {}, {}",
@@ -171,9 +174,6 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
                 e
             );
         }
-
-        // delete metadata from cache
-        WAL_PARQUET_METADATA.write().await.remove(&file_key);
         // need release the file
         PROCESSING_FILES.write().await.remove(&file_key);
         // delete from pending delete list
@@ -309,6 +309,9 @@ async fn prepare_files(
                 "[INGESTER:JOB] the file is empty, just delete file: {}",
                 file
             );
+            // delete metadata from cache
+            WAL_PARQUET_METADATA.write().await.remove(&file_key);
+            // delete file from disk
             if let Err(e) = remove_file(wal_dir.join(&file)) {
                 log::error!(
                     "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
@@ -316,8 +319,6 @@ async fn prepare_files(
                     e
                 );
             }
-            // delete metadata from cache
-            WAL_PARQUET_METADATA.write().await.remove(&file_key);
             continue;
         }
         let prefix = file_key[..file_key.rfind('/').unwrap()].to_string();
@@ -358,6 +359,9 @@ async fn move_files(
                 &stream_name,
                 file.key,
             );
+            // delete metadata from cache
+            WAL_PARQUET_METADATA.write().await.remove(&file.key);
+            // delete file from disk
             if let Err(e) = remove_file(wal_dir.join(&file.key)) {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
@@ -365,8 +369,7 @@ async fn move_files(
                     e
                 );
             }
-            // delete metadata from cache
-            WAL_PARQUET_METADATA.write().await.remove(&file.key);
+            // remove the file from processing set
             PROCESSING_FILES.write().await.remove(&file.key);
         }
         return Ok(());
@@ -402,6 +405,9 @@ async fn move_files(
                 &stream_name,
                 file.key,
             );
+            // delete metadata from cache
+            WAL_PARQUET_METADATA.write().await.remove(&file.key);
+            // delete file from disk
             if let Err(e) = remove_file(wal_dir.join(&file.key)) {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
@@ -409,8 +415,7 @@ async fn move_files(
                     e
                 );
             }
-            // delete metadata from cache
-            WAL_PARQUET_METADATA.write().await.remove(&file.key);
+            // remove the file from processing set
             PROCESSING_FILES.write().await.remove(&file.key);
         }
         return Ok(());
@@ -435,6 +440,9 @@ async fn move_files(
                     &stream_name,
                     file.key,
                 );
+                // delete metadata from cache
+                WAL_PARQUET_METADATA.write().await.remove(&file.key);
+                // delete file from disk
                 if let Err(e) = remove_file(wal_dir.join(&file.key)) {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
@@ -442,8 +450,7 @@ async fn move_files(
                         e
                     );
                 }
-                // delete metadata from cache
-                WAL_PARQUET_METADATA.write().await.remove(&file.key);
+                // remove the file from processing set
                 PROCESSING_FILES.write().await.remove(&file.key);
             }
             return Ok(());
@@ -547,8 +554,6 @@ async fn move_files(
         // check if allowed to delete the file
         for file in new_file_list.iter() {
             // use same lock to combine the operations of check lock and add to removing list
-            let wal_lock = infra::local_lock::lock("wal").await?;
-            let lock_guard = wal_lock.lock().await;
             let can_delete = if wal::lock_files_exists(&file.key) {
                 log::warn!(
                     "[INGESTER:JOB:{thread_id}] the file is in use, set to pending delete list: {}",
@@ -567,9 +572,11 @@ async fn move_files(
                 db::file_list::local::add_removing(&file.key).await?;
                 true
             };
-            drop(lock_guard);
 
             if can_delete {
+                // delete metadata from cache
+                WAL_PARQUET_METADATA.write().await.remove(&file.key);
+                // delete file from disk
                 match remove_file(wal_dir.join(&file.key)) {
                     Err(e) => {
                         log::warn!(
@@ -589,8 +596,6 @@ async fn move_files(
                         }
                     }
                     Ok(_) => {
-                        // delete metadata from cache
-                        WAL_PARQUET_METADATA.write().await.remove(&file.key);
                         // remove the file from processing set
                         PROCESSING_FILES.write().await.remove(&file.key);
                         // deleted successfully then update metrics

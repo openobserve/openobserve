@@ -1143,6 +1143,7 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         .iter()
         .filter(|v| v.deleted)
         .map(|v| FileListDeleted {
+            id: 0,
             file: v.key.clone(),
             index_file: v.meta.index_size > 0,
             flattened: v.meta.flattened,

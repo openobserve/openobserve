@@ -145,7 +145,7 @@ impl super::FileList for SqliteFileList {
         Ok(())
     }
 
-    async fn batch_remove_deleted(&self, files: &[String]) -> Result<()> {
+    async fn batch_remove_deleted(&self, files: &[FileKey]) -> Result<()> {
         if files.is_empty() {
             return Ok(());
         }
@@ -157,8 +157,12 @@ impl super::FileList for SqliteFileList {
             let pool = client.clone();
             let mut ids = Vec::with_capacity(files.len());
             for file in files {
+                if file.id > 0 {
+                    ids.push(file.id.to_string());
+                    continue;
+                }
                 let (stream_key, date_key, file_name) =
-                    parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
+                    parse_file_key_columns(&file.key).map_err(|e| Error::Message(e.to_string()))?;
                 let ret: Option<i64> = match sqlx::query_scalar(
                     r#"SELECT id FROM file_list_deleted WHERE stream = $1 AND date = $2 AND file = $3;"#,
                 )
@@ -551,7 +555,7 @@ SELECT date
         }
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 LIMIT $3;"#,
+            r#"SELECT id, stream, date, file, index_file, flattened FROM file_list_deleted WHERE org = $1 AND created_at < $2 ORDER BY created_at ASC LIMIT $3;"#,
         )
         .bind(org_id)
         .bind(time_max)
@@ -561,6 +565,7 @@ SELECT date
         Ok(ret
             .iter()
             .map(|r| FileListDeleted {
+                id: r.id,
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,
                 flattened: r.flattened,
@@ -571,13 +576,14 @@ SELECT date
     async fn list_deleted(&self) -> Result<Vec<FileListDeleted>> {
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileDeletedRecord>(
-            r#"SELECT stream, date, file, index_file, flattened FROM file_list_deleted;"#,
+            r#"SELECT id, stream, date, file, index_file, flattened FROM file_list_deleted;"#,
         )
         .fetch_all(&pool)
         .await?;
         Ok(ret
             .iter()
             .map(|r| FileListDeleted {
+                id: r.id,
                 file: format!("files/{}/{}/{}", r.stream, r.date, r.file),
                 index_file: r.index_file,
                 flattened: r.flattened,
@@ -909,6 +915,7 @@ UPDATE stream_stats
         let stream_key = format!("{org_id}/{stream_type}/{stream}");
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
+        let mut tx = client.begin().await?;
         match sqlx::query(
             "INSERT INTO file_list_jobs (org, stream, offsets, status, node, started_at, updated_at) VALUES ($1, $2, $3, $4, '', 0, 0);",
         )
@@ -916,7 +923,7 @@ UPDATE stream_stats
         .bind(&stream_key)
         .bind(offset)
         .bind(super::FileListJobStatus::Pending)
-        .execute(&*client)
+        .execute(&mut *tx)
         .await
         {
             Err(sqlx::Error::Database(e)) => if !e.is_unique_violation() {
@@ -929,15 +936,45 @@ UPDATE stream_stats
         };
 
         // get job id
-        let ret = sqlx::query(
-            "SELECT id FROM file_list_jobs WHERE org = $1 AND stream = $2 AND offsets = $3;",
+        let ret = match sqlx::query(
+            "SELECT id, status FROM file_list_jobs WHERE org = $1 AND stream = $2 AND offsets = $3;",
         )
         .bind(org_id)
         .bind(&stream_key)
         .bind(offset)
-        .fetch_one(&*client)
-        .await?;
-        Ok(ret.try_get::<i64, &str>("id").unwrap_or_default())
+        .fetch_one(&mut *tx)
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[SQLITE] rollback add job error: {e}");
+                }
+                return Err(e.into());
+            }
+        };
+        let id = ret.try_get::<i64, &str>("id").unwrap_or_default();
+        let status = ret.try_get::<i64, &str>("status").unwrap_or_default();
+        if id > 0 && super::FileListJobStatus::from(status) == super::FileListJobStatus::Done {
+            if let Err(e) =
+                sqlx::query("UPDATE file_list_jobs SET status = $1 WHERE status = $2 AND id = $3;")
+                    .bind(super::FileListJobStatus::Pending)
+                    .bind(super::FileListJobStatus::Done)
+                    .bind(id)
+                    .execute(&mut *tx)
+                    .await
+            {
+                if let Err(e) = tx.rollback().await {
+                    log::error!("[SQLITE] rollback update job status error: {e}");
+                }
+                return Err(e.into());
+            }
+        }
+        if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] commit add job error: {e}");
+            return Err(e.into());
+        }
+        Ok(id)
     }
 
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<super::MergeJobRecord>> {
