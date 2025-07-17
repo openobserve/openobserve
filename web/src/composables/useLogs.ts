@@ -1668,6 +1668,12 @@ const useLogs = () => {
     let multiSql = [];
 
     for (const stream of searchObj.data.stream.selectedStream) {
+      // one or more filter fields are missing in this stream so no need to include in histogram query
+      // this is to avoid the issue of missing fields in multi stream histogram query
+      if(searchObj.data.stream.missingStreamMultiStreamFilter.includes(stream)) {
+        continue;
+      }
+      // Replace the index name and where clause in the histogram query for each stream
       multiSql.push(histogramQuery.replace(
         "[INDEX_NAME]",
         stream
