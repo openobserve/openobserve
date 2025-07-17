@@ -1,6 +1,6 @@
 import { test, expect } from '../baseFixtures.js';
 import logData from "../../cypress/fixtures/log.json";
-import { LogsPage } from '../../pages/logsPages/logsPage.js';
+import PageManager from "../../pages/page-manager.js";
 
 test.describe.configure({ mode: "parallel" });
 
@@ -29,7 +29,7 @@ async function login(page) {
 
 
 test.describe("Sanity testcases", () => {
-  let logsPage;
+  let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -50,7 +50,7 @@ test.describe("Sanity testcases", () => {
 
   test.beforeEach(async ({ page }) => {
     await login(page);
-    logsPage = new LogsPage(page);
+    pageManager = new PageManager(page);
     await page.waitForTimeout(1000)
 
     const baseUrl = process.env.INGESTION_URL;  // Base URL from the environment variable

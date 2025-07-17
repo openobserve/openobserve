@@ -1,340 +1,239 @@
 import { test, expect } from "../baseFixtures.js";
-import { LoginPage } from '../../pages/generalPages/loginPage.js';
-import { LogsPage } from '../../pages/logsPages/logsPage.js';
-import { IngestionPage } from '../../pages/generalPages/ingestionPage.js';
-import { HomePage } from "../../pages/generalPages/homePage.js";
-import { MetricsPage } from "../../pages/metricsPages/metricsPage.js";
-import { TracesPage } from "../../pages/tracesPages/tracesPage.js";
-import { RumPage } from "../../pages/logsPages/rumPage.js";
-import { PipelinesPage } from "../../pages/pipelinesPages/pipelinesPage.js";
-import { DashboardPage } from "../../pages/dashboardPages/dashboardPage.js";
-import { StreamsPage } from "../../pages/streamsPages/streamsPage.js";
-import { ReportsPage } from "../../pages/reportsPages/reportsPage.js";
-import { AlertsPage } from "../../pages/alertsPages/alertsPage.js";
-import { DataPage } from "../../pages/generalPages/dataPage.js";
-import { IamPage } from "../../pages/iamPages/iamPage.js";
-import { ManagementPage } from "../../pages/generalPages/managementPage.js";
-import { AboutPage } from "../../pages/generalPages/aboutPage.js";
-import { CreateOrgPage } from "../../pages/generalPages/createOrgPage.js";
-import { CommonActions } from "../../pages/commonActions.js";
-
+import PageManager from "../../pages/page-manager.js";
 
 test.describe("Change Organisation", () => {
-    let loginPage, logsPage, ingestionPage, homePage, metricsPage,
-        tracesPage, rumPage, pipelinesPage, dashboardPage, streamsPage,
-        reportsPage, alertsPage, dataPage, iamPage, managementPage, aboutPage, createOrgPage, commonActions,
-        multiOrgIdentifier;
-        const timestamp = Date.now(); 
-        const randomSuffix = Math.floor(Math.random() * 1000); 
-        const newOrgName = `org${timestamp}${randomSuffix}`;
+    let pageManager, multiOrgIdentifier;
+    const timestamp = Date.now(); 
+    const randomSuffix = Math.floor(Math.random() * 1000); 
+    const newOrgName = `org${timestamp}${randomSuffix}`;
 
     test.beforeEach(async ({ page }) => {
-        loginPage = new LoginPage(page);
-        ingestionPage = new IngestionPage(page);
-        logsPage = new LogsPage(page);
-        homePage = new HomePage(page);
-        metricsPage = new MetricsPage(page);
-        tracesPage = new TracesPage(page);
-        rumPage = new RumPage(page);
-        pipelinesPage = new PipelinesPage(page);
-        dashboardPage = new DashboardPage(page);
-        streamsPage = new StreamsPage(page);
-        reportsPage = new ReportsPage(page);
-        alertsPage = new AlertsPage(page);
-        dataPage = new DataPage(page);
-        iamPage = new IamPage(page);
-        managementPage = new ManagementPage(page);
-        aboutPage = new AboutPage(page);
-        createOrgPage = new CreateOrgPage(page);
-        commonActions = new CommonActions(page);
-        await loginPage.gotoLoginPage();
-        await loginPage.loginAsInternalUser();
-        await loginPage.login();
-        await ingestionPage.ingestion();
-        
+        pageManager = new PageManager(page);
+        await pageManager.loginPage.gotoLoginPage();
+        await pageManager.loginPage.loginAsInternalUser();
+        await pageManager.loginPage.login();
+        await pageManager.ingestionPage.ingestion();
     });
 
     test("Home Page default validation", async ({ page }) => {
         await page.waitForTimeout(1000);
         await page.reload();
         await page.waitForTimeout(5000);
-        await homePage.homePageValidation();
-        await homePage.gotoHomePage();
-        await homePage.homePageValidation();
-        await homePage.homePageDefaultOrg();
-        await homePage.homePageURLValidationDefaultOrg();
-
+        await pageManager.homePage.homePageValidation();
+        await pageManager.homePage.gotoHomePage();
+        await pageManager.homePage.homePageValidation();
+        await pageManager.homePage.homePageDefaultOrg();
+        await pageManager.homePage.homePageURLValidationDefaultOrg();
     });
 
     test("Home Page change organisation validation", async ({ page }) => {
-        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
-        await homePage.homePageOrg(newOrgName);
-        await homePage.homePageValidation();
-        await homePage.homePageURLValidation(newOrgName);
-        await homePage.gotoHomePage();
-        await homePage.homePageValidation();
-        await homePage.homePageURLValidation(newOrgName);
-        await homePage.homeURLContains(multiOrgIdentifier);
+        multiOrgIdentifier = await pageManager.createOrgPage.createOrg(newOrgName);
+        await pageManager.ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homePageValidation();
+        await pageManager.homePage.homePageURLValidation(newOrgName);
+        await pageManager.homePage.gotoHomePage();
+        await pageManager.homePage.homePageValidation();
+        await pageManager.homePage.homePageURLValidation(newOrgName);
+        await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     });
 
     test("Logs Page default validation", async ({ page }) => {
-
-        await logsPage.navigateToLogs();
-        await logsPage.validateLogsPage();
-        await homePage.homePageDefaultOrg();
-        await homePage.homePageURLValidationDefaultOrg();
-
+        await pageManager.logsPage.navigateToLogs();
+        await pageManager.logsPage.validateLogsPage();
+        await pageManager.homePage.homePageDefaultOrg();
+        await pageManager.homePage.homePageURLValidationDefaultOrg();
     });
 
     test("Logs Page change organisation validation", async ({ page }) => {
-        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
-        await homePage.homePageOrg(newOrgName);
-        await logsPage.navigateToLogs(multiOrgIdentifier);
-        await homePage.homeURLContains(multiOrgIdentifier);
+        multiOrgIdentifier = await pageManager.createOrgPage.createOrg(newOrgName);
+        await pageManager.ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.logsPage.navigateToLogs(multiOrgIdentifier);
+        await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     });
 
     test("Metrics Page default validation", async ({ page }) => {
-
-
-        await metricsPage.gotoMetricsPage();
-        await homePage.homePageDefaultOrg();
-        await homePage.homePageURLValidationDefaultOrg();
-        await metricsPage.metricsPageValidation();
-        await metricsPage.metricsURLValidation();
+        await pageManager.metricsPage.gotoMetricsPage();
+        await pageManager.homePage.homePageDefaultOrg();
+        await pageManager.homePage.homePageURLValidationDefaultOrg();
+        await pageManager.metricsPage.metricsPageValidation();
+        await pageManager.metricsPage.metricsURLValidation();
     });
 
     test("Metrics Page change organisation validation", async ({ page }) => {
-
-        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
-        await homePage.homePageOrg(newOrgName);
-        await metricsPage.gotoMetricsPage();
-        await homePage.homeURLContains(multiOrgIdentifier);
-
-        
+        multiOrgIdentifier = await pageManager.createOrgPage.createOrg(newOrgName);
+        await pageManager.ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.metricsPage.gotoMetricsPage();
+        await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     });
 
     test("Traces Page default validation", async ({ page }) => {
-
-
-        await tracesPage.navigateToTraces();
-        await tracesPage.tracesPageDefaultOrg();
-        await homePage.homePageURLValidationDefaultOrg();
-        await tracesPage.validateTracesPage();
-        await tracesPage.tracesURLValidation();
+        await pageManager.tracesPage.navigateToTraces();
+        await pageManager.tracesPage.tracesPageDefaultOrg();
+        await pageManager.homePage.homePageURLValidationDefaultOrg();
+        await pageManager.tracesPage.validateTracesPage();
+        await pageManager.tracesPage.tracesURLValidation();
     });
 
     test("Traces Page change organisation validation", async ({ page }) => {
-
-        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
-        await homePage.homePageOrg(newOrgName);
-        await tracesPage.navigateToTraces();
-        await homePage.homeURLContains(multiOrgIdentifier);
-
+        multiOrgIdentifier = await pageManager.createOrgPage.createOrg(newOrgName);
+        await pageManager.ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.tracesPage.navigateToTraces();
+        await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     });
 
     test("RUM Page default validation", async ({ page }) => {
-
-
-        await rumPage.gotoRumPage();
-        await homePage.homePageDefaultOrg();
-        await homePage.homePageURLValidationDefaultOrg();
-        await rumPage.rumURLValidation();
-        await rumPage.rumURLValidation();
+        await pageManager.rumPage.gotoRumPage();
+        await pageManager.homePage.homePageDefaultOrg();
+        await pageManager.homePage.homePageURLValidationDefaultOrg();
+        await pageManager.rumPage.rumURLValidation();
     });
 
     test("RUM Page change organisation validation", async ({ page }) => {
-
-        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
-        await homePage.homePageOrg(newOrgName);
-        await rumPage.gotoRumPage();
-        await homePage.homeURLContains(multiOrgIdentifier);
-
+        multiOrgIdentifier = await pageManager.createOrgPage.createOrg(newOrgName);
+        await pageManager.ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.rumPage.gotoRumPage();
+        await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     });
 
-
     test("Pipelines Page default validation", async ({ page }) => {
-
-
-        await pipelinesPage.gotoPipelinesPage();
-        await homePage.homePageDefaultOrg();
-        await homePage.homePageURLValidationDefaultOrg();
-        await pipelinesPage.pipelinesURLValidation();
-        await pipelinesPage.pipelinesURLValidation();
+        await pageManager.pipelinesPage.gotoPipelinesPage();
+        await pageManager.homePage.homePageDefaultOrg();
+        await pageManager.homePage.homePageURLValidationDefaultOrg();
+        await pageManager.pipelinesPage.pipelinesURLValidation();
     });
 
     test("Pipelines Page change organisation validation", async ({ page }) => {
-
-        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
-        await homePage.homePageOrg(newOrgName);
-        await pipelinesPage.gotoPipelinesPage();
-        await homePage.homeURLContains(multiOrgIdentifier);
-
+        multiOrgIdentifier = await pageManager.createOrgPage.createOrg(newOrgName);
+        await pageManager.ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.pipelinesPage.gotoPipelinesPage();
+        await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     });
 
     test("Dashboard Page default validation", async ({ page }) => {
-
-
-        await dashboardPage.navigateToDashboards();
-        await homePage.clickDefaultOrg();
-        await homePage.homePageURLValidationDefaultOrg();
-        await dashboardPage.dashboardURLValidation();
-        
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.homePage.clickDefaultOrg();
+        await pageManager.homePage.homePageURLValidationDefaultOrg();
+        await pageManager.dashboardPage.dashboardURLValidation();
     });
 
     test("Dashboard Page change organisation validation", async ({ page }) => {
-
-        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
-        await homePage.homePageOrg(newOrgName);
-        await dashboardPage.navigateToDashboards();
-        await homePage.homeURLContains(multiOrgIdentifier);
-
+        multiOrgIdentifier = await pageManager.createOrgPage.createOrg(newOrgName);
+        await pageManager.ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.dashboardPage.navigateToDashboards();
+        await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     });
 
     test("Streams Page default validation", async ({ page }) => {
-
-
-        await streamsPage.gotoStreamsPage();
-        await streamsPage.streamsPageDefaultOrg();
-        await homePage.homePageURLValidationDefaultOrg();
-        await streamsPage.streamsURLValidation();
-        
+        await pageManager.streamsPage.gotoStreamsPage();
+        await pageManager.streamsPage.streamsPageDefaultOrg();
+        await pageManager.homePage.homePageURLValidationDefaultOrg();
+        await pageManager.streamsPage.streamsURLValidation();
     });
 
     test("Streams Page change organisation validation", async ({ page }) => {
-
-        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
-        await homePage.homePageOrg(newOrgName);
-        await streamsPage.gotoStreamsPage();
-        await homePage.homeURLContains(multiOrgIdentifier);
-
+        multiOrgIdentifier = await pageManager.createOrgPage.createOrg(newOrgName);
+        await pageManager.ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.streamsPage.gotoStreamsPage();
+        await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     });
 
     test("Reports Page default validation", async ({ page }) => {
-
-
-        await reportsPage.goToReports();
-        await homePage.homePageDefaultOrg();
-        await homePage.homePageURLValidationDefaultOrg();
-        await reportsPage.reportsURLValidation();
-        
+        await pageManager.reportsPage.goToReports();
+        await pageManager.homePage.homePageDefaultOrg();
+        await pageManager.homePage.homePageURLValidationDefaultOrg();
+        await pageManager.reportsPage.reportsURLValidation();
     });
 
     test("Reports Page change organisation validation", async ({ page }) => {
-
-        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
-        await homePage.homePageOrg(newOrgName);
-        await reportsPage.goToReports();
-        await homePage.homeURLContains(multiOrgIdentifier);
-
+        multiOrgIdentifier = await pageManager.createOrgPage.createOrg(newOrgName);
+        await pageManager.ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.reportsPage.goToReports();
+        await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     });
 
     test("Alerts Page default validation", async ({ page }) => {
-
-
-        await commonActions.navigateToAlerts();
-        await homePage.clickDefaultOrg();
+        await pageManager.commonActions.navigateToAlerts();
+        await pageManager.homePage.clickDefaultOrg();
         await page.waitForTimeout(5000);
-        await homePage.homePageURLValidationDefaultOrg();
-        await alertsPage.alertsURLValidation();
+        await pageManager.homePage.homePageURLValidationDefaultOrg();
+        await pageManager.alertsPage.alertsURLValidation();
     });
 
     test("Alerts Page change organisation validation", async ({ page }) => {
-
-        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
-        await homePage.homePageOrg(newOrgName);
-        await commonActions.navigateToAlerts();
-        await homePage.homeURLContains(multiOrgIdentifier);
-
+        multiOrgIdentifier = await pageManager.createOrgPage.createOrg(newOrgName);
+        await pageManager.ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.commonActions.navigateToAlerts();
+        await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     });
 
     test("Data sources Page default validation", async ({ page }) => {
-
-
-        await dataPage.gotoDataPage();
-        await homePage.homePageDefaultOrg();
-        await homePage.homePageURLValidationDefaultOrg();
-        await dataPage.dataURLValidation();
+        await pageManager.dataPage.gotoDataPage();
+        await pageManager.homePage.homePageDefaultOrg();
+        await pageManager.homePage.homePageURLValidationDefaultOrg();
+        await pageManager.dataPage.dataURLValidation();
     });
 
     test("Data sources Page change organisation validation", async ({ page }) => {
-
-        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
-        await homePage.homePageOrg(newOrgName);
-        await dataPage.gotoDataPage();
-        await homePage.homeURLContains(multiOrgIdentifier);
-
-
+        multiOrgIdentifier = await pageManager.createOrgPage.createOrg(newOrgName);
+        await pageManager.ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.dataPage.gotoDataPage();
+        await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     });
 
     test("IAM Page default validation", async ({ page }) => {
-
-
-        await iamPage.gotoIamPage();
-        await homePage.homePageDefaultOrg();
-        await homePage.homePageURLValidationDefaultOrg();
-        await iamPage.iamURLValidation();
+        await pageManager.iamPage.gotoIamPage();
+        await pageManager.homePage.homePageDefaultOrg();
+        await pageManager.homePage.homePageURLValidationDefaultOrg();
+        await pageManager.iamPage.iamURLValidation();
     });
 
     test("IAM Page change organisation validation", async ({ page }) => {
-
-        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
-        await homePage.homePageOrg(newOrgName);
-        await iamPage.gotoIamPage();
-        await homePage.homeURLContains(multiOrgIdentifier);
-
+        multiOrgIdentifier = await pageManager.createOrgPage.createOrg(newOrgName);
+        await pageManager.ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.iamPage.gotoIamPage();
+        await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     });
 
     test("Management Page default validation", async ({ page }) => {
-
-
-        await managementPage.goToManagement();
-        await homePage.homePageDefaultOrg();
-        await homePage.homePageURLValidationDefaultOrg();
-        await managementPage.managementURLValidation();
+        await pageManager.managementPage.goToManagement();
+        await pageManager.homePage.homePageDefaultOrg();
+        await pageManager.homePage.homePageURLValidationDefaultOrg();
+        await pageManager.managementPage.managementURLValidation();
     });
 
     test("Management Page change organisation validation", async ({ page }) => {
-        
-        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
-        await homePage.homePageOrg(newOrgName);
-        await managementPage.goToManagement();
-        await managementPage.managementURLValidation();
-      
-
+        multiOrgIdentifier = await pageManager.createOrgPage.createOrg(newOrgName);
+        await pageManager.ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.managementPage.goToManagement();
+        await pageManager.managementPage.managementURLValidation();
     });
 
     test("About Page default validation", async ({ page }) => {
-
-        await aboutPage.clickHelpMenu();
-        await aboutPage.gotoAboutPage();
-        await homePage.homePageDefaultOrg();
-        await aboutPage.aboutURLValidation();
+        await pageManager.aboutPage.clickHelpMenu();
+        await pageManager.aboutPage.gotoAboutPage();
+        await pageManager.homePage.homePageDefaultOrg();
+        await pageManager.aboutPage.aboutURLValidation();
     });
 
     test("About Page change organisation validation", async ({ page }) => {
-
-        multiOrgIdentifier = await createOrgPage.createOrg(newOrgName);
-        await ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
-        await aboutPage.clickHelpMenu();
-        await aboutPage.gotoAboutPage();
-        await homePage.homePageOrg(newOrgName);
-        await homePage.homeURLContains(multiOrgIdentifier);
-
+        multiOrgIdentifier = await pageManager.createOrgPage.createOrg(newOrgName);
+        await pageManager.ingestionPage.ingestionMultiOrg(multiOrgIdentifier);
+        await pageManager.aboutPage.clickHelpMenu();
+        await pageManager.aboutPage.gotoAboutPage();
+        await pageManager.homePage.homePageOrg(newOrgName);
+        await pageManager.homePage.homeURLContains(multiOrgIdentifier);
     });
-
-
-
 });

@@ -1,7 +1,7 @@
 import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import { LogsPage } from '../../pages/logsPages/logsPage.js';
+import PageManager from "../../pages/page-manager.js";
 
 test.describe.configure({ mode: 'parallel' });
 const streamName = `stream${Date.now()}`;
@@ -52,7 +52,7 @@ async function ingestion(page) {
 }
 
 test.describe("Schema testcases", () => {
-  let logsPage;
+  let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -73,7 +73,7 @@ test.describe("Schema testcases", () => {
 
   test.beforeEach(async ({ page }) => {
     await login(page);
-    logsPage = new LogsPage(page);
+    pageManager = new PageManager(page);
     await page.waitForTimeout(1000)
     await ingestion(page);
     await page.waitForTimeout(2000)
@@ -82,7 +82,7 @@ test.describe("Schema testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStream("e2e_automate"); 
+    await pageManager.logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
   });
 
