@@ -29,6 +29,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(default)]
 pub struct Alert {
     #[serde(default)]
     pub id: Option<Ksuid>,

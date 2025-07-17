@@ -30,7 +30,8 @@ use crate::{
 
 pub mod alert;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
+#[serde(default)]
 pub struct TriggerCondition {
     /// (minutes)
     pub period: i64, // 10 minutes

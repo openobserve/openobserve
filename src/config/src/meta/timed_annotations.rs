@@ -41,7 +41,8 @@ pub struct TimedAnnotationRes {
     pub timed_annotation_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
 pub struct TimedAnnotation {
     pub annotation_id: Option<String>,
     pub start_time: i64,

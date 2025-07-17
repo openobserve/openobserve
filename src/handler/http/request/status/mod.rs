@@ -559,17 +559,27 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                             .json("Service accounts are not allowed to login".to_string()));
                     }
 
-                    // get domain from email
-                    let domain = res.0.user_email.split('@').nth(1).unwrap_or_default();
-                    if !get_dex_config().allowed_domains.is_empty()
-                        && !get_dex_config().allowed_domains.contains(domain)
+                    // Check if email is allowed by domain management system
+                    #[cfg(feature = "enterprise")]
+                    match o2_enterprise::enterprise::domain_management::is_email_allowed(
+                        &res.0.user_email,
+                    )
+                    .await
                     {
-                        audit_message.response_meta.http_response_code = 400;
-                        audit_message._timestamp = now_micros();
-                        audit(audit_message).await;
-                        return Ok(
-                            HttpResponse::Unauthorized().json("Unauthorized access".to_string())
-                        );
+                        Ok(allowed) => {
+                            if !allowed {
+                                audit_message.response_meta.http_response_code = 403;
+                                audit_message._timestamp = now_micros();
+                                audit(audit_message).await;
+                                return Ok(HttpResponse::Unauthorized()
+                                    .json("Unauthorized".to_string()));
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Failed to check domain management: {}", e);
+                            // Fail open - allow access if domain management check fails
+                            // This prevents system lockouts due to configuration errors
+                        }
                     }
 
                     audit_message.user_email = res.0.user_email.clone();
