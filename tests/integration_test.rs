@@ -411,7 +411,7 @@ mod tests {
         )
         .await;
 
-        // test case : invalid index
+        // test case : missing index in metadata
         let body_str = "{\"event\":\"hello\"}";
         let req = test::TestRequest::post()
             .uri(&format!("/api/{}/_hec", "e2e"))
@@ -420,7 +420,7 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert!(resp.status().is_client_error());
+        assert!(resp.status().is_success());
 
         // test case : valid payload
         let body_str = "{\"event\":\"hello\",\"index\":\"hec_test\"}";
