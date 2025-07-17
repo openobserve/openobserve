@@ -781,7 +781,7 @@ pub async fn merge_files(
                 s.index_original_data,
                 s.index_all_values,
             ),
-            None => (Vec::new(), false, false, false),
+            None => (hashbrown::HashMap::new(), false, false, false),
         };
     let latest_schema = if !defined_schema_fields.is_empty() {
         let latest_schema = SchemaCache::new(latest_schema);

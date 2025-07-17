@@ -205,7 +205,7 @@ impl TraceListIndex {
                 data_retention: 0,
                 flatten_level: None,
                 max_query_range: 0,
-                defined_schema_fields: vec![],
+                defined_schema_fields: hashbrown::HashMap::new(),
                 store_original_data: false,
                 approx_partition: false,
                 distinct_value_fields: vec![],

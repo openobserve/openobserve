@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use datafusion::arrow::datatypes::{Field, Schema};
+use hashbrown::HashMap as HashBrownHashMap;
 
 use anyhow::Result;
 use config::{
@@ -26,7 +30,6 @@ use config::{
     metrics,
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt, time::now_micros},
 };
-use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
 use infra::schema::{
     STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,
@@ -126,7 +129,7 @@ pub async fn check_for_schema(
                         s.index_original_data,
                         s.index_all_values,
                     ),
-                    None => (Vec::new(), false, false, false),
+                    None => (HashBrownHashMap::new(), false, false, false),
                 };
             if !defined_schema_fields.is_empty() {
                 let schema = generate_schema_for_defined_schema_fields(
@@ -343,13 +346,18 @@ async fn handle_diff_schema(
 
     // For new streams, if defined_schema_fields are provided, add them directly to schema
     if is_new && !defined_schema_fields.is_empty() {
-        // Add each defined field to the schema with default string type
+        // Add each defined field to the schema with specified data type
         let mut new_fields = final_schema.fields().to_vec();
-        for field_name in &defined_schema_fields {
+        for (field_name, data_type) in &defined_schema_fields {
             if final_schema.field_with_name(field_name).is_err() {
+                let arrow_data_type = match data_type {
+                    config::meta::stream::DataType::Utf8 => datafusion::arrow::datatypes::DataType::Utf8,
+                    config::meta::stream::DataType::Int64 => datafusion::arrow::datatypes::DataType::Int64,
+                    config::meta::stream::DataType::Float64 => datafusion::arrow::datatypes::DataType::Float64,
+                };
                 let field = Arc::new(Field::new(
                     field_name,
-                    datafusion::arrow::datatypes::DataType::Utf8,
+                    arrow_data_type,
                     true,
                 ));
                 new_fields.push(field);
@@ -403,7 +411,7 @@ async fn handle_diff_schema(
             .filter_map(|f| {
                 let field_name = f.name().to_string();
                 if !original_field_names.contains(&field_name)
-                    && !defined_schema_fields.contains(&field_name)
+                    && !defined_schema_fields.contains_key(&field_name)
                 {
                     Some(field_name)
                 } else {
@@ -424,8 +432,8 @@ async fn handle_diff_schema(
 
             // Add new fields to defined_schema_fields (UDS)
             for field_name in &new_field_names {
-                if !defined_schema_fields.contains(field_name) {
-                    defined_schema_fields.push(field_name.clone());
+                if !defined_schema_fields.contains_key(field_name) {
+                    defined_schema_fields.insert(field_name.clone(), config::meta::stream::DataType::Utf8);
                 }
             }
 
@@ -512,7 +520,7 @@ async fn handle_diff_schema(
             }
         }
 
-        defined_schema_fields = uds_fields.into_iter().collect::<Vec<_>>();
+        defined_schema_fields = uds_fields.into_iter().map(|field_name| (field_name, config::meta::stream::DataType::Utf8)).collect();
         stream_setting.defined_schema_fields = defined_schema_fields.clone();
         final_schema.metadata.insert(
             "settings".to_string(),
@@ -579,7 +587,7 @@ async fn handle_diff_schema(
 // then we will use defined_schema_fields
 pub fn generate_schema_for_defined_schema_fields(
     schema: &SchemaCache,
-    fields: &[String],
+    fields: &HashBrownHashMap<String, config::meta::stream::DataType>,
     need_original: bool,
     index_original_data: bool,
     index_all_values: bool,
@@ -594,28 +602,28 @@ pub fn generate_schema_for_defined_schema_fields(
     let original_col = ORIGINAL_DATA_COL_NAME.to_string();
     let all_values_col = ALL_VALUES_COL_NAME.to_string();
 
-    let mut fields: HashSet<&String> = fields.iter().collect();
-    if !fields.contains(&timestamp_col) {
-        fields.insert(&timestamp_col);
+    let mut field_names: HashSet<&String> = fields.keys().collect();
+    if !field_names.contains(&timestamp_col) {
+        field_names.insert(&timestamp_col);
     }
-    if !fields.contains(&cfg.common.column_all) {
-        fields.insert(&cfg.common.column_all);
+    if !field_names.contains(&cfg.common.column_all) {
+        field_names.insert(&cfg.common.column_all);
     }
     if need_original || index_original_data {
-        if !fields.contains(&o2_id_col) {
-            fields.insert(&o2_id_col);
+        if !field_names.contains(&o2_id_col) {
+            field_names.insert(&o2_id_col);
         }
-        if !fields.contains(&original_col) {
-            fields.insert(&original_col);
+        if !field_names.contains(&original_col) {
+            field_names.insert(&original_col);
         }
     }
-    if index_all_values && !fields.contains(&all_values_col) {
-        fields.insert(&all_values_col);
+    if index_all_values && !field_names.contains(&all_values_col) {
+        field_names.insert(&all_values_col);
     }
 
-    let mut new_fields = Vec::with_capacity(fields.len());
-    for field in fields {
-        if let Some(f) = schema.fields_map().get(field) {
+    let mut new_fields = Vec::with_capacity(field_names.len());
+    for field_name in field_names {
+        if let Some(f) = schema.fields_map().get(field_name) {
             new_fields.push(schema.schema().fields()[*f].clone());
         }
     }
@@ -647,7 +655,7 @@ pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bo
                 is_schema_changed = true;
             }
             Some(idx) => {
-                if !defined_schema_fields.is_empty() && !defined_schema_fields.contains(item_name) {
+                if !defined_schema_fields.is_empty() && !defined_schema_fields.contains_key(item_name) {
                     continue;
                 }
                 let existing_field: Arc<Field> = schema.schema().fields()[*idx].clone();
@@ -776,8 +784,11 @@ mod tests {
 
         // Create a schema with some defined_schema_fields
         let mut metadata = HashMap::new();
+        let mut defined_fields = hashbrown::HashMap::new();
+        defined_fields.insert("custom_field1".to_string(), config::meta::stream::DataType::Utf8);
+        defined_fields.insert("custom_field2".to_string(), config::meta::stream::DataType::Utf8);
         let settings = config::meta::stream::StreamSettings {
-            defined_schema_fields: vec!["custom_field1".to_string(), "custom_field2".to_string()],
+            defined_schema_fields: defined_fields,
             ..Default::default()
         };
         metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
@@ -793,12 +804,12 @@ mod tests {
         assert!(
             stream_setting
                 .defined_schema_fields
-                .contains(&"custom_field1".to_string())
+                .contains_key(&"custom_field1".to_string())
         );
         assert!(
             stream_setting
                 .defined_schema_fields
-                .contains(&"custom_field2".to_string())
+                .contains_key(&"custom_field2".to_string())
         );
     }
 
@@ -809,8 +820,11 @@ mod tests {
 
         // Create an original schema with UDS fields
         let mut original_metadata = HashMap::new();
+        let mut original_defined_fields = hashbrown::HashMap::new();
+        original_defined_fields.insert("uds_field1".to_string(), config::meta::stream::DataType::Utf8);
+        original_defined_fields.insert("uds_field2".to_string(), config::meta::stream::DataType::Utf8);
         let original_settings = config::meta::stream::StreamSettings {
-            defined_schema_fields: vec!["uds_field1".to_string(), "uds_field2".to_string()],
+            defined_schema_fields: original_defined_fields,
             ..Default::default()
         };
         original_metadata.insert(
@@ -829,8 +843,11 @@ mod tests {
 
         // Create a new schema with additional fields
         let mut new_metadata = HashMap::new();
+        let mut new_defined_fields = hashbrown::HashMap::new();
+        new_defined_fields.insert("uds_field1".to_string(), config::meta::stream::DataType::Utf8);
+        new_defined_fields.insert("uds_field2".to_string(), config::meta::stream::DataType::Utf8);
         let new_settings = config::meta::stream::StreamSettings {
-            defined_schema_fields: vec!["uds_field1".to_string(), "uds_field2".to_string()],
+            defined_schema_fields: new_defined_fields,
             ..Default::default()
         };
         new_metadata.insert(
@@ -856,7 +873,9 @@ mod tests {
             .map(|f| f.name().to_string())
             .collect();
 
-        let current_uds_fields = vec!["uds_field1".to_string(), "uds_field2".to_string()];
+        let mut current_uds_fields = hashbrown::HashMap::new();
+        current_uds_fields.insert("uds_field1".to_string(), config::meta::stream::DataType::Utf8);
+        current_uds_fields.insert("uds_field2".to_string(), config::meta::stream::DataType::Utf8);
 
         let new_field_names: Vec<String> = new_schema
             .fields()
@@ -864,7 +883,7 @@ mod tests {
             .filter_map(|f| {
                 let field_name = f.name().to_string();
                 if !original_field_names.contains(&field_name)
-                    && !current_uds_fields.contains(&field_name)
+                    && !current_uds_fields.contains_key(&field_name)
                 {
                     Some(field_name)
                 } else {

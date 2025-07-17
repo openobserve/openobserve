@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, fmt::Display};
+use std::{cmp::max, fmt::Display, str::FromStr};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
@@ -30,6 +30,42 @@ use crate::{
         json::{self, Map, Value},
     },
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Default)]
+pub enum DataType {
+    #[serde(rename = "Utf8")]
+    #[default]
+    Utf8,
+    #[serde(rename = "Int64")]
+    Int64,
+    #[serde(rename = "Float64")]
+    Float64,
+}
+
+
+impl Display for DataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DataType::Utf8 => write!(f, "Utf8"),
+            DataType::Int64 => write!(f, "Int64"),
+            DataType::Float64 => write!(f, "Float64"),
+        }
+    }
+}
+
+impl FromStr for DataType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Utf8" => Ok(DataType::Utf8),
+            "Int64" => Ok(DataType::Int64),
+            "Float64" => Ok(DataType::Float64),
+            _ => Err(format!("Unknown data type: {s}")),
+        }
+    }
+}
 
 pub const ALL_STREAM_TYPES: [StreamType; 7] = [
     StreamType::Logs,
@@ -577,7 +613,7 @@ pub struct UpdateStreamSettings {
     #[serde(skip_serializing_if = "Option::None", default)]
     pub flatten_level: Option<i64>,
     #[serde(default)]
-    pub defined_schema_fields: UpdateSettingsWrapper<String>,
+    pub defined_schema_fields: UpdateSettingsWrapper<HashMap<String, DataType>>,
     #[serde(default)]
     pub distinct_value_fields: UpdateSettingsWrapper<String>,
     #[serde(default)]
@@ -706,7 +742,7 @@ pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub flatten_level: Option<i64>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub defined_schema_fields: Vec<String>,
+    pub defined_schema_fields: HashMap<String, DataType>,
     #[serde(default)]
     pub max_query_range: i64, // hours
     #[serde(default)]
@@ -757,10 +793,7 @@ impl Serialize for StreamSettings {
         state.serialize_field("disable_distinct_fields", &self.enable_distinct_fields)?;
 
         if !self.defined_schema_fields.is_empty() {
-            let mut fields = self.defined_schema_fields.clone();
-            fields.sort_unstable();
-            fields.dedup();
-            state.serialize_field("defined_schema_fields", &fields)?;
+            state.serialize_field("defined_schema_fields", &self.defined_schema_fields)?;
         } else {
             state.skip_field("defined_schema_fields")?;
         }
@@ -841,18 +874,14 @@ impl From<&str> for StreamSettings {
             max_query_range = v.as_i64().unwrap();
         };
 
-        let mut defined_schema_fields = Vec::<String>::new();
+        let mut defined_schema_fields = HashMap::new();
         if let Some(value) = settings.get("defined_schema_fields") {
-            let mut fields = value
-                .as_array()
+            defined_schema_fields = value
+                .as_object()
                 .unwrap()
                 .iter()
-                .map(|item| item.as_str().unwrap().to_string())
-                .collect::<Vec<_>>();
-
-            fields.sort_unstable();
-            fields.dedup();
-            defined_schema_fields = fields;
+                .map(|(k, v)| (k.to_string(), DataType::from_str(v.as_str().unwrap()).unwrap()))
+                .collect::<HashMap<_, _>>();
         }
 
         let flatten_level = settings.get("flatten_level").map(|v| v.as_i64().unwrap());

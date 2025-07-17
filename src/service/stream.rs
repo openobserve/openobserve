@@ -275,11 +275,14 @@ pub async fn save_stream_settings(
     if let Some(f) = &settings
         .defined_schema_fields
         .iter()
-        .find(|field| !is_valid_field_name(field))
+        .find(|(field_name, _)| !is_valid_field_name(field_name))
     {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,
-            format!("Field name '{f}' is invalid. Field names must start with a letter or underscore and contain only alphanumeric characters and underscores.")
+            format!(
+                "Field name '{}' is invalid. Field names must start with a letter or underscore and contain only alphanumeric characters and underscores.",
+                f.0
+            ),
         )));
     }
 
@@ -448,26 +451,28 @@ pub async fn update_stream_settings(
                     )));
                 }
 
-                if let Some(f) = &new_settings
-                    .defined_schema_fields
-                    .add
-                    .iter()
-                    .find(|field| !is_valid_field_name(field))
-                {
-                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                        http::StatusCode::BAD_REQUEST,
-                        format!("Field name '{f}' is invalid. Field names must start with a letter or underscore and contain only alphanumeric characters and underscores.")
-                    )));
+                for schema_fields in &new_settings.defined_schema_fields.add {
+                    if let Some(f) = schema_fields
+                        .iter()
+                        .find(|(field_name, _)| !is_valid_field_name(field_name))
+                    {
+                        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                            http::StatusCode::BAD_REQUEST,
+                            format!("Field name '{}' is invalid. Field names must start with a letter or underscore and contain only alphanumeric characters and underscores.", f.0)
+                        )));
+                    }
                 }
 
-                settings
-                    .defined_schema_fields
-                    .extend(new_settings.defined_schema_fields.add);
+                for schema_fields in new_settings.defined_schema_fields.add {
+                    settings.defined_schema_fields.extend(schema_fields);
+                }
             }
             if !new_settings.defined_schema_fields.remove.is_empty() {
-                settings
-                    .defined_schema_fields
-                    .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
+                for schema_fields in new_settings.defined_schema_fields.remove {
+                    for field_name in schema_fields.keys() {
+                        settings.defined_schema_fields.remove(field_name);
+                    }
+                }
             }
             if settings.defined_schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
