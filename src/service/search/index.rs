@@ -217,6 +217,12 @@ impl IndexCondition {
             _ => unreachable!("get_str_match_condition only support one str_match condition"),
         }
     }
+
+    // use for check if the index condition is only
+    // for the condition that query without filter
+    pub fn is_condition_all(&self) -> bool {
+        self.conditions.len() == 1 && matches!(self.conditions[0], Condition::All())
+    }
 }
 
 // single condition

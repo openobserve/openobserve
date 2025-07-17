@@ -126,7 +126,9 @@ pub async fn search(
     );
 
     // check inverted index
-    let use_inverted_index = query.use_inverted_index && index_condition.is_some();
+    let use_inverted_index = query.use_inverted_index
+        && index_condition.is_some()
+        && !index_condition.as_ref().unwrap().is_condition_all();
     if use_inverted_index {
         log::info!(
             "[trace_id {}] flight->search: use_inverted_index with tantivy format {}",
@@ -138,19 +140,6 @@ pub async fn search(
     let mut idx_took = 0;
     let mut is_add_filter_back = false;
     if use_inverted_index {
-        // reset idx_optimize_rule to None if not simple select or None
-        let idx_optimize_rule = if !matches!(
-            idx_optimize_rule,
-            Some(IndexOptimizeMode::SimpleSelect(..)) | None
-        ) {
-            log::warn!(
-                "[trace_id {}] search->storage: simple select without filter, skip inverted index, use_inverted_index: {use_inverted_index}",
-                query.trace_id
-            );
-            None
-        } else {
-            idx_optimize_rule
-        };
         (idx_took, is_add_filter_back, ..) = filter_file_list_by_tantivy_index(
             query.clone(),
             &mut files,
