@@ -183,6 +183,6 @@ test.describe("Streaming for logs", () => {
     await pageManager.logsPage.clearAndFillQueryEditor('SELECT count(_timestamp)  FROM "default" where code = 201');
     await page.waitForTimeout(1000);
     await pageManager.logsPage.selectRunQuery();
-    await pageManager.logsPage.expectNoDataFoundForHistogram();
+    await pageManager.streamsPage.expectNoDataFoundForHistogram();
   });
 }); 
