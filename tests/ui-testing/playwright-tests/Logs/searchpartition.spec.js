@@ -1,5 +1,6 @@
 import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
+import logsdata from "../../../test-data/logs_data.json";
 import PageManager from '../../pages/page-manager.js';
 
 test.describe.configure({ mode: "parallel" });
@@ -34,12 +35,7 @@ async function ingestTestData(page) {
     "Content-Type": "application/json",
   };
 
-  const logsdata = {
-    level: "info",
-    job: "test",
-    log: "test message",
-    e2e: "1",
-  };
+
 
   const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
     const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
