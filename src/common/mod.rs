@@ -15,5 +15,4 @@
 
 pub mod infra;
 pub mod meta;
-pub mod migration;
 pub mod utils;

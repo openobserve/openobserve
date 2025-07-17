@@ -20,7 +20,7 @@ use datafusion::arrow::datatypes::Schema;
 use crate::{
     db::{
         IndexStatement,
-        mysql::{CLIENT, create_index},
+        mysql::{CLIENT, CLIENT_DDL, create_index},
     },
     errors::{Error, Result},
 };
@@ -90,7 +90,7 @@ INSERT IGNORE INTO schema_history (org, stream_type, stream_name, start_dt, valu
 }
 
 pub async fn create_table() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     DB_QUERY_NUMS
         .with_label_values(&["create", "schema_history", ""])
         .inc();
