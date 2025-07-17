@@ -1686,9 +1686,6 @@ export default defineComponent({
         visualizeChartData.value = JSON.parse(
           JSON.stringify(dashboardPanelData.data),
         );
-
-        // set fields extraction loading to false
-        variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
       }
     };
 
@@ -1756,6 +1753,26 @@ export default defineComponent({
     provide(
       "variablesAndPanelsDataLoadingState",
       variablesAndPanelsDataLoadingState,
+    );
+
+    // ---------------------------------------------------------------------
+    // WATCHERS
+    // ---------------------------------------------------------------------
+
+    // Reset the `fieldsExtractionLoading` flag the moment the first search
+    // request (for data retrieval) is issued. This is detected via the
+    // presence of at least one trace-id recorded in
+    // `variablesAndPanelsDataLoadingState.searchRequestTraceIds`.
+    watch(
+      () =>
+        Object.values(
+          variablesAndPanelsDataLoadingState?.searchRequestTraceIds ?? {},
+        )?.flat()?.length,
+      (totalActiveTraceIds) => {
+        if (totalActiveTraceIds > 0) {
+          variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+        }
+      },
     );
 
     // [END] cancel running queries
