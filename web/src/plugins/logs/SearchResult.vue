@@ -323,7 +323,11 @@ import { useI18n } from "vue-i18n";
 
 import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
-import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
+import {
+  deepCopy,
+  getImageURL,
+  useLocalWrapContent,
+} from "../../utils/zincutils";
 import useLogs from "../../composables/useLogs";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";

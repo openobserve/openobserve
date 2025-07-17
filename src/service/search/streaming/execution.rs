@@ -315,6 +315,7 @@ pub async fn get_partitions(
         query_fn: Default::default(),
         streaming_output: true,
         histogram_interval: req.query.histogram_interval,
+        search_type: req.search_type,
     };
 
     let res = SearchService::search_partition(

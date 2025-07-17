@@ -901,45 +901,9 @@ const useLogs = () => {
           // showErrorNotification("Start time cannot be greater than end time");
           return false;
         }
-        searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
 
         req.query.start_time = timestamps.startTime;
         req.query.end_time = timestamps.endTime;
-
-        searchObj.meta.resultGrid.chartInterval = "10 second";
-        if (req.query.end_time - req.query.start_time >= 1000000 * 60 * 30) {
-          searchObj.meta.resultGrid.chartInterval = "15 second";
-          searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-        }
-        if (req.query.end_time - req.query.start_time >= 1000000 * 60 * 60) {
-          searchObj.meta.resultGrid.chartInterval = "30 second";
-          searchObj.meta.resultGrid.chartKeyFormat = "HH:mm:ss";
-        }
-        if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 2) {
-          searchObj.meta.resultGrid.chartInterval = "1 minute";
-          searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-        }
-        if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 6) {
-          searchObj.meta.resultGrid.chartInterval = "5 minute";
-          searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-        }
-        if (req.query.end_time - req.query.start_time >= 1000000 * 3600 * 24) {
-          searchObj.meta.resultGrid.chartInterval = "30 minute";
-          searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-        }
-        if (req.query.end_time - req.query.start_time >= 1000000 * 86400 * 7) {
-          searchObj.meta.resultGrid.chartInterval = "1 hour";
-          searchObj.meta.resultGrid.chartKeyFormat = "MM-DD HH:mm";
-        }
-        if (req.query.end_time - req.query.start_time >= 1000000 * 86400 * 30) {
-          searchObj.meta.resultGrid.chartInterval = "1 day";
-          searchObj.meta.resultGrid.chartKeyFormat = "YYYY-MM-DD";
-        }
-
-        req.aggs.histogram = req.aggs.histogram.replaceAll(
-          "[INTERVAL]",
-          searchObj.meta.resultGrid.chartInterval,
-        );
       } else {
         notificationMsg.value = "Invalid date format";
         return false;
@@ -1307,6 +1271,7 @@ const useLogs = () => {
               query: partitionQueryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
+              searchType: "ui",
             })
             .then(async (res: any) => {
               //this is called to get data into partitions array
@@ -1806,6 +1771,15 @@ const useLogs = () => {
         resetQueryData();
         searchObjDebug["partitionStartTime"] = performance.now();
         await getQueryPartitions(queryReq);
+
+        if(!queryReq.query?.streaming_output && searchObj.data.queryResults.histogram_interval) {
+          queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
+        }
+
+        if(searchObj.data.queryResults.histogram_interval) {
+          queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
+        }
+
         searchObjDebug["partitionEndTime"] = performance.now();
       }
 
@@ -2247,13 +2221,7 @@ const useLogs = () => {
     ) {
       histogramResults = [];
       histogramMappedData = [];
-      const intervalMs: any =
-        intervalMap[searchObj.meta.resultGrid.chartInterval];
-      if (!intervalMs) {
-        throw new Error("Invalid interval");
-      }
-      searchObj.data.histogramInterval = intervalMs;
-      const date = new Date();
+
       const startTimeDate = new Date(
         searchObj.data.customDownloadQueryObj.query.start_time / 1000,
       ); // Convert microseconds to milliseconds
@@ -2981,6 +2949,13 @@ const useLogs = () => {
 
       const dismiss = () => {};
       try {
+
+        // Replace interval in histogram query
+        searchObj.data.histogramQuery.query.sql = searchObj.data.histogramQuery.query.sql.replaceAll("[INTERVAL]", searchObj.data.queryResults.histogram_interval + " seconds");
+
+        // Set histogram interval
+        searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
+
         const { traceparent, traceId } = generateTraceContext();
         addTraceId(traceId);
         queryReq.query.size = -1;
