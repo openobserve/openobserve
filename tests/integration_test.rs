@@ -32,6 +32,7 @@ mod tests {
         utils::json,
     };
     use openobserve::{
+        common::meta::ingestion::IngestionResponse,
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
             http::{
@@ -146,6 +147,7 @@ mod tests {
         e2e_post_multi().await;
         e2e_post_trace().await;
         e2e_post_metrics().await;
+        e2e_post_hec().await;
         // e2e_post_kinesis_data().await;
 
         // streams
@@ -291,7 +293,7 @@ mod tests {
 
     async fn e2e_post_json() {
         let auth = setup();
-        let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":1665136888163792}]";
+
         let thread_id: usize = 0;
         let app = test::init_service(
             App::new()
@@ -304,8 +306,150 @@ mod tests {
                 .configure(get_basic_routes),
         )
         .await;
+
+        // timestamp in past
+        let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":1665136888163792}]";
         let req = test::TestRequest::post()
             .uri(&format!("/api/{}/{}/_json", "e2e", "olympics_schema"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let res: IngestionResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(res.code, 200);
+        assert_eq!(res.status.len(), 1);
+        assert_eq!(res.status[0].status.successful, 0);
+        assert_eq!(res.status[0].status.failed, 1);
+        assert!(res.status[0].status.error.contains("Too old data"));
+        assert!(
+            res.status[0]
+                .status
+                .error
+                .contains("ZO_INGEST_ALLOWED_UPTO=")
+        );
+
+        // timestamp in future
+        let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":9999999999999999}]";
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/{}/_json", "e2e", "olympics_schema"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let res: IngestionResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(res.code, 200);
+        assert_eq!(res.status.len(), 1);
+        assert_eq!(res.status[0].status.successful, 0);
+        assert_eq!(res.status[0].status.failed, 1);
+        assert!(res.status[0].status.error.contains("Too far data"));
+        assert!(
+            res.status[0]
+                .status
+                .error
+                .contains("ZO_INGEST_ALLOWED_IN_FUTURE=")
+        );
+
+        // timestamp not present
+        let body_str = "[{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\"}]";
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/{}/_json", "e2e", "olympics_schema"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let res: IngestionResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(res.code, 200);
+        assert_eq!(res.status.len(), 1);
+        assert_eq!(res.status[0].status.successful, 1);
+        assert_eq!(res.status[0].status.failed, 0);
+
+        // timestamp just right
+        let ts = chrono::Utc::now().timestamp_micros();
+        let body_str = format!(
+            "[{{\"Year\": 1896, \"City\": \"Athens\", \"Sport\": \"Aquatics\", \"Discipline\": \"Swimming\", \"Athlete\": \"HERSCHMANN, Otto\", \"Country\": \"AUT\", \"Gender\": \"Men\", \"Event\": \"100M Freestyle\", \"Medal\": \"Silver\", \"Season\": \"summer\",\"_timestamp\":{ts}}}]"
+        );
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/{}/_json", "e2e", "olympics_schema"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let res: IngestionResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(res.code, 200);
+        assert_eq!(res.status.len(), 1);
+        assert_eq!(res.status[0].status.successful, 1);
+        assert_eq!(res.status[0].status.failed, 0);
+    }
+
+    async fn e2e_post_hec() {
+        let auth = setup();
+        let thread_id: usize = 0;
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .app_data(web::Data::new(thread_id))
+                .configure(get_service_routes)
+                .configure(get_basic_routes),
+        )
+        .await;
+
+        // test case : missing index in metadata
+        let body_str = "{\"event\":\"hello\"}";
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/_hec", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // test case : valid payload
+        let body_str = "{\"event\":\"hello\",\"index\":\"hec_test\"}";
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/_hec", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // test case : json event
+        let body_str =
+            "{\"event\":{\"log\":\"hello\",\"severity\":\"info\"},\"index\":\"hec_test\"}";
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/_hec", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // test case : ndjson
+        let body_str = r#"
+                { "index": "hec_test", "event": "test log", "time": 1749113798091 }
+                { "index": "hec_test", "event": {"log":"test log","severity":"info"}, "fields": {"cluster":"c1", "namespace":"n1"} }
+                { "index": "hec_test", "event": {"log":"test log","severity":"info"}, "source" : "e2e_test", "fields": {"cluster":"c1", "namespace":"n1"}}
+            "#;
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/_hec", "e2e"))
             .insert_header(ContentType::json())
             .append_header(auth)
             .set_payload(body_str)
