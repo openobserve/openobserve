@@ -1,16 +1,10 @@
 import { test, expect } from "../baseFixtures.js";
-import { login } from "../utils/dashLogin.js";
-import { ingestionForMaps } from "../utils/dashIngestion.js";
+import { login } from "./utils/dashLogin.js";
+import { ingestionForMaps } from "./utils/dashIngestion.js";
 
-import {
-  waitForDashboardPage,
-  deleteDashboard,
-} from "../utils/dashCreation.js";
+import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
-import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart.js";
-import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
-import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
-import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
+import PageManager from "../../pages/page-manager";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -29,30 +23,28 @@ test.describe("dashboard maps testcases", () => {
   test("Should display the correct location when entering latitude and longitude values", async ({
     page,
   }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardPageActions = new DashboardactionPage(page);
+    // Instantiate PageManager with the current page
+    const pm = new PageManager(page);
 
     // select dashboard
-    await dashboardPage.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
 
     // Wait for dashboard page
     await waitForDashboardPage(page);
 
     // Add new dashboard
-    await dashboardCreate.createDashboard(randomDashboardName);
-    await dashboardCreate.addPanel();
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.addPanel();
 
-    await chartTypeSelector.selectChartType("maps");
+    await pm.chartTypeSelector.selectChartType("maps");
 
     // Add new dashboard
-    await chartTypeSelector.selectStreamType("logs");
-    await chartTypeSelector.selectStream("geojson");
+    await pm.chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStream("geojson");
 
-    await chartTypeSelector.searchAndAddField("country", "x");
-    await chartTypeSelector.searchAndAddField("ip", "y");
-    await chartTypeSelector.searchAndAddField("country", "filter");
+    await pm.chartTypeSelector.searchAndAddField("country", "x");
+    await pm.chartTypeSelector.searchAndAddField("ip", "y");
+    await pm.chartTypeSelector.searchAndAddField("country", "filter");
 
     // Apply Country Filter
     const conditionLabel = page.locator(
@@ -68,9 +60,9 @@ test.describe("dashboard maps testcases", () => {
 
     // Apply Dashboard Changes
 
-    await dashboardPageActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
-    await dashboardPageActions.waitForChartToRender();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Click on Map at Specific Position
     await page
@@ -79,8 +71,8 @@ test.describe("dashboard maps testcases", () => {
 
     // Save panel
 
-    await dashboardPageActions.addPanelName(randomDashboardName);
-    await dashboardPageActions.savePanel();
+    await pm.dashboardPanelActions.addPanelName(randomDashboardName);
+    await pm.dashboardPanelActions.savePanel();
 
     // Delete Dashboard
     await page.locator('[data-test="dashboard-back-btn"]').click();

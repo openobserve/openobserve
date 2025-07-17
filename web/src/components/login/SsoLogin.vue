@@ -5,9 +5,9 @@
         class="appLogo"
         style="width: 250px; height: auto"
         :src="
-          store?.state?.theme == 'dark'
-            ? getImageURL('images/common/open_observe_logo_2.svg')
-            : getImageURL('images/common/open_observe_logo.svg')
+          store.state.theme == 'dark'
+            ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+            : getImageURL('images/common/openobserve_latest_light_2.svg')
         "
       />
     </div>

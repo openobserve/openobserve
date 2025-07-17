@@ -25,11 +25,7 @@ import {
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
-import {
-  addLabelsToSQlQuery,
-  changeHistogramInterval,
-  convertQueryIntoSingleLine,
-} from "@/utils/query/sqlUtils";
+import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
   formatInterval,
@@ -337,20 +333,29 @@ export const usePanelDataLoader = (
   };
 
   const cancelQueryAbort = () => {
+    // Only set isPartialData to true if the panel was still loading
+    if (state.loading) {
+      state.isPartialData = true; // Set to true when cancelled
+    }
     state.loading = false;
     state.isOperationCancelled = true;
-    state.isPartialData = true; // Set to true when cancelled
 
     if (
       isStreamingEnabled(store.state) &&
       state.searchRequestTraceIds?.length > 0
     ) {
-      state.searchRequestTraceIds.forEach((traceId) => {
-        cancelStreamQueryBasedOnRequestId({
-          trace_id: traceId,
-          org_id: store?.state?.selectedOrganization?.identifier,
+      try {
+        state.searchRequestTraceIds.forEach((traceId) => {
+          cancelStreamQueryBasedOnRequestId({
+            trace_id: traceId,
+            org_id: store?.state?.selectedOrganization?.identifier,
+          });
         });
-      });
+      } catch (error) {
+        console.error("Error during Stream cleanup:", error);
+      } finally {
+        state.searchRequestTraceIds = [];
+      }
     }
 
     if (
@@ -381,23 +386,18 @@ export const usePanelDataLoader = (
     it: any,
     startISOTimestamp: string,
     endISOTimestamp: string,
-    histogramInterval: string | null,
+    histogramInterval: number | null | undefined,
   ) => {
-    const sql = store.state.zoConfig.sql_base64_enabled
-      ? b64EncodeUnicode(
-          await changeHistogramInterval(query, histogramInterval ?? null),
-        )
-      : await changeHistogramInterval(query, histogramInterval ?? null);
     return {
-      sql,
+      sql: query,
       query_fn: it.vrlFunctionQuery
         ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
         : null,
-      sql_mode: "full",
       // if i == 0 ? then do gap of 7 days
       start_time: startISOTimestamp,
       end_time: endISOTimestamp,
       size: -1,
+      histogram_interval: histogramInterval ?? undefined,
     };
   };
 
@@ -435,7 +435,6 @@ export const usePanelDataLoader = (
               query_fn: it.vrlFunctionQuery
                 ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                 : null,
-              sql_mode: "full",
               start_time: startISOTimestamp,
               end_time: endISOTimestamp,
               size: -1,
@@ -448,6 +447,9 @@ export const usePanelDataLoader = (
         abortControllerRef.signal,
       );
 
+      if (shouldSkipSearchDueToEmptyVariables()) {
+        return;
+      }
       // if aborted, return
       if (abortControllerRef?.signal?.aborted) {
         // Set partial data when partition API call is interrupted
@@ -478,9 +480,7 @@ export const usePanelDataLoader = (
       const max_query_range = res?.data?.max_query_range ?? 0;
 
       // histogram_interval from partition api response
-      const histogramInterval = res?.data?.histogram_interval
-        ? `${res?.data?.histogram_interval} seconds`
-        : null;
+      const histogramInterval = res?.data?.histogram_interval ?? undefined;
 
       // Add empty objects to state.resultMetaData for the results of this query
       state.data.push([]);
@@ -798,12 +798,7 @@ export const usePanelDataLoader = (
 
       if (response.type === "event_progress") {
         state.loadingProgressPercentage = response?.content?.percent ?? 0;
-        // Only set isPartialData to true if we're still loading and progress is not 100%
-        if (state.loading && state.loadingProgressPercentage < 100) {
-          state.isPartialData = true;
-        } else if (state.loadingProgressPercentage === 100) {
-          state.isPartialData = false;
-        }
+        state.isPartialData = true;
         saveCurrentStateToCache();
       }
     } catch (error: any) {
@@ -835,13 +830,15 @@ export const usePanelDataLoader = (
       content: {
         trace_id: payload.traceId,
         payload: {
-          query: await getHistogramSearchRequest(
-            payload.queryReq.query,
-            payload.queryReq.it,
-            payload.queryReq.startISOTimestamp,
-            payload.queryReq.endISOTimestamp,
-            null,
-          ),
+          query: {
+            ...(await getHistogramSearchRequest(
+              payload.queryReq.query,
+              payload.queryReq.it,
+              payload.queryReq.startISOTimestamp,
+              payload.queryReq.endISOTimestamp,
+              null,
+            )),
+          },
           // pass encodig if enabled,
           // make sure that `encoding: null` is not being passed, that's why used object extraction logic
           ...(store.state.zoConfig.sql_base64_enabled
@@ -883,11 +880,7 @@ export const usePanelDataLoader = (
     // set loading to false
     state.loading = false;
     state.isOperationCancelled = false;
-    // Only set isPartialData to true if we haven't received complete data
-    if (state.loadingProgressPercentage < 100) {
-      state.isPartialData = true;
-    }
-
+    state.isPartialData = false;
     // save current state to cache
     // this is async task, which will be executed in background(await is not required)
     saveCurrentStateToCache();
@@ -925,7 +918,6 @@ export const usePanelDataLoader = (
         (v) =>
           v.value === null ||
           v.value === undefined ||
-          v.value === "" ||
           (Array.isArray(v.value) && v.value.length === 0),
       )
       .map((v) => v.name);
@@ -1028,13 +1020,15 @@ export const usePanelDataLoader = (
         meta: any;
       } = {
         queryReq: {
-          query: await getHistogramSearchRequest(
-            query,
-            it,
-            startISOTimestamp,
-            endISOTimestamp,
-            null,
-          ),
+          query: {
+            ...(await getHistogramSearchRequest(
+              query,
+              it,
+              startISOTimestamp,
+              endISOTimestamp,
+              null,
+            )),
+          },
         },
         type: "histogram",
         isPagination: false,
@@ -1144,6 +1138,20 @@ export const usePanelDataLoader = (
 
       state.lastTriggeredAt = new Date().getTime();
 
+      if (runCount == 0) {
+        log("loadData: panelcache: run count is 0");
+        // restore from the cache and return
+        const isRestoredFromCache = await restoreFromCache();
+        log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
+        if (isRestoredFromCache) {
+          state.loading = false;
+          state.isOperationCancelled = false;
+          log("loadData: panelcache: restored from cache");
+          runCount++;
+          return;
+        }
+      }
+
       // Wait for isVisible to become true
       await waitForThePanelToBecomeVisible(abortController.signal);
 
@@ -1169,20 +1177,6 @@ export const usePanelDataLoader = (
         endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
       } else {
         return;
-      }
-
-      if (runCount == 0) {
-        log("loadData: panelcache: run count is 0");
-        // restore from the cache and return
-        const isRestoredFromCache = await restoreFromCache();
-        log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
-        if (isRestoredFromCache) {
-          state.loading = false;
-          state.isOperationCancelled = false;
-          log("loadData: panelcache: restored from cache");
-          runCount++;
-          return;
-        }
       }
 
       log(
@@ -1393,7 +1387,6 @@ export const usePanelDataLoader = (
                               query_fn: it.vrlFunctionQuery
                                 ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
                                 : null,
-                              sql_mode: "full",
                               start_time: startISOTimestamp,
                               end_time: endISOTimestamp,
                               per_query_response: true,
@@ -1507,8 +1500,7 @@ export const usePanelDataLoader = (
                   panelSchema.value.queryType,
                 );
 
-              // convert query into single line
-              const query = await convertQueryIntoSingleLine(query2);
+              const query = query2;
 
               const metadata: any = {
                 originalQuery: it.query,
@@ -1522,7 +1514,9 @@ export const usePanelDataLoader = (
                   periodAsStr: "",
                 },
               };
-
+              if (shouldSkipSearchDueToEmptyVariables()) {
+                return;
+              }
               state.metadata.queries[panelQueryIndex] = metadata;
               const annotations = shouldFetchAnnotations()
                 ? await refreshAnnotations(
@@ -2291,23 +2285,21 @@ export const usePanelDataLoader = (
     // cancel http2 queries using http streaming api
     if (
       isStreamingEnabled(store.state) &&
-      state.searchRequestTraceIds?.length > 0
+      state.searchRequestTraceIds?.length > 0 &&
+      state.loading &&
+      !state.isOperationCancelled
     ) {
       try {
-        // Only set isPartialData if we're still loading or haven't received complete response
-        // AND we haven't already marked it as complete
-        if (
-          (state.loading || state.loadingProgressPercentage < 100) &&
-          !state.isOperationCancelled
-        ) {
-          state.isPartialData = true;
-        }
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelStreamQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
           });
         });
+        queryService.delete_running_queries(
+          store?.state?.selectedOrganization?.identifier,
+          state.searchRequestTraceIds,
+        );
       } catch (error) {
         console.error("Error during HTTP2 cleanup:", error);
       } finally {
@@ -2318,23 +2310,21 @@ export const usePanelDataLoader = (
     // Cancel WebSocket queries
     if (
       isWebSocketEnabled(store.state) &&
-      state.searchRequestTraceIds?.length > 0
+      state.searchRequestTraceIds?.length > 0 &&
+      state.loading &&
+      !state.isOperationCancelled
     ) {
       try {
-        // Only set isPartialData if we're still loading or haven't received complete response
-        // AND we haven't already marked it as complete
-        if (
-          (state.loading || state.loadingProgressPercentage < 100) &&
-          !state.isOperationCancelled
-        ) {
-          state.isPartialData = true;
-        }
         state.searchRequestTraceIds.forEach((traceId) => {
           cancelSearchQueryBasedOnRequestId({
             trace_id: traceId,
             org_id: store?.state?.selectedOrganization?.identifier,
           });
         });
+        queryService.delete_running_queries(
+          store?.state?.selectedOrganization?.identifier,
+          state.searchRequestTraceIds,
+        );
       } catch (error) {
         console.error("Error during WebSocket cleanup:", error);
       } finally {

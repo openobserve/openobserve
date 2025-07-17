@@ -170,6 +170,15 @@ pub fn is_field(e: &Expr) -> bool {
     matches!(e, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
 }
 
+// Note: the expr should be Identifier or CompoundIdentifier
+pub fn get_field_name(expr: &Expr) -> String {
+    match expr {
+        Expr::Identifier(ident) => trim_quotes(ident.to_string().as_str()),
+        Expr::CompoundIdentifier(ident) => trim_quotes(ident[1].to_string().as_str()),
+        _ => unreachable!(),
+    }
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn collect_scan_stats(
     nodes: &[Arc<dyn NodeInfo>],

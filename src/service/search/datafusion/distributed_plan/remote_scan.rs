@@ -56,14 +56,12 @@ use tonic::{
     metadata::{MetadataKey, MetadataValue},
 };
 
-use super::{
-    codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
-    node::RemoteScanNode,
-};
+use super::node::RemoteScanNode;
 use crate::service::{
     grpc::get_cached_channel,
     search::{
         MetadataMap,
+        datafusion::distributed_plan::codec::get_physical_extension_codec,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
 };
@@ -89,9 +87,7 @@ impl RemoteScanExec {
         let cache = Self::compute_properties(Arc::clone(&input.schema()), output_partitions);
 
         // serialize the input plan and set it as the plan for the remote scan node
-        let proto = ComposedPhysicalExtensionCodec {
-            codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
-        };
+        let proto = get_physical_extension_codec();
         let physical_plan_bytes =
             physical_plan_to_bytes_with_extension_codec(input.clone(), &proto)?;
         remote_scan_node.set_plan(physical_plan_bytes.to_vec());
@@ -127,16 +123,12 @@ impl RemoteScanExec {
 }
 
 impl DisplayAs for RemoteScanExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match t {
-            DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                write!(
-                    f,
-                    "RemoteScanExec: input_partitions=output_partitions={}",
-                    self.partitions,
-                )
-            }
-        }
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "RemoteScanExec: input_partitions=output_partitions={}",
+            self.partitions,
+        )
     }
 }
 
@@ -164,9 +156,15 @@ impl ExecutionPlan for RemoteScanExec {
 
     fn with_new_children(
         self: Arc<Self>,
-        _: Vec<Arc<dyn ExecutionPlan>>,
+        children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        Ok(self)
+        if children.is_empty() {
+            return Ok(self);
+        }
+        Ok(Arc::new(Self::new(
+            children[0].clone(),
+            self.remote_scan_node.clone(),
+        )?))
     }
 
     fn execute(
@@ -243,7 +241,7 @@ async fn get_remote_batch(
     request.search_info.timeout = timeout as i64;
 
     log::info!(
-        "[trace_id {}] flight->search: request node: {}, query_type: {}, is_super: {}, is_querier: {}, timeout: {}, files: {}, idx_files: {}",
+        "[trace_id {}] flight->search: request node: {}, query_type: {}, is_super: {}, is_querier: {}, timeout: {}, files: {}",
         trace_id,
         &node.get_grpc_addr(),
         search_type.unwrap_or(SearchEventType::UI),
@@ -251,7 +249,6 @@ async fn get_remote_batch(
         is_querier,
         timeout,
         request.search_info.file_id_list.len(),
-        request.search_info.idx_file_list.len(),
     );
 
     let request: cluster_rpc::FlightSearchRequest = request.into();
@@ -472,7 +469,7 @@ fn process_partial_err(partial_err: Arc<Mutex<String>>, e: tonic::Status) {
     if partial_err.is_empty() {
         guard.push_str(e.to_string().as_str());
     } else {
-        guard.push_str(format!(" \n {}", e).as_str());
+        guard.push_str(format!(" \n {e}").as_str());
     }
 }
 
@@ -652,10 +649,10 @@ impl Stream for FlightStream {
 impl Drop for FlightStream {
     fn drop(&mut self) {
         let cfg = config::get_config();
-        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
-            if let Err(e) = self.create_stream_end_span() {
-                log::error!("error creating stream span: {}", e);
-            }
+        if (cfg.common.tracing_enabled || cfg.common.tracing_search_enabled)
+            && let Err(e) = self.create_stream_end_span()
+        {
+            log::error!("error creating stream span: {e}");
         }
         log::info!(
             "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",

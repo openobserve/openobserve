@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster::LOCAL_NODE, meta::cluster::NodeInfo};
+use config::{cluster::LOCAL_NODE, get_config, meta::cluster::NodeInfo};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -118,6 +118,14 @@ impl SearchInspectorFieldsBuilder {
 }
 
 pub fn search_inspector_fields(msg: String, kvs: SearchInspectorFields) -> String {
+    if !get_config().common.search_inspector_enabled {
+        return msg;
+    }
+
+    search_inspector_fields_inner(msg, kvs)
+}
+
+fn search_inspector_fields_inner(msg: String, kvs: SearchInspectorFields) -> String {
     if msg.is_empty() {
         return msg;
     }
@@ -131,12 +139,12 @@ pub fn search_inspector_fields(msg: String, kvs: SearchInspectorFields) -> Strin
 }
 
 pub fn extract_search_inspector_fields(msg: &str) -> Option<SearchInspectorFields> {
-    if let Some(start) = msg.find(" #{\"") {
-        if let Some(end) = msg[start..].find("}#") {
-            let json_str = &msg[start + 2..start + end + 1];
-            if let Ok(fields) = serde_json::from_str::<SearchInspectorFields>(json_str) {
-                return Some(fields);
-            }
+    if let Some(start) = msg.find(" #{\"")
+        && let Some(end) = msg[start..].find("}#")
+    {
+        let json_str = &msg[start + 2..start + end + 1];
+        if let Ok(fields) = serde_json::from_str::<SearchInspectorFields>(json_str) {
+            return Some(fields);
         }
     }
     None
@@ -154,7 +162,7 @@ mod tests {
             .component("search".to_string())
             .build();
 
-        let result = search_inspector_fields(msg.clone(), fields);
+        let result = search_inspector_fields_inner(msg.clone(), fields);
         assert!(result.contains("test message"));
         assert!(result.contains("\"duration\":100"));
         assert!(result.contains("\"component\":\"search\""));

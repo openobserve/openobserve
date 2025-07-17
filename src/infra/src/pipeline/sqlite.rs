@@ -158,13 +158,13 @@ INSERT INTO pipeline (id, version, enabled, name, description, org, source_type,
             }
         } {
             if let Err(e) = tx.rollback().await {
-                log::error!("[SQLITE] rollback push pipeline error: {}", e);
+                log::error!("[SQLITE] rollback push pipeline error: {e}");
             }
             return Err(e.into());
         }
 
         if let Err(e) = tx.commit().await {
-            log::error!("[SQLITE] commit push pipeline error: {}", e);
+            log::error!("[SQLITE] commit push pipeline error: {e}");
             return Err(e.into());
         }
 
@@ -236,13 +236,13 @@ UPDATE pipeline
             }
         } {
             if let Err(e) = tx.rollback().await {
-                log::error!("[SQLITE] rollback push pipeline error: {}", e);
+                log::error!("[SQLITE] rollback push pipeline error: {e}");
             }
             return Err(e.into());
         }
 
         if let Err(e) = tx.commit().await {
-            log::error!("[SQLITE] commit push pipeline error: {}", e);
+            log::error!("[SQLITE] commit push pipeline error: {e}");
             return Err(e.into());
         }
 
@@ -312,7 +312,7 @@ SELECT * FROM pipeline
         {
             Ok(pipelines) => Ok(pipelines),
             Err(e) => {
-                log::debug!("[SQLITE] list all pipelines error: {}", e);
+                log::debug!("[SQLITE] list all pipelines error: {e}");
                 Ok(vec![])
             }
         }
@@ -328,7 +328,7 @@ SELECT * FROM pipeline
         {
             Ok(pipelines) => Ok(pipelines),
             Err(e) => {
-                log::debug!("[SQLITE] list pipeline by org error: {}", e);
+                log::debug!("[SQLITE] list pipeline by org error: {e}");
                 Ok(vec![])
             }
         }
@@ -347,7 +347,7 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
         {
             Ok(pipelines) => Ok(pipelines),
             Err(e) => {
-                log::debug!("[SQLITE] list streams with pipelines error: {}", e);
+                log::debug!("[SQLITE] list streams with pipelines error: {e}");
                 Ok(vec![])
             }
         }
@@ -369,7 +369,7 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
             .await?;
 
         if let Err(e) = tx.commit().await {
-            log::error!("[SQLITE] commit delete pipeline error: {}", e);
+            log::error!("[SQLITE] commit delete pipeline error: {e}");
             return Err(e.into());
         }
 

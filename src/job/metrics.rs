@@ -73,7 +73,7 @@ pub static TRACE_METRICS_CHAN: Lazy<TraceMetricsChan> = Lazy::new(|| {
 pub static TRACE_METRICS_SPAN_HISTOGRAM: Lazy<Histogram<f64>> = Lazy::new(|| {
     let meter = opentelemetry::global::meter("o2");
     meter
-        .f64_histogram(format!("{}_span_duration_milliseconds", NAMESPACE))
+        .f64_histogram(format!("{NAMESPACE}_span_duration_milliseconds"))
         .with_unit("ms")
         .with_description("span duration milliseconds")
         .init()
@@ -86,7 +86,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if config::cluster::LOCAL_NODE.is_ingester() {
         tokio::spawn(async {
             if let Err(e) = traces_metrics_collect().await {
-                log::error!("Error traces_metrics_collect metrics: {}", e);
+                log::error!("Error traces_metrics_collect metrics: {e}");
             }
         });
     }
@@ -96,10 +96,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
     interval.tick().await; // trigger the first run
     loop {
         if let Err(e) = update_metadata_metrics().await {
-            log::error!("Error update metadata metrics: {}", e);
+            log::error!("Error update metadata metrics: {e}");
         }
         if let Err(e) = update_storage_metrics().await {
-            log::error!("Error update storage metrics: {}", e);
+            log::error!("Error update storage metrics: {e}");
         }
         interval.tick().await;
     }
@@ -112,7 +112,7 @@ async fn load_query_cache_limit_bytes() -> Result<(), anyhow::Error> {
         .set(cfg.memory_cache.max_size as i64);
     metrics::QUERY_DISK_CACHE_LIMIT_BYTES
         .with_label_values(&[])
-        .set(cfg.disk_cache.max_size as i64);
+        .set((cfg.disk_cache.max_size * cfg.disk_cache.bucket_num) as i64);
     Ok(())
 }
 
@@ -173,8 +173,8 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     } else {
         metrics::META_NUM_NODES.reset();
         let nodes = get_cached_online_nodes().await;
-        if nodes.is_some() {
-            for node in nodes.unwrap() {
+        if let Some(nodes) = nodes {
+            for node in nodes {
                 if node.is_ingester() {
                     metrics::META_NUM_NODES
                         .with_label_values(&[Role::Ingester.to_string().as_str()])
@@ -322,7 +322,7 @@ pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
             "openobserve",
         )]))
         .with_view(new_view(
-            Instrument::new().name(format!("{}_span_duration_milliseconds", NAMESPACE)),
+            Instrument::new().name(format!("{NAMESPACE}_span_duration_milliseconds")),
             Stream::new().aggregation(Aggregation::ExplicitBucketHistogram {
                 boundaries: SPAN_METRICS_BUCKET.to_vec(),
                 record_min_max: false,

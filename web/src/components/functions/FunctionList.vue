@@ -136,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-pa-sm"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
+        @sendToAiChat="sendToAiChat"
       />
     </div>
     <ConfirmDialog
@@ -228,6 +229,7 @@ export default defineComponent({
     "updated:fields",
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
+    "sendToAiChat"
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -243,8 +245,7 @@ export default defineComponent({
     const confirmDelete = ref<boolean>(false);
     const confirmForceDelete = ref<boolean>(false);
     const { searchObj } = useLogs();
-    const pipelineList = ref([
-    ]);
+    const pipelineList = ref([]);
     const selectedPipeline = ref("");
     const columns: any = ref<QTableProps["columns"]>([
       {
@@ -329,7 +330,7 @@ export default defineComponent({
           dismiss();
         })
         .catch((err) => {
-          console.log("--", err);
+          console.error("Error while pulling function", err);
 
           dismiss();
           if (err.response.status != 403) {
@@ -538,6 +539,10 @@ export default defineComponent({
 
     const forceDeleteFn = () => {};
 
+    const sendToAiChat = (value: any) => {
+      emit("sendToAiChat", value);
+    };
+
     return {
       t,
       qTable,
@@ -587,6 +592,7 @@ export default defineComponent({
       },
       getImageURL,
       verifyOrganizationStatus,
+      sendToAiChat
     };
   },
   computed: {

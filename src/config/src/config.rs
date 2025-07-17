@@ -46,7 +46,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 4;
+pub const DB_SCHEMA_VERSION: u64 = 5;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -66,7 +66,6 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
-pub const INDEX_SEGMENT_LENGTH: usize = 1024; // this can't be change, it will cause segment matching error
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 
 pub const FILE_EXT_JSON: &str = ".json";
@@ -74,11 +73,9 @@ pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
 pub const FILE_EXT_PUFFIN: &str = ".puffin";
 pub const FILE_EXT_TANTIVY: &str = ".ttv";
-pub const FILE_EXT_TANTIVY_FOLDER: &str = ".mmap";
 
 pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
-pub const INDEX_MIN_CHAR_LEN: usize = 3;
 pub const QUERY_WITH_NO_LIMIT: i64 = -999;
 
 pub const MINIMUM_DB_CONNECTIONS: u32 = 2;
@@ -258,6 +255,15 @@ pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::ne
     map
 });
 
+pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
+    get_config()
+        .compact
+        .old_data_streams
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .collect()
+});
+
 pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
@@ -398,7 +404,7 @@ pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
 #[derive(EnvConfig)]
 pub struct Config {
     pub auth: Auth,
-    pub websocket: WebSocket,
+    pub http_streaming: HttpStreaming,
     pub report_server: ReportServer,
     pub http: Http,
     pub grpc: Grpc,
@@ -427,35 +433,7 @@ pub struct Config {
 }
 
 #[derive(EnvConfig)]
-pub struct WebSocket {
-    #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
-    pub enabled: bool,
-    #[env_config(name = "ZO_WEBSOCKET_SESSION_IDLE_TIMEOUT_SECS", default = 300)]
-    pub session_idle_timeout_secs: i64,
-    #[env_config(name = "ZO_WEBSOCKET_SESSION_MAX_LIFETIME_SECS", default = 3600)]
-    pub session_max_lifetime_secs: i64,
-    #[env_config(name = "ZO_WEBSOCKET_SESSION_GC_INTERVAL_SECS", default = 60)]
-    pub session_gc_interval_secs: i64,
-    #[env_config(name = "ZO_WEBSOCKET_PING_INTERVAL_SECS", default = 30)]
-    pub ping_interval_secs: i64,
-    #[env_config(
-        name = "ZO_WEBSOCKET_MAX_FRAME_SIZE",
-        default = 1,
-        help = "Maximum allowed frame size in MB"
-    )]
-    pub max_frame_size: usize,
-    #[env_config(
-        name = "ZO_WEBSOCKET_MAX_CONTINUATION_SIZE",
-        default = 256,
-        help = "Maximum allowed continuation size in MB"
-    )]
-    pub max_continuation_size: usize,
-    #[env_config(
-        name = "ZO_WEBSOCKET_CHANNEL_BUFFER_SIZE",
-        default = 100,
-        help = "Maximum allowed number of messages in buffer"
-    )]
-    pub max_channel_buffer_size: usize,
+pub struct HttpStreaming {
     #[env_config(
         name = "ZO_STREAMING_RESPONSE_CHUNK_SIZE_MB",
         default = 1,
@@ -867,6 +845,7 @@ pub struct Common {
     pub print_key_event: bool,
     #[env_config(name = "ZO_PRINT_KEY_SQL", default = false)]
     pub print_key_sql: bool,
+    // usage reporting
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
     pub usage_enabled: bool,
     #[env_config(
@@ -891,6 +870,7 @@ pub struct Common {
     )]
     // in seconds
     pub usage_publish_interval: i64,
+    // MMDB
     #[env_config(name = "ZO_MMDB_DATA_DIR")] // ./data/openobserve/mmdb/
     pub mmdb_data_dir: String,
     #[env_config(name = "ZO_MMDB_DISABLE_DOWNLOAD", default = false)]
@@ -920,9 +900,9 @@ pub struct Common {
     #[env_config(name = "ZO_DEFAULT_SCRAPE_INTERVAL", default = 15)]
     // Default scrape_interval value 15s
     pub default_scrape_interval: u32,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_ENABLE", default = false)]
-    pub memory_circuit_breaker_enable: bool,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_RATIO", default = 100)]
+    #[env_config(name = "ZO_MEMORY_CIRCUIT_BREAKER_ENABLED", default = false)]
+    pub memory_circuit_breaker_enabled: bool,
+    #[env_config(name = "ZO_MEMORY_CIRCUIT_BREAKER_RATIO", default = 90)]
     pub memory_circuit_breaker_ratio: usize,
     #[env_config(
         name = "ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA",
@@ -942,40 +922,12 @@ pub struct Common {
         help = "Toggle inverted index cache."
     )]
     pub inverted_index_cache_enabled: bool,
-    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
-        default = "",
-        help = "Characters which should be used as a delimiter to split the string, default using all ascii punctuations."
-    )]
-    pub inverted_index_split_chars: String,
-    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_OLD_FORMAT",
         default = false,
         help = "Use old format for inverted index, it will generate same stream name for index."
     )]
     pub inverted_index_old_format: bool,
-    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_STORE_FORMAT",
-        default = "tantivy",
-        help = "InvertedIndex store format, parquet(default), tantivy, both"
-    )]
-    pub inverted_index_store_format: String,
-    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
-        default = "tantivy",
-        help = "InvertedIndex search format, parquet(default), tantivy."
-    )]
-    pub inverted_index_search_format: String,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_TANTIVY_MODE",
-        default = "",
-        help = "Tantivy search mode, puffin or mmap, default is puffin."
-    )]
-    pub inverted_index_tantivy_mode: String,
     #[env_config(
         name = "ZO_INVERTED_INDEX_CAMEL_CASE_TOKENIZER_DISABLED",
         default = false,
@@ -1069,7 +1021,7 @@ pub struct Common {
     pub self_metrics_consumption_whitelist: String,
     #[env_config(
         name = "ZO_RESULT_CACHE_ENABLED",
-        default = false,
+        default = true,
         help = "Enable result cache for query results"
     )]
     pub result_cache_enabled: bool,
@@ -1101,14 +1053,12 @@ pub struct Common {
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
-    #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
-    pub websocket_enabled: bool,
     #[env_config(name = "ZO_ES_VERSION", default = "")]
     pub es_version: String,
     #[env_config(
         name = "ZO_CREATE_ORG_THROUGH_INGESTION",
-        default = false,
-        help = "If true (default false), new org can be automatically created through ingestion for root user. This can be changed in the runtime."
+        default = true,
+        help = "If true (default true), new org can be automatically created through ingestion for root user. This can be changed in the runtime."
     )]
     pub create_org_through_ingestion: bool,
     #[env_config(
@@ -1117,8 +1067,6 @@ pub struct Common {
         help = "The number of days (default 7) an invitation token will be valid for. This can be changed in the runtime."
     )]
     pub org_invite_expiry: u32,
-    #[env_config(name = "ZO_WEBSOCKET_CLOSE_FRAME_DELAY", default = 0)]
-    pub websocket_close_frame_delay: u64, // in milliseconds
     #[env_config(
         name = "ZO_MIN_AUTO_REFRESH_INTERVAL",
         default = 5,
@@ -1141,6 +1089,22 @@ pub struct Common {
         help = "Enable to use stream settings for partitions. This will apply for all streams"
     )]
     pub use_stream_settings_for_partitions_enabled: bool,
+    #[env_config(name = "ZO_DASHBOARD_PLACEHOLDER", default = "_o2_all_")]
+    pub dashboard_placeholder: String,
+    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
+    pub aggregation_cache_enabled: bool,
+    #[env_config(name = "ZO_AGGREGATION_TOPK_ENABLED", default = true)]
+    pub aggregation_topk_enabled: bool,
+    #[env_config(name = "ZO_SEARCH_INSPECTOR_ENABLED", default = false)]
+    pub search_inspector_enabled: bool,
+    #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = true)]
+    pub utf8_view_enabled: bool,
+    #[env_config(
+        name = "ZO_DASHBOARD_SHOW_SYMBOL_ENABLED",
+        default = false,
+        help = "Enable to show symbol in dashboard"
+    )]
+    pub dashboard_show_symbol_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1267,7 +1231,7 @@ pub struct Limit {
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)]
     pub http_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)]
-    pub http_worker_max_blocking: usize, // equals to 1024 if 0
+    pub http_worker_max_blocking: usize, // equals to 256 if 0
     #[env_config(name = "ZO_GRPC_RUNTIME_WORKER_NUM", default = 0)]
     pub grpc_runtime_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_GRPC_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
@@ -1282,7 +1246,7 @@ pub struct Limit {
     pub job_runtime_shutdown_timeout: u64,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 60)] // seconds
     pub calculate_stats_interval: u64,
-    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT", default = 100000)] // records
+    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT", default = 1000000)] // records
     pub calculate_stats_step_limit: i64,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 5)] // seconds
     pub http_request_timeout: u64,
@@ -1294,18 +1258,6 @@ pub struct Limit {
     pub http_shutdown_timeout: u64,
     #[env_config(name = "ZO_ACTIX_SLOW_LOG_THRESHOLD", default = 5)] // seconds
     pub http_slow_log_threshold: u64,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_ENABLED", default = false)]
-    pub circuit_breaker_enabled: bool,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_WATCHING_WINDOW", default = 60)] // seconds
-    pub circuit_breaker_watching_window: i64,
-    #[env_config(name = "ZO_CIRCUIT_BREAKER_RESET_WINDOW_NUM", default = 3)] // 3 * watching window
-    pub circuit_breaker_reset_window_num: i64,
-    #[env_config(
-        name = "ZO_CIRCUIT_BREAKER_SLOW_REQUEST_THRESHOLD",
-        default = 100,
-        help = "Trigger circuit break if over this threshold in watching window, and will be reset after 2 * watching window"
-    )] // slow requests
-    pub circuit_breaker_slow_request_threshold: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 10)] // seconds
     pub alert_schedule_interval: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
@@ -1507,6 +1459,8 @@ pub struct Compact {
     pub max_file_size: usize,
     #[env_config(name = "ZO_COMPACT_EXTENDED_DATA_RETENTION_DAYS", default = 3650)] // days
     pub extended_data_retention_days: i64,
+    #[env_config(name = "ZO_COMPACT_OLD_DATA_STREAMS", default = "")] // use comma to split
+    pub old_data_streams: String,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
@@ -1614,6 +1568,8 @@ pub struct DiskCache {
     // MB, default is 10% of local volume available space and maximum 20GB
     #[env_config(name = "ZO_DISK_RESULT_CACHE_MAX_SIZE", default = 0)]
     pub result_max_size: usize,
+    #[env_config(name = "ZO_DISK_AGGREGATION_CACHE_MAX_SIZE", default = 0)]
+    pub aggregation_max_size: usize,
     // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
@@ -1627,6 +1583,12 @@ pub struct DiskCache {
     pub gc_interval: u64,
     #[env_config(name = "ZO_DISK_CACHE_MULTI_DIR", default = "")] // dir1,dir2,dir3...
     pub multi_dir: String,
+    #[env_config(
+        name = "ZO_DISK_CACHE_DELAY_WINDOW_MINS",
+        default = 10,
+        help = "Delay window indicates the time range from now to skip caching to disk, default is 10 minutes"
+    )]
+    pub delay_window_mins: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1878,6 +1840,54 @@ pub struct Pipeline {
         help = "pipeline exporter client max connections"
     )]
     pub max_connections: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_ENABLED",
+        default = true,
+        help = "Enable batching of entries before sending HTTP requests"
+    )]
+    pub batch_enabled: bool,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_SIZE",
+        default = 100,
+        help = "Maximum number of entries to batch together"
+    )]
+    pub batch_size: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_TIMEOUT_MS",
+        default = 1000,
+        help = "Maximum time to wait for a batch to fill up (in milliseconds)"
+    )]
+    pub batch_timeout_ms: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_SIZE_BYTES",
+        default = 10485760, // 10MB
+        help = "Maximum size of a batch in bytes"
+    )]
+    pub batch_size_bytes: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_USE_SHARED_HTTP_CLIENT",
+        default = false,
+        help = "Use shared HTTP client instances for better connection pooling"
+    )]
+    pub use_shared_http_client: bool,
+    #[env_config(
+        name = "ZO_PIPELINE_REMOVE_FILE_AFTER_MAX_RETRY",
+        default = true,
+        help = "Remove wal file after max retry"
+    )]
+    pub remove_file_after_max_retry: bool,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_RETRY_COUNT",
+        default = 10,
+        help = "pipeline exporter client max retry count"
+    )]
+    pub max_retry_count: u32,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_RETRY_TIME_IN_HOURS",
+        default = 24,
+        help = "pipeline exporter client max retry time in hours"
+    )]
+    pub max_retry_time_in_hours: u64,
 }
 
 #[derive(EnvConfig)]
@@ -1887,6 +1897,7 @@ pub struct Encryption {
     #[env_config(name = "ZO_MASTER_ENCRYPTION_KEY", default = "")]
     pub master_key: String,
 }
+
 #[derive(EnvConfig)]
 pub struct HealthCheck {
     #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]
@@ -2002,7 +2013,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.http_worker_num = cpu_num;
     }
     if cfg.limit.http_worker_max_blocking == 0 {
-        cfg.limit.http_worker_max_blocking = 1024;
+        cfg.limit.http_worker_max_blocking = 256;
     }
     if cfg.limit.grpc_runtime_worker_num == 0 {
         cfg.limit.grpc_runtime_worker_num = cpu_num;
@@ -2082,7 +2093,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.file_list_id_batch_size = 5000;
     }
 
-    if cfg.limit.consistent_hash_vnodes == 0 {
+    if cfg.limit.consistent_hash_vnodes < 1 {
         cfg.limit.consistent_hash_vnodes = 1000;
     }
 
@@ -2099,7 +2110,7 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check for calculate stats
     if cfg.limit.calculate_stats_step_limit < 1 {
-        cfg.limit.calculate_stats_step_limit = 10000;
+        cfg.limit.calculate_stats_step_limit = 1000000;
     }
 
     Ok(())
@@ -2215,37 +2226,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check bloom filter ndv ratio
     if cfg.common.bloom_filter_ndv_ratio == 0 {
         cfg.common.bloom_filter_ndv_ratio = 100;
-    }
-
-    // check default inverted index search format
-    #[allow(deprecated)]
-    {
-        cfg.common.inverted_index_store_format =
-            cfg.common.inverted_index_store_format.to_lowercase();
-        if cfg.common.inverted_index_store_format.is_empty() {
-            cfg.common.inverted_index_store_format = "parquet".to_string();
-        }
-        if !["both", "parquet", "tantivy"]
-            .contains(&cfg.common.inverted_index_store_format.as_str())
-        {
-            return Err(anyhow::anyhow!(
-                "ZO_INVERTED_INDEX_STORE_FORMAT must be one of parquet, tantivy, both."
-            ));
-        }
-        cfg.common.inverted_index_search_format =
-            cfg.common.inverted_index_search_format.to_lowercase();
-        if cfg.common.inverted_index_search_format.is_empty() {
-            cfg.common.inverted_index_search_format =
-                cfg.common.inverted_index_store_format.clone();
-        }
-        if cfg.common.inverted_index_search_format == "both" {
-            cfg.common.inverted_index_search_format = "parquet".to_string();
-        }
-        if !["parquet", "tantivy"].contains(&cfg.common.inverted_index_search_format.as_str()) {
-            return Err(anyhow::anyhow!(
-                "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of parquet, tantivy."
-            ));
-        }
     }
 
     // check for join match one
@@ -2475,6 +2455,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.is_local_storage
         && !cfg.common.result_cache_enabled
         && !cfg.common.metrics_cache_enabled
+        && !cfg.common.aggregation_cache_enabled
     {
         cfg.disk_cache.enabled = false;
     }
@@ -2483,6 +2464,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.disk_cache.enabled {
         cfg.common.result_cache_enabled = false;
         cfg.common.metrics_cache_enabled = false;
+        cfg.common.aggregation_cache_enabled = false;
         cfg.cache_latest_files.enabled = false;
         cfg.cache_latest_files.delete_merge_files = false;
     }
@@ -2505,13 +2487,23 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.disk_cache.result_max_size == 0 {
-        cfg.disk_cache.result_max_size = cfg.limit.disk_free / 10; // 10%
+        cfg.disk_cache.result_max_size = cfg.disk_cache.max_size / 10; // 10%
         if cfg.disk_cache.result_max_size > 1024 * 1024 * 1024 * 20 {
             cfg.disk_cache.result_max_size = 1024 * 1024 * 1024 * 20; // 20GB
         }
     } else {
         cfg.disk_cache.result_max_size *= 1024 * 1024;
     }
+
+    if cfg.disk_cache.aggregation_max_size == 0 {
+        cfg.disk_cache.aggregation_max_size = cfg.disk_cache.max_size / 10; // 10%
+        if cfg.disk_cache.aggregation_max_size > 1024 * 1024 * 1024 * 20 {
+            cfg.disk_cache.aggregation_max_size = 1024 * 1024 * 1024 * 20; // 20GB
+        }
+    } else {
+        cfg.disk_cache.aggregation_max_size *= 1024 * 1024;
+    }
+
     if cfg.disk_cache.skip_size == 0 {
         // will skip the cache when a query need cache great than this value, default is
         // 50% of max_size
@@ -2573,17 +2565,6 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
-
-    // check disk cache with tantivy mode
-    cfg.common.inverted_index_tantivy_mode = cfg.common.inverted_index_tantivy_mode.to_lowercase();
-    if cfg.common.inverted_index_tantivy_mode.is_empty() {
-        cfg.common.inverted_index_tantivy_mode = "puffin".to_string();
-    }
-    if !cfg.disk_cache.enabled && cfg.common.inverted_index_tantivy_mode == "mmap" {
-        return Err(anyhow::anyhow!(
-            "Inverted index tantivy mode can not be set to mmap when disk cache is disabled."
-        ));
-    }
 
     Ok(())
 }

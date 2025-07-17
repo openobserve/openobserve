@@ -37,6 +37,7 @@
           ref="dateTimePickerRef"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
+          @hide="setTimeForVariables()"
         />
         <AutoRefreshInterval
           v-model="refreshInterval"
@@ -109,7 +110,7 @@
                 :showDynamicFilters="
                   currentDashboardData.data?.variables?.showDynamicFilters
                 "
-                :selectedTimeDate="dashboardPanelData.meta.dateTime"
+                :selectedTimeDate="dateTimeForVariables || dashboardPanelData.meta.dateTime"
                 :initialVariableValues="getInitialVariablesData()"
                 @variablesData="variablesDataUpdated"
                 data-test="dashboard-viewpanel-variables-value-selector"
@@ -400,6 +401,7 @@ export default defineComponent({
     onUnmounted(async () => {
       // clear a few things
       resetDashboardPanelData();
+      parser = null;
     });
 
     onMounted(async () => {
@@ -520,8 +522,27 @@ export default defineComponent({
       updateDateTime(selectedDate.value);
     });
 
+    const dateTimeForVariables = ref(null);
+    
+    const setTimeForVariables = () => {
+      const date = dateTimePickerRef.value?.getConsumableDateTime();
+      const startTime = new Date(date.startTime);
+      const endTime = new Date(date.endTime);
+
+      // Update only the variables time object
+      dateTimeForVariables.value = {
+        start_time: startTime,
+        end_time: endTime,
+      };
+    };
+
     const updateDateTime = (value: object) => {
       dashboardPanelData.meta.dateTime = {
+        start_time: new Date(selectedDate.value.startTime),
+        end_time: new Date(selectedDate.value.endTime),
+      };
+
+      dateTimeForVariables.value = {
         start_time: new Date(selectedDate.value.startTime),
         end_time: new Date(selectedDate.value.endTime),
       };
@@ -610,6 +631,8 @@ export default defineComponent({
 
     return {
       t,
+      setTimeForVariables,
+      dateTimeForVariables,
       updateDateTime,
       goBack,
       currentDashboard,

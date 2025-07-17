@@ -69,9 +69,16 @@ pub async fn bulk(
     let mut resp = match logs::bulk::ingest(**thread_id, &org_id, body, user_email).await {
         Ok(v) => MetaHttpResponse::json(v),
         Err(e) => {
-            log::error!("Error processing request {org_id}/_bulk: {:?}", e);
-            HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
+            log::error!("Error processing request {org_id}/_bulk: {e}");
+            if matches!(e, infra::errors::Error::ResourceError(_)) {
+                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                    http::StatusCode::SERVICE_UNAVAILABLE,
+                    e,
+                ))
+            } else {
+                HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
+            }
         }
     };
 
@@ -135,12 +142,16 @@ pub async fn multi(
             _ => MetaHttpResponse::json(v),
         },
         Err(e) => {
-            log::error!(
-                "Error processing request {org_id}/{stream_name}/_multi: {:?}",
-                e
-            );
-            HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
+            log::error!("Error processing request {org_id}/{stream_name}/_multi: {e}");
+            if matches!(e, infra::errors::Error::ResourceError(_)) {
+                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                    http::StatusCode::SERVICE_UNAVAILABLE,
+                    e,
+                ))
+            } else {
+                HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
+            }
         }
     };
 
@@ -204,12 +215,16 @@ pub async fn json(
             _ => MetaHttpResponse::json(v),
         },
         Err(e) => {
-            log::error!(
-                "Error processing request {org_id}/{stream_name}/_json: {:?}",
-                e
-            );
-            HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
+            log::error!("Error processing request {org_id}/{stream_name}/_json: {e}");
+            if matches!(e, infra::errors::Error::ResourceError(_)) {
+                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                    http::StatusCode::SERVICE_UNAVAILABLE,
+                    e,
+                ))
+            } else {
+                HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
+            }
         }
     };
 
@@ -271,12 +286,20 @@ pub async fn handle_kinesis_request(
                 error_message: None,
             }),
             Err(e) => {
-                log::error!("Error processing kinesis request: {:?}", e);
-                HttpResponse::BadRequest().json(KinesisFHIngestionResponse {
-                    request_id,
-                    timestamp: request_time,
-                    error_message: e.to_string().into(),
-                })
+                log::error!("Error processing kinesis request: {e}");
+                if matches!(e, infra::errors::Error::ResourceError(_)) {
+                    HttpResponse::ServiceUnavailable().json(KinesisFHIngestionResponse {
+                        request_id,
+                        timestamp: request_time,
+                        error_message: e.to_string().into(),
+                    })
+                } else {
+                    HttpResponse::BadRequest().json(KinesisFHIngestionResponse {
+                        request_id,
+                        timestamp: request_time,
+                        error_message: e.to_string().into(),
+                    })
+                }
             }
         },
     )
@@ -304,12 +327,16 @@ pub async fn handle_gcp_request(
         {
             Ok(v) => MetaHttpResponse::json(v),
             Err(e) => {
-                log::error!(
-                    "Error processing request {org_id}/{stream_name}/_gcp: {:?}",
-                    e
-                );
-                HttpResponse::BadRequest()
-                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
+                log::error!("Error processing request {org_id}/{stream_name}/_gcp: {e:?}");
+                if matches!(e, infra::errors::Error::ResourceError(_)) {
+                    HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                        http::StatusCode::SERVICE_UNAVAILABLE,
+                        e,
+                    ))
+                } else {
+                    HttpResponse::BadRequest()
+                        .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
+                }
             }
         },
     )
@@ -345,10 +372,10 @@ pub async fn otlp_logs_write(
         CONTENT_TYPE_PROTO => match ExportLogsServiceRequest::decode(body) {
             Ok(req) => (req, OtlpRequestType::HttpProtobuf),
             Err(e) => {
-                log::error!("[LOGS:OTLP] Invalid proto: {}", e);
+                log::error!("[LOGS:OTLP] Invalid proto: {e}");
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                     http::StatusCode::BAD_REQUEST,
-                    format!("Invalid proto: {}", e),
+                    format!("Invalid proto: {e}"),
                 )));
             }
         },
@@ -356,10 +383,10 @@ pub async fn otlp_logs_write(
             match serde_json::from_slice::<ExportLogsServiceRequest>(body.as_ref()) {
                 Ok(req) => (req, OtlpRequestType::HttpJson),
                 Err(e) => {
-                    log::error!("[LOGS:OTLP] Invalid json: {}", e);
+                    log::error!("[LOGS:OTLP] Invalid json: {e}");
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                         http::StatusCode::BAD_REQUEST,
-                        format!("Invalid json: {}", e),
+                        format!("Invalid json: {e}"),
                     )));
                 }
             }
@@ -372,7 +399,7 @@ pub async fn otlp_logs_write(
         }
     };
 
-    match handle_request(
+    let resp = match handle_request(
         **thread_id,
         &org_id,
         request,
@@ -382,18 +409,24 @@ pub async fn otlp_logs_write(
     )
     .await
     {
-        Ok(v) => Ok(v),
+        Ok(v) => v,
         Err(e) => {
             log::error!(
-                "Error processing otlp {} logs write request {org_id}/{:?}: {:?}",
-                content_type,
-                in_stream_name,
-                e
+                "Error processing otlp {content_type} logs write request {org_id}/{in_stream_name:?}: {e:?}"
             );
-            Ok(HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e)))
+            if matches!(e, infra::errors::Error::ResourceError(_)) {
+                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
+                    http::StatusCode::SERVICE_UNAVAILABLE,
+                    e,
+                ))
+            } else {
+                HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
+            }
         }
-    }
+    };
+
+    Ok(resp)
 }
 
 /// HEC format compatible ingestion API
@@ -439,9 +472,13 @@ pub async fn hec(
             }
         }
         Err(e) => {
-            log::error!("Error processing request {org_id}/_hec: {:?}", e);
+            log::error!("Error processing request {org_id}/_hec: {e}");
             let res = HecResponse::from(HecStatus::Custom(e.to_string(), 400));
-            HttpResponse::BadRequest().json(res)
+            if matches!(e, infra::errors::Error::ResourceError(_)) {
+                HttpResponse::ServiceUnavailable().json(res)
+            } else {
+                HttpResponse::BadRequest().json(res)
+            }
         }
     };
 

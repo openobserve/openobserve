@@ -1568,6 +1568,8 @@ import Smooth from "@/components/icons/dashboards/Smooth.vue";
 import StepBefore from "@/components/icons/dashboards/StepBefore.vue";
 import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
 import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
+import { useStore } from "vuex";
+
 import { markRaw } from "vue";
 
 export default defineComponent({
@@ -1597,6 +1599,7 @@ export default defineComponent({
       dashboardPanelDataPageKey,
     );
     const { t } = useI18n();
+    const store = useStore();
 
     const basemapTypeOptions = [
       {
@@ -1685,7 +1688,9 @@ export default defineComponent({
       // by default, set show_symbol as false
       if (dashboardPanelData.data.config.show_symbol === undefined) {
         const isNewPanel = !dashboardPanelData.data.id;
-        dashboardPanelData.data.config.show_symbol = isNewPanel;
+        // if new panel, use config env
+        // else always false
+        dashboardPanelData.data.config.show_symbol = isNewPanel ? store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false : false;
       }
 
       // by default, set line interpolation as smooth
@@ -1883,8 +1888,28 @@ export default defineComponent({
         value: "top",
       },
       {
+        label: t("dashboard.left"),
+        value: "left",
+      },
+      {
+        label: t("dashboard.right"),
+        value: "right",
+      },
+      {
+        label: t("dashboard.bottom"),
+        value: "bottom",
+      },
+      {
         label: t("dashboard.inside"),
         value: "inside",
+      },
+      {
+        label: t("dashboard.insideLeft"),
+        value: "insideLeft",
+      },
+      {
+        label: t("dashboard.insideRight"),
+        value: "insideRight",
       },
       {
         label: t("dashboard.insideTop"),
@@ -1893,6 +1918,26 @@ export default defineComponent({
       {
         label: t("dashboard.insideBottom"),
         value: "insideBottom",
+      },
+      {
+        label: t("dashboard.insideTopLeft"),
+        value: "insideTopLeft",
+      },
+      {
+        label: t("dashboard.insideBottomLeft"),
+        value: "insideBottomLeft",
+      },
+      {
+        label: t("dashboard.insideTopRight"),
+        value: "insideTopRight",
+      },
+      {
+        label: t("dashboard.insideBottomRight"),
+        value: "insideBottomRight",
+      },
+      {
+        label: t("dashboard.outside"),
+        value: "outside",
       },
     ];
 

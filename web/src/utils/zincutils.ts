@@ -27,6 +27,7 @@ import cronParser from "cron-parser";
 let moment: any;
 let momentInitialized = false;
 const organizationDataLocal: any = ref({});
+export const trialPeriodAllowedPath = ["iam", "users", "organizations"];
 
 const importMoment = async () => {
   if (!momentInitialized) {
@@ -378,30 +379,23 @@ export const routeGuard = async (to: any, from: any, next: any) => {
   const store = useStore();
   const q = useQuasar();
   const { getStreams } = useStreams();
-
-  // if (
-  //   config.isCloud &&
-  //   store.state.selectedOrganization.subscription_type == config.freePlan
-  // ) {
-  //   await billings
-  //     .list_subscription(store.state.selectedOrganization.identifier)
-  //     .then((res: any) => {
-  //       if (res.data.data.length == 0) {
-  //         next({ path: "/billings/plans" });
-  //       }
-
-  //       if (
-  //         res.data.data.CustomerBillingObj.customer_id == null ||
-  //         res.data.data.CustomerBillingObj.customer_id == ""
-  //       ) {
-  //         next({ path: "/billings/plans" });
-  //       }
-  //     });
-  // }
+  if (config.isCloud) {
+    if (
+      store.state.organizationData?.organizationSettings?.free_trial_expiry !=
+      ""
+    ) {
+      const trialDueDays = getDueDays(
+        store.state.organizationData?.organizationSettings?.free_trial_expiry,
+      );
+      if (trialDueDays <= 0 && trialPeriodAllowedPath.indexOf(to.name) == -1) {
+        next({ name: "plans", query: { org_identifier: store.state.selectedOrganization.identifier } });
+      }
+    }
+  }
 
   if (
     to.path.indexOf("/ingestion") == -1 &&
-    to.path.indexOf("/iam") == -1 &&
+    trialPeriodAllowedPath.indexOf(to.name) == -1 &&
     store.state.zoConfig.hasOwnProperty("restricted_routes_on_empty_data") &&
     store.state.zoConfig.restricted_routes_on_empty_data == true &&
     store.state.organizationData.isDataIngested == false
@@ -575,6 +569,10 @@ export const timestampToTimezoneDate = (
   timezone: string = "UTC",
   format: string = "yyyy-MM-dd HH:mm:ss.SSS",
 ) => {
+  if (unixMilliTimestamp > 1e14) {
+    unixMilliTimestamp = Math.floor(unixMilliTimestamp / 1000); // convert microseconds to milliseconds
+  }
+
   return DateTime.fromMillis(Math.floor(unixMilliTimestamp))
     .setZone(timezone)
     .toFormat(format);
@@ -639,7 +637,7 @@ export const localTimeSelectedTimezoneUTCTime = async (
   // Convert the moment object to a Unix timestamp (in seconds)
   const unixTimestamp = convertedDate.unix() * 1000000;
 
-  console.log(unixTimestamp);
+  moment = null;
   return unixTimestamp;
 };
 
@@ -813,7 +811,7 @@ export const durationFormatter = (durationInSeconds: number): string => {
   return formattedDuration;
 };
 
-export const getTimezoneOffset = (timezone: string |null = null) => {
+export const getTimezoneOffset = (timezone: string | null = null) => {
   const now = new Date();
 
   // Get the day, month, and year from the date object
@@ -831,7 +829,9 @@ export const getTimezoneOffset = (timezone: string |null = null) => {
   // Combine them in the HH:MM format
   const scheduleTime = `${hours}:${minutes}`;
 
-  const ScheduleTimezone = timezone ? timezone : Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const ScheduleTimezone = timezone
+    ? timezone
+    : Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const convertedDateTime = convertDateToTimestamp(
     scheduleDate,
@@ -931,10 +931,13 @@ export const getTimezonesByOffset = async (offsetMinutes: number) => {
   await importMoment();
   const offsetHours = offsetMinutes / 60;
   const timezones = moment.tz.names();
-  return timezones.filter((zone: string) => {
+  const filteredTimezones = timezones.filter((zone: string) => {
     const zoneOffset = moment.tz(zone).utcOffset() / 60;
     return zoneOffset === offsetHours;
   });
+
+  moment = null;
+  return filteredTimezones;
 };
 
 export const convertTimeFromNsToMs = (time: number) => {
@@ -961,7 +964,12 @@ export const arraysMatch = (arr1: Array<any>, arr2: Array<any>) => {
 };
 
 export const deepCopy = (value: any) => {
-  return JSON.parse(JSON.stringify(value));
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (error) {
+    console.error("Error deep copying value", error);
+    return value;
+  }
 };
 
 export const getWebSocketUrl = (
@@ -1046,4 +1054,58 @@ export function isAboveMinRefreshInterval(
 ) {
   const minInterval = Number(config?.min_auto_refresh_interval) || 1;
   return value >= minInterval;
+}
+
+export function getDueDays(microTimestamp: number): number {
+  // Convert microseconds to milliseconds
+  const timestampMs = Math.floor(microTimestamp / 1000);
+
+  // Create date objects
+  const givenDate = new Date(timestampMs);
+  const currentDate = new Date();
+
+  // Calculate time difference in milliseconds using getTime()
+  const timeDiffMs = givenDate.getTime() - currentDate.getTime();
+
+  // Convert milliseconds to full days
+  const dueDays = Math.floor(timeDiffMs / (1000 * 60 * 60 * 24));
+
+  return dueDays;
+}
+export function checkCallBackValues(url: string, key: string) {
+  const tokens = url.split("&");
+  for (const token of tokens) {
+    const propArr = token.split("=");
+    if (propArr[0] == key) {
+      return propArr[1];
+    }
+  }
+}
+
+export const getIngestionURL = () => {
+  const store = useStore();
+  //by default it will use the store.state.API_ENDPOINT
+  //if the store.state.zoConfig.ingestion_url is present and not empty, it will use the store.state.zoConfig.ingestion_url
+  let ingestionURL: string = store.state.API_ENDPOINT;
+  if (
+    Object.hasOwn(store.state.zoConfig, "ingestion_url") &&
+    store.state.zoConfig.ingestion_url !== ""
+  ) {
+    ingestionURL = store.state.zoConfig.ingestion_url;
+  }
+  return ingestionURL;
+};
+
+export const getEndPoint = (ingestionURL: string) => {
+  //here we need to get the endpoint from the ingestionURL
+  //we need to get the hostname, port, protocol, tls from the ingestionURL
+  const url = new URL(ingestionURL);
+  const endpoint = {
+    url: ingestionURL,
+      host: url.hostname,
+      port: url.port || (url.protocol === "https:" ? "443" : "80"),
+      protocol: url.protocol.replace(":", ""),
+      tls: url.protocol === "https:" ? "On" : "Off",
+  }
+  return endpoint;
 }

@@ -198,11 +198,7 @@ impl ExecutablePipeline {
     ) -> Result<HashMap<StreamParams, Vec<(usize, Value)>>> {
         let batch_size = records.len();
         let pipeline_name = self.name.clone();
-        log::debug!(
-            "[Pipeline] {} : process batch of size {}",
-            pipeline_name,
-            batch_size
-        );
+        log::debug!("[Pipeline] {pipeline_name} : process batch of size {batch_size}");
         if batch_size == 0 {
             return Ok(HashMap::default());
         }
@@ -224,7 +220,7 @@ impl ExecutablePipeline {
         }
 
         // Spawn tasks for each node
-        let mut node_tasks = Vec::new();
+        let mut node_tasks = Vec::with_capacity(self.sorted_nodes.len());
         for (idx, node_id) in self.sorted_nodes.iter().enumerate() {
             let pl_id_cp = self.id.to_string();
             let org_id_cp = org_id.to_string();
@@ -243,22 +239,19 @@ impl ExecutablePipeline {
 
             // WARN: Do not change. Processing node can only be done in a task, as the internals of
             // remote wal writer depends on the task id.
-            let task = tokio::spawn(async move {
-                process_node(
-                    pl_id_cp,
-                    idx,
-                    org_id_cp,
-                    node,
-                    node_receiver,
-                    child_senders,
-                    vrl_runtime,
-                    result_sender_cp,
-                    error_sender_cp,
-                    pipeline_name,
-                    stream_name,
-                )
-                .await
-            });
+            let task = tokio::spawn(process_node(
+                pl_id_cp,
+                idx,
+                org_id_cp,
+                node,
+                node_receiver,
+                child_senders,
+                vrl_runtime,
+                result_sender_cp,
+                error_sender_cp,
+                pipeline_name,
+                stream_name,
+            ));
             node_tasks.push(task);
         }
 
@@ -317,12 +310,12 @@ impl ExecutablePipeline {
 
         // Wait for all node tasks to complete
         if let Err(e) = try_join_all(node_tasks).await {
-            log::error!("[Pipeline] node processing jobs failed: {}", e);
+            log::error!("[Pipeline] node processing jobs failed: {e}");
         }
 
         // Publish errors if received any
         if let Some(pipeline_errors) = error_task.await.map_err(|e| {
-            log::error!("[Pipeline] error collecting job failed: {}", e);
+            log::error!("[Pipeline] error collecting job failed: {e}");
             anyhow!("[Pipeline] error collecting job failed: {}", e)
         })? {
             let stream_params = self.get_source_stream_params();
@@ -336,7 +329,7 @@ impl ExecutablePipeline {
         }
 
         let results = result_task.await.map_err(|e| {
-            log::error!("[Pipeline] result collecting job failed: {}", e);
+            log::error!("[Pipeline] result collecting job failed: {e}");
             anyhow!("[Pipeline] result collecting job failed: {}", e)
         })?;
 
@@ -512,10 +505,7 @@ async fn process_node(
     match &node.node_data {
         NodeData::Stream(stream_params) => {
             if node.children.is_empty() {
-                log::debug!(
-                    "[Pipeline] {} : Leaf node {node_idx} starts processing",
-                    pipeline_name
-                );
+                log::debug!("[Pipeline] {pipeline_name} : Leaf node {node_idx} starts processing");
                 // leaf node: `result_sender` guaranteed to be Some()
                 // send received results directly via `result_sender` for collection
                 let result_sender = result_sender.unwrap();
@@ -527,14 +517,13 @@ async fn process_node(
                         ) {
                             Ok(flattened) => flattened,
                             Err(e) => {
-                                let err_msg = format!("LeafNode error with flattening: {}", e);
+                                let err_msg = format!("LeafNode error with flattening: {e}");
                                 if let Err(send_err) = error_sender
                                     .send((node.id.to_string(), node.node_type(), err_msg))
                                     .await
                                 {
                                     log::error!(
-                                        "[Pipeline] {} : LeafNode failed sending errors for collection caused by: {send_err}",
-                                        pipeline_name
+                                        "[Pipeline] {pipeline_name} : LeafNode failed sending errors for collection caused by: {send_err}"
                                     );
                                     break;
                                 }
@@ -569,8 +558,7 @@ async fn process_node(
                                     .await
                                 {
                                     log::error!(
-                                        "[Pipeline] {} : LeafNode failed sending errors for collection caused by: {send_err}",
-                                        pipeline_name
+                                        "[Pipeline] {pipeline_name} : LeafNode failed sending errors for collection caused by: {send_err}"
                                     );
                                     break;
                                 }
@@ -583,8 +571,7 @@ async fn process_node(
                         result_sender.send((idx, destination_stream, record)).await
                     {
                         log::error!(
-                            "[Pipeline] {} : LeafNode errors sending result for collection caused by: {send_err}",
-                            pipeline_name
+                            "[Pipeline] {pipeline_name} : LeafNode errors sending result for collection caused by: {send_err}"
                         );
                         break;
                     }
@@ -599,8 +586,7 @@ async fn process_node(
                     count += 1;
                 }
                 log::debug!(
-                    "[Pipeline] {} : source node {node_idx} done processing {count} records",
-                    pipeline_name
+                    "[Pipeline] {pipeline_name} : source node {node_idx} done processing {count} records"
                 );
             }
         }
@@ -615,14 +601,13 @@ async fn process_node(
                     ) {
                         Ok(flattened) => flattened,
                         Err(e) => {
-                            let err_msg = format!("ConditionNode error with flattening: {}", e);
+                            let err_msg = format!("ConditionNode error with flattening: {e}");
                             if let Err(send_err) = error_sender
                                 .send((node.id.to_string(), node.node_type(), err_msg))
                                 .await
                             {
                                 log::error!(
-                                    "[Pipeline] {} : ConditionNode failed sending errors for collection caused by: {send_err}",
-                                    pipeline_name
+                                    "[Pipeline] {pipeline_name} : ConditionNode failed sending errors for collection caused by: {send_err}"
                                 );
                                 break;
                             }
@@ -662,14 +647,13 @@ async fn process_node(
                         ) {
                             Ok(flattened) => flattened,
                             Err(e) => {
-                                let err_msg = format!("FunctionNode error with flattening: {}", e);
+                                let err_msg = format!("FunctionNode error with flattening: {e}");
                                 if let Err(send_err) = error_sender
                                     .send((node.id.to_string(), node.node_type(), err_msg))
                                     .await
                                 {
                                     log::error!(
-                                        "[Pipeline] {} : FunctionNode failed sending errors for collection caused by: {send_err}",
-                                        pipeline_name
+                                        "[Pipeline] {pipeline_name} : FunctionNode failed sending errors for collection caused by: {send_err}"
                                     );
                                     break;
                                 }
@@ -683,18 +667,17 @@ async fn process_node(
                             vrl_runtime,
                             record,
                             &org_id,
-                            &[stream_name.clone()],
+                            std::slice::from_ref(&stream_name),
                         ) {
                             (res, None) => res,
                             (res, Some(error)) => {
-                                let err_msg = format!("FunctionNode error: {}", error);
+                                let err_msg = format!("FunctionNode error: {error}");
                                 if let Err(send_err) = error_sender
                                     .send((node.id.to_string(), node.node_type(), err_msg))
                                     .await
                                 {
                                     log::error!(
-                                        "[Pipeline] {} : FunctionNode failed sending errors for collection caused by: {send_err}",
-                                        pipeline_name
+                                        "[Pipeline] {pipeline_name} : FunctionNode failed sending errors for collection caused by: {send_err}"
                                     );
                                     break;
                                 }
@@ -714,41 +697,40 @@ async fn process_node(
                 }
                 count += 1;
             }
-            if !result_array_records.is_empty() {
-                if let Some((vrl_runtime, true)) = &vrl_runtime {
-                    let result = match apply_vrl_fn(
-                        &mut runtime,
-                        vrl_runtime,
-                        json::Value::Array(result_array_records),
-                        &org_id,
-                        &[stream_name.clone()],
-                    ) {
-                        (res, None) => res,
-                        (res, Some(error)) => {
-                            let err_msg = format!("FunctionNode error: {}", error);
-                            if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg))
-                                .await
-                            {
-                                log::error!(
-                                    "[Pipeline] {} : FunctionNode failed sending errors for collection caused by: {send_err}",
-                                    pipeline_name
-                                );
-                                return Ok(());
-                            }
-                            res
+            if !result_array_records.is_empty()
+                && let Some((vrl_runtime, true)) = &vrl_runtime
+            {
+                let result = match apply_vrl_fn(
+                    &mut runtime,
+                    vrl_runtime,
+                    json::Value::Array(result_array_records),
+                    &org_id,
+                    std::slice::from_ref(&stream_name),
+                ) {
+                    (res, None) => res,
+                    (res, Some(error)) => {
+                        let err_msg = format!("FunctionNode error: {error}");
+                        if let Err(send_err) = error_sender
+                            .send((node.id.to_string(), node.node_type(), err_msg))
+                            .await
+                        {
+                            log::error!(
+                                "[Pipeline] {pipeline_name} : FunctionNode failed sending errors for collection caused by: {send_err}"
+                            );
+                            return Ok(());
                         }
-                    };
-                    // since apply_vrl_fn can produce unflattened data
-                    for record in result.as_array().unwrap().iter() {
-                        // use usize::MAX as a flag to disregard original_value
-                        send_to_children(
-                            &mut child_senders,
-                            (usize::MAX, record.clone(), false),
-                            "FunctionNode",
-                        )
-                        .await;
+                        res
                     }
+                };
+                // since apply_vrl_fn can produce unflattened data
+                for record in result.as_array().unwrap().iter() {
+                    // use usize::MAX as a flag to disregard original_value
+                    send_to_children(
+                        &mut child_senders,
+                        (usize::MAX, record.clone(), false),
+                        "FunctionNode",
+                    )
+                    .await;
                 }
             }
             log::debug!("[Pipeline]: func node {node_idx} done processing {count} records");
@@ -766,8 +748,7 @@ async fn process_node(
         NodeData::RemoteStream(remote_stream) => {
             let mut records = vec![];
             log::debug!(
-                "[Pipeline]: Destination node {node_idx} starts processing, remote_stream : {:?}",
-                remote_stream
+                "[Pipeline]: Destination node {node_idx} starts processing, remote_stream : {remote_stream:?}"
             );
             let min_ts = (Utc::now()
                 - chrono::Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
@@ -784,14 +765,13 @@ async fn process_node(
                     ) {
                         Ok(flattened) => flattened,
                         Err(e) => {
-                            let err_msg = format!("DestinationNode error with flattening: {}", e);
+                            let err_msg = format!("DestinationNode error with flattening: {e}");
                             if let Err(send_err) = error_sender
                                 .send((node.id.to_string(), node.node_type(), err_msg))
                                 .await
                             {
                                 log::error!(
-                                    "[Pipeline] {} : DestinationNode failed sending errors for collection caused by: {send_err}",
-                                    pipeline_name
+                                    "[Pipeline] {pipeline_name} : DestinationNode failed sending errors for collection caused by: {send_err}"
                                 );
                                 break;
                             }
@@ -802,14 +782,13 @@ async fn process_node(
                 if let Err(e) =
                     crate::service::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts)
                 {
-                    let err_msg = format!("DestinationNode error handling timestamp: {}", e);
+                    let err_msg = format!("DestinationNode error handling timestamp: {e}");
                     if let Err(send_err) = error_sender
                         .send((node.id.to_string(), node.node_type(), err_msg))
                         .await
                     {
                         log::error!(
-                            "[Pipeline] {} : DestinationNode failed sending errors for collection caused by: {send_err}",
-                            pipeline_name
+                            "[Pipeline] {pipeline_name} : DestinationNode failed sending errors for collection caused by: {send_err}"
                         );
                         break;
                     }
@@ -825,8 +804,7 @@ async fn process_node(
                 let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream).await?;
                 if let Err(e) = writer.write_wal(records).await {
                     let err_msg = format!(
-                        "DestinationNode error persisting data to be ingested externally: {}",
-                        e
+                        "DestinationNode error persisting data to be ingested externally: {e}"
                     );
                     if let Err(send_err) = error_sender
                         .send((node.id.to_string(), node.node_type(), err_msg))

@@ -19,6 +19,8 @@ pub const TRACES: &str = "traces";
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
 
     #[test]
@@ -30,14 +32,7 @@ mod tests {
 
     #[test]
     fn test_service_constants_are_unique() {
-        let services = vec![LOGS, METRICS, TRACES];
-        for i in 0..services.len() {
-            for j in (i + 1)..services.len() {
-                assert_ne!(
-                    services[i], services[j],
-                    "Service constants should be unique"
-                );
-            }
-        }
+        let services = [LOGS, METRICS, TRACES];
+        assert!(HashSet::from(services).len() == services.len());
     }
 }

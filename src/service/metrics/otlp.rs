@@ -13,18 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    io::{Error, ErrorKind},
-    sync::Arc,
-};
+use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_web::{HttpResponse, http, web};
 use bytes::BytesMut;
 use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME,
-    cluster::LOCAL_NODE,
     meta::{
         alerts::alert,
         otlp::OtlpRequestType,
@@ -48,12 +43,11 @@ use prost::Message;
 
 use crate::{
     common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
-    handler::http::router::ERROR_HEADER,
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{
-            TriggerAlertData, evaluate_trigger,
+            TriggerAlertData, check_ingestion_allowed, evaluate_trigger,
             grpc::{get_exemplar_val, get_metric_val, get_val},
             write_file,
         },
@@ -68,14 +62,10 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
     let request = match ExportMetricsServiceRequest::decode(body) {
         Ok(v) => v,
         Err(e) => {
-            log::error!(
-                "[METRICS:OTLP] Invalid proto: org_id: {}, error: {}",
-                org_id,
-                e
-            );
+            log::error!("[METRICS:OTLP] Invalid proto: org_id: {org_id}, error: {e}");
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("Invalid proto: {}", e),
+                format!("Invalid proto: {e}"),
             )));
         }
     };
@@ -83,11 +73,9 @@ pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, 
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!(
-                "[METRICS:OTLP] Error while handling grpc trace request: org_id: {}, error: {}",
-                org_id,
-                e
+                "[METRICS:OTLP] Error while handling grpc metrics request: org_id: {org_id}, error: {e}"
             );
-            Err(Error::new(ErrorKind::Other, e))
+            Err(Error::other(e))
         }
     }
 }
@@ -96,21 +84,18 @@ pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, s
     let request = match serde_json::from_slice::<ExportMetricsServiceRequest>(body.as_ref()) {
         Ok(req) => req,
         Err(e) => {
-            log::error!("[METRICS:OTLP] Invalid json: {}", e);
+            log::error!("[METRICS:OTLP] Invalid json: {e}");
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!("Invalid json: {}", e),
+                format!("Invalid json: {e}"),
             )));
         }
     };
     match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson).await {
         Ok(v) => Ok(v),
         Err(e) => {
-            log::error!(
-                "[METRICS:OTLP] Error while handling http trace request: {}",
-                e
-            );
-            Err(Error::new(ErrorKind::Other, e))
+            log::error!("[METRICS:OTLP] Error while handling http trace request: {e}");
+            Err(Error::other(e))
         }
     }
 }
@@ -120,26 +105,9 @@ pub async fn handle_otlp_request(
     request: ExportMetricsServiceRequest,
     req_type: OtlpRequestType,
 ) -> Result<HttpResponse, anyhow::Error> {
-    if !LOCAL_NODE.is_ingester() {
-        return Ok(HttpResponse::InternalServerError()
-            .append_header((ERROR_HEADER, "not an ingester".to_string()))
-            .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                "not an ingester",
-            )));
-    }
-
-    if !db::file_list::BLOCKED_ORGS.is_empty()
-        && db::file_list::BLOCKED_ORGS.contains(&org_id.to_string())
-    {
-        return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN,
-            format!("Quota exceeded for this organization [{}]", org_id),
-        )));
-    }
-
-    // check memtable
-    if let Err(e) = ingester::check_memtable_size() {
+    // check system resource
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
+        log::error!("[METRICS:OTLP] ingestion error: {e}");
         return Ok(
             HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
                 http::StatusCode::SERVICE_UNAVAILABLE,
@@ -268,21 +236,16 @@ pub async fn handle_otlp_request(
                 };
 
                 // update schema metadata
-                if !schema_exists.has_metadata {
-                    if let Err(e) = db::schema::update_setting(
+                if !schema_exists.has_metadata
+                    && let Err(e) = db::schema::update_setting(
                         org_id,
                         metric_name,
                         StreamType::Metrics,
                         prom_meta,
                     )
                     .await
-                    {
-                        log::error!(
-                            "Failed to set metadata for metric: {} with error: {}",
-                            metric_name,
-                            e
-                        );
-                    }
+                {
+                    log::error!("Failed to set metadata for metric: {metric_name} with error: {e}");
                 }
                 for mut rec in records {
                     // flattening
@@ -366,8 +329,7 @@ pub async fn handle_otlp_request(
         if let Some(exec_pl) = exec_pl_option {
             let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
                 let err_msg = format!(
-                    "[Ingestion]: Stream {} has pipeline, but inputs failed to be buffered. BUG",
-                    stream_name
+                    "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG",
                 );
                 log::error!("{err_msg}");
                 partial_success.error_message = err_msg;
@@ -380,8 +342,7 @@ pub async fn handle_otlp_request(
             {
                 Err(e) => {
                     let err_msg = format!(
-                        "[Ingestion]: Stream {} pipeline batch processing failed: {}",
-                        stream_name, e,
+                        "[Ingestion]: Stream {stream_name} pipeline batch processing failed: {e}",
                     );
                     log::error!("{err_msg}");
                     // update status
@@ -508,24 +469,17 @@ pub async fn handle_otlp_request(
             let need_trigger = !stream_trigger_map.contains_key(&local_metric_name);
             if need_trigger && !stream_alerts_map.is_empty() {
                 // Start check for alert trigger
-                let key = format!(
-                    "{}/{}/{}",
-                    &org_id,
-                    StreamType::Metrics,
-                    local_metric_name.clone()
-                );
+                let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, local_metric_name);
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     let alert_end_time = now_micros();
                     for alert in alerts {
-                        match alert
+                        if let Ok(Some(data)) = alert
                             .evaluate(Some(val_map), (None, alert_end_time), None)
                             .await
+                            .map(|res| res.data)
                         {
-                            Ok(res) if res.data.is_some() => {
-                                trigger_alerts.push((alert.clone(), res.data.unwrap()))
-                            }
-                            _ => {}
+                            trigger_alerts.push((alert.clone(), data))
                         }
                     }
                     stream_trigger_map.insert(local_metric_name.clone(), Some(trigger_alerts));

@@ -21,9 +21,10 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        function::RESULT_ARRAY_SKIP_VRL,
         search::{self, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
-        sql::resolve_stream_names,
+        sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
     },
     utils::{base64, hash::Sum64, json, sql::is_aggregate_query, time::format_duration},
@@ -45,6 +46,7 @@ use crate::{
         search::{
             self as SearchService,
             cache::cacher::check_cache,
+            init_vrl_runtime,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         },
         self_reporting::{http_report_metrics, report_request_usage_stats},
@@ -63,13 +65,14 @@ pub async fn search(
     user_id: Option<String>,
     in_req: &search::Request,
     range_error: String,
+    is_http2_streaming: bool,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
     // result cache can be enable only when its from the start
     let use_cache = if in_req.query.from == 0 {
-        in_req.use_cache.unwrap_or(false)
+        in_req.use_cache
     } else {
         false
     };
@@ -95,6 +98,15 @@ pub async fn search(
             Ok(v) => v,
             Err(_) => v.to_string(),
         });
+    let backup_query_fn = query_fn.clone();
+    let is_result_array_skip_vrl = query_fn
+        .as_ref()
+        .map(|v| is_result_array_skip_vrl(v))
+        .unwrap_or(false);
+    if is_result_array_skip_vrl {
+        query_fn = None;
+    }
+
     let action = req
         .query
         .action_id
@@ -120,10 +132,7 @@ pub async fn search(
 
     let mut should_exec_query = true;
 
-    let mut file_path = format!(
-        "{}/{}/{}/{}",
-        org_id, stream_type, stream_name, hashed_query
-    );
+    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
     let mut c_resp: MultiCachedQueryResponse = if use_cache {
         // cache layer
         check_cache(
@@ -145,14 +154,17 @@ pub async fn search(
                     cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
+                let order_by = v.order_by;
+
                 MultiCachedQueryResponse {
                     ts_column,
                     is_descending,
+                    order_by,
                     ..Default::default()
                 }
             }
             Err(e) => {
-                log::error!("Error parsing sql: {:?}", e);
+                log::error!("Error parsing sql: {e}");
                 MultiCachedQueryResponse::default()
             }
         }
@@ -191,17 +203,18 @@ pub async fn search(
             c_resp.limit,
             c_resp.is_descending,
             c_resp.took,
+            c_resp.order_by,
         )
     } else {
-        if let Some(vrl_function) = &query_fn {
-            if !vrl_function.trim().ends_with('.') {
-                query_fn = Some(format!("{} \n .", vrl_function));
-            }
+        if let Some(vrl_function) = &query_fn
+            && !vrl_function.trim().ends_with('.')
+        {
+            query_fn = Some(format!("{vrl_function} \n ."));
         }
         req.query.query_fn = query_fn;
 
         for fn_name in functions::get_all_transform_keys(org_id).await {
-            if req.query.sql.contains(&format!("{}(", fn_name)) {
+            if req.query.sql.contains(&format!("{fn_name}(")) {
                 req.query.uses_zo_fn = true;
                 break;
             }
@@ -240,10 +253,15 @@ pub async fn search(
         );
 
         let mut tasks = Vec::new();
+        let partition_num = c_resp.deltas.len();
         for (i, delta) in c_resp.deltas.into_iter().enumerate() {
             let mut req = req.clone();
             let org_id = org_id.to_string();
-            let trace_id = format!("{}-{}", trace_id, i);
+            let trace_id = if partition_num == 1 {
+                trace_id.to_string()
+            } else {
+                format!("{trace_id}-{i}")
+            };
             let user_id = user_id.clone();
 
             let enter_span = tracing::span::Span::current();
@@ -291,11 +309,18 @@ pub async fn search(
                 c_resp.limit,
                 c_resp.is_descending,
                 c_resp.took,
+                c_resp.order_by,
             )
         } else {
-            let mut reps = results[0].clone();
-            sort_response(c_resp.is_descending, &mut reps, &c_resp.ts_column);
-            reps
+            // let mut reps = results[0].clone();
+            // sort_response(
+            //     c_resp.is_descending,
+            //     &mut reps,
+            //     &c_resp.ts_column,
+            //     &c_resp.order_by,
+            // );
+            // reps
+            results[0].clone()
         }
     };
 
@@ -335,6 +360,10 @@ pub async fn search(
         &search_type,
         &search_group,
     );
+
+    // Create a deep copy for caching BEFORE any modifications
+    // let cache_res = deep_copy_response(&res);
+
     res.set_trace_id(trace_id.to_string());
     res.set_took(took_time as usize);
     res.set_cache_took(cache_took);
@@ -352,6 +381,11 @@ pub async fn search(
         records: res.hits.len() as i64,
         response_time: took_time,
         size: res.scan_size as f64,
+        scan_files: if res.scan_files > 0 {
+            Some(res.scan_files as i64)
+        } else {
+            None
+        },
         request_body: Some(req.query.sql),
         function: req.query.query_fn,
         user_email: user_id,
@@ -409,32 +443,24 @@ pub async fn search(
         res.new_end_time = Some(req.query.end_time);
     }
 
+    let write_res = deep_copy_response(&res);
+    let mut local_res = deep_copy_response(&res);
+
     // There are 3 types of partial responses:
     // 1. VRL error
     // 2. Super cluster error
     // 3. Range error (max_query_limit)
 
-    // let should_cache_results =
-    //     res.new_start_time.is_some() || res.new_end_time.is_some() ||
-    // res.function_error.is_empty();
-
-    // Cache partial results only if there is a range error
-    // if !res.function_error.is_empty() && !range_error.is_empty() {
-    //     res.function_error.retain(|err| !err.contains(&range_error));
-    //     should_cache_results = should_cache_results && res.function_error.is_empty();
-    // }
-
-    // Update: Don't cache any partial results
-    let should_cache_results = res.new_start_time.is_none()
+    // result cache save changes start
+    let should_cache_results = cfg.common.result_cache_enabled
+        && !is_http2_streaming
+        && should_exec_query
+        && c_resp.cache_query_response
+        && res.new_start_time.is_none()
         && res.new_end_time.is_none()
         && res.function_error.is_empty()
         && !res.hits.is_empty();
-
-    // result cache save changes start
-    if cfg.common.result_cache_enabled
-        && should_exec_query
-        && c_resp.cache_query_response
-        && should_cache_results
+    if should_cache_results
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))
     {
@@ -443,7 +469,7 @@ pub async fn search(
             &c_resp.ts_column,
             req.query.start_time,
             req.query.end_time,
-            &res,
+            &write_res,
             file_path,
             is_aggregate,
             c_resp.is_descending,
@@ -452,12 +478,24 @@ pub async fn search(
     }
     // result cache save changes Ends
 
+    if is_result_array_skip_vrl {
+        local_res.hits = apply_vrl_to_response(
+            backup_query_fn,
+            &mut local_res,
+            org_id,
+            &stream_name,
+            trace_id,
+        );
+        return Ok(local_res);
+    }
+
     Ok(res)
 }
 
 // based on _timestamp of first record in config::meta::search::Response either add it in start
 // or end to cache response
 #[tracing::instrument(name = "service:search:cache:merge_response", skip_all)]
+#[allow(clippy::too_many_arguments)]
 pub fn merge_response(
     trace_id: &str,
     cache_responses: &mut Vec<config::meta::search::Response>,
@@ -466,6 +504,7 @@ pub fn merge_response(
     limit: i64,
     is_descending: bool,
     cache_took: usize,
+    order_by: Vec<(String, OrderBy)>,
 ) -> config::meta::search::Response {
     cache_responses.retain(|res| !res.hits.is_empty());
 
@@ -552,7 +591,7 @@ pub fn merge_response(
 
         cache_response.hits.extend(res.hits.clone());
     }
-    sort_response(is_descending, &mut cache_response, ts_column);
+    sort_response(is_descending, &mut cache_response, ts_column, &order_by);
 
     if cache_response.hits.len() > (limit as usize) {
         cache_response.hits.truncate(limit as usize);
@@ -581,16 +620,66 @@ pub fn merge_response(
     cache_response
 }
 
-fn sort_response(is_descending: bool, cache_response: &mut search::Response, ts_column: &str) {
-    if is_descending {
-        cache_response
-            .hits
-            .sort_by_key(|b| std::cmp::Reverse(get_ts_value(ts_column, b)));
-    } else {
-        cache_response
-            .hits
-            .sort_by_key(|a| get_ts_value(ts_column, a));
+fn sort_response(
+    _is_descending: bool,
+    cache_response: &mut search::Response,
+    ts_column: &str,
+    order_by: &Vec<(String, OrderBy)>,
+) {
+    if order_by.is_empty() {
+        return;
     }
+
+    cache_response.hits.sort_by(|a, b| {
+        for (field, order) in order_by {
+            let cmp = if ts_column == field {
+                let a_ts = get_ts_value(ts_column, a);
+                let b_ts = get_ts_value(ts_column, b);
+                a_ts.partial_cmp(&b_ts).unwrap_or(std::cmp::Ordering::Equal)
+            } else {
+                let a_val = a.get(field).unwrap_or(&serde_json::Value::Null);
+                let b_val = b.get(field).unwrap_or(&serde_json::Value::Null);
+
+                match (a_val, b_val) {
+                    (serde_json::Value::String(a_str), serde_json::Value::String(b_str)) => {
+                        a_str.cmp(b_str)
+                    }
+                    (serde_json::Value::Number(a_num), serde_json::Value::Number(b_num)) => {
+                        if let (Some(a_f64), Some(b_f64)) = (a_num.as_f64(), b_num.as_f64()) {
+                            a_f64
+                                .partial_cmp(&b_f64)
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        } else {
+                            std::cmp::Ordering::Equal
+                        }
+                    }
+                    (serde_json::Value::String(_), serde_json::Value::Number(_)) => {
+                        std::cmp::Ordering::Less
+                    }
+                    (serde_json::Value::Number(_), serde_json::Value::String(_)) => {
+                        std::cmp::Ordering::Greater
+                    }
+                    _ => std::cmp::Ordering::Equal,
+                }
+            };
+
+            // Apply order direction
+            let final_cmp = if order == &OrderBy::Desc {
+                cmp.reverse()
+            } else {
+                cmp
+            };
+
+            // If this field comparison is not equal, return the result
+            // Otherwise, continue to the next field
+            if final_cmp != std::cmp::Ordering::Equal {
+                return final_cmp;
+            }
+        }
+
+        // If all fields are equal, maintain stable sort
+        std::cmp::Ordering::Equal
+    });
 }
 
 #[allow(clippy::too_many_arguments, unused_variables)]
@@ -607,15 +696,17 @@ pub async fn _write_results(
     // disable write_results_v1
     // return;
     // #[allow(unreachable_code)]
-    let mut local_resp = res.clone();
+    let mut local_resp = deep_copy_response(res);
     let remove_hit = if is_descending {
         local_resp.hits.last()
     } else {
         local_resp.hits.first()
     };
 
-    if !local_resp.hits.is_empty() && remove_hit.is_some() {
-        let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
+    if !local_resp.hits.is_empty()
+        && let Some(remove_hit) = remove_hit
+    {
+        let ts_value_to_remove = remove_hit.get(ts_column).cloned();
 
         if let Some(ts_value) = ts_value_to_remove {
             local_resp
@@ -688,7 +779,7 @@ pub async fn _write_results(
                 drop(w);
             }
             Err(e) => {
-                log::error!("Cache results to disk failed: {:?}", e);
+                log::error!("Cache results to disk failed: {e}");
             }
         }
     });
@@ -740,6 +831,7 @@ pub async fn write_results_v2(
     is_descending: bool,
 ) {
     let mut local_resp = res.clone();
+
     let remove_hit = if is_descending {
         local_resp.hits.last()
     } else {
@@ -759,13 +851,13 @@ pub async fn write_results_v2(
                 // Retain only the hits that do NOT fall within the
                 // same date, hour, minute as the hit to remove
                 local_resp.hits.retain(|hit| {
-                    if let Some(hit_ts) = hit.get(ts_column) {
-                        if let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts) {
-                            // Extract the date, hour, minute, and second for the current hit
-                            let hit_date_hour_minute_second =
-                                hit_ts_datetime.format("%Y-%m-%dT%H:%M:%S").to_string();
-                            return hit_date_hour_minute_second != target_date_hour_minute_second;
-                        }
+                    if let Some(hit_ts) = hit.get(ts_column)
+                        && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts)
+                    {
+                        // Extract the date, hour, minute, and second for the current hit
+                        let hit_date_hour_minute_second =
+                            hit_ts_datetime.format("%Y-%m-%dT%H:%M:%S").to_string();
+                        return hit_date_hour_minute_second != target_date_hour_minute_second;
                     }
                     false
                 });
@@ -777,10 +869,7 @@ pub async fn write_results_v2(
     }
 
     if local_resp.hits.is_empty() {
-        log::info!(
-            "[trace_id {trace_id}] No hits found for caching, skipping caching",
-            trace_id = trace_id
-        );
+        log::info!("[trace_id {trace_id}] No hits found for caching, skipping caching");
         return;
     }
 
@@ -843,10 +932,99 @@ pub async fn write_results_v2(
                 drop(w);
             }
             Err(e) => {
-                log::error!("Cache results to disk failed: {:?}", e);
+                log::error!("Cache results to disk failed: {e}");
             }
         }
     });
+}
+
+pub fn apply_vrl_to_response(
+    backup_query_fn: Option<String>,
+    res: &mut config::meta::search::Response,
+    org_id: &str,
+    stream_name: &str,
+    trace_id: &str,
+) -> Vec<serde_json::Value> {
+    let query_fn = backup_query_fn.clone();
+    let mut local_res = res.clone();
+
+    local_res.hits = if let Some(query_fn) = query_fn
+        && !local_res.hits.is_empty()
+        && !local_res.is_partial
+    {
+        // compile vrl function & apply the same before returning the response
+        let mut input_fn = query_fn.trim().to_string();
+
+        let apply_over_hits = RESULT_ARRAY_SKIP_VRL.is_match(&input_fn);
+        if apply_over_hits {
+            input_fn = RESULT_ARRAY_SKIP_VRL.replace(&input_fn, "").to_string();
+        }
+        let mut runtime = init_vrl_runtime();
+        let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
+            Ok(program) => {
+                let registry = program
+                    .config
+                    .get_custom::<vector_enrichment::TableRegistry>()
+                    .unwrap();
+                registry.finish_load();
+                Some(program)
+            }
+            Err(err) => {
+                log::error!("[trace_id {trace_id}] search->vrl: compile err: {err:?}");
+                local_res.function_error.push(err.to_string());
+                local_res.is_partial = true;
+                None
+            }
+        };
+        match program {
+            Some(program) => {
+                if apply_over_hits {
+                    let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                        &mut runtime,
+                        &config::meta::function::VRLResultResolver {
+                            program: program.program.clone(),
+                            fields: program.fields.clone(),
+                        },
+                        json::Value::Array(local_res.hits.clone()),
+                        org_id,
+                        &[stream_name.to_string()],
+                    );
+                    ret_val
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter_map(|v| {
+                            (!v.is_null())
+                                .then_some(config::utils::flatten::flatten(v.clone()).unwrap())
+                        })
+                        .collect()
+                } else {
+                    local_res
+                        .hits
+                        .into_iter()
+                        .filter_map(|hit| {
+                            let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                                &mut runtime,
+                                &config::meta::function::VRLResultResolver {
+                                    program: program.program.clone(),
+                                    fields: program.fields.clone(),
+                                },
+                                hit,
+                                org_id,
+                                &[stream_name.to_string()],
+                            );
+                            (!ret_val.is_null())
+                                .then_some(config::utils::flatten::flatten(ret_val).unwrap())
+                        })
+                        .collect()
+                }
+            }
+            None => local_res.hits,
+        }
+    } else {
+        local_res.hits
+    };
+    local_res.hits
 }
 
 #[tracing::instrument(name = "service:search:cacher:check_cache_v2", skip_all)]
@@ -892,10 +1070,7 @@ pub async fn check_cache_v2(
 
     let mut should_exec_query = true;
 
-    let mut file_path = format!(
-        "{}/{}/{}/{}",
-        org_id, stream_type, stream_name, hashed_query
-    );
+    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
     Ok(if use_cache {
         let mut resp = check_cache(
             trace_id,
@@ -928,7 +1103,7 @@ pub async fn check_cache_v2(
                 }
             }
             Err(e) => {
-                log::error!("[trace_id {}]: Error parsing sql: {:?}", trace_id, e);
+                log::error!("[trace_id {trace_id}]: Error parsing sql: {e:?}");
                 MultiCachedQueryResponse::default()
             }
         }
@@ -959,4 +1134,14 @@ fn convert_ts_value_to_datetime(ts_value: &serde_json::Value) -> Option<chrono::
         }
         _ => None,
     }
+}
+
+pub fn is_result_array_skip_vrl(vrl_fn: &str) -> bool {
+    RESULT_ARRAY_SKIP_VRL.is_match(vrl_fn)
+}
+
+// Helper function to create a deep copy of a Response
+fn deep_copy_response(res: &config::meta::search::Response) -> config::meta::search::Response {
+    let serialized = serde_json::to_string(res).expect("Failed to serialize response");
+    serde_json::from_str(&serialized).expect("Failed to deserialize response")
 }

@@ -141,10 +141,7 @@ pub async fn search(
             }
         };
         if group.len() > 1 {
-            log::info!(
-                "[trace_id {trace_id}] promql->search->grpc: get groups {:?}",
-                group
-            );
+            log::info!("[trace_id {trace_id}] promql->search->grpc: get groups {group:?}");
         }
         log::info!(
             "[trace_id {trace_id}] promql->search->grpc: generate search group, took: {} ms",
@@ -408,7 +405,7 @@ mod tests {
     #[tokio::test]
     async fn test_promql_generate_search_group() {
         // test case 1: normal case
-        let memory_limit = 200 as usize;
+        let memory_limit = 200_usize;
         let file_list = vec![
             FileKey {
                 meta: FileMeta {
@@ -474,7 +471,7 @@ mod tests {
         assert_eq!(resp.unwrap(), expected);
 
         // test case 4, the last group is greater than step * 5
-        let memory_limit = 100 as usize;
+        let memory_limit = 100_usize;
         let resp = generate_search_group(memory_limit, file_list.clone(), 0, 430, 5).await;
         let expected = vec![(0, 200), (205, 300), (305, 400), (405, 430)];
         assert!(resp.is_ok());

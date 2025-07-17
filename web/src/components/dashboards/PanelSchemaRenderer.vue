@@ -280,6 +280,7 @@ import {
   nextTick,
   defineAsyncComponent,
   onMounted,
+  onUnmounted,
 } from "vue";
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
@@ -290,7 +291,6 @@ import {
   getFoldersList,
 } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
-import { onUnmounted } from "vue";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
@@ -576,6 +576,14 @@ export default defineComponent({
           [panelSchema?.value?.id]: false,
         };
       }
+      
+      // Clear all refs to prevent memory leaks
+      chartPanelRef.value = null;
+      drilldownPopUpRef.value = null;
+      annotationPopupRef.value = null;
+      tableRendererRef.value = null;
+      parser = null;
+      
     });
     watch(
       [data, store?.state],
@@ -1402,6 +1410,8 @@ export default defineComponent({
             if (drilldownData.targetBlank) {
               window.open(logsUrl.toString(), "_blank");
             } else {
+              await store.dispatch("logs/setIsInitialized", false);
+              await nextTick();
               await router.push({
                 path: "/logs",
                 query: Object.fromEntries(logsUrl.searchParams.entries()),

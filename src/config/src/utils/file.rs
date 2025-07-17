@@ -38,23 +38,17 @@ pub fn is_exists(file: &str) -> bool {
 }
 
 #[inline(always)]
-pub fn get_file_contents(
-    file: &str,
-    range: Option<Range<usize>>,
-) -> Result<Vec<u8>, std::io::Error> {
+pub fn get_file_contents(file: &str, range: Option<Range<u64>>) -> Result<Vec<u8>, std::io::Error> {
     let mut file = File::open(file)?;
     let data = if let Some(range) = range {
         let to_read = range.end - range.start;
-        let mut buf = Vec::with_capacity(to_read);
-        file.seek(std::io::SeekFrom::Start(range.start as u64))?;
-        let read = file.take(to_read as u64).read_to_end(&mut buf)?;
-        if read != to_read {
+        let mut buf = Vec::with_capacity(to_read as usize);
+        file.seek(std::io::SeekFrom::Start(range.start))?;
+        let read = file.take(to_read).read_to_end(&mut buf)?;
+        if read != to_read as usize {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
-                format!(
-                    "Expected to read {} bytes, but read {} bytes",
-                    to_read, read
-                ),
+                format!("Expected to read {to_read} bytes, but read {read} bytes"),
             ));
         }
         buf
@@ -69,7 +63,7 @@ pub fn get_file_contents(
 #[inline(always)]
 pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Error> {
     // Create a temporary file in the same directory
-    let temp_file = format!("{}.tmp", file);
+    let temp_file = format!("{file}.tmp");
 
     // Write to temporary file first
     let mut file_handle = File::create(&temp_file)?;
@@ -146,9 +140,9 @@ pub async fn scan_files_with_channel(
             if path_ext == ext {
                 files.push(path.to_str().unwrap().to_string());
                 if limit > 0 && files.len() >= limit {
-                    tx.send(files.clone()).await.map_err(|e| {
-                        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
-                    })?;
+                    tx.send(files.clone())
+                        .await
+                        .map_err(|e| std::io::Error::other(e.to_string()))?;
                     files.clear();
                 }
             }
@@ -157,7 +151,7 @@ pub async fn scan_files_with_channel(
     if !files.is_empty() {
         tx.send(files)
             .await
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
     }
     Ok(())
 }

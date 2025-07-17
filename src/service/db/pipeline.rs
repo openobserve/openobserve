@@ -15,9 +15,12 @@
 
 use std::sync::Arc;
 
-use config::meta::{
-    pipeline::{Pipeline, components::PipelineSource},
-    stream::StreamParams,
+use config::{
+    cluster::LOCAL_NODE,
+    meta::{
+        pipeline::{Pipeline, components::PipelineSource},
+        stream::StreamParams,
+    },
 };
 use infra::{
     cluster_coordinator::pipelines::PIPELINES_WATCH_PREFIX,
@@ -88,8 +91,8 @@ pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>, 
     Ok(infra_pipeline::list_streams_with_pipeline(org).await?)
 }
 
-/// Transform the initialized and enabled pipeline into ExecutablePipeline struct that's ready for
-/// batch processing records.
+/// Retrieve cached ExecutablePipeline struct that's ready for batch processing records by
+/// StreamParams
 ///
 /// Used for pipeline execution.
 pub async fn get_executable_pipeline(stream_params: &StreamParams) -> Option<ExecutablePipeline> {
@@ -143,6 +146,9 @@ pub async fn delete(pipeline_id: &str) -> Result<(), PipelineError> {
 
 /// Preload all enabled pipelines into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
+    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
+        return Ok(());
+    }
     let pipelines = list().await?;
     if pipelines
         .iter()
@@ -155,26 +161,33 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             .await;
         log::info!("[PIPELINE:CACHE] done waiting");
     }
+    let mut pipeline_stream_mapping_cache = PIPELINE_STREAM_MAPPING.write().await;
     let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
+    // clear the cache first in case of a refresh
+    pipeline_stream_mapping_cache.clear();
+    stream_exec_pl.clear();
+
     for pipeline in pipelines.into_iter() {
-        if pipeline.enabled {
-            if let PipelineSource::Realtime(stream_params) = &pipeline.source {
-                match ExecutablePipeline::new(&pipeline).await {
-                    Err(e) => {
-                        log::error!(
-                            "[Pipeline] error initializing ExecutablePipeline from pipeline {}/{}. {}. Not cached",
-                            pipeline.org,
-                            pipeline.id,
-                            e
-                        )
-                    }
-                    Ok(exec_pl) => {
-                        stream_exec_pl.insert(stream_params.clone(), exec_pl);
-                    }
-                };
-            }
+        if pipeline.enabled
+            && let PipelineSource::Realtime(stream_params) = &pipeline.source
+        {
+            match ExecutablePipeline::new(&pipeline).await {
+                Err(e) => {
+                    log::error!(
+                        "[Pipeline] error initializing ExecutablePipeline from pipeline {}/{}. {}. Not cached",
+                        pipeline.org,
+                        pipeline.id,
+                        e
+                    )
+                }
+                Ok(exec_pl) => {
+                    pipeline_stream_mapping_cache.insert(pipeline.id, stream_params.clone());
+                    stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                }
+            };
         }
     }
+
     log::info!("[Pipeline] Cached with len: {}", stream_exec_pl.len());
     Ok(())
 }
@@ -221,8 +234,7 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
                 match config::utils::json::to_vec(pipeline) {
                     Err(e) => {
                         log::error!(
-                            "[Pipeline] error serializing pipeline for super_cluster event: {}",
-                            e
+                            "[Pipeline] error serializing pipeline for super_cluster event: {e}"
                         );
                     }
                     Ok(value_vec) => {
@@ -253,7 +265,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         let ev = match events.recv().await {
             Some(ev) => ev,
             None => {
-                log::error!("watch_pipelines: event channel closed");
+                log::error!("[Pipeline::watch] event channel closed");
                 break;
             }
         };
@@ -294,10 +306,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         if let Some(removed) = pipeline_stream_mapping_cache.remove(pipeline_id) {
                             if stream_exec_pl.remove(&removed).is_some() {
                                 log::info!(
-                                    "[Pipeline]: pipeline {} disabled and removed from cache.",
-                                    pipeline_id
+                                    "[Pipeline]: pipeline {pipeline_id} disabled and removed from cache."
                                 );
                             }
+                        } else {
+                            log::error!(
+                                "[Pipeline]: pipeline {pipeline_id} not found in cache to remove."
+                            );
                         }
                     }
                 }
@@ -312,10 +327,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         .is_some()
                     {
                         log::info!(
-                            "[Pipeline]: pipeline {} deleted and removed from cache.",
-                            pipeline_id
+                            "[Pipeline]: pipeline {pipeline_id} deleted and removed from cache."
                         );
                     };
+                } else {
+                    log::error!("[Pipeline]: pipeline {pipeline_id} not found in cache to remove.");
                 }
             }
             db::Event::Empty => {}

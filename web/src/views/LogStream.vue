@@ -161,12 +161,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-        <div class="flex justify-between items-center full-width q-mt-sm" style="font-size: 12px">
+        <div
+          class="flex justify-between items-center full-width q-mt-sm"
+          style="font-size: 12px"
+        >
           <div class="q-table__separator col text-bold">
-            {{scope.pagination.rowsNumber}} Stream(s)
+            {{ scope.pagination.rowsNumber }} Stream(s)
           </div>
           <div class="q-table__control" v-if="scope.pagination.rowsNumber > 0">
-            Showing {{ ((scope.pagination.page - 1) * scope.pagination.rowsPerPage) + 1 }} - {{((scope.pagination.page * scope.pagination.rowsPerPage) > scope.pagination.rowsNumber) ? scope.pagination.rowsNumber : scope.pagination.page * scope.pagination.rowsPerPage}} of {{scope.pagination.rowsNumber}}
+            Showing
+            {{ (scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1 }}
+            -
+            {{
+              scope.pagination.page * scope.pagination.rowsPerPage >
+              scope.pagination.rowsNumber
+                ? scope.pagination.rowsNumber
+                : scope.pagination.page * scope.pagination.rowsPerPage
+            }}
+            of {{ scope.pagination.rowsNumber }}
             <div class="q-btn-group row no-wrap inline q-ml-md">
               <q-btn
                 icon="chevron_left"
@@ -179,7 +191,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disable="scope.isFirstPage"
                 @click="scope.prevPage"
               />
-              <hr class="q-separator q-separator--vertical" aria-orientation="vertical">
+              <hr
+                class="q-separator q-separator--vertical"
+                aria-orientation="vertical"
+              />
               <q-btn
                 icon="chevron_right"
                 color="grey-8"
@@ -205,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disable="isDeleting"
           @click="confirmBatchDeleteAction"
         />
-        
+
         <div class="q-btn-group row no-wrap inline q-ml-md">
           <q-btn
             icon="chevron_left"
@@ -218,7 +233,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disable="scope.isFirstPage"
             @click="scope.prevPage"
           />
-          <hr class="q-separator q-separator--vertical" aria-orientation="vertical">
+          <hr
+            class="q-separator q-separator--vertical"
+            aria-orientation="vertical"
+          />
           <q-btn
             icon="chevron_right"
             color="grey-8"
@@ -232,7 +250,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </template>
-
     </q-table>
     <q-dialog
       v-model="showIndexSchemaDialog"
@@ -368,7 +385,7 @@ export default defineComponent({
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);
     const pagination = ref({
-      sortBy: 'name',
+      sortBy: "name",
       descending: false,
       page: 1,
       rowsPerPage: 20,
@@ -377,10 +394,15 @@ export default defineComponent({
     const sortField = ref("name");
     const sortAsc = ref(true);
 
-    const offset = pagination.value.page - 1 * pagination.value.rowsPerPage < 0 ? 0 : pagination.value.page - 1 * pagination.value.rowsPerPage;
+    const offset =
+      (pagination.value.page - 1) * pagination.value.rowsPerPage < 0
+        ? 0
+        : (pagination.value.page - 1) * pagination.value.rowsPerPage;
+
     const pageOffset = ref(offset);
+
     const pageRecordsPerPage = ref(pagination.value.rowsPerPage);
-    
+
     const streamFilterValues = [
       { label: t("logStream.labelLogs"), value: "logs" },
       { label: t("logStream.labelMetrics"), value: "metrics" },
@@ -388,7 +410,14 @@ export default defineComponent({
       { label: t("logStream.labelMetadata"), value: "metadata" },
       { label: t("logStream.labelIndex"), value: "index" },
     ];
-    const { getStreams, resetStreams, removeStream, getStream, getPaginatedStreams } = useStreams();
+    const {
+      getStreams,
+      resetStreams,
+      removeStream,
+      getStream,
+      getPaginatedStreams,
+      addNewStreams,
+    } = useStreams();
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -517,17 +546,25 @@ export default defineComponent({
         });
         logStream.value = [];
 
-        if (refresh) resetStreams();
-
         let counter = 1;
         let streamResponse;
         // if(selectedStreamType.value == "all") {
         //   streamResponse = getStreams(selectedStreamType.value || "", false, false);
         // } else {
-          streamResponse = getPaginatedStreams(selectedStreamType.value || "", false, false, pageOffset.value, pageRecordsPerPage.value, filterQuery.value, sortField.value, sortAsc.value);
+        streamResponse = getPaginatedStreams(
+          selectedStreamType.value || "",
+          false,
+          false,
+          pageOffset.value,
+          pageRecordsPerPage.value,
+          filterQuery.value,
+          sortField.value,
+          sortAsc.value,
+        );
         // }
 
-        streamResponse.then((res: any) => {
+        streamResponse
+          .then((res: any) => {
             logStream.value = [];
             let doc_num = "";
             let storage_size = "";
@@ -535,6 +572,7 @@ export default defineComponent({
             let index_size = "";
             resultTotal.value = res.list.length;
             pagination.value.rowsNumber = res.total;
+
             logStream.value.push(
               ...res.list.map((data: any) => {
                 doc_num = "--";
@@ -566,10 +604,11 @@ export default defineComponent({
                 listSchema({ row: element });
               }
             });
-
-            console.log(logStream.value)
             // onChangeStreamFilter(selectedStreamType.value);
             loadingState.value = false;
+
+            addNewStreams(selectedStreamType.value, res.list);
+
             dismiss();
           })
           .catch((err) => {
@@ -623,7 +662,6 @@ export default defineComponent({
     };
     const confirmBatchDeleteAction = () => {
       confirmBatchDelete.value = true;
-      console.log(selected, "selected items");
     };
 
     const deleteStream = () => {
@@ -692,7 +730,6 @@ export default defineComponent({
           }
 
           // Remove deleted streams from the list
-          console.log(selectedItems, "after deleting streams");
           selectedItems.forEach((stream: any) => {
             removeStream(stream.name, stream.stream_type);
             selected.value = selected.value.filter(
@@ -789,6 +826,10 @@ export default defineComponent({
     };
 
     const exploreStream = async (props: any) => {
+      store.dispatch("logs/setIsInitialized", false);
+
+      // We need to check if stream is present in store, if not then we need to fetch the stream
+
       const dateTime = await getTimeRange(props.row);
       router.push({
         name: "logs",
@@ -834,9 +875,6 @@ export default defineComponent({
       // resultTotal.value = logStream.value.length;
     };
 
-    const getSelectedItems = () => {
-      console.log(selected.value[0], "selected");
-    };
     const addStream = () => {
       addStreamDialog.value.show = true;
       // router.push({
@@ -852,10 +890,10 @@ export default defineComponent({
     };
 
     const onRequest = async (props: any) => {
-      const { page, rowsPerPage, sortBy, descending } = props.pagination
+      const { page, rowsPerPage, sortBy, descending } = props.pagination;
       const filter = props.filter;
 
-      if(sortBy != null) {
+      if (sortBy != null) {
         sortField.value = sortBy;
         sortAsc.value = !descending;
       } else {
@@ -863,22 +901,23 @@ export default defineComponent({
         sortAsc.value = true;
       }
 
-      pageOffset.value = ((page - 1) * rowsPerPage) < 0 ? 0 : (page - 1) * rowsPerPage;
+      pageOffset.value =
+        (page - 1) * rowsPerPage < 0 ? 0 : (page - 1) * rowsPerPage;
       pageRecordsPerPage.value = rowsPerPage;
 
-      loadingState.value = true
+      loadingState.value = true;
 
       await getLogStream();
 
       // don't forget to update local pagination object
-      pagination.value.page = page
-      pagination.value.rowsPerPage = rowsPerPage
-      pagination.value.sortBy = sortBy
-      pagination.value.descending = descending
+      pagination.value.page = page;
+      pagination.value.rowsPerPage = rowsPerPage;
+      pagination.value.sortBy = sortBy;
+      pagination.value.descending = descending;
 
-        // ...and turn of loading indicator
+      // ...and turn of loading indicator
       loadingState.value = false;
-    }
+    };
 
     return {
       t,
@@ -919,7 +958,6 @@ export default defineComponent({
       addStream,
       loadingState,
       getSelectedString,
-      getSelectedItems,
       isDeleting,
       getRowKey,
       searchKeyword,

@@ -70,6 +70,9 @@ pub struct ScanStats {
     /// unit: ms
     #[prost(int64, tag = "10")]
     pub file_list_took: i64,
+    /// unit: %
+    #[prost(int64, tag = "11")]
+    pub aggs_cache_ratio: i64,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]
@@ -97,15 +100,6 @@ pub struct FileKey {
     #[prost(bool, tag = "5")]
     pub deleted: bool,
     #[prost(bytes = "vec", optional, tag = "6")]
-    pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
-}
-#[derive(Eq)]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct IdxFileName {
-    #[prost(string, tag = "1")]
-    pub key: ::prost::alloc::string::String,
-    #[prost(bytes = "vec", optional, tag = "2")]
     pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -1017,6 +1011,8 @@ pub struct SearchQuery {
     pub skip_wal: bool,
     #[prost(string, tag = "15")]
     pub action_id: ::prost::alloc::string::String,
+    #[prost(int64, tag = "16")]
+    pub histogram_interval: i64,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2890,6 +2886,16 @@ pub struct NewEmptyExecNode {
     #[prost(message, optional, tag = "7")]
     pub full_schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AggregateTopkExecNode {
+    #[prost(string, tag = "1")]
+    pub sort_field: ::prost::alloc::string::String,
+    #[prost(bool, tag = "2")]
+    pub descending: bool,
+    #[prost(uint64, tag = "3")]
+    pub limit: u64,
+}
 /// Search request
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2926,14 +2932,16 @@ pub struct SearchInfo {
     pub plan: ::prost::alloc::vec::Vec<u8>,
     #[prost(int64, repeated, tag = "2")]
     pub file_id_list: ::prost::alloc::vec::Vec<i64>,
-    #[prost(message, repeated, tag = "3")]
-    pub idx_file_list: ::prost::alloc::vec::Vec<IdxFileName>,
     #[prost(int64, tag = "4")]
     pub start_time: i64,
     #[prost(int64, tag = "5")]
     pub end_time: i64,
     #[prost(int64, tag = "6")]
     pub timeout: i64,
+    #[prost(bool, tag = "7")]
+    pub use_cache: bool,
+    #[prost(int64, tag = "8")]
+    pub histogram_interval: i64,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2968,7 +2976,7 @@ pub struct SuperClusterInfo {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IdxOptimizeMode {
-    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2, 3")]
+    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2, 3, 4")]
     pub mode: ::core::option::Option<idx_optimize_mode::Mode>,
 }
 /// Nested message and enum types in `IdxOptimizeMode`.
@@ -2982,6 +2990,8 @@ pub mod idx_optimize_mode {
         SimpleCount(super::SimpleCount),
         #[prost(message, tag = "3")]
         SimpleHistogram(super::SimpleHistogram),
+        #[prost(message, tag = "4")]
+        SimpleTopn(super::SimpleTopN),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3004,6 +3014,16 @@ pub struct SimpleHistogram {
     pub bucket_width: u64,
     #[prost(uint32, tag = "3")]
     pub num_buckets: u32,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleTopN {
+    #[prost(string, tag = "1")]
+    pub field: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "2")]
+    pub limit: u32,
+    #[prost(bool, tag = "3")]
+    pub asc: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

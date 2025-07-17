@@ -15,10 +15,12 @@
 
 use std::ops::ControlFlow;
 
+use hashbrown::HashSet;
 use sqlparser::{
     ast::{
-        DuplicateTreatment, Expr, Function, FunctionArgumentList, FunctionArguments, GroupByExpr,
-        Query, SelectItem, SetExpr, Statement, Visit, Visitor,
+        DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList,
+        FunctionArguments, GroupByExpr, Query, SelectItem, SetExpr, Statement, TableFactor, Visit,
+        Visitor,
     },
     dialect::GenericDialect,
     parser::Parser,
@@ -26,7 +28,7 @@ use sqlparser::{
 
 use crate::TIMESTAMP_COL_NAME;
 
-pub const AGGREGATE_UDF_LIST: [&str; 10] = [
+pub const AGGREGATE_UDF_LIST: [&str; 17] = [
     "min",
     "max",
     "avg",
@@ -34,24 +36,30 @@ pub const AGGREGATE_UDF_LIST: [&str; 10] = [
     "count",
     "median",
     "array_agg",
-    "approx_percentile_cont",
     "percentile_cont",
     "summary_percentile",
+    "first_value",
+    "last_value",
+    "approx_distinct",
+    "approx_median",
+    "approx_percentile_cont",
+    "approx_percentile_cont_with_weight",
+    "approx_topk",
+    "approx_topk_distinct",
 ];
 
 pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
-        if let Statement::Query(query) = statement {
-            if is_aggregate_in_select(query)
+        if let Statement::Query(query) = statement
+            && (is_aggregate_in_select(query)
                 || has_group_by(query)
                 || has_having(query)
                 || has_join(query)
                 || has_subquery(statement)
-                || has_union(query)
-            {
-                return Ok(true);
-            }
+                || has_union(query))
+        {
+            return Ok(true);
         }
     }
     Ok(false)
@@ -65,14 +73,14 @@ pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser:
         if has_subquery(statement) || has_window_functions(statement) {
             return Ok(false);
         }
-        if let Statement::Query(query) = statement {
-            if !is_aggregate_in_select(query)
+
+        if let Statement::Query(query) = statement
+            && (!is_aggregate_in_select(query)
                 || has_join(query)
                 || has_union(query)
-                || has_cte(query)
-            {
-                return Ok(false);
-            }
+                || has_cte(query))
+        {
+            return Ok(false);
         }
     }
     Ok(true)
@@ -82,10 +90,11 @@ pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser:
 pub fn is_simple_distinct_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
-        if let Statement::Query(query) = statement {
-            if has_distinct(query) && !has_group_by(query) {
-                return Ok(true);
-            }
+        if let Statement::Query(query) = statement
+            && has_distinct(query)
+            && !has_group_by(query)
+        {
+            return Ok(true);
         }
     }
     Ok(false)
@@ -111,10 +120,9 @@ fn is_aggregate_in_select(query: &Query) -> bool {
         for select_item in &select.projection {
             if let SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, alias: _ } =
                 select_item
+                && is_aggregate_expression(expr)
             {
-                if is_aggregate_expression(expr) {
-                    return true;
-                }
+                return true;
             }
         }
     }
@@ -131,14 +139,14 @@ fn is_aggregate_expression(expr: &Expr) -> bool {
             is_aggregate_expression(left) || is_aggregate_expression(right)
         }
         Expr::Case {
+            operand,
             conditions,
-            results,
             else_result,
-            ..
         } => {
             // Check if any part of the CASE expression is an aggregate function
-            conditions.iter().any(is_aggregate_expression)
-                || results.iter().any(is_aggregate_expression)
+            conditions.iter().any(|c| {
+                is_aggregate_expression(&c.condition) || is_aggregate_expression(&c.result)
+            }) || operand.as_ref().is_some_and(|e| is_aggregate_expression(e))
                 || else_result
                     .as_ref()
                     .is_some_and(|e| is_aggregate_expression(e))
@@ -174,7 +182,7 @@ fn has_group_by(query: &Query) -> bool {
 // Check if has distinct
 fn has_distinct(query: &Query) -> bool {
     let mut visitor = DistinctVisitor::new();
-    query.visit(&mut visitor);
+    let _ = query.visit(&mut visitor);
     visitor.has_distinct
 }
 
@@ -195,11 +203,11 @@ impl Visitor for DistinctVisitor {
 
     fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
         // Check for SELECT DISTINCT
-        if let SetExpr::Select(select) = query.body.as_ref() {
-            if select.distinct.is_some() {
-                self.has_distinct = true;
-                return ControlFlow::Break(());
-            }
+        if let SetExpr::Select(select) = query.body.as_ref()
+            && select.distinct.is_some()
+        {
+            self.has_distinct = true;
+            return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
     }
@@ -246,13 +254,13 @@ fn has_join(query: &Query) -> bool {
 
 fn has_union(query: &Query) -> bool {
     let mut visitor = UnionVisitor::new();
-    query.visit(&mut visitor);
+    let _ = query.visit(&mut visitor);
     visitor.has_union
 }
 
 fn has_subquery(stat: &Statement) -> bool {
     let mut visitor = SubqueryVisitor::new();
-    stat.visit(&mut visitor);
+    let _ = stat.visit(&mut visitor);
     visitor.is_subquery
 }
 
@@ -318,19 +326,71 @@ impl Visitor for SubqueryVisitor {
 
 fn has_timestamp(stat: &Statement) -> bool {
     let mut visitor = TimestampVisitor::new();
-    stat.visit(&mut visitor);
+    let _ = stat.visit(&mut visitor);
     visitor.timestamp_selected
 }
 
-struct TimestampVisitor {
+pub struct TimestampVisitor {
     pub timestamp_selected: bool,
+    timestamp_aliases: HashSet<String>, // known aliases for _timestamp or histogram(_timestamp)
 }
 
 impl TimestampVisitor {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             timestamp_selected: false,
+            timestamp_aliases: HashSet::new(),
         }
+    }
+
+    fn is_timestamp_expr(expr: &Expr) -> bool {
+        match expr {
+            Expr::Identifier(ident) => ident.value == TIMESTAMP_COL_NAME,
+
+            Expr::CompoundIdentifier(idents) => idents
+                .last()
+                .is_some_and(|id| id.value == TIMESTAMP_COL_NAME),
+
+            Expr::Function(func) => {
+                func.name.to_string().to_lowercase() == "histogram"
+                    && match &func.args {
+                        FunctionArguments::List(args) => args.args.iter().any(|arg| match arg {
+                            FunctionArg::Unnamed(FunctionArgExpr::Expr(e)) => {
+                                Self::is_timestamp_expr(e)
+                            }
+                            _ => false,
+                        }),
+                        _ => false,
+                    }
+            }
+
+            _ => false,
+        }
+    }
+
+    fn visit_table_factor(&mut self, relation: &TableFactor) -> ControlFlow<()> {
+        match relation {
+            TableFactor::Derived { subquery, .. } => {
+                subquery.visit(self)?;
+            }
+            TableFactor::NestedJoin {
+                table_with_joins,
+                alias: _,
+            } => {
+                for join in &table_with_joins.joins {
+                    join.relation.visit(self)?;
+                }
+                table_with_joins.relation.visit(self)?;
+            }
+            _ => {}
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+impl Default for TimestampVisitor {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -338,30 +398,58 @@ impl Visitor for TimestampVisitor {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
+        //  Recurse into CTEs
+        if let Some(with) = &query.with {
+            for cte in &with.cte_tables {
+                cte.query.visit(self)?;
+            }
+        }
+
+        //  Recurse into subqueries in FROM clause
         if let SetExpr::Select(select) = query.body.as_ref() {
+            for table in &select.from {
+                self.visit_table_factor(&table.relation)?;
+            }
+
             for item in &select.projection {
                 match item {
-                    SelectItem::UnnamedExpr(expr) => match expr {
-                        Expr::Identifier(ident) if ident.value == TIMESTAMP_COL_NAME => {
+                    SelectItem::UnnamedExpr(expr) => {
+                        if Self::is_timestamp_expr(expr) {
                             self.timestamp_selected = true;
                             return ControlFlow::Break(());
                         }
-                        Expr::CompoundIdentifier(idents) => {
-                            if let Some(last) = idents.last() {
-                                if last.value == TIMESTAMP_COL_NAME {
-                                    self.timestamp_selected = true;
-                                    return ControlFlow::Break(());
-                                }
-                            }
-                        }
-                        _ => {}
-                    },
-                    SelectItem::ExprWithAlias { alias, .. } => {
-                        if alias.value == TIMESTAMP_COL_NAME {
+
+                        // Handle alias chain: SELECT ts1 FROM (...) where ts1 is alias for
+                        // _timestamp
+                        if let Expr::Identifier(ident) = expr
+                            && self.timestamp_aliases.contains(&ident.value)
+                        {
                             self.timestamp_selected = true;
                             return ControlFlow::Break(());
                         }
                     }
+
+                    SelectItem::ExprWithAlias { expr, alias } => {
+                        // If alias is "_timestamp", count it, regardless of expr
+                        if alias.value == TIMESTAMP_COL_NAME {
+                            self.timestamp_selected = true;
+                            return ControlFlow::Break(());
+                        }
+
+                        // If the expression is timestamp-related, remember its alias
+                        if Self::is_timestamp_expr(expr) {
+                            self.timestamp_aliases.insert(alias.value.clone());
+                        }
+
+                        // If the expression is an alias we already know maps to timestamp
+                        if let Expr::Identifier(ident) = expr
+                            && self.timestamp_aliases.contains(&ident.value)
+                        {
+                            self.timestamp_aliases.insert(alias.value.clone());
+                        }
+                    }
+
+                    // SELECT * — explicitly excluded
                     SelectItem::Wildcard(_) => {
                         self.timestamp_selected = true;
                         return ControlFlow::Break(());
@@ -377,7 +465,7 @@ impl Visitor for TimestampVisitor {
 
 fn has_window_functions(stat: &Statement) -> bool {
     let mut visitor = WindowFunctionVisitor::new();
-    stat.visit(&mut visitor);
+    let _ = stat.visit(&mut visitor);
     visitor.has_window_function
 }
 
@@ -519,6 +607,91 @@ mod tests {
                 true,
                 "Still results a _timestamp field",
             ),
+            // Subquery
+            (
+                "SELECT ts, code, request_count FROM ( SELECT histogram(_timestamp) AS ts, code, count(_timestamp) AS request_count, ROW_NUMBER() OVER (PARTITION BY histogram(_timestamp) ORDER BY count(_timestamp) DESC) AS rn FROM drop1 WHERE (code IS NOT NULL) GROUP BY ts, code ) t WHERE rn <= 3 ORDER BY ts DESC, request_count DESC",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // Subquery
+            (
+                "SELECT code, request_count FROM ( SELECT histogram(_timestamp) AS ts, code, count(_timestamp) AS request_count, ROW_NUMBER() OVER (PARTITION BY histogram(_timestamp) ORDER BY count(_timestamp) DESC) AS rn FROM drop1 WHERE (code IS NOT NULL) GROUP BY ts, code ) t WHERE rn <= 3 ORDER BY ts DESC, request_count DESC",
+                false,
+                "Final result does not have _timestamp field",
+            ),
+            // Subquery
+            (
+                "SELECT histogram(_timestamp) AS ts, count(*) FROM tbl1 WHERE a=b AND c IN(SELECT c FROM tbl2 WHERE c=d) GROUP BY ts ORDER BY ts ASC",
+                false,
+                "Final result does not have _timestamp field",
+            ),
+            // Subquery
+            (
+                "SELECT ts, cnt FROM (SELECT histogram(_timestamp) AS ts, count(*) AS cnt GROUP BY ts) LIMIT 10",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // Subquery
+            (
+                "SELECT * FROM (SELECT histogram(_timestamp) AS ts, count(*) AS cnt GROUP BY ts) LIMIT 10",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // Subquery
+            (
+                "SELECT histogram(_timestamp,'5 minutes') as t1, responsecode, COUNT(_timestamp) as total_count FROM (SELECT _timestamp, array_extract(regexp_match(log,'ResponseCode=(?<responsecode>[^,]+)'),1) AS responsecode FROM tbl WHERE log LIKE '%api/v1/%' and array_extract(regexp_match(log,'ResponseCode=(?<responsecode>[^,]+)'),1) = 200) GROUP BY t1, responsecode ORDER BY t1 DESC",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // Subquery
+            (
+                "SELECT histogram(_timestamp,'5 minutes') as t1, responsecode, COUNT(_timestamp) as total_count FROM tbl WHERE responsecode IN(SELECT array_extract(regexp_match(log,'ResponseCode=(?<responsecode>[^,]+)'),1) AS responsecode FROM tbl WHERE log LIKE '%api/v1/%' and array_extract(regexp_match(log,'ResponseCode=(?<responsecode>[^,]+)'),1) = 200) GROUP BY t1, responsecode ORDER BY t1 DESC",
+                false,
+                "Final result does not have _timestamp field",
+            ),
+            // Subquery
+            (
+                "WITH tbl1 AS (SELECT histogram(_timestamp) AS ts, count(*) AS cnt FROM tbl1) SELECT * FROM tbl1",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // Subquery
+            (
+                "WITH tbl1 AS (SELECT histogram(_timestamp) AS ts, count(*) AS cnt FROM tbl1) SELECT ts, cnt FROM tbl1",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // Subquery
+            (
+                "WITH tbl1 AS (SELECT histogram(_timestamp) AS ts, count(*) AS cnt FROM tbl1) SELECT cnt FROM tbl1",
+                false,
+                "Final result does not have _timestamp field",
+            ),
+            // Subquery
+            (
+                "WITH bucketed_statuses AS (SELECT histogram(_timestamp) AS ts, edgeresponsestatus, COUNT(_timestamp) AS request_count FROM tbl1 WHERE source = 'cloudflare' GROUP BY ts, edgeresponsestatus), ranked_statuses AS (SELECT ts, edgeresponsestatus, request_count, ROW_NUMBER() OVER (PARTITION BY ts ORDER BY request_count DESC) AS rk FROM bucketed_statuses) SELECT ts, edgeresponsestatus, request_count FROM ranked_statuses WHERE rk < 10 ORDER BY ts ASC, request_count DESC",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // Subquery
+            (
+                "WITH bucketed_statuses AS (SELECT histogram(_timestamp) AS ts, edgeresponsestatus, COUNT(_timestamp) AS request_count FROM tbl1 WHERE source = 'cloudflare' GROUP BY ts, edgeresponsestatus), ranked_statuses AS (SELECT ts AS ts2, edgeresponsestatus, request_count, ROW_NUMBER() OVER (PARTITION BY ts ORDER BY request_count DESC) AS rk FROM bucketed_statuses) SELECT ts2 AS ts3, edgeresponsestatus, request_count FROM ranked_statuses WHERE rk < 10 ORDER BY ts2 ASC, request_count DESC",
+                false,
+                "Final result does not have _timestamp field",
+            ),
+            // Join
+            (
+                "SELECT histogram(a._timestamp) AS ts, b.name, count(*) FROM tbl1 AS a LEFT JOIN tbl2 AS b ON a.userid=b.userid GROUP BY ts, name ORDER BY ts ASC",
+                false,
+                "Final result does not have _timestamp field",
+            ),
+            // CTE
+            (
+                "WITH a AS (SELECT histogram(_timestamp) AS ts, userid, count(*) as cnt FROM tbl1 GROUP BY ts, userid HAVING cnt > 40) SELECT ts, SUM(cnt) AS cnt, COUNT(DISTINCT userid) AS user_cnt FROM a GROUP BY ts",
+                true,
+                "Still results a _timestamp field",
+            ),
+            // CTE
         ];
 
         for (sql, expected, test_name) in test_cases {

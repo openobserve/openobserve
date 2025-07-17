@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
           :loadOptions="loadVariableOptions"
+          @search="onVariableSearch(index, $event)"
         />
       </div>
       <div v-else-if="item.type == 'constant'">
@@ -303,6 +304,12 @@ export default defineComponent({
       Object.keys(traceIdMapper.value).forEach((field) => {
         cancelTraceId(field);
       });
+
+      // Clean up any in-flight promises to prevent memory leaks
+      rejectAllPromises();
+      Object.keys(currentlyExecutingPromises).forEach((key) => {
+        currentlyExecutingPromises[key] = null;
+      });
     });
 
     const sendSearchMessage = (queryReq: any) => {
@@ -391,6 +398,12 @@ export default defineComponent({
         return;
       }
 
+      // Check if this operation was cancelled before processing
+      if (currentlyExecutingPromises[variableObject.name] === null) {
+        removeTraceId(variableObject.name, payload.traceId);
+        return;
+      }
+
       if (response.type === "cancel_response") {
         removeTraceId(variableObject.name, response.content.trace_id);
         return;
@@ -448,17 +461,55 @@ export default defineComponent({
                     ? value.zo_sql_key.toString()
                     : "<blank>",
                 value: value.zo_sql_key.toString(),
-              }))
-              // remove duplicates from previous options
-              .filter(
-                (option: any) =>
-                  !variableObject.options.some(
-                    (existingOption: any) =>
-                      existingOption.value === option.value,
-                  ),
-              );
-
-            variableObject.options = [...newOptions, ...variableObject.options];
+              }));
+            // For first response or subsequent responses, merge with existing options and keep selected values
+            if (isFirstResponse) {
+              // Add missing selected values to newOptions
+              if (
+                variableObject.multiSelect &&
+                Array.isArray(variableObject.value)
+              ) {
+                variableObject.value.forEach((val: string) => {
+                  if (
+                    !newOptions.some((opt: any) => opt.value === val) &&
+                    val !== SELECT_ALL_VALUE
+                  ) {
+                    newOptions.push({
+                      label: val,
+                      value: val,
+                    });
+                  }
+                });
+              } else if (
+                !variableObject.multiSelect &&
+                variableObject.value !== null
+              ) {
+                if (
+                  !newOptions.some(
+                    (opt: any) => opt.value === variableObject.value,
+                  ) &&
+                  variableObject.value !== SELECT_ALL_VALUE
+                ) {
+                  newOptions.push({
+                    label: variableObject.value,
+                    value: variableObject.value,
+                  });
+                }
+              }
+              variableObject.options = newOptions;
+            } else {
+              // For subsequent responses, merge with existing options
+              variableObject.options = [
+                ...newOptions,
+                ...variableObject.options,
+              ];
+            }
+            // Remove duplicates
+            variableObject.options = variableObject.options.filter(
+              (option: any, index: number, self: any[]) =>
+                index === self.findIndex((o) => o.value === option.value),
+            );
+            // Sort options
             variableObject.options.sort((a: any, b: any) =>
               a.label.localeCompare(b.label),
             );
@@ -589,6 +640,12 @@ export default defineComponent({
         // console.error("Invalid time range");
         return;
       }
+
+      // Check if this operation was cancelled before proceeding
+      if (currentlyExecutingPromises[variableObject.name] === null) {
+        return;
+      }
+
       // Set loading state before initiating WebSocket
       variableObject.isLoading = true;
       variableObject.isVariableLoadingPending = true;
@@ -794,7 +851,7 @@ export default defineComponent({
     onUnmounted(() => {
       // Clean up any in-flight promises to prevent memory leaks
       rejectAllPromises();
-      Object.keys(currentlyExecutingPromises).forEach(key => {
+      Object.keys(currentlyExecutingPromises).forEach((key) => {
         currentlyExecutingPromises[key] = null;
       });
     });
@@ -933,22 +990,22 @@ export default defineComponent({
           ?.length > 0;
 
       // Check for URL values first
-      const urlValue = props.initialVariableValues?.value[currentVariable.name];
-      if (urlValue) {
-        // If URL value exists, use it
-        if (currentVariable.multiSelect) {
-          currentVariable.value = Array.isArray(urlValue)
-            ? urlValue
-            : [urlValue];
-        } else {
-          // For single select, if coming from multiSelect, take first value
-          currentVariable.value = Array.isArray(urlValue)
-            ? urlValue[0]
-            : urlValue;
-        }
-        currentVariable.isVariableLoadingPending = true;
-        return;
-      }
+      // const urlValue = props.initialVariableValues?.value[currentVariable.name];
+      // if (urlValue) {
+      //   // If URL value exists, use it
+      //   if (currentVariable.multiSelect) {
+      //     currentVariable.value = Array.isArray(urlValue)
+      //       ? urlValue
+      //       : [urlValue];
+      //   } else {
+      //     // For single select, if coming from multiSelect, take first value
+      //     currentVariable.value = Array.isArray(urlValue)
+      //       ? urlValue[0]
+      //       : urlValue;
+      //   }
+      //   currentVariable.isVariableLoadingPending = true;
+      //   return;
+      // }
 
       // Only apply custom values if no URL value exists
       if (
@@ -1139,6 +1196,7 @@ export default defineComponent({
     const loadSingleVariableDataByName = async (
       variableObject: any,
       isInitialLoad: boolean = false,
+      searchText?: string,
     ) => {
       return new Promise(async (resolve, reject) => {
         const { name } = variableObject;
@@ -1149,11 +1207,25 @@ export default defineComponent({
           return;
         }
 
-        // If the variable is already being processed, cancel the previous request
-        if (currentlyExecutingPromises[name]) {
-          variableLog(name, "Canceling previous request");
-          currentlyExecutingPromises[name](false);
+        if (currentlyExecutingPromises[name] === null) {
+          variableLog(
+            name,
+            `Promise already cancelled, skipping load for variable ${name}`,
+          );
+          currentlyExecutingPromises[name] = reject;
         }
+
+        // For search operations, use comprehensive cancellation
+        if (searchText) {
+          cancelAllVariableOperations(name);
+        } else {
+          // If the variable is already being processed, cancel the previous request
+          if (currentlyExecutingPromises[name]) {
+            variableLog(name, "Canceling previous request");
+            currentlyExecutingPromises[name](false);
+          }
+        }
+
         currentlyExecutingPromises[name] = reject;
 
         // Check if this variable has any dependencies
@@ -1242,6 +1314,7 @@ export default defineComponent({
           const success = await handleVariableType(
             variableObject,
             isInitialLoad,
+            searchText,
           );
           // await finalizeVariableLoading(variableObject, success);
           resolve(success);
@@ -1261,6 +1334,7 @@ export default defineComponent({
     const handleVariableType = async (
       variableObject: any,
       isInitialLoad: boolean = false,
+      searchText?: string,
     ) => {
       variableLog(
         variableObject.name,
@@ -1270,7 +1344,7 @@ export default defineComponent({
         case "query_values": {
           // for initial loading check if the value is already available,
           // do not load the values
-          if (isInitialLoad) {
+          if (isInitialLoad && !searchText) {
             variableLog(
               variableObject.name,
               `Initial load check for variable: ${variableObject.name}, value: ${JSON.stringify(variableObject)}`,
@@ -1283,7 +1357,11 @@ export default defineComponent({
               (!Array.isArray(variableObject.value) ||
                 variableObject.value.length > 0)
             ) {
-              finalizePartialVariableLoading(variableObject, true);
+              finalizePartialVariableLoading(
+                variableObject,
+                true,
+                isInitialLoad,
+              );
               finalizeVariableLoading(variableObject, true);
               emitVariablesData();
               return true;
@@ -1291,7 +1369,10 @@ export default defineComponent({
           }
 
           try {
-            const queryContext: any = await buildQueryContext(variableObject);
+            const queryContext: any = await buildQueryContext(
+              variableObject,
+              searchText,
+            );
 
             if (
               isWebSocketEnabled(store.state) ||
@@ -1308,6 +1389,7 @@ export default defineComponent({
                   variableObject,
                   queryContext,
                 );
+
                 if (response?.data?.hits) {
                   const originalValue = JSON.parse(
                     JSON.stringify(variableObject.value),
@@ -1370,18 +1452,28 @@ export default defineComponent({
      * @param variableObject The variable object containing the query data.
      * @returns The query context as a string.
      */
-    const buildQueryContext = async (variableObject: any) => {
+    const buildQueryContext = async (
+      variableObject: any,
+      searchText?: string,
+    ) => {
       variableLog(
         variableObject.name,
-        `Building query context for variable: ${variableObject.name}`,
+        `Building query context for variable: ${variableObject.name}${searchText ? ` with search: ${searchText}` : ""}`,
       );
 
       const timestamp_column =
         store.state.zoConfig.timestamp_column || "_timestamp";
-      let dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
+
+      let dummyQuery: string;
+
+      if (searchText) {
+        dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}' WHERE CAST(${variableObject.query_data.field} AS TEXT) LIKE '%${escapeSingleQuotes(searchText.trim())}%'`;
+      } else {
+        dummyQuery = `SELECT ${timestamp_column} FROM '${variableObject.query_data.stream}'`;
+      }
 
       // Construct the filter from the query data
-      const constructedFilter = (variableObject.query_data.filter || []).map(
+      const constructedFilter = (variableObject.query_data?.filter || []).map(
         (condition: any) => ({
           name: condition.name,
           operator: condition.operator,
@@ -1390,10 +1482,9 @@ export default defineComponent({
       );
 
       // Add labels to the dummy query
-      let queryContext = await addLabelsToSQlQuery(
-        dummyQuery,
-        constructedFilter,
-      );
+      let queryContext = constructedFilter.length
+        ? await addLabelsToSQlQuery(dummyQuery, constructedFilter)
+        : dummyQuery;
 
       // Replace variable placeholders with actual values
       for (const variable of variablesData.values) {
@@ -1473,7 +1564,30 @@ export default defineComponent({
             value: value.zo_sql_key.toString(),
           }));
 
-        // Update options with new values
+        // Efficiently add the selected value to options if not present
+        if (variableObject.multiSelect && Array.isArray(variableObject.value)) {
+          const val = variableObject.value[0];
+          if (
+            val !== undefined &&
+            val !== null &&
+            !newOptions.some((opt) => opt.value === val) &&
+            val !== SELECT_ALL_VALUE
+          ) {
+            newOptions.push({ label: val, value: val });
+          }
+        } else if (
+          !variableObject.multiSelect &&
+          variableObject.value !== null &&
+          variableObject.value !== undefined &&
+          !newOptions.some((opt) => opt.value === variableObject.value) &&
+          variableObject.value !== SELECT_ALL_VALUE
+        ) {
+          newOptions.push({
+            label: variableObject.value,
+            value: variableObject.value,
+          });
+        }
+
         variableObject.options = newOptions;
 
         // Set default value
@@ -1595,6 +1709,7 @@ export default defineComponent({
     const finalizePartialVariableLoading = async (
       variableObject: any,
       success: boolean,
+      isInitialLoad: boolean = false, // this important for the the children load while initial loading
     ) => {
       try {
         variableLog(
@@ -1629,23 +1744,38 @@ export default defineComponent({
             `Old Varilables Data: ${JSON.stringify(oldVariablesData)}`,
           );
 
-          // Only load children if the parent value actually changed
-          if (oldVariablesData[name] !== variableObject.value) {
+          
             variableLog(
               variableObject.name,
               `finalizePartialVariableLoading: loading child variables: ${childVariables}, ${JSON.stringify(childVariableObjects)}`,
             );
             const results = await Promise.all(
-              childVariableObjects.map((childVariable: any) =>
-                loadSingleVariableDataByName(childVariable),
-              ),
+              childVariableObjects.map((childVariable: any) => {
+                // Only load children if the parent value actually changed 
+                // OR child is waiting for the load
+                if(childVariable.isVariableLoadingPending || oldVariablesData[name] !== variableObject.value) {
+                  
+                  variableLog(
+                    variableObject.name,
+                    `finalizePartialVariableLoading: Loading child variable ${childVariable.name} as parent value changed`,
+                  )
+                  
+                  return loadSingleVariableDataByName(childVariable, isInitialLoad);
+                } else {
+                  
+                  variableLog(
+                    variableObject.name,
+                    `finalizePartialVariableLoading: Skipping child variable ${childVariable.name} loading as parent value did not change`,
+                  );
+                
+                }
+              }),
             );
 
             variableLog(
               variableObject.name,
               `finalizePartialVariableLoading: child variables results: ${JSON.stringify(results)}`,
             );
-          }
         }
       } catch (error) {
         // console.error(`Error finalizing partial variable loading for ${variableObject.name}:`, error);
@@ -1658,8 +1788,19 @@ export default defineComponent({
      * @returns {Promise<void>} - A promise that resolves when the options have been loaded.
      */
     const loadVariableOptions = async (variableObject: any) => {
-      // When a dropdown is opened, only load the variable data
-      await loadSingleVariableDataByName(variableObject);
+      // Check if there's already a loading request in progress
+      if (variableObject.isLoading) {
+        return;
+      }
+      try {
+        // When a dropdown is opened, only load the variable data
+        await loadSingleVariableDataByName(variableObject);
+      } catch (error) {
+        variableLog(
+          variableObject.name,
+          `Error loading variable options for ${variableObject.name}: ${error.message}`,
+        );
+      }
     };
 
     let isLoading = false;
@@ -1836,14 +1977,25 @@ export default defineComponent({
           return;
         }
 
-        const filtered = currentVariable.value.filter((val: any) =>
-          currentVariable.options.some(
-            (opt: any) => opt.value === val || val == SELECT_ALL_VALUE,
-          ),
+        const optionValues = currentVariable.options.map(
+          (opt: any) => opt.value,
         );
 
-        if (filtered.length !== currentVariable.value.length) {
-          currentVariable.value = filtered;
+        const customTypedValues = currentVariable.value.filter(
+          (val: any) => !optionValues.includes(val) && val !== SELECT_ALL_VALUE,
+        );
+
+        const filtered = currentVariable.value.filter(
+          (val: any) => optionValues.includes(val) || val === SELECT_ALL_VALUE,
+        );
+
+        const merged = [
+          ...filtered,
+          ...customTypedValues.filter((v) => !filtered.includes(v)),
+        ];
+
+        if (merged.length !== currentVariable.value.length) {
+          currentVariable.value = merged;
         }
       }
 
@@ -1907,12 +2059,59 @@ export default defineComponent({
       }
     };
 
+    /**
+     * Comprehensive cancellation function that cancels all ongoing operations for a variable
+     * @param {string} variableName - The name of the variable to cancel operations for
+     */
+    const cancelAllVariableOperations = (variableName: string) => {
+      // 1. Cancel any ongoing promise-based operations
+      if (currentlyExecutingPromises[variableName]) {
+        variableLog(variableName, "Canceling currently executing promise");
+        currentlyExecutingPromises[variableName](false);
+        currentlyExecutingPromises[variableName] = null;
+      }
+
+      // 2. Cancel any ongoing WebSocket/Streaming operations
+      cancelTraceId(variableName);      
+
+      // 3. Reset loading states for the variable only if not in search mode
+      const variableObject = variablesData.values.find(
+        (v: any) => v.name === variableName,
+      );
+
+      if (variableObject) {
+        variableObject.isLoading = false;        
+        variableObject.isVariableLoadingPending = false;
+      }
+    };
+
+    const onVariableSearch = async (
+      index: number,
+      { variableItem, filterText }: any,
+    ) => {
+      if (
+        typeof index !== "number" ||
+        !variableItem ||
+        variableItem.type !== "query_values"
+      )
+        return;
+
+      const variableName = variableItem.name;
+
+      // Cancel any previous API calls for this variable immediately
+      cancelAllVariableOperations(variableName);
+
+      await loadSingleVariableDataByName(variableItem, false, filterText);
+    };
+
     return {
       props,
       variablesData,
       changeInitialVariableValues,
       onVariablesValueUpdated,
       loadVariableOptions,
+      onVariableSearch,
+      cancelAllVariableOperations,
     };
   },
 });

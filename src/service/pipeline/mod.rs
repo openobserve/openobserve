@@ -30,13 +30,12 @@ pub mod batch_execution;
 #[tracing::instrument(skip(pipeline))]
 pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
     // check if another realtime pipeline with the same source stream already exists
-    if let PipelineSource::Realtime(stream) = &pipeline.source {
-        if pipeline::list_streams_with_pipeline(&pipeline.org)
+    if let PipelineSource::Realtime(stream) = &pipeline.source
+        && pipeline::list_streams_with_pipeline(&pipeline.org)
             .await
             .is_ok_and(|list| list.iter().any(|existing| existing == stream))
-        {
-            return Err(PipelineError::StreamInUse);
-        }
+    {
+        return Err(PipelineError::StreamInUse);
     }
 
     // validate pipeline
@@ -62,7 +61,7 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
     }
 
     if let Err(e) = pipeline::set(&pipeline).await {
-        log::error!("Failed to save pipeline: {:?}", e);
+        log::error!("Failed to save pipeline: {e}");
         return Err(e);
     }
     set_ownership(&pipeline.org, "pipelines", Authz::new(&pipeline.id)).await;
@@ -154,11 +153,11 @@ pub async fn list_pipelines(
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("pipeline:{}", pipeline.id))
+                    .contains(&format!("pipeline:{}", &pipeline.id))
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("pipeline:_all_{}", org_id))
+                    .contains(&format!("pipeline:_all_{org_id}"))
         })
         .collect();
     Ok(PipelineList { list })
@@ -243,16 +242,15 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
     };
 
     // delete DerivedStream details if there's any
-    if let PipelineSource::Scheduled(derived_stream) = existing_pipeline.source {
-        if let Err(error) = super::alerts::derived_streams::delete(
+    if let PipelineSource::Scheduled(derived_stream) = existing_pipeline.source
+        && let Err(error) = super::alerts::derived_streams::delete(
             &derived_stream,
             &existing_pipeline.name,
             &existing_pipeline.id,
         )
         .await
-        {
-            return Err(PipelineError::InvalidDerivedStream(error.to_string()));
-        }
+    {
+        return Err(PipelineError::DeleteDerivedStream(error.to_string()));
     }
 
     pipeline::delete(pipeline_id).await?;

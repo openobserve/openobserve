@@ -256,17 +256,75 @@ const useHttpStreaming = () => {
 
       // Get the ReadableStream
       const readableStream = response.body;
+
       if (!readableStream) {
         throw new Error('Response body is null');
       }
       
       // Start the stream in the worker
-      if(worker) {
+      if (worker) {        
+        // Initialize the stream in the worker
         worker.postMessage({
           action: 'startStream',
-          traceId,
-          readableStream
-        }, [readableStream as any]);
+          traceId
+        });
+        
+        // For Safari compatibility: manually read the stream and send chunks to worker
+        const reader = readableStream.getReader();
+        const decoder = new TextDecoder();
+        
+        (async () => {
+          try {
+            while (true) {
+              // Check if this trace is still active before reading
+              if (!traceMap.value[traceId]) {
+                // console.log('Trace no longer active, stopping stream reading for traceId:', traceId);
+                break;
+              }
+              
+              const { done, value } = await reader.read();
+              
+              if (done) {
+                worker.postMessage({
+                  action: 'endStream',
+                  traceId
+                });
+                break;
+              }
+              
+              // Check again before processing the chunk
+              if (!traceMap.value[traceId]) {
+                // console.log('Trace cancelled during processing, skipping chunk for traceId:', traceId);
+                break;
+              }
+              
+              // Decode and send chunks to the worker
+              const chunk = decoder.decode(value, { stream: true });
+              worker.postMessage({
+                action: 'processChunk',
+                traceId,
+                chunk
+              });
+            }
+          } catch (error) {
+            // Handle AbortError gracefully - this is expected when stream is cancelled
+            if ((error as any).name === 'AbortError') {
+              // console.log('Stream reading was cancelled for traceId:', traceId);
+              // Don't call onError for expected cancellations
+            } else {
+              console.error('Error reading stream:', error);
+              onError(traceId, error);
+            }
+          } finally {
+            // Always release the reader lock to prevent resource leaks
+            try {
+              reader.releaseLock();
+            } catch (releaseError) {
+              // Ignore errors when releasing lock on already aborted stream
+              // console.log('Reader lock already released for traceId:', traceId);
+            }
+          }
+        })();
       } else {
         throw new Error('Worker is not supported');
       }
@@ -276,7 +334,7 @@ const useHttpStreaming = () => {
       
     } catch (error) {
       if ((error as any).name === 'AbortError') {
-        console.error('Stream was canceled');
+       // console.error('Stream was canceled');
       } else {
         onError(traceId, error);
       }
@@ -288,6 +346,12 @@ const useHttpStreaming = () => {
     org_id: string;
   }) => {
     const { trace_id } = payload;
+
+    // Check if this trace is still active before attempting cancellation
+    if (!traceMap.value[trace_id]) {
+      // console.log('Trace already cleaned up for traceId:', trace_id);
+      return;
+    }
 
     if (abortControllers.value[trace_id]) {
       abortControllers.value[trace_id].abort();
@@ -412,6 +476,18 @@ const useHttpStreaming = () => {
     closeStreamWithError,
     closeStream,
     resetAuthToken,
+    onData,
+    abortControllers,
+    traceMap,
+    activeStreamId,
+    streamConnections,
+    errorOccurred,
+    convertToWsResponse,
+    convertToWsError,
+    convertToWsEventProgress,
+    convertToWsEnd,
+    wsMapper,
+    onError,
   };
 };
 

@@ -63,7 +63,7 @@ pub async fn set(account: &str, key: &str, meta: Option<FileMeta>, deleted: bool
                 break;
             }
             Err(e) => {
-                log::error!("[FILE_LIST] Error saving file to storage, retrying: {}", e);
+                log::error!("[FILE_LIST] Error saving file to storage, retrying: {e}");
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             }
         }
@@ -84,7 +84,7 @@ async fn progress(account: &str, key: &str, data: Option<&FileMeta>, delete: boo
     let mut id = 0;
     if delete {
         if let Err(e) = infra::file_list::remove(key).await {
-            log::error!("service:db:file_list: delete {}, remove error: {}", key, e);
+            log::error!("service:db:file_list: delete {key}, remove error: {e}");
         }
     } else if let Some(data) = data {
         match infra::file_list::add(account, key, data).await {
@@ -92,18 +92,14 @@ async fn progress(account: &str, key: &str, data: Option<&FileMeta>, delete: boo
                 id = v;
             }
             Err(e) => {
-                log::error!("service:db:file_list: add {}, add error: {}", key, e);
+                log::error!("service:db:file_list: add {key}, add error: {e}");
             }
         }
         // update stream stats realtime
-        if config::get_config().common.local_mode {
-            if let Err(e) = infra::cache::stats::incr_stream_stats(key, data) {
-                log::error!(
-                    "service:db:file_list: add {}, incr_stream_stats error: {}",
-                    key,
-                    e
-                );
-            }
+        if config::get_config().common.local_mode
+            && let Err(e) = infra::cache::stats::incr_stream_stats(key, data)
+        {
+            log::error!("service:db:file_list: add {key}, incr_stream_stats error: {e}");
         }
     }
 

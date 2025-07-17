@@ -62,7 +62,6 @@ use {
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
     },
-    std::io::ErrorKind,
 };
 
 use crate::{
@@ -75,10 +74,8 @@ use crate::{
     },
     service::{
         db,
-        search::{
-            datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
-            tantivy::puffin_directory::reader_cache,
-        },
+        search::datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
+        tantivy::puffin_directory::reader_cache,
     },
 };
 
@@ -125,7 +122,8 @@ struct ConfigResponse<'a> {
     usage_enabled: bool,
     usage_publish_interval: i64,
     ingestion_url: String,
-    websocket_enabled: bool,
+    #[cfg(feature = "enterprise")]
+    aggregation_cache_enabled: bool,
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
     max_dashboard_series: usize,
@@ -134,6 +132,8 @@ struct ConfigResponse<'a> {
     histogram_enabled: bool,
     max_query_range: i64,
     ai_enabled: bool,
+    dashboard_placeholder: String,
+    dashboard_show_symbol_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -269,10 +269,13 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     #[cfg(not(feature = "enterprise"))]
     let ai_enabled = false;
 
+    #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
+    let build_type = "cloud";
     #[cfg(feature = "enterprise")]
     let build_type = "enterprise";
-    #[cfg(not(feature = "enterprise"))]
+    #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
     let build_type = "opensource";
+
     let cfg = get_config();
     Ok(HttpResponse::Ok().json(ConfigResponse {
         version: config::VERSION.to_string(),
@@ -325,15 +328,18 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
         ingestion_url: cfg.common.ingestion_url.to_string(),
-        websocket_enabled: cfg.websocket.enabled,
+        #[cfg(feature = "enterprise")]
+        aggregation_cache_enabled: cfg.common.aggregation_cache_enabled,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
         actions_enabled,
-        streaming_enabled: cfg.websocket.streaming_enabled,
+        streaming_enabled: cfg.http_streaming.streaming_enabled,
         histogram_enabled: cfg.limit.histogram_enabled,
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         ai_enabled,
+        dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
+        dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
     }))
 }
 
@@ -359,13 +365,13 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
 
     let mem_file_num = cache::file_data::memory::len().await;
     let (mem_max_size, mem_cur_size) = cache::file_data::memory::stats().await;
-    let disk_file_num = cache::file_data::disk::len(cache::file_data::disk::FileType::DATA).await;
+    let disk_file_num = cache::file_data::disk::len(cache::file_data::disk::FileType::Data).await;
     let (disk_max_size, disk_cur_size) =
-        cache::file_data::disk::stats(cache::file_data::disk::FileType::DATA).await;
+        cache::file_data::disk::stats(cache::file_data::disk::FileType::Data).await;
     let disk_result_file_num =
-        cache::file_data::disk::len(cache::file_data::disk::FileType::RESULT).await;
+        cache::file_data::disk::len(cache::file_data::disk::FileType::Result).await;
     let (disk_result_max_size, disk_result_cur_size) =
-        cache::file_data::disk::stats(cache::file_data::disk::FileType::RESULT).await;
+        cache::file_data::disk::stats(cache::file_data::disk::FileType::Result).await;
     stats.insert(
         "FILE_DATA",
         json::json!({
@@ -396,8 +402,14 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         json::json!({"reader_cache": reader_cache::GLOBAL_CACHE.clone().len()}),
     );
 
-    let consistent_hashing = cluster::print_consistent_hash().await;
-    stats.insert("CONSISTENT_HASHING", json::json!(consistent_hashing));
+    #[cfg(feature = "enterprise")]
+    let (total_count, expired_count) = crate::service::search::cardinality::get_cache_stats().await;
+    #[cfg(not(feature = "enterprise"))]
+    let (total_count, expired_count) = (0, 0);
+    stats.insert(
+        "CARDINALITY",
+        json::json!({"total_count": total_count, "expired_count": expired_count}),
+    );
 
     Ok(HttpResponse::Ok().json(stats))
 }
@@ -478,7 +490,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
     let code = match query.get("code") {
         Some(code) => code,
         None => {
-            return Err(Error::new(ErrorKind::Other, "no code in request"));
+            return Err(Error::other("no code in request"));
         }
     };
     let mut audit_message = AuditMessage {
@@ -506,7 +518,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 // Bad Request
                 audit_message.response_meta.http_response_code = 400;
                 audit(audit_message).await;
-                return Err(Error::new(ErrorKind::Other, "invalid state in request"));
+                return Err(Error::other("invalid state in request"));
             }
         },
 
@@ -514,11 +526,11 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             // Bad Request
             audit_message.response_meta.http_response_code = 400;
             audit(audit_message).await;
-            return Err(Error::new(ErrorKind::Other, "no state in request"));
+            return Err(Error::other("no state in request"));
         }
     };
 
-    log::info!("entering exchange_code: {}", code);
+    log::info!("entering exchange_code: {code}");
 
     match exchange_code(code).await {
         Ok(login_data) => {
@@ -537,15 +549,27 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             match token_ver {
                 Ok(res) => {
                     // check for service accounts , do not to allow login
-                    if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await {
-                        if db_user
+                    if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await
+                        && db_user
                             .organizations
                             .iter()
                             .any(|org| org.role.eq(&UserRole::ServiceAccount))
-                        {
-                            return Ok(HttpResponse::Unauthorized()
-                                .json("Service accounts are not allowed to login".to_string()));
-                        }
+                    {
+                        return Ok(HttpResponse::Unauthorized()
+                            .json("Service accounts are not allowed to login".to_string()));
+                    }
+
+                    // get domain from email
+                    let domain = res.0.user_email.split('@').nth(1).unwrap_or_default();
+                    if !get_dex_config().allowed_domains.is_empty()
+                        && !get_dex_config().allowed_domains.contains(domain)
+                    {
+                        audit_message.response_meta.http_response_code = 400;
+                        audit_message._timestamp = now_micros();
+                        audit(audit_message).await;
+                        return Ok(
+                            HttpResponse::Unauthorized().json("Unauthorized access".to_string())
+                        );
                     }
 
                     audit_message.user_email = res.0.user_email.clone();
@@ -557,13 +581,16 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                         "is_valid": res.0.is_valid,
                     }))
                     .unwrap();
+                    let is_new_usr = process_token(res)
+                        .await
+                        .map(|new_user| format!("&new_user_login={new_user}"));
                     login_url = format!(
-                        "{}#id_token={}.{}",
+                        "{}#id_token={}.{}{}",
                         login_data.url,
                         ID_TOKEN_HEADER,
-                        base64::encode(&id_token)
+                        base64::encode(&id_token),
+                        is_new_usr.unwrap_or_default()
                     );
-                    process_token(res).await
                 }
                 Err(e) => {
                     audit_message.response_meta.http_response_code = 400;
@@ -576,10 +603,17 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             // generate new UUID for access token & store token in DB
             let session_id = ider::uuid();
 
+            if access_token.is_empty() {
+                audit_message.response_meta.http_response_code = 400;
+                audit_message._timestamp = now_micros();
+                audit(audit_message).await;
+                return Ok(HttpResponse::Unauthorized().json("access token is empty".to_string()));
+            }
+
             // store session_id in cluster co-ordinator
             let _ = crate::service::session::set_session(&session_id, &access_token).await;
 
-            let access_token = format!("session {}", session_id);
+            let access_token = format!("session {session_id}");
 
             let tokens = json::to_string(&AuthTokens {
                 access_token,
@@ -634,6 +668,21 @@ pub async fn dex_login() -> Result<HttpResponse, Error> {
 #[cfg(feature = "enterprise")]
 #[get("/dex_refresh")]
 async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
+    let mut audit_message = AuditMessage {
+        user_email: "".to_string(),
+        org_id: "".to_string(),
+        _timestamp: now_micros(),
+        protocol: Protocol::Http,
+        response_meta: ResponseMeta {
+            http_method: "GET".to_string(),
+            http_path: "/config/dex_refresh".to_string(),
+            http_body: "".to_string(),
+            http_query_params: req.query_string().to_string(),
+            http_response_code: 302,
+            error_msg: None,
+            trace_id: None,
+        },
+    };
     let token = if let Some(cookie) = req.cookie("auth_tokens") {
         let decoded_cookie = config::utils::base64::decode(cookie.value()).unwrap_or_default();
         let auth_tokens: AuthTokens = json::from_str(&decoded_cookie).unwrap_or_default();
@@ -657,10 +706,17 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
             // generate new UUID for access token & store token in DB
             let session_id = ider::uuid();
 
+            if access_token.is_empty() {
+                audit_message.response_meta.http_response_code = 400;
+                audit_message._timestamp = now_micros();
+                audit(audit_message).await;
+                return HttpResponse::Unauthorized().json("access token is empty".to_string());
+            }
+
             // store session_id in cluster co-ordinator
             let _ = crate::service::session::set_session(&session_id, &access_token).await;
 
-            let access_token = format!("session {}", session_id);
+            let access_token = format!("session {session_id}");
 
             let tokens = json::to_string(&AuthTokens {
                 access_token,

@@ -35,11 +35,10 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_aggregate_query, is_simple_distinct_query},
+        sql::{is_aggregate_query, is_simple_distinct_query},
         time::now_micros,
     },
 };
-use datafusion::distributed_plan::streaming_aggs_exec;
 use hashbrown::HashMap;
 use infra::{
     cache::stats,
@@ -55,20 +54,43 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::grpc::make_grpc_search_client,
-    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-    o2_enterprise::enterprise::search::TaskStatus, o2_enterprise::enterprise::search::WorkGroup,
-    std::collections::HashSet, tracing::info_span,
+    crate::service::{grpc::make_grpc_search_client, search::sql::get_group_by_fields},
+    config::utils::sql::is_simple_aggregate_query,
+    o2_enterprise::enterprise::{
+        common::config::get_config as get_o2_config,
+        search::{
+            TaskStatus, WorkGroup,
+            cache::{
+                CardinalityLevel,
+                streaming_agg::{
+                    create_aggregation_cache_file_path, generate_aggregation_cache_interval,
+                    get_aggregation_cache_key_from_request,
+                },
+            },
+            cache_aggs_util,
+            datafusion::distributed_plan::streaming_aggs_exec,
+        },
+    },
+    std::collections::HashSet,
+    tracing::info_span,
 };
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::{self, infra::cluster as infra_cluster, utils::stream::get_settings_max_query_range},
+    common::{
+        infra::cluster as infra_cluster,
+        utils::{
+            functions::{get_all_transform_keys, init_vrl_runtime},
+            stream::get_settings_max_query_range,
+        },
+    },
     handler::grpc::request::search::Searcher,
     service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 
 pub(crate) mod cache;
+#[cfg(feature = "enterprise")]
+pub(crate) mod cardinality;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
@@ -77,11 +99,10 @@ pub(crate) mod index;
 pub(crate) mod inspector;
 pub(crate) mod partition;
 pub(crate) mod request;
-pub(crate) mod search_stream;
 pub(crate) mod sql;
+pub(crate) mod streaming;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
-pub(crate) mod tantivy;
 pub(crate) mod utils;
 
 /// The result of search in cluster
@@ -172,6 +193,7 @@ pub async fn search(
         user_id.clone(),
         Some((query.start_time, query.end_time)),
         in_req.search_type.map(|v| v.to_string()),
+        in_req.query.histogram_interval,
     );
     if in_req.query.streaming_output && !in_req.query.track_total_hits {
         request.set_streaming_output(true, in_req.query.streaming_id.clone());
@@ -179,6 +201,7 @@ pub async fn search(
     if let Some(v) = in_req.local_mode {
         request.set_local_mode(Some(v));
     }
+    request.set_use_cache(in_req.use_cache);
     let meta = Sql::new_from_req(&request, &query).await?;
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
@@ -216,13 +239,13 @@ pub async fn search(
     let mut _work_group = None;
     #[cfg(feature = "enterprise")]
     {
-        if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await {
-            if let Some((_, stat)) = status.first() {
-                match stat.work_group.as_ref() {
-                    Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
-                    Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
-                    None => _work_group = None,
-                }
+        if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await
+            && let Some((_, stat)) = status.first()
+        {
+            match stat.work_group.as_ref() {
+                Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
+                Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
+                None => _work_group = None,
             }
         };
     }
@@ -235,7 +258,7 @@ pub async fn search(
     match res {
         Ok(mut res) => {
             if in_req.query.streaming_output && meta.order_by.is_empty() {
-                res = crate::service::websocket_events::sort::order_search_results(res, None);
+                res = crate::service::search::streaming::order_search_results(res, None);
             }
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();
@@ -267,7 +290,7 @@ pub async fn search(
                 let stream_name = match resolve_stream_names(&req_query.sql) {
                     Ok(v) => v.join(","),
                     Err(e) => {
-                        log::error!("ParseSQLError(report_usage: parse sql error: {:?})", e);
+                        log::error!("ParseSQLError(report_usage: parse sql error: {e:?})");
                         "".to_string()
                     }
                 };
@@ -275,6 +298,11 @@ pub async fn search(
                     records: res.hits.len() as i64,
                     response_time: time,
                     size: res.scan_size as f64,
+                    scan_files: if res.scan_files > 0 {
+                        Some(res.scan_files as i64)
+                    } else {
+                        None
+                    },
                     request_body: Some(req_query.sql.clone()),
                     function: if req_query.query_fn.is_empty() {
                         None
@@ -307,7 +335,13 @@ pub async fn search(
             }
             Ok(res)
         }
-        Err(e) => Err(e),
+        Err(e) => {
+            #[cfg(feature = "enterprise")]
+            if let Some(streaming_id) = in_req.query.streaming_id.as_ref() {
+                streaming_aggs_exec::remove_cache(streaming_id)
+            }
+            Err(e)
+        }
     }
 }
 
@@ -349,7 +383,7 @@ pub async fn search_multi(
             per_query_resp = true;
         }
         if !vrl_function.trim().ends_with('.') {
-            query_fn = Some(format!("{} \n .", vrl_function));
+            query_fn = Some(format!("{vrl_function} \n ."));
         }
     }
 
@@ -363,7 +397,7 @@ pub async fn search_multi(
     // Before making any rpc requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
         if let Err(e) = req.decode() {
-            return Err(Error::Message(format!("decode sql error: {:?}", e)));
+            return Err(Error::Message(format!("decode sql error: {e:?}")));
         }
     }
     let queries_len = queries.len();
@@ -375,7 +409,7 @@ pub async fn search_multi(
         stream_names = match resolve_stream_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
-                log::error!("ParseSQLError(search_multi: parse sql error: {:?})", e);
+                log::error!("ParseSQLError(search_multi: parse sql error: {e:?})");
                 vec![]
             }
         };
@@ -384,8 +418,8 @@ pub async fn search_multi(
             req.query.query_fn = query_fn.clone();
         }
 
-        for fn_name in common::utils::functions::get_all_transform_keys(org_id).await {
-            if req.query.sql.contains(&format!("{}(", fn_name)) {
+        for fn_name in get_all_transform_keys(org_id).await {
+            if req.query.sql.contains(&format!("{fn_name}(")) {
                 req.query.uses_zo_fn = true;
                 break;
             }
@@ -403,7 +437,7 @@ pub async fn search_multi(
                 }
                 multi_res.from = res.from;
                 multi_res.size += res.size;
-                multi_res.file_count += res.file_count;
+                multi_res.scan_files += res.scan_files;
                 multi_res.scan_size += res.scan_size;
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.extend(res.columns);
@@ -425,7 +459,7 @@ pub async fn search_multi(
                 }
             }
             Err(e) => {
-                log::error!("search_multi: search error: {:?}", e);
+                log::error!("search_multi: search error: {e:?}");
                 if index == 0 {
                     // Error in the first query, return the error
                     return Err(e); // TODO: return partial results
@@ -449,7 +483,7 @@ pub async fn search_multi(
         if apply_over_hits {
             input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
         }
-        let mut runtime = common::utils::functions::init_vrl_runtime();
+        let mut runtime = init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
             Ok(program) => {
                 let registry = program
@@ -460,7 +494,7 @@ pub async fn search_multi(
                 Some(program)
             }
             Err(err) => {
-                log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
+                log::error!("[trace_id {trace_id}] search->vrl: compile err: {err:?}");
                 multi_res.function_error.push(err.to_string());
                 multi_res.is_partial = true;
                 None
@@ -587,6 +621,7 @@ pub async fn search_partition(
         start_time: req.start_time,
         end_time: req.end_time,
         sql: req.sql.to_string(),
+        histogram_interval: req.histogram_interval,
         ..Default::default()
     };
     let sql = Sql::new(&query, org_id, stream_type, None).await?;
@@ -608,12 +643,33 @@ pub async fn search_partition(
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
     let res_ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
     let ts_column = res_ts_column.map(|(v, _)| v);
-    let is_streaming_aggregate = ts_column.is_none()
-        && is_simple_aggregate_query(&req.sql).unwrap_or(false)
-        && cfg.common.feature_query_streaming_aggs;
+
+    #[cfg(feature = "enterprise")]
+    let mut is_cachable_aggs = is_simple_aggregate_query(&req.sql).unwrap_or(false);
+
+    #[cfg(feature = "enterprise")]
+    {
+        let res: Result<cache_aggs_util::CacheAggregationAnalysisResult, String> =
+            cache_aggs_util::analyze_count_aggregation_pattern(&req.sql);
+        if let Ok(result) = res {
+            is_cachable_aggs = result.matches_pattern || is_cachable_aggs;
+        }
+    }
+
     let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
     let is_simple_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false);
     let is_http_distinct = is_simple_distinct && is_http_req;
+
+    #[cfg(feature = "enterprise")]
+    let mut is_streaming_aggregate = ts_column.is_none()
+        && is_cachable_aggs
+        && cfg.common.feature_query_streaming_aggs
+        && !is_http_distinct;
+
+    #[cfg(not(feature = "enterprise"))]
+    let is_streaming_aggregate = false;
+    #[cfg(not(feature = "enterprise"))]
+    let streaming_interval_micros = 0;
 
     // if need streaming output and is simple query, we shouldn't skip file list
     if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
@@ -625,18 +681,76 @@ pub async fn search_partition(
         skip_get_file_list = true;
     }
 
+    #[cfg(feature = "enterprise")]
     // check if we need to use streaming_output
-    let streaming_id = if req.streaming_output && is_streaming_aggregate {
-        Some(ider::uuid())
-    } else {
-        None
-    };
-    if let Some(id) = &streaming_id {
-        log::info!(
-            "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
+    let (streaming_id, streaming_interval_micros) = if req.streaming_output
+        && is_streaming_aggregate
+    {
+        let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
+            // TODO: cache don't not support multiple stream names
+            Ok(v) => (v[0].clone(), v.join(",")),
+            Err(e) => {
+                return Err(Error::Message(e.to_string()));
+            }
+        };
+
+        // check cardinality for group by fields
+        let group_by_fields = get_group_by_fields(&sql).await?;
+        let cardinality_map = crate::service::search::cardinality::check_cardinality(
+            org_id,
+            stream_type,
+            &stream_name,
+            &group_by_fields,
+            query.end_time,
+        )
+        .await?;
+
+        let cardinality_value = cardinality_map.values().product::<f64>();
+        let cardinality_level = CardinalityLevel::from(cardinality_value);
+        let cache_interval = generate_aggregation_cache_interval(
+            query.start_time,
+            query.end_time,
+            cardinality_level,
         );
-        streaming_aggs_exec::init_cache(id, query.start_time, query.end_time);
-    }
+
+        log::info!(
+            "[trace_id {trace_id}] search_partition: using streaming_output, group by fields: {cardinality_map:?}, cardinality level: {cardinality_level:?}, interval: {cache_interval:?}"
+        );
+
+        let cache_interval_mins = cache_interval.get_duration_minutes();
+        if cache_interval_mins == 0 {
+            // this query can't use streaming_agg cache,
+            // so we set is_streaming_aggregate to false and return None
+            is_streaming_aggregate = false;
+            skip_get_file_list = true;
+            (None, 0)
+        } else {
+            let streaming_id = ider::uuid();
+            let hashed_query = get_aggregation_cache_key_from_request(req);
+            let cache_file_path = create_aggregation_cache_file_path(
+                org_id,
+                &stream_type.to_string(),
+                &stream_name,
+                hashed_query,
+                cache_interval_mins,
+            );
+            streaming_aggs_exec::init_cache(
+                &streaming_id,
+                query.start_time,
+                query.end_time,
+                &cache_file_path,
+            );
+            log::info!(
+                "[trace_id {trace_id}] [streaming_id: {streaming_id}] init streaming_agg cache: cache_file_path: {cache_file_path}"
+            );
+            (
+                Some(streaming_id),
+                cache_interval.get_interval_microseconds(),
+            )
+        }
+    } else {
+        (None, 0)
+    };
 
     let mut files = Vec::new();
 
@@ -707,11 +821,7 @@ pub async fn search_partition(
             let records = (stats.doc_num as i64 / data_retention) * query_duration;
             let original_size = (stats.storage_size as i64 / data_retention) * query_duration;
             log::info!(
-                "[trace_id {trace_id}] using approximation: stream: {}, records: {}, original_size: {} , data_retention in seconds: {}",
-                stream_name,
-                records,
-                original_size,
-                data_retention,
+                "[trace_id {trace_id}] using approximation: stream: {stream_name}, records: {records}, original_size: {original_size} , data_retention in seconds: {data_retention}",
             );
             files.push(infra::file_list::FileId {
                 id: Utc::now().timestamp_micros(),
@@ -758,6 +868,9 @@ pub async fn search_partition(
         (records + f.records, original_size + f.original_size)
     });
 
+    #[cfg(feature = "enterprise")]
+    let streaming_aggs = is_streaming_aggregate && req.streaming_output && streaming_id.is_some();
+
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
@@ -769,8 +882,19 @@ pub async fn search_partition(
         partitions: vec![],
         order_by: OrderBy::Desc,
         limit: sql.limit,
-        streaming_output: req.streaming_output,
-        streaming_aggs: req.streaming_output && is_streaming_aggregate,
+        // non enterprise - diabled
+        #[cfg(not(feature = "enterprise"))]
+        streaming_output: false,
+        #[cfg(not(feature = "enterprise"))]
+        streaming_aggs: false,
+        #[cfg(not(feature = "enterprise"))]
+        streaming_id: None,
+        // enterprise
+        #[cfg(feature = "enterprise")]
+        streaming_output: streaming_aggs,
+        #[cfg(feature = "enterprise")]
+        streaming_aggs,
+        #[cfg(feature = "enterprise")]
         streaming_id: streaming_id.clone(),
     };
 
@@ -779,7 +903,7 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        let hist_int = sql.histogram_interval.unwrap_or(1);
+        let hist_int = sql.histogram_interval.unwrap_or(0);
         // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
         if hist_int > 0 {
             min_step *= hist_int;
@@ -861,8 +985,14 @@ pub async fn search_partition(
     );
 
     // Generate partitions
-    let partitions =
-        generator.generate_partitions(req.start_time, req.end_time, step, sql_order_by);
+    let partitions = generator.generate_partitions(
+        req.start_time,
+        req.end_time,
+        step,
+        sql_order_by,
+        is_streaming_aggregate,
+        streaming_interval_micros,
+    );
 
     if sql_order_by == OrderBy::Asc {
         resp.order_by = OrderBy::Asc;
@@ -966,6 +1096,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 idx_scan_size: scan_stats.idx_scan_size / 1024 / 1024, // change to MB
                 idx_took: scan_stats.idx_took,
                 file_list_took: scan_stats.file_list_took,
+                aggs_cache_ratio: scan_stats.aggs_cache_ratio,
             });
         let query_status = if result.is_queue {
             "waiting"
@@ -1211,6 +1342,7 @@ pub async fn search_partition_multi(
                 clusters: req.clusters.clone(),
                 query_fn: req.query_fn.clone(),
                 streaming_output: req.streaming_output,
+                histogram_interval: req.histogram_interval,
             },
             false,
             true,
@@ -1224,7 +1356,7 @@ pub async fn search_partition_multi(
                 }
             }
             Err(err) => {
-                log::error!("search_partition_multi error: {:?}", err);
+                log::error!("search_partition_multi error: {err:?}");
             }
         };
     }
@@ -1238,10 +1370,10 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
     /// Set a key and value in the MetadataMap.  Does nothing if the key or
     /// value are not valid inputs
     fn set(&mut self, key: &str, value: String) {
-        if let Ok(key) = tonic::metadata::MetadataKey::from_bytes(key.as_bytes()) {
-            if let Ok(val) = tonic::metadata::MetadataValue::try_from(&value) {
-                self.0.insert(key, val);
-            }
+        if let Ok(key) = tonic::metadata::MetadataKey::from_bytes(key.as_bytes())
+            && let Ok(val) = tonic::metadata::MetadataValue::try_from(&value)
+        {
+            self.0.insert(key, val);
         }
     }
 }
@@ -1255,20 +1387,20 @@ pub fn generate_search_schema_diff(
     let mut diff_fields = HashMap::new();
 
     for field in schema.fields().iter() {
-        if let Some(latest_field) = latest_schema_map.get(field.name()) {
-            if field.data_type() != latest_field.data_type() {
-                diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
-            }
+        if let Some(latest_field) = latest_schema_map.get(field.name())
+            && field.data_type() != latest_field.data_type()
+        {
+            diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
         }
     }
 
     diff_fields
 }
 
-pub fn is_use_inverted_index(sql: &Arc<Sql>) -> (bool, Vec<(String, String)>) {
-    // parquet format inverted index only support single table
+// inverted index only support single table
+pub fn is_use_inverted_index(sql: &Arc<Sql>) -> bool {
     if sql.stream_names.len() != 1 {
-        return (false, vec![]);
+        return false;
     }
 
     let cfg = get_config();
@@ -1281,13 +1413,11 @@ pub fn is_use_inverted_index(sql: &Arc<Sql>) -> (bool, Vec<(String, String)>) {
         vec![]
     };
 
-    let use_inverted_index = sql.stream_type != StreamType::Index
+    sql.stream_type != StreamType::Index
         && sql.use_inverted_index
         && cfg.common.inverted_index_enabled
         && !cfg.common.feature_query_without_index
-        && (sql.index_condition.is_some() || sql.match_items.is_some() || !index_terms.is_empty());
-
-    (use_inverted_index, index_terms)
+        && (sql.index_condition.is_some() || sql.match_items.is_some() || !index_terms.is_empty())
 }
 
 pub fn filter_index_fields(

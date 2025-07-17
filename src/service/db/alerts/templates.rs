@@ -82,17 +82,15 @@ pub async fn set(template: Template) -> Result<Template, TemplateError> {
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
-    {
-        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::templates_put(
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::templates_put(
             &event_key,
             saved.clone(),
         )
         .await
-        {
-            log::error!(
-                "[Template] error triggering super cluster event to add template to cache: {e}"
-            );
-        }
+    {
+        log::error!(
+            "[Template] error triggering super cluster event to add template to cache: {e}"
+        );
     }
 
     Ok(saved)
@@ -122,16 +120,14 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
-    {
-        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::templates_delete(
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::templates_delete(
             &event_key, org_id, name,
         )
         .await
-        {
-            log::error!(
-                "[Template] error triggering super cluster event to remove template from cache: {e}"
-            );
-        }
+    {
+        log::error!(
+            "[Template] error triggering super cluster event to remove template from cache: {e}"
+        );
     }
 
     Ok(())
@@ -143,8 +139,11 @@ pub async fn list(org_id: &str) -> Result<Vec<Template>, TemplateError> {
         return Ok(cache
             .into_iter()
             .filter_map(|(k, template)| {
-                (k.starts_with(&format!("{org_id}/")) || k.starts_with(&format!("{DEFAULT_ORG}/")))
-                    .then_some(template)
+                let is_org_template = k.starts_with(&format!("{org_id}/"));
+                // do not return default org's template for cloud version
+                let is_default_template =
+                    !cfg!(feature = "cloud") && k.starts_with(&format!("{DEFAULT_ORG}/"));
+                (is_org_template || is_default_template).then_some(template)
             })
             .sorted_by(|a, b| a.name.cmp(&b.name))
             .collect());
@@ -183,7 +182,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                     Err(e) => {
-                        log::error!("Error getting from db: {}", e);
+                        log::error!("Error getting from db: {e}");
                         continue;
                     }
                 };
