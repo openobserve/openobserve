@@ -3,14 +3,18 @@ name: Playwright UI Tests
 on:
   push:
     branches:
-      - "main"
+      - main
     # paths:
-    #   - "web/**"
+    #   - web/**
+    #   - tests/ui-testing/**
+    #   - .github/workflows/playwright.yml
   pull_request:
     branches:
       - "*"
     # paths:
-    #   - "web/**"
+    #   - web/**
+    #   - tests/ui-testing/**
+    #   - .github/workflows/playwright.yml
 
 env:
   COLUMNS: 150
@@ -40,16 +44,18 @@ env:
 
 jobs:
   build_binary:
-    name: build_binary
+    name: Build Binary
     runs-on:
       labels: ubicloud-standard-16
+    outputs:
+      binary-path: ${{ steps.upload-binary.outputs.path }}
 
     steps:
       - name: Remove unused tools
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf /usr/local/share/boost"
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
       - name: Clone the current repo
@@ -58,167 +64,222 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-03-02
-          targets: x86_64-unknown-linux-gnu
-      - uses: Swatinem/rust-cache@v2
+          toolchain: nightly-2025
+          targets: x8664-unknown-linux-gnu
+      
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+      
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
         with:
-          version: "21.12"
-      - uses: actions/setup-node@v4
+          version: "2112     
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: web/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('web/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
       - name: Build frontend code
         env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
+          NODE_OPTIONS: "--max-old-space-size=8192
           VITE_COVERAGE: "true"
-          COVERAGE: "true"
-        run: cd web && npm install && npm run build
+          COVERAGE: true"
+        run: |
+          cd web
+          npm ci --prefer-offline
+          npm run build
 
-      - name: Build and run binary
-        run: cargo build --release --target x86_64-unknown-linux-gnu
+      - name: Build binary
+        run: cargo build --release --target x8664-unknown-linux-gnu
 
-      - name: Upload artifacts
+      - name: Upload binary artifact
+        id: upload-binary
         uses: actions/upload-artifact@v4
         with:
-          name: debug-binary
-          path: target/x86_64-unknown-linux-gnu/release/openobserve
+          name: openobserve-binary
+          path: target/x8664-unknown-linux-gnu/release/openobserve
           retention-days: 1
 
   ui_integration_tests:
-    name: playwright_ui_integration_tests
+    name: Playwright UI Tests
     needs: [build_binary]
     runs-on:
-      labels: ubicloud-standard-8
-    container:
-      image: mcr.microsoft.com/playwright:v1.50.0-jammy
+      labels: ubicloud-standard-8  container:
+      image: mcr.microsoft.com/playwright:v1.5ammy
       options: --user root
     strategy:
+      fail-fast: false
       matrix:
-        browser: [chrome]
-        testfilename: [
-            "alerts/alerts-e2e-flow.spec.js",
-            "alerts/alerts-ui-operations.spec.js",
-            "alerts/alerts-import.spec.js",
-            "GeneralTests/changeOrg.spec.js",
-            "dashboards/custom-charts.spec.js",
-            "dashboards/dashboard.spec.js",
-            "dashboards/dashboard-filter.spec.js",
-            "dashboards/dashboard-folder.spec.js",
-            "dashboards/dashboard-geoMap.spec.js",
-            "dashboards/dashboard-general-setting.spec.js",
-            "dashboards/dashboard-import.spec.js",
-            "dashboards/dashboard-maps.spec.js",
-            "dashboards/dashboard-multi-y-axis.spec.js",
-            "dashboards/dashboard-tabs-setting.spec.js",
-            "dashboards/dashboard-transpose.spec.js",
-            "dashboards/dashboard-variables-setting.spec.js",
-            "dashboards/dashboard2.spec.js",
-            "dashboards/dashboardtype.spec.js",
-            "dashboards/visualize.spec.js",
-            "dashboards/visualization-vrl.spec.js",
-            "GeneralTests/enrichment.spec.js",
-            "Logs/join.spec.js",
-            "Logs/logshistogram.spec.js",
-            "Logs/logspage.spec.js",
-            "Logs/logsqueries.spec.js",
-            "Logs/logsquickmode.spec.js",
-            "Streams/multiselect-stream.spec.js",
-            "Logs/pagination.spec.js",
-            "Pipelines/pipelines.spec.js",
-            "Reports/reportsUpdated.spec.js",
-            "Reports/reportsUpdated2.spec.js",
-            "GeneralTests/sanity.spec.js",
-            "GeneralTests/sanity2.spec.js",
-            "GeneralTests/schema.spec.js",
-            "GeneralTests/schemaload.spec.js",
-            "Logs/secondsPrecisionAdded.spec.js",
-            "GeneralTests/serviceAccount.spec.js",
-            "Streams/streamname.spec.js",
-            "Streams/streaming.spec.js",
-            "Logs/unflattened.spec.js",
-            "GeneralTests/usersOrg.spec.js",
-            "Logs/websocket.spec.js",
-            "Pipelines/pipeline-dynamic.spec.js",
-            "Logs/searchpartition.spec.js",
-            "Pipelines/pipeline-core.spec.js",
-            # "remotepipeline.spec.js",
-
-          ]
+        test_group: [
+          [object Object]
+            name: "alerts",
+            tests:
+              alerts/alerts-e2js,
+             alerts/alerts-ui-operations.spec.js,
+           alerts/alerts-import.spec.js"
+            ]
+          },
+          [object Object]
+            name: "general",
+            tests:      GeneralTests/changeOrg.spec.js,        GeneralTests/enrichment.spec.js,       GeneralTests/sanity.spec.js,       GeneralTests/sanity2.spec.js,       GeneralTests/schema.spec.js,          GeneralTests/schemaload.spec.js,     GeneralTests/serviceAccount.spec.js,     GeneralTests/usersOrg.spec.js"
+            ]
+          },
+          [object Object]
+            name: "dashboards",
+            tests:              dashboards/custom-charts.spec.js,
+         dashboards/dashboard.spec.js,
+         dashboards/dashboard-filter.spec.js,
+         dashboards/dashboard-folder.spec.js,
+         dashboards/dashboard-geoMap.spec.js,
+         dashboards/dashboard-general-setting.spec.js,
+         dashboards/dashboard-import.spec.js,
+         dashboards/dashboard-maps.spec.js,
+         dashboards/dashboard-multi-y-axis.spec.js,
+         dashboards/dashboard-tabs-setting.spec.js,
+         dashboards/dashboard-transpose.spec.js,
+         dashboards/dashboard-variables-setting.spec.js,
+         dashboards/dashboard2.spec.js,
+         dashboards/dashboardtype.spec.js,
+              dashboards/visualize.spec.js,
+              dashboards/visualization-vrl.spec.js"
+            ]
+          },
+          [object Object]
+            name: "logs",
+            tests:              Logs/join.spec.js,          Logs/logshistogram.spec.js,            Logs/logspage.spec.js,             Logs/logsqueries.spec.js,           Logs/logsquickmode.spec.js,              Logs/pagination.spec.js,            Logs/secondsPrecisionAdded.spec.js,             Logs/unflattened.spec.js,             Logs/websocket.spec.js,        Logs/searchpartition.spec.js"
+            ]
+          },
+          [object Object]
+            name: "reports",
+            tests:        Reports/reportsUpdated.spec.js,        Reports/reportsUpdated2.spec.js"
+            ]
+          },
+          [object Object]
+            name: "streams",
+            tests:        Streams/streamname.spec.js,           Streams/streaming.spec.js,         Streams/multiselect-stream.spec.js"
+            ]
+          },
+          [object Object]
+            name: "pipelines",
+            tests:         Pipelines/pipeline-dynamic.spec.js,
+        Pipelines/pipeline-core.spec.js,
+          Pipelines/pipelines.spec.js"
+            ]
+          }
+        ]
 
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v4
 
-      - name: Download artifacts
+      - name: Download binary artifact
         uses: actions/download-artifact@v4
+        with:
+          name: openobserve-binary
+          path: ./
 
-      - name: Start OpenObserve
-        run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
-
-      - name: Wait for start
-        run: sleep 15
-
-      - name: Ensure we are getting a reply from the server
-        run: curl http://localhost:5080/web/login
-
-      - name: Create coverage json folder
-        run: mkdir -p tests/ui-testing/.nyc_output
-
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: lts/*
-      - name: Install dependencies and run ui-tests
+          cache: 'npm'
+          cache-dependency-path: tests/ui-testing/package-lock.json
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: tests/ui-testing/node_modules
+          key: ${{ runner.os }}-test-node-${{ hashFiles(tests/ui-testing/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-test-node-
+
+      - name: Create environment file
         run: |
-          touch .env
-          echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
-          echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}" >> .env
-          echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
-          echo "WS_ZO_BASE_URL=${WS_ZO_BASE_URL}" >> .env
-          echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
-          echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
-          echo "INGESTION_URL=${INGESTION_URL}" >> .env
-          echo "ORGNAME=${ORGNAME}" >> .env
-          echo "ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}" >> .env
-          mv .env tests/ui-testing
-          cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
+          cat > tests/ui-testing/.env << EOF
+          ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}
+          ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}
+          ZO_BASE_URL=${ZO_BASE_URL}
+          WS_ZO_BASE_URL=${WS_ZO_BASE_URL}
+          ZO_BASE_URL_SC=${ZO_BASE_URL_SC}
+          ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}
+          INGESTION_URL=${INGESTION_URL}
+          ORGNAME=${ORGNAME}
+          ZO_SMTP_ENABLED=${ZO_SMTP_ENABLED}
+          EOF
 
-      # - name: Check OpenObserve logs
-      #   if: always()
-      #   run: cat o2.log
+      - name: Install test dependencies
+        run: cd tests/ui-testing && npm ci --prefer-offline
 
-      - name: Sanitize Test Filename
-        shell: bash
+      - name: Start OpenObserve with health check
         run: |
-          # Assign the matrix variable to a Bash variable
-          SANITIZED_FILENAME="${{ matrix.testfilename }}"
-          # Replace all '/' characters with '_'
-          SANITIZED_FILENAME="${SANITIZED_FILENAME//\//_}"
-          # Export as a GitHub Actions environment variable
-          echo "SANITIZED_FILENAME=$SANITIZED_FILENAME" >> $GITHUB_ENV
+          chmod +x ./openobserve
+          ./openobserve > o2.log 2>&1&
+          echoWaiting for OpenObserve to start..."
+          
+          # Wait for service to be ready with timeout
+          timeout=60
+          while [ $timeout -gt 0 ]; do
+            if curl -f http://localhost:5080/login > /dev/null 2>&1; then
+              echo "OpenObserve is ready!"
+              break
+            fi
+            sleep 2
+            timeout=$((timeout - 2))
+          done
+          
+          if [ $timeout -le 0 ]; then
+            echo "OpenObserve failed to start within 60 seconds"
+            cat o2.log
+            exit 1
+          fi
 
-      - name: Upload Coverage Data
+      - name: Create coverage directory
+        run: mkdir -p tests/ui-testing/.nyc_output
+
+      - name: Run Playwright tests
+        run: |
+          cd tests/ui-testing
+          npx playwright test ${{ join(matrix.test_group.tests, )}} --reporter=html
+
+      - name: Upload test results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-coverage-${{ env.SANITIZED_FILENAME }}
-          path: tests/ui-testing/.nyc_output
+          name: playwright-report-${{ matrix.test_group.name }}
+          path: tests/ui-testing/playwright-report/
+          retention-days:30    - name: Upload coverage data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-data-${{ matrix.test_group.name }}
+          path: tests/ui-testing/.nyc_output/
           include-hidden-files: true
 
-      - name: Generate Coverage Report
+      - name: Generate coverage report
+        if: always()
         run: cd tests/ui-testing && npx nyc report
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload coverage report
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 30
+          name: coverage-report-${{ matrix.test_group.name }}
+          path: tests/ui-testing/coverage-report/
+          retention-days: 7
 
   generate_coverage_report:
-    name: Generate Coverage Report
+    name: Generate Combined Coverage Report
     needs: [build_binary, ui_integration_tests]
     runs-on: ubicloud-standard-8
     if: always()
@@ -227,27 +288,65 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v4
 
-      - name: Download Playwright Coverage Data
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+          cache-dependency-path: tests/ui-testing/package-lock.json
+
+      - name: Download all coverage data
         uses: actions/download-artifact@v4
         with:
-          pattern: playwright-coverage-* # Match all artifacts with this prefix
+          pattern: coverage-data-*
           path: merged-coverage
           merge-multiple: true
 
-      - name: Verify Downloaded Files
-        run: ls -R merged-coverage # Check the structure and contents
-
-      - name: Move Coverage Files to .nyc_output
+      - name: Verify coverage files
         run: |
-          mkdir -p tests/ui-testing/.nyc_output
-          mv merged-coverage/* tests/ui-testing/.nyc_output/ || echo "No files to move"
+          echo "Downloaded coverage files:"
+          find merged-coverage -type f -name*.json" | head -10  - name: Generate combined coverage report
+        run: |
+          cd tests/ui-testing
+          npm ci --prefer-offline
+          
+          # Move all coverage files to .nyc_output
+          mkdir -p .nyc_output
+          find ../merged-coverage -name*.json -exec cp[object Object]} .nyc_output/ \;
+          
+          # Generate combined report
+          npx nyc report --reporter=html --reporter=text
 
-      - name: Generate Coverage Report
-        run: cd tests/ui-testing && npm ci && npx nyc report
-
-      - name: Upload Coverage Report
+      - name: Upload combined coverage report
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
-          path: tests/ui-testing/coverage-report
+          name: combined-coverage-report
+          path: tests/ui-testing/coverage-report/
           retention-days: 7
+
+      - name: Comment coverage summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require(fs
+            const coveragePath = tests/ui-testing/coverage-report/coverage-summary.json';
+            
+            if (fs.existsSync(coveragePath)) {
+              const coverage = JSON.parse(fs.readFileSync(coveragePath, 'utf8));             const summary = coverage.total;
+              
+              const comment = `## Coverage Summary
+              
+              - **Statements**: ${summary.statements.pct}% (${summary.statements.covered}/${summary.statements.total})
+              - **Branches**: ${summary.branches.pct}% (${summary.branches.covered}/${summary.branches.total})
+              - **Functions**: ${summary.functions.pct}% ($[object Object]summary.functions.covered}/${summary.functions.total})
+              - **Lines**: $[object Object]summary.lines.pct}% (${summary.lines.covered}/${summary.lines.total})
+              `;
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            }
