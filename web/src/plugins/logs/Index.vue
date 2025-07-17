@@ -1584,6 +1584,9 @@ export default defineComponent({
               JSON.stringify(dashboardPanelData.data),
             );
 
+            // set fields extraction loading to false
+            variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+
             // emit resize event
             // this will rerender/call resize method of already rendered chart to resize
             window.dispatchEvent(new Event("resize"));
@@ -1669,7 +1672,7 @@ export default defineComponent({
         }
 
         // if (!isValid(true, true)) {
-          // return;
+        // return;
         // }
 
         // reset searchResponseForVisualization
@@ -1683,6 +1686,9 @@ export default defineComponent({
         visualizeChartData.value = JSON.parse(
           JSON.stringify(dashboardPanelData.data),
         );
+
+        // set fields extraction loading to false
+        variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
       }
     };
 
@@ -1725,8 +1731,6 @@ export default defineComponent({
         await fieldsExtractionPromise;
       } catch (err: any) {
         throw err;
-      } finally {
-        variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
       }
     };
 

@@ -5600,15 +5600,9 @@ const useLogs = () => {
     if((isPagination && searchPartitionMap[payload.traceId] === 1) || !appendResult){
       searchObj.data.queryResults.hits = response.content.results.hits;
     } else if (appendResult) {
-      // if order by is desc, append new partition response at end
-      if (searchObj.data.queryResults.order_by?.toLowerCase() === "desc") {
-        searchObj.data.queryResults.hits.push(...response.content.results.hits);
-      } else {
-        // else append new partition response at start
-        searchObj.data.queryResults.hits.unshift(
-          ...response.content.results.hits,
-        );
-      }
+      searchObj.data.queryResults.hits.push(
+        ...response.content.results.hits,
+      );
     } 
     
     if (searchObj.meta.refreshInterval === 0) {
@@ -5903,7 +5897,6 @@ const useLogs = () => {
     }
 
     if(payload.type === "histogram" && response?.type === "search_response_hits") {
-      console.log("histogram streaming hits", response);
       handleHistogramStreamingHits(payload, response, payload.isPagination);
       return;
     }
