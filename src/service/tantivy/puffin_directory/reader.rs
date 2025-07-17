@@ -198,7 +198,7 @@ impl Directory for PuffinDirReader {
 pub async fn warm_up_terms(
     searcher: &tantivy::Searcher,
     terms_grouped_by_field: &HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>>,
-    need_all_term_fields: Vec<tantivy::schema::Field>,
+    need_all_term_fields: HashSet<tantivy::schema::Field>,
     need_fast_field: Option<String>,
 ) -> anyhow::Result<()> {
     let mut warm_up_fields_futures = Vec::new();
@@ -603,7 +603,7 @@ mod tests {
 
         // Test with empty terms
         let terms_grouped_by_field = HashbrownHashMap::new();
-        let result = warm_up_terms(&searcher, &terms_grouped_by_field, vec![], None).await;
+        let result = warm_up_terms(&searcher, &terms_grouped_by_field, HashSet::new(), None).await;
         assert!(result.is_ok());
     }
 
@@ -640,7 +640,7 @@ mod tests {
         field_terms.insert(term, false);
         terms_grouped_by_field.insert(text_field, field_terms);
 
-        let result = warm_up_terms(&searcher, &terms_grouped_by_field, vec![], None).await;
+        let result = warm_up_terms(&searcher, &terms_grouped_by_field, HashSet::new(), None).await;
         assert!(result.is_ok());
     }
 
@@ -673,7 +673,8 @@ mod tests {
         // Test with prefix field
         let terms_grouped_by_field = HashbrownHashMap::new();
         let result =
-            warm_up_terms(&searcher, &terms_grouped_by_field, vec![text_field], None).await;
+            warm_up_terms(&searcher, &terms_grouped_by_field, HashSet::from([text_field]), None)
+                .await;
         assert!(result.is_ok());
     }
 
@@ -708,7 +709,7 @@ mod tests {
         let result = warm_up_terms(
             &searcher,
             &terms_grouped_by_field,
-            vec![],
+            HashSet::new(),
             Some(TIMESTAMP_COL_NAME.to_string()),
         )
         .await;
@@ -755,7 +756,7 @@ mod tests {
         terms_grouped_by_field.insert(text_field, field_terms);
 
         let start = Instant::now();
-        let result = warm_up_terms(&searcher, &terms_grouped_by_field, vec![], None).await;
+        let result = warm_up_terms(&searcher, &terms_grouped_by_field, HashSet::new(), None).await;
         let duration = start.elapsed();
 
         assert!(result.is_ok());

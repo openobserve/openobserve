@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::Arc};
+use std::{any::Any, collections::HashSet, sync::Arc};
 
 use arrow::array::{
     Array, Int64Array, TimestampMicrosecondArray, TimestampNanosecondArray, UInt64Array,
 };
-use config::meta::{inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
+use config::meta::{inverted_index::IndexOptimizeMode, stream::FileKey};
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
     common::{Result, Statistics, internal_err},
@@ -44,7 +44,7 @@ pub struct TantivyOptimizeExec {
     file_list: Vec<FileKey>,                 // The list of files to read
     index_condition: Option<IndexCondition>, // The condition to filter the rows
     cache: PlanProperties,                   // Cached properties of this plan
-    index_optimize_mode: InvertedIndexOptimizeMode, // Type of query the ttv index optimizes
+    index_optimize_mode: IndexOptimizeMode,  // Type of query the ttv index optimizes
 }
 
 impl TantivyOptimizeExec {
@@ -54,7 +54,7 @@ impl TantivyOptimizeExec {
         schema: SchemaRef,
         file_list: Vec<FileKey>,
         index_condition: Option<IndexCondition>,
-        index_optimize_mode: InvertedIndexOptimizeMode,
+        index_optimize_mode: IndexOptimizeMode,
     ) -> Self {
         let cache = Self::compute_properties(Arc::clone(&schema));
         TantivyOptimizeExec {
@@ -157,7 +157,7 @@ async fn adapt_tantivy_result(
     mut file_list: Vec<FileKey>,
     index_condition: Option<IndexCondition>,
     schema: SchemaRef,
-    idx_optimize_mode: InvertedIndexOptimizeMode,
+    idx_optimize_mode: IndexOptimizeMode,
 ) -> Result<RecordBatch> {
     let (idx_took, error, result) = filter_file_list_by_tantivy_index(
         query.clone(),
@@ -182,10 +182,10 @@ async fn adapt_tantivy_result(
     );
 
     let array = match idx_optimize_mode {
-        InvertedIndexOptimizeMode::SimpleCount => {
+        IndexOptimizeMode::SimpleCount => {
             vec![Arc::new(Int64Array::from(vec![result.num_rows() as i64])) as Arc<dyn Array>]
         }
-        InvertedIndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
+        IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
             create_histogram_arrow_array(
                 &schema,
                 result.histogram(),
@@ -194,8 +194,11 @@ async fn adapt_tantivy_result(
                 num_buckets,
             )?
         }
-        InvertedIndexOptimizeMode::SimpleTopN(field, limit, _ascend) => {
+        IndexOptimizeMode::SimpleTopN(field, limit, _ascend) => {
             create_top_n_arrow_array(&schema, result.top_n(), &field, limit)?
+        }
+        IndexOptimizeMode::SimpleDistinct(_field, _limit, _ascend) => {
+            create_distinct_arrow_array(&schema, result.distinct())?
         }
         _ => {
             return internal_err!(
@@ -358,6 +361,27 @@ fn create_top_n_arrow_array(
     Ok(vec![field_array, count_array])
 }
 
+fn create_distinct_arrow_array(
+    schema: &SchemaRef,
+    distinct_values: HashSet<String>,
+) -> Result<Vec<Arc<dyn arrow::array::Array>>, DataFusionError> {
+    // Validate inputs
+    if schema.fields().len() != 1 {
+        return Err(DataFusionError::Internal(format!(
+            "Expected schema with 1 field for Distinct, got {}",
+            schema.fields().len()
+        )));
+    }
+
+    // Get field data types from schema to ensure we create the right array types
+    let field_field = &schema.fields()[0];
+
+    // Create field value array with proper type based on schema
+    let field_array = create_field_array(field_field, distinct_values.into_iter().collect())?;
+
+    Ok(vec![field_array])
+}
+
 /// Helper function to create field arrays with proper type conversion
 fn create_field_array(
     field: &arrow_schema::Field,
@@ -379,7 +403,7 @@ fn create_field_array(
         arrow_schema::DataType::Boolean => parse_bool_array(&field_values),
         // Handle other string types as needed
         _ => Err(DataFusionError::Internal(format!(
-            "Unexpected field type in TopN schema: {:?}",
+            "Unexpected field type in TopN or Distinct schema: {:?}",
             field.data_type()
         ))),
     }

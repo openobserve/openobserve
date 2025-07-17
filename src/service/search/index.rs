@@ -107,22 +107,6 @@ impl Debug for IndexCondition {
     }
 }
 
-// single condition
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Condition {
-    // field, value
-    Equal(String, String),
-    // field, value, case_sensitive
-    StrMatch(String, String, bool),
-    In(String, Vec<String>),
-    Regex(String, String),
-    MatchAll(String),
-    FuzzyMatchAll(String, u8),
-    All(),
-    Or(Box<Condition>, Box<Condition>),
-    And(Box<Condition>, Box<Condition>),
-}
-
 impl IndexCondition {
     // this only use for display the query
     pub fn to_query(&self) -> String {
@@ -133,6 +117,7 @@ impl IndexCondition {
             .join(" AND ")
     }
 
+    // get the tantivy query for the index condition
     pub fn to_tantivy_query(
         &self,
         schema: Schema,
@@ -150,6 +135,7 @@ impl IndexCondition {
         Ok(Box::new(BooleanQuery::from(queries)))
     }
 
+    // get the fields use for search in tantivy
     pub fn get_tantivy_fields(&self) -> HashSet<String> {
         self.conditions
             .iter()
@@ -159,6 +145,7 @@ impl IndexCondition {
             })
     }
 
+    // get the fields use for search in datafusion(for add filter back logical)
     pub fn get_schema_fields(&self, fst_fields: &[String]) -> HashSet<String> {
         self.conditions
             .iter()
@@ -206,6 +193,46 @@ impl IndexCondition {
             .iter()
             .all(|condition| condition.can_remove_filter())
     }
+
+    // check if the index condition is a simple str match condition
+    // the simple str match condition is like str_match(field, 'value')
+    // use for check if the distinct query can be optimized
+    pub fn is_simple_str_match(&self, field: &str) -> bool {
+        if self.conditions.len() != 1 {
+            return false;
+        }
+        matches!(
+            &self.conditions[0],
+            Condition::StrMatch(f, ..) if f == field
+        )
+    }
+
+    // use for simple distinct optimization
+    pub fn get_str_match_condition(&self) -> Option<(String, bool)> {
+        match &self.conditions[0] {
+            Condition::StrMatch(_, value, case_sensitive) => {
+                Some((value.to_string(), *case_sensitive))
+            }
+            Condition::All() => None, // for the condition that query without filter
+            _ => unreachable!("get_str_match_condition only support one str_match condition"),
+        }
+    }
+}
+
+// single condition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Condition {
+    // field, value
+    Equal(String, String),
+    // field, value, case_sensitive
+    StrMatch(String, String, bool),
+    In(String, Vec<String>),
+    Regex(String, String),
+    MatchAll(String),
+    FuzzyMatchAll(String, u8),
+    All(),
+    Or(Box<Condition>, Box<Condition>),
+    And(Box<Condition>, Box<Condition>),
 }
 
 impl Condition {
