@@ -110,9 +110,5 @@ test.describe("dashboard max query testcases", () => {
     await dashboardPage.menuItem("streams-item");
 
     await streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "0");
-
-    // await page.locator('[data-test="dashboard-back-btn"]').click();
-
-    // await deleteDashboard(page, randomDashboardName);
   });
 });
