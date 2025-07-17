@@ -582,7 +582,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                             }
                         }
                         Err(e) => {
-                            log::error!("Failed to check domain management: {}", e);
+                            log::error!("Failed to check domain management: {e}");
                             // Fail open - allow access if domain management check fails
                             // This prevents system lockouts due to configuration errors
                         }
