@@ -279,7 +279,7 @@ pub async fn save_stream_settings(
     {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,
-            format!("Field name '{}' is invalid. Field names must start with a letter or underscore and contain only alphanumeric characters and underscores.", f)
+            format!("Field name '{f}' is invalid. Field names must start with a letter or underscore and contain only alphanumeric characters and underscores.")
         )));
     }
 

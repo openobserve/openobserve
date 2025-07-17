@@ -346,8 +346,12 @@ async fn handle_diff_schema(
         // Add each defined field to the schema with default string type
         let mut new_fields = final_schema.fields().to_vec();
         for field_name in &defined_schema_fields {
-            if !final_schema.field_with_name(field_name).is_ok() {
-                let field = Arc::new(Field::new(field_name, datafusion::arrow::datatypes::DataType::Utf8, true));
+            if final_schema.field_with_name(field_name).is_err() {
+                let field = Arc::new(Field::new(
+                    field_name,
+                    datafusion::arrow::datatypes::DataType::Utf8,
+                    true,
+                ));
                 new_fields.push(field);
             }
         }
@@ -369,8 +373,82 @@ async fn handle_diff_schema(
             stream_name,
             stream_type,
             stream_setting.clone(),
-        ).await {
+        )
+        .await
+        {
             log::error!("save_stream_settings [{org_id}/{stream_type}/{stream_name}] error: {e}");
+        }
+    }
+
+    // For existing streams with UDS enabled, add new fields to both schema and UDS
+    if !is_new && !defined_schema_fields.is_empty() {
+        // Get the original schema to compare with
+        let original_schema = if let Some(stream_schema) = stream_schema_map.get(stream_name) {
+            stream_schema.schema().as_ref().clone()
+        } else {
+            // If we can't get the original schema, skip this logic
+            final_schema.clone()
+        };
+
+        // Find new fields that are in final_schema but not in original_schema
+        let original_field_names: HashSet<String> = original_schema
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect();
+
+        let new_field_names: Vec<String> = final_schema
+            .fields()
+            .iter()
+            .filter_map(|f| {
+                let field_name = f.name().to_string();
+                if !original_field_names.contains(&field_name)
+                    && !defined_schema_fields.contains(&field_name)
+                {
+                    Some(field_name)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if !new_field_names.is_empty() {
+            log::info!(
+                "Adding {} new fields to both schema and UDS for existing stream [{}/{}/{}]: {:?}",
+                new_field_names.len(),
+                org_id,
+                stream_type,
+                stream_name,
+                new_field_names
+            );
+
+            // Add new fields to defined_schema_fields (UDS)
+            for field_name in &new_field_names {
+                if !defined_schema_fields.contains(field_name) {
+                    defined_schema_fields.push(field_name.clone());
+                }
+            }
+
+            // Update the settings with new UDS fields
+            stream_setting.defined_schema_fields = defined_schema_fields.clone();
+            final_schema.metadata.insert(
+                "settings".to_string(),
+                json::to_string(&stream_setting).unwrap(),
+            );
+
+            // Save the updated settings
+            if let Err(e) = super::stream::save_stream_settings(
+                org_id,
+                stream_name,
+                stream_type,
+                stream_setting.clone(),
+            )
+            .await
+            {
+                log::error!(
+                    "save_stream_settings [{org_id}/{stream_type}/{stream_name}] error: {e}"
+                );
+            }
         }
     }
 
@@ -695,7 +773,7 @@ mod tests {
     fn test_new_stream_schema_fields_behavior() {
         // Test that our logic correctly handles new stream creation with defined_schema_fields
         // This is a unit test for the logic we added in handle_diff_schema
-        
+
         // Create a schema with some defined_schema_fields
         let mut metadata = HashMap::new();
         let settings = config::meta::stream::StreamSettings {
@@ -703,18 +781,105 @@ mod tests {
             ..Default::default()
         };
         metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
-        
+
         let schema = Schema::new_with_metadata(
-            vec![
-                Arc::new(Field::new("existing_field", DataType::Utf8, true)),
-            ],
+            vec![Arc::new(Field::new("existing_field", DataType::Utf8, true))],
             metadata,
         );
-        
+
         // Verify that the settings are correctly parsed
         let stream_setting = unwrap_stream_settings(&schema).unwrap_or_default();
         assert_eq!(stream_setting.defined_schema_fields.len(), 2);
-        assert!(stream_setting.defined_schema_fields.contains(&"custom_field1".to_string()));
-        assert!(stream_setting.defined_schema_fields.contains(&"custom_field2".to_string()));
+        assert!(
+            stream_setting
+                .defined_schema_fields
+                .contains(&"custom_field1".to_string())
+        );
+        assert!(
+            stream_setting
+                .defined_schema_fields
+                .contains(&"custom_field2".to_string())
+        );
+    }
+
+    #[test]
+    fn test_existing_stream_uds_field_addition() {
+        // Test that our logic correctly handles existing streams with UDS enabled
+        // This tests the logic for adding new fields to both schema and UDS
+
+        // Create an original schema with UDS fields
+        let mut original_metadata = HashMap::new();
+        let original_settings = config::meta::stream::StreamSettings {
+            defined_schema_fields: vec!["uds_field1".to_string(), "uds_field2".to_string()],
+            ..Default::default()
+        };
+        original_metadata.insert(
+            "settings".to_string(),
+            json::to_string(&original_settings).unwrap(),
+        );
+
+        let original_schema = Schema::new_with_metadata(
+            vec![
+                Arc::new(Field::new("existing_field", DataType::Utf8, true)),
+                Arc::new(Field::new("uds_field1", DataType::Utf8, true)),
+                Arc::new(Field::new("uds_field2", DataType::Utf8, true)),
+            ],
+            original_metadata,
+        );
+
+        // Create a new schema with additional fields
+        let mut new_metadata = HashMap::new();
+        let new_settings = config::meta::stream::StreamSettings {
+            defined_schema_fields: vec!["uds_field1".to_string(), "uds_field2".to_string()],
+            ..Default::default()
+        };
+        new_metadata.insert(
+            "settings".to_string(),
+            json::to_string(&new_settings).unwrap(),
+        );
+
+        let new_schema = Schema::new_with_metadata(
+            vec![
+                Arc::new(Field::new("existing_field", DataType::Utf8, true)),
+                Arc::new(Field::new("uds_field1", DataType::Utf8, true)),
+                Arc::new(Field::new("uds_field2", DataType::Utf8, true)),
+                Arc::new(Field::new("new_field1", DataType::Utf8, true)),
+                Arc::new(Field::new("new_field2", DataType::Utf8, true)),
+            ],
+            new_metadata,
+        );
+
+        // Simulate the logic: find new fields that should be added to UDS
+        let original_field_names: HashSet<String> = original_schema
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect();
+
+        let current_uds_fields = vec!["uds_field1".to_string(), "uds_field2".to_string()];
+
+        let new_field_names: Vec<String> = new_schema
+            .fields()
+            .iter()
+            .filter_map(|f| {
+                let field_name = f.name().to_string();
+                if !original_field_names.contains(&field_name)
+                    && !current_uds_fields.contains(&field_name)
+                {
+                    Some(field_name)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Verify that new fields are detected correctly
+        assert_eq!(new_field_names.len(), 2);
+        assert!(new_field_names.contains(&"new_field1".to_string()));
+        assert!(new_field_names.contains(&"new_field2".to_string()));
+
+        // Verify that existing UDS fields are not included
+        assert!(!new_field_names.contains(&"uds_field1".to_string()));
+        assert!(!new_field_names.contains(&"uds_field2".to_string()));
     }
 }
