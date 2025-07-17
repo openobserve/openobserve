@@ -1114,6 +1114,8 @@ pub struct EnrichmentTableMetaStreamStats {
     pub start_time: i64,
     pub end_time: i64,
     pub size: i64,
+    #[serde(default)]
+    pub s3_last_updated: i64,
 }
 
 #[cfg(test)]

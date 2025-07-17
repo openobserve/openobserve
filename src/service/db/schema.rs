@@ -402,7 +402,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let stream_name = keys[2];
 
                 if stream_type.eq(&StreamType::EnrichmentTables) {
-                    let data = super::enrichment_table::get(org_id, stream_name)
+                    let data = super::super::enrichment::get_enrichment_table(org_id, stream_name)
                         .await
                         .unwrap();
                     ENRICHMENT_TABLES.insert(
@@ -584,7 +584,8 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
 
     // fill data
     for (key, tbl) in tables {
-        let data = super::enrichment_table::get(&tbl.org_id, &tbl.stream_name).await?;
+        let data =
+            super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name).await?;
         ENRICHMENT_TABLES.insert(
             key,
             StreamTable {
