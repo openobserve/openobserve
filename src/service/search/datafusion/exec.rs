@@ -559,12 +559,6 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
 
-    #[cfg(feature = "enterprise")]
-    ctx.register_udf(super::udf::cipher_udf::DECRYPT_UDF.clone());
-    #[cfg(feature = "enterprise")]
-    ctx.register_udf(super::udf::cipher_udf::ENCRYPT_UDF.clone());
-    #[cfg(feature = "enterprise")]
-    ctx.register_udf(super::udf::cipher_udf::DECRYPT_SLOW_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::percentile_cont::PercentileCont::new(),
@@ -582,6 +576,7 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     {
         ctx.register_udf(super::udf::cipher_udf::DECRYPT_UDF.clone());
         ctx.register_udf(super::udf::cipher_udf::ENCRYPT_UDF.clone());
+        ctx.register_udf(super::udf::cipher_udf::DECRYPT_SLOW_UDF.clone());
         ctx.register_udaf(AggregateUDF::from(
             o2_enterprise::enterprise::search::datafusion::udaf::approx_topk::ApproxTopK::new(),
         ));
