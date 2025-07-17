@@ -155,6 +155,7 @@ mod tests {
             settings: StreamSettings::default(),
             metrics_meta: None,
             total_fields: 1,
+            is_derived: None,
         };
 
         let list_stream = ListStream {
@@ -234,6 +235,7 @@ mod tests {
             settings: StreamSettings::default(),
             metrics_meta: None,
             total_fields: 1,
+            is_derived: None,
         };
 
         assert!(stream.uds_schema.len() == 1);
