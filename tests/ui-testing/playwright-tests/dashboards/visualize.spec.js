@@ -253,12 +253,12 @@ test.describe("logs testcases", () => {
   test.skip("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization.", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    const pm = new PageManager(page);
 
     // Open the logs page and set relative time
-    await logsVisualise.openLogs();
-    await logsVisualise.setRelative("6", "w");
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Add the kubernetes_container_hash field to the search query
     await page.getByLabel('Expand "kubernetes_container_hash"').click();
@@ -273,11 +273,11 @@ test.describe("logs testcases", () => {
         '[data-test="logs-search-subfield-add-kubernetes_container_hash-058694856476\\.dkr\\.ecr\\.us-west-2\\.amazonaws\\.com\\/ziox\\@sha256\\:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589"] [data-test="log-search-subfield-list-equal-kubernetes_container_hash-field-btn"]'
       )
       .click();
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.logsApplyQueryButton();
 
     // Open the visualization tab
-    await logsVisualise.openVisualiseTab();
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
     let exceptionBefore = null;
     let exceptionAfter = null;
 
@@ -293,11 +293,11 @@ test.describe("logs testcases", () => {
     }
 
     await page.locator('[data-test="dashboard-add-condition-remove"]').click();
-    await logsVisualise.runQueryAndWaitForCompletion();
-    await logsVisualise.backToLogs();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.backToLogs();
 
-    await logsVisualise.logsApplyQueryButton();
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.openVisualiseTab();
 
     try {
       await expect(
@@ -309,7 +309,7 @@ test.describe("logs testcases", () => {
       exceptionAfter = e;
     }
     expect(exceptionBefore).toBe(exceptionAfter);
-    await logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion();
   });
 
   test("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
@@ -435,7 +435,6 @@ test.describe("logs testcases", () => {
     let previousCount = -1;
     let currentCount = 0;
     const maxRetries = 10;
-    
 
     for (let i = 0; i < maxRetries; i++) {
       const options = await page.getByRole("option");
@@ -554,11 +553,11 @@ test.describe("logs testcases", () => {
   test("Should not call the API after toggling to the Visualization view.", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    const pm = new PageManager(page);
 
     // Open the logs page and the query editor
-    await logsVisualise.openLogs();
-    await logsVisualise.openQueryEditor();
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.openQueryEditor();
     const queryEditor = page
       .locator('[data-test="logs-search-bar-query-editor"]')
       .getByRole("textbox");
@@ -568,13 +567,13 @@ test.describe("logs testcases", () => {
     // Fill query in the query editor
     await queryEditor.fill(initialQuery);
 
-    await logsVisualise.setRelative("1", "m");
+    await pm.logsVisualise.setRelative("1", "m");
 
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.logsApplyQueryButton();
     await page.waitForTimeout(5000);
 
     //open the visualization tab
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
 
     // Assert that the event-streaming search API call is **not** fired
     const apiCallHappened = await page
@@ -596,7 +595,7 @@ test.describe("logs testcases", () => {
   test.skip("Should update the field name after updating the query.", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    const pm = new PageManager(page);
 
     const updatedQuery = `SELECT
     kubernetes_namespace_testname,
@@ -616,8 +615,8 @@ ORDER BY
 LIMIT 100`;
 
     // Step 1: Open Logs page and query editor
-    await logsVisualise.openLogs();
-    await logsVisualise.openQueryEditor();
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.openQueryEditor();
 
     const queryEditor = page
       .locator('[data-test="logs-search-bar-query-editor"]')
@@ -626,12 +625,12 @@ LIMIT 100`;
 
     // Step 2: Fill and apply the initial query
     await queryEditor.fill(initialQuery.trim());
-    await logsVisualise.setRelative("1", "m");
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("1", "m");
+    await pm.logsVisualise.logsApplyQueryButton();
     await page.waitForTimeout(3000); // Optional: Replace with proper wait if possible
 
     // Step 3: Open the Visualization tab
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
 
     await expect(
       page.locator('[data-test="dashboard-x-item-kubernetes_namespace_name"]')
@@ -660,11 +659,12 @@ LIMIT 100`;
   test("Should redirect to the table chart in visualization when the query includes more than two fields on the X-axis.", async ({
     page,
   }) => {
-    const logsVisualise = new LogsVisualise(page);
+    const pm = new PageManager(page);
+    // const logsVisualise = new LogsVisualise(page);
 
     // Step 1: Open Logs page and query editor
-    await logsVisualise.openLogs();
-    await logsVisualise.openQueryEditor();
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.openQueryEditor();
 
     const queryEditor = page
       .locator('[data-test="logs-search-bar-query-editor"]')
@@ -673,12 +673,12 @@ LIMIT 100`;
 
     // Step 2: Fill and apply the initial query
     await queryEditor.fill(initialQuery.trim());
-    await logsVisualise.setRelative("1", "m");
-    await logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.setRelative("1", "m");
+    await pm.logsVisualise.logsApplyQueryButton();
     await page.waitForTimeout(3000); // Optional: Replace with proper wait if possible
 
     // Step 3: Open the Visualization tab
-    await logsVisualise.openVisualiseTab();
+    await pm.logsVisualise.openVisualiseTab();
     await expect(
       page.locator('[data-test="selected-chart-table-item"]').locator("..")
     ).toHaveClass(/bg-grey-3|5/); // matches light (3) or dark (5) theme
