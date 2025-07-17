@@ -19,7 +19,7 @@ use actix_web::{
     HttpRequest, HttpResponse, Responder, delete, get, http, http::StatusCode, post, put, web,
 };
 use config::{
-    meta::stream::{StreamSettings, StreamType, UpdateStreamSettings},
+    meta::stream::{StreamSettings, StreamType, TimeRange, UpdateStreamSettings},
     utils::schema::format_stream_name,
 };
 use hashbrown::HashMap;
@@ -568,4 +568,43 @@ async fn delete_stream_cache(
             "Error deleting cache, please retry",
         ))),
     }
+}
+
+/// StreamDeleteDataByTimeRange
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Streams",
+    operation_id = "StreamDeleteDataByTimeRange",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("type" = String, Query, description = "Stream type"),
+        ("start_ts" = String, Query, description = "Start unix timestamp in microseconds"),
+        ("end_ts" = String, Query, description = "End unix timestamp in microseconds"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[delete("/{org_id}/streams/{stream_name}/data_by_time_range")]
+async fn delete_stream_data_by_time_range(
+    path: web::Path<(String, String)>,
+    body: web::Json<TimeRange>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let time_range = (body.start, body.end);
+    // TODO: create a job to delete the data
+    todo!()
 }
