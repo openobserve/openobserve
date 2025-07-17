@@ -185,13 +185,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             clickable
                             v-close-popup
                             dense
-                            :class="{'text-primary': props.row.identifier === userClickedOrg?.identifier}"
+                            :class="{'text-primary': props.row.identifier === userClickedOrg?.identifier                            }"
                             @click="selectedOrg = props.row; updateOrganization()"
                           >
                             <q-item-section>
-                              <q-item-label data-test="organization-menu-item-label-item-label" class="ellipsis">
-                                {{ props.row.label }}
-                              </q-item-label>
+                              <q-item-label
+                                  data-test="organization-menu-item-label-item-label"
+                                  class="tw-overflow-hidden tw-whitespace-nowrap tw-text-ellipsis tw-max-w-[230px]"
+                                >
+                                  {{ props.row.label }}
+                                  <q-tooltip v-if="props.row.label.length > 35"  anchor="bottom middle" self="top start">
+                                    {{ props.row.label }}
+                                  </q-tooltip>
+                                </q-item-label>
                             </q-item-section>
                           </q-item>
                         </q-td>
