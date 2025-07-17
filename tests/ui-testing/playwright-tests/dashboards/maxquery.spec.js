@@ -10,7 +10,7 @@ import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
 import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
 import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
 import StreamSettingsPage from "../../pages/dashboardPages/streams.js";
-import { ManagementPage } from "../../pages/managementPage.js";
+import { ManagementPage } from "../../pages/generalPages/managementPage.js";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -101,7 +101,11 @@ test.describe("dashboard max query testcases", () => {
       page.locator('[data-test="dashboard-panel-max-duration-warning"]')
     ).not.toBeVisible();
 
-    await page.waitForTimeout(10000);
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+
+    await deleteDashboard(page, randomDashboardName);
+
+    await page.waitForTimeout(1000);
 
     await dashboardPage.menuItem("streams-item");
 
