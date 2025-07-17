@@ -59,6 +59,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { run_check_running_jobs().await });
     tokio::task::spawn(async move { run_clean_done_jobs().await });
     tokio::task::spawn(async move { run_compactor_pending_jobs_metric().await });
+    tokio::task::spawn(async move { run_enrichment_table_merge().await });
 
     Ok(())
 }
@@ -254,4 +255,24 @@ async fn run_clean_done_jobs() -> Result<(), anyhow::Error> {
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(time as u64)).await;
     }
+}
+
+async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
+    let cfg = get_config();
+    let interval = cfg.enrichment_table.merge_interval_seconds;
+    let Ok(locker) = infra::dist_lock::lock("/enrichment_table/merge", 0).await else {
+        log::error!("[COMPACTOR::JOB] Failed to acquire lock for enrichment table merge");
+        return Ok(());
+    };
+
+    let handle = tokio::task::spawn(async move {
+        if let Err(e) = crate::service::enrichment::storage::s3::run_merge_job().await {
+            log::error!("[COMPACTOR::JOB] run enrichment table merge error: {e}");
+        }
+    });
+    handle.await.unwrap();
+    if let Err(e) = infra::dist_lock::unlock(&locker).await {
+        log::error!("[COMPACTOR::JOB] Failed to release lock for enrichment table merge: {e}");
+    }
+    Ok(())
 }

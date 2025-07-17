@@ -18,6 +18,8 @@ use config::utils::time::parse_str_to_time;
 use vector_enrichment::{Case, IndexHandle, Table};
 use vrl::value::{ObjectMap, Value};
 
+pub mod storage;
+
 #[derive(Clone)]
 pub struct StreamTableConfig {}
 
@@ -27,6 +29,7 @@ pub struct StreamTable {
     pub stream_name: String,
     pub data: Vec<vrl::value::Value>,
 }
+
 impl StreamTable {}
 
 #[async_trait]
@@ -170,4 +173,66 @@ fn get_data(
     };
 
     resp
+}
+
+// Global state for caching
+// static METADATA_CACHE: Lazy<Arc<RwLock<HashMap<String, EnrichmentTableMetadata>>>> =
+//     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
+
+/// Retrieve enrichment table data
+pub async fn get_enrichment_table(
+    org_id: &str,
+    table_name: &str,
+) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
+    let mut records = vec![];
+    let db_stats = crate::service::db::enrichment_table::get_meta_table_stats(org_id, table_name)
+        .await
+        .unwrap_or_default();
+    let local_stats_last_updated = storage::local::get_last_updated_at(org_id, table_name)
+        .await
+        .unwrap_or_default();
+
+    if db_stats.end_time > local_stats_last_updated {
+        // check in s3 to check last updated
+        let s3_last_updated = storage::s3::get_last_updated_at().await?;
+        // fetch from s3 and put into records
+        let data = storage::s3::retrieve(org_id, table_name)
+            .await
+            .unwrap_or_default();
+        records.extend(data);
+        if db_stats.end_time > s3_last_updated {
+            // fetch from db and put into records
+            let data = crate::service::db::enrichment_table::get_enrichment_data_from_db(
+                org_id, table_name,
+            )
+            .await?;
+            records.extend(data.0);
+        }
+    } else {
+        // fetch from local cache and put into records
+        let data = storage::local::retrieve(org_id, table_name).await?;
+        records.extend(data);
+    }
+
+    records.sort_by(|a, b| {
+        a.get("_timestamp")
+            .unwrap()
+            .as_i64()
+            .unwrap()
+            .cmp(&b.get("_timestamp").unwrap().as_i64().unwrap())
+    });
+    let last_updated_at = records
+        .last()
+        .unwrap()
+        .get("_timestamp")
+        .unwrap()
+        .as_i64()
+        .unwrap();
+    storage::local::store_data_if_needed_background(org_id, table_name, &records, last_updated_at)
+        .await?;
+
+    Ok(records
+        .iter()
+        .map(crate::service::db::enrichment_table::convert_to_vrl)
+        .collect())
 }
