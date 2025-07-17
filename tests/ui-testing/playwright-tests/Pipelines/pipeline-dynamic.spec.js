@@ -1,107 +1,49 @@
-import { test, expect } from '@playwright/test';
-import { PipelinesPage } from '../../pages/pipelinesPages/pipelinesPage.js';
-import logsdata from '../../../test-data/logs_data.json';
-import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
+import { test, expect } from "../baseFixtures.js";
+import PageManager from "../../pages/page-manager.js";
 
-test.describe('Pipeline Dynamic Stream Names', () => {
+test.describe.configure({ mode: "parallel" });
+
+test.describe("Dynamic Pipeline Tests", () => {
+  let pageManager;
   let page;
-  let pipelinePage;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeEach(async ({ browser }) => {
     page = await browser.newPage();
-    pipelinePage = new PipelinesPage(page);
+    pageManager = new PageManager(page);
+  });
 
-    // Login - happens only once before all tests
-    await page.goto(process.env["ZO_BASE_URL"]);
-    if (await page.getByText('Login as internal user').isVisible()) {
-      await page.getByText('Login as internal user').click();
-    }
+  test("should create and delete dynamic pipeline", async () => {
+    await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
-    await page
-      .locator('[data-cy="login-user-id"]')
-      .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-    await page
-      .locator('[data-cy="login-password"]')
-      .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-    await page.locator('[data-cy="login-sign-in"]').click();
-    // Wait for login to complete and page to be ready
-    await page.waitForTimeout(4000);
-  });
-
-  test.beforeEach(async () => {
-    // Ensure page is still open
-    if (page.isClosed()) {
-      throw new Error('Page was closed unexpectedly');
-    }
-
-    // Ingestion - happens before each test
-    const orgId = process.env["ORGNAME"];
-    const streamNames = ["e2e_automate", "e2e_automate1", "e2e_automate2", "e2e_automate3"];
-    const headers = getHeaders();
-    
-    for(const streamName of streamNames) {
-      const url = getIngestionUrl(orgId, streamName);
-      const response = await sendRequest(page, url, logsdata, headers);
-      console.log(response);
-    }
+    await pageManager.pipelinesPage.addPipeline();
+    await pageManager.pipelinesPage.selectStream();
+    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
+    await pageManager.pipelinesPage.selectLogs();
+    await pageManager.pipelinesPage.enterStreamName("e2e");
+    await pageManager.pipelinesPage.enterStreamName("e2e_automate");
     await page.waitForTimeout(2000);
-  });
-
-  test.afterEach(async () => {
-    // Add a small wait after each test to ensure operations are complete
+    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
+    await pageManager.pipelinesPage.saveInputNodeStream();
+    await page.waitForTimeout(2000);
+    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
+    await page.locator("button").filter({ hasText: "edit" }).hover();
+    await page.getByRole("img", { name: "Output Stream" }).click();
+    await page.getByLabel("Stream Name *").click();
+    await page.getByLabel("Stream Name *").fill("destination-node");
     await page.waitForTimeout(1000);
-  });
-
-  test.afterAll(async () => {
-    // Add a wait before closing to ensure all operations are complete
-    await page.waitForTimeout(2000);
-    if (!page.isClosed()) {
-      await page.close();
-    }
-  });
-
-  test('Verify pipeline with dynamic destination name using kubernetes_container_name', async () => {
-    // Navigate to stream and pipeline
-    await pipelinePage.exploreStreamAndNavigateToPipeline('e2e_automate1');
-    await page.waitForLoadState('networkidle');
-    
-    // Setup source stream
-    await pipelinePage.setupPipelineWithSourceStream('e2e_automate1');
-    await page.waitForLoadState('networkidle');
-    
-    // Setup container name condition
-    await pipelinePage.setupContainerNameCondition();
-    await page.waitForLoadState('networkidle');
-    
-    // Setup destination stream
-    await pipelinePage.setupDestinationStream('dynamic_ziox_dynamic');
-    await page.waitForLoadState('networkidle');
-    
-    // Create and verify pipeline
-    await pipelinePage.createAndVerifyPipeline('dynamic_ziox_dynamic', 'e2e_automate1');
-  });
-
-  test('Verify pipeline with dynamic destination name using kubernetes_container_name with underscores', async () => {
-    await pipelinePage.exploreStreamAndNavigateToPipeline('e2e_automate2');
-    await page.waitForLoadState('networkidle');
-    await pipelinePage.setupPipelineWithSourceStream('e2e_automate2');
-    await page.waitForLoadState('networkidle');
-    await pipelinePage.setupContainerNameCondition();
-    await page.waitForLoadState('networkidle');
-    await pipelinePage.setupDestinationStream('dynamic_ziox_dynamic');
-    await page.waitForLoadState('networkidle');
-    await pipelinePage.createAndVerifyPipeline('dynamic_ziox_dynamic', 'e2e_automate2');
-  });
-
-  test('Verify pipeline with dynamic destination name using kubernetes_container_name directly', async () => {
-    await pipelinePage.exploreStreamAndNavigateToPipeline('e2e_automate3');
-    await page.waitForLoadState('networkidle');
-    await pipelinePage.setupPipelineWithSourceStream('e2e_automate3');
-    await page.waitForLoadState('networkidle');
-    await pipelinePage.setupContainerNameCondition();
-    await page.waitForLoadState('networkidle');
-    await pipelinePage.setupDestinationStream('ziox');
-    await page.waitForLoadState('networkidle');
-    await pipelinePage.createAndVerifyPipeline('ziox', 'e2e_automate3');
+    await pageManager.pipelinesPage.clickInputNodeStreamSave();
+    const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
+    await pageManager.pipelinesPage.enterPipelineName(pipelineName);
+    await pageManager.pipelinesPage.savePipeline();
+    await pageManager.pipelinesPage.searchPipeline(pipelineName);
+    await page.waitForTimeout(1000);
+    const deletePipelineButton = page.locator(
+      `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
+    );
+    await deletePipelineButton.waitFor({ state: "visible" });
+    await deletePipelineButton.click();
+    await pageManager.pipelinesPage.confirmDeletePipeline();
+    await pageManager.pipelinesPage.verifyPipelineDeleted();
   });
 }); 
