@@ -251,6 +251,15 @@ pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::ne
     map
 });
 
+pub static COMPACT_OLD_DATA_STREAM_SET: Lazy<HashSet<String>> = Lazy::new(|| {
+    get_config()
+        .compact
+        .old_data_streams
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .collect()
+});
+
 pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
@@ -1103,6 +1112,12 @@ pub struct Common {
     pub search_inspector_enabled: bool,
     #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = true)]
     pub utf8_view_enabled: bool,
+    #[env_config(
+        name = "ZO_DASHBOARD_SHOW_SYMBOL_ENABLED",
+        default = false,
+        help = "Enable to show symbol in dashboard"
+    )]
+    pub dashboard_show_symbol_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1457,6 +1472,8 @@ pub struct Compact {
     pub max_file_size: usize,
     #[env_config(name = "ZO_COMPACT_EXTENDED_DATA_RETENTION_DAYS", default = 3650)] // days
     pub extended_data_retention_days: i64,
+    #[env_config(name = "ZO_COMPACT_OLD_DATA_STREAMS", default = "")] // use comma to split
+    pub old_data_streams: String,
     #[env_config(name = "ZO_COMPACT_DATA_RETENTION_DAYS", default = 3650)] // days
     pub data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MAX_DAYS", default = 7)] // days
@@ -1850,6 +1867,24 @@ pub struct Pipeline {
         help = "Use shared HTTP client instances for better connection pooling"
     )]
     pub use_shared_http_client: bool,
+    #[env_config(
+        name = "ZO_PIPELINE_REMOVE_FILE_AFTER_MAX_RETRY",
+        default = true,
+        help = "Remove wal file after max retry"
+    )]
+    pub remove_file_after_max_retry: bool,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_RETRY_COUNT",
+        default = 10,
+        help = "pipeline exporter client max retry count"
+    )]
+    pub max_retry_count: u32,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_RETRY_TIME_IN_HOURS",
+        default = 24,
+        help = "pipeline exporter client max retry time in hours"
+    )]
+    pub max_retry_time_in_hours: u64,
 }
 
 #[derive(EnvConfig)]

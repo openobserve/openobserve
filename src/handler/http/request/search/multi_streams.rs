@@ -396,7 +396,7 @@ pub async fn search_multi(
                 }
                 multi_res.from = res.from;
                 multi_res.size += res.size;
-                multi_res.file_count += res.file_count;
+                multi_res.scan_files += res.scan_files;
                 multi_res.scan_size += res.scan_size;
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.extend(res.columns);

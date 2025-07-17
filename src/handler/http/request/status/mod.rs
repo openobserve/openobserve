@@ -139,6 +139,8 @@ struct ConfigResponse<'a> {
     max_query_range: i64,
     histogram_enabled: bool,
     dashboard_placeholder: String,
+    ai_enabled: bool,
+    dashboard_show_symbol_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -268,6 +270,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let custom_hide_self_logo = o2cfg.common.custom_hide_self_logo;
     #[cfg(not(feature = "enterprise"))]
     let custom_hide_self_logo = false;
+    let ai_enabled = false;
 
     #[cfg(feature = "enterprise")]
     let build_type = "enterprise";
@@ -335,6 +338,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         histogram_enabled: cfg.limit.histogram_enabled,
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
+        ai_enabled,
+        dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
     }))
 }
 

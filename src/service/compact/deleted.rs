@@ -14,30 +14,26 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    meta::stream::FileListDeleted,
+    meta::stream::{FileKey, FileMeta},
     utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
 };
-use hashbrown::HashMap;
 use infra::{file_list as infra_file_list, storage};
 
-pub async fn delete(
-    org_id: &str,
-    _time_min: i64,
-    time_max: i64,
-    batch_size: i64,
-) -> Result<i64, anyhow::Error> {
-    let files = query_deleted(org_id, time_max, batch_size).await?;
+// Batch size for deleting files from file_list_deleted table
+const BATCH_SIZE: i64 = 10000;
+
+pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
+    let files = infra_file_list::query_deleted(org_id, time_max, BATCH_SIZE).await?;
     if files.is_empty() {
         return Ok(0);
     }
-    let files_num = files.values().flatten().count() as i64;
+    let files_num = files.len() as i64;
 
     // delete files from storage
     let local_mode = config::get_config().common.local_mode;
     if let Err(e) = storage::del(
         &files
-            .values()
-            .flatten()
+            .iter()
             .filter_map(|file| {
                 if !ingester::is_wal_file(local_mode, &file.file) {
                     Some(file.file.as_str())
@@ -51,15 +47,14 @@ pub async fn delete(
     {
         // maybe the file already deleted, so we just skip the `not found` error
         if !e.to_string().to_lowercase().contains("not found") {
-            log::error!("[COMPACTOR] delete files from storage failed: {}", e);
+            log::error!("[COMPACTOR] delete files from storage failed: {e}");
             return Err(e.into());
         }
     }
 
     // delete related inverted index puffin files
     let inverted_index_files = files
-        .values()
-        .flatten()
+        .iter()
         .filter_map(|file| {
             if file.index_file {
                 convert_parquet_idx_file_name_to_tantivy_file(&file.file)
@@ -80,7 +75,7 @@ pub async fn delete(
             // maybe the file already deleted or there's not related index files,
             // so we just skip the `not found` error
             if !e.to_string().to_lowercase().contains("not found") {
-                log::error!("[COMPACTOR] delete files from storage failed: {}", e);
+                log::error!("[COMPACTOR] delete files from storage failed: {e}");
                 return Err(e.into());
             }
         }
@@ -88,8 +83,7 @@ pub async fn delete(
 
     // delete flattened files from storage
     let flattened_files = files
-        .values()
-        .flatten()
+        .iter()
         .filter_map(|file| {
             if file.flattened {
                 Some(format!(
@@ -113,48 +107,24 @@ pub async fn delete(
         {
             // maybe the file already deleted, so we just skip the `not found` error
             if !e.to_string().to_lowercase().contains("not found") {
-                log::error!("[COMPACTOR] delete files from storage failed: {}", e);
+                log::error!("[COMPACTOR] delete files from storage failed: {e}");
                 return Err(e.into());
             }
-        }
-    }
-
-    // delete files from file_list_deleted s3
-    if files.keys().len() > 1 || !files.contains_key("") {
-        if let Err(e) =
-            storage::del(&files.keys().map(|file| file.as_str()).collect::<Vec<_>>()).await
-        {
-            log::error!("[COMPACTOR] delete files from storage failed: {}", e);
-            return Err(e.into());
         }
     }
 
     // delete files from file_list_deleted table
     if let Err(e) = infra_file_list::batch_remove_deleted(
         &files
-            .values()
-            .flatten()
-            .map(|file| file.file.to_owned())
+            .iter()
+            .map(|file| FileKey::new(file.id, file.file.clone(), FileMeta::default(), false))
             .collect::<Vec<_>>(),
     )
     .await
     {
-        log::error!("[COMPACTOR] delete files from table failed: {}", e);
+        log::error!("[COMPACTOR] delete files from table failed: {e}");
         return Err(e.into());
     }
 
     Ok(files_num)
-}
-
-async fn query_deleted(
-    org_id: &str,
-    time_max: i64,
-    limit: i64,
-) -> Result<HashMap<String, Vec<FileListDeleted>>, anyhow::Error> {
-    let files = infra_file_list::query_deleted(org_id, time_max, limit).await?;
-    let mut hash_files = HashMap::default();
-    if !files.is_empty() {
-        hash_files.insert("".to_string(), files);
-    }
-    Ok(hash_files)
 }
