@@ -520,29 +520,6 @@ export default defineComponent({
                 variableObject.isVariablePartialLoaded = true;
               }
             }
-
-            // Check if value actually changed before loading child variables
-            // const hasValueChanged =
-            //   Array.isArray(originalValue) &&
-            //   Array.isArray(variableObject.value)
-            //     ? JSON.stringify(originalValue) !==
-            //       JSON.stringify(variableObject.value)
-            //     : originalValue !== variableObject.value;
-
-            // // Only load child variables if value actually changed
-            // if (hasValueChanged) {
-            //   const childVariables =
-            //     variablesDependencyGraph[variableObject.name]
-            //       ?.childVariables || [];
-            //   if (childVariables.length > 0) {
-            //     const childVariableObjects = variablesData.values.filter(
-            //       (variable: any) => childVariables.includes(variable.name),
-            //     );
-            //     childVariableObjects.forEach((childVariable: any) => {
-            //       loadSingleVariableDataByName(childVariable);
-            //     });
-            //   }
-            // }
           }
         }
       } catch (error) {
@@ -821,17 +798,6 @@ export default defineComponent({
       },
     );
 
-    // you may need to query the data if the variable configs or the data/time changes
-    // watch(
-    //   () => props.selectedTimeDate,
-    //   () => {
-    //     // reject all promises
-    //     rejectAllPromises();
-
-    //     // loadAllVariablesData(false);
-    //     skipAPILoad.value = true;
-    //   },
-    // );
     watch(
       () =>
         JSON.stringify({
@@ -933,24 +899,6 @@ export default defineComponent({
       const isChildVariable =
         variablesDependencyGraph[currentVariable.name]?.parentVariables
           ?.length > 0;
-
-      // Check for URL values first
-      // const urlValue = props.initialVariableValues?.value[currentVariable.name];
-      // if (urlValue) {
-      //   // If URL value exists, use it
-      //   if (currentVariable.multiSelect) {
-      //     currentVariable.value = Array.isArray(urlValue)
-      //       ? urlValue
-      //       : [urlValue];
-      //   } else {
-      //     // For single select, if coming from multiSelect, take first value
-      //     currentVariable.value = Array.isArray(urlValue)
-      //       ? urlValue[0]
-      //       : urlValue;
-      //   }
-      //   currentVariable.isVariableLoadingPending = true;
-      //   return;
-      // }
 
       // Only apply custom values if no URL value exists
       if (
@@ -1070,29 +1018,6 @@ export default defineComponent({
           currentVariable.value = null;
         }
       }
-    };
-
-    /**
-     * Check if any of the dependent variables are loading
-     * @param {object} variableObject - the variable object
-     * @returns {boolean} - true if any of the dependent variables are loading, false otherwise
-     */
-    const isDependentVariableLoading = (variableObject: any) => {
-      const parentVariables =
-        variablesDependencyGraph[variableObject.name]?.parentVariables || [];
-
-      // If no parent variables, dependencies can't be loading
-      if (parentVariables.length === 0) return false;
-
-      // Check if any of the parent variables are loading or pending
-      return parentVariables.some((parentName: string) => {
-        const parentVariable = variablesData.values.find(
-          (v: any) => v.name === parentName,
-        );
-        return (
-          parentVariable?.isLoading || parentVariable?.isVariableLoadingPending
-        );
-      });
     };
 
     /**
@@ -1606,25 +1531,6 @@ export default defineComponent({
             val.isLoading || val.isVariableLoadingPending,
         );
 
-        // Don't load child variables on dropdown open events
-        // Load child variables if any
-        // const childVariables =
-        //   variablesDependencyGraph[name]?.childVariables || [];
-        // if (childVariables.length > 0) {
-        //   const childVariableObjects = variablesData.values.filter(
-        //     (variable: any) => childVariables.includes(variable.name),
-        //   );
-
-        //   // Only load children if the parent value actually changed
-        //   if (oldVariablesData[name] !== variableObject.value) {
-        //     await Promise.all(
-        //       childVariableObjects.map((childVariable: any) =>
-        //         loadSingleVariableDataByName(childVariable),
-        //       ),
-        //     );
-        //   }
-        // }
-
         // Emit updated data
         emitVariablesData();
       } else {
@@ -1654,9 +1560,6 @@ export default defineComponent({
         const { name } = variableObject;
 
         variableObject.isVariablePartialLoaded = success;
-
-        // Update old variables data
-        // oldVariablesData[name] = variableObject.value;
 
         // Don't load child variables on dropdown open events
         // Load child variables if any
@@ -1771,47 +1674,6 @@ export default defineComponent({
           ),
         );
       }
-
-      // const loadDependentVariables = async () => {
-      //   for (const variable of dependentVariables) {
-      //     // Find all parent variables of the current variable
-      //     const parentVariables =
-      //       variablesDependencyGraph[variable.name].parentVariables;
-      //     // Check if all parent variables are loaded
-      //     const areParentsLoaded = parentVariables.every(
-      //       (parentName: string) => {
-      //         const parentVariable = variablesData.values.find(
-      //           (v: any) => v.name === parentName,
-      //         );
-      //         return (
-      //           parentVariable &&
-      //           !parentVariable.isLoading &&
-      //           !parentVariable.isVariableLoadingPending &&
-      //           parentVariable.value !== null
-      //         );
-      //       },
-      //     );
-
-      //     // If all parent variables are loaded, load the current variable
-      //     if (areParentsLoaded) {
-      //       await loadSingleVariableDataByName(variable);
-      //     }
-      //   }
-      // };
-
-      // // Attempt to load dependent variables up to 3 times
-      // for (let attempt = 0; attempt < 3; attempt++) {
-      //   await loadDependentVariables();
-
-      //   // Check if all variables are loaded
-      //   const allLoaded = variablesData.values.every(
-      //     (variable: any) =>
-      //       !variable.isLoading && !variable.isVariableLoadingPending,
-      //   );
-
-      //   // If all variables are loaded, break the loop
-      //   if (allLoaded) break;
-      // }
 
       isLoading = false;
     };
