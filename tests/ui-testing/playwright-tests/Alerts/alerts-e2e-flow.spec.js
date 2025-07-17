@@ -49,11 +49,7 @@ test.describe("Alerts E2E Flow", () => {
     }
 
     // Skip data ingestion for scheduled alert test
-    if (!test.info().title.includes('Scheduled Alert')) {
-      // Ingest test data using common actions
-      const streamName = 'auto_playwright_stream';
-      await pageManager.commonActions.ingestTestData(streamName);
-    }
+    await pageManager.commonActions.skipDataIngestionForScheduledAlert(test.info().title);
     
     // Navigate to alerts page
     await page.goto(

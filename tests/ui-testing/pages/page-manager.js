@@ -1,20 +1,20 @@
 // Centralized PageManager for dashboard-related page objects
-import DashboardCreate from "./dashboardPages/dashboard-create";
-import DashboardListPage from "./dashboardPages/dashboard-list";
-import DashboardFolder from "./dashboardPages/dashboard-folder";
-import DashboardPanelActions from "./dashboardPages/dashboard-panel-actions";
-import DashboardPanelConfigs from "./dashboardPages/dashboard-panel-configs";
-import DashboardPanelEdit from "./dashboardPages/dashboard-panel-edit";
-import DashboardSetting from "./dashboardPages/dashboard-settings";
-import DashboardVariables from "./dashboardPages/dashboard-variables";
-import ChartTypeSelector from "./dashboardPages/dashboard-chart";
-import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
-import DashboardFilter from "./dashboardPages/dashboard-filter";
-import DashboardImport from "./dashboardPages/dashboard-import.js";
-import DashboardShareExportPage from "./dashboardPages/dashboard-share-export";
-import DashboardTimeRefresh from "./dashboardPages/dashboard-refresh";
-import DateTimeHelper from "./dashboardPages/dashboard-time";
-import LogsVisualise from "./dashboardPages/visualise";
+import { DashboardCreate } from "./dashboardPages/dashboard-create";
+import { DashboardListPage } from "./dashboardPages/dashboard-list";
+import { DashboardFolder } from "./dashboardPages/dashboard-folder";
+import { DashboardPanelActions } from "./dashboardPages/dashboard-panel-actions";
+import { DashboardPanelConfigs } from "./dashboardPages/dashboard-panel-configs";
+import { DashboardPanelEdit } from "./dashboardPages/dashboard-panel-edit";
+import { DashboardSetting } from "./dashboardPages/dashboard-settings";
+import { DashboardVariables } from "./dashboardPages/dashboard-variables";
+import { ChartTypeSelector } from "./dashboardPages/dashboard-chart";
+import { DashboardDrilldownPage } from "./dashboardPages/dashboard-drilldown";
+import { DashboardFilter } from "./dashboardPages/dashboard-filter";
+import { DashboardImport } from "./dashboardPages/dashboard-import.js";
+import { DashboardShareExportPage } from "./dashboardPages/dashboard-share-export";
+import { DashboardTimeRefresh } from "./dashboardPages/dashboard-refresh";
+import { DateTimeHelper } from "./dashboardPages/dashboard-time";
+import { LogsVisualise } from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
 
@@ -42,7 +42,7 @@ import { CommonActions } from "./commonActions.js";
 import { UserPage } from "./generalPages/userPage.js";
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
-import UnflattenedPage from "./logsPages/unflattened.js";
+import { UnflattenedPage } from "./logsPages/unflattened.js";
 
 
 class PageManager {
