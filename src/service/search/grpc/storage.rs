@@ -125,7 +125,9 @@ pub async fn search(
         files.len(),
     );
 
-    // check inverted index
+    // Condition:All() means search tantivy without filter,
+    // so we should not use inverted index in datafusion search
+    // Condition:All() is used for TantivyOptimizeExec
     let use_inverted_index = query.use_inverted_index
         && index_condition.is_some()
         && !index_condition.as_ref().unwrap().is_condition_all();
