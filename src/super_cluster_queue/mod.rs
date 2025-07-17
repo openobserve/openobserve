@@ -19,6 +19,7 @@ mod cipher_keys;
 mod dashboards;
 mod destinations;
 mod distinct_values;
+mod domain_management;
 mod folders;
 mod meta;
 mod org_user;
@@ -30,7 +31,6 @@ mod scheduler;
 mod schemas;
 mod search_job;
 mod short_urls;
-mod domain_management;
 mod templates;
 mod user;
 

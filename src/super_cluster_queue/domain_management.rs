@@ -14,9 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use infra::errors::{Error, Result};
-use o2_enterprise::enterprise::{
-    super_cluster::queue::{Message, MessageType}
-};
+use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     let db = infra::db::get_db().await;
