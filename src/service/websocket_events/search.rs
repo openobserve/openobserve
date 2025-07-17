@@ -788,7 +788,6 @@ async fn get_partitions(
         query_fn: Default::default(),
         streaming_output: true,
         histogram_interval: search_payload.query.histogram_interval,
-        search_type: Some(req.search_type),
     };
 
     let res = SearchService::search_partition(
