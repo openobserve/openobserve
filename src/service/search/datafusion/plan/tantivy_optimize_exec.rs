@@ -18,7 +18,10 @@ use std::{any::Any, collections::HashSet, sync::Arc};
 use arrow::array::{
     Array, Int64Array, TimestampMicrosecondArray, TimestampNanosecondArray, UInt64Array,
 };
-use config::meta::{inverted_index::IndexOptimizeMode, stream::FileKey};
+use config::{
+    PARQUET_BATCH_SIZE,
+    meta::{inverted_index::IndexOptimizeMode, stream::FileKey},
+};
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
     common::{Result, Statistics, internal_err},
@@ -28,9 +31,11 @@ use datafusion::{
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
+        memory::MemoryStream,
         stream::RecordBatchStreamAdapter,
     },
 };
+use futures::TryStreamExt;
 
 use crate::service::search::{
     grpc::{QueryParams, storage::filter_file_list_by_tantivy_index},
@@ -140,7 +145,7 @@ impl ExecutionPlan for TantivyOptimizeExec {
             self.schema.clone(),
             self.index_optimize_mode.clone(),
         );
-        let stream = futures::stream::once(fut);
+        let stream = futures::stream::once(fut).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(
             self.schema.clone(),
             stream,
@@ -158,7 +163,7 @@ async fn adapt_tantivy_result(
     index_condition: Option<IndexCondition>,
     schema: SchemaRef,
     idx_optimize_mode: IndexOptimizeMode,
-) -> Result<RecordBatch> {
+) -> Result<SendableRecordBatchStream> {
     let (idx_took, error, result) = filter_file_list_by_tantivy_index(
         query.clone(),
         &mut file_list,
@@ -181,24 +186,28 @@ async fn adapt_tantivy_result(
         idx_took
     );
 
-    let array = match idx_optimize_mode {
+    // first level is for each record batch
+    // second level is each array in record batch
+    let array: Vec<Vec<Arc<dyn Array>>> = match idx_optimize_mode {
         IndexOptimizeMode::SimpleCount => {
-            vec![Arc::new(Int64Array::from(vec![result.num_rows() as i64])) as Arc<dyn Array>]
+            vec![vec![Arc::new(Int64Array::from(vec![
+                result.num_rows() as i64
+            ]))]]
         }
         IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
-            create_histogram_arrow_array(
+            vec![create_histogram_arrow_array(
                 &schema,
                 result.histogram(),
                 min_value,
                 bucket_width,
                 num_buckets,
-            )?
+            )?]
         }
         IndexOptimizeMode::SimpleTopN(field, limit, _ascend) => {
             create_top_n_arrow_array(&schema, result.top_n(), &field, limit)?
         }
         IndexOptimizeMode::SimpleDistinct(_field, _limit, _ascend) => {
-            create_distinct_arrow_array(&schema, result.distinct())?
+            vec![create_distinct_arrow_array(&schema, result.distinct())?]
         }
         _ => {
             return internal_err!(
@@ -207,11 +216,22 @@ async fn adapt_tantivy_result(
         }
     };
 
-    RecordBatch::try_new(schema, array).map_err(|e| {
-        DataFusionError::Internal(format!(
-            "TantivyOptimizeExec create record batch error: {e}",
-        ))
-    })
+    let record_batches = array
+        .into_iter()
+        .map(|array| {
+            RecordBatch::try_new(schema.clone(), array).map_err(|e| {
+                DataFusionError::Internal(format!(
+                    "TantivyOptimizeExec create record batch error: {e}",
+                ))
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(Box::pin(MemoryStream::try_new(
+        record_batches,
+        schema,
+        None,
+    )?))
 }
 
 /// Creates a RecordBatch containing histogram data with timestamps and counts
@@ -336,7 +356,7 @@ fn create_top_n_arrow_array(
     top_n: Vec<(String, u64)>,
     _field: &str,
     _limit: usize,
-) -> Result<Vec<Arc<dyn arrow::array::Array>>, DataFusionError> {
+) -> Result<Vec<Vec<Arc<dyn arrow::array::Array>>>, DataFusionError> {
     // Validate inputs
     if schema.fields().len() != 2 {
         return Err(DataFusionError::Internal(format!(
@@ -352,13 +372,31 @@ fn create_top_n_arrow_array(
     let field_field = &schema.fields()[0];
     let count_field = &schema.fields()[1];
 
-    // Create field value array with proper type based on schema
-    let field_array = create_field_array(field_field, field_values)?;
+    let total_rows = field_values.len();
 
-    // Create count array with proper type based on schema
-    let count_array = create_count_array(count_field, count_values)?;
+    if total_rows == 0 {
+        return Ok(vec![]);
+    }
 
-    Ok(vec![field_array, count_array])
+    let mut batches = Vec::new();
+
+    // Process data in batches of BATCH_SIZE
+    for chunk_start in (0..total_rows).step_by(PARQUET_BATCH_SIZE) {
+        let chunk_end = std::cmp::min(chunk_start + PARQUET_BATCH_SIZE, total_rows);
+
+        let field_chunk = field_values[chunk_start..chunk_end].to_vec();
+        let count_chunk = count_values[chunk_start..chunk_end].to_vec();
+
+        // Create field value array with proper type based on schema
+        let field_array = create_field_array(field_field, field_chunk)?;
+
+        // Create count array with proper type based on schema
+        let count_array = create_count_array(count_field, count_chunk)?;
+
+        batches.push(vec![field_array, count_array]);
+    }
+
+    Ok(batches)
 }
 
 fn create_distinct_arrow_array(

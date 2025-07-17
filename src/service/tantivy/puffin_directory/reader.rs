@@ -672,9 +672,13 @@ mod tests {
 
         // Test with prefix field
         let terms_grouped_by_field = HashbrownHashMap::new();
-        let result =
-            warm_up_terms(&searcher, &terms_grouped_by_field, HashSet::from([text_field]), None)
-                .await;
+        let result = warm_up_terms(
+            &searcher,
+            &terms_grouped_by_field,
+            HashSet::from([text_field]),
+            None,
+        )
+        .await;
         assert!(result.is_ok());
     }
 
