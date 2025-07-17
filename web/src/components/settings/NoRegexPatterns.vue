@@ -39,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { useI18n } from "vue-i18n";
     import { getImageURL } from "@/utils/zincutils";
     import { useStore } from "vuex";
-import { useRouter } from "vue-router";
   
   export default defineComponent({
     
@@ -48,7 +47,6 @@ import { useRouter } from "vue-router";
     setup(props, { emit }) {
       const { t } = useI18n();
       const store = useStore();
-      const router = useRouter();
       const createNewRegexPattern = () => {
         emit("create-new-regex-pattern");
       }
@@ -56,7 +54,7 @@ import { useRouter } from "vue-router";
         emit("import-regex-pattern");
       }
   
-      return { t, getImageURL, store, router, createNewRegexPattern, importRegexPattern };
+      return { t, getImageURL, store, createNewRegexPattern, importRegexPattern };
     },
   });
   </script>

@@ -527,7 +527,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         try {
           const isValidRegexPattern = await validateRegexPatternInputs(
             jsonObj,
-            0,
             index,
           );
           if (!isValidRegexPattern) {
@@ -550,11 +549,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       };
   
-      const validateRegexPatternInputs = async (jsonObj: any, regexPatternIndex: number = 1, index: number) => {
+      const validateRegexPatternInputs = async (jsonObj: any, index: number) => {
         if(!jsonObj.name || !jsonObj.name.trim() || typeof jsonObj.name !== 'string'){
           regexPatternErrorsToDisplay.value.push([{
             field: 'regex_pattern_name',
-            message: 'Regex pattern name is required'
+            message: `Regex pattern - ${index}: name is required`
           }]);
           return false;
         }
@@ -562,7 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         if(existingPatternNames.value.has(jsonObj.name.trim())) {
           regexPatternErrorsToDisplay.value.push([{
             field: 'regex_pattern_name',
-            message: 'Regex pattern with this name already exists'
+            message: `Regex pattern - ${index}: with this name already exists`
           }]);
 
           return false;
@@ -570,12 +569,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         if(!jsonObj.pattern || !jsonObj.pattern.trim() || typeof jsonObj.pattern !== 'string'){
           regexPatternErrorsToDisplay.value.push([{
             field: 'regex_pattern',
-            message: 'Regex pattern is required'
+            message: `Regex pattern - ${index}: is required`
           }]);
           return false;
         }
         if(typeof jsonObj.description !== 'string' && jsonObj.description !== null && jsonObj.description !== undefined){
-          regexPatternErrorsToDisplay.value.push(['Regex pattern description must be a string or should be empty']);
+          regexPatternErrorsToDisplay.value.push([`Regex pattern - ${index}: description must be a string or should be empty`]);
           return false;
         }
         return true;
@@ -716,24 +715,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   .error-item {
     padding: 5px 0px;
     font-size: 14px;
-  }
-  .report-list-tabs {
-    height: fit-content;
-  
-    :deep(.rum-tabs) {
-      border: 1px solid #464646;
-    }
-  
-    :deep(.rum-tab) {
-      &:hover {
-        background: #464646;
-      }
-  
-      &.active {
-        background: #5960b2;
-        color: #ffffff !important;
-      }
-    }
   }
   .report-list-tabs {
     height: fit-content;

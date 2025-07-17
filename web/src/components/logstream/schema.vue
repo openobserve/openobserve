@@ -1029,7 +1029,8 @@ export default defineComponent({
       }
       //after this we need to have a map of pattern_id and according to field as well
       //so that we can easily access the apply_at value for a pattern if it is undefined or null
-      previousSchemaVersion.pattern_associations.forEach((pattern: PatternAssociation) => {
+      
+      previousSchemaVersion.pattern_associations && previousSchemaVersion.pattern_associations.forEach((pattern: PatternAssociation) => {
         patternIdToApplyAtMap.set(pattern.field + pattern.pattern_id, pattern);
       });
       if (!streamResponse.schema?.length) {
@@ -1302,7 +1303,7 @@ export default defineComponent({
         )
         .then(async (res) => {
           if (
-            store.state.logs.logs.data.stream.selectedStream.includes(
+            store.state.logs?.logs?.data?.stream?.selectedStream?.includes(
               indexData.value.name,
             )
           ) {
@@ -1731,7 +1732,6 @@ export default defineComponent({
     //this is used to update an already applied pattern in the field
     //for suppose user wants to update policy or apply_at for a pattern
     const handleUpdateAppliedPattern = (pattern: PatternAssociation, fieldName: string, patternId: string, attribute: string) => {
-      console.log(pattern,'pattern')
       patternAssociations.value[pattern.field] && patternAssociations.value[fieldName].forEach((p: PatternAssociation) => {
         if(p.pattern_id === pattern.pattern_id && p.pattern_name === pattern.pattern_name){
           if(attribute === "policy"){

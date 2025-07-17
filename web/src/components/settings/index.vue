@@ -287,7 +287,7 @@ export default defineComponent({
       }
     }
     const regexIcon = computed(()=>{
-      return getImageURL(store.state.theme == 'dark' && router.currentRoute.value.name !== 'regexPatterns' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
+      return getImageURL(store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
     })
 
     return {

@@ -70,7 +70,7 @@
                             hide-bottom
                             dense
                             :filter="filterPattern"
-                            @:ilter-method="handleFilterMethod"
+                            @filter-method="handleFilterMethod"
                           >
                             <template v-slot:body="props">
                               <q-tr :data-test="`associated-regex-patterns-applied-patterns-table-row-${props.row.pattern_id}`" class="tw-cursor-pointer " :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'dark-selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'light-selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
@@ -610,21 +610,16 @@ export default defineComponent({
           return userClickedPattern.value?.pattern_name === patternName;
         }
 
-        const handleTestStringInput = () => {
-            console.log(testString.value,'test string')
+        //used filter method to filter the patterns based on the name
+        const handleFilterMethod = (rows: any[], terms: string) => {
+          const lowerTerm = terms.toLowerCase();
+          const filtered = rows.filter(row =>
+            row?.name?.toLowerCase().includes(lowerTerm)
+          );
+          resultTotal.value = filtered.length;
+          return filtered;
         };
 
-        const handleFilterMethod = (rows: any, terms: any) => {
-          var filtered = [];
-            terms = terms.toLowerCase();
-            for (var i = 0; i < rows.length; i++) { 
-              if (rows[i]["name"].toLowerCase().includes(terms)) {
-                filtered.push(rows[i]);
-              }
-            }
-            resultTotal.value = filtered.length;
-            return filtered;
-        }
 
         const updateRegexPattern = () => {
           emit("updateSettings");
@@ -743,7 +738,6 @@ export default defineComponent({
             policy,
             apply_at,
             isPatternValid,
-            handleTestStringInput,
             appliedPatternsExpandedRef,
             allPatternsExpandedRef,
             handleFilterMethod,

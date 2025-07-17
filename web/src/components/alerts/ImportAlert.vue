@@ -842,7 +842,6 @@ export default defineComponent({
     };
 
     const validateAlertInputs = async (input: any, index: number) => {
-      console.log(input,'input')
       let alertErrors: (string | { message: string; field: string })[] = [];
 
       // 1. Validate 'name' field

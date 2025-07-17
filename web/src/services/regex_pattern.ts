@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-
+type PatternPayload = {
+  name: string;
+  pattern: string;
+  description: string;
+};
 const regexPatterns = {
   list: (
     org_identifier: string
@@ -25,9 +29,8 @@ const regexPatterns = {
   },
   create: (
     org_identifier: string,
-    payload: any
+    payload: PatternPayload
   ) => {
-    console.log(payload,'payload')
     return http().post(
       `/api/${org_identifier}/re_patterns`,
       payload

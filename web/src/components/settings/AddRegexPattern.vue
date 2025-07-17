@@ -103,6 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         placeholder="Eg. Internal Passwords"
                         />
                     <q-input
+                        v-bind:readonly="isEdit"
+                        v-bind:disable="isEdit"
                         v-model="regexPatternInputs.description"
                         :label="t('regex_patterns.description')"
                         color="input-border"

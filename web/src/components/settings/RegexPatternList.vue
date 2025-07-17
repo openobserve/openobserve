@@ -377,7 +377,7 @@
         });
       } catch (error) {
         $q.notify({
-          message: error?.response?.data?.message || error?.data?.message || "Error deleting regex pattern",
+          message: error?.data?.message || error?.response?.data?.message || "Error deleting regex pattern",
           color: "negative",
           timeout: 1500,
         });
@@ -396,6 +396,7 @@
     }
 
     const exportRegexPattern = (row: any) => {
+      let url = "";
       try{
       const regexPatternToBeExported = {
         name: row.name,
@@ -405,12 +406,11 @@
 
       const regexPatternJson = JSON.stringify(regexPatternToBeExported, null, 2);
       const blob = new Blob([regexPatternJson], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
+      url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.download = `${row.name || 'regex_pattern'}.json`;
       link.click();
-      URL.revokeObjectURL(url);
       $q.notify({
         message: `Regex pattern exported successfully`,
         color: "positive",
@@ -422,6 +422,12 @@
         color: "negative",
         icon: "error",
       });
+    }
+    finally{
+      //this is added for proper clean up of the blob url
+      if(url){
+        URL.revokeObjectURL(url);
+      }
     }
   }
   const closeAddRegexPatternDialog = () => {
