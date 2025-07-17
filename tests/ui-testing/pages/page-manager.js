@@ -42,7 +42,7 @@ import { CommonActions } from "./commonActions.js";
 import { UserPage } from "./generalPages/userPage.js";
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
-import { UnflattenedPage } from "./logsPages/unflattened.js";
+import UnflattenedPage from "./logsPages/unflattened.js";
 
 
 class PageManager {
