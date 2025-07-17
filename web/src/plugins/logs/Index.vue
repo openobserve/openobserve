@@ -1624,6 +1624,10 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.data.type,
       async () => {
+
+        // validate panel data
+        isValid(true, true)          
+        
         // await nextTick();
         visualizeChartData.value = JSON.parse(
           JSON.stringify(dashboardPanelData.data),
@@ -1671,9 +1675,9 @@ export default defineComponent({
           return;
         }
 
-        // if (!isValid(true, true)) {
-        // return;
-        // }
+        if (!isValid(true, true)) {
+          // return;
+        }
 
         // reset searchResponseForVisualization
         searchResponseForVisualization.value = {};

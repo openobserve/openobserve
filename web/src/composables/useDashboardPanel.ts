@@ -844,6 +844,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           query.fields.source = null;
           query.fields.target = null;
           query.fields.value = null;
+
+          // make sure that x axis should not have more than one field
+          if (query.fields.x.length > 1) {
+            query.fields.x = [query.fields.x[0]];
+          }
+
+          // make sure that y axis should not have more than one field
+          if (query.fields.y.length > 1) {
+            query.fields.y = [query.fields.y[0]];
+          }
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
@@ -888,6 +898,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           query.fields.source = null;
           query.fields.target = null;
           query.fields.value = null;
+
+          // make sure that x axis should not have more than one field
+          if (query.fields.x.length > 1) {
+            // if breakdown is empty, then take 2nd x axis field on breakdown and remove all other x axis
+            if (query.fields.breakdown.length === 0) {
+              query.fields.breakdown = [query.fields.x[1]];
+              query.fields.x = [query.fields.x[0]];
+            } else {
+              query.fields.x = [query.fields.x[0]];
+            }
+          }
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
@@ -900,9 +921,47 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           getDefaultCustomChartText();
         break;
       case "table":
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y.forEach((itemY: any) => {
+          if (itemY.aggregationFunction === null && !itemY.isDerived) {
+            itemY.aggregationFunction = "count";
+          }
+        });
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown = [];
+        // we have multiple queries for geomap, so if we are moving away, we need to reset
+        // the values of lat, lng and weight in all the queries
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+        });
+        if (dashboardPanelData.data.queryType === "sql") {
+          dashboardPanelData.layout.currentQueryIndex = 0;
+          dashboardPanelData.data.queries =
+            dashboardPanelData.data.queries.slice(0, 1);
+        }
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
+
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
+        break;
       case "pie":
       case "donut":
-      case "metric":
       case "gauge":
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -928,6 +987,63 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           query.fields.source = null;
           query.fields.target = null;
           query.fields.value = null;
+
+          // make sure that x axis should not have more than one field
+          if (query.fields.x.length > 1) {
+            query.fields.x = [query.fields.x[0]];
+          }
+
+          // make sure that y axis should not have more than one field
+          if (query.fields.y.length > 1) {
+            query.fields.y = [query.fields.y[0]];
+          }
+        });
+        if (dashboardPanelData.data.queryType === "sql") {
+          dashboardPanelData.layout.currentQueryIndex = 0;
+          dashboardPanelData.data.queries =
+            dashboardPanelData.data.queries.slice(0, 1);
+        }
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
+
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
+        break;
+      case "metric":
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y.forEach((itemY: any) => {
+          if (itemY.aggregationFunction === null && !itemY.isDerived) {
+            itemY.aggregationFunction = "count";
+          }
+        });
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown = [];
+        // we have multiple queries for geomap, so if we are moving away, we need to reset
+        // the values of lat, lng and weight in all the queries
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
+
+          // remove all x axis fields
+          query.fields.x = [];
+          // make sure that y axis should not have more than one field
+          if (query.fields.y.length > 1) {
+            query.fields.y = [query.fields.y[0]];
+          }
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
@@ -3175,6 +3291,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       timeseries_field: string | null;
     } = searchRes.data;
 
+    // remove all fields from custom query fields
+    dashboardPanelData.meta.stream.customQueryFields = [];
+
+    // add all fields to custom query fields
+    extractedFields.projections.forEach((field: any) => {
+      dashboardPanelData.meta.stream.customQueryFields.push({
+        name: field,
+        type: "",
+      });
+    });
+
     // remove group by and timeseries field from projections, while using it on y axis
     const yAxisFields = extractedFields.projections.filter(
       (field) =>
@@ -3279,37 +3406,3 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 };
 export default useDashboardPanelData;
-
-/**
- * Call a function with an AbortController, and propagate the abort
- * signal to the function. This allows the function to be cancelled
- * when the AbortController is aborted.
- *
- * @param fn The function to call
- * @param signal The AbortSignal to use
- * @returns A promise that resolves with the result of the function, or
- * rejects with an error if the function is cancelled or throws an error
- */
-const callWithAbortController = async <T>(
-  fn: () => Promise<T>,
-  signal: AbortSignal,
-): Promise<T> => {
-  return new Promise<T>((resolve, reject) => {
-    const result = fn();
-
-    // Listen to the abort signal and reject the promise if it is
-    // received
-    signal.addEventListener("abort", () => {
-      reject();
-    });
-
-    // Handle the result of the function
-    result
-      .then((res) => {
-        resolve(res);
-      })
-      .catch((error) => {
-        reject(error);
-      });
-  });
-};
