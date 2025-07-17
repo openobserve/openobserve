@@ -104,7 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields.latitude.label
                     "
-                    :rules="[(val: any) => val > 0 || 'Required']"
                   />
                   <div
                     v-if="
@@ -240,7 +239,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields.longitude.label
                     "
-                    :rules="[(val: any) => val > 0 || 'Required']"
                   />
                   <div
                     v-if="
@@ -411,7 +409,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields.weight.label
                     "
-                    :rules="[(val: any) => val > 0 || 'Required']"
                   />
                   <div style="width: 100%" class="tw-mb-2">
                     <span class="tw-block tw-mb-1 tw-font-bold">Having</span>

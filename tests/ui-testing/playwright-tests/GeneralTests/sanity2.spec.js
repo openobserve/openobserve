@@ -2,18 +2,18 @@ import { test, expect } from '../baseFixtures.js';
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import { toZonedTime } from "date-fns-tz";
-import { LogsPage } from '../../pages/logsPages/logsPage.js';
+import PageManager from '../../pages/page-manager.js';
 
 test.describe.configure({ mode: "parallel" });
 const folderName = `Folder ${Date.now()}`;
 const dashboardName = `AutomatedDashboard${Date.now()}`;
 
+// ===== HELPER FUNCTIONS =====
 async function login(page) {
- 
   await page.goto(process.env["ZO_BASE_URL"]);
   if (await page.getByText('Login as internal user').isVisible()) {
     await page.getByText('Login as internal user').click();
-}
+  }
   console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
 
@@ -57,44 +57,43 @@ async function ingestion(page) {
   console.log(response);
 }
 
+// ===== UTILITY FUNCTIONS =====
+function removeUTFCharacters(text) {
+  return text.replace(/[^\x00-\x7F]/g, " ");
+}
+
+async function applyQueryButton(page) {
+  // click on the run query button
+  const search = page.waitForResponse(logData.applyQuery);
+  await page.waitForTimeout(3000);
+  await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
+    force: true,
+  });
+  // get the data from the search variable
+  await expect.poll(async () => (await search).status()).toBe(200);
+}
 
 test.describe("Sanity testcases", () => {
-  let logsPage;
-  // let logData;
-  function removeUTFCharacters(text) {
-    // console.log(text, "tex");
-    // Remove UTF characters using regular expression
-    return text.replace(/[^\x00-\x7F]/g, " ");
-  }
-  async function applyQueryButton(page) {
-    // click on the run query button
-    // Type the value of a variable into an input field
-    const search = page.waitForResponse(logData.applyQuery);
-    await page.waitForTimeout(3000);
-    await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
-      force: true,
-    });
-    // get the data from the search variable
-    await expect.poll(async () => (await search).status()).toBe(200);
-  }
+  let pm; // Page Manager instance
 
   test.beforeEach(async ({ page }) => {
+    // ===== INITIALIZATION =====
     await login(page);
-    logsPage = new LogsPage(page);
+    pm = new PageManager(page);
     await page.waitForTimeout(1000)
     await ingestion(page);
     await page.waitForTimeout(2000)
 
+    // ===== NAVIGATE TO LOGS PAGE =====
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStream("e2e_automate"); 
+    await pm.logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
-    // const streams = page.waitForResponse("**/api/default/streams**");
   });
 
- 
+  // ===== SETTINGS TESTS =====
   test("should change settings successfully", async ({ page }) => {
     await page.waitForTimeout(2000);
     await page.locator('[data-test="menu-link-settings-item"]').click();
@@ -106,6 +105,7 @@ test.describe("Sanity testcases", () => {
     await page.getByText("Organization settings updated").click();
   });
 
+  // ===== STREAMS TESTS =====
   test("should display results on click refresh stats", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.locator('[data-test="log-stream-refresh-stats-btn"]').click();
@@ -113,6 +113,7 @@ test.describe("Sanity testcases", () => {
     await page.getByRole("cell", { name: "01", exact: true }).click();
   });
 
+  // ===== SCHEMA PAGINATION TESTS =====
   test("should display pagination for schema", async ({ page }) => {
     await page.waitForTimeout(2000);
     await page
@@ -129,9 +130,8 @@ test.describe("Sanity testcases", () => {
       .click();
   });
 
-  test("should display pagination when histogram is off and clicking and closing the result", async ({
-    page,
-  }) => {
+  // ===== HISTOGRAM PAGINATION TESTS =====
+  test("should display pagination when histogram is off and clicking and closing the result", async ({ page }) => {
     await page
       .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
       .nth(2)
@@ -143,15 +143,13 @@ test.describe("Sanity testcases", () => {
       .click();
   });
 
-  test("should display pagination when only SQL is on clicking and closing the result", async ({
-    page,
-  }) => {
+  test("should display pagination when only SQL is on clicking and closing the result", async ({ page }) => {
     await page
       .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div')
       .nth(2)
       .click();
-      await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
-      await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="log-table-column-1-_timestamp"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page
@@ -159,7 +157,8 @@ test.describe("Sanity testcases", () => {
       .click();
   });
 
-  test(" should display histogram in sql mode", async ({ page }) => {
+  // ===== HISTOGRAM SQL TESTS =====
+  test("should display histogram in sql mode", async ({ page }) => {
     await page
       .locator('[data-test="logs-search-result-bar-chart"] canvas')
       .click({
@@ -170,7 +169,6 @@ test.describe("Sanity testcases", () => {
       });
     await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    // await page.getByRole('heading', { name: 'Error while fetching' }).click();
 
     await expect(
       page.getByRole("heading", { name: "Error while fetching" })
@@ -185,9 +183,7 @@ test.describe("Sanity testcases", () => {
       });
   });
 
-  test("should display results when SQL+histogram is on and then stream is selected", async ({
-    page,
-  }) => {
+  test("should display results when SQL+histogram is on and then stream is selected", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/-item"]').click();
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
     await page
@@ -202,6 +198,7 @@ test.describe("Sanity testcases", () => {
       .click();
   });
 
+  // ===== API HELPER FUNCTIONS =====
   const getHeaders = () => {
     const basicAuthCredentials = Buffer.from(
       `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
@@ -233,9 +230,8 @@ test.describe("Sanity testcases", () => {
     );
   };
 
-  test.skip("should check JSON responses for successful:1 with timestamp 15 mins before", async ({
-    page,
-  }) => {
+  // ===== TIMESTAMP TESTS =====
+  test.skip("should check JSON responses for successful:1 with timestamp 15 mins before", async ({ page }) => {
     const orgId = process.env["ORGNAME"];
     const streamName = "e2e_automate";
     const headers = getHeaders();
@@ -276,9 +272,7 @@ test.describe("Sanity testcases", () => {
     expect(response2.status[0].successful).toBe(1);
   });
 
-test.skip("should display error if timestamp past the ingestion time limit", async ({
-    page,
-  }) => {
+  test.skip("should display error if timestamp past the ingestion time limit", async ({ page }) => {
     const orgId = process.env["ORGNAME"];
     const streamName = "e2e_automate";
     const headers = getHeaders();
@@ -323,6 +317,7 @@ test.skip("should display error if timestamp past the ingestion time limit", asy
     );
   });
 
+  // ===== TIMEZONE TESTS =====
   const formatDate = (date) => {
     const year = String(date.getFullYear());
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -332,6 +327,7 @@ test.skip("should display error if timestamp past the ingestion time limit", asy
     const seconds = String(date.getSeconds()).padStart(2, "0");
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
+
   test.skip("should compare time displayed in table dashboards after changing timezone and then delete it ", async ({ page }) => {
     const orgId = process.env["ORGNAME"];
     const streamName = "e2e_tabledashboard";
@@ -392,7 +388,7 @@ test.skip("should display error if timestamp past the ingestion time limit", asy
     await page.locator('[data-test="dashboard-panel-save"]').click();
     await page.waitForTimeout(2000);
 
-    // // Change timezone to Asia/Calcutta
+    // Change timezone to Asia/Calcutta
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="datetime-timezone-select"]').click();
     await page
@@ -451,6 +447,8 @@ test.skip("should display error if timestamp past the ingestion time limit", asy
       .click();
     await page.locator('[data-test="confirm-button"]').click();
   });
+
+  // ===== SEARCH HISTORY TESTS =====
   test.skip('should verify search history displayed and user navigates to logs', async ({ page, context }) => {
     // Step 1: Click on the "Share Link" button
     await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
@@ -458,14 +456,11 @@ test.skip("should display error if timestamp past the ingestion time limit", asy
     await page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
     await page.waitForTimeout(1000);
     await page.locator('[data-test="search-history-item-btn"]').click();
-    // await page.getByText('Search History').click();    
     await page.locator('[data-test="search-history-date-time"]').click();
     await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
     await page.getByRole('button', { name: 'Get History' }).click();
     await page.waitForTimeout(6000);
     await page.getByRole('cell', { name: 'Trace ID' }).click();
-    // Locate the row using a known static value like the SQL query
-    // const row = page.locator('tr:has-text("select histogram")');
     // Locate the row using a known static value, ignoring case sensitivity
     const row = page.locator('tr').filter({ hasText: /select histogram/i });
     // Click the button inside the located row
@@ -482,7 +477,6 @@ test.skip("should display error if timestamp past the ingestion time limit", asy
     await page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
     await page.waitForTimeout(1000);
     await page.locator('[data-test="search-history-item-btn"]').click();
-    // await page.getByText('Search History').click();
     await page.locator('[data-test="search-history-date-time"]').click();
     await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
     await page.locator('[data-test="search-history-alert-back-btn"]').click();
@@ -508,7 +502,6 @@ test.skip("should display error if timestamp past the ingestion time limit", asy
 
     // Use a more specific locator for 'e2e_automate' by targeting its unique container or parent element
     await page.locator('[data-test="logs-search-index-list"]').getByText('e2e_automate').click();
-
   });
 
 });
