@@ -270,10 +270,6 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let custom_hide_self_logo = o2cfg.common.custom_hide_self_logo;
     #[cfg(not(feature = "enterprise"))]
     let custom_hide_self_logo = false;
-
-    #[cfg(feature = "enterprise")]
-    let ai_enabled = o2cfg.ai.enabled;
-    #[cfg(not(feature = "enterprise"))]
     let ai_enabled = false;
 
     #[cfg(feature = "enterprise")]
