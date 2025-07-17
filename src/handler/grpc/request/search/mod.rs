@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    meta::{
-        search::{self},
-        stream::StreamType,
-    },
+    meta::{search, stream::StreamType},
     utils::json,
 };
 use proto::cluster_rpc::{
