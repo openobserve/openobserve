@@ -41,6 +41,8 @@ use infra::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
+use once_cell::sync::Lazy;
+use regex::Regex;
 
 use super::db::enrichment_table;
 #[cfg(feature = "enterprise")]
@@ -60,6 +62,12 @@ use crate::{
 
 const LOCAL: &str = "disk";
 const S3: &str = "s3";
+
+fn is_valid_field_name(field_name: &str) -> bool {
+    static FIELD_NAME_REGEX: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_]*$").unwrap());
+    FIELD_NAME_REGEX.is_match(field_name)
+}
 
 pub async fn get_stream(
     org_id: &str,
@@ -264,6 +272,17 @@ pub async fn save_stream_settings(
         )));
     }
 
+    if let Some(f) = &settings
+        .defined_schema_fields
+        .iter()
+        .find(|field| !is_valid_field_name(field))
+    {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST,
+            format!("Field name '{}' is invalid. Field names must start with a letter or underscore and contain only alphanumeric characters and underscores.", f)
+        )));
+    }
+
     // _all field can't setting for inverted index & index field
     for key in settings.full_text_search_keys.iter() {
         if key == &cfg.common.column_all {
@@ -428,6 +447,19 @@ pub async fn update_stream_settings(
                         "user defined schema is not allowed, you need to set ZO_ALLOW_USER_DEFINED_SCHEMAS=true",
                     )));
                 }
+
+                if let Some(f) = &new_settings
+                    .defined_schema_fields
+                    .add
+                    .iter()
+                    .find(|field| !is_valid_field_name(field))
+                {
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST,
+                        format!("Field name '{f}' is invalid. Field names must start with a letter or underscore and contain only alphanumeric characters and underscores.")
+                    )));
+                }
+
                 settings
                     .defined_schema_fields
                     .extend(new_settings.defined_schema_fields.add);
@@ -867,5 +899,23 @@ mod tests {
             Some(stats.clone()),
         );
         assert_eq!(res.stats, stats);
+    }
+
+    #[test]
+    fn test_is_valid_field_name() {
+        // Valid field names
+        assert!(is_valid_field_name("valid_field"));
+        assert!(is_valid_field_name("field123"));
+        assert!(is_valid_field_name("FIELD_NAME"));
+        assert!(is_valid_field_name("_private_field"));
+        assert!(is_valid_field_name("field"));
+        assert!(is_valid_field_name("_field"));
+
+        // Invalid field names
+        assert!(!is_valid_field_name("invalid-field"));
+        assert!(!is_valid_field_name("invalid field"));
+        assert!(!is_valid_field_name("invalid@field"));
+        assert!(!is_valid_field_name("123field")); // starts with number
+        assert!(!is_valid_field_name("")); // empty
     }
 }
