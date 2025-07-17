@@ -1470,7 +1470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-bold q-py-md flex items-center"
           style="width: 190px"
         >
-          Comparison Against
+          Differential
           <q-btn
             no-caps
             padding="xs"
