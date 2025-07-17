@@ -962,12 +962,12 @@ async fn search_tantivy_index(
         (true, Some(IndexOptimizeMode::SimpleTopN(field, limit, ascend))) => {
             TantivyResult::handle_simple_top_n(&searcher, query, &field, limit, ascend)
         }
-        (true, Some(IndexOptimizeMode::SimpleDistinct(field, _limit, _ascend))) => {
+        (true, Some(IndexOptimizeMode::SimpleDistinct(field, limit, ascend))) => {
             if tantivy_schema.get_field(&field).is_err() {
                 log::warn!("search->tantivy: {field} not index in tantivy file: {ttv_file_name}");
                 Ok(TantivyResult::Distinct(HashSet::new()))
             } else {
-                TantivyResult::handle_simple_distinct(&searcher, &condition, &field)
+                TantivyResult::handle_simple_distinct(&searcher, &condition, &field, limit, ascend)
             }
         }
     })

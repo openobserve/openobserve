@@ -161,8 +161,10 @@ impl TantivyResult {
         searcher: &Searcher,
         index_condition: &IndexCondition,
         field: &str,
+        limit: usize,
+        ascend: bool,
     ) -> anyhow::Result<Self> {
-        let mut distinct_values = HashSet::new();
+        let mut distinct_values: Vec<String> = Vec::with_capacity(limit * 4);
         let field = searcher.schema().get_field(field).unwrap();
         if let Some((value, case_sensitive)) = index_condition.get_str_match_condition() {
             for seg in searcher.segment_readers() {
@@ -173,7 +175,10 @@ impl TantivyResult {
                     .into_stream()
                     .unwrap();
                 while let Some((term, _)) = terms.next() {
-                    distinct_values.insert(String::from_utf8(term.to_vec()).unwrap());
+                    if ascend && distinct_values.len() >= limit {
+                        break;
+                    }
+                    distinct_values.push(String::from_utf8(term.to_vec()).unwrap());
                 }
             }
         } else {
@@ -181,11 +186,18 @@ impl TantivyResult {
                 let index = seg.inverted_index(field).unwrap();
                 let mut terms = index.terms().stream().unwrap();
                 while let Some((term, _)) = terms.next() {
-                    distinct_values.insert(String::from_utf8(term.to_vec()).unwrap());
+                    if ascend && distinct_values.len() >= limit {
+                        break;
+                    }
+                    distinct_values.push(String::from_utf8(term.to_vec()).unwrap());
                 }
             }
         }
-        Ok(Self::Distinct(distinct_values))
+        if !ascend {
+            distinct_values.reverse();
+            distinct_values.truncate(limit);
+        }
+        Ok(Self::Distinct(distinct_values.into_iter().collect()))
     }
 }
 
