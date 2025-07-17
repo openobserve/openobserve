@@ -198,10 +198,11 @@ const openFilterCreator = (event: any, { name, ftsKey }: any) => {
 
       whereClause = parsedSQL.join(" ");
 
-      query_context = query_context.replace(
-        "[WHERE_CLAUSE]",
-        " WHERE " + whereClause
-      );
+      // query_context = query_context.replace(
+      //   "[WHERE_CLAUSE]",
+      //   " WHERE " + whereClause
+      // );
+      query_context = query_context.split("[WHERE_CLAUSE]").join(" WHERE " + whereClause);
     } else {
       query_context = query_context.replace("[WHERE_CLAUSE]", "");
     }

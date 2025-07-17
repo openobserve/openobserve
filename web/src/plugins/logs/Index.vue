@@ -1746,10 +1746,6 @@ export default defineComponent({
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
-        } else if (this.searchObj.data.stream.selectedStream.length > 1) {
-          this.resetHistogramWithError(
-            "Histogram is not available for multi stream search.",
-          );
         } else if (
           this.searchObj.meta.histogramDirtyFlag == true &&
           this.searchObj.meta.jobId == ""

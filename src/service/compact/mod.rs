@@ -17,6 +17,7 @@ use std::collections::HashSet;
 
 use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
+    COMPACT_OLD_DATA_STREAM_SET,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
@@ -219,6 +220,11 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                         }
                     }
                     CompactionJobType::Historical => {
+                        if !COMPACT_OLD_DATA_STREAM_SET.is_empty()
+                            && !COMPACT_OLD_DATA_STREAM_SET.contains(&stream_name)
+                        {
+                            continue;
+                        }
                         if let Err(e) = merge::generate_old_data_job_by_stream(
                             &org_id,
                             stream_type,
@@ -486,19 +492,8 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     let time_max = time_max.timestamp_micros();
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
-        // get the working node for the organization
-        let Some(node_name) = get_node_from_consistent_hash(&org_id, &Role::Compactor, None).await
-        else {
-            continue; // no compactor node
-        };
-        if LOCAL_NODE.name.ne(&node_name) {
-            continue; // not this node
-        }
-
-        let (offset, _) = db::compact::organization::get_offset(&org_id, "file_list_deleted").await;
-        let batch_size = 10000;
         loop {
-            match deleted::delete(&org_id, offset, time_max, batch_size).await {
+            match deleted::delete(&org_id, time_max).await {
                 Ok(affected) => {
                     if affected == 0 {
                         break;

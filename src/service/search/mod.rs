@@ -299,6 +299,11 @@ pub async fn search(
                     records: res.hits.len() as i64,
                     response_time: time,
                     size: res.scan_size as f64,
+                    scan_files: if res.scan_files > 0 {
+                        Some(res.scan_files as i64)
+                    } else {
+                        None
+                    },
                     request_body: Some(req_query.sql.clone()),
                     function: if req_query.query_fn.is_empty() {
                         None
@@ -433,7 +438,7 @@ pub async fn search_multi(
                 }
                 multi_res.from = res.from;
                 multi_res.size += res.size;
-                multi_res.file_count += res.file_count;
+                multi_res.scan_files += res.scan_files;
                 multi_res.scan_size += res.scan_size;
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.extend(res.columns);
@@ -875,7 +880,7 @@ pub async fn search_partition(
     });
 
     #[cfg(feature = "enterprise")]
-    let streaming_aggs = is_streaming_aggregate && req.streaming_output;
+    let streaming_aggs = is_streaming_aggregate && req.streaming_output && streaming_id.is_some();
 
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),

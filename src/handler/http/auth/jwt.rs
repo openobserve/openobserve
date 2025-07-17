@@ -147,7 +147,11 @@ pub async fn process_token(
 
                 if index == 0 {
                     // this is to allow user call organization api with org
-                    tuples.push(get_user_org_tuple(&user_email, &user_email));
+                    tuples.push(get_user_org_tuple(
+                        &user_email,
+                        &user_email,
+                        Some(&org.role.to_string()),
+                    ));
                 }
 
                 tuples_to_add.insert(org.name.to_owned(), tuples);
@@ -412,10 +416,18 @@ async fn map_group_to_custom_role(
                 NON_OWNING_ORG.to_vec(),
             )
             .await;
-            tuples.push(get_user_org_tuple(&dex_cfg.default_org, user_email));
+            tuples.push(get_user_org_tuple(
+                &dex_cfg.default_org,
+                user_email,
+                Some(&role.to_string()),
+            ));
             // this check added to avoid service accounts from logging in
             if !role.eq(&UserRole::ServiceAccount) {
-                tuples.push(get_user_org_tuple(user_email, user_email));
+                tuples.push(get_user_org_tuple(
+                    user_email,
+                    user_email,
+                    Some(&role.to_string()),
+                ));
             }
             let start = std::time::Instant::now();
             check_and_get_crole_tuple_for_new_user(

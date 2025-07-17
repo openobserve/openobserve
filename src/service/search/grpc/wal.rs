@@ -79,6 +79,12 @@ pub async fn search_parquet(
         search_partition_keys,
     )
     .await?;
+    log::info!(
+        "[trace_id {}] wal->parquet->search: get file list files: {}, took {} ms",
+        query.trace_id,
+        files.len(),
+        load_start.elapsed().as_millis()
+    );
     if files.is_empty() {
         return Ok((vec![], ScanStats::new()));
     }
@@ -90,12 +96,11 @@ pub async fn search_parquet(
     let files_num = files.len();
     let mut new_files = Vec::with_capacity(files_num);
     let files_metadata = futures::stream::iter(files)
-        .map(|file| async move {
+        .map(|mut file| async move {
             let cfg = get_config();
             let r = WAL_PARQUET_METADATA.read().await;
             let source_file = cfg.common.data_wal_dir.to_string() + file.key.as_str();
             if let Some(meta) = r.get(file.key.as_str()) {
-                let mut file = file;
                 file.meta = meta.clone();
                 // reset file meta if it already removed
                 if !is_exists(&source_file) {
@@ -107,12 +112,7 @@ pub async fn search_parquet(
             let meta = read_metadata_from_file(&source_file.into())
                 .await
                 .unwrap_or_default();
-            let mut file = file;
             file.meta = meta;
-            WAL_PARQUET_METADATA
-                .write()
-                .await
-                .insert(file.key.clone(), file.meta.clone());
             file
         })
         .buffer_unordered(cfg.limit.cpu_num)
@@ -271,9 +271,6 @@ pub async fn search_parquet(
     let mut tables = Vec::new();
     let start = std::time::Instant::now();
     for (ver, files) in files_group {
-        if files.is_empty() {
-            continue;
-        }
         if files.is_empty() {
             continue;
         }
@@ -568,9 +565,9 @@ async fn get_file_list_inner(
         })
         .collect::<Vec<_>>();
 
-    // use same lock to combine the operations of filter by pending delete and lock files
-    let wal_lock = infra::local_lock::lock("wal").await?;
-    let lock_guard = wal_lock.lock().await;
+    if files.is_empty() {
+        return Ok(vec![]);
+    }
 
     // filter by pending delete
     let mut files = crate::service::db::file_list::local::filter_by_pending_delete(files).await;
@@ -592,7 +589,6 @@ async fn get_file_list_inner(
 
     // lock theses files
     wal::lock_files(&files);
-    drop(lock_guard);
 
     let stream_params = Arc::new(StreamParams::new(
         &query.org_id,

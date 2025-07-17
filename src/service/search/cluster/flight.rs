@@ -55,7 +55,8 @@ use crate::{
             DATAFUSION_RUNTIME, SearchResult,
             datafusion::{
                 distributed_plan::{
-                    EmptyExecVisitor, remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter,
+                    EmptyExecVisitor, NewEmptyExecCountVisitor, remote_scan::RemoteScanExec,
+                    rewrite::RemoteScanRewriter,
                 },
                 exec::{prepare_datafusion_context, register_udf},
                 optimizer::{generate_analyzer_rules, generate_optimizer_rules},
@@ -462,6 +463,8 @@ pub async fn run_datafusion(
     let org_id = req.org_id.clone();
 
     let context = tracing::Span::current().context();
+
+    // rewrite physical plan
     let mut rewrite = RemoteScanRewriter::new(
         req,
         nodes.into_arc_vec(),
@@ -474,6 +477,11 @@ pub async fn run_datafusion(
         false, // for super cluster
         context,
     );
+
+    // TODO:if there is only one table and single node, we can skip the remote scan rewrite
+    let mut empty_exec_count_visitor = NewEmptyExecCountVisitor::default();
+    physical_plan.visit(&mut empty_exec_count_visitor)?;
+    let _empty_exec_count = empty_exec_count_visitor.get_count();
     physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
 
     // add remote scan exec to top if physical plan is not changed
@@ -505,15 +513,16 @@ pub async fn run_datafusion(
         let use_cache = use_cache && org_settings.aggregation_cache_enabled;
         let target_partitions = ctx.state().config().target_partitions();
 
-        let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) = o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::rewrite_aggregate_plan(
-            streaming_id,
-            start_time,
-            end_time,
-            use_cache,
-            target_partitions,
-            physical_plan,
-        )
-        .await?;
+        let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) =
+            o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_streaming_agg_plan(
+                streaming_id,
+                start_time,
+                end_time,
+                use_cache,
+                target_partitions,
+                physical_plan,
+            )
+            .await?;
         physical_plan = plan;
         // Check for aggs cache hit
         if is_complete_cache_hit {
@@ -532,6 +541,17 @@ pub async fn run_datafusion(
             };
             return Ok((vec![], scan_stats, "".to_string()));
         }
+    }
+
+    // rewrite physical plan for merge aggregation and get topk
+    #[cfg(feature = "enterprise")]
+    {
+        let plan = o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_topk_agg_plan(
+            sql.limit,
+            physical_plan,
+        )
+        .await?;
+        physical_plan = plan;
     }
 
     if !skip_empty_exec_visitor {

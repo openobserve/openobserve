@@ -861,7 +861,7 @@ mod tests {
                 total: 101,
                 from: 0,
                 size: 280,
-                file_count: 0,
+                scan_files: 0,
                 cached_ratio: 100,
                 scan_size: 0,
                 idx_scan_size: 0,

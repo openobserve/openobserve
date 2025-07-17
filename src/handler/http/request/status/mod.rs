@@ -139,6 +139,8 @@ struct ConfigResponse<'a> {
     max_query_range: i64,
     histogram_enabled: bool,
     dashboard_placeholder: String,
+    ai_enabled: bool,
+    dashboard_show_symbol_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -268,6 +270,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
     let custom_hide_self_logo = o2cfg.common.custom_hide_self_logo;
     #[cfg(not(feature = "enterprise"))]
     let custom_hide_self_logo = false;
+    let ai_enabled = false;
 
     #[cfg(feature = "enterprise")]
     let build_type = "enterprise";
@@ -335,6 +338,8 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         histogram_enabled: cfg.limit.histogram_enabled,
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
+        ai_enabled,
+        dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
     }))
 }
 
@@ -552,6 +557,18 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                             return Ok(HttpResponse::Unauthorized()
                                 .json("Service accounts are not allowed to login".to_string()));
                         }
+                    }
+                    // get domain from email
+                    let domain = res.0.user_email.split('@').nth(1).unwrap_or_default();
+                    if !get_dex_config().allowed_domains.is_empty()
+                        && !get_dex_config().allowed_domains.contains(domain)
+                    {
+                        audit_message.response_meta.http_response_code = 400;
+                        audit_message._timestamp = now_micros();
+                        audit(audit_message).await;
+                        return Ok(
+                            HttpResponse::Unauthorized().json("Unauthorized access".to_string())
+                        );
                     }
 
                     audit_message.user_email = res.0.user_email.clone();

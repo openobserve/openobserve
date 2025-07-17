@@ -1009,15 +1009,17 @@ const useLogs = () => {
 
           whereClause = parsedSQL.join(" ");
 
-          req.query.sql = req.query.sql.replace(
-            "[WHERE_CLAUSE]",
-            " WHERE " + whereClause,
-          );
+          // req.query.sql = req.query.sql.replace(
+          //   "[WHERE_CLAUSE]",
+          //   " WHERE " + whereClause,
+          // );
+          req.query.sql = req.query.sql.split("[WHERE_CLAUSE]").join(" WHERE " + whereClause);
 
-          req.aggs.histogram = req.aggs.histogram.replace(
-            "[WHERE_CLAUSE]",
-            " WHERE " + whereClause,
-          );
+          // req.aggs.histogram = req.aggs.histogram.replace(
+          //   "[WHERE_CLAUSE]",
+          //   " WHERE " + whereClause,
+          // );
+          req.aggs.histogram = req.aggs.histogram.split("[WHERE_CLAUSE]").join(" WHERE " + whereClause);
         } else {
           req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
           req.aggs.histogram = req.aggs.histogram.replace("[WHERE_CLAUSE]", "");
@@ -1661,6 +1663,23 @@ const useLogs = () => {
     }
   }
 
+  const setMultiStreamHistogramQuery = (queryReq: any) => {
+    let histogramQuery = `select histogram(${store.state.zoConfig.timestamp_column}, '${searchObj.meta.resultGrid.chartInterval}') AS zo_sql_key, count(*) AS zo_sql_num from "[INDEX_NAME]" [WHERE_CLAUSE] GROUP BY zo_sql_key`;
+    let multiSql = [];
+
+    for (const stream of searchObj.data.stream.selectedStream) {
+      multiSql.push(histogramQuery.replace(
+        "[INDEX_NAME]",
+        stream
+      ).replace(
+        "[WHERE_CLAUSE]",
+        searchObj.data.query ? 'WHERE ' + searchObj.data.query : ''
+      ));
+    }
+
+    return `with multistream_histogram as (` + multiSql.join(" UNION ALL ") + `) select zo_sql_key, sum(zo_sql_num) as zo_sql_num from multistream_histogram group by zo_sql_key order by zo_sql_key`;
+  }
+
   const getQueryData = async (isPagination = false) => {
     try {
       //remove any data that has been cached 
@@ -1863,81 +1882,68 @@ const useLogs = () => {
             searchObj.meta.refreshHistogram == true &&
             searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
-            searchObj.data.stream.selectedStream.length <= 1 &&
             (!searchObj.meta.sqlMode ||
               isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.meta.sqlMode == false &&
-            searchObj.data.stream.selectedStream.length <= 1 &&
             searchObj.meta.refreshHistogram == true)
         ) {
           searchObj.meta.refreshHistogram = false;
           if (searchObj.data.queryResults.hits.length > 0) {
             if (searchObj.data.stream.selectedStream.length > 1) {
-              searchObj.data.histogram = {
-                xData: [],
-                yData: [],
-                chartParams: {
-                  title: getHistogramTitle(),
-                  unparsed_x_data: [],
-                  timezone: "",
-                },
-                errorCode: 0,
-                errorMsg: "Histogram is not available for multi stream search.",
-                errorDetail: "",
-              };
-            } else {
-              searchObjDebug["histogramStartTime"] = performance.now();
-              searchObj.data.histogram.errorMsg = "";
-              searchObj.data.histogram.errorCode = 0;
-              searchObj.data.histogram.errorDetail = "";
-              searchObj.loadingHistogram = true;
-
-              const parsedSQL: any = fnParsedSQL();
-              searchObj.data.queryResults.aggs = [];
-
-              const partitions = JSON.parse(
-                JSON.stringify(
-                  searchObj.data.queryResults.partitionDetail.partitions,
-                ),
-              );
-
-              // is _timestamp orderby ASC then reverse the partition array
-              if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
-                partitions.reverse();
-              }
-
-              await generateHistogramSkeleton();
-              for (const partition of partitions) {
-                searchObj.data.histogramQuery.query.start_time = partition[0];
-                searchObj.data.histogramQuery.query.end_time = partition[1];
-                //to improve the cancel query UI experience we add additional check here and further we need to remove it
-                if (searchObj.data.isOperationCancelled) {
-                  searchObj.loadingHistogram = false;
-                  searchObj.data.isOperationCancelled = false;
-
-                  if (!searchObj.data.histogram?.xData?.length) {
-                    notificationMsg.value = "Search query was cancelled";
-                    searchObj.data.histogram.errorMsg =
-                      "Search query was cancelled";
-                    searchObj.data.histogram.errorDetail =
-                      "Search query was cancelled";
-                  }
-
-                  showCancelSearchNotification();
-                  break;
-                }
-                await getHistogramQueryData(searchObj.data.histogramQuery);
-                if (partitions.length > 1) {
-                  setTimeout(async () => {
-                    await generateHistogramData();
-                    if(!queryReq.query?.streaming_output)  refreshPartitionPagination(true);
-                  }, 100);
-                }
-              }
-              searchObj.loadingHistogram = false;
+              searchObj.data.histogramQuery.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query);
             }
+            
+            searchObjDebug["histogramStartTime"] = performance.now();
+            searchObj.data.histogram.errorMsg = "";
+            searchObj.data.histogram.errorCode = 0;
+            searchObj.data.histogram.errorDetail = "";
+            searchObj.loadingHistogram = true;
+
+            const parsedSQL: any = fnParsedSQL();
+            searchObj.data.queryResults.aggs = [];
+
+            const partitions = JSON.parse(
+              JSON.stringify(
+                searchObj.data.queryResults.partitionDetail.partitions,
+              ),
+            );
+
+            // is _timestamp orderby ASC then reverse the partition array
+            if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
+              partitions.reverse();
+            }
+
+            await generateHistogramSkeleton();
+            for (const partition of partitions) {
+              searchObj.data.histogramQuery.query.start_time = partition[0];
+              searchObj.data.histogramQuery.query.end_time = partition[1];
+              //to improve the cancel query UI experience we add additional check here and further we need to remove it
+              if (searchObj.data.isOperationCancelled) {
+                searchObj.loadingHistogram = false;
+                searchObj.data.isOperationCancelled = false;
+
+                if (!searchObj.data.histogram?.xData?.length) {
+                  notificationMsg.value = "Search query was cancelled";
+                  searchObj.data.histogram.errorMsg =
+                    "Search query was cancelled";
+                  searchObj.data.histogram.errorDetail =
+                    "Search query was cancelled";
+                }
+
+                showCancelSearchNotification();
+                break;
+              }
+              await getHistogramQueryData(searchObj.data.histogramQuery);
+              if (partitions.length > 1) {
+                setTimeout(async () => {
+                  await generateHistogramData();
+                  if(!queryReq.query?.streaming_output)  refreshPartitionPagination(true);
+                }, 100);
+              }
+            }
+            searchObj.loadingHistogram = false;
           }
           await generateHistogramData();
           if(!queryReq.query?.streaming_output) refreshPartitionPagination(true);
@@ -1994,21 +2000,6 @@ const useLogs = () => {
               await getPageCount(queryReq);
               searchObjDebug["pagecountEndTime"] = performance.now();
             }, 0);
-          }
-
-          if (searchObj.data.stream.selectedStream.length > 1) {
-            searchObj.data.histogram = {
-              xData: [],
-              yData: [],
-              chartParams: {
-                title: getHistogramTitle(),
-                unparsed_x_data: [],
-                timezone: "",
-              },
-              errorCode: 0,
-              errorMsg: "Histogram is not available for multi stream search.",
-              errorDetail: "",
-            };
           }
         }
       } else {
@@ -4554,11 +4545,6 @@ const useLogs = () => {
       searchObj.data.tempFunctionContent = "";
       searchObj.meta.searchApplied = false;
 
-      // Update histogram visibility
-      if (streams.length > 1) {
-        searchObj.meta.showHistogram = false;
-      }
-
       if (!store.state.zoConfig.query_on_stream_selection) {
         await handleQueryData();
       } else {
@@ -6076,21 +6062,19 @@ const useLogs = () => {
   const shouldShowHistogram = (parsedSQL: any) => {
     return (isHistogramDataMissing(searchObj) &&
     isHistogramEnabled(searchObj) &&
-    isSingleStreamSelected(searchObj) &&
     (!searchObj.meta.sqlMode ||
       isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
   (isHistogramEnabled(searchObj) &&
-    isSingleStreamSelected(searchObj) &&
     !searchObj.meta.sqlMode);
   }
 
   const processHistogramRequest = async (queryReq: SearchRequestPayload) => {
     const parsedSQL: any = fnParsedSQL();
 
-    if (searchObj.data.stream.selectedStream.length > 1) {
-      const errMsg = "Histogram is not available for multi stream search.";
-      resetHistogramWithError(errMsg, 0);
-    }
+    // if (searchObj.data.stream.selectedStream.length > 1) {
+    //   const errMsg = "Histogram is not available for multi stream search.";
+    //   resetHistogramWithError(errMsg, 0);
+    // }
 
     if (!searchObj.data.queryResults?.hits?.length) {
       return;
@@ -6119,6 +6103,10 @@ const useLogs = () => {
           false,
           "histogram",
         );
+
+        if (searchObj.data.stream.selectedStream.length > 1) {
+          payload.queryReq.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query);
+        }
 
         payload.meta = {
           isHistogramOnly: searchObj.meta.histogramDirtyFlag,

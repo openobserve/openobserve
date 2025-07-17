@@ -27,13 +27,10 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
         let Some(offset) = update_stats_from_file_list_inner(latest_pk).await? else {
             break;
         };
-        log::info!(
-            "keep updating stream stats from file list, offset: {:?} ...",
-            offset
-        );
+        log::info!("keep updating stream stats from file list, offset: {offset:?} ...");
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
     }
-    log::info!("done updating stream stats from file list");
+    log::debug!("done updating stream stats from file list");
     Ok(None)
 }
 
