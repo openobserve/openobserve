@@ -1,267 +1,211 @@
 import { test, expect } from "../baseFixtures.js";
-import { LoginPage } from '../../pages/generalPages/loginPage.js';
-import { UserPage } from "../../pages/generalPages/userPage.js";
-import { CreateOrgPage } from "../../pages/generalPages/createOrgPage.js";
-
-
+import PageManager from "../../pages/page-manager.js";
 
 test.describe("Users and Organizations", () => {
-    let loginPage, userPage, createOrgPage;
+    let pageManager;
 
-   
     const timestamp = Date.now(); 
     const randomSuffix = Math.floor(Math.random() * 1000); 
     const emailName = `email${timestamp}${randomSuffix}@gmail.com`;
     const orgName = `Organ${timestamp}${randomSuffix}`;
-   
 
     test.beforeEach(async ({ page }) => {
-
-        
-        loginPage = new LoginPage(page);
-        userPage = new UserPage(page);
-        createOrgPage = new CreateOrgPage(page);
-        await loginPage.gotoLoginPage();
-        await loginPage.loginAsInternalUser();
-        await loginPage.login();
-
-        
-    
-
+        pageManager = new PageManager(page);
+        await pageManager.loginPage.gotoLoginPage();
+        await pageManager.loginPage.loginAsInternalUser();
+        await pageManager.loginPage.login();
     });
 
-
     test("Error Message displayed if Email Blank", async ({ page }) => {
-
-        await userPage.gotoIamPage();
-        await userPage.addUser("");   
-        await userPage.userCreate(); 
-        await userPage.verifySuccessMessage('Please enter a valid email address');
-
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.addUser("");   
+        await pageManager.userPage.userCreate(); 
+        await pageManager.userPage.verifySuccessMessage('Please enter a valid email address');
     });
 
     test("Error Message displayed if Add user with missing role", async ({ page }) => {
-
-        await userPage.gotoIamPage();
-        await userPage.addUser(emailName);
-        await userPage.userCreate();
-        await userPage.verifySuccessMessage('Field is required');
-
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.userCreate();
+        await pageManager.userPage.verifySuccessMessage('Field is required');
     });
 
     test("User created with password and first name and last name", async ({ page }) => {
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.selectUserRole('Admin');
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.userCreate();
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
+        await pageManager.userPage.addUserFirstLast('a', 'b');
+        await pageManager.userPage.userCreate();
 
-        await userPage.gotoIamPage();
-        await userPage.addUser(emailName);
-        await userPage.selectUserRole('Admin');
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.userCreate();
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
-        await userPage.addUserFirstLast('a', 'b');
-        await userPage.userCreate();
-
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.verifySuccessMessage('User added successfully.');
-
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.verifySuccessMessage('User added successfully.');
     });
 
     test("User not created if Email already exists", async ({ page }) => {
-
-        await userPage.gotoIamPage();
-        await userPage.addUser(emailName);
-        await userPage.selectUserRole('Admin');
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.userCreate();
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
-        await userPage.addUserFirstLast('a', 'b');
-        await userPage.page.waitForTimeout(1000);
-        await userPage.userCreate();
-        await userPage.verifySuccessMessage('User added successfully.');
-        await userPage.page.waitForTimeout(5000);   
-        await userPage.gotoIamPage();
-        await userPage.addUser(emailName);
-        await userPage.selectUserRole('Admin');
-        await userPage.userCreate();   
-        await userPage.verifySuccessMessage('User is already part of the organization');
-
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.selectUserRole('Admin');
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.userCreate();
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
+        await pageManager.userPage.addUserFirstLast('a', 'b');
+        await pageManager.userPage.page.waitForTimeout(1000);
+        await pageManager.userPage.userCreate();
+        await pageManager.userPage.verifySuccessMessage('User added successfully.');
+        await pageManager.userPage.page.waitForTimeout(5000);   
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.selectUserRole('Admin');
+        await pageManager.userPage.userCreate();   
+        await pageManager.userPage.verifySuccessMessage('User is already part of the organization');
     });
     
     test("User not created if Cancel clicked on first Add User Page", async ({ page }) => {
-
-        await userPage.gotoIamPage();
-        await userPage.addUser(emailName);
-        await userPage.selectUserRole('Admin');
-        await userPage.page.waitForTimeout(1000); 
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.selectUserRole('Admin');
+        await pageManager.userPage.page.waitForTimeout(1000); 
         await page.locator('[data-test="cancel-user-button"]').click();
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.gotoIamPage();
-        await userPage.searchUser(emailName);
-        await userPage.verifyUserNotExists();
-
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.searchUser(emailName);
+        await pageManager.userPage.verifyUserNotExists();
     });
 
     test("User not created if Cancel clicked on second Add User Page", async ({ page }) => {
-
-        await userPage.gotoIamPage();
-        await userPage.addUser(emailName);
-        await userPage.selectUserRole('Admin');
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.userCreate();
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
-        await userPage.addUserFirstLast('a', 'b');
-        await userPage.page.waitForTimeout(1000);
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.selectUserRole('Admin');
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.userCreate();
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
+        await pageManager.userPage.addUserFirstLast('a', 'b');
+        await pageManager.userPage.page.waitForTimeout(1000);
         await page.locator('[data-test="cancel-user-button"]').click();
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.gotoIamPage();
-        await userPage.searchUser(emailName);
-        await userPage.verifyUserNotExists();
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.searchUser(emailName);
+        await pageManager.userPage.verifyUserNotExists();
     });
-    
-    
 
     test("User Created and deleted", async ({ page }) => {
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.selectUserRole('Admin');
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.userCreate();
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
+        await pageManager.userPage.addUserFirstLast('a', 'b');
+        await pageManager.userPage.userCreate();
 
-        await userPage.gotoIamPage();
-        await userPage.addUser(emailName);
-        await userPage.selectUserRole('Admin');
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.userCreate();
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
-        await userPage.addUserFirstLast('a', 'b');
-        await userPage.userCreate();
-
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.verifySuccessMessage('User added successfully.');
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.gotoIamPage();
-        await userPage.deleteUser(emailName);
-        await userPage.verifySuccessMessage('User deleted successfully.');
-
-
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.verifySuccessMessage('User added successfully.');
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.deleteUser(emailName);
+        await pageManager.userPage.verifySuccessMessage('User deleted successfully.');
     });
 
     test("User Created and not deleted if cancel clicked", async ({ page }) => {
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.selectUserRole('Admin');
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.userCreate();
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
+        await pageManager.userPage.addUserFirstLast('a', 'b');
+        await pageManager.userPage.userCreate();
 
-        await userPage.gotoIamPage();
-        await userPage.addUser(emailName);
-        await userPage.selectUserRole('Admin');
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.userCreate();
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
-        await userPage.addUserFirstLast('a', 'b');
-        await userPage.userCreate();
-
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.verifySuccessMessage('User added successfully.');
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.gotoIamPage();
-        await userPage.deleteUserCancel(emailName);
-        await userPage.gotoIamPage();
-        await userPage.searchUser(emailName);
-        await userPage.verifyUserExists(emailName);
-
-        
-
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.verifySuccessMessage('User added successfully.');
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.deleteUserCancel(emailName);
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.searchUser(emailName);
+        await pageManager.userPage.verifyUserExists(emailName);
     });
 
-   
     test("User Created and updated First Name and Last Name", async ({ page }) => {
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.selectUserRole('Admin');
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.userCreate();
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
+        await pageManager.userPage.addUserFirstLast('a', 'b');
+        await pageManager.userPage.userCreate();
 
-        await userPage.gotoIamPage();
-        await userPage.addUser(emailName);
-        await userPage.selectUserRole('Admin');
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.userCreate();
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
-        await userPage.addUserFirstLast('a', 'b');
-        await userPage.userCreate();
-
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.verifySuccessMessage('User added successfully.');
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.gotoIamPage();
-        await userPage.editUser(emailName);
-        await userPage.addUserFirstLast('c', 'd');
-        await userPage.userCreate();
-        await userPage.verifySuccessMessage('User updated successfully.');
-       
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.verifySuccessMessage('User added successfully.');
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.editUser(emailName);
+        await pageManager.userPage.addUserFirstLast('c', 'd');
+        await pageManager.userPage.userCreate();
+        await pageManager.userPage.verifySuccessMessage('User updated successfully.');
     });
 
     test("User Created and updated Password", async ({ page }) => {
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.selectUserRole('Admin');
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.userCreate();
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
+        await pageManager.userPage.addUserFirstLast('a', 'b');
+        await pageManager.userPage.userCreate();
 
-        await userPage.gotoIamPage();
-        await userPage.addUser(emailName);
-        await userPage.selectUserRole('Admin');
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.userCreate();
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.addUserPassword(process.env["ZO_ROOT_USER_PASSWORD"]);
-        await userPage.addUserFirstLast('a', 'b');
-        await userPage.userCreate();
-
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.verifySuccessMessage('User added successfully.');
-        await userPage.page.waitForTimeout(1000);   
-        await userPage.gotoIamPage();
-        await userPage.editUser(emailName);
-        await userPage.addNewPassword('1234567890');
-        await userPage.userCreate();
-        await userPage.verifySuccessMessage('User updated successfully.');
-        
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.verifySuccessMessage('User added successfully.');
+        await pageManager.userPage.page.waitForTimeout(1000);   
+        await pageManager.userPage.gotoIamPage();
+        await pageManager.userPage.editUser(emailName);
+        await pageManager.userPage.addNewPassword('1234567890');
+        await pageManager.userPage.userCreate();
+        await pageManager.userPage.verifySuccessMessage('User updated successfully.');
     });
 
     test('Add Organization Successfully', async ({ page }) => {
-        
-        await createOrgPage.navigateToOrg();
-        await createOrgPage.clickAddOrg();
-        await createOrgPage.fillOrgName(orgName);
-        await createOrgPage.clickSaveOrg();
-        await userPage.verifySuccessMessage('Organization added successfully.');
-        
-     
-      });
+        await pageManager.createOrgPage.navigateToOrg();
+        await pageManager.createOrgPage.clickAddOrg();
+        await pageManager.createOrgPage.fillOrgName(orgName);
+        await pageManager.createOrgPage.clickSaveOrg();
+        await pageManager.userPage.verifySuccessMessage('Organization added successfully.');
+    });
 
-      test('Save button disabled if Add Organization with Empty Name', async ({ page }) => {
-        
-        await createOrgPage.navigateToOrg();
-        await createOrgPage.clickAddOrg();
-        await createOrgPage.fillOrgName('');
-        await createOrgPage.checkSaveEnabled();
-        
-        
-     
-      });
+    test('Save button disabled if Add Organization with Empty Name', async ({ page }) => {
+        await pageManager.createOrgPage.navigateToOrg();
+        await pageManager.createOrgPage.clickAddOrg();
+        await pageManager.createOrgPage.fillOrgName('');
+        await pageManager.createOrgPage.checkSaveEnabled();
+    });
 
-      test('Organization not added if Cancel clicked', async ({ page }) => {
-        
-        await createOrgPage.navigateToOrg();
-        await createOrgPage.clickAddOrg();
-        await createOrgPage.fillOrgName(orgName);
-        await createOrgPage.clickCancelButton();
-        await createOrgPage.navigateToOrg();
-        await createOrgPage.searchOrg(orgName);
-        await createOrgPage.verifyOrgNotExists(expect);
-        
-     
-      });
+    test('Organization not added if Cancel clicked', async ({ page }) => {
+        await pageManager.createOrgPage.navigateToOrg();
+        await pageManager.createOrgPage.clickAddOrg();
+        await pageManager.createOrgPage.fillOrgName(orgName);
+        await pageManager.createOrgPage.clickCancelButton();
+        await pageManager.createOrgPage.navigateToOrg();
+        await pageManager.createOrgPage.searchOrg(orgName);
+        await pageManager.createOrgPage.verifyOrgNotExists(expect);
+    });
 
-      test('Error Message displayed if Add Organization is blank', async ({ page }) => {
-        
-        await createOrgPage.navigateToOrg();
-        await createOrgPage.clickAddOrg();
-        await createOrgPage.fillOrgName('');
+    test('Error Message displayed if Add Organization is blank', async ({ page }) => {
+        await pageManager.createOrgPage.navigateToOrg();
+        await pageManager.createOrgPage.clickAddOrg();
+        await pageManager.createOrgPage.fillOrgName('');
         await page.locator('.q-field__bottom').click();
-        await userPage.verifySuccessMessage('Name is required');
-        
-        
-     
-      });
-
-
+        await pageManager.userPage.verifySuccessMessage('Name is required');
+    });
 });
