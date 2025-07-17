@@ -22,7 +22,8 @@ use std::{
 use arrow_schema::{DataType, Field, Schema};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
-    meta::{bitvec::BitVec, inverted_index::InvertedIndexOptimizeMode},
+    meta::{bitvec::BitVec, inverted_index::IndexOptimizeMode},
+    utils::tantivy::query::contains_query::ContainsAutomaton,
 };
 use tantivy::{
     Searcher,
@@ -35,13 +36,16 @@ use tantivy::{
     query::Query,
 };
 
+use crate::service::search::index::IndexCondition;
+
 #[derive(Debug, Clone)]
 pub enum TantivyResult {
     RowIds(HashSet<u32>),
     RowIdsBitVec(usize, BitVec),
-    Count(usize),             // simple count optimization
-    Histogram(Vec<u64>),      // simple histogram optimization
-    TopN(Vec<(String, u64)>), // simple top n optimization
+    Count(usize),              // simple count optimization
+    Histogram(Vec<u64>),       // simple histogram optimization
+    TopN(Vec<(String, u64)>),  // simple top n optimization
+    Distinct(HashSet<String>), // simple distinct optimization
 }
 
 impl TantivyResult {
@@ -152,6 +156,49 @@ impl TantivyResult {
             anyhow::bail!("Failed to get top n results from tantivy");
         }
     }
+
+    pub fn handle_simple_distinct(
+        searcher: &Searcher,
+        index_condition: &IndexCondition,
+        field: &str,
+        limit: usize,
+        ascend: bool,
+    ) -> anyhow::Result<Self> {
+        let mut distinct_values: Vec<String> = Vec::with_capacity(limit * 4);
+        let field = searcher.schema().get_field(field).unwrap();
+        if let Some((value, case_sensitive)) = index_condition.get_str_match_condition() {
+            for seg in searcher.segment_readers() {
+                let index = seg.inverted_index(field).unwrap();
+                let mut terms = index
+                    .terms()
+                    .search(ContainsAutomaton::new(&value, case_sensitive))
+                    .into_stream()
+                    .unwrap();
+                while let Some((term, _)) = terms.next() {
+                    if ascend && distinct_values.len() >= limit {
+                        break;
+                    }
+                    distinct_values.push(String::from_utf8(term.to_vec()).unwrap());
+                }
+            }
+        } else {
+            for seg in searcher.segment_readers() {
+                let index = seg.inverted_index(field).unwrap();
+                let mut terms = index.terms().stream().unwrap();
+                while let Some((term, _)) = terms.next() {
+                    if ascend && distinct_values.len() >= limit {
+                        break;
+                    }
+                    distinct_values.push(String::from_utf8(term.to_vec()).unwrap());
+                }
+            }
+        }
+        if !ascend {
+            distinct_values.reverse();
+            distinct_values.truncate(limit);
+        }
+        Ok(Self::Distinct(distinct_values.into_iter().collect()))
+    }
 }
 
 // TantivyMultiResultBuilder is used to build a TantivyMultiResult from multiple TantivyResult
@@ -159,14 +206,18 @@ pub enum TantivyMultiResultBuilder {
     RowNums(u64),
     Histogram(Vec<Vec<u64>>),
     TopN(Vec<(String, u64)>),
+    Distinct(HashSet<String>),
 }
 
 impl TantivyMultiResultBuilder {
-    pub fn new(optimize_rule: &Option<InvertedIndexOptimizeMode>) -> Self {
+    pub fn new(optimize_rule: &Option<IndexOptimizeMode>) -> Self {
         match optimize_rule {
-            Some(InvertedIndexOptimizeMode::SimpleHistogram(..)) => Self::Histogram(vec![]),
-            Some(InvertedIndexOptimizeMode::SimpleTopN(..)) => Self::TopN(vec![]),
-            _ => Self::RowNums(0),
+            Some(IndexOptimizeMode::SimpleHistogram(..)) => Self::Histogram(vec![]),
+            Some(IndexOptimizeMode::SimpleTopN(..)) => Self::TopN(vec![]),
+            Some(IndexOptimizeMode::SimpleDistinct(..)) => Self::Distinct(HashSet::new()),
+            Some(IndexOptimizeMode::SimpleSelect(..))
+            | Some(IndexOptimizeMode::SimpleCount)
+            | None => Self::RowNums(0),
         }
     }
 
@@ -191,6 +242,13 @@ impl TantivyMultiResultBuilder {
     pub fn add_top_n(&mut self, top_n: Vec<(String, u64)>) {
         match self {
             Self::TopN(a) => a.extend(top_n),
+            _ => unreachable!("unsupported tantivy multi result"),
+        }
+    }
+
+    pub fn add_distinct(&mut self, distinct: HashSet<String>) {
+        match self {
+            Self::Distinct(a) => a.extend(distinct),
             _ => unreachable!("unsupported tantivy multi result"),
         }
     }
@@ -221,6 +279,7 @@ impl TantivyMultiResultBuilder {
                 TantivyMultiResult::Histogram(histogram)
             }
             Self::TopN(a) => TantivyMultiResult::TopN(a),
+            Self::Distinct(a) => TantivyMultiResult::Distinct(a),
         }
     }
 }
@@ -229,6 +288,7 @@ pub enum TantivyMultiResult {
     RowNums(u64),
     Histogram(Vec<u64>),
     TopN(Vec<(String, u64)>),
+    Distinct(HashSet<String>),
 }
 
 impl Display for TantivyMultiResult {
@@ -236,9 +296,10 @@ impl Display for TantivyMultiResult {
         match self {
             Self::RowNums(num) => write!(f, "row_nums: {num}"),
             Self::Histogram(histogram) => {
-                write!(f, "histogram hits:{}", histogram.iter().sum::<u64>())
+                write!(f, "histogram hits: {}", histogram.iter().sum::<u64>())
             }
-            Self::TopN(top_n) => write!(f, "top_n hits:{}", top_n.len()),
+            Self::TopN(top_n) => write!(f, "top_n hits: {}", top_n.len()),
+            Self::Distinct(distinct) => write!(f, "distinct hits: {}", distinct.len()),
         }
     }
 }
@@ -262,6 +323,13 @@ impl TantivyMultiResult {
         match self {
             Self::TopN(a) => a,
             _ => vec![],
+        }
+    }
+
+    pub fn distinct(self) -> HashSet<String> {
+        match self {
+            Self::Distinct(a) => a,
+            _ => HashSet::new(),
         }
     }
 }
