@@ -111,10 +111,6 @@ pub async fn search_parquet(
                 .await
                 .unwrap_or_default();
             file.meta = meta;
-            WAL_PARQUET_METADATA
-                .write()
-                .await
-                .insert(file.key.clone(), file.meta.clone());
             file
         })
         .buffer_unordered(cfg.limit.cpu_num)
@@ -273,9 +269,6 @@ pub async fn search_parquet(
     let mut tables = Vec::new();
     let start = std::time::Instant::now();
     for (ver, files) in files_group {
-        if files.is_empty() {
-            continue;
-        }
         if files.is_empty() {
             continue;
         }
@@ -473,7 +466,13 @@ pub async fn search_memtable(
         }
         let record_batches = merge_groupes
             .into_iter()
-            .map(|group| concat_batches(group[0].schema().clone(), group).unwrap())
+            .map(|mut group| {
+                if group.len() == 1 {
+                    group.remove(0)
+                } else {
+                    concat_batches(group[0].schema().clone(), group).unwrap()
+                }
+            })
             .collect::<Vec<_>>();
 
         tokio::task::coop::consume_budget().await;
