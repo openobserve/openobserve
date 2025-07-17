@@ -930,7 +930,7 @@ impl VisitorMut for IndexVisitor {
                 if can_remove_filter
                     && let Some(distinct) = is_simple_distinct_query(query)
                     && let Some(index) = self.index_condition.as_ref()
-                    && index.is_simple_str_match(&distinct.0)
+                    && !index.is_simple_str_match(&distinct.0)
                 {
                     self.can_optimize = false;
                 }
