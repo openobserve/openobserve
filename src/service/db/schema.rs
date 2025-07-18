@@ -22,7 +22,7 @@ use config::{
     get_config,
     ider::SnowflakeIdGenerator,
     is_local_disk_storage,
-    meta::stream::StreamType,
+    meta::{cluster::RoleGroup, stream::StreamType},
     utils::{json, time::now_micros},
 };
 use hashbrown::{HashMap, HashSet};
@@ -40,7 +40,10 @@ use {
 };
 
 use crate::{
-    common::{infra::config::ENRICHMENT_TABLES, meta::stream::StreamSchema},
+    common::{
+        infra::{cluster::get_cached_online_querier_nodes, config::ENRICHMENT_TABLES},
+        meta::stream::StreamSchema,
+    },
     service::{db, enrichment::StreamTable},
 };
 
