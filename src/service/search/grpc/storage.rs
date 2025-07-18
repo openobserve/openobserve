@@ -420,7 +420,7 @@ pub async fn cache_files(
             cache_misses += 1;
         };
         let check_cache_took = start.elapsed().as_millis() as usize;
-        if check_cache_took > 1000 {
+        if check_cache_took > 100 {
             log::info!(
                 "[trace_id {trace_id}] search->storage: check file {file} took: {check_cache_took} ms",
             );

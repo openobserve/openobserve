@@ -533,7 +533,7 @@ pub async fn exist(file: &str) -> bool {
         RESULT_FILES[idx].read().await
     };
     let get_lock_took = start.elapsed().as_millis() as usize;
-    if get_lock_took > 1000 {
+    if get_lock_took > 100 {
         log::info!("disk->cache: check file {file} exist get lock took: {get_lock_took} ms",);
     }
     // file not exist, we can fast return
@@ -543,7 +543,7 @@ pub async fn exist(file: &str) -> bool {
     drop(files);
 
     let exist_took = start.elapsed().as_millis() as usize;
-    if exist_took > 1000 {
+    if exist_took > 100 {
         log::info!("disk->cache: check file {file} exist took: {exist_took} ms",);
     }
 
@@ -555,7 +555,7 @@ pub async fn exist(file: &str) -> bool {
     // file is not exist, need remove it from cache index
     _ = remove("", file).await;
     let remove_took = start.elapsed().as_millis() as usize;
-    if remove_took > 1000 {
+    if remove_took > 100 {
         log::info!("disk->cache: check file {file} exist remove took: {remove_took} ms",);
     }
 
