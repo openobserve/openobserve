@@ -729,6 +729,7 @@ pub async fn build_search_request_per_field(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
+    keyword: &str,
 ) -> Result<Vec<(config::meta::search::Request, StreamType, FieldName)>, Error> {
     let query_fn = req
         .vrl_fn
@@ -788,7 +789,7 @@ pub async fn build_search_request_per_field(
     let mut query = config::meta::search::Query {
         sql: decoded_sql.clone(), // Will be populated per field in the loop below
         from: 0,
-        size: req.size.unwrap_or(config::meta::sql::MAX_LIMIT),
+        size: req.size.unwrap_or(10),
         start_time,
         end_time,
         query_fn: query_fn.clone(),
@@ -889,17 +890,25 @@ pub async fn build_search_request_per_field(
         stream_type
     };
 
+    let size = req.query.size;
     let mut requests = Vec::new();
     for field in fields {
+        let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
+            format!("{sql_where} AND str_match_ignore_case({field}, '{keyword}')")
+        } else if !keyword.is_empty() {
+            format!("WHERE str_match_ignore_case({field}, '{keyword}')")
+        } else {
+            sql_where.clone()
+        };
         let sql = if no_count {
             // we use min(0) as a hack to do streaming aggregation but actually return 0,
             // essentially we are not counting the values
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
+                "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_key asc limit {size}"
             )
         } else {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
+                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_num desc limit {size}"
             )
         };
 
