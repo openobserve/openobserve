@@ -2,8 +2,7 @@ import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../../test-data/logs_data.json";
-import { PipelinesPage } from "../../pages/pipelinesPages/pipelinesPage.js";
-import { LogsPage } from '../../pages/logsPages/logsPage.js';
+import PageManager from "../../pages/page-manager.js";
 
 
 test.describe.configure({ mode: "parallel" });
@@ -133,7 +132,7 @@ async function deletePipeline(page, randomPipelineName) {
   await page.locator('[data-test="confirm-button"]').click();
 }
 test.describe("Pipeline testcases", () => {
-  let logsPage;
+  let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -155,7 +154,7 @@ test.describe("Pipeline testcases", () => {
  
   test.beforeEach(async ({ page }) => {
     await login(page);
-    logsPage = new LogsPage(page);
+    pageManager = new PageManager(page);
     await page.waitForTimeout(5000);
     
 
@@ -175,15 +174,14 @@ test.describe("Pipeline testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStream("e2e_automate"); 
+    await pageManager.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
   });
 
   test("should display error when stream not selected while adding source", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -198,7 +196,7 @@ test.describe("Pipeline testcases", () => {
   test("should display error when user directly clicks on save without adding details", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pipelinePage.addPipeline();
@@ -209,7 +207,7 @@ test.describe("Pipeline testcases", () => {
   test("should display error on entering only pipeline name and save", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pipelinePage.addPipeline();
@@ -222,7 +220,7 @@ test.describe("Pipeline testcases", () => {
   test("should display error on entering only source node and save", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -252,7 +250,7 @@ test.describe("Pipeline testcases", () => {
   test("should delete the create source node on confirmation", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -280,7 +278,7 @@ test.describe("Pipeline testcases", () => {
   test.skip("should add source & destination node and then delete the pipeline", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -338,7 +336,7 @@ test.describe("Pipeline testcases", () => {
   });
 
   test("should create query source and delete it", async ({ page }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     // Open the pipeline menu and wait for a moment
     await pipelinePage.openPipelineMenu();
@@ -389,7 +387,7 @@ test.describe("Pipeline testcases", () => {
   test.skip("should add source, function,destination and then delete pipeline", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -467,7 +465,7 @@ test.describe("Pipeline testcases", () => {
   test("should display error when function name is not added", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -483,7 +481,7 @@ test.describe("Pipeline testcases", () => {
   test("should create function when name added but function is not added", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -500,7 +498,7 @@ test.describe("Pipeline testcases", () => {
   test.skip("should display error if query added without sql", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     // Open the pipeline menu and wait for a moment
     await pipelinePage.openPipelineMenu();
@@ -521,7 +519,7 @@ test.describe("Pipeline testcases", () => {
   test("should display error when save clicked directly while adding destination", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -535,7 +533,7 @@ test.describe("Pipeline testcases", () => {
   test.skip("should add source, condition & destination node and then delete the pipeline", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -611,7 +609,7 @@ test.describe("Pipeline testcases", () => {
   test("should display error when function is not selected under select function", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pipelinePage.addPipeline();
@@ -625,7 +623,7 @@ test.describe("Pipeline testcases", () => {
   test("should display error when condition is not added but user clicks save", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pipelinePage.addPipeline();
@@ -638,7 +636,7 @@ test.describe("Pipeline testcases", () => {
   test("should add source & destination node without connection and error to be displayed", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -689,7 +687,7 @@ test.describe("Pipeline testcases", () => {
   test("should navigate to dashboard page if user accepts dialog box", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -723,7 +721,7 @@ test.describe("Pipeline testcases", () => {
   test("should stay on pipeline page if user dismisses the dialog box", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
