@@ -22,7 +22,7 @@ use config::{
     get_config,
     ider::SnowflakeIdGenerator,
     is_local_disk_storage,
-    meta::{cluster::RoleGroup, stream::StreamType},
+    meta::stream::StreamType,
     utils::{json, time::now_micros},
 };
 use hashbrown::{HashMap, HashSet};
@@ -41,10 +41,7 @@ use {
 
 use crate::{
     common::{
-        infra::{
-            cluster::get_cached_online_querier_nodes,
-            config::{ENRICHMENT_TABLES, ORGANIZATIONS},
-        },
+        infra::config::{ENRICHMENT_TABLES, ORGANIZATIONS},
         meta::stream::StreamSchema,
     },
     service::{db, enrichment::StreamTable, organization::check_and_create_org},
@@ -596,17 +593,17 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
     }
 
     // waiting for querier to be ready
-    let expect_querier_num = get_config().limit.starting_expect_querier_num;
-    loop {
-        let nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
-            .await
-            .unwrap_or_default();
-        if nodes.len() >= expect_querier_num {
-            break;
-        }
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        log::info!("Waiting for querier to be ready");
-    }
+    // let expect_querier_num = get_config().limit.starting_expect_querier_num;
+    // loop {
+    //     let nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+    //         .await
+    //         .unwrap_or_default();
+    //     if nodes.len() >= expect_querier_num {
+    //         break;
+    //     }
+    //     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    //     log::info!("Waiting for querier to be ready");
+    // }
 
     // fill data
     for (key, tbl) in tables {
