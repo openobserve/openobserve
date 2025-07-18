@@ -1,18 +1,11 @@
 import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import { login } from "../utils/dashLogin.js";
-import { ingestion } from "../utils/dashIngestion.js";
-import {
-  waitForDashboardPage,
-  deleteDashboard,
-} from "../utils/dashCreation.js";
+import { login } from "./utils/dashLogin.js";
+import { ingestion } from "./utils/dashIngestion.js";
+import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
-import ChartTypeSelector from "../../pages/dashboardPages/dashboard-chart.js";
-import DashboardListPage from "../../pages/dashboardPages/dashboard-list.js";
-import DashboardCreate from "../../pages/dashboardPages/dashboard-create.js";
-import DateTimeHelper from "../../pages/dashboardPages/dashboard-time.js";
-import DashboardactionPage from "../../pages/dashboardPages/dashboard-panel-actions.js";
+import PageManager from "../../pages/page-manager";
 
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
@@ -27,6 +20,10 @@ test.describe("dashboard aggregations testcases", () => {
     await ingestion(page);
     await page.waitForTimeout(2000);
 
+    // Ensure Streaming is disabled for consistent test behaviour
+    const pm = new PageManager(page);
+    await pm.managementPage.ensureStreamingDisabled();
+
     const orgNavigation = page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
@@ -35,25 +32,21 @@ test.describe("dashboard aggregations testcases", () => {
   test("Should return a response containing 'streaming_aggs: true' when executing a query with aggregation enabled.", async ({
     page,
   }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardPageActions = new DashboardactionPage(page);
-    const dateTimeHelper = new DateTimeHelper(page);
+    const pm = new PageManager(page);
 
-    await dashboardPage.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
 
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
 
-    await dashboardCreate.addPanel();
+    await pm.dashboardCreate.addPanel();
 
-    await chartTypeSelector.selectChartType("line");
+    await pm.chartTypeSelector.selectChartType("line");
 
-    await chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStreamType("logs");
 
-    await chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
 
     await page.waitForTimeout(2000);
     // await page
@@ -63,18 +56,26 @@ test.describe("dashboard aggregations testcases", () => {
       .locator('[data-test="dashboard-x-item-_timestamp-remove"]')
       .click();
 
-    await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_namespace_name",
+      "y"
+    );
 
-    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_container_name",
+      "x"
+    );
 
-    await dateTimeHelper.setRelativeTimeRange("6-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
 
-    await dashboardPageActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Wait for response
 
     // Apply query and wait for response
-    await dashboardPageActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
     await page.waitForResponse(async (res) => {
       const url = res.url();
       const isValid =
@@ -103,9 +104,9 @@ test.describe("dashboard aggregations testcases", () => {
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
-    await dashboardPageActions.addPanelName(randomDashboardName);
+    await pm.dashboardPanelActions.addPanelName(randomDashboardName);
 
-    await dashboardPageActions.savePanel();
+    await pm.dashboardPanelActions.savePanel();
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
 
@@ -115,33 +116,35 @@ test.describe("dashboard aggregations testcases", () => {
   test("Should return a response containing 'streaming_aggs: false' when executing a query without aggregation..", async ({
     page,
   }) => {
-    const chartTypeSelector = new ChartTypeSelector(page);
-    const dashboardPage = new DashboardListPage(page);
-    const dashboardCreate = new DashboardCreate(page);
-    const dashboardPageActions = new DashboardactionPage(page);
+    const pm = new PageManager(page);
 
-    await dashboardPage.menuItem("dashboards-item");
+    await pm.dashboardList.menuItem("dashboards-item");
 
     await waitForDashboardPage(page);
 
-    await dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
 
-    await dashboardCreate.addPanel();
+    await pm.dashboardCreate.addPanel();
 
-    await chartTypeSelector.selectChartType("line");
+    await pm.chartTypeSelector.selectChartType("line");
 
-    await chartTypeSelector.selectStreamType("logs");
+    await pm.chartTypeSelector.selectStreamType("logs");
 
-    await chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.selectStream("e2e_automate");
 
-    await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_namespace_name",
+      "y"
+    );
 
-    await dashboardPageActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
+
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Wait for response
 
     // Apply query and wait for response
-    await dashboardPageActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.applyDashboardBtn();
     await page.waitForResponse(async (res) => {
       const url = res.url();
       const isValid =
@@ -170,9 +173,9 @@ test.describe("dashboard aggregations testcases", () => {
 
     await page.locator('[data-test="query-inspector-close-btn"]').click();
 
-    await dashboardPageActions.addPanelName(randomDashboardName);
+    await pm.dashboardPanelActions.addPanelName(randomDashboardName);
 
-    await dashboardPageActions.savePanel();
+    await pm.dashboardPanelActions.savePanel();
 
     await page.locator('[data-test="dashboard-back-btn"]').click();
 
