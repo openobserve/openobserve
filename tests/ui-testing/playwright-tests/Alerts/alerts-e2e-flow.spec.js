@@ -48,7 +48,7 @@ test.describe("Alerts E2E Flow", () => {
       console.log('Generated shared random value for this run:', sharedRandomValue);
     }
 
-    // Skip data ingestion for scheduled alert test
+
     await pageManager.commonActions.skipDataIngestionForScheduledAlert(test.info().title);
     
     // Navigate to alerts page
