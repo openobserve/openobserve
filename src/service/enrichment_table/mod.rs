@@ -145,7 +145,6 @@ pub async fn save_enrichment_data(
         );
     }
 
-    let mut schema_evolved = false;
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let stream_schema = stream_schema_exists(
         org_id,
@@ -172,22 +171,6 @@ pub async fn save_enrichment_data(
             TIMESTAMP_COL_NAME.to_string(),
             json::Value::Number(timestamp.into()),
         );
-
-        // check for schema evolution
-        if !schema_evolved
-            && check_for_schema(
-                org_id,
-                stream_name,
-                StreamType::EnrichmentTables,
-                &mut stream_schema_map,
-                vec![&json_record],
-                timestamp,
-            )
-            .await
-            .is_ok()
-        {
-            schema_evolved = true;
-        }
 
         if records.is_empty() {
             // let schema = stream_schema_map.get(stream_name).unwrap();
@@ -253,7 +236,7 @@ pub async fn save_enrichment_data(
                 ))
                 .json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    format!("Error writing enrichment table to database"),
+                    "Error writing enrichment table to database".to_string(),
                 )));
         }
     } else {
@@ -298,6 +281,22 @@ pub async fn save_enrichment_data(
     //                 )));
     //         }
     //     };
+
+    let mut record_vals = vec![];
+    for record in records.iter() {
+        record_vals.push(record.as_object().unwrap());
+    }
+    // check for schema evolution
+
+    let _ = check_for_schema(
+        org_id,
+        stream_name,
+        StreamType::EnrichmentTables,
+        &mut stream_schema_map,
+        record_vals,
+        timestamp,
+    )
+    .await;
 
     let mut enrich_meta_stats = db::enrichment_table::get_meta_table_stats(org_id, stream_name)
         .await

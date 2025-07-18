@@ -133,7 +133,7 @@ pub async fn get_enrichment_data_from_db(
         match serde_json::from_slice(&record.data) {
             Ok(data) => match data {
                 json::Value::Array(arr) => {
-                    vec.extend(arr.iter().map(|v| v.clone()));
+                    vec.extend(arr.iter().cloned());
                 }
                 _ => {
                     log::error!("Invalid enrichment data: {data}");

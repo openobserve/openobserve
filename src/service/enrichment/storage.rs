@@ -73,14 +73,14 @@ pub mod s3 {
         org_id: &str,
         table_name: &str,
         file_meta: FileMeta,
-        data: &Vec<u8>,
+        data: &[u8],
         created_at: i64,
     ) -> Result<()> {
         // Create S3 key with enrichment table prefix
         let s3_key = create_s3_key(org_id, table_name, created_at);
 
         // Use existing storage::put function for S3 upload
-        infra::storage::put(&s3_key, Bytes::from(data.clone()))
+        infra::storage::put(&s3_key, Bytes::from(data.to_owned()))
             .await
             .map_err(|e| anyhow!("Failed to upload enrichment table to S3: {}", e))?;
 
@@ -106,7 +106,7 @@ pub mod s3 {
                         .await
                         .map_err(|e| anyhow!("Failed to get data bytes: {}", e))?;
                     let (_schema, batches) = read_recordbatch_from_bytes(&data_bytes).await?;
-                    let batches: Vec<_> = batches.iter().map(|batch| batch).collect();
+                    let batches: Vec<_> = batches.iter().collect();
                     let table_data = record_batches_to_json_rows(&batches)?;
                     let table_data = table_data
                         .iter()
@@ -487,7 +487,7 @@ pub mod local {
     pub async fn store_data_if_needed(
         org_id: &str,
         table_name: &str,
-        data: &Vec<Value>,
+        data: &[Value],
         updated_at: i64,
     ) -> Result<()> {
         let key = get_key(org_id, table_name);
@@ -503,13 +503,12 @@ pub mod local {
     pub async fn store_data_if_needed_background(
         org_id: &str,
         table_name: &str,
-        data: &Vec<Value>,
+        data: &[Value],
         updated_at: i64,
     ) -> Result<()> {
         let org_id = org_id.to_string();
         let table_name = table_name.to_string();
-        let data = data.clone();
-        let updated_at = updated_at;
+        let data = data.to_owned();
         tokio::task::spawn(async move {
             store_data_if_needed(&org_id, &table_name, &data, updated_at).await
         });
