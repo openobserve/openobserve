@@ -252,7 +252,7 @@ pub async fn save_enrichment_data(
                     format!("Error writing enrichment table to database: {e}"),
                 ))
                 .json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                     format!("Error writing enrichment table to database"),
                 )));
         }

@@ -80,12 +80,11 @@ pub mod s3 {
         let s3_key = create_s3_key(org_id, table_name, created_at);
 
         // Use existing storage::put function for S3 upload
-        let account = infra::storage::get_account(&s3_key).unwrap_or_default();
-        infra::storage::put(&account, &s3_key, Bytes::from(data.clone()))
+        infra::storage::put(&s3_key, Bytes::from(data.clone()))
             .await
             .map_err(|e| anyhow!("Failed to upload enrichment table to S3: {}", e))?;
 
-        crate::service::db::file_list::set(&account, &s3_key, Some(file_meta), false).await?;
+        crate::service::db::file_list::set(&s3_key, Some(file_meta), false).await?;
 
         log::debug!("Uploaded enrichment table {} to S3", table_name);
         Ok(())
@@ -96,20 +95,16 @@ pub mod s3 {
         // Create S3 key with enrichment table prefix
         let s3_key = get_s3_key_prefix(org_id, table_name);
 
-        let accounts = infra::storage::list_accounts();
-        let mut account_file_pairs = Vec::new();
-        for account in accounts {
-            let s3_key = format!("{}/{}", account, s3_key);
-            let files = infra::storage::list(&account, &s3_key).await?;
-            for file in files {
-                account_file_pairs.push((account.clone(), file));
-            }
-        }
+        let files = infra::storage::list(&s3_key).await?;
 
         let mut records = Vec::new();
-        for (account, file) in account_file_pairs {
-            match infra::storage::get_bytes(&account, &file).await {
+        for file in files {
+            match infra::storage::get(&file).await {
                 Ok(data_bytes) => {
+                    let data_bytes = data_bytes
+                        .bytes()
+                        .await
+                        .map_err(|e| anyhow!("Failed to get data bytes: {}", e))?;
                     let (_schema, batches) = read_recordbatch_from_bytes(&data_bytes).await?;
                     let batches: Vec<_> = batches.iter().map(|batch| batch).collect();
                     let table_data = record_batches_to_json_rows(&batches)?;
@@ -217,29 +212,22 @@ pub mod s3 {
         // Create S3 key with enrichment table prefix
         let s3_key = get_s3_key_prefix(org_id, table_name);
 
-        let accounts = infra::storage::list_accounts();
-        let mut account_file_pairs = Vec::new();
-        let mut all_files = Vec::new();
-        for account in &accounts {
-            let s3_key = format!("{}/{}", account, s3_key);
-            let files = infra::storage::list(account, &s3_key)
-                .await
-                .map_err(|e| anyhow!("Failed to list S3 keys for deletion: {}", e))?;
-            all_files.push((account.clone(), files));
-        }
+        let files = infra::storage::list(&s3_key)
+            .await
+            .map_err(|e| anyhow!("Failed to list S3 keys for deletion: {}", e))?;
+        let files: Vec<_> = files.iter().map(|file| file.as_str()).collect();
 
-        for (account, files) in &all_files {
-            for file in files {
-                account_file_pairs.push((account.as_str(), file.as_str()));
-            }
+        if files.is_empty() {
+            return Ok(());
         }
 
         log::debug!(
-            "Attempting to delete enrichment table {} from S3",
+            "Attempting to delete {} files for enrichment table {} from S3",
+            files.len(),
             table_name
         );
 
-        infra::storage::del(account_file_pairs)
+        infra::storage::del(&files)
             .await
             .map_err(|e| anyhow!("Failed to delete enrichment table from S3: {}", e))?;
 
