@@ -405,7 +405,9 @@ pub async fn cache_files(
     // check how many files already cached
     let mut cached_files = HashSet::with_capacity(files.len());
     let (mut cache_hits, mut cache_misses) = (0, 0);
+    let start = std::time::Instant::now();
     for (file, _, max_ts) in files.iter() {
+        let start = std::time::Instant::now();
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
             cached_files.insert(file);
@@ -417,6 +419,12 @@ pub async fn cache_files(
         } else {
             cache_misses += 1;
         };
+        let check_cache_took = start.elapsed().as_millis() as usize;
+        if check_cache_took > 1000 {
+            log::info!(
+                "[trace_id {trace_id}] search->storage: check file {file} took: {check_cache_took} ms",
+            );
+        }
 
         // Record file access metrics
         let stream_type = if file_type == "index" {
@@ -444,6 +452,11 @@ pub async fn cache_files(
                 .observe(file_age_hours);
         }
     }
+
+    let cache_took = start.elapsed().as_millis() as usize;
+    log::info!(
+        "[trace_id {trace_id}] search->storage: check all {file_type} files cache took: {cache_took} ms, cache_hits: {cache_hits}, cache_misses: {cache_misses}",
+    );
 
     let files_num = files.len() as i64;
     if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
@@ -483,6 +496,7 @@ pub async fn cache_files(
     let file_type = file_type.to_string();
     tokio::spawn(async move {
         let files_num = files.len();
+        let start = std::time::Instant::now();
         for (file, size, ts) in files {
             if let Err(e) =
                 crate::job::queue_background_download(&trace_id, &file, size, ts, cache_type).await
@@ -492,12 +506,9 @@ pub async fn cache_files(
                 );
             }
         }
+        let download_took = start.elapsed().as_millis() as usize;
         log::info!(
-            "[trace_id {}] search->storage: successfully enqueued {} files of {} for background download into {:?}",
-            trace_id,
-            files_num,
-            file_type,
-            cache_type,
+            "[trace_id {trace_id}] search->storage: successfully enqueued {files_num} files of {file_type} for background download into {cache_type:?} took: {download_took} ms",
         );
     });
 
