@@ -37,7 +37,7 @@ pub mod remote {
         },
     };
 
-    pub const ENRICHMENT_TABLE_remote_KEY: &str = "/enrichment_table_remote/";
+    pub const ENRICHMENT_TABLE_REMOTE_KEY: &str = "/enrichment_table_remote/";
 
     use infra::db as infra_db;
 
@@ -97,7 +97,7 @@ pub mod remote {
             remote_last_updated: now_micros(),
         };
         let db = infra_db::get_db().await;
-        let db_key = format!("{ENRICHMENT_TABLE_remote_KEY}{org_id}/{table_name}");
+        let db_key = format!("{ENRICHMENT_TABLE_REMOTE_KEY}{org_id}/{table_name}");
         db.put(
             &db_key,
             serde_json::to_string(&meta).unwrap().into(),
@@ -307,7 +307,7 @@ pub mod remote {
 
     pub async fn get_last_updated_at(org_id: &str, table_name: &str) -> Result<i64> {
         let db = infra_db::get_db().await;
-        let db_key = format!("{ENRICHMENT_TABLE_remote_KEY}{org_id}/{table_name}");
+        let db_key = format!("{ENRICHMENT_TABLE_REMOTE_KEY}{org_id}/{table_name}");
         let metadata: remoteEnrichmentTableMeta = {
             let metadata = db.get(&db_key).await.unwrap_or_default();
             let metadata = String::from_utf8_lossy(&metadata);
