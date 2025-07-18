@@ -901,10 +901,8 @@ pub async fn build_search_request_per_field(
             sql_where.clone()
         };
         let sql = if no_count {
-            // we use min(0) as a hack to do streaming aggregation but actually return 0,
-            // essentially we are not counting the values
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_key asc limit {size}"
+                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_key asc limit {size}"
             )
         } else {
             format!(
