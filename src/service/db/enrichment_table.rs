@@ -34,8 +34,10 @@ use crate::{
 pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
 pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
 
-
-pub async fn get_enrichment_table_data(org_id: &str, name: &str) -> Result<Vec<serde_json::Value>, anyhow::Error> {
+pub async fn get_enrichment_table_data(
+    org_id: &str,
+    name: &str,
+) -> Result<Vec<serde_json::Value>, anyhow::Error> {
     let start_time = get_start_time(org_id, name).await;
     let end_time = now_micros();
 

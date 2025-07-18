@@ -206,7 +206,9 @@ pub async fn get_enrichment_table_json(
 
     if db_stats.end_time > local_stats_last_updated {
         //
-        let data = crate::service::db::enrichment_table::get_enrichment_table_data(org_id, table_name).await?;
+        let data =
+            crate::service::db::enrichment_table::get_enrichment_table_data(org_id, table_name)
+                .await?;
         records.extend(data);
     } else {
         // fetch from local cache and put into records

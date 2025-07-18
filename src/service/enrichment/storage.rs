@@ -23,7 +23,7 @@ use config::utils::{
 };
 use serde::{Deserialize, Serialize};
 
-pub mod s3 {
+pub mod remote {
     use std::sync::Arc;
 
     use chrono::{Datelike, Timelike};
@@ -37,18 +37,18 @@ pub mod s3 {
         },
     };
 
-    pub const ENRICHMENT_TABLE_S3_KEY: &str = "/enrichment_table_s3/";
+    pub const ENRICHMENT_TABLE_remote_KEY: &str = "/enrichment_table_remote/";
 
     use infra::db as infra_db;
 
     use super::*;
 
     #[derive(Debug, Default, Serialize, Deserialize)]
-    pub struct S3EnrichmentTableMeta {
-        pub s3_last_updated: i64,
+    pub struct remoteEnrichmentTableMeta {
+        pub remote_last_updated: i64,
     }
 
-    fn get_s3_key_prefix(org_id: &str, table_name: &str) -> String {
+    fn get_remote_key_prefix(org_id: &str, table_name: &str) -> String {
         format!(
             "files/{}/{}/{}",
             org_id,
@@ -57,8 +57,8 @@ pub mod s3 {
         )
     }
 
-    /// Create S3 key with enrichment table prefix
-    fn create_s3_key(org_id: &str, table_name: &str, created_at: i64) -> String {
+    /// Create remote key with enrichment table prefix
+    fn create_remote_key(org_id: &str, table_name: &str, created_at: i64) -> String {
         let ts = chrono::DateTime::from_timestamp_micros(created_at).unwrap();
         let file_name = format!(
             "{:04}/{:02}/{:02}/{:02}/{}.parquet",
@@ -68,32 +68,36 @@ pub mod s3 {
             ts.hour(),
             config::ider::generate()
         );
-        format!("{}/{}", get_s3_key_prefix(org_id, table_name), file_name)
+        format!(
+            "{}/{}",
+            get_remote_key_prefix(org_id, table_name),
+            file_name
+        )
     }
 
-    /// Upload data to S3 using existing infra::storage::put function
-    pub async fn upload_to_s3(
+    /// Upload data to remote using existing infra::storage::put function
+    pub async fn upload_to_remote(
         org_id: &str,
         table_name: &str,
         file_meta: FileMeta,
         data: &[u8],
         created_at: i64,
     ) -> Result<()> {
-        // Create S3 key with enrichment table prefix
-        let s3_key = create_s3_key(org_id, table_name, created_at);
+        // Create remote key with enrichment table prefix
+        let remote_key = create_remote_key(org_id, table_name, created_at);
 
-        // Use existing storage::put function for S3 upload
-        infra::storage::put(&s3_key, Bytes::from(data.to_owned()))
+        // Use existing storage::put function for remote upload
+        infra::storage::put(&remote_key, Bytes::from(data.to_owned()))
             .await
-            .map_err(|e| anyhow!("Failed to upload enrichment table to S3: {}", e))?;
+            .map_err(|e| anyhow!("Failed to upload enrichment table to remote: {}", e))?;
 
-        crate::service::db::file_list::set(&s3_key, Some(file_meta), false).await?;
+        crate::service::db::file_list::set(&remote_key, Some(file_meta), false).await?;
 
-        let meta = S3EnrichmentTableMeta {
-            s3_last_updated: now_micros(),
+        let meta = remoteEnrichmentTableMeta {
+            remote_last_updated: now_micros(),
         };
         let db = infra_db::get_db().await;
-        let db_key = format!("{ENRICHMENT_TABLE_S3_KEY}{org_id}/{table_name}");
+        let db_key = format!("{ENRICHMENT_TABLE_remote_KEY}{org_id}/{table_name}");
         db.put(
             &db_key,
             serde_json::to_string(&meta).unwrap().into(),
@@ -102,16 +106,16 @@ pub mod s3 {
         )
         .await?;
 
-        log::debug!("Uploaded enrichment table {} to S3", table_name);
+        log::debug!("Uploaded enrichment table {} to remote", table_name);
         Ok(())
     }
 
-    /// Fetch data from S3 using existing infra::storage::get_bytes function
+    /// Fetch data from remote using existing infra::storage::get_bytes function
     pub async fn retrieve(org_id: &str, table_name: &str) -> Result<Vec<Value>> {
-        // Create S3 key with enrichment table prefix
-        let s3_key = get_s3_key_prefix(org_id, table_name);
+        // Create remote key with enrichment table prefix
+        let remote_key = get_remote_key_prefix(org_id, table_name);
 
-        let files = infra::storage::list(&s3_key).await?;
+        let files = infra::storage::list(&remote_key).await?;
 
         let mut records = Vec::new();
         for file in files {
@@ -128,19 +132,19 @@ pub mod s3 {
                         .iter()
                         .map(|row| Value::Object(row.clone()))
                         .collect::<Vec<_>>();
-                    log::debug!("Fetched enrichment table {} from S3", s3_key);
+                    log::debug!("Fetched enrichment table {} from remote", remote_key);
                     records.extend(table_data);
                 }
                 Err(e) => {
-                    log::warn!("Enrichment table {} not found in S3: {}", s3_key, e);
+                    log::warn!("Enrichment table {} not found in remote: {}", remote_key, e);
                 }
             }
         }
         Ok(records)
     }
 
-    /// Merge and upload data to S3
-    pub async fn merge_and_upload_to_s3(org_id: &str, table_name: &str) -> Result<()> {
+    /// Merge and upload data to remote
+    pub async fn merge_and_upload_to_remote(org_id: &str, table_name: &str) -> Result<()> {
         // Get schema from cache
         let schema = infra::schema::get_cache(org_id, table_name, StreamType::EnrichmentTables)
             .await
@@ -180,9 +184,12 @@ pub mod s3 {
 
         file_meta.compressed_size = data.len() as i64;
 
-        upload_to_s3(org_id, table_name, file_meta, &data, min_ts).await?;
+        upload_to_remote(org_id, table_name, file_meta, &data, min_ts).await?;
 
-        log::debug!("Merged and uploaded enrichment table {} to S3", table_name);
+        log::debug!(
+            "Merged and uploaded enrichment table {} to remote",
+            table_name
+        );
 
         // Delete the data from the db
         database::delete(org_id, table_name).await?;
@@ -227,17 +234,17 @@ pub mod s3 {
         )
         .await?;
         file_meta.compressed_size = data.len() as i64;
-        upload_to_s3(org_id, table_name, file_meta, &data, created_at).await?;
+        upload_to_remote(org_id, table_name, file_meta, &data, created_at).await?;
         Ok(())
     }
 
     pub async fn delete(org_id: &str, table_name: &str) -> Result<()> {
-        // Create S3 key with enrichment table prefix
-        let s3_key = get_s3_key_prefix(org_id, table_name);
+        // Create remote key with enrichment table prefix
+        let remote_key = get_remote_key_prefix(org_id, table_name);
 
-        let files = infra::storage::list(&s3_key)
+        let files = infra::storage::list(&remote_key)
             .await
-            .map_err(|e| anyhow!("Failed to list S3 keys for deletion: {}", e))?;
+            .map_err(|e| anyhow!("Failed to list remote keys for deletion: {}", e))?;
         let files: Vec<_> = files.iter().map(|file| file.as_str()).collect();
 
         if files.is_empty() {
@@ -245,16 +252,16 @@ pub mod s3 {
         }
 
         log::debug!(
-            "Attempting to delete {} files for enrichment table {} from S3",
+            "Attempting to delete {} files for enrichment table {} from remote",
             files.len(),
             table_name
         );
 
         infra::storage::del(&files)
             .await
-            .map_err(|e| anyhow!("Failed to delete enrichment table from S3: {}", e))?;
+            .map_err(|e| anyhow!("Failed to delete enrichment table from remote: {}", e))?;
 
-        log::debug!("Deleted enrichment table {} from S3", table_name);
+        log::debug!("Deleted enrichment table {} from remote", table_name);
         Ok(())
     }
 
@@ -279,9 +286,12 @@ pub mod s3 {
                 org_table_pairs
             );
             for (org_id, table_name) in org_table_pairs {
-                match merge_and_upload_to_s3(&org_id, &table_name).await {
+                match merge_and_upload_to_remote(&org_id, &table_name).await {
                     Ok(_) => {
-                        log::debug!("Merged and uploaded enrichment table {} to S3", table_name);
+                        log::debug!(
+                            "Merged and uploaded enrichment table {} to remote",
+                            table_name
+                        );
                     }
                     Err(e) => {
                         log::error!(
@@ -297,14 +307,14 @@ pub mod s3 {
 
     pub async fn get_last_updated_at(org_id: &str, table_name: &str) -> Result<i64> {
         let db = infra_db::get_db().await;
-        let db_key = format!("{ENRICHMENT_TABLE_S3_KEY}{org_id}/{table_name}");
-        let metadata: S3EnrichmentTableMeta = {
+        let db_key = format!("{ENRICHMENT_TABLE_remote_KEY}{org_id}/{table_name}");
+        let metadata: remoteEnrichmentTableMeta = {
             let metadata = db.get(&db_key).await.unwrap_or_default();
             let metadata = String::from_utf8_lossy(&metadata);
             serde_json::from_str(&metadata).unwrap_or_default()
         };
 
-        Ok(metadata.s3_last_updated)
+        Ok(metadata.remote_last_updated)
     }
 }
 

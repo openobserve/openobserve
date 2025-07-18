@@ -232,7 +232,7 @@ pub async fn save_enrichment_data(
     // );
 
     // If data size is less than the merge threshold, we can store it in the database
-    let merge_threshold_mb = crate::service::enrichment::storage::s3::get_merge_threshold_mb()
+    let merge_threshold_mb = crate::service::enrichment::storage::remote::get_merge_threshold_mb()
         .await
         .unwrap_or(100) as f64;
     if (records_size as f64) < merge_threshold_mb * SIZE_IN_MB {
@@ -257,9 +257,13 @@ pub async fn save_enrichment_data(
         }
     } else {
         // If data size is greater than the merge threshold, we can store it directly to s3
-        if let Err(e) =
-            crate::service::enrichment::storage::s3::store(org_id, stream_name, &records, timestamp)
-                .await
+        if let Err(e) = crate::service::enrichment::storage::remote::store(
+            org_id,
+            stream_name,
+            &records,
+            timestamp,
+        )
+        .await
         {
             log::error!("Error writing enrichment table to S3: {e}");
         }
@@ -351,7 +355,7 @@ pub async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_typ
         log::error!("Error deleting stream schema: {}", e);
     }
 
-    if let Err(e) = crate::service::enrichment::storage::s3::delete(org_id, stream_name).await {
+    if let Err(e) = crate::service::enrichment::storage::remote::delete(org_id, stream_name).await {
         log::error!("Error deleting enrichment table from S3: {e}");
     }
     if let Err(e) = crate::service::enrichment::storage::local::delete(org_id, stream_name).await {
@@ -474,7 +478,7 @@ pub async fn cleanup_enrichment_table_resources(
 ) {
     log::info!("cleaning up enrichment table  resources {stream_name}");
 
-    if let Err(e) = crate::service::enrichment::storage::s3::delete(org_id, stream_name).await {
+    if let Err(e) = crate::service::enrichment::storage::remote::delete(org_id, stream_name).await {
         log::error!("Error deleting enrichment table from S3: {e}");
     }
     if let Err(e) = crate::service::enrichment::storage::local::delete(org_id, stream_name).await {
