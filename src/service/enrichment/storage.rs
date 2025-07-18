@@ -252,11 +252,11 @@ pub mod s3 {
         log::info!("[ENRICHMENT::STORAGE] Running enrichment table merge job");
         let cfg = config::get_config();
         // let merge_threshold_mb = cfg.enrichment_table.merge_threshold_mb;
-        let merge_interval_seconds = cfg.enrichment_table.merge_interval_seconds;
+        let merge_interval = cfg.enrichment_table.merge_interval;
         let db = infra_db::get_db().await;
 
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(merge_interval_seconds)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(merge_interval)).await;
             let org_table_pairs = database::list().await?;
             log::info!(
                 "[ENRICHMENT::STORAGE] Found {} enrichment tables, {:?}",

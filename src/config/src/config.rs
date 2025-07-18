@@ -1907,11 +1907,11 @@ pub struct EnrichmentTable {
     )]
     pub merge_threshold_mb: u64,
     #[env_config(
-        name = "ZO_ENRICHMENT_TABLE_MERGE_INTERVAL_SECONDS",
-        default = 300,
+        name = "ZO_ENRICHMENT_TABLE_MERGE_INTERVAL",
+        default = 600,
         help = "Background sync interval in seconds"
     )]
-    pub merge_interval_seconds: u64,
+    pub merge_interval: u64,
 }
 
 pub fn init() -> Config {
