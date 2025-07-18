@@ -1570,6 +1570,7 @@ export default defineComponent({
           query: queryReq,
           page_type: searchObj.data.stream.streamType,
           traceparent: generateTraceContext().traceId,
+          searchType: "ui",
         });
 
         return res;
