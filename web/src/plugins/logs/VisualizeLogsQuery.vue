@@ -36,13 +36,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator vertical />
       <!-- for query related chart only -->
       <div
-        v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
-        class="col"
+        v-if="
+          !['html', 'markdown', '6custom_chart'].includes(
+            dashboardPanelData.data.type,
+          )
+        "
+        class="col flex column"
         style="width: 100%; height: 100%"
       >
+        <!-- collapse field list bar -->
+        <div
+          v-if="!dashboardPanelData.layout.showFieldList"
+          class="field-list-sidebar-header-collapsed"
+          @click="collapseFieldList"
+          style="width: 50px; height: 100%"
+        >
+          <q-icon
+            name="expand_all"
+            class="field-list-collapsed-icon rotate-90"
+            data-test="dashboard-field-list-collapsed-icon"
+          />
+          <div class="field-list-collapsed-title">{{ t("panel.fields") }}</div>
+        </div>
         <q-splitter
           v-model="dashboardPanelData.layout.splitter"
           @update:model-value="layoutSplitterUpdated"
+          :limits="[0, 100]"
           style="width: 100%; height: 100%"
         >
           <template #before>
@@ -52,131 +71,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-weight-bold">{{ t("panel.fields") }}</span>
                 </div>
                 <div class="col" style="width: 100%; height: 100%">
-                  <FieldList :editMode="true" />
+                  <FieldList :editMode="true" :hideAllFieldsSelection="true" />
                 </div>
               </div>
             </div>
           </template>
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
-            <q-avatar
+            <q-btn
               color="primary"
-              text-color="white"
-              size="20px"
-              icon="drag_indicator"
-              style="top: 10px; left: 3.5px"
+              size="sm"
+              :icon="
+                dashboardPanelData.layout.showFieldList
+                  ? 'chevron_left'
+                  : 'chevron_right'
+              "
+              dense
+              round
+              style="top: 14px; z-index: 100"
+              @click.stop="collapseFieldList"
             />
           </template>
           <template #after>
-            <div class="row" style="height: 100%">
+            <div
+              class="row"
+              :style="{
+                height: '100%',
+                width: dashboardPanelData.layout.showFieldList
+                  ? '100%'
+                  : 'calc(100% - 50px)',
+              }"
+            >
               <div class="col" style="height: 100%">
-                <q-splitter
-                  class="query-editor-splitter"
-                  v-model="dashboardPanelData.layout.querySplitter"
-                  horizontal
-                  @update:model-value="querySplitterUpdated"
-                  reverse
-                  unit="px"
-                  :limits="
-                    !dashboardPanelData.layout.showQueryBar
-                      ? [0, 400]
-                      : [140, 400]
-                  "
-                  :disable="!dashboardPanelData.layout.showQueryBar"
-                  style="height: 100%"
-                >
-                  <template #before>
+                <div class="layout-panel-container col" style="height: 100%">
+                  <!-- <DashboardQueryBuilder :dashboardData="{}" /> -->
+                  <q-separator />
+
+                  <div
+                    v-if="isOutDated"
+                    :style="{
+                      borderColor: '#c3920d',
+                      borderWidth: '1px',
+                      borderStyle: 'solid',
+                      backgroundColor:
+                        store.state.theme == 'dark' ? '#2a1f03' : '#faf2da',
+                      padding: '1%',
+                      margin: '1%',
+                      borderRadius: '5px',
+                    }"
+                  >
+                    <div style="font-weight: 700">
+                      Your chart is not up to date
+                    </div>
+                    <div>
+                      Chart configuration has been updated, but the chart was
+                      not updated automatically. Click on the "Run Query" button
+                      to run the query again
+                    </div>
+                  </div>
+
+                  <div
+                    class="col"
+                    style="position: relative; height: 100%; width: 100%"
+                  >
                     <div
-                      class="layout-panel-container col"
-                      style="height: 100%"
+                      style="
+                        flex: 1;
+                        min-height: calc(100% - 24px);
+                        height: calc(100% - 24px);
+                        width: 100%;
+                        margin-top: 24px;
+                      "
                     >
-                      <DashboardQueryBuilder :dashboardData="{}" />
-                      <q-separator />
-
-                      <div
-                        v-if="isOutDated"
-                        :style="{
-                          borderColor: '#c3920d',
-                          borderWidth: '1px',
-                          borderStyle: 'solid',
-                          backgroundColor:
-                            store.state.theme == 'dark' ? '#2a1f03' : '#faf2da',
-                          padding: '1%',
-                          margin: '1%',
-                          borderRadius: '5px',
-                        }"
-                      >
-                        <div style="font-weight: 700">
-                          Your chart is not up to date
-                        </div>
-                        <div>
-                          Chart configuration has been updated, but the chart
-                          was not updated automatically. Click on the "Run
-                          Query" button to run the query again
-                        </div>
-                      </div>
-
-                      <div
-                        class="col"
-                        style="position: relative; height: 100%; width: 100%"
-                      >
-                        <div
-                          style="
-                            flex: 1;
-                            min-height: calc(100% - 24px);
-                            height: calc(100% - 24px);
-                            width: 100%;
-                            margin-top: 24px;
-                          "
-                        >
-                          <PanelSchemaRenderer
-                            @metadata-update="metaDataValue"
-                            :key="dashboardPanelData.data.type"
-                            :panelSchema="chartData"
-                            :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                            :variablesData="{}"
-                            @updated:vrl-function-field-list="
-                              updateVrlFunctionFieldList
-                            "
-                            :width="6"
-                            @error="handleChartApiError"
-                          />
-                        </div>
-                        <div
-                          class="flex justify-end q-pr-lg q-mb-md q-pt-xs"
-                          style="position: absolute; top: 0px; right: -13px"
-                        >
-                          <q-btn
-                            size="md"
-                            class="no-border"
-                            no-caps
-                            dense
-                            style="padding: 2px 4px; z-index: 1"
-                            color="primary"
-                            @click="addToDashboard"
-                            title="Add To Dashboard"
-                            >Add To Dashboard</q-btn
-                          >
-                        </div>
-                      </div>
-                      <DashboardErrorsComponent
-                        :errors="errorData"
-                        class="col-auto"
-                        style="flex-shrink: 0"
+                      <PanelSchemaRenderer
+                        @metadata-update="metaDataValue"
+                        :key="dashboardPanelData.data.type"
+                        :panelSchema="chartData"
+                        :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                        :variablesData="{}"
+                        @updated:vrl-function-field-list="
+                          updateVrlFunctionFieldList
+                        "
+                        :width="6"
+                        @error="handleChartApiError"
+                        :searchResponse="searchResponse"
                       />
                     </div>
-                  </template>
-                  <template #separator>
                     <div
-                      class="splitter"
-                      :class="
-                        dashboardPanelData.layout.showQueryBar
-                          ? 'splitter-enabled'
-                          : ''
-                      "
-                    ></div>
-                  </template>
-                </q-splitter>
+                      class="flex justify-end q-pr-lg q-mb-md q-pt-xs"
+                      style="position: absolute; top: 0px; right: -13px"
+                    >
+                      <q-btn
+                        size="md"
+                        class="no-border"
+                        no-caps
+                        dense
+                        style="padding: 2px 4px; z-index: 1"
+                        color="primary"
+                        @click="addToDashboard"
+                        title="Add To Dashboard"
+                        >Add To Dashboard</q-btn
+                      >
+                    </div>
+                  </div>
+                  <DashboardErrorsComponent
+                    :errors="errorData"
+                    class="col-auto"
+                    style="flex-shrink: 0"
+                  />
+                </div>
               </div>
               <q-separator vertical />
               <div class="col-auto">
@@ -215,22 +218,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
       </div>
-      
+
       <div
         v-if="dashboardPanelData.data.type == 'custom_chart'"
         class="col column"
-        style="height: 100% "
+        style="height: 100%"
       >
+        <!-- collapse field list bar -->
+        <div
+          v-if="!dashboardPanelData.layout.showFieldList"
+          class="field-list-sidebar-header-collapsed"
+          @click="collapseFieldList"
+          style="width: 50px; height: 100%"
+        >
+          <q-icon
+            name="expand_all"
+            class="field-list-collapsed-icon rotate-90"
+            data-test="dashboard-field-list-collapsed-icon"
+          />
+          <div class="field-list-collapsed-title">{{ t("panel.fields") }}</div>
+        </div>
         <q-splitter
           v-model="dashboardPanelData.layout.splitter"
           @update:model-value="layoutSplitterUpdated"
+          :limits="[0, 100]"
           style="width: 100%; height: 100%"
         >
           <template #before>
-            <div
-              class="col scroll"
-              style="height: 100%; overflow-y: auto"
-            >
+            <div class="col scroll" style="height: 100%; overflow-y: auto">
               <div
                 v-if="dashboardPanelData.layout.showFieldList"
                 class="column"
@@ -269,21 +284,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #after>
-            <div
-              class="row"
-              style="height:100% ; overflow-y: auto"
-            >
+            <div class="row" style="height: 100%; overflow-y: auto">
               <div class="col" style="height: 100%">
-                    <div
-                      class="layout-panel-container col"
-                      style="height: 100%"
-                    >
-                    <q-splitter
-                      class="query-editor-splitter"
-                      v-model="splitterModel"    
-                      style="height: 100%"
-                      @update:model-value="layoutSplitterUpdated"
-                    >
+                <div class="layout-panel-container col" style="height: 100%">
+                  <q-splitter
+                    class="query-editor-splitter"
+                    v-model="splitterModel"
+                    style="height: 100%"
+                    @update:model-value="layoutSplitterUpdated"
+                  >
                     <template #before>
                       <CustomChartEditor
                         v-model="dashboardPanelData.data.customChartContent"
@@ -302,28 +311,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </template>
                     <template #after>
-                        <PanelSchemaRenderer
-                            @metadata-update="metaDataValue"
-                            :key="dashboardPanelData.data.type"
-                            :panelSchema="chartData"
-                            :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                            :variablesData="{}"
-                            @updated:vrl-function-field-list="
-                              updateVrlFunctionFieldList
-                            "
-                            :width="6"
-                            @error="handleChartApiError"
-                          />
-
-                    </template>
-                     </q-splitter> 
-                      <DashboardErrorsComponent
-                        :errors="errorData"
-                        class="col-auto"
-                        style="flex-shrink: 0"
+                      <PanelSchemaRenderer
+                        @metadata-update="metaDataValue"
+                        :key="dashboardPanelData.data.type"
+                        :panelSchema="chartData"
+                        :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                        :variablesData="{}"
+                        @updated:vrl-function-field-list="
+                          updateVrlFunctionFieldList
+                        "
+                        :width="6"
+                        @error="handleChartApiError"
+                        :searchResponse="searchResponse"
                       />
-                    </div>
-
+                    </template>
+                  </q-splitter>
+                  <DashboardErrorsComponent
+                    :errors="errorData"
+                    class="col-auto"
+                    style="flex-shrink: 0"
+                  />
+                </div>
               </div>
               <q-separator vertical />
               <div class="col-auto">
@@ -401,6 +409,10 @@ export default defineComponent({
       type: Object,
       required: true,
     },
+    searchResponse: {
+      type: Object,
+      required: false,
+    },
   },
   components: {
     ChartSelection,
@@ -419,7 +431,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "logs"
+      "logs",
     );
     const { t } = useI18n();
     const store = useStore();
@@ -443,7 +455,7 @@ export default defineComponent({
       async () => {
         // await nextTick();
         chartData.value = JSON.parse(JSON.stringify(visualizeChartData.value));
-      }
+      },
     );
 
     const isOutDated = computed(() => {
@@ -460,7 +472,7 @@ export default defineComponent({
       () => dashboardPanelData.layout.isConfigPanelOpen,
       () => {
         window.dispatchEvent(new Event("resize"));
-      }
+      },
     );
 
     // resize the chart when query editor is opened and closed
@@ -475,24 +487,18 @@ export default defineComponent({
               expandedSplitterHeight.value;
           }
         }
-      }
+      },
     );
 
     const layoutSplitterUpdated = () => {
-      if (!dashboardPanelData.layout.showFieldList) {
-        dashboardPanelData.layout.splitter = 0;
-      }
+      dashboardPanelData.layout.showFieldList =
+        dashboardPanelData.layout.splitter > 0;
+      // emit resize event
+      // this will rerender/call resize method of already rendered chart to resize
       window.dispatchEvent(new Event("resize"));
     };
 
     const expandedSplitterHeight = ref(null);
-
-    const querySplitterUpdated = (newHeight: any) => {
-      window.dispatchEvent(new Event("resize"));
-      if (dashboardPanelData.layout.showQueryBar) {
-        expandedSplitterHeight.value = newHeight;
-      }
-    };
 
     const handleChartApiError = (errorMessage: any) => {
       emit("handleChartApiError", errorMessage);
@@ -511,7 +517,7 @@ export default defineComponent({
         dataIndex: number,
         seriesIndex: number,
         panelId: any,
-        hoveredTime?: any
+        hoveredTime?: any,
       ) {
         hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
         hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
@@ -527,13 +533,13 @@ export default defineComponent({
     const addToDashboard = () => {
       const errors: any = [];
       // will push errors in errors array
-      validatePanel(errors,true);
+      validatePanel(errors, true);
 
       if (errors.length) {
         // set errors into errorData
         props.errorData.errors = errors;
         showErrorNotification(
-          "There are some errors, please fix them and try again"
+          "There are some errors, please fix them and try again",
         );
         return;
       } else {
@@ -547,6 +553,10 @@ export default defineComponent({
 
     onActivated(() => {
       dashboardPanelData.layout.querySplitter = 20;
+
+      // keep field list closed for visualization
+      dashboardPanelData.layout.showFieldList = false;
+      dashboardPanelData.layout.splitter = 0;
     });
 
     const updateVrlFunctionFieldList = (fieldList: any) => {
@@ -708,19 +718,21 @@ export default defineComponent({
     };
     const collapseFieldList = () => {
       if (dashboardPanelData.layout.showFieldList) {
-        dashboardPanelData.layout.splitter = 0;
         dashboardPanelData.layout.showFieldList = false;
+        dashboardPanelData.layout.splitter = 0;
       } else {
-        dashboardPanelData.layout.splitter = 20;
         dashboardPanelData.layout.showFieldList = true;
+        dashboardPanelData.layout.splitter = 20;
       }
+      // emit resize event
+      // this will rerender/call resize method of already rendered chart to resize
+      window.dispatchEvent(new Event("resize"));
     };
 
     return {
       t,
       layoutSplitterUpdated,
       expandedSplitterHeight,
-      querySplitterUpdated,
       dashboardPanelData,
       handleChartApiError,
       resetAggregationFunction,
@@ -750,10 +762,12 @@ export default defineComponent({
   height: 4px;
   width: 100%;
 }
+
 .splitter-vertical {
   width: 4px;
   height: 100%;
 }
+
 .splitter-enabled {
   background-color: #ffffff00;
   transition: 0.3s;
@@ -766,5 +780,27 @@ export default defineComponent({
 
 :deep(.query-editor-splitter .q-splitter__separator) {
   background-color: transparent !important;
+}
+
+.field-list-sidebar-header-collapsed {
+  cursor: pointer;
+  width: 50px;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.field-list-collapsed-icon {
+  margin-top: 10px;
+  font-size: 20px;
+}
+
+.field-list-collapsed-title {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-weight: bold;
 }
 </style>

@@ -432,6 +432,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(enrichment_table::save_enrichment_table)
         .service(search::search)
         .service(search::search_partition)
+        .service(search::result_schema)
         .service(search::around_v1)
         .service(search::around_v2)
         .service(search_inspector::get_search_profile)
