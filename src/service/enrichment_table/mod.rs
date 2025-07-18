@@ -189,6 +189,22 @@ pub async fn save_enrichment_data(
         records_size += record_size;
     }
 
+    let mut record_vals = vec![];
+    for record in records.iter() {
+        record_vals.push(record.as_object().unwrap());
+    }
+    // check for schema evolution
+
+    let _ = check_for_schema(
+        org_id,
+        stream_name,
+        StreamType::EnrichmentTables,
+        &mut stream_schema_map,
+        record_vals,
+        timestamp,
+    )
+    .await;
+
     if records.is_empty() {
         return Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
             StatusCode::OK.into(),
@@ -281,22 +297,6 @@ pub async fn save_enrichment_data(
     //                 )));
     //         }
     //     };
-
-    let mut record_vals = vec![];
-    for record in records.iter() {
-        record_vals.push(record.as_object().unwrap());
-    }
-    // check for schema evolution
-
-    let _ = check_for_schema(
-        org_id,
-        stream_name,
-        StreamType::EnrichmentTables,
-        &mut stream_schema_map,
-        record_vals,
-        timestamp,
-    )
-    .await;
 
     let mut enrich_meta_stats = db::enrichment_table::get_meta_table_stats(org_id, stream_name)
         .await
