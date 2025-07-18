@@ -1,15 +1,18 @@
 import { test, expect } from '@playwright/test';
-import { PipelinesPage } from '../../pages/pipelinesPages/pipelinesPage.js';
+import PageManager from '../../pages/page-manager.js';
 import logsdata from '../../../test-data/logs_data.json';
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
 
 test.describe('Pipeline Dynamic Stream Names', () => {
+
+
+
   let page;
-  let pipelinePage;
+  let pageManager;
 
   test.beforeAll(async ({ browser }) => {
     page = await browser.newPage();
-    pipelinePage = new PipelinesPage(page);
+    pageManager = new PageManager(page);
 
     // Login - happens only once before all tests
     await page.goto(process.env["ZO_BASE_URL"]);
@@ -54,6 +57,8 @@ test.describe('Pipeline Dynamic Stream Names', () => {
 
   test.afterAll(async () => {
     // Add a wait before closing to ensure all operations are complete
+
+
     await page.waitForTimeout(2000);
     if (!page.isClosed()) {
       await page.close();
@@ -62,46 +67,46 @@ test.describe('Pipeline Dynamic Stream Names', () => {
 
   test('Verify pipeline with dynamic destination name using kubernetes_container_name', async () => {
     // Navigate to stream and pipeline
-    await pipelinePage.exploreStreamAndNavigateToPipeline('e2e_automate1');
+    await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline('e2e_automate1');
     await page.waitForLoadState('networkidle');
     
     // Setup source stream
-    await pipelinePage.setupPipelineWithSourceStream('e2e_automate1');
+    await pageManager.pipelinesPage.setupPipelineWithSourceStream('e2e_automate1');
     await page.waitForLoadState('networkidle');
     
     // Setup container name condition
-    await pipelinePage.setupContainerNameCondition();
+    await pageManager.pipelinesPage.setupContainerNameCondition();
     await page.waitForLoadState('networkidle');
     
     // Setup destination stream
-    await pipelinePage.setupDestinationStream('dynamic_ziox_dynamic');
+    await pageManager.pipelinesPage.setupDestinationStream('dynamic_ziox_dynamic');
     await page.waitForLoadState('networkidle');
     
     // Create and verify pipeline
-    await pipelinePage.createAndVerifyPipeline('dynamic_ziox_dynamic', 'e2e_automate1');
+    await pageManager.pipelinesPage.createAndVerifyPipeline('dynamic_ziox_dynamic', 'e2e_automate1');
   });
 
   test('Verify pipeline with dynamic destination name using kubernetes_container_name with underscores', async () => {
-    await pipelinePage.exploreStreamAndNavigateToPipeline('e2e_automate2');
+    await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline('e2e_automate2');
     await page.waitForLoadState('networkidle');
-    await pipelinePage.setupPipelineWithSourceStream('e2e_automate2');
+    await pageManager.pipelinesPage.setupPipelineWithSourceStream('e2e_automate2');
     await page.waitForLoadState('networkidle');
-    await pipelinePage.setupContainerNameCondition();
+    await pageManager.pipelinesPage.setupContainerNameCondition();
     await page.waitForLoadState('networkidle');
-    await pipelinePage.setupDestinationStream('dynamic_ziox_dynamic');
+    await pageManager.pipelinesPage.setupDestinationStream('dynamic_ziox_dynamic');
     await page.waitForLoadState('networkidle');
-    await pipelinePage.createAndVerifyPipeline('dynamic_ziox_dynamic', 'e2e_automate2');
+    await pageManager.pipelinesPage.createAndVerifyPipeline('dynamic_ziox_dynamic', 'e2e_automate2');
   });
 
   test('Verify pipeline with dynamic destination name using kubernetes_container_name directly', async () => {
-    await pipelinePage.exploreStreamAndNavigateToPipeline('e2e_automate3');
+    await pageManager.pipelinesPage.exploreStreamAndNavigateToPipeline('e2e_automate3');
     await page.waitForLoadState('networkidle');
-    await pipelinePage.setupPipelineWithSourceStream('e2e_automate3');
+    await pageManager.pipelinesPage.setupPipelineWithSourceStream('e2e_automate3');
     await page.waitForLoadState('networkidle');
-    await pipelinePage.setupContainerNameCondition();
+    await pageManager.pipelinesPage.setupContainerNameCondition();
     await page.waitForLoadState('networkidle');
-    await pipelinePage.setupDestinationStream('ziox');
+    await pageManager.pipelinesPage.setupDestinationStream('ziox');
     await page.waitForLoadState('networkidle');
-    await pipelinePage.createAndVerifyPipeline('ziox', 'e2e_automate3');
+    await pageManager.pipelinesPage.createAndVerifyPipeline('ziox', 'e2e_automate3');
   });
 }); 

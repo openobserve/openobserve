@@ -1,26 +1,24 @@
 // Implementation test.spec.js
 import { test, expect } from "../baseFixtures.js";
-import { LoginPage } from '../../pages/generalPages/loginPage.js';
-import { LogsPage } from '../../pages/logsPages/logsPage.js';
-
+import PageManager from '../../pages/page-manager.js';
 
 import { startTimeValue, endTimeValue } from '../../pages/commonActions.js';
 
 test('Relative Seconds on Logs page', async ({ page }) => {
-  // Create page object instances
-  const loginPage = new LoginPage(page);
-  const logsPage = new LogsPage(page);
+  // Create page manager instance
+  const pageManager = new PageManager(page);
+  
   // Step 1: Navigate to the application and login
-  await loginPage.gotoLoginPage();
-  await loginPage.loginAsInternalUser();
-  await loginPage.login();
+  await pageManager.loginPage.gotoLoginPage();
+  await pageManager.loginPage.loginAsInternalUser();
+  await pageManager.loginPage.login();
   // Step 2: Navigate to Logs Page
  // await page.waitForTimeout(4000);  // Wait for login process 
-  await logsPage.navigateToLogs();
+  await pageManager.logsPage.navigateToLogs();
   // Step 3: Set the time to past 30 seconds and verify
-  await logsPage.setTimeToPast30Seconds();
-  await logsPage.verifyTimeSetTo30Seconds();
-  await logsPage.signOut();
+  await pageManager.logsPage.setTimeToPast30Seconds();
+  await pageManager.logsPage.verifyTimeSetTo30Seconds();
+  await pageManager.logsPage.signOut();
 });
 
 
