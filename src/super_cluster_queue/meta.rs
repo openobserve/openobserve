@@ -26,6 +26,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 .await?;
             // hack: notify the nodes to update the meta table stats
             if msg.key.starts_with(ENRICHMENT_TABLE_META_STREAM_STATS_KEY) {
+                log::debug!("enrichment table meta stream stats key: {}", msg.key);
                 let key_parts = msg.key.split('/').collect::<Vec<&str>>();
                 let org_id = key_parts[1];
                 let name = key_parts[2];

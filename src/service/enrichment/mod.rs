@@ -205,7 +205,6 @@ pub async fn get_enrichment_table_json(
         .unwrap_or_default();
 
     if (db_stats.end_time > local_stats_last_updated) || local_stats_last_updated == 0 {
-        //
         let data =
             crate::service::db::enrichment_table::get_enrichment_table_data(org_id, table_name)
                 .await?;
