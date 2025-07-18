@@ -162,8 +162,9 @@ async fn get_data(
     name: String,
     schema: SchemaRef,
 ) -> Result<SendableRecordBatchStream> {
+    let clean_name = name.trim_matches('"');
     let data =
-        match crate::service::db::enrichment_table::get_enrichment_data_from_db(&org_id, &name)
+        match crate::service::db::enrichment_table::get_enrichment_data_from_db(&org_id, &clean_name)
             .await
         {
             Ok((data, _min_ts, _max_ts)) => data.into_iter().map(Arc::new).collect::<Vec<_>>(),
