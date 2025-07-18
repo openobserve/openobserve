@@ -60,7 +60,7 @@ impl MigrationTrait for Migration {
     }
 }
 
-/// Statement to create the reports table.
+/// Statement to create the enrichment tables table.
 fn create_enrichment_tables_statement() -> TableCreateStatement {
     Table::create()
         .table(EnrichmentTables::Table)
@@ -68,7 +68,7 @@ fn create_enrichment_tables_statement() -> TableCreateStatement {
         // The ID is a unique auto-incrementing integer.
         .col(
             ColumnDef::new(EnrichmentTables::Id)
-                .unsigned()
+                .big_integer()
                 .auto_increment()
                 .primary_key(),
         )
@@ -116,40 +116,13 @@ mod tests {
     #[test]
     fn postgres() {
         collapsed_eq!(
-            &create_reports_table_statement().to_string(PostgresQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS "reports" ( 
-                "id" char(27) NOT NULL PRIMARY KEY,
+            &create_enrichment_tables_statement().to_string(PostgresQueryBuilder),
+            r#"CREATE TABLE IF NOT EXISTS "enrichment_tables" ( 
+                "id" bigint NOT NULL PRIMARY KEY,
                 "org" varchar(256) NOT NULL,
-                "folder_id" char(27) NOT NULL,
                 "name" varchar(256) NOT NULL,
-                "title" varchar(256) NOT NULL,
-                "description" text NULL,
-                "enabled" bool NOT NULL,
-                "frequency" json NOT NULL,
-                "destinations" json NOT NULL,
-                "message" text NULL,
-                "timezone" varchar(256) NOT NULL,
-                "tz_offset" integer NOT NULL,
-                "owner" varchar(256) NULL,
-                "last_edited_by" varchar(256) NULL,
-                "created_at" bigint NOT NULL,
-                "updated_at" bigint NULL,
-                "start_at" bigint NOT NULL,
-                CONSTRAINT "reports_folders_fk" FOREIGN KEY ("folder_id") REFERENCES "folders" ("id") 
-            )"#
-        );
-
-        collapsed_eq!(
-            &create_report_dashboards_table_statement().to_string(PostgresQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS "report_dashboards" ( 
-                "report_id" char(27) NOT NULL,
-                "dashboard_id" char(27) NOT NULL,
-                "tab_names" json NOT NULL,
-                "variables" json NOT NULL,
-                "timerange" json NOT NULL,
-                PRIMARY KEY ("report_id", "dashboard_id"),
-                CONSTRAINT "report_dashboards_reports_fk" FOREIGN KEY ("report_id") REFERENCES "reports" ("id") ON DELETE CASCADE,
-                CONSTRAINT "report_dashboards_dashboards_fk" FOREIGN KEY ("dashboard_id") REFERENCES "dashboards" ("id") ON DELETE CASCADE 
+                "data" bytea NOT NULL,
+                "created_at" bigint NOT NULL
             )"#
         );
     }
@@ -157,40 +130,13 @@ mod tests {
     #[test]
     fn mysql() {
         collapsed_eq!(
-            &create_reports_table_statement().to_string(MysqlQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS `reports` ( 
-                `id` char(27) NOT NULL PRIMARY KEY,
+            &create_enrichment_tables_statement().to_string(MysqlQueryBuilder),
+            r#"CREATE TABLE IF NOT EXISTS `enrichment_tables` ( 
+                `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
                 `org` varchar(256) NOT NULL,
-                `folder_id` char(27) NOT NULL,
                 `name` varchar(256) NOT NULL,
-                `title` varchar(256) NOT NULL,
-                `description` text NULL,
-                `enabled` bool NOT NULL,
-                `frequency` json NOT NULL,
-                `destinations` json NOT NULL,
-                `message` text NULL,
-                `timezone` varchar(256) NOT NULL,
-                `tz_offset` int NOT NULL,
-                `owner` varchar(256) NULL,
-                `last_edited_by` varchar(256) NULL,
-                `created_at` bigint NOT NULL,
-                `updated_at` bigint NULL,
-                `start_at` bigint NOT NULL,
-                CONSTRAINT `reports_folders_fk` FOREIGN KEY (`folder_id`) REFERENCES `folders` (`id`)
-            )"#
-        );
-
-        collapsed_eq!(
-            &create_report_dashboards_table_statement().to_string(MysqlQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS `report_dashboards` ( 
-                `report_id` char(27) NOT NULL,
-                `dashboard_id` char(27) NOT NULL,
-                `tab_names` json NOT NULL,
-                `variables` json NOT NULL,
-                `timerange` json NOT NULL,
-                PRIMARY KEY (`report_id`, `dashboard_id`),
-                CONSTRAINT `report_dashboards_reports_fk` FOREIGN KEY (`report_id`) REFERENCES `reports` (`id`) ON DELETE CASCADE,
-                CONSTRAINT `report_dashboards_dashboards_fk` FOREIGN KEY (`dashboard_id`) REFERENCES `dashboards` (`id`) ON DELETE CASCADE 
+                `data` longblob NOT NULL,
+                `created_at` bigint NOT NULL
             )"#
         );
     }
@@ -198,40 +144,13 @@ mod tests {
     #[test]
     fn sqlite() {
         collapsed_eq!(
-            &create_reports_table_statement().to_string(SqliteQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS "reports" ( 
-                "id" char(27) NOT NULL PRIMARY KEY,
+            &create_enrichment_tables_statement().to_string(SqliteQueryBuilder),
+            r#"CREATE TABLE IF NOT EXISTS "enrichment_tables" ( 
+                "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
                 "org" varchar(256) NOT NULL,
-                "folder_id" char(27) NOT NULL,
                 "name" varchar(256) NOT NULL,
-                "title" varchar(256) NOT NULL,
-                "description" text NULL,
-                "enabled" boolean NOT NULL,
-                "frequency" json_text NOT NULL,
-                "destinations" json_text NOT NULL,
-                "message" text NULL,
-                "timezone" varchar(256) NOT NULL,
-                "tz_offset" integer NOT NULL,
-                "owner" varchar(256) NULL,
-                "last_edited_by" varchar(256) NULL,
-                "created_at" bigint NOT NULL,
-                "updated_at" bigint NULL,
-                "start_at" bigint NOT NULL,
-                FOREIGN KEY ("folder_id") REFERENCES "folders" ("id") 
-            )"#
-        );
-
-        collapsed_eq!(
-            &create_report_dashboards_table_statement().to_string(SqliteQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS "report_dashboards" ( 
-                "report_id" char(27) NOT NULL,
-                "dashboard_id" char(27) NOT NULL,
-                "tab_names" json_text NOT NULL,
-                "variables" json_text NOT NULL,
-                "timerange" json_text NOT NULL,
-                PRIMARY KEY ("report_id", "dashboard_id"),
-                FOREIGN KEY ("report_id") REFERENCES "reports" ("id") ON DELETE CASCADE,
-                FOREIGN KEY ("dashboard_id") REFERENCES "dashboards" ("id") ON DELETE CASCADE 
+                "data" blob NOT NULL,
+                "created_at" bigint NOT NULL
             )"#
         );
     }
