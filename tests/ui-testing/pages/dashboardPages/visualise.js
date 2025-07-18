@@ -165,7 +165,7 @@ export default class LogsVisualise {
   async chartRender(x, y) {
     await this.page
       .locator('[data-test="chart-renderer"] canvas')
-      .first()
+      .last()
       .waitFor({ state: "visible" });
     await this.page
       .locator('[data-test="chart-renderer"] canvas')
@@ -181,10 +181,6 @@ export default class LogsVisualise {
   //back to logs
   async backToLogs() {
     await this.page.locator('[data-test="logs-logs-toggle"]').click();
-    await this.page
-      .locator('[data-test="confirm-button"]')
-      .waitFor({ state: "visible" });
-    await this.page.locator('[data-test="confirm-button"]').click();
   }
 
   //open query editor

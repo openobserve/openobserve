@@ -350,7 +350,7 @@ export class LogsPage {
 
     async typeQuery(query) {
         await this.page.locator(this.queryEditor).click();
-        await this.page.locator(this.queryEditor).press('ControlOrMeta+a');
+        await this.page.locator(this.queryEditor).press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await this.page.keyboard.type(query);
     }
 
@@ -779,7 +779,7 @@ export class LogsPage {
 
     async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
         await this.page.getByText(resultsPerPage, { exact: true }).click();
-        await this.page.waitForTimeout(3000); // Increased wait time for UI update
+        await this.page.waitForTimeout(5000); // Increased wait time for UI update
         
         // Use flexible assertions based on the results per page
         let expectedPattern;
