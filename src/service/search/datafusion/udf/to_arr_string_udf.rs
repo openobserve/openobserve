@@ -65,18 +65,17 @@ pub fn to_arr_string_impl(args: &[ColumnarValue]) -> datafusion::error::Result<C
     let array = list_array
         .iter()
         .map(|array| {
-            array
-                .and_then(|string_array| {
-                    as_generic_string_array::<i32>(&string_array)
-                        .ok()
-                        .and_then(|string_array| {
-                            let arr: Vec<String> = string_array
-                                .iter()
-                                .filter_map(|string| string.map(|s| s.to_string()))
-                                .collect();
-                            json::to_string(&arr).ok()
-                        })
-                })
+            array.and_then(|string_array| {
+                as_generic_string_array::<i32>(&string_array)
+                    .ok()
+                    .and_then(|string_array| {
+                        let arr: Vec<String> = string_array
+                            .iter()
+                            .filter_map(|string| string.map(|s| s.to_string()))
+                            .collect();
+                        json::to_string(&arr).ok()
+                    })
+            })
         })
         .collect::<StringArray>();
 
@@ -98,7 +97,7 @@ mod tests {
                     "+---------------+",
                     "| ret           |",
                     "+---------------+",
-                  r#"| ["0","1","2"] |"#,
+                    r#"| ["0","1","2"] |"#,
                     "+---------------+",
                 ],
             ),
@@ -112,7 +111,7 @@ mod tests {
                     "+---------------+",
                     "| ret           |",
                     "+---------------+",
-                  r#"| ["a","b","c"] |"#,
+                    r#"| ["a","b","c"] |"#,
                     "+---------------+",
                 ],
             ),
@@ -122,7 +121,7 @@ mod tests {
                     "+---------------+",
                     "| ret           |",
                     "+---------------+",
-                  r#"| ["1","2","3"] |"#,
+                    r#"| ["1","2","3"] |"#,
                     "+---------------+",
                 ],
             ),
@@ -132,7 +131,7 @@ mod tests {
                     "+---------------------+",
                     "| ret                 |",
                     "+---------------------+",
-                  r#"| ["1.5","2.7","3.9"] |"#,
+                    r#"| ["1.5","2.7","3.9"] |"#,
                     "+---------------------+",
                 ],
             ),
@@ -142,7 +141,7 @@ mod tests {
                     "+-------------------------+",
                     "| ret                     |",
                     "+-------------------------+",
-                  r#"| ["true","false","true"] |"#,
+                    r#"| ["true","false","true"] |"#,
                     "+-------------------------+",
                 ],
             ),
@@ -161,13 +160,7 @@ mod tests {
     #[tokio::test]
     async fn test_to_array_string_null_input() {
         let sql = "select to_array_string(null) as ret";
-        let expected_output = vec![
-            "+-----+",
-            "| ret |",
-            "+-----+",
-            "|     |",
-            "+-----+",
-        ];
+        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
 
         let ctx = SessionContext::new();
         ctx.register_udf(TO_ARR_STRING.clone());

@@ -64,38 +64,37 @@ pub fn arr_sort_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
     let array = arr_field
         .iter()
         .map(|arr_field| {
-            arr_field
-                .and_then(|arr_field| {
-                    json::from_str::<json::Value>(arr_field)
-                        .ok()
-                        .and_then(|arr_field| {
-                            if let json::Value::Array(mut field) = arr_field {
-                                if field.is_empty() {
-                                    None
-                                } else {
-                                    field.sort_by(|a, b| {
-                                        // Assuming the array having elements of same type
-                                        if a.is_f64() {
-                                            a.as_f64().unwrap().total_cmp(b.as_f64().as_ref().unwrap())
-                                        } else if a.is_i64() {
-                                            a.as_i64().unwrap().cmp(b.as_i64().as_ref().unwrap())
-                                        } else if a.is_u64() {
-                                            a.as_u64().unwrap().cmp(b.as_u64().as_ref().unwrap())
-                                        } else if a.is_string() {
-                                            a.as_str().unwrap().cmp(b.as_str().unwrap())
-                                        } else if a.is_boolean() {
-                                            a.as_bool().unwrap().cmp(b.as_bool().as_ref().unwrap())
-                                        } else {
-                                            Ordering::Less
-                                        }
-                                    });
-                                    json::to_string(&field).ok()
-                                }
-                            } else {
+            arr_field.and_then(|arr_field| {
+                json::from_str::<json::Value>(arr_field)
+                    .ok()
+                    .and_then(|arr_field| {
+                        if let json::Value::Array(mut field) = arr_field {
+                            if field.is_empty() {
                                 None
+                            } else {
+                                field.sort_by(|a, b| {
+                                    // Assuming the array having elements of same type
+                                    if a.is_f64() {
+                                        a.as_f64().unwrap().total_cmp(b.as_f64().as_ref().unwrap())
+                                    } else if a.is_i64() {
+                                        a.as_i64().unwrap().cmp(b.as_i64().as_ref().unwrap())
+                                    } else if a.is_u64() {
+                                        a.as_u64().unwrap().cmp(b.as_u64().as_ref().unwrap())
+                                    } else if a.is_string() {
+                                        a.as_str().unwrap().cmp(b.as_str().unwrap())
+                                    } else if a.is_boolean() {
+                                        a.as_bool().unwrap().cmp(b.as_bool().as_ref().unwrap())
+                                    } else {
+                                        Ordering::Less
+                                    }
+                                });
+                                json::to_string(&field).ok()
                             }
-                        })
-                })
+                        } else {
+                            None
+                        }
+                    })
+            })
         })
         .collect::<StringArray>();
 
@@ -123,7 +122,11 @@ mod tests {
         let sql = "select arrsort(arr_field) as ret from t";
         let sqls = [(sql, expected_output)];
 
-        let schema = Arc::new(Schema::new(vec![Field::new("arr_field", DataType::Utf8, false)]));
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "arr_field",
+            DataType::Utf8,
+            false,
+        )]));
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![Arc::new(StringArray::from(vec![arr_field]))],
@@ -144,13 +147,7 @@ mod tests {
 
     // Helper function to run multiple test cases that should all return null
     async fn run_null_returning_tests(test_cases: &[&str]) {
-        let expected_output = vec![
-            "+-----+",
-            "| ret |",
-            "+-----+",
-            "|     |",
-            "+-----+",
-        ];
+        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
 
         for &arr_field in test_cases {
             run_single_test(arr_field, expected_output.clone()).await;
@@ -231,12 +228,12 @@ mod tests {
     async fn test_arr_sort_null_returning_cases() {
         // Test cases that should return null
         let null_cases = [
-            r#"not json"#,              // invalid JSON
-            r#"{"key": "value"}"#,      // object
-            r#""just a string""#,       // string
-            r#"42"#,                    // number
-            r#"true"#,                  // boolean
-            r#"null"#,                  // null
+            r#"not json"#,         // invalid JSON
+            r#"{"key": "value"}"#, // object
+            r#""just a string""#,  // string
+            r#"42"#,               // number
+            r#"true"#,             // boolean
+            r#"null"#,             // null
         ];
 
         run_null_returning_tests(&null_cases).await;
@@ -244,15 +241,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_arr_sort_null_input() {
-        let expected_output = vec![
-            "+-----+",
-            "| ret |",
-            "+-----+",
-            "|     |",
-            "+-----+",
-        ];
+        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
 
-        let schema = Arc::new(Schema::new(vec![Field::new("arr_field", DataType::Utf8, true)]));
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "arr_field",
+            DataType::Utf8,
+            true,
+        )]));
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![Arc::new(StringArray::from(vec![None::<String>]))],
@@ -292,7 +287,11 @@ mod tests {
             "+---------------+",
         ];
 
-        let schema = Arc::new(Schema::new(vec![Field::new("arr_field", DataType::Utf8, false)]));
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "arr_field",
+            DataType::Utf8,
+            false,
+        )]));
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![Arc::new(StringArray::from(arr_fields))],
