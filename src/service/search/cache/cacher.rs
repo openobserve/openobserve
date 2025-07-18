@@ -704,14 +704,14 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     Ok(true)
 }
 
-fn handle_histogram(
+pub fn handle_histogram(
     origin_sql: &mut String,
     q_time_range: Option<(i64, i64)>,
     histogram_interval: i64,
 ) {
     let caps = RE_HISTOGRAM.captures(origin_sql.as_str()).unwrap();
     let interval = if histogram_interval > 0 {
-        format!("{histogram_interval} seconds")
+        format!("{histogram_interval} second")
     } else {
         let attrs = caps
             .get(1)

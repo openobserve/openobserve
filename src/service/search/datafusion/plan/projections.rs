@@ -8,6 +8,7 @@ use datafusion::{
 use hashbrown::HashSet;
 
 use crate::service::search::{
+    cache::cacher::handle_histogram,
     cluster::flight::{generate_context, register_table},
     request::Request,
     sql::Sql,
@@ -176,10 +177,21 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
     }
 }
 
-pub async fn get_result_schema(sql: Sql) -> Result<ResultSchemaExtractor, anyhow::Error> {
+pub async fn get_result_schema(
+    mut sql: Sql,
+    is_streaming: bool,
+    use_cache: bool,
+) -> Result<ResultSchemaExtractor, anyhow::Error> {
     if sql.schemas.len() != 1 {
         return Ok(ResultSchemaExtractor::new());
     }
+
+    if !is_streaming && use_cache {
+        if let Some(interval) = sql.histogram_interval {
+            handle_histogram(&mut sql.sql, sql.time_range, interval);
+        }
+    }
+
     let sql_arc = Arc::new(sql.clone());
     let ctx = generate_context(&Request::default(), &sql_arc, 0).await?;
     register_table(&ctx, &sql_arc).await?;
@@ -237,9 +249,15 @@ mod tests {
     async fn get_sql(sql: &str) -> Sql {
         let schema = Schema::new(get_fields());
         infra::db_init().await.unwrap();
-        infra::schema::merge("parse_test", "default", StreamType::Logs, &schema, Some(1752660674351000))
-            .await
-            .unwrap();
+        infra::schema::merge(
+            "parse_test",
+            "default",
+            StreamType::Logs,
+            &schema,
+            Some(1752660674351000),
+        )
+        .await
+        .unwrap();
         let query = SearchQuery {
             sql: sql.to_string(),
             quick_mode: false,
@@ -268,7 +286,7 @@ mod tests {
                     SELECT k8s_namespace_name, CAST(array_element(regexp_match(log, 'took: ([0-9]+) ms'), 1) AS INTEGER)
                     FROM FilteredLogs"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("_timestamp".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("_timestamp".to_string()));
@@ -285,7 +303,7 @@ mod tests {
         let sql = r#"select * FROM default 
         WHERE CAST(array_element(regexp_match(log, 'took: ([0-9]+) ms'), 1) AS INTEGER) > 500"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("_timestamp".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("_timestamp".to_string()));
@@ -311,7 +329,7 @@ mod tests {
     async fn test_basic_group_by() {
         let sql = r#"select histogram(_timestamp), k8s_namespace_name FROM "default" group by histogram(_timestamp),k8s_namespace_name"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(
             extractor.timeseries,
             Some("histogram(default._timestamp)".to_string())
@@ -332,7 +350,7 @@ mod tests {
 
         let sql = r#"select str_match(log,'test') from "default" group by str_match(log,'test')"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, None);
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, None);
@@ -354,7 +372,7 @@ mod tests {
             ORDER BY histogram(_timestamp) ASC"#;
 
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(
             extractor.timeseries,
             Some("histogram(default._timestamp)".to_string())
@@ -388,7 +406,7 @@ mod tests {
         k8s_namespace_name
         FROM "default" GROUP BY k8s_namespace_name,_timestamp"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("_timestamp".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("_timestamp".to_string()));
@@ -412,7 +430,7 @@ mod tests {
     async fn test_basic_alias() {
         let sql = r#"select k8s_namespace_name as namespace, _timestamp as ts FROM default"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("ts".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("ts".to_string()));
@@ -424,7 +442,7 @@ mod tests {
                     SELECT namespace as ns, _timestamp as tts
                     FROM FilteredLogs"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("tts".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("tts".to_string()));
@@ -437,7 +455,7 @@ mod tests {
         GROUP BY x_axis_1, x_axis_2 ORDER BY
         x_axis_1 ASC"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("x_axis_1".to_string()));
         assert_eq!(extractor.ts_hist_alias, Some("x_axis_1".to_string()));
         assert_eq!(extractor.timestamp_alias, None);
@@ -454,7 +472,7 @@ mod tests {
         FROM "default" t1 INNER JOIN "default" t2
         ON t1.k8s_namespace_name = t2.k8s_namespace_name"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("_timestamp".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("_timestamp".to_string()));
@@ -492,7 +510,7 @@ mod tests {
             t1.k8s_pod_name
             "#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, None);
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, None);
@@ -524,7 +542,7 @@ mod tests {
                 GROUP BY d2.k8s_pod_name, d2.code"#;
 
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, None);
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, None);
@@ -543,7 +561,7 @@ mod tests {
         select h,c,k, ts as tts from test"#;
 
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("h".to_string()));
         assert_eq!(extractor.ts_hist_alias, Some("h".to_string()));
         assert_eq!(extractor.timestamp_alias, Some("tts".to_string()));

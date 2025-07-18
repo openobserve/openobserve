@@ -1698,6 +1698,14 @@ pub async fn result_schema(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
+    let use_cache = get_use_cache_from_request(&query);
+    let is_streaming = {
+        match query.get("is_streaming") {
+            None => false,
+            Some(v) => v.to_lowercase().as_str().parse::<bool>().unwrap_or(false),
+        }
+    };
+
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
@@ -1822,7 +1830,7 @@ pub async fn result_schema(
             }
         };
 
-    let res_schema = match get_result_schema(sql).await {
+    let res_schema = match get_result_schema(sql, is_streaming, use_cache).await {
         Ok(v) => v,
         Err(e) => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
