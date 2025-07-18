@@ -1,7 +1,7 @@
 //Methods: Duplicate dashboard, Delete duplicate dashboard, Move dashboard, Menu Items(dashboards)
 
 import { expect } from "@playwright/test";
-import { deleteDashboard } from "../../playwright-tests/Dashboards/utils/dashCreation.js";
+// import { deleteDashboard } from "../../playwright-tests/Dashboards/utils/dashCreation.js";
 
 export default class DashboardListPage {
   constructor(page) {
