@@ -165,6 +165,10 @@ pub mod s3 {
         upload_to_s3(org_id, table_name, file_meta, &data, min_ts).await?;
 
         log::debug!("Merged and uploaded enrichment table {} to S3", table_name);
+
+        // Delete the data from the db
+        database::delete(org_id, table_name).await?;
+
         Ok(())
     }
 
@@ -257,16 +261,6 @@ pub mod s3 {
                 org_table_pairs
             );
             for (org_id, table_name) in org_table_pairs {
-                let data = match retrieve(&org_id, &table_name).await {
-                    Ok(data) => data,
-                    Err(e) => {
-                        log::error!("Failed to retrieve enrichment table {}: {}", table_name, e);
-                        continue;
-                    }
-                };
-                if data.is_empty() {
-                    continue;
-                }
                 match merge_and_upload_to_s3(&org_id, &table_name).await {
                     Ok(_) => {
                         let meta = S3EnrichmentTableMeta {

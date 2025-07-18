@@ -158,6 +158,11 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
             continue;
         }
         for stream_type in ALL_STREAM_TYPES {
+            // Now, enrichment tables are stored in the db, and then pushed to s3,
+            // so we need to skip them
+            if stream_type == StreamType::EnrichmentTables {
+                continue;
+            }
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             for stream_name in streams {
                 let Some(node_name) =
