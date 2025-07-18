@@ -205,21 +205,9 @@ pub async fn get_enrichment_table_json(
         .unwrap_or_default();
 
     if db_stats.end_time > local_stats_last_updated {
-        // check in s3 to check last updated
-        let s3_last_updated = storage::s3::get_last_updated_at().await.unwrap_or_default();
-        // fetch from s3 and put into records
-        let data = storage::s3::retrieve(org_id, table_name)
-            .await
-            .unwrap_or_default();
+        //
+        let data = crate::service::db::enrichment_table::get_enrichment_table_data(org_id, table_name).await?;
         records.extend(data);
-        if db_stats.end_time > s3_last_updated {
-            // fetch from db and put into records
-            let data = crate::service::db::enrichment_table::get_enrichment_data_from_db(
-                org_id, table_name,
-            )
-            .await?;
-            records.extend(data.0);
-        }
     } else {
         // fetch from local cache and put into records
         let data = storage::local::retrieve(org_id, table_name).await?;
