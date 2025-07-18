@@ -2939,7 +2939,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ...selectedStreamFieldsBasedOnUserDefinedSchema.value,
       ...dashboardPanelData.meta.stream.vrlFunctionFieldList,
       ...dashboardPanelData.meta.stream.customQueryFields,
-    ]);
+    ], pageKey);
   };
 
   const VARIABLE_PLACEHOLDER = "substituteValue";
