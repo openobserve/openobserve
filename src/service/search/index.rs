@@ -1000,6 +1000,7 @@ mod tests {
         assert!(fields.contains("field1"));
     }
 
+    #[test]
     fn test_is_alphanumeric() {
         assert!(is_alphanumeric("123"));
         assert!(is_alphanumeric("123abc"));
