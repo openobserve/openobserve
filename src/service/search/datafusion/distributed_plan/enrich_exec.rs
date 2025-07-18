@@ -166,9 +166,7 @@ async fn get_data(
         match crate::service::db::enrichment_table::get_enrichment_data_from_db(&org_id, &name)
             .await
         {
-            Ok((data, _min_ts, _max_ts)) => {
-                data.into_iter().map(|d| Arc::new(d)).collect::<Vec<_>>()
-            }
+            Ok((data, _min_ts, _max_ts)) => data.into_iter().map(Arc::new).collect::<Vec<_>>(),
             Err(e) => return internal_err!("get enrichment data from db: {e}"),
         };
 
