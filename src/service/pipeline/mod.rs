@@ -14,12 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::{
-    pipeline::{Pipeline, PipelineList, components::PipelineSource},
+    pipeline::{Pipeline, components::PipelineSource},
     search::SearchEventType,
     stream::ListStreamParams,
+    triggers::{Trigger, TriggerModule},
 };
 
-use super::db::pipeline::{self, PipelineError};
+use super::db::{
+    pipeline::{self, PipelineError},
+    scheduler,
+};
 use crate::common::{
     meta::authz::Authz,
     utils::auth::{remove_ownership, set_ownership},
@@ -142,10 +146,10 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
 
 #[tracing::instrument]
 pub async fn list_pipelines(
-    org_id: String,
+    org_id: &str,
     permitted: Option<Vec<String>>,
-) -> Result<PipelineList, PipelineError> {
-    let list = pipeline::list_by_org(&org_id)
+) -> Result<Vec<Pipeline>, PipelineError> {
+    Ok(pipeline::list_by_org(org_id)
         .await?
         .into_iter()
         .filter(|pipeline| {
@@ -159,8 +163,16 @@ pub async fn list_pipelines(
                     .unwrap()
                     .contains(&format!("pipeline:_all_{org_id}"))
         })
-        .collect();
-    Ok(PipelineList { list })
+        .collect())
+}
+
+#[tracing::instrument]
+pub async fn list_pipeline_triggers(org_id: &str) -> Result<Vec<Trigger>, PipelineError> {
+    Ok(
+        scheduler::list_by_org(org_id, Some(TriggerModule::DerivedStream))
+            .await
+            .unwrap_or_default(),
+    )
 }
 
 #[tracing::instrument]
