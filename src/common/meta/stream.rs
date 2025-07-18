@@ -50,8 +50,7 @@ pub struct Stream {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct StreamProperty {
     pub name: String,
-    #[serde(rename = "type")]
-    pub prop_type: String,
+    pub r#type: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -108,11 +107,11 @@ mod tests {
     fn test_stream_property() {
         let property = StreamProperty {
             name: "test_field".to_string(),
-            prop_type: "string".to_string(),
+            r#type: "string".to_string(),
         };
 
         assert_eq!(property.name, "test_field");
-        assert_eq!(property.prop_type, "string");
+        assert_eq!(property.r#type, "string");
     }
 
     #[test]
@@ -151,7 +150,7 @@ mod tests {
             stats: StreamStats::default(),
             schema: vec![StreamProperty {
                 name: "field1".to_string(),
-                prop_type: "string".to_string(),
+                r#type: "string".to_string(),
             }],
             uds_schema: vec![],
             settings: StreamSettings::default(),
@@ -233,7 +232,7 @@ mod tests {
             schema: vec![],
             uds_schema: vec![StreamProperty {
                 name: "uds_field".to_string(),
-                prop_type: "string".to_string(),
+                r#type: "string".to_string(),
             }],
             settings: StreamSettings::default(),
             metrics_meta: None,

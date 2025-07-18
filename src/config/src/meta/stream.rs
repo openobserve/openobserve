@@ -32,28 +32,24 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "PascalCase")]
 pub enum DataType {
-    #[serde(rename = "Utf8")]
     #[default]
     Utf8,
-    #[serde(rename = "Int64")]
     Int64,
-    #[serde(rename = "Uint64")]
     Uint64,
-    #[serde(rename = "Float64")]
     Float64,
-    #[serde(rename = "Boolean")]
     Boolean,
 }
 
-impl Into<arrow_schema::DataType> for DataType {
-    fn into(self) -> arrow_schema::DataType {
-        match self {
-            DataType::Utf8 => arrow_schema::DataType::Utf8,
-            DataType::Int64 => arrow_schema::DataType::Int64,
-            DataType::Uint64 => arrow_schema::DataType::UInt64,
-            DataType::Float64 => arrow_schema::DataType::Float64,
-            DataType::Boolean => arrow_schema::DataType::Boolean,
+impl From<DataType> for arrow_schema::DataType {
+    fn from(data_type: DataType) -> Self {
+        match data_type {
+            DataType::Utf8 => Self::Utf8,
+            DataType::Int64 => Self::Int64,
+            DataType::Uint64 => Self::UInt64,
+            DataType::Float64 => Self::Float64,
+            DataType::Boolean => Self::Boolean,
         }
     }
 }
@@ -74,16 +70,39 @@ impl FromStr for DataType {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Utf8" => Ok(DataType::Utf8),
-            "Int64" => Ok(DataType::Int64),
-            "Uint64" => Ok(DataType::Uint64),
-            "Float64" => Ok(DataType::Float64),
-            "Boolean" => Ok(DataType::Boolean),
+        match s.to_lowercase().as_str() {
+            "utf8" => Ok(DataType::Utf8),
+            "int64" => Ok(DataType::Int64),
+            "uint64" => Ok(DataType::Uint64),
+            "float64" => Ok(DataType::Float64),
+            "boolean" => Ok(DataType::Boolean),
             _ => Err(format!("Unknown data type: {s}")),
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
+pub struct DataField {
+    pub name: String,
+    pub r#type: DataType,
+}
+
+impl DataField {
+    pub fn new(name: &str, r#type: DataType) -> Self {
+        Self {
+            name: name.to_string(),
+            r#type,
+        }
+    }
+}
+
+impl PartialEq for DataField {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Eq for DataField {}
 
 pub const ALL_STREAM_TYPES: [StreamType; 7] = [
     StreamType::Logs,
@@ -631,7 +650,7 @@ pub struct UpdateStreamSettings {
     #[serde(skip_serializing_if = "Option::None", default)]
     pub flatten_level: Option<i64>,
     #[serde(default)]
-    pub defined_schema_fields: UpdateSettingsWrapper<HashMap<String, DataType>>,
+    pub defined_schema_fields: UpdateSettingsWrapper<DataField>,
     #[serde(default)]
     pub distinct_value_fields: UpdateSettingsWrapper<String>,
     #[serde(default)]
@@ -743,6 +762,7 @@ impl TimeRange {
         result
     }
 }
+
 #[derive(Clone, Debug, Default, Deserialize, ToSchema, PartialEq)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
@@ -760,7 +780,7 @@ pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub flatten_level: Option<i64>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub defined_schema_fields: HashMap<String, DataType>,
+    pub defined_schema_fields: Vec<DataField>,
     #[serde(default)]
     pub max_query_range: i64, // hours
     #[serde(default)]
@@ -892,19 +912,22 @@ impl From<&str> for StreamSettings {
             max_query_range = v.as_i64().unwrap();
         };
 
-        let mut defined_schema_fields = HashMap::new();
+        let mut defined_schema_fields = Vec::new();
         if let Some(value) = settings.get("defined_schema_fields") {
             defined_schema_fields = value
-                .as_object()
+                .as_array()
                 .unwrap()
                 .iter()
-                .map(|(k, v)| {
-                    (
-                        k.to_string(),
-                        DataType::from_str(v.as_str().unwrap()).unwrap(),
-                    )
+                .map(|v| {
+                    let name = v.get("name").unwrap().as_str().unwrap().to_string();
+                    let r#type = v
+                        .get("type")
+                        .and_then(Value::as_str)
+                        .and_then(|v| DataType::from_str(v).ok())
+                        .unwrap();
+                    DataField { name, r#type }
                 })
-                .collect::<HashMap<_, _>>();
+                .collect::<Vec<_>>();
         }
 
         let flatten_level = settings.get("flatten_level").map(|v| v.as_i64().unwrap());
