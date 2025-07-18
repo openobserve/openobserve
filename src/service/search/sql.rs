@@ -1555,6 +1555,12 @@ fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> {
         _ => return None,
     };
 
+    // Check if ORDER BY references the field (with alias support)
+    let field_alias = match &select.projection[0] {
+        SelectItem::ExprWithAlias { alias, .. } => Some(alias.value.clone()),
+        _ => None,
+    };
+
     // Must have GROUP BY with exactly one expression that references the same field
     let group_by_field = match &select.group_by {
         GroupByExpr::Expressions(exprs, _) if exprs.len() == 1 => match &exprs[0] {
@@ -1571,8 +1577,12 @@ fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> {
         _ => return None,
     };
 
-    // GROUP BY field must match SELECT field
-    if group_by_field.as_ref() != Some(&field_name) {
+    // GROUP BY field must match SELECT field (with alias support)
+    if let Some(group_by_field_name) = group_by_field.as_ref() {
+        if !field_matches_with_alias(&field_name, field_alias.as_deref(), group_by_field_name) {
+            return None;
+        }
+    } else {
         return None;
     }
 
@@ -1585,13 +1595,19 @@ fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> {
     {
         match &exprs[0].expr {
             Expr::Identifier(ident) => {
-                if ident.value == field_name {
+                if field_matches_with_alias(&field_name, field_alias.as_deref(), &ident.value) {
                     order_by_references_field = true;
                     is_asc = exprs[0].options.asc.unwrap_or(true);
                 }
             }
             Expr::CompoundIdentifier(idents) => {
-                if !idents.is_empty() && idents.last().unwrap().value == field_name {
+                if !idents.is_empty()
+                    && field_matches_with_alias(
+                        &field_name,
+                        field_alias.as_deref(),
+                        &idents.last().unwrap().value,
+                    )
+                {
                     order_by_references_field = true;
                     is_asc = exprs[0].options.asc.unwrap_or(true);
                 }
@@ -2466,6 +2482,24 @@ fn is_eq_placeholder(expr: &Expr, placeholder: &str) -> bool {
     } else {
         false
     }
+}
+
+/// Helper function to resolve field names considering aliases
+/// Returns true if the given field_name matches either the actual field name or its alias
+fn field_matches_with_alias(field_name: &str, alias: Option<&str>, target_field: &str) -> bool {
+    // Direct match with field name
+    if field_name == target_field {
+        return true;
+    }
+
+    // Match with alias if present
+    if let Some(alias_name) = alias
+        && alias_name == target_field
+    {
+        return true;
+    }
+
+    false
 }
 
 #[cfg(test)]
@@ -3678,6 +3712,50 @@ mod tests {
     fn test_is_simple_distinct_visit3() {
         // Test with desc order by
         let sql = "select id from stream group by id order by id desc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_field_matches_with_alias() {
+        // Test direct field name match
+        assert!(field_matches_with_alias("field1", None, "field1"));
+
+        // Test alias match
+        assert!(field_matches_with_alias("field1", Some("alias1"), "alias1"));
+
+        // Test no match
+        assert!(!field_matches_with_alias("field1", None, "field2"));
+        assert!(!field_matches_with_alias(
+            "field1",
+            Some("alias1"),
+            "field2"
+        ));
+        assert!(!field_matches_with_alias(
+            "field1",
+            Some("alias1"),
+            "alias2"
+        ));
+    }
+
+    #[test]
+    fn test_is_simple_distinct_with_alias() {
+        // Test with field alias in SELECT and ORDER BY using alias
+        let sql = "select id as user_id from stream group by id order by user_id asc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_distinct_with_alias_group_by_alias() {
+        // Test with field alias in SELECT and GROUP BY using alias
+        let sql = "select id as user_id from stream group by user_id order by user_id asc limit 10";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
