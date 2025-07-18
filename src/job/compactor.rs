@@ -23,7 +23,7 @@ use config::{
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use tokio::sync::mpsc;
 
-use crate::service::compact;
+use crate::{common::infra::cluster::get_node_by_uuid, service::compact};
 
 const ENRICHMENT_TABLE_MERGE_LOCK_KEY: &str = "/compact/enrichment_table";
 
@@ -275,7 +275,10 @@ async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
         .await
         .unwrap_or_default();
     let node_id = String::from_utf8_lossy(&node_id);
-    if !node_id.is_empty() && !node_id.eq(&LOCAL_NODE.uuid) {
+    if !node_id.is_empty()
+        && LOCAL_NODE.uuid.ne(&node_id)
+        && get_node_by_uuid(&node_id).await.is_some()
+    {
         // Unlock and return
         if let Err(e) = infra::dist_lock::unlock(&locker).await {
             log::error!("[COMPACTOR::JOB] Failed to release lock for enrichment table merge: {e}");
@@ -310,12 +313,5 @@ async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
         }
     });
     handle.await.unwrap();
-    // Remove the uuid from the db after it is stopped
-    if let Err(e) = db
-        .delete(ENRICHMENT_TABLE_MERGE_LOCK_KEY, false, false, None)
-        .await
-    {
-        log::error!("[COMPACTOR::JOB] Failed to delete lock for enrichment table merge: {e}");
-    }
     Ok(())
 }
