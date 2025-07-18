@@ -66,7 +66,7 @@ test.describe("dashboard UI testcases", () => {
       .locator('[data-test="chart-renderer"]')
       .waitFor({ state: "visible" });
     await page.screenshot({
-      path: `playwright-tests/dashboards/dashboard-snaps/areachart-screenshot.png`,
+      path: `playwright-tests/Dashboards/dashboard-snaps/areachart-screenshot.png`,
       selector: '[data-test="chart-renderer"]',
     });
 
