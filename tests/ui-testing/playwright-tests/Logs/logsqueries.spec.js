@@ -1,7 +1,7 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import { LogsPage } from '../../pages/logsPages/logsPage.js';
+import PageManager from '../../pages/page-manager.js';
 
 test.describe.configure({ mode: 'parallel' });
 async function login(page) {
@@ -51,7 +51,7 @@ async function ingestion(page) {
   console.log(response);
 }
 test.describe("Logs Queries testcases", () => {
-  let logsPage;
+  let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -73,7 +73,7 @@ test.describe("Logs Queries testcases", () => {
 
   test.beforeEach(async ({ page }) => {
     await login(page);
-    logsPage = new LogsPage(page);
+    pageManager = new PageManager(page);
     await page.waitForTimeout(1000)
     await ingestion(page);
     await page.waitForTimeout(2000)
@@ -82,7 +82,7 @@ test.describe("Logs Queries testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStream("e2e_automate"); 
+    await pageManager.logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
@@ -90,32 +90,32 @@ test.describe("Logs Queries testcases", () => {
   test("should display quick mode toggle button", {
     tag: ['@quickModeLogs', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.expectQuickModeToggleVisible();
+    await pageManager.logsPage.expectQuickModeToggleVisible();
   });
 
   test.skip("should add timestamp to editor save this view and switch", {
     tag: ['@timestampViewLogs', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.waitForTimeout(3000);
-    await logsPage.clickLogTableColumnSource();
-    await logsPage.clickIncludeExcludeFieldButton();
-    await logsPage.clickIncludeFieldButton();
-    await logsPage.clickCloseDialog();
-    await logsPage.clickSavedViewsButton();
-    await logsPage.fillSavedViewName("e2etimestamp");
-    await logsPage.clickSavedViewDialogSaveContent();
-    await logsPage.clickSavedViewArrow();
-    await logsPage.clickSavedViewByLabel(/timestamp/);
-    await logsPage.waitForTimeout(3000);
-    await logsPage.clickSavedViewsExpand();
-    await logsPage.clickSavedViewSearchInput();
-    await logsPage.fillSavedViewSearchInput('e2e');
-    await logsPage.clickSavedViewByTitle('e2etimestamp');
-    await logsPage.clickSavedViewsExpand();
-    await logsPage.clickSavedViewSearchInput();
-    await logsPage.clickSavedViewByTitle('e2etimestamp');
-    await logsPage.clickDeleteButton();
-    await logsPage.clickConfirmButton();
+    await pageManager.logsPage.waitForTimeout(3000);
+    await pageManager.logsPage.clickLogTableColumnSource();
+    await pageManager.logsPage.clickIncludeExcludeFieldButton();
+    await pageManager.logsPage.clickIncludeFieldButton();
+    await pageManager.logsPage.clickCloseDialog();
+    await pageManager.logsPage.clickSavedViewsButton();
+    await pageManager.logsPage.fillSavedViewName("e2etimestamp");
+    await pageManager.logsPage.clickSavedViewDialogSaveContent();
+    await pageManager.logsPage.clickSavedViewArrow();
+    await pageManager.logsPage.clickSavedViewByLabel(/timestamp/);
+    await pageManager.logsPage.waitForTimeout(3000);
+    await pageManager.logsPage.clickSavedViewsExpand();
+    await pageManager.logsPage.clickSavedViewSearchInput();
+    await pageManager.logsPage.fillSavedViewSearchInput('e2e');
+    await pageManager.logsPage.clickSavedViewByTitle('e2etimestamp');
+    await pageManager.logsPage.clickSavedViewsExpand();
+    await pageManager.logsPage.clickSavedViewSearchInput();
+    await pageManager.logsPage.clickSavedViewByTitle('e2etimestamp');
+    await pageManager.logsPage.clickDeleteButton();
+    await pageManager.logsPage.clickConfirmButton();
   });
 
   test("should redirect to logs after clicking on stream explorer via stream page", {
@@ -125,210 +125,262 @@ test.describe("Logs Queries testcases", () => {
     const randomSavedViewName = `streamslog${Math.random().toString(36).substring(2, 10)}`;
   
     // Interactions with the page
-    await logsPage.clickRefreshButton();
-    await logsPage.clickSavedViewsExpand();
-    await logsPage.clickSaveViewButton();
-    await logsPage.fillSavedViewName(randomSavedViewName); // Use the random name
-    await logsPage.clickSavedViewDialogSave();
-    await logsPage.waitForTimeout(5000);
-    await logsPage.clickStreamsMenuItem();
-    await logsPage.clickSearchStreamInput();
-    await logsPage.fillSearchStreamInput('e2e');
-    await logsPage.waitForTimeout(1000);
-    await logsPage.clickExploreButton();
-    await logsPage.waitForTimeout(5000);
-    await logsPage.waitForSavedViewsButton();
-    await logsPage.clickSavedViewsExpand();
-    await logsPage.clickSavedViewSearchInput();
-    await logsPage.fillSavedViewSearchInput(randomSavedViewName); // Use the random name here
-    await logsPage.waitForTimeout(3000);
-    await logsPage.waitForSavedViewText(randomSavedViewName);
-    await logsPage.clickSavedViewByText(randomSavedViewName);
-    await logsPage.clickSavedViewsExpand();
-    await logsPage.clickSavedViewSearchInput();
-    await logsPage.clickSavedViewByTitle(randomSavedViewName); // Use the random name here
+    await pageManager.logsPage.clickRefreshButton();
+    await pageManager.logsPage.clickSavedViewsExpand();
+    await pageManager.logsPage.clickSaveViewButton();
+    await pageManager.logsPage.fillSavedViewName(randomSavedViewName); // Use the random name
+    await pageManager.logsPage.clickSavedViewDialogSave();
+    await pageManager.logsPage.waitForTimeout(5000);
+    await pageManager.logsPage.clickStreamsMenuItem();
+    await pageManager.logsPage.clickSearchStreamInput();
+    await pageManager.logsPage.fillSearchStreamInput('e2e');
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.clickExploreButton();
+    await pageManager.logsPage.waitForTimeout(5000);
+    await pageManager.logsPage.waitForSavedViewsButton();
+    await pageManager.logsPage.clickSavedViewsExpand();
+    await pageManager.logsPage.clickSavedViewSearchInput();
+    await pageManager.logsPage.fillSavedViewSearchInput(randomSavedViewName); // Use the random name here
+    await pageManager.logsPage.waitForTimeout(3000);
+    await pageManager.logsPage.waitForSavedViewText(randomSavedViewName);
+    await pageManager.logsPage.clickSavedViewByText(randomSavedViewName);
+    await pageManager.logsPage.clickSavedViewsExpand();
+    await pageManager.logsPage.clickSavedViewSearchInput();
+    await pageManager.logsPage.clickSavedViewByTitle(randomSavedViewName); // Use the random name here
   
     // Dynamic delete button selector using the random saved view name
-    await logsPage.clickDeleteSavedViewButton(randomSavedViewName);
-    await logsPage.clickConfirmButton(); // Confirm deletion
+    await pageManager.logsPage.clickDeleteSavedViewButton(randomSavedViewName);
+    await pageManager.logsPage.clickConfirmButton(); // Confirm deletion
   });
 
   test("should reset the editor on clicking reset filter button", {
     tag: ['@resetFilters', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.clickDateTimeButton();
-    await logsPage.clickRelative15MinButton();
-    await logsPage.clickQueryEditorTextbox();
-    await logsPage.typeInQueryEditor("match_all_raw_ignore_case('provide_credentials')");
-    await logsPage.waitForSearchBarRefreshButton();
-    await logsPage.clickRefreshButton();
-    await logsPage.clickResetFiltersButton();
-    await logsPage.waitForQueryEditorTextbox();
-    await logsPage.expectQueryEditorEmpty();
+    await pageManager.logsPage.clickDateTimeButton();
+    await pageManager.logsPage.clickRelative15MinButton();
+    await pageManager.logsPage.clickQueryEditorTextbox();
+    await pageManager.logsPage.typeInQueryEditor("match_all_raw_ignore_case('provide_credentials')");
+    await pageManager.logsPage.waitForSearchBarRefreshButton();
+    await pageManager.logsPage.clickRefreshButton();
+    await pageManager.logsPage.clickResetFiltersButton();
+    await pageManager.logsPage.waitForQueryEditorTextbox();
+    await pageManager.logsPage.expectQueryEditorEmpty();
   });
 
   test("should add invalid query and display error", {
     tag: ['@invalidQueryLogs', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickDateTimeButton();
-    await logsPage.clickRelative15MinButton();
-    await logsPage.clickQueryEditor();
-    await logsPage.typeInQueryEditor("kubernetes");
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickSearchBarRefreshButton();
-    await logsPage.expectErrorMessageVisible();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickDateTimeButton();
+    await pageManager.logsPage.clickRelative15MinButton();
+    await pageManager.logsPage.clickQueryEditor();
+    await pageManager.logsPage.typeInQueryEditor("kubernetes");
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await pageManager.logsPage.expectErrorMessageVisible();
   });
 
   test("should not display error if match all case added in log query search", {
     tag: ['@matchAllLogs', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.clickDateTimeButton();
-    await logsPage.clickRelative15MinButton();
+    await pageManager.logsPage.clickDateTimeButton();
+    await pageManager.logsPage.clickRelative15MinButton();
 
-    await logsPage.expectQueryEditorVisible();
-    await logsPage.clickQueryEditor();
-    await logsPage.typeInQueryEditor("match_all('code')");
+    await pageManager.logsPage.expectQueryEditorVisible();
+    await pageManager.logsPage.clickQueryEditor();
+    await pageManager.logsPage.typeInQueryEditor("match_all('code')");
 
-    await logsPage.expectSearchBarRefreshButtonVisible();
-    await logsPage.clickSearchBarRefreshButton();
+    await pageManager.logsPage.expectSearchBarRefreshButtonVisible();
+    await pageManager.logsPage.clickSearchBarRefreshButton();
 
-    await logsPage.expectLogTableColumnSourceVisible();
+    await pageManager.logsPage.expectLogTableColumnSourceVisible();
   });
 
-
-
-  test("should change stream settings and click on search stream", {
-    tag: ['@streamSettings', '@all', '@logs']
+  test("should display error when save function is clicked without any VRL function", {
+    tag: ['@functionValidation', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.clickStreamsMenuItem();
-    await logsPage.waitForTimeout(3000);
-    await logsPage.clickStreamsSearchStreamInput();
-    await logsPage.fillStreamsSearchStreamInput("e2e_automate");
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickStreamDetail();
-    await logsPage.clickSchemaStreamIndexSelect();
-    await logsPage.clickFullTextSearch();
-    await logsPage.clickSchemaUpdateSettingsButton();
-    await logsPage.waitForTimeout(3000);
-    await logsPage.clickColAutoButton();
-    await logsPage.waitForTimeout(3000);
-    await logsPage.clickExploreTitle();
-    await logsPage.expectLogTableColumnSourceVisible();
+    await pageManager.logsPage.clickFunctionDropdownSave();
+    await pageManager.logsPage.expectWarningNoFunctionDefinition();
   });
 
-
-  test("should display error if blank spaces added under stream name and clicked create stream ", {
-    tag: ['@streamValidation', '@all', '@logs']
+  test("should create a function and then delete it", {
+    tag: ['@functionCRUD', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.clickStreamsMenuItem();
-    await logsPage.clickAddStreamButton();
-    await logsPage.clickAddStreamNameInput();
-    await logsPage.typeInQueryEditor("  ");
-    await logsPage.clickSaveStreamButton();
-    await logsPage.expectFieldRequiredVisible();
+    await pageManager.logsPage.clickRefreshButton();
+    await pageManager.logsPage.clickFunctionDropdownSave();
+    await pageManager.logsPage.clickVrlEditor();
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.clickFunctionDropdownSave();
+    await pageManager.logsPage.clickSavedFunctionNameInput();
+    const randomString = pageManager.logsPage.generateRandomString();
+    const functionName = 'e2efunction_' + randomString;
+    await pageManager.logsPage.fillSavedFunctionNameInput(functionName);
+    await pageManager.logsPage.clickSavedViewDialogSave();
+    await pageManager.logsPage.clickMenuLinkPipelineItem();
+    await pageManager.logsPage.clickTabRealtime();
+    await pageManager.logsPage.clickFunctionStreamTab();
+    await pageManager.logsPage.clickSearchFunctionInput();
+    await pageManager.logsPage.fillSearchFunctionInput(randomString);
+    await pageManager.logsPage.clickDeleteFunctionButton();
+    await pageManager.logsPage.clickConfirmButton();
   });
 
-
-
-  test("should display error if create stream is clicked without adding name", {
-    tag: ['@streamValidation', '@all', '@logs']
+  test("should display click save directly while creating a function", {
+    tag: ['@functionSaveValidation', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.clickStreamsMenuItem();
-    await logsPage.clickAddStreamButton();
-    await logsPage.waitForSaveStreamButton();
-    await logsPage.scrollSaveStreamButtonIntoView();
-    await logsPage.clickSaveStreamButton();
-    await logsPage.expectFieldRequiredVisible();
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.clickVrlEditor();
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.clickFunctionDropdownSave();
+    await pageManager.logsPage.clickSavedViewDialogSave();
+    await pageManager.logsPage.expectFunctionNameNotValid();
   });
 
-  test("should display enter count query", {
-    tag: ['@countQuery', '@all', '@logs']
+  test("should display error on adding only blank spaces under function name", {
+    tag: ['@functionNameValidation', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.clickQueryEditorTextbox();
-    await logsPage.typeInQueryEditor('SELECT COUNT(_timestamp) AS xyz, _timestamp FROM "e2e_automate"  Group by _timestamp ORDER BY _timestamp DESC');
-    await logsPage.waitForTimeout(4000);
-    await logsPage.clickSQLModeToggle();
-    await logsPage.expectSearchBarRefreshButtonVisible();
-    await logsPage.waitForTimeout(3000);
-    await logsPage.clickRefreshButton();
-    await logsPage.waitForTimeout(4000);
-    await logsPage.expectErrorWhileFetchingNotVisible();
-    await logsPage.clickBarChartCanvas();
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.clickVrlEditor();
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.clickFunctionDropdownSave();
+    await pageManager.logsPage.fillSavedFunctionNameInput(' ');
+    await pageManager.logsPage.clickSavedViewDialogSave();
+    await pageManager.logsPage.expectFunctionNameNotValid();
   });
 
-  test("should display values API text successfully and error to not be displayed", {
-    tag: ['@valuesAPI', '@all', '@logs']
+  test("should display error on adding invalid characters under function name", {
+    tag: ['@functionNameValidation', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.fillIndexFieldSearchInput('kubernetes_pod_name');
-    await logsPage.clickExpandLabel('kubernetes_pod_name');
-    await logsPage.expectErrorWhileFetchingFieldValuesNotVisible();
-    await logsPage.clickText('ziox-ingester-');
-    await logsPage.clickRefreshButton();
-    await logsPage.clickCollapseLabel('kubernetes_pod_name');
-    await logsPage.clickExpandLabel('kubernetes_pod_name');
-    await logsPage.expectSubfieldAddButtonVisible('kubernetes_pod_name', 'ziox-ingester-');
-    await logsPage.clickSubfieldAddButton('kubernetes_pod_name', 'ziox-ingester-');
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.clickVrlEditor();
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.clickFunctionDropdownSave();
+    await pageManager.logsPage.fillSavedFunctionNameInput('e2e@@@');
+    await pageManager.logsPage.clickSavedViewDialogSave();
+    await pageManager.logsPage.expectFunctionNameNotValid();
   });
 
-  test("should display results in selected time", {
-    tag: ['@timeSelection', '@all', '@logs']
-  }, async ({
-    page,
-  }) => {
-
-    await logsPage.setDateTimeToToday();
-
-
-  });
-
-  test("should display results if stringmatch ignorecase lowercase added in log query search", {
-    tag: ['@stringMatchIgnoreLowerCase', '@all', '@logs']
+  test("should display added function on switching between tabs and again navigate to log", {
+    tag: ['@functionPersistence', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.selectStream('e2e_automate');
-    await logsPage.setDateTimeTo15Minutes();
-    await logsPage.searchWithStringMatchIgnoreCase('ziox');
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.clickVrlEditor();
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.clickRefreshButton();
+    await pageManager.logsPage.clickMenuLinkMetricsItem();
+    await pageManager.logsPage.clickMenuLinkLogsItem();
+    await pageManager.logsPage.clickMenuLinkLogsItem();
+    await pageManager.logsPage.expectPageContainsText(".a=2");
   });
 
-  test("should display results if stringmatch ignorecase uppercase added in log query search", {
-    tag: ['@stringMatchIgnoreUpperCase', '@all', '@logs'] 
+  test("should display bar chart when histogram toggle is on", {
+    tag: ['@histogramBarChart', '@histogram', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.selectStream('e2e_automate');
-    await logsPage.setDateTimeTo15Minutes();
-    await logsPage.searchWithStringMatchIgnoreCase('Ziox');
+    await pageManager.logsPage.clickLogSearchIndexListFieldSearchInput();
+    await pageManager.logsPage.fillLogSearchIndexListFieldSearchInput('code');
+    await pageManager.logsPage.waitForTimeout(4000);
+    await pageManager.logsPage.clickExpandCode();
+    await pageManager.logsPage.waitForTimeout(4000);
+    await pageManager.logsPage.clickRefreshButton();
+    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.clickRefreshButton();
+    await pageManager.logsPage.clickBarChartCanvas();
+    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.clickRefreshButton();
+    await pageManager.logsPage.clickBarChartCanvas();
+    await pageManager.logsPage.clickHistogramToggleDiv();
   });
 
-  test("should trigger search results when pressing Cmd+Enter or Ctrl+Enter", {
-    tag: ['@keyboardShortcuts', '@all', '@logs']
+  test("should display search around in histogram mode", {
+    tag: ['@searchAroundHistogram', '@histogram', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.executeQueryWithKeyboardShortcutTest();
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.clickLogTableColumnSource();
+    await pageManager.logsPage.clickLogsDetailTableSearchAroundBtn();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.expectLogTableColumnSourceVisible();
   });
 
-  test("should execute query with keyboard shortcut (Cmd+Enter or Ctrl+Enter) after clicking elsewhere ", {
-    tag: ['@keyboardShortcuts', '@all', '@logs']
-  }, async ({ page }) => {
-    await logsPage.executeQueryWithKeyboardShortcutAfterClickingElsewhere();
+  test.skip("should display results for search around after adding function", async ({ page }) => {
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.clickVrlEditor();
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.clickRefreshButton();
+    await pageManager.logsPage.clickLogTableColumn3Source();
+    await pageManager.logsPage.clickLogsDetailTableSearchAroundBtn();
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.expectLogTableColumnSourceVisible();
   });
 
-  test("should execute different query with keyboard shortcut (Cmd+Enter or Ctrl+Enter)", {
-    tag: ['@keyboardShortcuts', '@all', '@logs']
+  test("should display search around in SQL mode", {
+    tag: ['@searchAroundSQL', '@sqlMode', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.executeQueryWithKeyboardShortcutWithDifferentQuery();
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.clickLogTableColumnSource();
+    await pageManager.logsPage.clickLogsDetailTableSearchAroundBtn();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.expectLogTableColumnSourceVisible();
   });
 
-  test("should execute SQL query with keyboard shortcut (Cmd+Enter or Ctrl+Enter)", {
-    tag: ['@keyboardShortcuts', '@sqlMode', '@all', '@logs']
+  test("should display results for search around with limit query", {
+    tag: ['@searchAroundLimit', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.executeQueryWithKeyboardShortcutWithSQLMode();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickDateTimeButton();
+    await pageManager.logsPage.clickRelative15MinButton();
+    await pageManager.logsPage.clickQueryEditor();
+    await pageManager.logsPage.typeInQueryEditor("match_all('code') limit 5");
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickLogTableColumnSource();
+    await pageManager.logsPage.clickLogsDetailTableSearchAroundBtn();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.expectLogTableColumnSourceVisible();
   });
 
-  test("should verify logcount ordering in ascending and descending order", {
-    tag: ['@logCountOrdering', '@all', '@logs']
+  test("should not display pagination for limit query", {
+    tag: ['@paginationLimit', '@all', '@logs']
   }, async ({ page }) => {
-    // Verify descending order
-    await logsPage.verifyLogCountOrderingDescending();
-    
-    // Verify ascending order
-    await logsPage.verifyLogCountOrderingAscending();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickDateTimeButton();
+    await pageManager.logsPage.clickRelative15MinButton();
+    await pageManager.logsPage.clickQueryEditor();
+    await pageManager.logsPage.typeInQueryEditor("match_all('code') limit 5");
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickRefreshButton();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.expectPaginationNotVisible();
   });
-})
+
+  test("should not display pagination for SQL limit query", {
+    tag: ['@paginationSQLLimit', '@sqlMode', '@all', '@logs']
+  }, async ({ page }) => {
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickDateTimeButton();
+    await pageManager.logsPage.clickRelative15MinButton();
+    await pageManager.logsPage.clickQueryEditor();
+    await pageManager.logsPage.typeInQueryEditor('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickRefreshButton();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.expectPaginationNotVisible();
+  });
+
+  test("should not display pagination for SQL group/order/limit query", {
+    tag: ['@paginationSQLGroupOrder', '@sqlMode', '@all', '@logs']
+  }, async ({ page }) => {
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickDateTimeButton();
+    await pageManager.logsPage.clickRelative15MinButton();
+    await pageManager.logsPage.clickQueryEditor();
+    await pageManager.logsPage.typeInQueryEditor('SELECT * FROM "e2e_automate" WHERE code < 400 GROUP BY code ORDER BY count(*) DESC LIMIT 5');
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickRefreshButton();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.expectPaginationNotVisible();
+  });
+});
