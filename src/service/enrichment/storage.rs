@@ -44,7 +44,7 @@ pub mod remote {
     use super::*;
 
     #[derive(Debug, Default, Serialize, Deserialize)]
-    pub struct remoteEnrichmentTableMeta {
+    pub struct RemoteEnrichmentTableMeta {
         pub remote_last_updated: i64,
     }
 
@@ -93,7 +93,7 @@ pub mod remote {
 
         crate::service::db::file_list::set(&remote_key, Some(file_meta), false).await?;
 
-        let meta = remoteEnrichmentTableMeta {
+        let meta = RemoteEnrichmentTableMeta {
             remote_last_updated: now_micros(),
         };
         let db = infra_db::get_db().await;
@@ -308,7 +308,7 @@ pub mod remote {
     pub async fn get_last_updated_at(org_id: &str, table_name: &str) -> Result<i64> {
         let db = infra_db::get_db().await;
         let db_key = format!("{ENRICHMENT_TABLE_REMOTE_KEY}{org_id}/{table_name}");
-        let metadata: remoteEnrichmentTableMeta = {
+        let metadata: RemoteEnrichmentTableMeta = {
             let metadata = db.get(&db_key).await.unwrap_or_default();
             let metadata = String::from_utf8_lossy(&metadata);
             serde_json::from_str(&metadata).unwrap_or_default()
