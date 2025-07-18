@@ -328,7 +328,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             infra_db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                log::debug!("enrichment table: {} put", item_key);
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
                 let stream_name = keys[2];

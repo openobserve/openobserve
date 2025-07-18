@@ -28,8 +28,16 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             if msg.key.starts_with(ENRICHMENT_TABLE_META_STREAM_STATS_KEY) {
                 log::debug!("enrichment table meta stream stats key: {}", msg.key);
                 let key_parts = msg.key.split('/').collect::<Vec<&str>>();
-                let org_id = key_parts[1];
-                let name = key_parts[2];
+                if key_parts.len() != 4 {
+                    log::error!(
+                        "enrichment table meta stream stats key is not valid: {}",
+                        msg.key
+                    );
+                    return Ok(());
+                }
+                // Format is /enrichment_table_meta_stream_stats/{org_id}/{name}
+                let org_id = key_parts[2];
+                let name = key_parts[3];
                 if let Err(e) = notify_update(org_id, name).await {
                     log::error!(
                         "super cluster meta queue enrichment table notify_update error: {:?}",
