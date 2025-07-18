@@ -2493,10 +2493,10 @@ fn field_matches_with_alias(field_name: &str, alias: Option<&str>, target_field:
     }
 
     // Match with alias if present
-    if let Some(alias_name) = alias {
-        if alias_name == target_field {
-            return true;
-        }
+    if let Some(alias_name) = alias
+        && alias_name == target_field
+    {
+        return true;
     }
 
     false
