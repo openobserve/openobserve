@@ -350,11 +350,7 @@ async fn handle_diff_schema(
         let mut new_fields = final_schema.fields().to_vec();
         for (field_name, data_type) in &defined_schema_fields {
             if final_schema.field_with_name(field_name).is_err() {
-                let arrow_data_type = match data_type {
-                    config::meta::stream::DataType::Utf8 => datafusion::arrow::datatypes::DataType::Utf8,
-                    config::meta::stream::DataType::Int64 => datafusion::arrow::datatypes::DataType::Int64,
-                    config::meta::stream::DataType::Float64 => datafusion::arrow::datatypes::DataType::Float64,
-                };
+                let arrow_data_type = (*data_type).into();
                 let field = Arc::new(Field::new(
                     field_name,
                     arrow_data_type,

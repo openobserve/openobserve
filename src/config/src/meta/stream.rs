@@ -31,25 +31,41 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, Default)]
 pub enum DataType {
     #[serde(rename = "Utf8")]
     #[default]
     Utf8,
     #[serde(rename = "Int64")]
     Int64,
+    #[serde(rename = "Uint64")]
+    Uint64,
     #[serde(rename = "Float64")]
     Float64,
+    #[serde(rename = "Boolean")]
+    Boolean,
 }
 
+impl Into<arrow_schema::DataType> for DataType {
+    fn into(self) -> arrow_schema::DataType {
+        match self {
+            DataType::Utf8 => arrow_schema::DataType::Utf8,
+            DataType::Int64 => arrow_schema::DataType::Int64,
+            DataType::Uint64 => arrow_schema::DataType::UInt64,
+            DataType::Float64 => arrow_schema::DataType::Float64,
+            DataType::Boolean => arrow_schema::DataType::Boolean,
+        }
+    }
+}
 
 impl Display for DataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DataType::Utf8 => write!(f, "Utf8"),
             DataType::Int64 => write!(f, "Int64"),
+            DataType::Uint64 => write!(f, "Uint64"),
             DataType::Float64 => write!(f, "Float64"),
+            DataType::Boolean => write!(f, "Boolean"),
         }
     }
 }
@@ -61,7 +77,9 @@ impl FromStr for DataType {
         match s {
             "Utf8" => Ok(DataType::Utf8),
             "Int64" => Ok(DataType::Int64),
+            "Uint64" => Ok(DataType::Uint64),
             "Float64" => Ok(DataType::Float64),
+            "Boolean" => Ok(DataType::Boolean),
             _ => Err(format!("Unknown data type: {s}")),
         }
     }
@@ -880,7 +898,12 @@ impl From<&str> for StreamSettings {
                 .as_object()
                 .unwrap()
                 .iter()
-                .map(|(k, v)| (k.to_string(), DataType::from_str(v.as_str().unwrap()).unwrap()))
+                .map(|(k, v)| {
+                    (
+                        k.to_string(),
+                        DataType::from_str(v.as_str().unwrap()).unwrap(),
+                    )
+                })
                 .collect::<HashMap<_, _>>();
         }
 
