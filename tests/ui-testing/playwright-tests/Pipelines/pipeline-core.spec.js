@@ -1,8 +1,7 @@
 import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import { PipelinesPage } from "../../pages/pipelinesPages/pipelinesPage.js";
-import { LogsPage } from '../../pages/logsPages/logsPage.js';
+import PageManager from "../../pages/page-manager.js";
 
 test.describe.configure({ mode: "parallel" });
 
@@ -89,11 +88,11 @@ async function applyQueryButton(page) {
 }
 
 test.describe("Core Pipeline Tests", () => {
-  let logsPage;
+  let pageManager;
 
   test.beforeEach(async ({ page }) => {
     await login(page);
-    logsPage = new LogsPage(page);
+    pageManager = new PageManager(page);
     await page.waitForTimeout(5000);
 
     const orgId = process.env["ORGNAME"];
@@ -111,25 +110,23 @@ test.describe("Core Pipeline Tests", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    await logsPage.selectStream("e2e_automate");
+    await pageManager.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
   });
 
   test("should add source & destination node and then delete the pipeline", async ({ page }) => {
-    const pipelinePage = new PipelinesPage(page);
-
-    await pipelinePage.openPipelineMenu();
+    await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
-    await pipelinePage.addPipeline();
-    await pipelinePage.selectStream();
-    await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
-    await pipelinePage.selectLogs();
+    await pageManager.pipelinesPage.addPipeline();
+    await pageManager.pipelinesPage.selectStream();
+    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
+    await pageManager.pipelinesPage.selectLogs();
 
-    await pipelinePage.enterStreamName("e2e");
-    await pipelinePage.enterStreamName("e2e_automate3");
+    await pageManager.pipelinesPage.enterStreamName("e2e");
+    await pageManager.pipelinesPage.enterStreamName("e2e_automate3");
     await page.waitForTimeout(2000);
     await page.getByRole("option", { name: "e2e_automate3", exact: true }).click();
-    await pipelinePage.saveInputNodeStream();
+    await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(3000);
     await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
@@ -138,45 +135,43 @@ test.describe("Core Pipeline Tests", () => {
     await page.getByLabel("Stream Name *").click();
     await page.getByLabel("Stream Name *").fill("destination-node");
     await page.waitForTimeout(1000);
-    await pipelinePage.clickInputNodeStreamSave();
+    await pageManager.pipelinesPage.clickInputNodeStreamSave();
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
-    await pipelinePage.enterPipelineName(pipelineName);
-    await pipelinePage.savePipeline();
+    await pageManager.pipelinesPage.enterPipelineName(pipelineName);
+    await pageManager.pipelinesPage.savePipeline();
     await ingestion(page);
 
     await exploreStreamAndNavigateToPipeline(page, 'destination_node');
-    await pipelinePage.searchPipeline(pipelineName);
+    await pageManager.pipelinesPage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
     const deletePipelineButton = page.locator(
       `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
     );
     await deletePipelineButton.waitFor({ state: "visible" });
     await deletePipelineButton.click();
-    await pipelinePage.confirmDeletePipeline();
-    await pipelinePage.verifyPipelineDeleted();
+    await pageManager.pipelinesPage.confirmDeletePipeline();
+    await pageManager.pipelinesPage.verifyPipelineDeleted();
   });
 
   test("should add source, function, destination and then delete pipeline", async ({ page }) => {
-    const pipelinePage = new PipelinesPage(page);
-
-    await pipelinePage.openPipelineMenu();
+    await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
-    await pipelinePage.addPipeline();
-    await pipelinePage.selectStream();
-    await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
-    await pipelinePage.selectLogs();
-    await pipelinePage.enterStreamName("e2e");
-    await pipelinePage.enterStreamName("e2e_automate1");
+    await pageManager.pipelinesPage.addPipeline();
+    await pageManager.pipelinesPage.selectStream();
+    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
+    await pageManager.pipelinesPage.selectLogs();
+    await pageManager.pipelinesPage.enterStreamName("e2e");
+    await pageManager.pipelinesPage.enterStreamName("e2e_automate1");
     await page.waitForTimeout(2000);
     await page.getByRole("option", { name: "e2e_automate1", exact: true }).click();
-    await pipelinePage.saveInputNodeStream();
+    await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
     await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
     await page.locator("button").filter({ hasText: "edit" }).hover();
     await page.getByRole("img", { name: "Function", exact: true }).click();
-    await pipelinePage.toggleCreateFunction();
-    await pipelinePage.enterFunctionName(randomFunctionName);
+    await pageManager.pipelinesPage.toggleCreateFunction();
+    await pageManager.pipelinesPage.enterFunctionName(randomFunctionName);
     await page.locator('[data-test="logs-vrl-function-editor"]').getByRole('textbox').click();
     await page.keyboard.type(".a=41", { delay: 100 });
     await page.keyboard.press("Enter");
@@ -184,48 +179,46 @@ test.describe("Core Pipeline Tests", () => {
     await page.getByText("Note: The function will be").click();
     await page.getByText(".a=41 .");
     await page.waitForTimeout(1000);
-    await pipelinePage.saveNewFunction();
+    await pageManager.pipelinesPage.saveNewFunction();
     await page.waitForTimeout(3000);
-    await pipelinePage.saveFunction();
+    await pageManager.pipelinesPage.saveFunction();
     await page.waitForTimeout(3000);
     await page.getByText(randomFunctionName).hover();
     await page.getByRole("img", { name: "Output Stream" }).click();
     await page.getByLabel("Stream Name *").click();
     await page.getByLabel("Stream Name *").fill("destination-node");
     await page.waitForTimeout(100);
-    await pipelinePage.clickInputNodeStreamSave();
+    await pageManager.pipelinesPage.clickInputNodeStreamSave();
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
-    await pipelinePage.enterPipelineName(pipelineName);
-    await pipelinePage.savePipeline();
+    await pageManager.pipelinesPage.enterPipelineName(pipelineName);
+    await pageManager.pipelinesPage.savePipeline();
     await ingestion(page);
 
     await exploreStreamAndInteractWithLogDetails(page, 'destination_node');
-    await pipelinePage.searchPipeline(pipelineName);
+    await pageManager.pipelinesPage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
     const deletePipelineButton = page.locator(
       `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
     );
     await deletePipelineButton.waitFor({ state: "visible" });
     await deletePipelineButton.click();
-    await pipelinePage.confirmDeletePipeline();
-    await pipelinePage.verifyPipelineDeleted();
+    await pageManager.pipelinesPage.confirmDeletePipeline();
+    await pageManager.pipelinesPage.verifyPipelineDeleted();
   });
 
   test("should add source, condition & destination node and then delete the pipeline", async ({ page }) => {
-    const pipelinePage = new PipelinesPage(page);
-
-    await pipelinePage.openPipelineMenu();
+    await pageManager.pipelinesPage.openPipelineMenu();
     await page.waitForTimeout(1000);
-    await pipelinePage.addPipeline();
-    await pipelinePage.selectStream();
-    await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
-    await pipelinePage.selectLogs();
+    await pageManager.pipelinesPage.addPipeline();
+    await pageManager.pipelinesPage.selectStream();
+    await pageManager.pipelinesPage.dragStreamToTarget(pageManager.pipelinesPage.streamButton);
+    await pageManager.pipelinesPage.selectLogs();
 
-    await pipelinePage.enterStreamName("e2e");
-    await pipelinePage.enterStreamName("e2e_automate2");
+    await pageManager.pipelinesPage.enterStreamName("e2e");
+    await pageManager.pipelinesPage.enterStreamName("e2e_automate2");
     await page.waitForTimeout(2000);
     await page.getByRole("option", { name: "e2e_automate2", exact: true }).click();
-    await pipelinePage.saveInputNodeStream();
+    await pageManager.pipelinesPage.saveInputNodeStream();
     await page.waitForTimeout(2000);
     await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
@@ -240,29 +233,29 @@ test.describe("Core Pipeline Tests", () => {
     await page.getByText("Contains", { exact: true }).click();
     await page.getByPlaceholder("Value").click();
     await page.getByPlaceholder("Value").fill("prometheus");
-    await pipelinePage.saveCondition();
+    await pageManager.pipelinesPage.saveCondition();
     await page.waitForTimeout(2000);
     await page.getByText('kubernetes_container_name').hover();
     await page.getByRole("img", { name: "Output Stream" }).click();
     await page.getByLabel("Stream Name *").click();
     await page.getByLabel("Stream Name *").fill("destination-node");
     await page.waitForTimeout(1000);
-    await pipelinePage.clickInputNodeStreamSave();
+    await pageManager.pipelinesPage.clickInputNodeStreamSave();
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
-    await pipelinePage.enterPipelineName(pipelineName);
-    await pipelinePage.savePipeline();
+    await pageManager.pipelinesPage.enterPipelineName(pipelineName);
+    await pageManager.pipelinesPage.savePipeline();
     await ingestion(page);
 
     await exploreStreamAndNavigateToPipeline(page, 'destination_node');
     await page.waitForTimeout(1000);
-    await pipelinePage.searchPipeline(pipelineName);
+    await pageManager.pipelinesPage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
     const deletePipelineButton = page.locator(
       `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
     );
     await deletePipelineButton.waitFor({ state: "visible" });
     await deletePipelineButton.click();
-    await pipelinePage.confirmDeletePipeline();
-    await pipelinePage.verifyPipelineDeleted();
+    await pageManager.pipelinesPage.confirmDeletePipeline();
+    await pageManager.pipelinesPage.verifyPipelineDeleted();
   });
 }); 
