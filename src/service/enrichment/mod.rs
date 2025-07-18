@@ -194,7 +194,7 @@ pub async fn get_enrichment_table(
 
     if db_stats.end_time > local_stats_last_updated {
         // check in s3 to check last updated
-        let s3_last_updated = storage::s3::get_last_updated_at().await?;
+        let s3_last_updated = storage::s3::get_last_updated_at().await.unwrap_or_default();
         // fetch from s3 and put into records
         let data = storage::s3::retrieve(org_id, table_name)
             .await
