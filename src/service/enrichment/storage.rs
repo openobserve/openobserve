@@ -204,7 +204,7 @@ pub mod s3 {
             .map_err(|e| anyhow!("Failed to get schema from cache: {}", e))?;
 
         let buf = Bytes::from(serde_json::to_string(&data).unwrap());
-        let file_meta = FileMeta {
+        let mut file_meta = FileMeta {
             min_ts: created_at,
             max_ts: created_at,
             records: data.len() as i64,
@@ -226,6 +226,7 @@ pub mod s3 {
             &file_meta,
         )
         .await?;
+        file_meta.compressed_size = data.len() as i64;
         upload_to_s3(org_id, table_name, file_meta, &data, created_at).await?;
         Ok(())
     }
