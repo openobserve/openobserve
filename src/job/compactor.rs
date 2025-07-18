@@ -25,7 +25,7 @@ use tokio::sync::mpsc;
 
 use crate::service::compact;
 
-const ENRICHMENT_TABLE_MERGE_LOCK_KEY: &str = "/enrichment_table_merge";
+const ENRICHMENT_TABLE_MERGE_LOCK_KEY: &str = "/compact/enrichment_table";
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_compactor() {
