@@ -81,6 +81,7 @@ import config from "@/aws-exports";
 import useSearchWebSocket from "./useSearchWebSocket";
 import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
+import { changeHistogramInterval } from "@/utils/query/sqlUtils";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -6121,6 +6122,9 @@ const useLogs = () => {
         await generateHistogramSkeleton();
 
         histogramResults = [];
+
+        searchObj.data.histogramQuery.query.sql = await changeHistogramInterval(searchObj.data.histogramQuery.query.sql, 0);
+
 
         const payload = buildWebSocketPayload(
           searchObj.data.histogramQuery,
