@@ -1664,8 +1664,11 @@ const useLogs = () => {
     }
   }
 
-  const setMultiStreamHistogramQuery = (queryReq: any) => {
-    let histogramQuery = `select histogram(${store.state.zoConfig.timestamp_column}, '${searchObj.meta.resultGrid.chartInterval}') AS zo_sql_key, count(*) AS zo_sql_num from "[INDEX_NAME]" [WHERE_CLAUSE] GROUP BY zo_sql_key`;
+  const setMultiStreamHistogramQuery = (queryReq: any, interval: string | null = null) => {
+    // In case of http2 streaming, we don't need to pass the interval to the histogram function as BE will handle it
+    const histogramFn = interval ? `histogram(${store.state.zoConfig.timestamp_column}, '${interval}')` : `histogram(${store.state.zoConfig.timestamp_column})`;
+    let histogramQuery = `select ${histogramFn} AS zo_sql_key, count(*) AS zo_sql_num from "[INDEX_NAME]" [WHERE_CLAUSE] GROUP BY zo_sql_key`;
+
     let multiSql = [];
 
     for (const stream of searchObj.data.stream.selectedStream) {
@@ -1913,7 +1916,9 @@ const useLogs = () => {
               };
             } else {
               if(searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false) {
-                searchObj.data.histogramQuery.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query);
+                searchObj.data.histogramQuery.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query, searchObj.data.queryResults.histogram_interval + " seconds");
+              } else {
+                searchObj.data.histogramQuery.query.sql = searchObj.data.histogramQuery.query.sql.replaceAll("[INTERVAL]", searchObj.data.queryResults.histogram_interval + " seconds");
               }
               searchObjDebug["histogramStartTime"] = performance.now();
               searchObj.data.histogram.errorMsg = "";
@@ -2861,10 +2866,6 @@ const useLogs = () => {
 
       const dismiss = () => {};
       try {
-
-        // Replace interval in histogram query
-        searchObj.data.histogramQuery.query.sql = searchObj.data.histogramQuery.query.sql.replaceAll("[INTERVAL]", searchObj.data.queryResults.histogram_interval + " seconds");
-
         // Set histogram interval
         searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
 
@@ -6133,11 +6134,9 @@ const useLogs = () => {
         );
 
         if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false) {
-          payload.queryReq.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query);
+          payload.queryReq.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query, null);
         } else {
-          payload.queryReq.query.sql = searchObj.data.histogramQuery.query.sql.replace("[INTERVAL]",
-            searchObj.meta.resultGrid.chartInterval,
-          );
+          payload.queryReq.query.sql = await changeHistogramInterval(searchObj.data.histogramQuery.query.sql, 0);
         }
 
         payload.meta = {
