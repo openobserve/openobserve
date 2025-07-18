@@ -155,7 +155,7 @@ pub mod s3 {
         }
 
         let buf = Bytes::from(serde_json::to_string(&data).unwrap());
-        let file_meta = FileMeta {
+        let mut file_meta = FileMeta {
             min_ts,
             max_ts,
             records: data.len() as i64,
@@ -177,6 +177,8 @@ pub mod s3 {
             &file_meta,
         )
         .await?;
+
+        file_meta.compressed_size = data.len() as i64;
 
         upload_to_s3(org_id, table_name, file_meta, &data, min_ts).await?;
 
