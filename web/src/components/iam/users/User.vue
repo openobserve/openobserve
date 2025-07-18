@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #top="scope">
         <QTablePagination
+          style="padding: 0px !important;"
           :scope="scope"
           :pageTitle="t('iam.basicUsers')"
           :resultTotal="resultTotal"

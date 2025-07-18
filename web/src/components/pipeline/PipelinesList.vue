@@ -237,6 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #top="scope">
           <q-table-pagination
+            style="padding: 0px !important;"
             :scope="scope"
             :pageTitle="t('pipeline.header')"
             :position="'top'"
