@@ -200,6 +200,7 @@ async function deletePipeline(page, randomPipelineName) {
   await page.locator('[data-test="confirm-button"]').click();
 }
 test.describe("Pipeline testcases", () => {
+  let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
