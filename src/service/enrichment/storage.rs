@@ -116,7 +116,7 @@ pub mod s3 {
                     records.extend(table_data);
                 }
                 Err(e) => {
-                    log::debug!("Enrichment table {} not found in S3: {}", s3_key, e);
+                    log::warn!("Enrichment table {} not found in S3: {}", s3_key, e);
                 }
             }
         }
@@ -424,6 +424,9 @@ pub mod local {
         let key = get_key(org_id, table_name);
         let file_dir = get_table_dir(&key);
         let metadata_path = get_metadata_path();
+        if !metadata_path.exists() {
+            return Ok(());
+        }
 
         if file_dir.exists() {
             tokio::fs::remove_dir_all(&file_dir)
@@ -490,12 +493,11 @@ pub mod local {
         let key = get_key(org_id, table_name);
         let metadata_content = get_metadata_content().await?;
         let last_updated_at = metadata_content.get(&key).cloned().unwrap_or_default();
-        if last_updated_at <= updated_at {
-            return Ok(());
+        if last_updated_at < updated_at || last_updated_at == 0 {
+            delete(org_id, table_name).await?;
+            store(org_id, table_name, data, updated_at).await?;
         }
-        // Delete the old data
-        delete(org_id, table_name).await?;
-        store(org_id, table_name, data, updated_at).await
+        Ok(())
     }
 
     pub async fn store_data_if_needed_background(
