@@ -1697,9 +1697,6 @@ const useLogs = () => {
         searchObjDebug["partitionEndTime"] = performance.now();
       }
 
-      searchObj.data.queryResults.scan_size = 0;
-      searchObj.data.queryResults.took = 0;
-
       //reset the plot chart when the query is run 
       //this is to avoid the issue of chart not updating when histogram is disabled and enabled and clicking the run query button
       //only reset the plot chart when the query is not run for pagination
