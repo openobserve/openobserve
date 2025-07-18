@@ -184,6 +184,18 @@ pub async fn get_enrichment_table(
     org_id: &str,
     table_name: &str,
 ) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
+    let records = get_enrichment_table_json(org_id, table_name).await?;
+
+    Ok(records
+        .iter()
+        .map(crate::service::db::enrichment_table::convert_to_vrl)
+        .collect())
+}
+
+pub async fn get_enrichment_table_json(
+    org_id: &str,
+    table_name: &str,
+) -> Result<Vec<serde_json::Value>, anyhow::Error> {
     let mut records = vec![];
     let db_stats = crate::service::db::enrichment_table::get_meta_table_stats(org_id, table_name)
         .await
@@ -221,6 +233,9 @@ pub async fn get_enrichment_table(
             .unwrap()
             .cmp(&b.get("_timestamp").unwrap().as_i64().unwrap())
     });
+    if records.is_empty() {
+        return Ok(vec![]);
+    }
     let last_updated_at = records
         .last()
         .unwrap()
@@ -231,8 +246,5 @@ pub async fn get_enrichment_table(
     storage::local::store_data_if_needed_background(org_id, table_name, &records, last_updated_at)
         .await?;
 
-    Ok(records
-        .iter()
-        .map(crate::service::db::enrichment_table::convert_to_vrl)
-        .collect())
+    Ok(records)
 }

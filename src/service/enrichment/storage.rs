@@ -323,13 +323,7 @@ pub mod local {
     }
 
     fn get_table_path(table_dir: &str, created_at: i64) -> PathBuf {
-        let cfg = config::get_config();
-        let cache_dir = if cfg.enrichment_table.cache_dir.is_empty() {
-            format!("{}/enrichment_table_cache", cfg.common.data_cache_dir)
-        } else {
-            cfg.enrichment_table.cache_dir.clone()
-        };
-        PathBuf::from(format!("{cache_dir}/{table_dir}/{created_at}.json"))
+        PathBuf::from(format!("{table_dir}/{created_at}.json"))
     }
 
     fn get_metadata_path() -> PathBuf {
