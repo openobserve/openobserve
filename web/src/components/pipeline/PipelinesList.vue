@@ -461,7 +461,6 @@ const togglePipeline = (row: any) => {
   }else{
     //if we are going to resume the pipeline then we need to show the dialog to resume the pipeline from where it paused / start from now as per the user choice
     resumePipelineDialogMeta.value.show = true;
-    console.log("row",row);
     resumePipelineDialogMeta.value.data = row;
   }
 }
@@ -475,7 +474,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
       newState,
       from_now
     )
-    .then((response) => {
+    .then(async (response) => {
       row.enabled = newState;
       const message = row.enabled
         ? `${row.name} state resumed successfully`
@@ -486,6 +485,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
         position: "bottom",
         timeout: 3000,
       });
+      await getPipelines();
     })
     .catch((error) => {
       if (error.response.status != 403) {

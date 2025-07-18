@@ -19,17 +19,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card class="resume-pipeline-dialog" data-test="dialog-box">
       <q-card-section class="resume-pipeline-dialog-header q-pa-none" style="padding: 0px;">
         <div class="dialog-title">Resume Pipeline Ingestion</div>
-        <div class="last-paused-at-text">Last paused: {{ lastPausedAt ?? "2025-07-17" }}</div>
+        <div v-if="lastPausedAt" class="last-paused-at-text">Last paused: {{ convertUnixToQuasarFormat(lastPausedAt) }}</div>
       </q-card-section>
       <q-card-section class="resume-pipeline-dialog-body q-pa-none" style="padding: 0px;">
               <q-radio
               v-model="resumeFromStart"
+              class="resume-radio-align"
               :val="false">
-              <span class="resume-pipeline-dialog-body-text">Continue from where it paused ({{ lastPausedAt ?? "2025-07-17" }}).</span>
+                <div class="resume-radio-label">
+                <div class="resume-radio-main-text resume-pipeline-dialog-body-text" >Continue from where it paused</div>
+                <div v-if="lastPausedAt" class="resume-radio-sub-text resume-pipeline-dialog-body-text-time">
+                  {{ convertUnixToQuasarFormat(lastPausedAt) }}.
+                </div>
+              </div>
             </q-radio>
             <q-radio
               v-model="resumeFromStart"
               :val="true"
+              style="height: 18px;"
             >
               <span class="resume-pipeline-dialog-body-text">Start from now.</span>
             </q-radio>
@@ -70,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { convertUnixToQuasarFormat } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "ConfirmDialog",
@@ -102,6 +110,7 @@ export default defineComponent({
       onConfirm,
       resumeFromStart,
       store,
+      convertUnixToQuasarFormat
     };
   },
 });
@@ -129,7 +138,6 @@ export default defineComponent({
   gap: 7px;
   width: 312px;
   .q-radio{
-    height: 18px !important;
     margin-left: -8px;
     ::v-deep(.q-radio__inner){
       min-height: 16px !important;
@@ -157,6 +165,12 @@ export default defineComponent({
   font-weight: 400;
 
 }
+.resume-pipeline-dialog-body-text-time{
+font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+
+}
 
 .resume-pipeline-dialog-actions{
   display: flex;
@@ -179,6 +193,11 @@ export default defineComponent({
   }
 }
 
+.resume-pipeline-dialog-body-text-time{
+  height: 18px;
+
+}
+
 //light theme
 .light-theme-dialog{
   .dialog-title{
@@ -189,6 +208,9 @@ export default defineComponent({
   }
   .resume-pipeline-dialog{
     box-shadow: 0px 2px 11px rgba(0, 0, 0, 0.25);
+  }
+  .resume-pipeline-dialog-body-text-time{
+    color: rgba(89, 89, 89, 1);
   }
 }
 //dark-theme
@@ -202,5 +224,11 @@ export default defineComponent({
   .resume-pipeline-dialog{
     box-shadow: 0px 2px 6px rgba(255, 255, 255, 0.15);
   }
+  .resume-pipeline-dialog-body-text-time{
+    color: rgba(153, 153, 153, 1);
+  }
+}
+.resume-radio-align {
+  align-items: flex-start; /* aligns radio button with top of the label */
 }
 </style>
