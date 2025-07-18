@@ -185,62 +185,41 @@ pub async fn list_streams_with_pipeline(org: &str) -> Result<ListStreamParams, P
 pub async fn enable_pipeline(
     org_id: &str,
     pipeline_id: &str,
-    value: bool,
+    enable: bool,
+    starts_from_now: bool,
 ) -> Result<(), PipelineError> {
     let Ok(mut pipeline) = pipeline::get_by_id(pipeline_id).await else {
         return Err(PipelineError::NotFound(pipeline_id.to_string()));
     };
 
-    pipeline.enabled = value;
+    pipeline.enabled = enable;
     // add or remove trigger if it's a scheduled pipeline
     if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
-        if pipeline.enabled {
-            super::alerts::derived_streams::save(
-                derived_stream.clone(),
-                &pipeline.name,
-                pipeline_id,
-                false,
-            )
-            .await
-            .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
-        } else {
-            super::alerts::derived_streams::delete(derived_stream, &pipeline.name, pipeline_id)
+        if enable {
+            if starts_from_now {
+                super::alerts::derived_streams::delete(derived_stream, &pipeline.name, pipeline_id)
+                    .await
+                    .map_err(|e| PipelineError::DeleteDerivedStream(e.to_string()))?;
+                super::alerts::derived_streams::save(
+                    derived_stream.clone(),
+                    &pipeline.name,
+                    pipeline_id,
+                    false,
+                )
                 .await
-                .map_err(|e| PipelineError::DeleteDerivedStream(e.to_string()))?;
+                .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
+            } else {
+                super::alerts::derived_streams::save(
+                    derived_stream.clone(),
+                    &pipeline.name,
+                    pipeline_id,
+                    false,
+                )
+                .await
+                .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
+            }
         }
-    }
-
-    pipeline::update(&pipeline, None).await?;
-    Ok(())
-}
-
-#[tracing::instrument]
-pub async fn pause_pipeline(
-    org_id: &str,
-    pipeline_id: &str,
-    paused: bool,
-) -> Result<(), PipelineError> {
-    let Ok(mut pipeline) = pipeline::get_by_id(pipeline_id).await else {
-        return Err(PipelineError::NotFound(pipeline_id.to_string()));
-    };
-
-    // add or remove trigger if it's a scheduled pipeline
-    let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source else {
-        return Err(PipelineError::PipelineDoesNotApply);
-    };
-
-    pipeline.enabled = paused;
-    // bring next_run_at to now if unpaused
-    if !paused {
-        super::alerts::derived_streams::save(
-            derived_stream.clone(),
-            &pipeline.name,
-            pipeline_id,
-            false,
-        )
-        .await
-        .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
     }
 
     pipeline::update(&pipeline, None).await?;

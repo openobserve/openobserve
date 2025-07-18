@@ -98,7 +98,11 @@ mod tests {
     async fn run_single_test(log_line: &str, expected_output: Vec<&str>, nullable: bool) {
         let sqls = [("select cast_to_arr(log) as ret from t", expected_output)];
 
-        let schema = Arc::new(Schema::new(vec![Field::new("log", DataType::Utf8, nullable)]));
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "log",
+            DataType::Utf8,
+            nullable,
+        )]));
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![Arc::new(StringArray::from(vec![log_line]))],
@@ -119,13 +123,7 @@ mod tests {
 
     // Helper function to run multiple test cases that should all return null
     async fn run_null_returning_tests(test_cases: &[&str]) {
-        let expected_output = vec![
-            "+-----+",
-            "| ret |",
-            "+-----+",
-            "|     |",
-            "+-----+",
-        ];
+        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
 
         for &log_line in test_cases {
             run_single_test(log_line, expected_output.clone(), false).await;
@@ -186,13 +184,13 @@ mod tests {
     async fn test_cast_to_arr_null_returning_cases() {
         // Test cases that should return null
         let null_cases = [
-            r#"[]"#,                    // empty array
-            r#"not json"#,              // invalid JSON
-            r#"{"key": "value"}"#,      // object
-            r#""just a string""#,       // string
-            r#"42"#,                    // number
-            r#"true"#,                  // boolean
-            r#"null"#,                  // null
+            r#"[]"#,               // empty array
+            r#"not json"#,         // invalid JSON
+            r#"{"key": "value"}"#, // object
+            r#""just a string""#,  // string
+            r#"42"#,               // number
+            r#"true"#,             // boolean
+            r#"null"#,             // null
         ];
 
         run_null_returning_tests(&null_cases).await;
@@ -200,13 +198,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cast_to_arr_null_input() {
-        let expected_output = vec![
-            "+-----+",
-            "| ret |",
-            "+-----+",
-            "|     |",
-            "+-----+",
-        ];
+        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
 
         let schema = Arc::new(Schema::new(vec![Field::new("log", DataType::Utf8, true)]));
         let batch = RecordBatch::try_new(
@@ -253,11 +245,9 @@ mod tests {
         )];
 
         let schema = Arc::new(Schema::new(vec![Field::new("log", DataType::Utf8, false)]));
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![Arc::new(StringArray::from(log_lines))],
-        )
-        .unwrap();
+        let batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(StringArray::from(log_lines))])
+                .unwrap();
 
         let ctx = SessionContext::new();
         ctx.register_udf(CAST_TO_ARR_UDF.clone());
