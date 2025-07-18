@@ -56,7 +56,7 @@ use crate::service::{
             },
             exec::{prepare_datafusion_context, register_udf},
             plan::tantivy_count_exec::TantivyCountExec,
-            table_provider::uniontable::NewUnionTable,
+            table_provider::{enrich_table::NewEnrichTable, uniontable::NewUnionTable},
         },
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -338,6 +338,16 @@ pub async fn search(
         };
         tables.extend(tbls);
         scan_stats.add(&stats);
+    }
+
+    // if the stream type is enrichment tables and the enrich mode is true, we need to load
+    // enrichment data from db to datafusion tables
+    if stream_type == StreamType::EnrichmentTables && req.query_identifier.enrich_mode {
+        // get the enrichment table from db
+        let enrichment_table =
+            NewEnrichTable::new(&org_id, &stream_name, empty_exec.schema().clone());
+        // add the enrichment table to the tables
+        tables.push(Arc::new(enrichment_table) as _);
     }
 
     // create a Union Plan to merge all tables

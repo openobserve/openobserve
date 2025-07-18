@@ -2813,6 +2813,9 @@ pub struct QueryIdentifier {
     /// the unique id for each remote scan
     #[prost(string, tag = "5")]
     pub job_id: ::prost::alloc::string::String,
+    /// need special logic for loading enrich table
+    #[prost(bool, tag = "6")]
+    pub enrich_mode: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
