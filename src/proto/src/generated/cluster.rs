@@ -2976,7 +2976,7 @@ pub struct SuperClusterInfo {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IdxOptimizeMode {
-    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2, 3, 4")]
+    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2, 3, 4, 5")]
     pub mode: ::core::option::Option<idx_optimize_mode::Mode>,
 }
 /// Nested message and enum types in `IdxOptimizeMode`.
@@ -2992,6 +2992,8 @@ pub mod idx_optimize_mode {
         SimpleHistogram(super::SimpleHistogram),
         #[prost(message, tag = "4")]
         SimpleTopn(super::SimpleTopN),
+        #[prost(message, tag = "5")]
+        SimpleDistinct(super::SimpleDistinct),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3018,6 +3020,16 @@ pub struct SimpleHistogram {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SimpleTopN {
+    #[prost(string, tag = "1")]
+    pub field: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "2")]
+    pub limit: u32,
+    #[prost(bool, tag = "3")]
+    pub asc: bool,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleDistinct {
     #[prost(string, tag = "1")]
     pub field: ::prost::alloc::string::String,
     #[prost(uint32, tag = "2")]
