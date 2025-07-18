@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="
                     props.row.enabled ? t('alerts.pause') : t('alerts.start')
                   "
-                  @click.stop="toggleAlertState(props.row)"
+                  @click.stop="togglePipeline(props.row)"
                 />
                 <q-btn
                   :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
@@ -278,6 +278,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:cancel="resetConfirmDialog"
     v-model="confirmDialogMeta.show"
   />
+  <resume-pipeline-dialog
+    :shouldStartfromNow="shouldStartfromNow"
+    :lastPausedAt="resumePipelineDialogMeta.data?.paused_at"
+    @update:ok="resumePipelineDialogMeta.onConfirm()"
+    @update:cancel="resumePipelineDialogMeta.onCancel()"
+    v-model="resumePipelineDialogMeta.show"
+    @update:shouldStartfromNow="shouldStartfromNow = $event"
+  />
 </template>
 <script setup lang="ts">
 import {
@@ -310,6 +318,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import AppTabs from "@/components/common/AppTabs.vue";
 import PipelineView from "./PipelineView.vue";
+import ResumePipelineDialog from "../ResumePipelineDialog.vue";
 
 import { filter, update } from "lodash-es";
 
@@ -338,6 +347,15 @@ const pipelines = ref([]);
 
 const store = useStore();
 const isEnabled = ref(false);
+
+const shouldStartfromNow = ref(true);
+const resumePipelineDialogMeta: any = ref({
+  show: false,
+  title: "Resume Pipeline Ingestion",
+  data: null,
+  onConfirm: () =>  handleResumePipeline(),
+  onCancel: () => handleCancelResumePipeline(),
+});
 
 const { pipelineObj } = useDragAndDrop();
 
@@ -432,14 +450,30 @@ const updateActiveTab = () => {
   resultTotal.value = filteredPipelines.value.length;
   columns.value = getColumnsForActiveTab(activeTab.value);
 };
+//this is the function to check whether the pipeline is enabled or not 
+//becuase if it is not enabled then we need to show the dialog to resume the pipeline from where it paused / start from now
+//else we need to toggle the pipeline state
+const togglePipeline = (row: any) => {
+  //if we are going to pause the pipeline and it is realtime pipeline then we need to toggle the pipeline state and pause the pipeline
+  //and the resume at would be false because it is not required to resume the pipeline and for realtime pipelines from where it paused
+  if(row.enabled || row.type == "realtime"){
+    togglePipelineState(row,true);
+  }else{
+    //if we are going to resume the pipeline then we need to show the dialog to resume the pipeline from where it paused / start from now as per the user choice
+    resumePipelineDialogMeta.value.show = true;
+    console.log("row",row);
+    resumePipelineDialogMeta.value.data = row;
+  }
+}
 
-const toggleAlertState = (row: any) => {
+const togglePipelineState = (row: any, from_now: boolean) => {
   const newState = !row.enabled;
   pipelineService
     .toggleState(
       store.state.selectedOrganization.identifier,
       row.pipeline_id,
       newState,
+      from_now
     )
     .then((response) => {
       row.enabled = newState;
@@ -478,12 +512,6 @@ const triggerExpand = (props: any) => {
     expandedRow.value = props.row.pipeline_id;
   }
 };
-
-const editingPipeline = ref<any | null>(null);
-
-// const updateActiveTab = (tab: string) => {
-//   isRealTime.value = tab === "realTime";
-// };
 
 const getColumnsForActiveTab = (tab: any) => {
   let realTimeColumns = [
@@ -843,6 +871,16 @@ const exportBulkPipelines = () => {
     timeout: 3000,
   });
 };
+//if user clicks on run pipeline button then we need toggle the pipeline state and resume the pipeline from where it paused / start from now as per the user choice
+const handleResumePipeline = () => {
+  resumePipelineDialogMeta.value.show = false;
+  togglePipelineState(resumePipelineDialogMeta.value.data,shouldStartfromNow.value);
+}
+//if user clicks on cancel button then we need to just close the dialog and do not toggle the pipeline state
+const handleCancelResumePipeline = () => {
+  resumePipelineDialogMeta.value.show = false;
+  return;
+}
 </script>
 <style lang="scss" scoped>
 .pipeline-list-table {
