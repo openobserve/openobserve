@@ -1,7 +1,7 @@
 <template>
   <div data-test="add-stream-fields-section">
     <div v-if="showHeader" data-test="alert-conditions-text" class="text-bold">
-      Fields *
+      Fields
     </div>
     <template v-if="!fields.length">
       <q-btn
@@ -28,12 +28,9 @@
         :data-test="`alert-conditions-${index + 1}`"
       >
         <div data-test="add-stream-field-name-input" class="q-ml-none o2-input flex items-center ">
-          <span class="q-py-sm q-pr-md">
-            Field Name
-          </span>
           <q-input
             v-model="field.name"
-            :placeholder="t('common.name') + ' *'"
+            :placeholder="'Field Name' + ' *'"
             color="input-border"
             bg-color="input-bg"
             class="q-py-sm"
@@ -43,7 +40,7 @@
             dense
             :rules="[(val: any) => !!val.trim() || 'Field is required!']"
             tabindex="0"
-            :style="isInSchema ? { width: '40vw' } : { width: '300px' }"
+            :style="isInSchema ? { width: '40vw' } : { width: '250px' }"
           />
         </div>
         <!-- <div
@@ -75,7 +72,7 @@
           <q-select
             v-model="field.index_type"
             :options="streamIndexType"
-            :popup-content-style="{ textTransform: 'capitalize' }"
+            :popup-content-style="{ textTransform: 'lowercase' }"
             color="input-border"
             bg-color="input-bg"
             class="q-py-sm stream-schema-index-select"
@@ -85,33 +82,56 @@
             :option-disable="(_option: any) => disableOptions(field, _option)"
             emit-value
             clearable
-            stack-label
             outlined
+            stack-label
+            borderless
             filled
             dense
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="width: 300px"
+            use-input
+            fill-input
+            hide-bottom-space
+            style="width: 250px"
+            :placeholder="!isFocused && (!field.index_type || field.index_type.length === 0) ? 'Index Type' : ''"
             @update:model-value="emits('input:update', 'conditions', field)"
+            @focus="handleFocus"
+            @blur="handleBlur"
           />
         </div>
         <div
-          class="q-ml-none alerts-condition-action"
-          style="margin-bottom: 12px"
+          v-if="visibleInputs.index_type"
+          data-test="add-stream-field-type-select-input"
+          class="q-ml-none flex items-end o2-input"
         >
-          <q-btn
-            data-test="add-stream-delete-field-btn"
-            :icon="outlinedDelete"
-            class="q-ml-xs "
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            flat
-            
-            :title="t('alert_templates.edit')"
-            @click="deleteApiHeader(field, index)"
-            style="min-width: auto; border: 1px solid #F2452F; color: #F2452F;"
+          <q-select
+            v-model="field.type"
+            :options="dataTypes"
+            :popup-content-style="{ textTransform: 'lowercase' }"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-sm stream-schema-index-select"
+            option-label="label"
+            option-value="value"
+            clearable
+            outlined
+            borderless
+            filled
+            dense
+            use-input
+            fill-input
+            hide-selected
+            emit-value
+            hide-bottom-space
+            style="width: 250px"
+            :placeholder="!isDataTypeFocused && (!field.type || field.type.length === 0) ? 'Data Type' : ''"
+            @update:model-value="emits('input:update', 'conditions', field)"
+            @focus="handleDataTypeFocus"
+            @blur="handleDataTypeBlur"
           />
+        </div>
+        <div
+          class="q-ml-none "
+          style="margin-bottom: 8px;"
+        >
           <q-btn
             data-test="add-stream-add-field-btn"
             v-if="index === fields.length - 1"
@@ -126,6 +146,20 @@
             :title="t('alert_templates.edit')"
             @click="addApiHeader()"
             style="min-width: auto;border: 1px solid #5960B2; color: #5960B2;"
+          />
+          <q-btn
+            data-test="add-stream-delete-field-btn"
+            :icon="outlinedDelete"
+            class="q-ml-xs "
+            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
+            padding="sm"
+            unelevated
+            size="sm"
+            flat
+            
+            :title="t('alert_templates.edit')"
+            @click="deleteApiHeader(field, index)"
+            style="min-width: auto; border: 1px solid #F2452F; color: #F2452F;"
           />
         </div>
       </div>
@@ -178,7 +212,7 @@ const streamIndexType = [
   { label: "Hash partition (128 Buckets)", value: "hashPartition_128" },
 ];
 
-const fieldTypes = [
+const dataTypes = [
   {
     label: "String",
     value: "Utf8",
@@ -196,6 +230,11 @@ const fieldTypes = [
 const store = useStore();
 
 const { t } = useI18n();
+
+const isFocused = ref(false)
+//repetitive need to refactor
+const isDataTypeFocused = ref(false)
+
 
 const deleteApiHeader = (field: any, index: number) => {
   emits("remove", field, index);
@@ -239,6 +278,22 @@ const disableOptions = (schema: any, option: any) => {
 
   return false;
 };
+
+
+const handleFocus = () => {
+  isFocused.value = true
+}
+
+const handleBlur = () => {
+  isFocused.value = false
+}
+const handleDataTypeFocus = () => {
+  isDataTypeFocused.value = true
+}
+
+const handleDataTypeBlur = () => {
+  isDataTypeFocused.value = false
+}
 </script>
 
 <style lang="scss">
