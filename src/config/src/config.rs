@@ -1841,6 +1841,24 @@ pub struct Pipeline {
     )]
     pub batch_size_bytes: usize,
     #[env_config(
+        name = "ZO_PIPELINE_BATCH_RETRY_MAX_ATTEMPTS",
+        default = 3,
+        help = "Maximum number of retries for batch flush"
+    )]
+    pub batch_retry_max_attempts: u32,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_RETRY_INITIAL_DELAY_MS",
+        default = 1000, // 1 second
+        help = "Initial delay for batch flush retry (in milliseconds)"
+    )]
+    pub batch_retry_initial_delay_ms: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_RETRY_MAX_DELAY_MS",
+        default = 30000, // 30 seconds
+        help = "Maximum delay for batch flush retry (in milliseconds)"
+    )]
+    pub batch_retry_max_delay_ms: u64,
+    #[env_config(
         name = "ZO_PIPELINE_USE_SHARED_HTTP_CLIENT",
         default = false,
         help = "Use shared HTTP client instances for better connection pooling"
