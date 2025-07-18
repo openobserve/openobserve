@@ -77,38 +77,40 @@ pub fn arr_index_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Colum
     // 2. perform the computation
     let array = zip(arr_field1.iter(), start.iter())
         .map(|(arr_field1, start)| {
-            let mut index_arrs = vec![];
-
             match (arr_field1, start) {
-                // in arrow, any value can be null.
-                // Here we decide to make our UDF to return null when either argument is null.
                 (Some(arr_field1), Some(start)) => {
                     let start = start as usize;
-                    let arr_field1: json::Value =
-                        json::from_str(arr_field1).expect("Failed to deserialize arrzip field1");
-                    // This field is assumed to be an array field
-                    if let json::Value::Array(field1) = arr_field1
-                        && field1.len() > start
-                    {
-                        if let Some(end) = end {
-                            // end is min(end, field1.len)
-                            let end = if end.as_usize() < field1.len() {
-                                end as usize
-                            } else {
-                                field1.len() - 1
-                            };
-                            if start <= end && end < field1.len() {
-                                for item in field1.into_iter().take(end + 1).skip(start) {
-                                    index_arrs.push(item);
+                    json::from_str::<json::Value>(arr_field1)
+                        .ok()
+                        .and_then(|arr_field1| {
+                            if let json::Value::Array(field1) = arr_field1 {
+                                let mut index_arrs: Vec<json::Value> = vec![];
+                                if field1.len() > start {
+                                    if let Some(end) = end {
+                                        // end is min(end, field1.len)
+                                        let end = if end.as_usize() < field1.len() {
+                                            end as usize
+                                        } else {
+                                            field1.len() - 1
+                                        };
+                                        if start <= end && end < field1.len() {
+                                            for item in field1.into_iter().take(end + 1).skip(start)
+                                            {
+                                                index_arrs.push(item);
+                                            }
+                                        }
+                                        // If start > end or end >= field1.len(), index_arrs remains empty
+                                    } else {
+                                        index_arrs.push(field1[start].clone());
+                                    }
                                 }
+                                // If start >= field1.len(), index_arrs remains empty
+                                // Always return the array, even if empty
+                                json::to_string(&index_arrs).ok()
+                            } else {
+                                None
                             }
-                        } else {
-                            index_arrs.push(field1[start].clone());
-                        }
-                    }
-                    let index_arrs =
-                        json::to_string(&index_arrs).expect("Failed to stringify arrs");
-                    Some(index_arrs)
+                        })
                 }
                 _ => None,
             }
@@ -236,5 +238,120 @@ mod tests {
             let data = df.collect().await.unwrap();
             assert_batches_eq!(item.1, &data);
         }
+    }
+
+    #[tokio::test]
+    async fn test_arr_index_edge_cases() {
+        // Test cases that should return null or empty arrays
+        let edge_cases = [
+            (r#"not json"#, 0, 1, "invalid JSON"),
+            (r#"{"key": "value"}"#, 0, 1, "object"),
+            (r#""just a string""#, 0, 1, "string"),
+            (r#"42"#, 0, 1, "number"),
+            (r#"true"#, 0, 1, "boolean"),
+            (r#"null"#, 0, 1, "null"),
+            (r#"[]"#, 0, 1, "empty array"),
+        ];
+
+        for (json_input, start, end, _test_name) in edge_cases {
+            let sql = format!(
+                "select arrindex(test_col, {}, {}) as ret from t",
+                start, end
+            );
+            // Empty arrays return [] instead of null, other invalid inputs return null
+            let expected = if json_input == r#"[]"# {
+                vec!["+-----+", "| ret |", "+-----+", "| []  |", "+-----+"]
+            } else {
+                vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"]
+            };
+
+            let schema = Arc::new(Schema::new(vec![Field::new(
+                "test_col",
+                DataType::Utf8,
+                false,
+            )]));
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![Arc::new(StringArray::from(vec![json_input]))],
+            )
+            .unwrap();
+
+            let ctx = SessionContext::new();
+            ctx.register_udf(ARR_INDEX_UDF.clone());
+            let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+            ctx.register_table("t", Arc::new(provider)).unwrap();
+
+            let df = ctx.sql(&sql).await.unwrap();
+            let data = df.collect().await.unwrap();
+            assert_batches_eq!(expected, &data);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_arr_index_null_input() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "test_col",
+            DataType::Utf8,
+            true,
+        )]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(vec![None::<String>]))],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_INDEX_UDF.clone());
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let df = ctx
+            .sql("select arrindex(test_col, 0, 1) as ret from t")
+            .await
+            .unwrap();
+        let data = df.collect().await.unwrap();
+        assert_batches_eq!(
+            vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"],
+            &data
+        );
+    }
+
+
+
+    #[tokio::test]
+    async fn test_arr_index_wrong_arguments() {
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_INDEX_UDF.clone());
+
+        // Test with no arguments
+        let result = ctx.sql("select arrindex() as ret").await;
+        assert!(result.is_err());
+
+        // Test with only one argument
+        let result = ctx.sql("select arrindex('a') as ret").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_arr_index_invalid_json_no_panic() {
+        // Test that invalid JSON doesn't cause a panic
+        let schema = Arc::new(Schema::new(vec![Field::new("test_col", DataType::Utf8, false)]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(vec!["not json"]))],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_INDEX_UDF.clone());
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let df = ctx
+            .sql("select arrindex(test_col, 0, 1) as ret from t")
+            .await
+            .unwrap();
+        let data = df.collect().await.unwrap();
+        assert_batches_eq!(vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"], &data);
     }
 }

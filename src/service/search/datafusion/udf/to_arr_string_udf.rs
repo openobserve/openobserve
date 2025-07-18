@@ -65,22 +65,18 @@ pub fn to_arr_string_impl(args: &[ColumnarValue]) -> datafusion::error::Result<C
     let array = list_array
         .iter()
         .map(|array| {
-            if let Some(string_array) = array {
-                let string_array = as_generic_string_array::<i32>(&string_array)
-                    .expect("failed to cast to string array from list array");
-                let mut arr = vec![];
-                string_array.iter().for_each(|string| {
-                    if let Some(string) = string {
-                        arr.push(string.to_string());
-                    }
-                });
-
-                let arr_string =
-                    json::to_string(&arr).expect("failed to stringify datafusion array");
-                Some(arr_string)
-            } else {
-                None
-            }
+            array
+                .and_then(|string_array| {
+                    as_generic_string_array::<i32>(&string_array)
+                        .ok()
+                        .and_then(|string_array| {
+                            let arr: Vec<String> = string_array
+                                .iter()
+                                .filter_map(|string| string.map(|s| s.to_string()))
+                                .collect();
+                            json::to_string(&arr).ok()
+                        })
+                })
         })
         .collect::<StringArray>();
 
@@ -94,7 +90,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_to_array_string() {
+    async fn test_to_array_string_valid_arrays() {
         let sqls = [
             (
                 "select to_array_string(range(0, 3)) as ret",
@@ -102,7 +98,7 @@ mod tests {
                     "+---------------+",
                     "| ret           |",
                     "+---------------+",
-                    "| [\"0\",\"1\",\"2\"] |",
+                  r#"| ["0","1","2"] |"#,
                     "+---------------+",
                 ],
             ),
@@ -110,10 +106,48 @@ mod tests {
                 "select to_array_string(range(0, 0)) as ret",
                 vec!["+-----+", "| ret |", "+-----+", "| []  |", "+-----+"],
             ),
+            (
+                "select to_array_string(array['a', 'b', 'c']) as ret",
+                vec![
+                    "+---------------+",
+                    "| ret           |",
+                    "+---------------+",
+                  r#"| ["a","b","c"] |"#,
+                    "+---------------+",
+                ],
+            ),
+            (
+                "select to_array_string(array[1, 2, 3]) as ret",
+                vec![
+                    "+---------------+",
+                    "| ret           |",
+                    "+---------------+",
+                  r#"| ["1","2","3"] |"#,
+                    "+---------------+",
+                ],
+            ),
+            (
+                "select to_array_string(array[1.5, 2.7, 3.9]) as ret",
+                vec![
+                    "+---------------------+",
+                    "| ret                 |",
+                    "+---------------------+",
+                  r#"| ["1.5","2.7","3.9"] |"#,
+                    "+---------------------+",
+                ],
+            ),
+            (
+                "select to_array_string(array[true, false, true]) as ret",
+                vec![
+                    "+-------------------------+",
+                    "| ret                     |",
+                    "+-------------------------+",
+                  r#"| ["true","false","true"] |"#,
+                    "+-------------------------+",
+                ],
+            ),
         ];
 
-        // declare a new context. In spark API, this corresponds to a new spark
-        // SQLsession
         let ctx = SessionContext::new();
         ctx.register_udf(TO_ARR_STRING.clone());
 
@@ -122,5 +156,38 @@ mod tests {
             let data = df.collect().await.unwrap();
             assert_batches_eq!(item.1, &data);
         }
+    }
+
+    #[tokio::test]
+    async fn test_to_array_string_null_input() {
+        let sql = "select to_array_string(null) as ret";
+        let expected_output = vec![
+            "+-----+",
+            "| ret |",
+            "+-----+",
+            "|     |",
+            "+-----+",
+        ];
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(TO_ARR_STRING.clone());
+
+        let df = ctx.sql(sql).await.unwrap();
+        let data = df.collect().await.unwrap();
+        assert_batches_eq!(expected_output, &data);
+    }
+
+    #[tokio::test]
+    async fn test_to_array_string_wrong_arguments() {
+        let ctx = SessionContext::new();
+        ctx.register_udf(TO_ARR_STRING.clone());
+
+        // Test with no arguments
+        let result = ctx.sql("select to_array_string() as ret").await;
+        assert!(result.is_err());
+
+        // Test with multiple arguments
+        let result = ctx.sql("select to_array_string('a', 'b') as ret").await;
+        assert!(result.is_err());
     }
 }
