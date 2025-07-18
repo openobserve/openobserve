@@ -261,8 +261,6 @@ async fn run_clean_done_jobs() -> Result<(), anyhow::Error> {
 }
 
 async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    let interval = cfg.enrichment_table.merge_interval_seconds;
     let Ok(locker) = infra::dist_lock::lock("/enrichment_table/merge", 0).await else {
         log::error!("[COMPACTOR::JOB] Failed to acquire lock for enrichment table merge");
         return Ok(());
