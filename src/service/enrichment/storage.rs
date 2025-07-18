@@ -37,7 +37,7 @@ pub mod s3 {
         },
     };
 
-    const ENRICHMENT_TABLE_S3_KEY: &str = "/enrichment_table_s3/";
+    pub const ENRICHMENT_TABLE_S3_KEY: &str = "/enrichment_table_s3/";
 
     use infra::db as infra_db;
 
@@ -88,6 +88,19 @@ pub mod s3 {
             .map_err(|e| anyhow!("Failed to upload enrichment table to S3: {}", e))?;
 
         crate::service::db::file_list::set(&s3_key, Some(file_meta), false).await?;
+
+        let meta = S3EnrichmentTableMeta {
+            s3_last_updated: now_micros(),
+        };
+        let db = infra_db::get_db().await;
+        let db_key = format!("{ENRICHMENT_TABLE_S3_KEY}{org_id}/{table_name}");
+        db.put(
+            &db_key,
+            serde_json::to_string(&meta).unwrap().into(),
+            false,
+            None,
+        )
+        .await?;
 
         log::debug!("Uploaded enrichment table {} to S3", table_name);
         Ok(())
@@ -253,7 +266,6 @@ pub mod s3 {
         let cfg = config::get_config();
         // let merge_threshold_mb = cfg.enrichment_table.merge_threshold_mb;
         let merge_interval = cfg.enrichment_table.merge_interval;
-        let db = infra_db::get_db().await;
 
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(merge_interval)).await;
@@ -266,16 +278,6 @@ pub mod s3 {
             for (org_id, table_name) in org_table_pairs {
                 match merge_and_upload_to_s3(&org_id, &table_name).await {
                     Ok(_) => {
-                        let meta = S3EnrichmentTableMeta {
-                            s3_last_updated: now_micros(),
-                        };
-                        db.put(
-                            ENRICHMENT_TABLE_S3_KEY,
-                            serde_json::to_string(&meta).unwrap().into(),
-                            false,
-                            None,
-                        )
-                        .await?;
                         log::debug!("Merged and uploaded enrichment table {} to S3", table_name);
                     }
                     Err(e) => {
