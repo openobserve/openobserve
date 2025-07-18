@@ -28,7 +28,7 @@ use config::{
     get_config,
     meta::{
         // self_reporting::usage::UsageType,
-        stream::{PartitionTimeLevel, StreamType},
+        stream::StreamType,
     },
     utils::{flatten::format_key, json, time::now_micros},
 };
@@ -43,7 +43,7 @@ use infra::{
 };
 
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
+    common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::router::ERROR_HEADER,
     service::{
         db,
@@ -185,8 +185,8 @@ pub async fn save_enrichment_data(
         }
 
         if records.is_empty() {
-            let schema = stream_schema_map.get(stream_name).unwrap();
-            let schema_key = schema.hash_key();
+            // let schema = stream_schema_map.get(stream_name).unwrap();
+            // let schema_key = schema.hash_key();
             // hour_key = super::ingestion::get_write_partition_key(
             //     timestamp,
             //     &vec![],

@@ -1922,29 +1922,11 @@ pub struct HealthCheck {
 #[derive(EnvConfig)]
 pub struct EnrichmentTable {
     #[env_config(
-        name = "ZO_ENRICHMENT_TABLE_LOCAL_STORAGE_ENABLED",
-        default = true,
-        help = "Enable the enrichment table storage system"
-    )]
-    pub local_storage_enabled: bool,
-    #[env_config(
         name = "ZO_ENRICHMENT_TABLE_CACHE_DIR",
         default = "",
         help = "Local cache directory for enrichment tables"
     )]
     pub cache_dir: String,
-    #[env_config(
-        name = "ZO_ENRICHMENT_TABLE_MAX_CACHE_SIZE_MB",
-        default = 1024,
-        help = "Maximum cache size in MB"
-    )]
-    pub max_cache_size_mb: u64,
-    #[env_config(
-        name = "ZO_ENRICHMENT_TABLE_CACHE_TTL_SECONDS",
-        default = 3600,
-        help = "Cache TTL in seconds"
-    )]
-    pub cache_ttl_seconds: u64,
     #[env_config(
         name = "ZO_ENRICHMENT_TABLE_MERGE_THRESHOLD_MB",
         default = 10,
