@@ -1280,9 +1280,19 @@ async fn handle_derived_stream_triggers(
                         // need to get the metadata from the destination node with the same
                         // stream_params since this is a scheduled
                         // pipeline, only the destination node can be of stream node.
-                        let request_metadata = pipeline
+                        let mut request_metadata = pipeline
                             .get_metadata_by_stream_params(&dest_stream)
-                            .map(|meta| cluster_rpc::IngestRequestMetadata { data: meta });
+                            .map(|meta| {
+                                let mut meta = meta;
+                                meta.insert("is_derived".to_string(), "true".to_string());
+                                cluster_rpc::IngestRequestMetadata { data: meta }
+                            });
+                        if request_metadata.is_none() {
+                            let mut metadata = HashMap::new();
+                            metadata.insert("is_derived".to_string(), "true".to_string());
+                            request_metadata =
+                                Some(cluster_rpc::IngestRequestMetadata { data: metadata });
+                        }
                         let (org_id, stream_name, stream_type): (String, String, String) = {
                             (
                                 dest_stream.org_id.into(),
@@ -1291,6 +1301,7 @@ async fn handle_derived_stream_triggers(
                             )
                         };
                         let records_len = records.len();
+
                         let req = cluster_rpc::IngestionRequest {
                             org_id: org_id.clone(),
                             stream_name: stream_name.clone(),

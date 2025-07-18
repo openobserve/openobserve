@@ -209,6 +209,7 @@ async fn write_logs_by_stream(
     status: &mut IngestionStatus,
     json_data_by_stream: HashMap<String, O2IngestJsonData>,
     byte_size_by_stream: HashMap<String, usize>,
+    derived_streams: HashSet<String>,
 ) -> Result<()> {
     for (stream_name, (json_data, fn_num)) in json_data_by_stream {
         // check if we are allowed to ingest
@@ -219,7 +220,15 @@ async fn write_logs_by_stream(
         }
 
         // write json data by stream
-        let mut req_stats = write_logs(thread_id, org_id, &stream_name, status, json_data).await?;
+        let mut req_stats = write_logs(
+            thread_id,
+            org_id,
+            &stream_name,
+            status,
+            json_data,
+            derived_streams.contains(&stream_name),
+        )
+        .await?;
 
         let time_took = time_stats.1.elapsed().as_secs_f64();
         req_stats.response_time = time_took;
@@ -277,6 +286,7 @@ async fn write_logs(
     stream_name: &str,
     status: &mut IngestionStatus,
     json_data: Vec<(i64, Map<String, Value>)>,
+    is_derived: bool,
 ) -> Result<RequestStats> {
     let cfg = get_config();
     let log_ingest_errors = ingestion_log_enabled().await;
@@ -335,6 +345,7 @@ async fn write_logs(
         &mut stream_schema_map,
         json_data.iter().map(|(_, v)| v).collect(),
         *min_timestamp,
+        is_derived, // is_derived is true if the stream is derived
     )
     .await?;
 

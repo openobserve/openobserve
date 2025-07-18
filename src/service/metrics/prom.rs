@@ -443,6 +443,7 @@ pub async fn remote_write(
                     &mut metric_schema_map,
                     vec![val_map],
                     timestamp,
+                    false, // is_derived is false for metrics
                 )
                 .await
                 .is_ok()

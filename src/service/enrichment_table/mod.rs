@@ -176,6 +176,7 @@ pub async fn save_enrichment_data(
                 &mut stream_schema_map,
                 vec![&json_record],
                 timestamp,
+                false, // is_derived is false for enrichment tables
             )
             .await
             .is_ok()

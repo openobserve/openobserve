@@ -41,6 +41,8 @@ pub struct Stream {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics_meta: Option<Metadata>,
     pub total_fields: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_derived: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -153,6 +155,7 @@ mod tests {
             settings: StreamSettings::default(),
             metrics_meta: None,
             total_fields: 1,
+            is_derived: None,
         };
 
         let list_stream = ListStream {
@@ -232,6 +235,7 @@ mod tests {
             settings: StreamSettings::default(),
             metrics_meta: None,
             total_fields: 1,
+            is_derived: None,
         };
 
         assert!(stream.uds_schema.len() == 1);

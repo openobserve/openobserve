@@ -245,6 +245,13 @@ pub fn unwrap_stream_created_at(schema: &Schema) -> Option<i64> {
         .and_then(|v| v.parse().ok())
 }
 
+pub fn unwrap_stream_is_derived(schema: &Schema) -> Option<bool> {
+    schema
+        .metadata()
+        .get("is_derived")
+        .and_then(|v| v.parse().ok())
+}
+
 pub fn unwrap_partition_time_level(
     level: Option<PartitionTimeLevel>,
     stream_type: StreamType,
@@ -671,6 +678,7 @@ pub struct SchemaCache {
     schema: SchemaRef,
     fields_map: HashMap<String, usize>,
     hash_key: String,
+    is_derived: bool,
 }
 
 impl SchemaCache {
@@ -690,6 +698,7 @@ impl SchemaCache {
             schema,
             fields_map,
             hash_key,
+            is_derived: false,
         }
     }
 
