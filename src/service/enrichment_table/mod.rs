@@ -344,7 +344,7 @@ pub async fn save_enrichment_data(
     )))
 }
 
-async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: StreamType) {
+pub async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: StreamType) {
     log::info!("deleting enrichment table  {stream_name}");
     // delete stream schema
     if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
@@ -465,4 +465,32 @@ pub async fn extract_multipart(
     }
 
     Ok(records)
+}
+
+pub async fn cleanup_enrichment_table_resources(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) {
+    log::info!("cleaning up enrichment table  resources {stream_name}");
+
+    if let Err(e) = crate::service::enrichment::storage::s3::delete(org_id, stream_name).await {
+        log::error!("Error deleting enrichment table from S3: {e}");
+    }
+    if let Err(e) = crate::service::enrichment::storage::local::delete(org_id, stream_name).await {
+        log::error!("Error deleting enrichment table from local cache: {e}");
+    }
+    if let Err(e) = crate::service::enrichment::storage::database::delete(org_id, stream_name).await
+    {
+        log::error!("Error deleting enrichment table from database: {e}");
+    }
+
+    // delete stream key
+    if let Err(e) = db::enrichment_table::delete(org_id, stream_name).await {
+        log::error!("Error deleting enrichment table: {}", e);
+    }
+
+    // delete stream stats cache
+    stats::remove_stream_stats(org_id, stream_name, stream_type);
+    log::info!("deleted enrichment table  {stream_name}");
 }

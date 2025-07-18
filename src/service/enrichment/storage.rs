@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, path::PathBuf};
-
 use anyhow::{Result, anyhow};
 use bytes::Bytes;
-use config::utils::json::Value;
+use config::utils::{
+    enrichment_local_cache::{
+        get_key, get_metadata_content, get_metadata_path, get_table_dir, get_table_path,
+    },
+    json::Value,
+};
 use serde::{Deserialize, Serialize};
 
 pub mod s3 {
@@ -301,48 +304,6 @@ pub mod s3 {
 
 pub mod local {
     use super::*;
-
-    fn get_key(org_id: &str, table_name: &str) -> String {
-        format!("{}/{}", org_id, table_name)
-    }
-
-    fn get_table_dir(key: &str) -> PathBuf {
-        let cfg = config::get_config();
-        let cache_dir = if cfg.enrichment_table.cache_dir.is_empty() {
-            format!("{}/enrichment_table_cache", cfg.common.data_cache_dir)
-        } else {
-            cfg.enrichment_table.cache_dir.clone()
-        };
-        PathBuf::from(format!("{cache_dir}/{key}"))
-    }
-
-    fn get_table_path(table_dir: &str, created_at: i64) -> PathBuf {
-        PathBuf::from(format!("{table_dir}/{created_at}.json"))
-    }
-
-    fn get_metadata_path() -> PathBuf {
-        let cfg = config::get_config();
-        let cache_dir = if cfg.enrichment_table.cache_dir.is_empty() {
-            format!("{}/enrichment_table_cache", cfg.common.data_cache_dir)
-        } else {
-            cfg.enrichment_table.cache_dir.clone()
-        };
-        PathBuf::from(format!("{cache_dir}/metadata.json"))
-    }
-
-    async fn get_metadata_content() -> Result<HashMap<String, i64>> {
-        let metadata_path = get_metadata_path();
-        if metadata_path.exists() {
-            let existing_metadata = tokio::fs::read_to_string(&metadata_path)
-                .await
-                .map_err(|e| anyhow!("Failed to read metadata file: {}", e))?;
-            let existing_metadata: HashMap<String, i64> = serde_json::from_str(&existing_metadata)
-                .map_err(|e| anyhow!("Failed to parse metadata JSON: {}", e))?;
-            Ok(existing_metadata)
-        } else {
-            Ok(HashMap::new())
-        }
-    }
 
     pub async fn store(
         org_id: &str,

@@ -469,6 +469,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         };
                     }
                 }
+                if stream_type.eq(&StreamType::EnrichmentTables) {
+                    if let Err(e) =
+                        config::utils::enrichment_local_cache::delete(org_id, stream_name).await
+                    {
+                        log::error!("[Schema:watch] delete local enrichment file error: {}", e);
+                    }
+                }
             }
             db::Event::Empty => {}
         }
