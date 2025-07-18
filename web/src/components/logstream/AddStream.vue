@@ -323,15 +323,12 @@ const getStreamPayload = () => {
       }
     });
 
-    if (field.type && isSchemaUDSEnabled.value) {
+    if (isSchemaUDSEnabled.value) {
       settings.defined_schema_fields.push({
-        field: field.name,
+        name: field.name,
         type: field.type,
       });
     }
-
-    // if (isSchemaUDSEnabled.value)
-    //   settings.defined_schema_fields.push(field.name);
   });
 
   return settings;
