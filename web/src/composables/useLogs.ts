@@ -6074,6 +6074,9 @@ const useLogs = () => {
 
         histogramResults = [];
 
+        searchObj.data.histogramQuery.query.sql = await changeHistogramInterval(searchObj.data.histogramQuery.query.sql, 0);
+
+
         const payload = buildWebSocketPayload(
           searchObj.data.histogramQuery,
           false,
