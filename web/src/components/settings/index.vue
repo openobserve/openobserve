@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <q-page class="management-page">
-    <div class="head q-table__title q-mx-md q-my-sm">
+    <div class="head q-table__title q-mx-md q-py-sm">
       {{ t("settings.header") }}
     </div>
     <q-separator class="separator" />
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-slot:after>
         <div
-      style="position: absolute;  top: -5px; left: -16px; z-index: 90; "
+      style="position: absolute;  top: -5px; left: -16px; z-index: 1200; "
     >
       <!-- Place the content you want in the middle here -->
       <q-btn

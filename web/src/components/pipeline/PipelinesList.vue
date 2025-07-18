@@ -24,6 +24,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       class="full-wdith pipeline-list-table"
     >
+    <div class="flex justify-between full-width tw-py-3 tw-px-4 items-center"
+    :class="store.state.theme === 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+    >
+      <div class="q-table__title" data-test="pipeline-list-title">
+            {{ t("pipeline.header") }}
+          </div>
+          <div class="tw-flex tw-items-centertabs q-ml-auto">
+            <div class="app-tabs-container q-mr-md">
+              <app-tabs
+              data-test="pipeline-list-tabs"
+              class="tabs-selection-container"
+              :class="store.state.theme === 'dark' ? 'tabs-selection-container-dark' : 'tabs-selection-container-light'"
+              :tabs="tabs"
+              v-model:active-tab="activeTab"
+              @update:active-tab="updateActiveTab"
+            />
+            </div>
+
+            <q-input
+              data-test="pipeline-list-search-input"
+              v-model="filterQuery"
+              borderless
+              filled
+              dense
+              class="no-border"
+              :placeholder="t('pipeline.search')"
+            >
+              <template #prepend>
+                <q-icon name="search" class="cursor-pointer" />
+              </template>
+            </q-input>
+            <q-btn
+              data-test="pipeline-list-import-pipeline-btn"
+              class="q-ml-md text-bold"
+              padding="sm lg"
+              no-caps
+              :label="t(`pipeline.import`)"
+              @click="routeToImportPipeline"
+            />
+            <q-btn
+              data-test="pipeline-list-add-pipeline-btn"
+              class="q-ml-md text-bold no-border"
+              padding="sm lg"
+              color="secondary"
+              no-caps
+              :label="t(`pipeline.addPipeline`)"
+              @click="routeToAddPipeline"
+            />
+          </div>
+    </div>
       <q-table
         data-test="pipeline-list-table"
         ref="qTableRef"
@@ -34,9 +84,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter="filterQuery"
         :filter-method="filterData"
         style="width: 100%"
-        dense
         selection="multiple"
         v-model:selected="selectedPipelines"
+        class="o2-quasar-table"
+        :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
       >
         <template v-slot:body="props">
           <q-tr
@@ -170,9 +221,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #no-data>
           <no-data />
         </template>
-        <template #header-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
-        </template>
         <template v-slot:body-selection="scope">
           <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
         </template>
@@ -188,49 +236,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
         <template #top="scope">
-          <div class="q-table__title" data-test="pipeline-list-title">
-            {{ t("pipeline.header") }}
-          </div>
-          <div class="tw-flex tw-items-center report-list-tabs q-ml-auto">
-            <app-tabs
-              data-test="pipeline-list-tabs"
-              class="q-mr-md"
-              :tabs="tabs"
-              v-model:active-tab="activeTab"
-              @update:active-tab="updateActiveTab"
-            />
-            <q-input
-              data-test="pipeline-list-search-input"
-              v-model="filterQuery"
-              borderless
-              filled
-              dense
-              class="q-mb-xs no-border"
-              :placeholder="t('pipeline.search')"
-            >
-              <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
-              </template>
-            </q-input>
-            <q-btn
-              data-test="pipeline-list-import-pipeline-btn"
-              class="q-ml-md q-mb-xs text-bold"
-              padding="sm lg"
-              no-caps
-              :label="t(`pipeline.import`)"
-              @click="routeToImportPipeline"
-            />
-            <q-btn
-              data-test="pipeline-list-add-pipeline-btn"
-              class="q-ml-md q-mb-xs text-bold no-border"
-              padding="sm lg"
-              color="secondary"
-              no-caps
-              :label="t(`pipeline.addPipeline`)"
-              @click="routeToAddPipeline"
-            />
-          </div>
-
           <q-table-pagination
             :scope="scope"
             :pageTitle="t('pipeline.header')"
@@ -261,6 +266,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </template>
+
+        <template v-slot:header="props">
+            <q-tr :props="props">
+              <!-- Adding this block to render the select-all checkbox -->
+              <q-th auto-width>
+                <q-checkbox
+                  v-model="props.selected"
+                  size="sm"
+                  color="secondary"
+                  @update:model-value="(val) => props.selected = val"
+                />
+              </q-th>
+
+              <!-- Rendering the rest of the columns -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
       </q-table>
     </div>
   </div>
@@ -515,7 +545,7 @@ const triggerExpand = (props: any) => {
 
 const getColumnsForActiveTab = (tab: any) => {
   let realTimeColumns = [
-    { name: "#", label: "#", field: "#", align: "left" },
+    { name: "#", label: "#", field: "#", align: "left", style: "width: 67px;" },
 
     {
       name: "name",
@@ -541,7 +571,7 @@ const getColumnsForActiveTab = (tab: any) => {
   ];
 
   let scheduledColumns = [
-    { name: "#", label: "#", field: "#", align: "left" },
+    { name: "#", label: "#", field: "#", align: "left", style: "width: 67px;" },
 
     {
       name: "name",
@@ -595,6 +625,7 @@ const getColumnsForActiveTab = (tab: any) => {
     label: t("alerts.actions"),
     align: "center",
     sortable: false,
+    classes: "actions-column",
   };
   if (tab === "all") {
     const allColumns = [...scheduledColumns, actionsColumn];
@@ -883,33 +914,6 @@ const handleCancelResumePipeline = () => {
 }
 </script>
 <style lang="scss" scoped>
-.pipeline-list-table {
-  th:last-child,
-  td:last-child {
-    position: sticky;
-    right: 0;
-    z-index: 1;
-    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
-    width: 100px;
-  }
-}
-
-.dark-theme {
-  th:last-child,
-  td:last-child {
-    background: var(--q-dark);
-    box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
-    width: 100px;
-  }
-}
-
-.light-theme {
-  th:last-child,
-  td:last-child {
-    background: #ffffff;
-    width: 100px;
-  }
-}
 .dark-mode {
   background-color: $dark-page;
 
@@ -929,31 +933,6 @@ const handleCancelResumePipeline = () => {
         background: #5960b2;
         color: #ffffff !important;
       }
-    }
-  }
-}
-.report-list-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
     }
   }
 }
@@ -980,20 +959,6 @@ const handleCancelResumePipeline = () => {
   border-left: #7a54a2 3px solid;
 }
 
-:deep(.pipeline-list-table thead th:last-child) {
-  position: sticky;
-  right: 0;
-  z-index: 1;
-  box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
-  width: 100px;
-}
-
-:deep(.dark-theme.pipeline-list-table thead th:last-child) {
-  background: var(--q-dark);
-}
-:deep(.light-theme.pipeline-list-table thead th:last-child) {
-  background: #ffffff;
-}
 .bottom-btn {
   display: flex;
   width: 100%;
