@@ -143,8 +143,6 @@ pub async fn check_cache(
         result_ts_col = Some(TIMESTAMP_COL_NAME.to_string());
     }
 
-    // @hengfei,Loakesh ref comment
-
     let result_ts_col = result_ts_col.unwrap();
     let mut discard_interval = -1;
     if let Some(interval) = sql.histogram_interval {
@@ -706,7 +704,7 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     Ok(true)
 }
 
-pub fn handle_histogram(
+fn handle_histogram(
     origin_sql: &mut String,
     q_time_range: Option<(i64, i64)>,
     histogram_interval: i64,

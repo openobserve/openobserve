@@ -45,7 +45,7 @@ use crate::{
     service::{
         search::{
             self as SearchService,
-            cache::cacher::{check_cache, handle_histogram},
+            cache::cacher::check_cache,
             init_vrl_runtime,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         },
@@ -155,26 +155,6 @@ pub async fn search(
                         .unwrap_or_default();
 
                 let order_by = v.order_by;
-
-                // temp hack to test @YJDoc2 finalize after discussion
-                let mut req_time_range = (req.query.start_time, req.query.end_time);
-                if req_time_range.1 == 0 {
-                    req_time_range.1 = config::utils::time::now_micros();
-                }
-
-                let meta_time_range_is_empty =
-                    v.time_range.is_none() || v.time_range == Some((0, 0));
-                let q_time_range =
-                    if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
-                        Some(req_time_range)
-                    } else {
-                        v.time_range
-                    };
-                handle_histogram(
-                    &mut req.query.sql,
-                    q_time_range,
-                    req.query.histogram_interval,
-                );
 
                 MultiCachedQueryResponse {
                     ts_column,
