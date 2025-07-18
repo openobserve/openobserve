@@ -16,8 +16,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="q-pa-none">
-    <div v-if="!showAddDialog">
+  <q-page class="q-pa-none" style="min-height: inherit;">
+    <div v-if="!showAddDialog" style="height: calc(100vh - 112px); overflow-y: auto;">
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
+      :class="store.state.theme == 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+      >
+            <div
+              class="col q-table__title items-start"
+              data-test="cipher-keys-list-title"
+            >
+              {{ t("cipherKey.header") }}
+            </div>
+            <div class="col-auto flex">
+              <q-input
+                v-model="filterQuery"
+                filled
+                dense
+                class="q-ml-none"
+                style="width: 400px"
+                :placeholder="t('cipherKey.search')"
+                clearable
+              >
+                <template #prepend>
+                  <q-icon name="search" />
+                </template>
+              </q-input>
+              <q-btn
+                class="text-bold no-border q-ml-md"
+                padding="sm lg"
+                color="secondary"
+                no-caps
+                dense
+                :label="t(`cipherKey.add`)"
+                @click="addCipherKey"
+              />
+            </div>
+          </div>
       <q-table
         ref="qTable"
         :rows="tabledata"
@@ -26,7 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pagination="pagination"
         :filter="filterQuery"
         :filter-method="filterData"
-        :loading="loading"
+        class="o2-quasar-table"
+        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
       >
         <template #no-data><NoData /></template>
         <template v-slot:body-cell-actions="props">
@@ -59,40 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #top="scope">
           <div class="row full-width">
-            <div
-              class="col q-table__title items-start"
-              data-test="cipher-keys-list-title"
-            >
-              {{ t("cipherKey.header") }}
-            </div>
-            <div class="col-auto flex">
-              <q-input
-                v-model="filterQuery"
-                filled
-                dense
-                class="q-ml-none q-mb-xs"
-                style="width: 400px"
-                :placeholder="t('cipherKey.search')"
-                clearable
-              >
-                <template #prepend>
-                  <q-icon name="search" />
-                </template>
-              </q-input>
-              <q-btn
-                class="q-mb-xs text-bold no-border q-ml-md"
-                padding="sm lg"
-                color="secondary"
-                no-caps
-                dense
-                :label="t(`cipherKey.add`)"
-                @click="addCipherKey"
-              />
-            </div>
-          </div>
-          <div class="row full-width">
             <QTablePagination
-              v-if="resultTotal > 0"
               :scope="scope"
               :pageTitle="t('cipherKey.header')"
               :resultTotal="resultTotal"
@@ -113,6 +115,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:changeRecordPerPage="changePagination"
           />
         </template>
+        <template v-slot:header="props">
+            <q-tr :props="props">
+              <!-- Render the table headers -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
       </q-table>
     </div>
     <div v-else>
@@ -168,6 +184,7 @@ export default defineComponent({
         label: "#",
         field: "#",
         align: "left",
+        style: "width: 67px",
       },
       {
         name: "name",
@@ -182,6 +199,7 @@ export default defineComponent({
         label: t("cipherKey.storeType"),
         align: "left",
         sortable: true,
+        style: "width: 150px",
       },
       {
         name: "mechanism_type",
@@ -189,6 +207,7 @@ export default defineComponent({
         label: t("cipherKey.mechanismType"),
         align: "left",
         sortable: true,
+        style: "width: 150px",
       },
       {
         name: "actions",
@@ -196,6 +215,7 @@ export default defineComponent({
         label: t("cipherKey.actions"),
         align: "left",
         sortable: false,
+        classes:'actions-column'
       },
     ]);
     const perPageOptions = [
