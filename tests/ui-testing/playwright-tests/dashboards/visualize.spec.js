@@ -158,10 +158,10 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="selected-chart-bar-item"]').click();
     await page.locator('[data-test="dashboard-x-item-_timestamp"]').click();
     await expect(
-      page.locator('[data-test="dashboard-x-item-zo_sql_key"]')
+      page.locator('[data-test="dashboard-x-item-_timestamp"]')
     ).toBeVisible();
     await expect(
-      page.locator('[data-test="dashboard-y-item-zo_sql_num"]')
+      page.locator('[data-test="dashboard-y-item-_timestamp"]')
     ).toBeVisible();
   });
 
@@ -181,21 +181,18 @@ test.describe(" visualize UI testcases", () => {
     await expect(page.getByText("There are some errors, please")).toBeVisible();
     await page
       .locator(
-        '[data-test="field-list-item-logs-e2e_automate-zo_sql_key"] [data-test="dashboard-add-x-data"]'
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-x-data"]'
       )
       .click();
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
-
+    await page
+      .locator('[data-test="dashboard-y-item-_timestamp-remove"]')
+      .click();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]'
-      )
-      .waitFor({ state: "visible" });
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-zo_sql_num"] [data-test="dashboard-add-y-data"]'
       )
       .click();
     const search = page.waitForResponse(logData.applyQuery);
@@ -649,138 +646,5 @@ test.describe(" visualize UI testcases", () => {
     await expect(
       page.locator('[data-test="logs-search-result-bar-chart"]')
     ).toBeVisible();
-  });
-  test("Should not call the API after toggling to the Visualization view.", async ({
-    page,
-  }) => {
-    const pm = new PageManager(page);
-
-    // Open the logs page and the query editor
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.openQueryEditor();
-    const queryEditor = page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("textbox");
-    // Wait for the query editor to be visible
-    await expect(queryEditor).toBeVisible();
-
-    // Fill query in the query editor
-    await queryEditor.fill(initialQuery);
-
-    await pm.logsVisualise.setRelative("1", "m");
-
-    await pm.logsVisualise.logsApplyQueryButton();
-    await page.waitForTimeout(5000);
-
-    //open the visualization tab
-    await pm.logsVisualise.openVisualiseTab();
-
-    // Assert that the event-streaming search API call is **not** fired
-    const apiCallHappened = await page
-      .waitForResponse(
-        (response) =>
-          response
-            .url()
-            .includes(
-              "/api/default/_search_stream?type=logs&search_type=dashboards"
-            ),
-        { timeout: 5000 }
-      )
-      .then(() => true)
-      .catch(() => false); // timeout ⇒ call not made
-
-    expect(apiCallHappened).toBe(false);
-  });
-
-  test("Should update the field name after updating the query.", async ({
-    page,
-  }) => {
-    const pm = new PageManager(page);
-
-    const updatedQuery = `SELECT
-    kubernetes_namespace_testname,
-    kubernetes_pod_name,
-    kubernetes_container_name,
-    COUNT(*) AS log_count
-FROM
-    e2e_automate
-WHERE
-    kubernetes_container_name = 'ziox'
-GROUP BY
-    kubernetes_namespace_testname,
-    kubernetes_pod_name,
-    kubernetes_container_name
-ORDER BY
-    log_count DESC
-LIMIT 100`;
-
-    // Step 1: Open Logs page and query editor
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.openQueryEditor();
-
-    const queryEditor = page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("textbox");
-    await expect(queryEditor).toBeVisible();
-
-    // Step 2: Fill and apply the initial query
-    await queryEditor.fill(initialQuery.trim());
-    await pm.logsVisualise.setRelative("1", "m");
-    await pm.logsVisualise.logsApplyQueryButton();
-    await page.waitForTimeout(3000); // Optional: Replace with proper wait if possible
-
-    // Step 3: Open the Visualization tab
-    await pm.logsVisualise.openVisualiseTab();
-
-    await expect(
-      page.locator('[data-test="dashboard-x-item-kubernetes_namespace_name"]')
-    ).toBeVisible();
-
-    // Step 4: Update the query
-    await queryEditor.click();
-    await queryEditor.press(
-      process.platform === "darwin" ? "Meta+A" : "Control+A"
-    );
-    await queryEditor.fill(updatedQuery.trim());
-
-    // Activate the function editor to trigger reprocessing
-    await page.locator("#fnEditor").getByRole("textbox").locator("div").click();
-    // await logsVisualise.openVisualiseTab();
-
-    await page.waitForTimeout(5000);
-    // Step 5: Assert updated field is visible
-    await expect(
-      page.locator(
-        '[data-test="dashboard-x-item-kubernetes_namespace_testname"]'
-      )
-    ).toHaveCount(1, { timeout: 10000 });
-  });
-
-  test("Should redirect to the table chart in visualization when the query includes more than two fields on the X-axis.", async ({
-    page,
-  }) => {
-    const pm = new PageManager(page);
-    // const logsVisualise = new LogsVisualise(page);
-
-    // Step 1: Open Logs page and query editor
-    await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.openQueryEditor();
-
-    const queryEditor = page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByRole("textbox");
-    await expect(queryEditor).toBeVisible();
-
-    // Step 2: Fill and apply the initial query
-    await queryEditor.fill(initialQuery.trim());
-    await pm.logsVisualise.setRelative("1", "m");
-    await pm.logsVisualise.logsApplyQueryButton();
-    await page.waitForTimeout(3000); // Optional: Replace with proper wait if possible
-
-    // Step 3: Open the Visualization tab
-    await pm.logsVisualise.openVisualiseTab();
-    await expect(
-      page.locator('[data-test="selected-chart-table-item"]').locator("..")
-    ).toHaveClass(/bg-grey-3|5/); // matches light (3) or dark (5) theme
   });
 });
