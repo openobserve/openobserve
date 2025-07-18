@@ -26,9 +26,9 @@
 
 //     // Navigate back to the base URL
 //     await page.goto(process.env["ZO_BASE_URL"]);
-//     // await page.context().storageState({ path: './playwright-tests/login/LoginAuth.json' });
+//     // await page.context().storageState({ path: './playwright-tests/Login/LoginAuth.json' });
 //     const storageState = await page.context().storageState();
-//     await fs.writeFile('./playwright-tests/login/LoginAuth.json', JSON.stringify(storageState));
+//     await fs.writeFile('./playwright-tests/Login/LoginAuth.json', JSON.stringify(storageState));
 //   });
 
 
@@ -52,5 +52,5 @@ test('Login', async ({ page }) => {
 
     // Save storage state to file
     const storageState = await page.context().storageState();
-    await fs.writeFile('./playwright-tests/login/LoginAuth.json', JSON.stringify(storageState));
+    await fs.writeFile('./playwright-tests/Login/LoginAuth.json', JSON.stringify(storageState));
 });

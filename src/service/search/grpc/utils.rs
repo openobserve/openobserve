@@ -127,7 +127,7 @@ impl TantivyResult {
                 size: Some(limit),
                 order: None,
                 missing: None,
-                min_doc_count: Some(0),
+                min_doc_count: Some(1),
                 show_term_doc_count_error: Some(false),
                 segment_size: Some(limit),
             }),
