@@ -214,15 +214,23 @@ const streamIndexType = [
 
 const dataTypes = [
   {
-    label: "String",
+    label: "UTF-8",
     value: "Utf8",
   },
   {
-    label: "Integer",
+    label: "Uint-64",
+    value: "Uint64",
+  },
+  {
+    label: "Boolean",
+    value: "Boolean",
+  },
+  {
+    label: "Int-64",
     value: "Int64",
   },
   {
-    label: "Float",
+    label: "Float-64",
     value: "Float64",
   },
 ];

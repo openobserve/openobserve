@@ -278,6 +278,7 @@ const getStreamPayload = () => {
   if (showDataRetention.value) {
     settings["data_retention"] = Number(streamInputs.value.dataRetentionDays);
   }
+  const schemaFields: Record<string, string> = {};
 
   fields.value.forEach((field) => {
     field.name = field.name
@@ -322,17 +323,16 @@ const getStreamPayload = () => {
         settings.bloom_filter_fields.push(field.name);
       }
     });
+    //here we will collect all the schema fields into one object and push it to the settings
+      if (field.type && isSchemaUDSEnabled.value) {
+        schemaFields[field.name] = field.type;
+      }
 
-    if (field.type && isSchemaUDSEnabled.value) {
-      settings.defined_schema_fields.push({
-        field: field.name,
-        type: field.type,
-      });
-    }
-
-    // if (isSchemaUDSEnabled.value)
-    //   settings.defined_schema_fields.push(field.name);
   });
+
+  if (isSchemaUDSEnabled.value) {
+    settings.defined_schema_fields.push(schemaFields);
+  }
 
   return settings;
 };
