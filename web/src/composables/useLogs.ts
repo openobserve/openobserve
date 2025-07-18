@@ -2373,24 +2373,29 @@ const useLogs = () => {
 
 
   const fetchAllParitions = async(queryReq: any) => {
-    if (
-      searchObj.data.queryResults.partitionDetail.partitions[
-        searchObj.data.queryResults.subpage
-      ]?.length
-    ) {
-      queryReq.query.start_time =
+    return new Promise(async (resolve) => {
+      if (
         searchObj.data.queryResults.partitionDetail.partitions[
           searchObj.data.queryResults.subpage
-        ][0];
-      queryReq.query.end_time =
-        searchObj.data.queryResults.partitionDetail.partitions[
-          searchObj.data.queryResults.subpage
-        ][1];
-      queryReq.query.from = 0;
-      queryReq.query.size = -1;
-      searchObj.data.queryResults.subpage++;
-      await getPaginatedData(queryReq, true, false);
-    }
+        ]?.length
+      ) {
+        queryReq.query.start_time =
+          searchObj.data.queryResults.partitionDetail.partitions[
+            searchObj.data.queryResults.subpage
+          ][0];
+        queryReq.query.end_time =
+          searchObj.data.queryResults.partitionDetail.partitions[
+            searchObj.data.queryResults.subpage
+          ][1];
+        queryReq.query.from = 0;
+        queryReq.query.size = -1;
+        searchObj.data.queryResults.subpage++;
+
+        await getPaginatedData(queryReq, true, false);
+        resolve(true);
+      }
+      resolve(true);
+    });
   }
 
   const getPaginatedData = async (
@@ -2572,15 +2577,18 @@ const useLogs = () => {
             searchObj.data.queryResults.scan_size = (searchObj.data.queryResults.scan_size || 0) + res.data.scan_size;
             searchObj.data.queryResults.took = (searchObj.data.queryResults.took || 0) + res.data.took;
             searchObj.data.queryResults.hits = res.data.hits;
-            fetchAllParitions(queryReq);
+            await processPostPaginationData();
+            await fetchAllParitions(queryReq);
           } else if(isAggregation) {
             searchObj.data.queryResults.from = res.data.from;
             searchObj.data.queryResults.total = (searchObj.data.queryResults.total || 0) + res.data.total;
             searchObj.data.queryResults.scan_size = (searchObj.data.queryResults.scan_size || 0) + res.data.scan_size;
             searchObj.data.queryResults.took = (searchObj.data.queryResults.took || 0) + res.data.took;
             searchObj.data.queryResults.hits.push(...res.data.hits);
-            fetchAllParitions(queryReq);
+            await processPostPaginationData();
+            await fetchAllParitions(queryReq);
           } else if (res.data.from > 0 || searchObj.data.queryResults.subpage > 1) {
+
             if (appendResult && !queryReq.query?.streaming_output) {
               searchObj.data.queryResults.from += res.data.from;
               searchObj.data.queryResults.scan_size += res.data.scan_size;
