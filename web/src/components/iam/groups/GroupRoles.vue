@@ -15,17 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="iam-roles-selection-section" class="col q-pr-xs">
+  <div data-test="iam-roles-selection-section" class="col">
     <div
       class="flex justify-start bordered q-px-md q-py-sm"
       style="position: sticky; top: 0px; z-index: 2"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-      :style="{
-        'box-shadow':
-          store.state.theme === 'dark'
-            ? 'rgb(45 45 45) 0px 4px 7px 0px'
-            : 'rgb(240 240 240) 0px 4px 7px 0px',
-      }"
     >
       <div class="q-mr-md">
         <div
@@ -83,13 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-input>
       </div>
     </div>
-    <div data-test="iam-roles-selection-table" class="q-px-md">
-      <div
-        data-test="iam-roles-selection-table-title"
-        class="q-my-sm text-bold"
-      >
-        {{ rows.length }} Roles
-      </div>
+    <div data-test="iam-roles-selection-table">
       <template v-if="rows.length">
         <app-table
           :rows="rows"
@@ -100,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             value: userSearchKey,
             method: filterRoles,
           }"
+          :title="t('iam.roles')"
         >
           <template v-slot:select="slotProps: any">
             <q-checkbox
