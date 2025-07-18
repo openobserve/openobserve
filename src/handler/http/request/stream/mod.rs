@@ -18,8 +18,9 @@ use std::{cmp::Ordering, io::Error};
 use actix_web::{
     HttpRequest, HttpResponse, Responder, delete, get, http, http::StatusCode, post, put, web,
 };
+use chrono::{TimeZone, Utc};
 use config::{
-    meta::stream::{StreamSettings, StreamType, UpdateStreamSettings},
+    meta::stream::{StreamSettings, StreamType, TimeRange, UpdateStreamSettings},
     utils::schema::format_stream_name,
 };
 use hashbrown::HashMap;
@@ -557,4 +558,87 @@ async fn delete_stream_cache(
             "Error deleting cache, please retry",
         ))),
     }
+}
+
+/// StreamDeleteDataByTimeRange
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Streams",
+    operation_id = "StreamDeleteDataByTimeRange",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("type" = String, Query, description = "Stream type"),
+        ("start_ts" = String, Query, description = "Start unix timestamp in microseconds"),
+        ("end_ts" = String, Query, description = "End unix timestamp in microseconds"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[delete("/{org_id}/streams/{stream_name}/data_by_time_range")]
+async fn delete_stream_data_by_time_range(
+    path: web::Path<(String, String)>,
+    body: web::Json<TimeRange>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let cfg = config::get_config();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !cfg.common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let time_range = body.into_inner();
+
+    let time_range_start = Utc
+        .timestamp_nanos(time_range.start * 1000)
+        .format("%Y-%m-%d")
+        .to_string();
+    let time_range_end = Utc
+        .timestamp_nanos(time_range.end * 1000)
+        .format("%Y-%m-%d")
+        .to_string();
+    if time_range_start >= time_range_end {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST,
+            "Invalid time range",
+        )));
+    }
+
+    log::debug!(
+        "[COMPACTOR] delete_by_stream {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end}",
+    );
+
+    // Create a job to delete the data by the time range
+    match crate::service::db::compact::retention::delete_stream(
+        &org_id,
+        stream_type,
+        &stream_name,
+        Some((time_range_start.as_str(), time_range_end.as_str())),
+    )
+    .await
+    {
+        Ok(_) => {}
+        Err(e) => {
+            log::error!(
+                "delete_by_stream {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end} error: {e}"
+            );
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST,
+                e.to_string(),
+            )));
+        }
+    };
+
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+        http::StatusCode::OK,
+        "data deletion job created",
+    )))
 }

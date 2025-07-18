@@ -331,9 +331,7 @@ async fn watch_node_list() -> Result<()> {
                     Err(e) => {
                         let value_str = String::from_utf8_lossy(ev.value.as_ref().unwrap());
                         log::error!(
-                            "[CLUSTER] watch_node_list: error parsing node: {}, payload: {}",
-                            e,
-                            value_str
+                            "[CLUSTER] watch_node_list: error parsing node: {e}, payload: {value_str}"
                         );
                         continue;
                     }
