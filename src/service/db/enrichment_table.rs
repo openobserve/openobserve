@@ -285,9 +285,15 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org_id = keys[0];
                 let stream_name = keys[2];
 
-                let data = super::super::enrichment::get_enrichment_table(org_id, stream_name)
+                let data = match super::super::enrichment::get_enrichment_table(org_id, stream_name)
                     .await
-                    .unwrap();
+                {
+                    Ok(data) => data,
+                    Err(e) => {
+                        log::error!("[ENRICHMENT::TABLE watch] get enrichment table error: {e}");
+                        vec![]
+                    }
+                };
                 log::debug!(
                     "enrichment table: {} cache data length: {}",
                     item_key,

@@ -34,6 +34,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if !cfg.compact.enabled {
         return Ok(());
     }
+    log::info!("[COMPACTOR::JOB] Compactor is enabled");
 
     let mut worker = compact::worker::MergeWorker::new(cfg.limit.file_merge_thread_num);
     if let Err(e) = worker.run() {
@@ -261,6 +262,7 @@ async fn run_clean_done_jobs() -> Result<(), anyhow::Error> {
 }
 
 async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
+    log::info!("[COMPACTOR::JOB] Running enrichment table merge");
     let Ok(locker) = infra::dist_lock::lock("/enrichment_table/merge", 0).await else {
         log::error!("[COMPACTOR::JOB] Failed to acquire lock for enrichment table merge");
         return Ok(());

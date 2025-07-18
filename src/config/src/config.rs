@@ -1902,7 +1902,7 @@ pub struct EnrichmentTable {
     pub cache_dir: String,
     #[env_config(
         name = "ZO_ENRICHMENT_TABLE_MERGE_THRESHOLD_MB",
-        default = 10,
+        default = 60,
         help = "Threshold for merging small files before S3 upload (in MB)"
     )]
     pub merge_threshold_mb: u64,

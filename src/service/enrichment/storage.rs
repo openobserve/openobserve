@@ -254,6 +254,7 @@ pub mod s3 {
     }
 
     pub async fn run_merge_job() -> Result<()> {
+        log::info!("[ENRICHMENT::STORAGE] Running enrichment table merge job");
         let cfg = config::get_config();
         // let merge_threshold_mb = cfg.enrichment_table.merge_threshold_mb;
         let merge_interval_seconds = cfg.enrichment_table.merge_interval_seconds;
@@ -262,6 +263,11 @@ pub mod s3 {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(merge_interval_seconds)).await;
             let org_table_pairs = database::list().await?;
+            log::info!(
+                "[ENRICHMENT::STORAGE] Found {} enrichment tables, {:?}",
+                org_table_pairs.len(),
+                org_table_pairs
+            );
             for (org_id, table_name) in org_table_pairs {
                 let data = match retrieve(&org_id, &table_name).await {
                     Ok(data) => data,
@@ -302,7 +308,7 @@ pub mod s3 {
     pub async fn get_last_updated_at() -> Result<i64> {
         let db = infra_db::get_db().await;
         let metadata: S3EnrichmentTableMeta = {
-            let metadata = db.get(ENRICHMENT_TABLE_S3_KEY).await?;
+            let metadata = db.get(ENRICHMENT_TABLE_S3_KEY).await.unwrap_or_default();
             let metadata = String::from_utf8_lossy(&metadata);
             serde_json::from_str(&metadata).unwrap_or_default()
         };
@@ -328,14 +334,14 @@ pub mod local {
         PathBuf::from(format!("{cache_dir}/{key}"))
     }
 
-    fn get_table_path(created_at: i64) -> PathBuf {
+    fn get_table_path(table_dir: &str, created_at: i64) -> PathBuf {
         let cfg = config::get_config();
         let cache_dir = if cfg.enrichment_table.cache_dir.is_empty() {
             format!("{}/enrichment_table_cache", cfg.common.data_cache_dir)
         } else {
             cfg.enrichment_table.cache_dir.clone()
         };
-        PathBuf::from(format!("{cache_dir}/{created_at}.json"))
+        PathBuf::from(format!("{cache_dir}/{table_dir}/{created_at}.json"))
     }
 
     fn get_metadata_path() -> PathBuf {
@@ -369,7 +375,8 @@ pub mod local {
         updated_at: i64,
     ) -> Result<()> {
         let key = get_key(org_id, table_name);
-        let file_path = get_table_path(updated_at);
+        let table_dir = get_table_dir(&key);
+        let file_path = get_table_path(table_dir.to_str().unwrap(), updated_at);
         let metadata_path = get_metadata_path();
 
         // Ensure directory exists

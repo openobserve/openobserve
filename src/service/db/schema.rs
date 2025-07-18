@@ -22,7 +22,7 @@ use config::{
     get_config,
     ider::SnowflakeIdGenerator,
     is_local_disk_storage,
-    meta::{cluster::RoleGroup, stream::StreamType},
+    meta::stream::StreamType,
     utils::{json, time::now_micros},
 };
 use hashbrown::{HashMap, HashSet};
@@ -40,10 +40,7 @@ use {
 };
 
 use crate::{
-    common::{
-        infra::{cluster::get_cached_online_querier_nodes, config::ENRICHMENT_TABLES},
-        meta::stream::StreamSchema,
-    },
+    common::{infra::config::ENRICHMENT_TABLES, meta::stream::StreamSchema},
     service::{db, enrichment::StreamTable},
 };
 
@@ -402,9 +399,16 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let stream_name = keys[2];
 
                 if stream_type.eq(&StreamType::EnrichmentTables) {
-                    let data = super::super::enrichment::get_enrichment_table(org_id, stream_name)
-                        .await
-                        .unwrap();
+                    let data =
+                        match super::super::enrichment::get_enrichment_table(org_id, stream_name)
+                            .await
+                        {
+                            Ok(data) => data,
+                            Err(e) => {
+                                log::error!("[Schema:watch] get enrichment table error: {e}");
+                                vec![]
+                            }
+                        };
                     ENRICHMENT_TABLES.insert(
                         item_key.to_owned(),
                         StreamTable {
@@ -570,17 +574,17 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
     }
 
     // waiting for querier to be ready
-    let expect_querier_num = get_config().limit.starting_expect_querier_num;
-    loop {
-        let nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
-            .await
-            .unwrap_or_default();
-        if nodes.len() >= expect_querier_num {
-            break;
-        }
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        log::info!("Waiting for querier to be ready");
-    }
+    // let expect_querier_num = get_config().limit.starting_expect_querier_num;
+    // loop {
+    //     let nodes = get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+    //         .await
+    //         .unwrap_or_default();
+    //     if nodes.len() >= expect_querier_num {
+    //         break;
+    //     }
+    //     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    //     log::info!("Waiting for querier to be ready");
+    // }
 
     // fill data
     for (key, tbl) in tables {

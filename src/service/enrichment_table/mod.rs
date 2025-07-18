@@ -30,7 +30,7 @@ use config::{
         // self_reporting::usage::UsageType,
         stream::StreamType,
     },
-    utils::{flatten::format_key, json, time::now_micros},
+    utils::{flatten::format_key, json},
 };
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashSet;
@@ -310,7 +310,7 @@ pub async fn save_enrichment_data(
         enrich_meta_stats.start_time =
             db::enrichment_table::get_start_time(org_id, stream_name).await;
     }
-    enrich_meta_stats.end_time = now_micros();
+    enrich_meta_stats.end_time = timestamp;
     enrich_meta_stats.size = total_expected_size_in_bytes as i64;
     // The stream_stats table takes some time to update, so we need to update the enrichment table
     // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
