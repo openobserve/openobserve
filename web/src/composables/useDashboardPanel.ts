@@ -21,6 +21,7 @@ import {
   splitQuotedString,
   escapeSingleQuotes,
   b64EncodeUnicode,
+  isStreamingEnabled,
 } from "@/utils/zincutils";
 import { extractFields } from "@/utils/query/sqlUtils";
 import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
@@ -3276,6 +3277,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             : {}),
         },
         page_type: "dashboards",
+        is_streaming: isStreamingEnabled(store.state)
       },
       "dashboards",
     );

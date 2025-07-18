@@ -67,6 +67,7 @@ const search = {
       traceparent,
       dashboard_id,
       folder_id,
+      is_streaming = false,
     }: {
       org_identifier: string;
       query: any;
@@ -74,6 +75,7 @@ const search = {
       traceparent?: string;
       dashboard_id?: string;
       folder_id?: string;
+      is_streaming?: boolean;
     },
     search_type: string = "ui",
   ) => {
@@ -83,7 +85,7 @@ const search = {
         ? (window as any).use_cache
         : true;
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
-    let url = `/api/${org_identifier}/result_schema?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
+    let url = `/api/${org_identifier}/result_schema?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&is_streaming=${is_streaming}`;
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
     if (folder_id) url += `&folder_id=${folder_id}`;
     if (typeof query.query.sql != "string") {
