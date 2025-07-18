@@ -294,10 +294,11 @@ pub mod s3 {
         }
     }
 
-    pub async fn get_last_updated_at() -> Result<i64> {
+    pub async fn get_last_updated_at(org_id: &str, table_name: &str) -> Result<i64> {
         let db = infra_db::get_db().await;
+        let db_key = format!("{ENRICHMENT_TABLE_S3_KEY}{org_id}/{table_name}");
         let metadata: S3EnrichmentTableMeta = {
-            let metadata = db.get(ENRICHMENT_TABLE_S3_KEY).await.unwrap_or_default();
+            let metadata = db.get(&db_key).await.unwrap_or_default();
             let metadata = String::from_utf8_lossy(&metadata);
             serde_json::from_str(&metadata).unwrap_or_default()
         };

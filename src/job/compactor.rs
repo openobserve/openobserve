@@ -25,6 +25,8 @@ use tokio::sync::mpsc;
 
 use crate::service::compact;
 
+const ENRICHMENT_TABLE_MERGE_LOCK_KEY: &str = "/enrichment_table_merge";
+
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_compactor() {
         return Ok(());
@@ -263,19 +265,57 @@ async fn run_clean_done_jobs() -> Result<(), anyhow::Error> {
 
 async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
     log::info!("[COMPACTOR::JOB] Running enrichment table merge");
-    let Ok(locker) = infra::dist_lock::lock("/enrichment_table/merge", 0).await else {
+    let db = infra::db::get_db().await;
+    let Ok(locker) = infra::dist_lock::lock(ENRICHMENT_TABLE_MERGE_LOCK_KEY, 0).await else {
         log::error!("[COMPACTOR::JOB] Failed to acquire lock for enrichment table merge");
         return Ok(());
     };
+    let node_id = db
+        .get(ENRICHMENT_TABLE_MERGE_LOCK_KEY)
+        .await
+        .unwrap_or_default();
+    let node_id = String::from_utf8_lossy(&node_id);
+    if !node_id.is_empty() && !node_id.eq(&LOCAL_NODE.uuid) {
+        // Unlock and return
+        if let Err(e) = infra::dist_lock::unlock(&locker).await {
+            log::error!("[COMPACTOR::JOB] Failed to release lock for enrichment table merge: {e}");
+        }
+        return Ok(());
+    }
 
+    log::debug!("[COMPACTOR::JOB] No node is merging enrichment table");
+    // This node is the first node to merge enrichment table
+    if let Err(e) = db
+        .put(
+            ENRICHMENT_TABLE_MERGE_LOCK_KEY,
+            LOCAL_NODE.uuid.clone().into(),
+            false,
+            None,
+        )
+        .await
+    {
+        log::error!("[COMPACTOR::JOB] Failed to put lock for enrichment table merge: {e}");
+        if let Err(e) = infra::dist_lock::unlock(&locker).await {
+            log::error!("[COMPACTOR::JOB] Failed to release lock for enrichment table merge: {e}");
+        }
+        return Ok(());
+    }
+
+    if let Err(e) = infra::dist_lock::unlock(&locker).await {
+        log::error!("[COMPACTOR::JOB] Failed to release lock for enrichment table merge: {e}");
+    }
     let handle = tokio::task::spawn(async move {
         if let Err(e) = crate::service::enrichment::storage::s3::run_merge_job().await {
             log::error!("[COMPACTOR::JOB] run enrichment table merge error: {e}");
         }
     });
     handle.await.unwrap();
-    if let Err(e) = infra::dist_lock::unlock(&locker).await {
-        log::error!("[COMPACTOR::JOB] Failed to release lock for enrichment table merge: {e}");
+    // Remove the uuid from the db after it is stopped
+    if let Err(e) = db
+        .delete(ENRICHMENT_TABLE_MERGE_LOCK_KEY, false, false, None)
+        .await
+    {
+        log::error!("[COMPACTOR::JOB] Failed to delete lock for enrichment table merge: {e}");
     }
     Ok(())
 }
