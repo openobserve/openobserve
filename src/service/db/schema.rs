@@ -395,32 +395,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     })
                     .or_insert(schema_versions);
                 drop(w);
-
-                let keys = item_key.split('/').collect::<Vec<&str>>();
-                let org_id = keys[0];
-                let stream_type = StreamType::from(keys[1]);
-                let stream_name = keys[2];
-
-                if stream_type.eq(&StreamType::EnrichmentTables) {
-                    let data =
-                        match super::super::enrichment::get_enrichment_table(org_id, stream_name)
-                            .await
-                        {
-                            Ok(data) => data,
-                            Err(e) => {
-                                log::error!("[Schema:watch] get enrichment table error: {e}");
-                                vec![]
-                            }
-                        };
-                    ENRICHMENT_TABLES.insert(
-                        item_key.to_owned(),
-                        StreamTable {
-                            org_id: org_id.to_string(),
-                            stream_name: stream_name.to_string(),
-                            data,
-                        },
-                    );
-                }
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();

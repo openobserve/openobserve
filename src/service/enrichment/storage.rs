@@ -21,7 +21,6 @@ use config::utils::{
     },
     json::Value,
 };
-use serde::{Deserialize, Serialize};
 
 pub mod remote {
     use std::sync::Arc;
@@ -33,20 +32,10 @@ pub mod remote {
             arrow::record_batches_to_json_rows,
             parquet::{read_recordbatch_from_bytes, write_recordbatch_to_parquet},
             record_batch_ext::convert_json_to_record_batch,
-            time::now_micros,
         },
     };
 
-    pub const ENRICHMENT_TABLE_REMOTE_KEY: &str = "/enrichment_table_remote/";
-
-    use infra::db as infra_db;
-
     use super::*;
-
-    #[derive(Debug, Default, Serialize, Deserialize)]
-    pub struct RemoteEnrichmentTableMeta {
-        pub remote_last_updated: i64,
-    }
 
     fn get_remote_key_prefix(org_id: &str, table_name: &str) -> String {
         format!(
@@ -92,19 +81,6 @@ pub mod remote {
             .map_err(|e| anyhow!("Failed to upload enrichment table to remote: {}", e))?;
 
         crate::service::db::file_list::set(&remote_key, Some(file_meta), false).await?;
-
-        let meta = RemoteEnrichmentTableMeta {
-            remote_last_updated: now_micros(),
-        };
-        let db = infra_db::get_db().await;
-        let db_key = format!("{ENRICHMENT_TABLE_REMOTE_KEY}{org_id}/{table_name}");
-        db.put(
-            &db_key,
-            serde_json::to_string(&meta).unwrap().into(),
-            false,
-            None,
-        )
-        .await?;
 
         log::debug!("Uploaded enrichment table {} to remote", table_name);
         Ok(())
@@ -303,18 +279,6 @@ pub mod remote {
                 }
             }
         }
-    }
-
-    pub async fn get_last_updated_at(org_id: &str, table_name: &str) -> Result<i64> {
-        let db = infra_db::get_db().await;
-        let db_key = format!("{ENRICHMENT_TABLE_REMOTE_KEY}{org_id}/{table_name}");
-        let metadata: RemoteEnrichmentTableMeta = {
-            let metadata = db.get(&db_key).await.unwrap_or_default();
-            let metadata = String::from_utf8_lossy(&metadata);
-            serde_json::from_str(&metadata).unwrap_or_default()
-        };
-
-        Ok(metadata.remote_last_updated)
     }
 }
 
