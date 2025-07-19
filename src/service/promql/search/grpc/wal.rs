@@ -170,6 +170,7 @@ async fn get_wal_batches(
             stream_type: StreamType::Metrics.to_string(),
             partition: 0,           // set in FlightSearchRequest
             job_id: "".to_string(), // set in FlightSearchRequest
+            enrich_mode: false,
         },
         search_infos: SearchInfos {
             plan: vec![],          // set in RemoteScanNode

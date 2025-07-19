@@ -29,11 +29,12 @@ message FlightSearchRequest {
 }
 
 message QueryIdentifier {
-    string                       trace_id = 1; 
+    string                       trace_id = 1;
     string                         org_id = 2;
     string                    stream_type = 3;
     uint32                      partition = 4; // the partition number of the remote scan
     string                         job_id = 5; // the unique id for each remote scan 
+    bool                      enrich_mode = 6; // need special logic for loading enrich table
 }
 
 message SearchInfo {
@@ -47,8 +48,8 @@ message SearchInfo {
 
 message IndexInfo {
     bool                   use_inverted_index = 1;
-    string                    index_condition = 2; 
-    repeated KvItem                equal_keys = 3; 
+    string                    index_condition = 2;
+    repeated KvItem                equal_keys = 3;
     repeated string            match_all_keys = 4;
     IdxOptimizeMode       index_optimize_mode = 5;
 }
@@ -56,7 +57,7 @@ message IndexInfo {
 message SuperClusterInfo {
     bool                 is_super_cluster = 1;
     optional string               user_id = 2;
-    optional string            work_group = 3; 
+    optional string            work_group = 3;
     optional string     search_event_type = 4; // use for super cluster
     optional bool              local_mode = 5; // use for super cluster
 }

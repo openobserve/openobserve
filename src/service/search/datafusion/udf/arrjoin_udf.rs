@@ -65,21 +65,17 @@ pub fn arr_join_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
             match (arr_field1, val) {
                 // in arrow, any value can be null.
                 // Here we decide to make our UDF to return null when either argument is null.
-                (Some(arr_field1), Some(delim)) => {
-                    json::from_str::<json::Value>(arr_field1)
-                        .ok()
-                        .and_then(|arr_field1| {
-                            if let json::Value::Array(field1) = arr_field1 {
-                                let join_arrs: Vec<String> = field1
-                                    .iter()
-                                    .map(super::stringify_json_value)
-                                    .collect();
-                                Some(join_arrs.join(delim))
-                            } else {
-                                None
-                            }
-                        })
-                }
+                (Some(arr_field1), Some(delim)) => json::from_str::<json::Value>(arr_field1)
+                    .ok()
+                    .and_then(|arr_field1| {
+                        if let json::Value::Array(field1) = arr_field1 {
+                            let join_arrs: Vec<String> =
+                                field1.iter().map(super::stringify_json_value).collect();
+                            Some(join_arrs.join(delim))
+                        } else {
+                            None
+                        }
+                    }),
                 _ => None,
             }
         })
@@ -109,7 +105,11 @@ mod tests {
         let sql = format!("select arrjoin(arr_field, '{}') as ret from t", delimiter);
         let sqls = [(sql.as_str(), expected_output)];
 
-        let schema = Arc::new(Schema::new(vec![Field::new("arr_field", DataType::Utf8, false)]));
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "arr_field",
+            DataType::Utf8,
+            false,
+        )]));
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![Arc::new(StringArray::from(vec![arr_field]))],
@@ -130,13 +130,7 @@ mod tests {
 
     // Helper function to run multiple test cases that should all return null
     async fn run_null_returning_tests(test_cases: &[(&str, &str)]) {
-        let expected_output = vec![
-            "+-----+",
-            "| ret |",
-            "+-----+",
-            "|     |",
-            "+-----+",
-        ];
+        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
 
         for &(arr_field, delimiter) in test_cases {
             run_single_test(arr_field, delimiter, expected_output.clone()).await;
@@ -234,13 +228,13 @@ mod tests {
     async fn test_arr_join_null_returning_cases() {
         // Test cases that should return null
         let null_cases = [
-            (r#"[]"#, ","),                    // empty array
-            (r#"not json"#, ","),              // invalid JSON
-            (r#"{"key": "value"}"#, ","),      // object
-            (r#""just a string""#, ","),       // string
-            (r#"42"#, ","),                    // number
-            (r#"true"#, ","),                  // boolean
-            (r#"null"#, ","),                  // null
+            (r#"[]"#, ","),               // empty array
+            (r#"not json"#, ","),         // invalid JSON
+            (r#"{"key": "value"}"#, ","), // object
+            (r#""just a string""#, ","),  // string
+            (r#"42"#, ","),               // number
+            (r#"true"#, ","),             // boolean
+            (r#"null"#, ","),             // null
         ];
 
         run_null_returning_tests(&null_cases).await;
@@ -248,15 +242,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_arr_join_null_input() {
-        let expected_output = vec![
-            "+-----+",
-            "| ret |",
-            "+-----+",
-            "|     |",
-            "+-----+",
-        ];
+        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
 
-        let schema = Arc::new(Schema::new(vec![Field::new("arr_field", DataType::Utf8, true)]));
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "arr_field",
+            DataType::Utf8,
+            true,
+        )]));
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![Arc::new(StringArray::from(vec![None::<String>]))],
@@ -296,7 +288,11 @@ mod tests {
             "+-------+",
         ];
 
-        let schema = Arc::new(Schema::new(vec![Field::new("arr_field", DataType::Utf8, false)]));
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "arr_field",
+            DataType::Utf8,
+            false,
+        )]));
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![Arc::new(StringArray::from(arr_fields))],

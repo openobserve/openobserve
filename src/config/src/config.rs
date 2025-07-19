@@ -427,6 +427,7 @@ pub struct Config {
     pub pipeline: Pipeline,
     pub health_check: HealthCheck,
     pub encryption: Encryption,
+    pub enrichment_table: EnrichmentTable,
 }
 
 #[derive(EnvConfig)]
@@ -1907,6 +1908,28 @@ pub struct HealthCheck {
         help = "The node will be removed from consistent hash if health check failed exceed this times"
     )]
     pub failed_times: usize,
+}
+
+#[derive(EnvConfig)]
+pub struct EnrichmentTable {
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_CACHE_DIR",
+        default = "",
+        help = "Local cache directory for enrichment tables"
+    )]
+    pub cache_dir: String,
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_MERGE_THRESHOLD_MB",
+        default = 60,
+        help = "Threshold for merging small files before S3 upload (in MB)"
+    )]
+    pub merge_threshold_mb: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_MERGE_INTERVAL",
+        default = 600,
+        help = "Background sync interval in seconds"
+    )]
+    pub merge_interval: u64,
 }
 
 pub fn init() -> Config {
