@@ -1963,9 +1963,23 @@ const useLogs = () => {
         ) {
           searchObj.meta.refreshHistogram = false;
           if (searchObj.data.queryResults.hits.length > 0) {
-            if (searchObj.data.stream.selectedStream.length > 1) {
-              searchObj.data.histogramQuery.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query);
-            }
+            if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == true) {
+              searchObj.data.histogram = {
+                xData: [],
+                yData: [],
+                chartParams: {
+                  title: getHistogramTitle(),
+                  unparsed_x_data: [],
+                  timezone: "",
+                },
+                errorCode: 0,
+                errorMsg: "Histogram is not available for multi-stream SQL mode search.",
+                errorDetail: "",
+              };
+            } else {
+              if(searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false) {
+                searchObj.data.histogramQuery.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query);
+              }
               searchObjDebug["histogramStartTime"] = performance.now();
               searchObj.data.histogram.errorMsg = "";
               searchObj.data.histogram.errorCode = 0;
@@ -2015,8 +2029,11 @@ const useLogs = () => {
                 }
               }
               searchObj.loadingHistogram = false;
+            }
           }
-          await generateHistogramData();
+          if (searchObj.data.stream.selectedStream.length == 1 || (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false)) {
+            await generateHistogramData();
+          }
           if(!queryReq.query?.streaming_output) refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
           resetHistogramWithError(
@@ -4671,6 +4688,11 @@ const useLogs = () => {
       searchObj.data.tempFunctionContent = "";
       searchObj.meta.searchApplied = false;
 
+      // Update histogram visibility
+      if (streams.length > 1 && searchObj.meta.sqlMode == true) {
+        searchObj.meta.showHistogram = false;
+      }
+
       if (!store.state.zoConfig.query_on_stream_selection) {
         await handleQueryData();
       } else {
@@ -6210,16 +6232,18 @@ const useLogs = () => {
   };
 
   const shouldShowHistogram = (parsedSQL: any) => {
-    return (isHistogramDataMissing(searchObj) &&
-    isHistogramEnabled(searchObj) &&
-    (!searchObj.meta.sqlMode ||
-      isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
-  (isHistogramEnabled(searchObj) &&
-    !searchObj.meta.sqlMode);
+    return ((isHistogramDataMissing(searchObj) && isHistogramEnabled(searchObj) && (!searchObj.meta.sqlMode || isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
+            (isHistogramEnabled(searchObj) && !searchObj.meta.sqlMode)) &&
+            (searchObj.data.stream.selectedStream.length === 1 || (searchObj.data.stream.selectedStream.length > 1 && !searchObj.meta.sqlMode));
   }
 
   const processHistogramRequest = async (queryReq: SearchRequestPayload) => {
     const parsedSQL: any = fnParsedSQL();
+
+    if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == true) {
+      const errMsg = "Histogram is not available for multi-stream SQL mode search.";
+      resetHistogramWithError(errMsg, 0);
+    }
 
     if (!searchObj.data.queryResults?.hits?.length) {
       return;
@@ -6249,7 +6273,7 @@ const useLogs = () => {
           "histogram",
         );
 
-        if (searchObj.data.stream.selectedStream.length > 1) {
+        if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false) {
           payload.queryReq.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query);
         }
 
