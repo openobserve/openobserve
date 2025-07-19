@@ -64,37 +64,38 @@ pub fn arr_sort_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
     let array = arr_field
         .iter()
         .map(|arr_field| {
-            let mut arr_sorted = vec![];
-
-            if let Some(arr_field) = arr_field {
-                let arr_field: json::Value =
-                    json::from_str(arr_field).expect("Failed to deserialize arrzip field1");
-                // This field is assumed to be a multivalue field
-                if let json::Value::Array(mut field) = arr_field {
-                    field.sort_by(|a, b| {
-                        // Assuming the array having elements of same type
-                        if a.is_f64() {
-                            a.as_f64().unwrap().total_cmp(b.as_f64().as_ref().unwrap())
-                        } else if a.is_i64() {
-                            a.as_i64().unwrap().cmp(b.as_i64().as_ref().unwrap())
-                        } else if a.is_u64() {
-                            a.as_u64().unwrap().cmp(b.as_u64().as_ref().unwrap())
-                        } else if a.is_string() {
-                            a.as_str().unwrap().cmp(b.as_str().unwrap())
-                        } else if a.is_boolean() {
-                            a.as_bool().unwrap().cmp(b.as_bool().as_ref().unwrap())
-                        } else {
-                            Ordering::Less
-                        }
-                    });
-                    arr_sorted.append(&mut field);
-                }
-                let arr_sorted =
-                    json::to_string(&arr_sorted).expect("Failed to stringify sorted arrs");
-                Some(arr_sorted)
-            } else {
-                None
-            }
+            arr_field
+                .and_then(|arr_field| {
+                    json::from_str::<json::Value>(arr_field)
+                        .ok()
+                        .and_then(|arr_field| {
+                            if let json::Value::Array(mut field) = arr_field {
+                                if field.is_empty() {
+                                    None
+                                } else {
+                                    field.sort_by(|a, b| {
+                                        // Assuming the array having elements of same type
+                                        if a.is_f64() {
+                                            a.as_f64().unwrap().total_cmp(b.as_f64().as_ref().unwrap())
+                                        } else if a.is_i64() {
+                                            a.as_i64().unwrap().cmp(b.as_i64().as_ref().unwrap())
+                                        } else if a.is_u64() {
+                                            a.as_u64().unwrap().cmp(b.as_u64().as_ref().unwrap())
+                                        } else if a.is_string() {
+                                            a.as_str().unwrap().cmp(b.as_str().unwrap())
+                                        } else if a.is_boolean() {
+                                            a.as_bool().unwrap().cmp(b.as_bool().as_ref().unwrap())
+                                        } else {
+                                            Ordering::Less
+                                        }
+                                    });
+                                    json::to_string(&field).ok()
+                                }
+                            } else {
+                                None
+                            }
+                        })
+                })
         })
         .collect::<StringArray>();
 
@@ -117,11 +118,50 @@ mod tests {
 
     use super::*;
 
+    // Helper function to run a single test case
+    async fn run_single_test(arr_field: &str, expected_output: Vec<&str>) {
+        let sql = "select arrsort(arr_field) as ret from t";
+        let sqls = [(sql, expected_output)];
+
+        let schema = Arc::new(Schema::new(vec![Field::new("arr_field", DataType::Utf8, false)]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(vec![arr_field]))],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_SORT_UDF.clone());
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        for item in sqls {
+            let df = ctx.sql(item.0).await.unwrap();
+            let data = df.collect().await.unwrap();
+            assert_batches_eq!(item.1, &data);
+        }
+    }
+
+    // Helper function to run multiple test cases that should all return null
+    async fn run_null_returning_tests(test_cases: &[&str]) {
+        let expected_output = vec![
+            "+-----+",
+            "| ret |",
+            "+-----+",
+            "|     |",
+            "+-----+",
+        ];
+
+        for &arr_field in test_cases {
+            run_single_test(arr_field, expected_output.clone()).await;
+        }
+    }
+
     #[tokio::test]
-    async fn test_arr_sort_udf() {
-        let sqls = [
+    async fn test_arr_sort_valid_arrays() {
+        let test_cases = [
             (
-                "select arrsort(bools) as ret from t",
+                r#"[true,false,true]"#,
                 vec![
                     "+-------------------+",
                     "| ret               |",
@@ -131,7 +171,7 @@ mod tests {
                 ],
             ),
             (
-                "select arrsort(names) as ret from t",
+                r#"["hello2","hi2","bye2"]"#,
                 vec![
                     "+-------------------------+",
                     "| ret                     |",
@@ -141,7 +181,7 @@ mod tests {
                 ],
             ),
             (
-                "select arrsort(nums) as ret from t",
+                r#"[12, 345, 23, 45]"#,
                 vec![
                     "+----------------+",
                     "| ret            |",
@@ -151,7 +191,7 @@ mod tests {
                 ],
             ),
             (
-                "select arrsort(floats) as ret from t",
+                r#"[1.9, 34.5, 2.6, 4.5]"#,
                 vec![
                     "+--------------------+",
                     "| ret                |",
@@ -160,44 +200,126 @@ mod tests {
                     "+--------------------+",
                 ],
             ),
+            (
+                r#"[3, 1, 4, 1, 5]"#,
+                vec![
+                    "+-------------+",
+                    "| ret         |",
+                    "+-------------+",
+                    "| [1,1,3,4,5] |",
+                    "+-------------+",
+                ],
+            ),
+            (
+                r#"["zebra", "apple", "banana"]"#,
+                vec![
+                    "+----------------------------+",
+                    "| ret                        |",
+                    "+----------------------------+",
+                    "| [\"apple\",\"banana\",\"zebra\"] |",
+                    "+----------------------------+",
+                ],
+            ),
         ];
 
-        // define a schema.
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("log", DataType::Utf8, false),
-            Field::new("bools", DataType::Utf8, false),
-            Field::new("names", DataType::Utf8, false),
-            Field::new("nums", DataType::Utf8, false),
-            Field::new("floats", DataType::Utf8, false),
-        ]));
+        for (arr_field, expected_output) in test_cases {
+            run_single_test(arr_field, expected_output).await;
+        }
+    }
 
-        // define data.
+    #[tokio::test]
+    async fn test_arr_sort_null_returning_cases() {
+        // Test cases that should return null
+        let null_cases = [
+            r#"not json"#,              // invalid JSON
+            r#"{"key": "value"}"#,      // object
+            r#""just a string""#,       // string
+            r#"42"#,                    // number
+            r#"true"#,                  // boolean
+            r#"null"#,                  // null
+        ];
+
+        run_null_returning_tests(&null_cases).await;
+    }
+
+    #[tokio::test]
+    async fn test_arr_sort_null_input() {
+        let expected_output = vec![
+            "+-----+",
+            "| ret |",
+            "+-----+",
+            "|     |",
+            "+-----+",
+        ];
+
+        let schema = Arc::new(Schema::new(vec![Field::new("arr_field", DataType::Utf8, true)]));
         let batch = RecordBatch::try_new(
             schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["a"])),
-                Arc::new(StringArray::from(vec!["[true,false,true]"])),
-                Arc::new(StringArray::from(vec!["[\"hello2\",\"hi2\",\"bye2\"]"])),
-                Arc::new(StringArray::from(vec!["[12, 345, 23, 45]"])),
-                Arc::new(StringArray::from(vec!["[1.9, 34.5, 2.6, 4.5]"])),
-            ],
+            vec![Arc::new(StringArray::from(vec![None::<String>]))],
         )
         .unwrap();
 
-        // declare a new context. In spark API, this corresponds to a new spark
-        // SQLsession
         let ctx = SessionContext::new();
         ctx.register_udf(ARR_SORT_UDF.clone());
-
-        // declare a table in memory. In spark API, this corresponds to
-        // createDataFrame(...).
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
-        for item in sqls {
-            let df = ctx.sql(item.0).await.unwrap();
-            let data = df.collect().await.unwrap();
-            assert_batches_eq!(item.1, &data);
-        }
+        let sql = "select arrsort(arr_field) as ret from t";
+        let df = ctx.sql(sql).await.unwrap();
+        let data = df.collect().await.unwrap();
+        assert_batches_eq!(expected_output, &data);
+    }
+
+    #[tokio::test]
+    async fn test_arr_sort_multiple_rows() {
+        let arr_fields = vec![
+            r#"[3, 1, 4]"#,
+            r#"[]"#,
+            r#"not json"#,
+            r#"["b", "a", "c"]"#,
+            r#"{"key": "value"}"#,
+        ];
+        let sql = "select arrsort(arr_field) as ret from t";
+        let expected_output = vec![
+            "+---------------+",
+            "| ret           |",
+            "+---------------+",
+            "| [1,3,4]       |",
+            "|               |",
+            "|               |",
+            "| [\"a\",\"b\",\"c\"] |",
+            "|               |",
+            "+---------------+",
+        ];
+
+        let schema = Arc::new(Schema::new(vec![Field::new("arr_field", DataType::Utf8, false)]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(arr_fields))],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_SORT_UDF.clone());
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let df = ctx.sql(sql).await.unwrap();
+        let data = df.collect().await.unwrap();
+        assert_batches_eq!(expected_output, &data);
+    }
+
+    #[tokio::test]
+    async fn test_arr_sort_wrong_arguments() {
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_SORT_UDF.clone());
+
+        // Test with no arguments
+        let result = ctx.sql("select arrsort() as ret").await;
+        assert!(result.is_err());
+
+        // Test with multiple arguments
+        let result = ctx.sql("select arrsort('a', 'b') as ret").await;
+        assert!(result.is_err());
     }
 }
