@@ -94,13 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="field-table full-height"
         id="fieldList"
         :rows-per-page-options="[]"
-        :hide-bottom="
-          (!store.state.zoConfig.user_defined_schemas_enabled ||
-            !searchObj.meta.hasUserDefinedSchemas) &&
-          streamFieldsRows != undefined &&
-          (streamFieldsRows.length <= pagination.rowsPerPage ||
-            streamFieldsRows.length == 0)
-        "
       >
         <template #body-cell-name="props">
           <q-tr
@@ -648,6 +641,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="scope.lastPage"
             />
           </div>
+          <div class="q-ml-xs text-right" :class="scope.pagesNumber > 1 ? 'col-1' : 'col'">
+            <q-icon name="restart_alt" size="21px" data-test="logs-page-fields-list-reset-icon" class="cursor-pointer	" @click="resetSelectedFileds" />
+            <q-tooltip
+              data-test="logs-page-fields-list-reset-tooltip"
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+              class="text-body2"
+            >
+              <span class="text-bold" color="white">{{
+                t("search.resetFields")
+              }}</span>
+            </q-tooltip>
+          </div>
         </template>
       </q-table>
     </div>
@@ -785,6 +792,14 @@ export default defineComponent({
       return searchObj.data.stream.streamLists;
     });
 
+    const checkSelectedFields = computed(() => {
+      console.log("checkSelectedFields", searchObj.data.stream.selectedFields);
+      return (
+        searchObj.data.stream.selectedFields &&
+        searchObj.data.stream.selectedFields.length > 0
+      );
+    });
+
     watch(
       () => streamList.value,
       () => {
@@ -846,6 +861,11 @@ export default defineComponent({
         store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();
       filterHitsColumns();
+    }
+
+    function resetSelectedFileds() {
+      searchObj.data.stream.selectedFields = [];
+      updatedLocalLogFilterField();
     }
 
     /**
@@ -1652,6 +1672,8 @@ export default defineComponent({
       cancelTraceId,
       cancelFilterCreator,
       selectedStream,
+      checkSelectedFields,
+      resetSelectedFileds,
     };
   },
 });
