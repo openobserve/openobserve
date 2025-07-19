@@ -52,7 +52,8 @@ use crate::service::{
                 empty_exec::NewEmptyExec, rewrite::tantivy_optimize_rewrite,
             },
             exec::{prepare_datafusion_context, register_udf},
-            table_provider::uniontable::NewUnionTable,
+            plan::tantivy_count_exec::TantivyCountExec,
+            table_provider::{enrich_table::NewEnrichTable, uniontable::NewUnionTable},
         },
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -307,6 +308,28 @@ pub async fn search(
         };
         tables.extend(tbls);
         scan_stats.add(&stats);
+    }
+    log::info!(
+        "stream_type: {:?} stream_name: {:?} empty_exec.name()={} ,enrich_mode {}",
+        stream_type,
+        stream_name,
+        empty_exec.name(),
+        req.query_identifier.enrich_mode
+    );
+    // if the stream type is enrichment tables and the enrich mode is true, we need to load
+    // enrichment data from db to datafusion tables
+    if stream_type == StreamType::EnrichmentTables && req.query_identifier.enrich_mode {
+        log::debug!(
+            "Creating enrichment table for org_id={}, stream_name={}, empty_exec.name()={}",
+            org_id,
+            stream_name,
+            empty_exec.name()
+        );
+        // get the enrichment table from db
+        let enrichment_table =
+            NewEnrichTable::new(&org_id, &stream_name, empty_exec.schema().clone());
+        // add the enrichment table to the tables
+        tables.push(Arc::new(enrichment_table) as _);
     }
 
     // create a Union Plan to merge all tables

@@ -400,36 +400,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     })
                     .or_insert(schema_versions);
                 drop(w);
-
-                let keys = item_key.split('/').collect::<Vec<&str>>();
-                let org_id = keys[0];
-                let stream_type = StreamType::from(keys[1]);
-                let stream_name = keys[2];
-
-                if stream_type.eq(&StreamType::EnrichmentTables) {
-                    let data = super::enrichment_table::get(org_id, stream_name)
-                        .await
-                        .unwrap();
-                    ENRICHMENT_TABLES.insert(
-                        item_key.to_owned(),
-                        StreamTable {
-                            org_id: org_id.to_string(),
-                            stream_name: stream_name.to_string(),
-                            data,
-                        },
-                    );
-                }
-
-                // if create_org_through_ingestion is enabled, we need to create the org
-                // if it doesn't exist. Hence, we need to check if the org exists in the cache
-                if (cfg.common.create_org_through_ingestion
-                    || cfg.common.usage_enabled
-                    || audit_enabled)
-                    && !ORGANIZATIONS.read().await.contains_key(org_id)
-                    && let Err(e) = check_and_create_org(org_id).await
-                {
-                    log::error!("Failed to save organization in database: {e}");
-                }
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
@@ -480,6 +450,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     {
                         log::error!("[Schema:watch] remove_dir_all: {e}");
                     };
+                }
+                if stream_type.eq(&StreamType::EnrichmentTables) {
+                    if let Err(e) =
+                        config::utils::enrichment_local_cache::delete(org_id, stream_name).await
+                    {
+                        log::error!("[Schema:watch] delete local enrichment file error: {}", e);
+                    }
                 }
             }
             db::Event::Empty => {}
@@ -610,7 +587,8 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
 
     // fill data
     for (key, tbl) in tables {
-        let data = super::enrichment_table::get(&tbl.org_id, &tbl.stream_name).await?;
+        let data =
+            super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name).await?;
         ENRICHMENT_TABLES.insert(
             key,
             StreamTable {

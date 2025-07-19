@@ -27,10 +27,10 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        self_reporting::usage::UsageType,
-        stream::{PartitionTimeLevel, StreamType},
+        // self_reporting::usage::UsageType,
+        stream::StreamType,
     },
-    utils::{flatten::format_key, json, schema_ext::SchemaExt, time::now_micros},
+    utils::{flatten::format_key, json},
 };
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashSet;
@@ -43,13 +43,14 @@ use infra::{
 };
 
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
+    common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::router::ERROR_HEADER,
     service::{
-        db, format_stream_name,
-        ingestion::write_file,
+        db,
+        format_stream_name,
+        // ingestion::write_file,
         schema::{check_for_schema, stream_schema_exists},
-        self_reporting::report_request_usage_stats,
+        // self_reporting::report_request_usage_stats,
     },
 };
 
@@ -61,12 +62,12 @@ pub async fn save_enrichment_data(
     payload: Vec<json::Map<String, json::Value>>,
     append_data: bool,
 ) -> Result<HttpResponse, Error> {
-    let start = std::time::Instant::now();
+    // let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
 
-    let mut hour_key = String::new();
-    let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
+    // let mut hour_key = String::new();
+    // let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
     let table_name = table_name.trim();
     let stream_name = &format_stream_name(table_name);
 
@@ -139,7 +140,6 @@ pub async fn save_enrichment_data(
         );
     }
 
-    let mut schema_evolved = false;
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let stream_schema = stream_schema_exists(
         org_id,
@@ -158,47 +158,46 @@ pub async fn save_enrichment_data(
     let mut records_size = 0;
     let timestamp = Utc::now().timestamp_micros();
     for mut json_record in payload {
-        let timestamp = match json_record.get(TIMESTAMP_COL_NAME) {
-            Some(v) => v.as_i64().unwrap_or(timestamp),
-            None => timestamp,
-        };
+        // Use now as _timestamp in the json records, as we don't
+        // care about the timestamp in enrichment tables. Also, we can use the timestamp
+        // as start_time and end_time in the meta table stats.
         json_record.insert(
             TIMESTAMP_COL_NAME.to_string(),
             json::Value::Number(timestamp.into()),
         );
 
-        // check for schema evolution
-        if !schema_evolved
-            && check_for_schema(
-                org_id,
-                stream_name,
-                StreamType::EnrichmentTables,
-                &mut stream_schema_map,
-                vec![&json_record],
-                timestamp,
-            )
-            .await
-            .is_ok()
-        {
-            schema_evolved = true;
-        }
-
-        if records.is_empty() {
-            let schema = stream_schema_map.get(stream_name).unwrap();
-            let schema_key = schema.hash_key();
-            hour_key = super::ingestion::get_write_partition_key(
-                timestamp,
-                &vec![],
-                PartitionTimeLevel::Unset,
-                &json_record,
-                Some(schema_key),
-            );
-        }
+        // if records.is_empty() {
+        // let schema = stream_schema_map.get(stream_name).unwrap();
+        // let schema_key = schema.hash_key();
+        // hour_key = super::ingestion::get_write_partition_key(
+        //     timestamp,
+        //     &vec![],
+        //     PartitionTimeLevel::Unset,
+        //     &json_record,
+        //     Some(schema_key),
+        // );
+        // }
         let record = json::Value::Object(json_record);
         let record_size = json::estimate_json_bytes(&record);
-        records.push(Arc::new(record));
+        records.push(record);
         records_size += record_size;
     }
+
+    let mut record_vals = vec![];
+    for record in records.iter() {
+        record_vals.push(record.as_object().unwrap());
+    }
+    // check for schema evolution
+
+    let _ = check_for_schema(
+        org_id,
+        stream_name,
+        StreamType::EnrichmentTables,
+        &mut stream_schema_map,
+        record_vals,
+        timestamp,
+    )
+    .await;
 
     if records.is_empty() {
         return Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
@@ -215,37 +214,87 @@ pub async fn save_enrichment_data(
         .clone()
         .with_metadata(HashMap::new());
     let schema = Arc::new(schema);
-    let schema_key = schema.hash_key();
-    buf.insert(
-        hour_key,
-        SchemaRecords {
-            schema_key,
-            schema: schema.clone(),
-            records,
-            records_size,
-        },
-    );
+    // let schema_key = schema.hash_key();
+    // buf.insert(
+    //     hour_key,
+    //     SchemaRecords {
+    //         schema_key,
+    //         schema: schema.clone(),
+    //         records,
+    //         records_size,
+    //     },
+    // );
+
+    // If data size is less than the merge threshold, we can store it in the database
+    let merge_threshold_mb = crate::service::enrichment::storage::remote::get_merge_threshold_mb()
+        .await
+        .unwrap_or(100) as f64;
+    if (records_size as f64) < merge_threshold_mb * SIZE_IN_MB {
+        if let Err(e) = crate::service::enrichment::storage::database::store(
+            org_id,
+            stream_name,
+            &records,
+            timestamp,
+        )
+        .await
+        {
+            log::error!("Error writing enrichment table to database: {e}");
+            return Ok(HttpResponse::InternalServerError()
+                .append_header((
+                    ERROR_HEADER,
+                    format!("Error writing enrichment table to database: {e}"),
+                ))
+                .json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    "Error writing enrichment table to database".to_string(),
+                )));
+        }
+    } else {
+        // If data size is greater than the merge threshold, we can store it directly to s3
+        if let Err(e) = crate::service::enrichment::storage::remote::store(
+            org_id,
+            stream_name,
+            &records,
+            timestamp,
+        )
+        .await
+        {
+            log::error!("Error writing enrichment table to S3: {e}");
+        }
+    }
+
+    // write data to local cache
+    if let Err(e) =
+        crate::service::enrichment::storage::local::store(org_id, stream_name, &records, timestamp)
+            .await
+    {
+        log::error!("Error writing enrichment table to local cache: {e}");
+    }
+
+    // write data to s3
+    // crate::service::enrichment::storage::s3::store(org_id, stream_name, records,
+    // timestamp).await?;
 
     // write data to wal
-    let writer = ingester::get_writer(
-        0,
-        org_id,
-        StreamType::EnrichmentTables.as_str(),
-        stream_name,
-    )
-    .await;
-    let mut req_stats =
-        match write_file(&writer, stream_name, buf, !cfg.common.wal_fsync_disabled).await {
-            Ok(stats) => stats,
-            Err(e) => {
-                return Ok(HttpResponse::InternalServerError()
-                    .append_header((ERROR_HEADER, format!("Error writing enrichment table: {e}")))
-                    .json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Error writing enrichment table: {e}"),
-                    )));
-            }
-        };
+    // let writer = ingester::get_writer(
+    //     0,
+    //     org_id,
+    //     StreamType::EnrichmentTables.as_str(),
+    //     stream_name,
+    // )
+    // .await;
+    // let mut req_stats =
+    //     match write_file(&writer, stream_name, buf, !cfg.common.wal_fsync_disabled).await {
+    //         Ok(stats) => stats,
+    //         Err(e) => {
+    //             return Ok(HttpResponse::InternalServerError()
+    //                 .append_header((ERROR_HEADER, format!("Error writing enrichment table:
+    // {e}")))                 .json(MetaHttpResponse::error(
+    //                     http::StatusCode::INTERNAL_SERVER_ERROR,
+    //                     format!("Error writing enrichment table: {e}"),
+    //                 )));
+    //         }
+    //     };
 
     let mut enrich_meta_stats = db::enrichment_table::get_meta_table_stats(org_id, stream_name)
         .await
@@ -258,7 +307,7 @@ pub async fn save_enrichment_data(
         enrich_meta_stats.start_time =
             db::enrichment_table::get_start_time(org_id, stream_name).await;
     }
-    enrich_meta_stats.end_time = now_micros();
+    enrich_meta_stats.end_time = timestamp;
     enrich_meta_stats.size = total_expected_size_in_bytes as i64;
     // The stream_stats table takes some time to update, so we need to update the enrichment table
     // size in the meta table to avoid exceeding the `ZO_ENRICHMENT_TABLE_LIMIT`.
@@ -272,22 +321,20 @@ pub async fn save_enrichment_data(
         log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
     }
 
-    req_stats.response_time = start.elapsed().as_secs_f64();
-    log::info!(
-        "save enrichment data to: {org_id}/{table_name}/{append_data} success with stats {req_stats:?}"
-    );
+    // req_stats.response_time = start.elapsed().as_secs_f64();
+    log::info!("save enrichment data to: {org_id}/{table_name}/{append_data} success with stats");
 
     // metric + data usage
-    report_request_usage_stats(
-        req_stats,
-        org_id,
-        stream_name,
-        StreamType::Logs,
-        UsageType::EnrichmentTable,
-        0,
-        started_at,
-    )
-    .await;
+    // report_request_usage_stats(
+    //     req_stats,
+    //     org_id,
+    //     stream_name,
+    //     StreamType::Logs,
+    //     UsageType::EnrichmentTable,
+    //     0,
+    //     started_at,
+    // )
+    // .await;
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
         StatusCode::OK,
@@ -295,11 +342,22 @@ pub async fn save_enrichment_data(
     )))
 }
 
-async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: StreamType) {
+pub async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: StreamType) {
     log::info!("deleting enrichment table  {stream_name}");
     // delete stream schema
     if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
         log::error!("Error deleting stream schema: {e}");
+    }
+
+    if let Err(e) = crate::service::enrichment::storage::remote::delete(org_id, stream_name).await {
+        log::error!("Error deleting enrichment table from S3: {e}");
+    }
+    if let Err(e) = crate::service::enrichment::storage::local::delete(org_id, stream_name).await {
+        log::error!("Error deleting enrichment table from local cache: {e}");
+    }
+    if let Err(e) = crate::service::enrichment::storage::database::delete(org_id, stream_name).await
+    {
+        log::error!("Error deleting enrichment table from database: {e}");
     }
 
     // create delete for compactor
@@ -405,4 +463,32 @@ pub async fn extract_multipart(
     }
 
     Ok(records)
+}
+
+pub async fn cleanup_enrichment_table_resources(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) {
+    log::info!("cleaning up enrichment table  resources {stream_name}");
+
+    if let Err(e) = crate::service::enrichment::storage::remote::delete(org_id, stream_name).await {
+        log::error!("Error deleting enrichment table from S3: {e}");
+    }
+    if let Err(e) = crate::service::enrichment::storage::local::delete(org_id, stream_name).await {
+        log::error!("Error deleting enrichment table from local cache: {e}");
+    }
+    if let Err(e) = crate::service::enrichment::storage::database::delete(org_id, stream_name).await
+    {
+        log::error!("Error deleting enrichment table from database: {e}");
+    }
+
+    // delete stream key
+    if let Err(e) = db::enrichment_table::delete(org_id, stream_name).await {
+        log::error!("Error deleting enrichment table: {}", e);
+    }
+
+    // delete stream stats cache
+    stats::remove_stream_stats(org_id, stream_name, stream_type);
+    log::info!("deleted enrichment table  {stream_name}");
 }
