@@ -105,6 +105,84 @@ mod tests {
         short_url.strip_prefix(&prefix).map(|s| s.to_string())
     }
 
+    #[test]
+    fn test_get_base_url() {
+        let base_url = get_base_url();
+        // Should contain the web URL and base URI from config
+        assert!(!base_url.is_empty());
+        // Should end with the base URI
+        assert!(base_url.ends_with(&get_config().common.base_uri));
+    }
+
+    #[test]
+    fn test_construct_short_url() {
+        let org_id = "test_org";
+        let short_id = "abc123def456";
+        let short_url = construct_short_url(org_id, short_id);
+
+        // Should contain the base URL
+        assert!(short_url.starts_with(&get_base_url()));
+        // Should contain the web path
+        assert!(short_url.contains("/web/"));
+        // Should contain the short URL path
+        assert!(short_url.contains(SHORT_URL_WEB_PATH));
+        // Should contain the short ID
+        assert!(short_url.contains(short_id));
+        // Should contain the org identifier
+        assert!(short_url.contains(&format!("org_identifier={}", org_id)));
+    }
+
+    #[test]
+    fn test_generate_short_id() {
+        let original_url = "https://www.example.com/some/long/url";
+        let short_id = generate_short_id(original_url, None);
+        assert_eq!(short_id.len(), 16);
+        let timestamp = Utc::now().timestamp_micros();
+        let short_id2 = generate_short_id(original_url, Some(timestamp));
+        assert_eq!(short_id2.len(), 16);
+        assert_ne!(short_id, short_id2);
+    }
+
+    #[test]
+    fn test_generate_short_id_with_timestamp() {
+        let original_url = "https://www.example.com/some/long/url";
+        let timestamp = 1672575000000000;
+        let short_id = generate_short_id(original_url, Some(timestamp));
+        assert_eq!(short_id.len(), 16);
+
+        // Same URL with same timestamp should generate same ID
+        let short_id2 = generate_short_id(original_url, Some(timestamp));
+        assert_eq!(short_id, short_id2);
+
+        // Same URL with different timestamp should generate different ID
+        let short_id3 = generate_short_id(original_url, Some(timestamp + 1));
+        assert_ne!(short_id, short_id3);
+    }
+
+    #[test]
+    fn test_generate_short_id_different_urls() {
+        let url1 = "https://www.example.com/url1";
+        let url2 = "https://www.example.com/url2";
+
+        let short_id1 = generate_short_id(url1, None);
+        let short_id2 = generate_short_id(url2, None);
+
+        assert_ne!(short_id1, short_id2);
+        assert_eq!(short_id1.len(), 16);
+        assert_eq!(short_id2.len(), 16);
+    }
+
+    #[test]
+    fn test_generate_short_id_empty_url() {
+        let empty_url = "";
+        let short_id = generate_short_id(empty_url, None);
+        assert_eq!(short_id.len(), 16);
+
+        let short_id2 = generate_short_id(empty_url, Some(123));
+        assert_eq!(short_id2.len(), 16);
+        assert_ne!(short_id, short_id2);
+    }
+
     #[tokio::test]
     #[ignore]
     async fn test_shorten_and_retrieve() {
@@ -139,7 +217,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_generate_short_id() {
+    async fn test_generate_short_id_async() {
         let original_url = "https://www.example.com/some/long/url";
         let short_id = generate_short_id(original_url, None);
         assert_eq!(short_id.len(), 16);

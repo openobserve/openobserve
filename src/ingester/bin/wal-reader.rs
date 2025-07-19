@@ -31,11 +31,11 @@ fn main() -> Result<()> {
         let entry = match reader.read_entry() {
             Ok(entry) => entry,
             Err(wal::Error::UnableToReadData { source }) => {
-                println!("Unable to read entry from: {}, skip the entry", source);
+                println!("Unable to read entry from: {source}, skip the entry");
                 continue;
             }
             Err(e) => {
-                println!("Error: {}", e);
+                println!("Error: {e}");
                 break;
             }
         };
@@ -54,6 +54,6 @@ fn main() -> Result<()> {
         );
         total += entry.data.len();
     }
-    println!("total: {}", total);
+    println!("total: {total}");
     Ok(())
 }

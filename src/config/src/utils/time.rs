@@ -222,20 +222,20 @@ pub fn parse_milliseconds(s: &str) -> Result<u64, anyhow::Error> {
 pub fn parse_timezone_to_offset(offset: &str) -> i64 {
     // let offset = "+08:00"; // or "-07:00" or "UTC"
     let sign: i64;
-    let time: String;
+    let time: &str;
 
     if let Some(stripped) = offset.strip_prefix('+') {
         sign = 1;
-        time = stripped.to_string();
+        time = stripped;
     } else if let Some(stripped) = offset.strip_prefix('-') {
         sign = -1;
-        time = stripped.to_string();
-    } else if offset.to_uppercase() == "CST" {
+        time = stripped;
+    } else if offset.eq_ignore_ascii_case("cst") {
         sign = 1;
-        time = "+08:00".to_string();
-    } else if offset.to_uppercase() == "UTC" || offset.to_uppercase() == "" {
+        time = "+08:00";
+    } else if offset.eq_ignore_ascii_case("utc") || offset.is_empty() {
         sign = 0;
-        time = "00:00".to_string();
+        time = "00:00";
     } else {
         panic!("Invalid time zone offset");
     }
@@ -251,13 +251,10 @@ pub fn parse_timezone_to_offset(offset: &str) -> i64 {
 
 #[inline(always)]
 pub fn parse_str_to_timestamp_micros_as_option(v: &str) -> Option<i64> {
-    match v.parse() {
-        Ok(i) => Some(parse_i64_to_timestamp_micros(i)),
-        Err(_) => match parse_str_to_time(v) {
-            Ok(v) => Some(v.timestamp_micros()),
-            Err(_) => None,
-        },
-    }
+    v.parse()
+        .ok()
+        .map(parse_i64_to_timestamp_micros)
+        .or_else(|| parse_str_to_time(v).map(|t| t.timestamp_micros()).ok())
 }
 
 /// Get the end of the day timestamp_micros
@@ -303,160 +300,91 @@ mod tests {
 
     #[test]
     fn test_parse_i64_to_timestamp_micros() {
-        let v = 1609459200000000000;
-        let t = parse_i64_to_timestamp_micros(v);
-        assert_eq!(t, v / 1000);
+        let test_fn = parse_i64_to_timestamp_micros;
 
-        let v = 1609459200000000;
-        let t = parse_i64_to_timestamp_micros(v);
-        assert_eq!(t, v);
-
-        let v = 1609459200000;
-        let t = parse_i64_to_timestamp_micros(v);
-        assert_eq!(t, v * 1000);
-
-        let v = 1609459200;
-        let t = parse_i64_to_timestamp_micros(v);
-        assert_eq!(t, v * 1_000_000);
+        let v_exp_arr = [
+            (1609459200000000000, 1609459200000000000 / 1000),
+            (1609459200000000, 1609459200000000),
+            (1609459200000, 1609459200000 * 1000),
+            (1609459200, 1609459200 * 1_000_000),
+        ];
+        for (input, expected) in v_exp_arr {
+            assert_eq!(test_fn(input), expected);
+        }
     }
 
     #[test]
     fn test_parse_str_to_time() {
-        let s = "2021-01-01T00:00:00";
-        let t = parse_str_to_time(s).unwrap();
-        assert_eq!(t.timestamp_micros(), 1609459200000000);
+        let test_fn = |v| parse_str_to_time(v).map(|v| v.timestamp_micros());
 
-        let s = "2021-01-01T00:00:00Z";
-        let t = parse_str_to_time(s).unwrap();
-        assert_eq!(t.timestamp_micros(), 1609459200000000);
-
-        let s = "2021-01-01T23:59:59Z";
-        let t = parse_str_to_time(s).unwrap();
-        assert_eq!(t.timestamp_micros(), 1609545599000000);
-
-        let s = "2021-01-01T00:00:00+08:00";
-        let t = parse_str_to_time(s).unwrap();
-        assert_eq!(t.timestamp_micros(), 1609430400000000);
-
-        let s = "2021-01-01T00:00:00-08:00";
-        let t = parse_str_to_time(s).unwrap();
-        assert_eq!(t.timestamp_micros(), 1609488000000000);
-
-        let s = "2021-01-01 00:00:00";
-        let t = parse_str_to_time(s).unwrap();
-        assert_eq!(t.timestamp_micros(), 1609459200000000);
-
-        let s = "2021-01-01T00:00:00.000000Z";
-        let t = parse_str_to_time(s).unwrap();
-        assert_eq!(t.timestamp_micros(), 1609459200000000);
-
-        let s = "2021-01-01T00:00:00.000000+08:00";
-        let t = parse_str_to_time(s).unwrap();
-        assert_eq!(t.timestamp_micros(), 1609430400000000);
-
-        let s = "Wed, 8 Mar 2023 16:46:51 CST";
-        let t = parse_str_to_time(s).unwrap();
-        assert_eq!(t.timestamp_micros(), 1678315611000000);
-
-        // Test milliseconds format (3 decimal places)
-        let s = "2021-01-01T00:00:00.123";
-        let t = parse_str_to_time(s).unwrap();
-        assert_eq!(t.timestamp_micros(), 1609459200123000);
-
-        // Test microseconds format (6 decimal places)
-        let s = "2021-01-01T00:00:00.123456";
-        let t = parse_str_to_time(s).unwrap();
-        assert_eq!(t.timestamp_micros(), 1609459200123456);
-
-        // Test other decimal places (fallback to RFC3339)
-        let s = "2021-01-01T00:00:00.123456789";
-        let t = parse_str_to_time(s);
-        assert!(t.is_err());
-
-        // Test with timezone and milliseconds
-        let s = "2021-01-01T00:00:00.123Z";
-        let t = parse_str_to_time(s).unwrap();
-        assert_eq!(t.timestamp_micros(), 1609459200123000);
-
-        // Test with timezone and microseconds
-        let s = "2021-01-01T00:00:00.123456+08:00";
-        let t = parse_str_to_time(s).unwrap();
-        assert_eq!(t.timestamp_micros(), 1609430400123456);
-
-        // Test with timezone and other decimal places
-        let s = "2021-01-01T00:00:00.123456789-08:00";
-        let t = parse_str_to_time(s).unwrap();
-        assert_eq!(t.timestamp_micros(), 1609488000123456);
+        assert!(test_fn("2021-01-01T00:00:00").is_ok_and(|v| v == 1609459200000000));
+        assert!(test_fn("2021-01-01T00:00:00Z").is_ok_and(|v| v == 1609459200000000));
+        assert!(test_fn("2021-01-01T23:59:59Z").is_ok_and(|v| v == 1609545599000000));
+        assert!(test_fn("2021-01-01T00:00:00+08:00").is_ok_and(|v| v == 1609430400000000));
+        assert!(test_fn("2021-01-01T00:00:00-08:00").is_ok_and(|v| v == 1609488000000000));
+        assert!(test_fn("2021-01-01 00:00:00").is_ok_and(|v| v == 1609459200000000));
+        assert!(test_fn("2021-01-01T00:00:00.000000Z").is_ok_and(|v| v == 1609459200000000));
+        assert!(test_fn("2021-01-01T00:00:00.000000+08:00").is_ok_and(|v| v == 1609430400000000));
+        assert!(test_fn("Wed, 8 Mar 2023 16:46:51 CST").is_ok_and(|v| v == 1678315611000000));
+        assert!(test_fn("2021-01-01T00:00:00.123").is_ok_and(|v| v == 1609459200123000));
+        assert!(test_fn("2021-01-01T00:00:00.123456").is_ok_and(|v| v == 1609459200123456));
+        assert!(test_fn("2021-01-01T00:00:00.123456+08:00").is_ok_and(|v| v == 1609430400123456));
+        assert!(
+            test_fn("2021-01-01T00:00:00.123456789-08:00").is_ok_and(|v| v == 1609488000123456)
+        );
+        assert!(test_fn("2021-01-01T00:00:00.123Z").is_ok_and(|v| v == 1609459200123000));
+        assert!(test_fn("2021-01-01T00:00:00.123456789").is_err());
     }
 
     #[test]
     fn test_parse_str_to_timestamp_micros() {
-        let s = "2021-01-01T00:00:00";
-        let t = parse_str_to_timestamp_micros(s).unwrap();
-        assert_eq!(t, 1609459200000000);
+        let test_fn = parse_str_to_timestamp_micros;
+        let v_exp_arr = [
+            (1609459200000000, "2021-01-01T00:00:00"),
+            (1609459200000000, "2021-01-01T00:00:00Z"),
+            (1609430400000000, "2021-01-01T00:00:00+08:00"),
+            (1609488000000000, "2021-01-01T00:00:00-08:00"),
+            (1609459200000000, "2021-01-01 00:00:00"),
+            (1609459200000000, "2021-01-01T00:00:00.000000Z"),
+            (1609430400000000, "2021-01-01T00:00:00.000000+08:00"),
+            (1678315611000000, "Wed, 8 Mar 2023 16:46:51 CST"),
+            (1609459200123000, "2021-01-01T00:00:00.123"),
+            (1609459200123456, "2021-01-01T00:00:00.123456"),
+            (1609430400123456, "2021-01-01T00:00:00.123456+08:00"),
+            (1609488000123456, "2021-01-01T00:00:00.123456789-08:00"),
+        ];
 
-        let s = "2021-01-01T00:00:00Z";
-        let t = parse_str_to_timestamp_micros(s).unwrap();
-        assert_eq!(t, 1609459200000000);
-
-        let s = "2021-01-01T00:00:00+08:00";
-        let t = parse_str_to_timestamp_micros(s).unwrap();
-        assert_eq!(t, 1609430400000000);
-
-        let s = "2021-01-01T00:00:00-08:00";
-        let t = parse_str_to_timestamp_micros(s).unwrap();
-        assert_eq!(t, 1609488000000000);
-
-        let s = "2021-01-01 00:00:00";
-        let t = parse_str_to_timestamp_micros(s).unwrap();
-        assert_eq!(t, 1609459200000000);
-
-        let s = "2021-01-01T00:00:00.000000Z";
-        let t = parse_str_to_timestamp_micros(s).unwrap();
-        assert_eq!(t, 1609459200000000);
-
-        let s = "2021-01-01T00:00:00.000000+08:00";
-        let t = parse_str_to_timestamp_micros(s).unwrap();
-        assert_eq!(t, 1609430400000000);
-
-        let s = "Wed, 8 Mar 2023 16:46:51 CST";
-        let t = parse_str_to_timestamp_micros(s).unwrap();
-        assert_eq!(t, 1678315611000000);
+        for (v_exp, input) in v_exp_arr {
+            assert!(test_fn(input).is_ok_and(|v| v == v_exp));
+        }
     }
 
     #[test]
     fn test_parse_timestamp_micro_from_value() {
-        let v = json::json!(1609459200000000i64);
-        let t = parse_timestamp_micro_from_value(&v).unwrap();
-        assert_eq!(t, 1609459200000000);
+        let test_fn = parse_timestamp_micro_from_value;
+        let v_exp_arr = [
+            (1609459200000000, json::json!(1609459200000000i64)),
+            (1609459200000000, json::json!("2021-01-01T00:00:00")),
+            (1609459200000000, json::json!("2021-01-01T00:00:00Z")),
+            (1609430400000000, json::json!("2021-01-01T00:00:00+08:00")),
+            (1609488000000000, json::json!("2021-01-01T00:00:00-08:00")),
+            (1609459200000000, json::json!("2021-01-01 00:00:00")),
+            (1609459200000000, json::json!("2021-01-01T00:00:00.000000Z")),
+            (
+                1609430400000000,
+                json::json!("2021-01-01T00:00:00.000000+08:00"),
+            ),
+            (
+                1678315611000000,
+                json::json!("Wed, 8 Mar 2023 16:46:51 CST"),
+            ),
+            (1609459200123000, json::json!("2021-01-01T00:00:00.123")),
+            (1609459200123456, json::json!("2021-01-01T00:00:00.123456")),
+        ];
 
-        let v = json::json!("2021-01-01T00:00:00");
-        let t = parse_timestamp_micro_from_value(&v).unwrap();
-        assert_eq!(t, 1609459200000000);
-
-        let v = json::json!("2021-01-01T00:00:00Z");
-        let t = parse_timestamp_micro_from_value(&v).unwrap();
-        assert_eq!(t, 1609459200000000);
-
-        let v = json::json!("2021-01-01T00:00:00+08:00");
-        let t = parse_timestamp_micro_from_value(&v).unwrap();
-        assert_eq!(t, 1609430400000000);
-
-        let v = json::json!("2021-01-01T00:00:00-08:00");
-        let t = parse_timestamp_micro_from_value(&v).unwrap();
-        assert_eq!(t, 1609488000000000);
-
-        let v = json::json!("2021-01-01 00:00:00");
-        let t = parse_timestamp_micro_from_value(&v).unwrap();
-        assert_eq!(t, 1609459200000000);
-
-        let v = json::json!("2021-01-01T00:00:00.000000Z");
-        let t = parse_timestamp_micro_from_value(&v).unwrap();
-        assert_eq!(t, 1609459200000000);
-
-        let v = json::json!("Wed, 8 Mar 2023 16:46:51 CST");
-        let t = parse_timestamp_micro_from_value(&v).unwrap();
-        assert_eq!(t, 1678315611000000);
+        for (v_exp, input) in v_exp_arr {
+            assert!(test_fn(&input).is_ok_and(|v| v == v_exp));
+        }
     }
 
     #[test]
@@ -492,53 +420,49 @@ mod tests {
 
     #[test]
     fn test_end_of_the_day() {
-        let t = [1609459200000000, 1727740800000000];
-        let d = [1609545599999999, 1727827199999999];
-        for i in 0..t.len() {
-            assert_eq!(end_of_the_day(t[i]), d[i]);
+        let t_d_arr = [
+            (1609545599999999, 1609459200000000),
+            (1727827199999999, 1727740800000000),
+        ];
+        for (d_exp, t) in t_d_arr {
+            assert_eq!(end_of_the_day(t), d_exp);
         }
     }
 
     #[test]
     fn test_get_ymdhms_from_micros() {
-        let n = 1609459200000000;
-        let s = get_ymdh_from_micros(n);
-        assert_eq!(s, "2021/01/01/00");
+        assert_eq!(get_ymdh_from_micros(1609459200000000), "2021/01/01/00");
+        assert_eq!(get_ymdh_from_micros(1744077663427000), "2025/04/08/02");
 
-        let n = 1744077663427000;
-        let s = get_ymdh_from_micros(n);
-        assert_eq!(s, "2025/04/08/02");
+        // Test with input 0 (uses current time, so we can't test the exact value)
+        let result = get_ymdh_from_micros(0);
+        assert!(result.len() > 0);
     }
 
     #[test]
     fn test_format_duration() {
-        // Test zero milliseconds
-        assert_eq!(format_duration(0), "0s");
+        let v_exp_arr = [
+            ("0s", 0),              // Zero milliseconds
+            ("1s", 1000),           // 1 second
+            ("5s", 5000),           // 5 seconds
+            ("59s", 59000),         // 59 seconds
+            ("1m", 60000),          // 1 minute
+            ("5m", 300000),         // 5 minutes
+            ("59m", 3540000),       // 59 minutes
+            ("1h", 3600000),        // 1 hour
+            ("2h", 7200000),        // 2 hours
+            ("23h", 82800000),      // 23 hours
+            ("1d", 86400000),       // 1 day
+            ("2d", 172800000),      // 2 days
+            ("30d", 2592000000),    // 30 days
+            ("1d1h1m1s", 90061000), // 1 day 1 hour 1 minute 1 second
+            ("1d2h3m4s", 93784000), // 1 day 2 hours 3 minutes 4 seconds
+            ("1h1m1s", 3661000),
+            ("1m1s", 61000),
+        ];
 
-        // Test seconds only
-        assert_eq!(format_duration(1000), "1s");
-        assert_eq!(format_duration(5000), "5s");
-        assert_eq!(format_duration(59000), "59s");
-
-        // Test minutes only
-        assert_eq!(format_duration(60000), "1m");
-        assert_eq!(format_duration(300000), "5m");
-        assert_eq!(format_duration(3540000), "59m");
-
-        // Test hours only
-        assert_eq!(format_duration(3600000), "1h");
-        assert_eq!(format_duration(7200000), "2h");
-        assert_eq!(format_duration(82800000), "23h");
-
-        // Test days only
-        assert_eq!(format_duration(86400000), "1d");
-        assert_eq!(format_duration(172800000), "2d");
-        assert_eq!(format_duration(2592000000), "30d");
-
-        // Test combinations
-        assert_eq!(format_duration(90061000), "1d1h1m1s");
-        assert_eq!(format_duration(93784000), "1d2h3m4s");
-        assert_eq!(format_duration(3661000), "1h1m1s");
-        assert_eq!(format_duration(61000), "1m1s");
+        for (v_exp, input) in v_exp_arr {
+            assert_eq!(format_duration(input), v_exp);
+        }
     }
 }
