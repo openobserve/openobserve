@@ -241,7 +241,12 @@ async fn get_remote_batch(
     }
 
     // fast return for empty file list querier node
-    if !is_super && is_querier && !is_ingester && remote_scan_node.is_file_list_empty(partition) {
+    if !is_super
+        && is_querier
+        && !is_ingester
+        && !enrich_mode
+        && remote_scan_node.is_file_list_empty(partition)
+    {
         return Ok(get_empty_record_batch_stream(
             trace_id,
             schema,
