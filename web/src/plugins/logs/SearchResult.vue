@@ -377,6 +377,15 @@ export default defineComponent({
         this.searchObj.data.resultGrid.colOrder[
           this.searchObj.data.stream.selectedStream
         ] = [...newColOrder];
+
+        if(newColOrder.length > 0){
+          this.searchObj.organizationIdentifier =
+            this.store.state.selectedOrganization.identifier;
+          let selectedFields = this.reorderSelectedFields();
+
+          this.searchObj.data.stream.selectedFields = selectedFields;
+          this.updatedLocalLogFilterField();
+        }
       }
     },
 
