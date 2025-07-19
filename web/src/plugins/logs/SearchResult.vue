@@ -259,45 +259,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <q-dialog
-        data-test="logs-search-result-detail-dialog"
-        v-model="searchObj.meta.showDetailTab"
-        position="right"
-        full-height
-        maximized
-        @escap.stop="reDrawChart"
-        @hide="reDrawChart"
-        @before-hide="reDrawChart"
-        key="search-result-detail-dialog-key"
-      >
-        <DetailTable
-          v-if="searchObj.data.queryResults?.hits?.length"
-          :key="
-            'dialog_' + searchObj.meta.resultGrid.navigation.currentRowIndex
-          "
-          v-model="
-            searchObj.data.queryResults.hits[
-              searchObj.meta.resultGrid.navigation.currentRowIndex
-            ]
-          "
-          :stream-type="searchObj.data.stream.streamType"
-          style="margin-bottom: 15px"
-          :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
-          :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
-          @showNextDetail="navigateRowDetail"
-          @showPrevDetail="navigateRowDetail"
-          @add:searchterm="addSearchTerm"
-          @remove:searchterm="removeSearchTerm"
-          @search:timeboxed="onTimeBoxed"
-          @add:table="addFieldToTable"
-          @view-trace="
-            redirectToTraces(
-              searchObj.data.queryResults.hits[
-                searchObj.meta.resultGrid.navigation.currentRowIndex
-              ],
-            )
-          "
-        />
-      </q-dialog>
+    data-test="logs-search-result-detail-dialog"
+    v-model="searchObj.meta.showDetailTab"
+    position="right"
+    full-height
+    maximized
+    @escap.stop="reDrawChart"
+    @hide="reDrawChart"
+    @before-hide="reDrawChart"
+    key="search-result-detail-dialog-key"
+  >
+    <DetailTable
+      v-if="searchObj.data.queryResults?.hits?.length"
+      :key="'dialog_' + searchObj.meta.resultGrid.navigation.currentRowIndex"
+      v-model="
+        searchObj.data.queryResults.hits[
+          searchObj.meta.resultGrid.navigation.currentRowIndex
+        ]
+      "
+      :stream-type="searchObj.data.stream.streamType"
+      style="margin-bottom: 15px"
+      :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
+      :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
+      @showNextDetail="navigateRowDetail"
+      @showPrevDetail="navigateRowDetail"
+      @add:searchterm="addSearchTerm"
+      @remove:searchterm="removeSearchTerm"
+      @search:timeboxed="onTimeBoxed"
+      @add:table="addFieldToTable"
+      @view-trace="
+        redirectToTraces(
+          searchObj.data.queryResults.hits[
+            searchObj.meta.resultGrid.navigation.currentRowIndex
+          ],
+        )
+      "
+    />
+  </q-dialog>
 </template>
 
 <script lang="ts">
@@ -316,7 +314,11 @@ import { useI18n } from "vue-i18n";
 
 import HighLight from "../../components/HighLight.vue";
 import { byString } from "../../utils/json";
-import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
+import {
+  deepCopy,
+  getImageURL,
+  useLocalWrapContent,
+} from "../../utils/zincutils";
 import useLogs from "../../composables/useLogs";
 import { convertLogData } from "@/utils/logs/convertLogData";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
