@@ -173,7 +173,7 @@ async fn get_data(
         Ok((data, _min_ts, _max_ts)) => data.into_iter().map(Arc::new).collect::<Vec<_>>(),
         Err(e) => return internal_err!("get enrichment data from db: {e}"),
     };
-    log::info!("[EnrichExec] get_data: {org_id}/{clean_name} db data: {:?}", data.len());
+    log::info!("[EnrichExec] get_data: {org_id}/{clean_name} db data: {:?}", data);
 
     let batch = match convert_json_to_record_batch(&schema, &data) {
         Ok(batch) => batch,
