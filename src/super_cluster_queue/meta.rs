@@ -49,6 +49,26 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         MessageType::Delete(with_prefix) => {
             db.delete(&msg.key, with_prefix, msg.need_watch, None)
                 .await?;
+            if msg.key.starts_with(ENRICHMENT_TABLE_META_STREAM_STATS_KEY) {
+                log::debug!("enrichment table meta stream stats key: {}", msg.key);
+                let key_parts = msg.key.split('/').collect::<Vec<&str>>();
+                if key_parts.len() != 4 {
+                    log::error!(
+                        "enrichment table meta stream stats delete key is not valid: {}",
+                        msg.key
+                    );
+                    return Ok(());
+                }
+                // Format is /enrichment_table_meta_stream_stats/{org_id}/{name}
+                // We need to delete the db data for enrichment table because it is deleted
+                let org_id = key_parts[2];
+                let name = key_parts[3];
+                if let Err(e) =
+                    crate::service::enrichment::storage::database::delete(org_id, name).await
+                {
+                    log::error!("delete enrichment table db data error: {:?}", e);
+                }
+            }
         }
         _ => {
             log::error!(
