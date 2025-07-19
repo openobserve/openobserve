@@ -84,7 +84,7 @@
     "refresh": "Refresh"
   },
   "search": {
-    "resetFields": "Reset Selected Table Fields",
+    "resetFields": "Reset selected table fields",
     "metrics": "Metrics",
     "selectIndex": "Select Stream First",
     "typeSearch": "Type your search query here.",
