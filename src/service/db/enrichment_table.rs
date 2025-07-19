@@ -74,7 +74,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
     }
 }
 
-fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
+pub fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
     match value {
         json::Value::Null => vrl::value::Value::Null,
         json::Value::Bool(b) => vrl::value::Value::Boolean(*b),
@@ -97,6 +97,57 @@ fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
                 .collect(),
         ),
     }
+}
+
+pub async fn save_enrichment_data_to_db(
+    org_id: &str,
+    name: &str,
+    data: &Vec<json::Value>,
+    created_at: i64,
+) -> Result<(), infra::errors::Error> {
+    let bin_data = serde_json::to_vec(&data).unwrap();
+    infra::table::enrichment_tables::add(org_id, name, bin_data, created_at).await
+}
+
+pub async fn get_enrichment_data_from_db(
+    org_id: &str,
+    name: &str,
+) -> Result<(Vec<json::Value>, i64, i64), infra::errors::Error> {
+    let mut vec = vec![];
+    let mut min_ts = 0;
+    let mut max_ts = 0;
+    // Each record is a json array
+    let records = infra::table::enrichment_tables::get_by_org_and_name(org_id, name).await?;
+    // Records are in descending order, we need to convert them to a json array
+    for record in records {
+        if min_ts == 0 || record.created_at < min_ts {
+            min_ts = record.created_at;
+        }
+        if max_ts == 0 || record.created_at > max_ts {
+            max_ts = record.created_at;
+        }
+        match serde_json::from_slice(&record.data) {
+            Ok(data) => match data {
+                json::Value::Array(arr) => {
+                    vec.extend(arr.iter().map(|v| v.clone()));
+                }
+                _ => {
+                    log::error!("Invalid enrichment data: {data}");
+                }
+            },
+            Err(e) => {
+                log::error!("Failed to parse enrichment data: {e}");
+            }
+        }
+    }
+    Ok((vec, min_ts, max_ts))
+}
+
+pub async fn delete_enrichment_data_from_db(
+    org_id: &str,
+    name: &str,
+) -> Result<(), infra::errors::Error> {
+    infra::table::enrichment_tables::delete(org_id, name).await
 }
 
 /// Delete the size of the enrichment table in bytes
@@ -230,7 +281,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org_id = keys[0];
                 let stream_name = keys[2];
 
-                let data = super::enrichment_table::get(org_id, stream_name)
+                let data = super::super::enrichment::get_enrichment_table(org_id, stream_name)
                     .await
                     .unwrap();
                 log::debug!(
