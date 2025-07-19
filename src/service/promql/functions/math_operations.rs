@@ -112,3 +112,335 @@ fn exec(data: Value, op: &MathOperationsType) -> Result<Value> {
         ))),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::service::promql::value::{InstantValue, Labels, Sample, Value};
+
+    #[test]
+    fn test_math_operations_type_apply() {
+        assert_eq!(MathOperationsType::Abs.apply(-5.0), 5.0);
+        assert_eq!(MathOperationsType::Abs.apply(5.0), 5.0);
+        assert_eq!(MathOperationsType::Abs.apply(0.0), 0.0);
+
+        assert_eq!(MathOperationsType::Ceil.apply(3.2), 4.0);
+        assert_eq!(MathOperationsType::Ceil.apply(3.0), 3.0);
+        assert_eq!(MathOperationsType::Ceil.apply(-3.2), -3.0);
+
+        assert_eq!(MathOperationsType::Floor.apply(3.2), 3.0);
+        assert_eq!(MathOperationsType::Floor.apply(3.0), 3.0);
+        assert_eq!(MathOperationsType::Floor.apply(-3.2), -4.0);
+
+        assert_eq!(MathOperationsType::Exp.apply(0.0), 1.0);
+        assert_eq!(MathOperationsType::Exp.apply(1.0), std::f64::consts::E);
+        assert_eq!(
+            MathOperationsType::Exp.apply(-1.0),
+            1.0 / std::f64::consts::E
+        );
+
+        assert_eq!(MathOperationsType::Ln.apply(1.0), 0.0);
+        assert_eq!(MathOperationsType::Ln.apply(std::f64::consts::E), 1.0);
+
+        assert_eq!(MathOperationsType::Log2.apply(1.0), 0.0);
+        assert_eq!(MathOperationsType::Log2.apply(2.0), 1.0);
+        assert_eq!(MathOperationsType::Log2.apply(4.0), 2.0);
+
+        assert_eq!(MathOperationsType::Log10.apply(1.0), 0.0);
+        assert_eq!(MathOperationsType::Log10.apply(10.0), 1.0);
+        assert_eq!(MathOperationsType::Log10.apply(100.0), 2.0);
+
+        assert_eq!(MathOperationsType::Sqrt.apply(0.0), 0.0);
+        assert_eq!(MathOperationsType::Sqrt.apply(1.0), 1.0);
+        assert_eq!(MathOperationsType::Sqrt.apply(4.0), 2.0);
+
+        assert_eq!(MathOperationsType::Round.apply(3.2), 3.0);
+        assert_eq!(MathOperationsType::Round.apply(3.5), 4.0);
+        assert_eq!(MathOperationsType::Round.apply(3.7), 4.0);
+        assert_eq!(MathOperationsType::Round.apply(-3.2), -3.0);
+        assert_eq!(MathOperationsType::Round.apply(-3.5), -4.0);
+
+        assert_eq!(MathOperationsType::Sgn.apply(5.0), 1.0);
+        assert_eq!(MathOperationsType::Sgn.apply(0.0), 1.0);
+        assert_eq!(MathOperationsType::Sgn.apply(-5.0), -1.0);
+    }
+
+    #[test]
+    fn test_abs() {
+        let vector = vec![
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(1000, -5.0),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(2000, 3.0),
+            },
+        ];
+        let value = Value::Vector(vector);
+        let result = abs(value).unwrap();
+
+        if let Value::Vector(result_vector) = result {
+            assert_eq!(result_vector.len(), 2);
+            assert_eq!(result_vector[0].sample.value, 5.0);
+            assert_eq!(result_vector[1].sample.value, 3.0);
+        } else {
+            panic!("Expected Vector result");
+        }
+    }
+
+    #[test]
+    fn test_ceil() {
+        let vector = vec![
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(1000, 3.2),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(2000, -3.2),
+            },
+        ];
+        let value = Value::Vector(vector);
+        let result = ceil(value).unwrap();
+
+        if let Value::Vector(result_vector) = result {
+            assert_eq!(result_vector.len(), 2);
+            assert_eq!(result_vector[0].sample.value, 4.0);
+            assert_eq!(result_vector[1].sample.value, -3.0);
+        } else {
+            panic!("Expected Vector result");
+        }
+    }
+
+    #[test]
+    fn test_floor() {
+        let vector = vec![
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(1000, 3.2),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(2000, -3.2),
+            },
+        ];
+        let value = Value::Vector(vector);
+        let result = floor(value).unwrap();
+
+        if let Value::Vector(result_vector) = result {
+            assert_eq!(result_vector.len(), 2);
+            assert_eq!(result_vector[0].sample.value, 3.0);
+            assert_eq!(result_vector[1].sample.value, -4.0);
+        } else {
+            panic!("Expected Vector result");
+        }
+    }
+
+    #[test]
+    fn test_exp() {
+        let vector = vec![
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(1000, 0.0),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(2000, 1.0),
+            },
+        ];
+        let value = Value::Vector(vector);
+        let result = exp(value).unwrap();
+
+        if let Value::Vector(result_vector) = result {
+            assert_eq!(result_vector.len(), 2);
+            assert_eq!(result_vector[0].sample.value, 1.0);
+            assert_eq!(result_vector[1].sample.value, std::f64::consts::E);
+        } else {
+            panic!("Expected Vector result");
+        }
+    }
+
+    #[test]
+    fn test_ln() {
+        let vector = vec![
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(1000, 1.0),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(2000, std::f64::consts::E),
+            },
+        ];
+        let value = Value::Vector(vector);
+        let result = ln(value).unwrap();
+
+        if let Value::Vector(result_vector) = result {
+            assert_eq!(result_vector.len(), 2);
+            assert_eq!(result_vector[0].sample.value, 0.0);
+            assert_eq!(result_vector[1].sample.value, 1.0);
+        } else {
+            panic!("Expected Vector result");
+        }
+    }
+
+    #[test]
+    fn test_log2() {
+        let vector = vec![
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(1000, 1.0),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(2000, 2.0),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(3000, 4.0),
+            },
+        ];
+        let value = Value::Vector(vector);
+        let result = log2(value).unwrap();
+
+        if let Value::Vector(result_vector) = result {
+            assert_eq!(result_vector.len(), 3);
+            assert_eq!(result_vector[0].sample.value, 0.0);
+            assert_eq!(result_vector[1].sample.value, 1.0);
+            assert_eq!(result_vector[2].sample.value, 2.0);
+        } else {
+            panic!("Expected Vector result");
+        }
+    }
+
+    #[test]
+    fn test_log10() {
+        let vector = vec![
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(1000, 1.0),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(2000, 10.0),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(3000, 100.0),
+            },
+        ];
+        let value = Value::Vector(vector);
+        let result = log10(value).unwrap();
+
+        if let Value::Vector(result_vector) = result {
+            assert_eq!(result_vector.len(), 3);
+            assert_eq!(result_vector[0].sample.value, 0.0);
+            assert_eq!(result_vector[1].sample.value, 1.0);
+            assert_eq!(result_vector[2].sample.value, 2.0);
+        } else {
+            panic!("Expected Vector result");
+        }
+    }
+
+    #[test]
+    fn test_sqrt() {
+        let vector = vec![
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(1000, 0.0),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(2000, 1.0),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(3000, 4.0),
+            },
+        ];
+        let value = Value::Vector(vector);
+        let result = sqrt(value).unwrap();
+
+        if let Value::Vector(result_vector) = result {
+            assert_eq!(result_vector.len(), 3);
+            assert_eq!(result_vector[0].sample.value, 0.0);
+            assert_eq!(result_vector[1].sample.value, 1.0);
+            assert_eq!(result_vector[2].sample.value, 2.0);
+        } else {
+            panic!("Expected Vector result");
+        }
+    }
+
+    #[test]
+    fn test_round() {
+        let vector = vec![
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(1000, 3.2),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(2000, 3.5),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(3000, -3.2),
+            },
+        ];
+        let value = Value::Vector(vector);
+        let result = round(value).unwrap();
+
+        if let Value::Vector(result_vector) = result {
+            assert_eq!(result_vector.len(), 3);
+            assert_eq!(result_vector[0].sample.value, 3.0);
+            assert_eq!(result_vector[1].sample.value, 4.0);
+            assert_eq!(result_vector[2].sample.value, -3.0);
+        } else {
+            panic!("Expected Vector result");
+        }
+    }
+
+    #[test]
+    fn test_sgn() {
+        let vector = vec![
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(1000, 5.0),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(2000, -5.0),
+            },
+            InstantValue {
+                labels: Labels::default(),
+                sample: Sample::new(3000, 0.0),
+            },
+        ];
+        let value = Value::Vector(vector);
+        let result = sgn(value).unwrap();
+
+        if let Value::Vector(result_vector) = result {
+            assert_eq!(result_vector.len(), 3);
+            assert_eq!(result_vector[0].sample.value, 1.0);
+            assert_eq!(result_vector[1].sample.value, -1.0);
+            assert_eq!(result_vector[2].sample.value, 1.0);
+        } else {
+            panic!("Expected Vector result");
+        }
+    }
+
+    #[test]
+    fn test_none_value() {
+        let value = Value::None;
+        let result = abs(value).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_invalid_input() {
+        let value = Value::Float(5.0);
+        let result = abs(value);
+        assert!(result.is_err());
+    }
+}
