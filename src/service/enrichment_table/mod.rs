@@ -163,26 +163,25 @@ pub async fn save_enrichment_data(
     let mut records_size = 0;
     let timestamp = Utc::now().timestamp_micros();
     for mut json_record in payload {
-        let timestamp = match json_record.get(TIMESTAMP_COL_NAME) {
-            Some(v) => v.as_i64().unwrap_or(timestamp),
-            None => timestamp,
-        };
+        // Use now as _timestamp in the json records, as we don't
+        // care about the timestamp in enrichment tables. Also, we can use the timestamp
+        // as start_time and end_time in the meta table stats.
         json_record.insert(
             TIMESTAMP_COL_NAME.to_string(),
             json::Value::Number(timestamp.into()),
         );
 
-        if records.is_empty() {
-            // let schema = stream_schema_map.get(stream_name).unwrap();
-            // let schema_key = schema.hash_key();
-            // hour_key = super::ingestion::get_write_partition_key(
-            //     timestamp,
-            //     &vec![],
-            //     PartitionTimeLevel::Unset,
-            //     &json_record,
-            //     Some(schema_key),
-            // );
-        }
+        // if records.is_empty() {
+        // let schema = stream_schema_map.get(stream_name).unwrap();
+        // let schema_key = schema.hash_key();
+        // hour_key = super::ingestion::get_write_partition_key(
+        //     timestamp,
+        //     &vec![],
+        //     PartitionTimeLevel::Unset,
+        //     &json_record,
+        //     Some(schema_key),
+        // );
+        // }
         let record = json::Value::Object(json_record);
         let record_size = json::estimate_json_bytes(&record);
         records.push(record);
