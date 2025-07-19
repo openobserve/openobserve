@@ -3585,16 +3585,14 @@ const useLogs = () => {
           : {};
       const logFieldSelectedValue: any = [];
       const stream = searchObj.data.stream.selectedStream.sort().join("_");
+      // Check if logFilterField has keys (since it's an object, not an array)
       if (
-        logFilterField.length > 0 &&
-        logFilterField[
-          `${store.state.selectedOrganization.identifier}_${stream}`
-        ] != undefined
+        Object.keys(logFilterField).length > 0 &&
+        logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`] != undefined &&
+        Array.isArray(logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`])
       ) {
         logFieldSelectedValue.push(
-          ...logFilterField[
-            `${store.state.selectedOrganization.identifier}_${stream}`
-          ],
+          ...logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`]
         );
       }
       let selectedFields = (logFilterField && logFieldSelectedValue) || [];
