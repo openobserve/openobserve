@@ -163,6 +163,7 @@ async fn get_data(
     schema: SchemaRef,
 ) -> Result<SendableRecordBatchStream> {
     let clean_name = name.trim_matches('"');
+    log::info!("[EnrichExec] get_data: {org_id}/{clean_name}");
     let data = match crate::service::db::enrichment_table::get_enrichment_data_from_db(
         &org_id,
         &clean_name,
@@ -172,11 +173,13 @@ async fn get_data(
         Ok((data, _min_ts, _max_ts)) => data.into_iter().map(Arc::new).collect::<Vec<_>>(),
         Err(e) => return internal_err!("get enrichment data from db: {e}"),
     };
+    log::info!("[EnrichExec] get_data: {org_id}/{clean_name} db data: {:?}", data.len());
 
     let batch = match convert_json_to_record_batch(&schema, &data) {
         Ok(batch) => batch,
         Err(e) => return internal_err!("convert enrichment data from json to record batch: {e}"),
     };
+    log::info!("[EnrichExec] get_data: {org_id}/{clean_name} batch data: {:?}", batch.num_rows());
 
     // convert data to RecordBatch
     Ok(Box::pin(MemoryStream::try_new(
