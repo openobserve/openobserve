@@ -17,12 +17,12 @@ use std::{any::Any, sync::Arc};
 
 use config::utils::record_batch_ext::convert_json_to_record_batch;
 use datafusion::{
-    arrow::{array::RecordBatch, datatypes::SchemaRef},
+    arrow::datatypes::SchemaRef,
     common::{Result, Statistics},
     execution::{SendableRecordBatchStream, TaskContext},
     physical_expr::{EquivalenceProperties, Partitioning},
     physical_plan::{
-        DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, common,
+        DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
         internal_err,
         memory::MemoryStream,
@@ -60,10 +60,6 @@ impl NewEnrichExec {
         let output_partitioning = Self::output_partitioning_helper(self.partitions);
         self.cache = self.cache.with_partitioning(output_partitioning);
         self
-    }
-
-    fn data(&self) -> Result<Vec<RecordBatch>> {
-        Ok(vec![])
     }
 
     fn output_partitioning_helper(n_partitions: usize) -> Partitioning {
@@ -146,14 +142,7 @@ impl ExecutionPlan for NewEnrichExec {
     }
 
     fn statistics(&self) -> Result<Statistics> {
-        let batch = self
-            .data()
-            .expect("Create empty RecordBatch should not fail");
-        Ok(common::compute_record_batch_statistics(
-            &[batch],
-            &self.schema,
-            None,
-        ))
+        Ok(Statistics::new_unknown(&self.schema()))
     }
 }
 
@@ -163,7 +152,6 @@ async fn get_data(
     schema: SchemaRef,
 ) -> Result<SendableRecordBatchStream> {
     let clean_name = name.trim_matches('"');
-    log::info!("[EnrichExec] get_data: {org_id}/{clean_name}");
     let data = match crate::service::db::enrichment_table::get_enrichment_data_from_db(
         &org_id,
         &clean_name,
@@ -173,20 +161,16 @@ async fn get_data(
         Ok((data, _min_ts, _max_ts)) => data.into_iter().map(Arc::new).collect::<Vec<_>>(),
         Err(e) => return internal_err!("get enrichment data from db: {e}"),
     };
+
     log::info!(
-        "[EnrichExec] get_data: {org_id}/{clean_name} db data: {:?}",
-        data
+        "[EnrichExec] get_data: {org_id}/{clean_name} db data: {}",
+        data.len(),
     );
 
     let batch = match convert_json_to_record_batch(&schema, &data) {
         Ok(batch) => batch,
         Err(e) => return internal_err!("convert enrichment data from json to record batch: {e}"),
     };
-    log::info!(
-        "[EnrichExec] get_data: {org_id}/{clean_name} batch data: {:?}",
-        batch.num_rows()
-    );
-    _ = arrow::util::pretty::print_batches(&[batch.clone()]);
 
     // convert data to RecordBatch
     Ok(Box::pin(MemoryStream::try_new(
