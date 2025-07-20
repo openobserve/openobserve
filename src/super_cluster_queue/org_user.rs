@@ -134,7 +134,7 @@ async fn update_token(msg: Message) -> Result<()> {
     }
     let org_id = keys[2];
     let user_email = keys[3];
-    if db_org_users::get(&org_id, &user_email).await.is_err() {
+    if db_org_users::get(org_id, user_email).await.is_err() {
         // User not found, ignore
         log::warn!(
             "[SUPER_CLUSTER:sync] User not found, ignore update token org user: {org_id}/{user_email}, ignore",
@@ -162,7 +162,7 @@ async fn update_rum_token(msg: Message) -> Result<()> {
     }
     let org_id = keys[2];
     let user_email = keys[3];
-    if db_org_users::get(&org_id, &user_email).await.is_err() {
+    if db_org_users::get(org_id, user_email).await.is_err() {
         // User not found, ignore
         log::warn!(
             "[SUPER_CLUSTER:sync] User not found, ignore update RUM token org user: {org_id}/{user_email}, ignore",
