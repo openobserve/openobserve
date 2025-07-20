@@ -159,11 +159,11 @@ pub async fn get_versions(
         }
 
         if let Some(last_index) = last_schema_index {
-            if last_index > 0 {
-                if let Some((_, data)) = versions.get(last_index - 1) {
-                    // older version of schema before start_dt should be added in start
-                    schemas.insert(0, data.clone());
-                }
+            if last_index > 0
+                && let Some((_, data)) = versions.get(last_index - 1)
+            {
+                // older version of schema before start_dt should be added in start
+                schemas.insert(0, data.clone());
             }
         } else {
             // this is latest version of schema hence added in end
@@ -201,7 +201,7 @@ pub async fn get_settings(
     stream_name: &str,
     stream_type: StreamType,
 ) -> Option<StreamSettings> {
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
 
     // Try to get from read lock first
     if let Some(settings) = get_stream_settings_atomic(&key) {
@@ -270,7 +270,7 @@ pub fn unwrap_partition_time_level(
 pub fn get_stream_setting_defined_schema_fields(settings: &Option<StreamSettings>) -> Vec<String> {
     settings
         .as_ref()
-        .map(|settings| settings.defined_schema_fields.clone().unwrap_or_default())
+        .map(|settings| settings.defined_schema_fields.clone())
         .unwrap_or_default()
 }
 
@@ -408,8 +408,7 @@ pub async fn merge(
                         Some(s) => s,
                         None => {
                             return Err(Error::Message(format!(
-                                "Error parsing latest schema for schema: {}",
-                                key
+                                "Error parsing latest schema for schema: {key}"
                             )));
                         }
                     };
@@ -433,18 +432,22 @@ pub async fn merge(
                         .collect::<Vec<_>>();
                     let need_new_version = !schema_version_changes.is_empty();
 
-                    if need_new_version && start_dt.is_some() {
+                    if need_new_version && let Some(start_dt) = start_dt {
                         // update old version end_dt
                         let mut metadata = latest_schema.metadata().clone();
-                        metadata.insert("end_dt".to_string(), start_dt.unwrap().to_string());
+                        metadata.insert("end_dt".to_string(), start_dt.to_string());
                         let prev_schema = vec![latest_schema.clone().with_metadata(metadata)];
                         let mut new_metadata = latest_schema.metadata().clone();
-                        new_metadata.insert("start_dt".to_string(), start_dt.unwrap().to_string());
+                        new_metadata.insert("start_dt".to_string(), start_dt.to_string());
                         let new_schema = vec![final_schema.clone().with_metadata(new_metadata)];
                         tx.send(Some((final_schema, field_datatype_delta))).unwrap();
                         Ok(Some((
                             Some(json::to_vec(&prev_schema).unwrap().into()),
-                            Some((key, json::to_vec(&new_schema).unwrap().into(), start_dt)),
+                            Some((
+                                key,
+                                json::to_vec(&new_schema).unwrap().into(),
+                                Some(start_dt),
+                            )),
                         )))
                     } else {
                         // just update the latest schema
@@ -572,23 +575,10 @@ pub async fn delete_fields(
 
             let mut settings = unwrap_stream_settings(&latest_schema).unwrap_or_default();
 
-            if let Some(schema_fields) = settings.defined_schema_fields {
-                let defined_schema_fields = schema_fields
-                    .iter()
-                    .filter_map(|f| {
-                        if deleted_fields.contains(f) {
-                            None
-                        } else {
-                            Some(f.clone())
-                        }
-                    })
-                    .collect::<Vec<_>>();
-                if defined_schema_fields.is_empty() {
-                    settings.defined_schema_fields = None;
-                } else {
-                    settings.defined_schema_fields = Some(defined_schema_fields);
-                }
-            };
+            settings
+                .defined_schema_fields
+                .retain(|f| !deleted_fields.contains(f));
+
             new_metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
             let new_schema = vec![Schema::new_with_metadata(fields, new_metadata)];
             Ok(Some((
@@ -617,7 +607,7 @@ pub async fn delete(
     match db.delete(&key, false, infra_db::NEED_WATCH, start_dt).await {
         Ok(_) => {}
         Err(e) => {
-            log::error!("Error deleting schema: {}", e);
+            log::error!("Error deleting schema: {e}");
             return Err(Error::Message(format!("Error deleting schema: {e}")));
         }
     }

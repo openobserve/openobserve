@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="row tw-min-h-[44px]">
         <div
-          class="col-6 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
+          class="col-7 text-left q-pl-lg q-mt-xs bg-warning text-white rounded-borders"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           class="q-pb-lg"
-           style="top: 50px; position: absolute; left: 50%"
+          style="top: 50px; position: absolute; left: 50%"
           v-if="histogramLoader"
         >
           <q-spinner-hourglass
@@ -236,7 +236,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :functionErrorMsg="searchObj?.data?.functionError"
         :expandedRows="expandedLogs"
         :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
-        :highlight-query="searchObj.meta.sqlMode ? searchObj.data.query.toLowerCase().split('where')[1] : searchObj.data.query.toLowerCase()"
+        :highlight-query="
+          searchObj.meta.sqlMode
+            ? searchObj.data.query.toLowerCase().split('where')[1]
+            : searchObj.data.query.toLowerCase()
+        "
         :default-columns="!searchObj.data.stream.selectedFields.length"
         class="col-12"
         :style="{
@@ -255,8 +259,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close-column="closeColumn"
         @click:data-row="openLogDetails"
         @expand-row="expandLog"
+        @send-to-ai-chat="sendToAiChat"
         @view-trace="redirectToTraces"
-
       />
 
       <q-dialog
@@ -296,6 +300,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ],
             )
           "
+          @sendToAiChat="sendToAiChat"
+          @closeTable="closeTable"
         />
       </q-dialog>
     </div>
@@ -310,7 +316,6 @@ import {
   onMounted,
   onUpdated,
   defineAsyncComponent,
-  watch,
 } from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -343,6 +348,7 @@ export default defineComponent({
     "expandlog",
     "update:recordsPerPage",
     "update:columnSizes",
+    "sendToAiChat",
   ],
   props: {
     expandedLogs: {
@@ -379,6 +385,15 @@ export default defineComponent({
         this.searchObj.data.resultGrid.colOrder[
           this.searchObj.data.stream.selectedStream
         ] = [...newColOrder];
+
+        if(newColOrder.length > 0){
+          this.searchObj.organizationIdentifier =
+            this.store.state.selectedOrganization.identifier;
+          let selectedFields = this.reorderSelectedFields();
+
+          this.searchObj.data.stream.selectedFields = selectedFields;
+          this.updatedLocalLogFilterField();
+        }
       }
     },
 
@@ -596,7 +611,6 @@ export default defineComponent({
     };
 
     const getWidth = computed(() => {
-      console.log("get search width", searchListContainer);
       return "";
     });
 
@@ -699,6 +713,14 @@ export default defineComponent({
       return searchObj.meta.showHistogram && searchObj.loadingHistogram == true;
     });
 
+    const sendToAiChat = (value: any) => {
+      emit("sendToAiChat", value);
+    };
+
+    const closeTable = () => {
+      searchObj.meta.showDetailTab = false;
+    }
+
     return {
       t,
       store,
@@ -738,6 +760,8 @@ export default defineComponent({
       refreshPagination,
       refreshJobPagination,
       histogramLoader,
+      sendToAiChat,
+      closeTable
     };
   },
   computed: {

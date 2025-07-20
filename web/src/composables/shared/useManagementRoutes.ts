@@ -1,9 +1,9 @@
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
+
 const Settings = () => import("@/components/settings/index.vue");
 const TemplateList = () => import("@/components/alerts/TemplateList.vue");
-const AlertsDestinationList = () =>
-  import("@/components/alerts/AlertsDestinationList.vue");
+const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
 
 const useManagementRoutes = () => {
   const routes: any = [
@@ -99,8 +99,36 @@ const useManagementRoutes = () => {
             routeGuard(to, from, next);
           },
         },
+        {
+          path: "domain_management",
+          name: "domainManagement",
+          component: () => import("@/components/settings/DomainManagement.vue"),
+          meta: {
+            keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
       ],
     );
+  }
+  if (config.isCloud == "true") {
+    routes[0].children.push(
+      ...[
+        {
+          path: "organization_management",
+          name: "orgnizationManagement",
+          component: () => import("@/components/settings/OrganizationManagement.vue"),
+          meta: {
+            keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        }
+      ]
+    )
   }
   return routes;
 };

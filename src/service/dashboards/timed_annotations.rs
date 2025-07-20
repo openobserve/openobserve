@@ -34,9 +34,7 @@ pub async fn create_timed_annotations(
         {
             Ok(_) => (),
             Err(e) => log::error!(
-                "[dashboard_id: {}] Failed to emit event to super cluster: {:?}",
-                dashboard_id,
-                e
+                "[dashboard_id: {dashboard_id}] Failed to emit event to super cluster: {e:?}"
             ),
         };
     }
@@ -71,9 +69,7 @@ pub async fn delete_timed_annotations(
         match super_cluster::emit_timed_annotation_delete_event(dashboard_id, id).await {
             Ok(_) => (),
             Err(e) => log::error!(
-                "[timed_annotation_id: {}] Failed to emit event to super cluster: {:?}",
-                id,
-                e
+                "[timed_annotation_id: {id}] Failed to emit event to super cluster: {e:?}"
             ),
         };
     }

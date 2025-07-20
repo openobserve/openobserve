@@ -15,27 +15,29 @@
 
 use std::sync::Arc;
 
-use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
+use config::meta::{cluster::NodeInfo, inverted_index::IndexOptimizeMode, stream::FileKey};
 use datafusion::{
     common::{
-        DataFusionError, Result, TableReference,
+        Result, TableReference,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
     },
-    physical_expr::LexOrdering,
+    physical_expr::{LexOrdering, utils::collect_columns},
     physical_plan::{
         ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        aggregates::{AggregateExec, AggregateMode},
         repartition::RepartitionExec,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
+        union::UnionExec,
     },
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use proto::cluster_rpc::KvItem;
 
-use super::{
-    empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec,
-    streaming_aggs_exec,
+use super::{empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec};
+use crate::service::search::{
+    datafusion::plan::tantivy_optimize_exec::TantivyOptimizeExec, grpc::QueryParams,
+    index::IndexCondition, request::Request,
 };
-use crate::service::search::{index::IndexCondition, request::Request};
 
 // add remote scan to physical plan
 pub struct RemoteScanRewriter {
@@ -49,11 +51,10 @@ impl RemoteScanRewriter {
         req: Request,
         nodes: Vec<Arc<dyn NodeInfo>>,
         file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
-        idx_file_list: Vec<FileKey>,
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
-        index_optimize_mode: Option<InvertedIndexOptimizeMode>,
+        index_optimize_mode: Option<IndexOptimizeMode>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
     ) -> Self {
@@ -62,7 +63,6 @@ impl RemoteScanRewriter {
                 req,
                 nodes,
                 file_id_lists,
-                idx_file_list,
                 equal_keys,
                 match_all_keys,
                 index_condition,
@@ -191,50 +191,91 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
     }
 }
 
-pub struct StreamingAggsRewriter {
-    id: String,
-    start_time: i64,
-    end_time: i64,
+pub struct GroupByFieldVisitor {
+    group_by_fields: HashSet<String>,
 }
 
-impl StreamingAggsRewriter {
-    pub fn new(id: String, start_time: i64, end_time: i64) -> Self {
+impl GroupByFieldVisitor {
+    pub fn new() -> Self {
         Self {
-            id,
-            start_time,
-            end_time,
+            group_by_fields: HashSet::new(),
+        }
+    }
+
+    pub fn get_group_by_fields(&self) -> Vec<String> {
+        self.group_by_fields.iter().cloned().collect()
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for GroupByFieldVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        let name = node.name();
+        if name == "AggregateExec" {
+            let aggregate = node.as_any().downcast_ref::<AggregateExec>().unwrap();
+            let group_by = aggregate.group_expr();
+            let fields = group_by
+                .expr()
+                .iter()
+                .flat_map(|(expr, _)| {
+                    collect_columns(expr)
+                        .into_iter()
+                        .map(|field| field.name().to_string())
+                })
+                .collect::<HashSet<_>>();
+            self.group_by_fields.extend(fields);
+            Ok(TreeNodeRecursion::Stop)
+        } else {
+            Ok(TreeNodeRecursion::Continue)
         }
     }
 }
 
-impl TreeNodeRewriter for StreamingAggsRewriter {
+// rewrite the physical plan to add tantivy optimize exec
+pub fn tantivy_optimize_rewrite(
+    query: Arc<QueryParams>,
+    file_list: Vec<FileKey>,
+    index_condition: Option<IndexCondition>,
+    index_optimize_mode: IndexOptimizeMode,
+    mut physical_plan: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    let tantivy_exec = Arc::new(TantivyOptimizeExec::new(
+        query,
+        physical_plan.schema(),
+        file_list,
+        index_condition,
+        index_optimize_mode,
+    ));
+    let mut visitor = TantivyOptimizeRewriter::new(tantivy_exec);
+    physical_plan = physical_plan.rewrite(&mut visitor)?.data;
+    Ok(physical_plan)
+}
+
+pub struct TantivyOptimizeRewriter {
+    tantivy_exec: Arc<TantivyOptimizeExec>,
+}
+
+impl TantivyOptimizeRewriter {
+    pub fn new(tantivy_exec: Arc<TantivyOptimizeExec>) -> Self {
+        Self { tantivy_exec }
+    }
+}
+
+impl TreeNodeRewriter for TantivyOptimizeRewriter {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
-        if node.name() == "RemoteScanExec"
-            && !node.children().is_empty()
-            && node.children().first().unwrap().name() == "AggregateExec"
-            && config::get_config().common.feature_query_streaming_aggs
-        {
-            if !streaming_aggs_exec::GLOBAL_ID_CACHE.exists(&self.id) {
-                return Err(DataFusionError::Plan(format!(
-                    "streaming aggregation cache not found with id: {}",
-                    self.id
-                )));
+        if node.name() == "AggregateExec" {
+            let aggregate = node.as_any().downcast_ref::<AggregateExec>().unwrap();
+            if *aggregate.mode() == AggregateMode::Partial {
+                let new_node = Arc::new(UnionExec::new(vec![node, self.tantivy_exec.clone() as _]));
+                Ok(Transformed::new(new_node, true, TreeNodeRecursion::Stop))
+            } else {
+                unreachable!("AggregateExec should be partial mode");
             }
-            let cached_data = streaming_aggs_exec::GLOBAL_CACHE
-                .get(&self.id)
-                .unwrap_or_default();
-            let streaming_node: Arc<dyn ExecutionPlan> =
-                Arc::new(streaming_aggs_exec::StreamingAggsExec::new(
-                    self.id.clone(),
-                    self.start_time,
-                    self.end_time,
-                    cached_data,
-                    node,
-                )) as _;
-            return Ok(Transformed::yes(streaming_node));
+        } else {
+            Ok(Transformed::no(node))
         }
-        Ok(Transformed::no(node))
     }
 }

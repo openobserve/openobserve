@@ -74,8 +74,8 @@ pub async fn save_enrichment_data(
         return Ok(HttpResponse::InternalServerError()
             .append_header((ERROR_HEADER, "not an ingester".to_string()))
             .json(MetaHttpResponse::error(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                "not an ingester".to_string(),
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                "not an ingester",
             )));
     }
 
@@ -92,7 +92,7 @@ pub async fn save_enrichment_data(
                 format!("enrichment table [{stream_name}] is being deleted"),
             ))
             .json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST,
                 format!("enrichment table [{stream_name}] is being deleted"),
             )));
     }
@@ -104,9 +104,8 @@ pub async fn save_enrichment_data(
             Ok(v) => bytes_in_payload += json::estimate_json_bytes(&v),
             Err(_) => {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    "Invalid JSON payload: Could not convert file data into valid JSON object"
-                        .to_string(),
+                    http::StatusCode::BAD_REQUEST,
+                    "Invalid JSON payload: Could not convert file data into valid JSON object",
                 )));
             }
         }
@@ -123,10 +122,7 @@ pub async fn save_enrichment_data(
     let total_expected_size_in_bytes = current_size_in_bytes + bytes_in_payload as f64;
     let total_expected_size_in_mb = total_expected_size_in_bytes / SIZE_IN_MB;
     log::info!(
-        "enrichment table [{stream_name}] current stats in bytes: {:?} vs total expected size in mb: {} vs max_table_size in mb: {}",
-        current_size_in_bytes,
-        total_expected_size_in_mb,
-        enrichment_table_max_size
+        "enrichment table [{stream_name}] current stats in bytes: {current_size_in_bytes:?} vs total expected size in mb: {total_expected_size_in_mb} vs max_table_size in mb: {enrichment_table_max_size}"
     );
 
     // we need to check if the storage size exceeds the max size
@@ -135,10 +131,9 @@ pub async fn save_enrichment_data(
     if total_expected_size_in_mb > enrichment_table_max_size {
         return Ok(
             HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST,
                 format!(
-                    "enrichment table [{stream_name}] total expected storage size {} exceeds max storage size {}",
-                    total_expected_size_in_mb, enrichment_table_max_size
+                    "enrichment table [{stream_name}] total expected storage size {total_expected_size_in_mb} exceeds max storage size {enrichment_table_max_size}"
                 ),
             )),
         );
@@ -207,8 +202,8 @@ pub async fn save_enrichment_data(
 
     if records.is_empty() {
         return Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
-            StatusCode::OK.into(),
-            "Saved enrichment table".to_string(),
+            StatusCode::OK,
+            "Saved enrichment table",
         )));
     }
 
@@ -244,13 +239,10 @@ pub async fn save_enrichment_data(
             Ok(stats) => stats,
             Err(e) => {
                 return Ok(HttpResponse::InternalServerError()
-                    .append_header((
-                        ERROR_HEADER,
-                        format!("Error writing enrichment table: {}", e),
-                    ))
+                    .append_header((ERROR_HEADER, format!("Error writing enrichment table: {e}")))
                     .json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        format!("Error writing enrichment table: {}", e),
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Error writing enrichment table: {e}"),
                     )));
             }
         };
@@ -274,19 +266,15 @@ pub async fn save_enrichment_data(
         db::enrichment_table::update_meta_table_stats(org_id, stream_name, enrich_meta_stats).await;
 
     // notify update
-    if !schema.fields().is_empty() {
-        if let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await {
-            log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
-        };
+    if !schema.fields().is_empty()
+        && let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await
+    {
+        log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
     }
 
     req_stats.response_time = start.elapsed().as_secs_f64();
     log::info!(
-        "save enrichment data to: {}/{}/{} success with stats {:?}",
-        org_id,
-        table_name,
-        append_data,
-        req_stats
+        "save enrichment data to: {org_id}/{table_name}/{append_data} success with stats {req_stats:?}"
     );
 
     // metric + data usage
@@ -302,8 +290,8 @@ pub async fn save_enrichment_data(
     .await;
 
     Ok(HttpResponse::Ok().json(MetaHttpResponse::error(
-        StatusCode::OK.into(),
-        "Saved enrichment table".to_string(),
+        StatusCode::OK,
+        "Saved enrichment table",
     )))
 }
 
@@ -311,14 +299,14 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
     log::info!("deleting enrichment table  {stream_name}");
     // delete stream schema
     if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
-        log::error!("Error deleting stream schema: {}", e);
+        log::error!("Error deleting stream schema: {e}");
     }
 
     // create delete for compactor
     if let Err(e) =
         db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
     {
-        log::error!("Error creating stream retention job: {}", e);
+        log::error!("Error creating stream retention job: {e}");
     }
 
     // delete stream schema cache
@@ -343,7 +331,7 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
 
     // delete stream key
     if let Err(e) = db::enrichment_table::delete(org_id, stream_name).await {
-        log::error!("Error deleting enrichment table: {}", e);
+        log::error!("Error deleting enrichment table: {e}");
     }
 
     // delete stream stats cache

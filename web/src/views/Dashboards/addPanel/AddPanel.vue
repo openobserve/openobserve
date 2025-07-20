@@ -17,11 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="height: calc(100vh - 40px); overflow-y: auto" class="scroll">
-    <div class="flex  items-center q-pa-sm"
-    :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
+    <div
+      class="flex items-center q-pa-sm"
+      :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
     >
-      <div class="flex items-center q-table__title" 
-      :class="!store.state.isAiChatEnabled ? 'q-mr-md' : 'q-mr-sm'"
+      <div
+        class="flex items-center q-table__title"
+        :class="!store.state.isAiChatEnabled ? 'q-mr-md' : 'q-mr-sm'"
       >
         <span>
           {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
@@ -71,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="selectedDate"
           ref="dateTimePickerRef"
           :disable="disable"
+          @hide="setTimeForVariables"
         />
         <q-btn
           class="q-ml-md text-bold"
@@ -177,131 +180,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #after>
-            <div
-              class="row"
-              style="height: calc(100vh - 99px); overflow-y: auto"
-            >
-              <div class="col" style="height: 100%">
-                <q-splitter
-                  class="query-editor-splitter"
-                  v-model="dashboardPanelData.layout.querySplitter"
-                  horizontal
-                  @update:model-value="querySplitterUpdated"
-                  reverse
-                  unit="px"
-                  :limits="
-                    !dashboardPanelData.layout.showQueryBar
-                      ? [43, 400]
-                      : [140, 400]
-                  "
-                  :disable="!dashboardPanelData.layout.showQueryBar"
-                  style="height: 100%"
-                >
-                  <template #before>
-                    <div
-                      class="layout-panel-container col"
-                      style="height: 100%"
-                    >
-                      <DashboardQueryBuilder
-                        :dashboardData="currentDashboardData.data"
-                      />
-                      <q-separator />
-                      <VariablesValueSelector
-                        :variablesConfig="currentDashboardData.data?.variables"
-                        :showDynamicFilters="
-                          currentDashboardData.data?.variables
-                            ?.showDynamicFilters
-                        "
-                        :selectedTimeDate="dashboardPanelData.meta.dateTime"
-                        @variablesData="variablesDataUpdated"
-                        :initialVariableValues="initialVariableValues"
-                      />
+            <div class="row">
+              <div
+                class="col scroll"
+                style="height: calc(100vh - 99px); overflow-y: auto"
+              >
+                <div class="layout-panel-container col">
+                  <DashboardQueryBuilder
+                    :dashboardData="currentDashboardData.data"
+                  />
+                  <q-separator />
+                  <VariablesValueSelector
+                    v-if="
+                      dateTimeForVariables ||
+                      (dashboardPanelData.meta.dateTime &&
+                        dashboardPanelData.meta.dateTime.start_time &&
+                        dashboardPanelData.meta.dateTime.end_time)
+                    "
+                    :variablesConfig="currentDashboardData.data?.variables"
+                    :showDynamicFilters="
+                      currentDashboardData.data?.variables?.showDynamicFilters
+                    "
+                    :selectedTimeDate="
+                      dateTimeForVariables || dashboardPanelData.meta.dateTime
+                    "
+                    @variablesData="variablesDataUpdated"
+                    :initialVariableValues="initialVariableValues"
+                  />
 
-                      <div v-if="isOutDated" class="tw-p-2">
-                        <div
-                          :style="{
-                            borderColor: '#c3920d',
-                            borderWidth: '1px',
-                            borderStyle: 'solid',
-                            backgroundColor:
-                              store.state.theme == 'dark'
-                                ? '#2a1f03'
-                                : '#faf2da',
-                            padding: '1%',
-                            borderRadius: '5px',
-                          }"
-                        >
-                          <div style="font-weight: 700">
-                            Your chart is not up to date
-                          </div>
-                          <div>
-                            Chart Configuration / Variables has been updated,
-                            but the chart was not updated automatically. Click
-                            on the "Apply" button to run the query again
-                          </div>
-                        </div>
-                      </div>
-                      <div class="tw-flex tw-justify-end tw-mr-2">
-                        <span v-if="lastTriggeredAt" class="lastRefreshedAt">
-                          <span class="lastRefreshedAtIcon">🕑</span
-                          ><RelativeTime
-                            :timestamp="lastTriggeredAt"
-                            fullTimePrefix="Last Refreshed At: "
-                          />
-                        </span>
-                      </div>
-                      <div class="col" style="flex: 1">
-                        <PanelSchemaRenderer
-                          v-if="chartData"
-                          @metadata-update="metaDataValue"
-                          :key="dashboardPanelData.data.type"
-                          :panelSchema="chartData"
-                          :dashboard-id="queryParams?.dashboard"
-                          :folder-id="queryParams?.folder"
-                          :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                          :variablesData="updatedVariablesData"
-                          :allowAnnotationsAdd="editMode"
-                          :width="6"
-                          @error="handleChartApiError"
-                          @updated:data-zoom="onDataZoom"
-                          @updated:vrlFunctionFieldList="
-                            updateVrlFunctionFieldList
-                          "
-                          @last-triggered-at-update="
-                            handleLastTriggeredAtUpdate
-                          "
-                          searchType="dashboards"
-                        />
-                        <q-dialog v-model="showViewPanel">
-                          <QueryInspector
-                            :metaData="metaData"
-                            :data="panelTitle"
-                          ></QueryInspector>
-                        </q-dialog>
-                      </div>
-                      <DashboardErrorsComponent
-                        :errors="errorData"
-                        class="col-auto"
-                        style="flex-shrink: 0"
-                      />
-                    </div>
-                  </template>
-                  <template #separator>
+                  <div v-if="isOutDated" class="tw-p-2">
                     <div
-                      class="splitter"
-                      :class="
-                        dashboardPanelData.layout.showQueryBar
-                          ? 'splitter-enabled'
-                          : ''
-                      "
-                    ></div>
-                  </template>
-                  <template #after>
-                    <div style="height: 100%; width: 100%" class="row column">
-                      <DashboardQueryEditor />
+                      :style="{
+                        borderColor: '#c3920d',
+                        borderWidth: '1px',
+                        borderStyle: 'solid',
+                        backgroundColor:
+                          store.state.theme == 'dark' ? '#2a1f03' : '#faf2da',
+                        padding: '1%',
+                        borderRadius: '5px',
+                      }"
+                    >
+                      <div style="font-weight: 700">
+                        Your chart is not up to date
+                      </div>
+                      <div>
+                        Chart Configuration / Variables has been updated, but
+                        the chart was not updated automatically. Click on the
+                        "Apply" button to run the query again
+                      </div>
                     </div>
-                  </template>
-                </q-splitter>
+                  </div>
+                  <div class="tw-flex tw-justify-end tw-mr-2">
+                    <span v-if="lastTriggeredAt" class="lastRefreshedAt">
+                      <span class="lastRefreshedAtIcon">🕑</span
+                      ><RelativeTime
+                        :timestamp="lastTriggeredAt"
+                        fullTimePrefix="Last Refreshed At: "
+                      />
+                    </span>
+                  </div>
+                  <div class="tw-h-[calc(100vh-500px)]">
+                    <PanelSchemaRenderer
+                      v-if="chartData"
+                      @metadata-update="metaDataValue"
+                      :key="dashboardPanelData.data.type"
+                      :panelSchema="chartData"
+                      :dashboard-id="queryParams?.dashboard"
+                      :folder-id="queryParams?.folder"
+                      :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                      :variablesData="updatedVariablesData"
+                      :allowAnnotationsAdd="editMode"
+                      :width="6"
+                      @error="handleChartApiError"
+                      @updated:data-zoom="onDataZoom"
+                      @updated:vrlFunctionFieldList="updateVrlFunctionFieldList"
+                      @last-triggered-at-update="handleLastTriggeredAtUpdate"
+                      searchType="dashboards"
+                    />
+                    <q-dialog v-model="showViewPanel">
+                      <QueryInspector
+                        :metaData="metaData"
+                        :data="panelTitle"
+                      ></QueryInspector>
+                    </q-dialog>
+                  </div>
+                  <DashboardErrorsComponent
+                    :errors="errorData"
+                    class="col-auto"
+                    style="flex-shrink: 0"
+                  />
+                </div>
+                <div class="row column tw-h-[calc(100vh-180px)]">
+                  <DashboardQueryEditor />
+                </div>
               </div>
               <q-separator vertical />
               <div class="col-auto">
@@ -422,96 +393,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="row"
               style="height: calc(100vh - 99px); overflow-y: auto"
             >
-              <div class="col" style="height: 100%">
-                <q-splitter
-                  class="query-editor-splitter"
-                  v-model="dashboardPanelData.layout.querySplitter"
-                  horizontal
-                  @update:model-value="querySplitterUpdated"
-                  reverse
-                  unit="px"
-                  :limits="
-                    !dashboardPanelData.layout.showQueryBar
-                      ? [43, 400]
-                      : [140, 400]
-                  "
-                  :disable="!dashboardPanelData.layout.showQueryBar"
-                  style="height: 100%"
+              <div class="col scroll" style="height: 100%">
+                <div
+                  class="layout-panel-container tw-h-[calc(100vh-200px)] col"
                 >
-                  <template #before>
-                    <div
-                      class="layout-panel-container col"
-                      style="height: 100%"
-                    >
-                      <q-splitter
-                        class="query-editor-splitter"
-                        v-model="splitterModel"
-                        style="height: 100%"
-                        @update:model-value="layoutSplitterUpdated"
-                      >
-                        <template #before>
-                          <CustomChartEditor
-                            v-model="dashboardPanelData.data.customChartContent"
-                            style="width: 100%; height: 100%"
-                          />
-                        </template>
-                        <template #separator>
-                          <div class="splitter-vertical splitter-enabled"></div>
-                          <q-avatar
-                            color="primary"
-                            text-color="white"
-                            size="20px"
-                            icon="drag_indicator"
-                            style="top: 10px; left: 3.5px"
-                            data-test="dashboard-markdown-editor-drag-indicator"
-                          />
-                        </template>
-                        <template #after>
-                          <PanelSchemaRenderer
-                            v-if="chartData"
-                            @metadata-update="metaDataValue"
-                            :key="dashboardPanelData.data.type"
-                            :panelSchema="chartData"
-                            :dashboard-id="queryParams?.dashboard"
-                            :folder-id="queryParams?.folder"
-                            :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                            :variablesData="updatedVariablesData"
-                            :width="6"
-                            @error="handleChartApiError"
-                            @updated:data-zoom="onDataZoom"
-                            @updated:vrlFunctionFieldList="
-                              updateVrlFunctionFieldList
-                            "
-                            @last-triggered-at-update="
-                              handleLastTriggeredAtUpdate
-                            "
-                            searchType="dashboards"
-                          />
-                        </template>
-                      </q-splitter>
-                      <DashboardErrorsComponent
-                        :errors="errorData"
-                        class="col-auto"
-                        style="flex-shrink: 0"
+                  <q-splitter
+                    class="query-editor-splitter"
+                    v-model="splitterModel"
+                    style="height: 100%"
+                    @update:model-value="layoutSplitterUpdated"
+                  >
+                    <template #before>
+                      <CustomChartEditor
+                        v-model="dashboardPanelData.data.customChartContent"
+                        style="width: 100%; height: 100%"
                       />
-                    </div>
-                  </template>
-                  <template #separator>
-                    <div
-                      class="splitter"
-                      :class="
-                        dashboardPanelData.layout.showQueryBar
-                          ? 'splitter-enabled'
-                          : ''
-                      "
-                    ></div>
-                  </template>
-                  <template #after>
-                    <div style="height: 100%; width: 100%" class="row column">
-                      <DashboardQueryEditor />
-                    </div>
-                  </template>
-                </q-splitter>
+                    </template>
+                    <template #separator>
+                      <div class="splitter-vertical splitter-enabled"></div>
+                      <q-avatar
+                        color="primary"
+                        text-color="white"
+                        size="20px"
+                        icon="drag_indicator"
+                        style="top: 10px; left: 3.5px"
+                        data-test="dashboard-markdown-editor-drag-indicator"
+                      />
+                    </template>
+                    <template #after>
+                      <PanelSchemaRenderer
+                        v-if="chartData"
+                        @metadata-update="metaDataValue"
+                        :key="dashboardPanelData.data.type"
+                        :panelSchema="chartData"
+                        :dashboard-id="queryParams?.dashboard"
+                        :folder-id="queryParams?.folder"
+                        :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                        :variablesData="updatedVariablesData"
+                        :width="6"
+                        @error="handleChartApiError"
+                        @updated:data-zoom="onDataZoom"
+                        @updated:vrlFunctionFieldList="
+                          updateVrlFunctionFieldList
+                        "
+                        @last-triggered-at-update="handleLastTriggeredAtUpdate"
+                        searchType="dashboards"
+                      />
+                    </template>
+                  </q-splitter>
+                  <DashboardErrorsComponent
+                    :errors="errorData"
+                    class="col-auto"
+                    style="flex-shrink: 0"
+                  />
+                </div>
+                <div class="row column tw-h-[calc(100vh-180px)]">
+                  <DashboardQueryEditor />
+                </div>
               </div>
               <q-separator vertical />
               <div class="col-auto">
@@ -573,6 +511,8 @@ import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+import useAiChat from "@/composables/useAiChat";
+import useStreams from "@/composables/useStreams";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -646,6 +586,8 @@ export default defineComponent({
       errors: [],
     });
     let variablesData: any = reactive({});
+    const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
+    const { getStream } = useStreams();
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
@@ -748,7 +690,12 @@ export default defineComponent({
 
       // remove beforeUnloadHandler event listener
       window.removeEventListener("beforeunload", beforeUnloadHandler);
+
+      removeAiContextHandler();
       // console.timeEnd("onUnmounted");
+
+      // Clear all refs to prevent memory leaks
+      dateTimePickerRef.value = null;
     });
 
     onMounted(async () => {
@@ -807,6 +754,8 @@ export default defineComponent({
       window.addEventListener("beforeunload", beforeUnloadHandler);
       // console.time("add panel loadDashboard");
       loadDashboard();
+
+      registerAiContextHandler();
       // console.timeEnd("add panel loadDashboard");
     });
 
@@ -920,9 +869,31 @@ export default defineComponent({
       //check that is it addpanel initial call
       if (isInitialDashboardPanelData() && !editMode.value) return false;
       //compare chartdata and dashboardpaneldata and variables data as well
+
+      const normalizeVariables = (obj: any) => {
+        const normalized = JSON.parse(JSON.stringify(obj));
+        // Sort arrays to ensure consistent ordering
+        if (normalized.values) {
+          normalized.values = normalized.values
+            .map((variable: any) => {
+              if (Array.isArray(variable.value)) {
+                variable.value.sort((a: any, b: any) =>
+                  JSON.stringify(a).localeCompare(JSON.stringify(b)),
+                );
+              }
+              return variable;
+            })
+            .sort((a: any, b: any) => a.name.localeCompare(b.name));
+        }
+        return normalized;
+      };
+
+      const normalizedCurrent = normalizeVariables(variablesData);
+      const normalizedRefreshed = normalizeVariables(updatedVariablesData);
+
       return (
         !isEqual(chartData.value, dashboardPanelData.data) ||
-        !isEqual(variablesData, updatedVariablesData)
+        !isEqual(normalizedCurrent, normalizedRefreshed)
       );
     });
 
@@ -939,7 +910,19 @@ export default defineComponent({
         // console.timeEnd("watch:dashboardPanelData.data.type");
       },
     );
+    const dateTimeForVariables = ref(null);
 
+    const setTimeForVariables = () => {
+      const date = dateTimePickerRef.value?.getConsumableDateTime();
+      const startTime = new Date(date.startTime);
+      const endTime = new Date(date.endTime);
+
+      // Update only the variables time object
+      dateTimeForVariables.value = {
+        start_time: startTime,
+        end_time: endTime,
+      };
+    };
     watch(selectedDate, () => {
       // console.time("watch:selectedDate");
       updateDateTime(selectedDate.value);
@@ -1031,6 +1014,10 @@ export default defineComponent({
           end_time: new Date(date.endTime),
         };
 
+        dateTimeForVariables.value = {
+          start_time: new Date(selectedDate.value.startTime),
+          end_time: new Date(selectedDate.value.endTime),
+        };
         router.replace({
           query: {
             ...route.query,
@@ -1566,6 +1553,65 @@ export default defineComponent({
       return { width: `${contentWidth}px` };
     });
 
+    // [START] ai chat
+
+    // [START] O2 AI Context Handler
+
+    const registerAiContextHandler = () => {
+      registerAiChatHandler(getContext);
+    };
+
+    const getContext = async () => {
+      return new Promise(async (resolve, reject) => {
+        try {
+          const isAddPanelPage = router.currentRoute.value.name === "addPanel";
+
+          const isStreamSelectedInDashboardPage =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream;
+
+          if (!isAddPanelPage || !isStreamSelectedInDashboardPage) {
+            resolve("");
+            return;
+          }
+
+          const payload = {};
+
+          const stream =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream;
+
+          const streamType =
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream_type;
+
+          if (!streamType || !stream?.length) {
+            resolve("");
+            return;
+          }
+
+          const schema = await getStream(stream, streamType, true);
+
+          payload["stream_name"] = stream;
+          payload["schema"] = schema.uds_schema || schema.schema || [];
+
+          resolve(payload);
+        } catch (error) {
+          console.error("Error in getContext for add panel page", error);
+          resolve("");
+        }
+      });
+    };
+
+    const removeAiContextHandler = () => {
+      removeAiChatHandler();
+    };
+
+    // [END] O2 AI Context Handler
+
     return {
       t,
       updateDateTime,
@@ -1610,6 +1656,8 @@ export default defineComponent({
       collapseFieldList,
       splitterModel,
       inputStyle,
+      setTimeForVariables,
+      dateTimeForVariables,
     };
   },
   methods: {

@@ -600,8 +600,12 @@ export const convertSQLData = async (
         fontSize: 12,
       },
       formatter: (params: any) => {
-        hoveredSeriesState?.value?.setHoveredSeriesName(params?.name);
-        return params?.name;
+        try {
+          hoveredSeriesState?.value?.setHoveredSeriesName(params?.name);
+          return params?.name;
+        } catch (error) {
+          return params?.name ?? "";
+        }
       },
     },
     textStyle: {
@@ -940,24 +944,36 @@ export const convertSQLData = async (
       : Math.max(configValue, dataValue);
   };
 
+  const hasXAxisName = panelSchema.queries[0]?.fields?.x[0]?.label;
+
+  const hasYAxisName =
+    panelSchema.queries[0]?.fields?.y?.length == 1 &&
+    panelSchema.queries[0]?.fields?.y[0]?.label;
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
       containLabel: panelSchema.config?.axis_width == null ? true : false,
-      left: panelSchema.config?.axis_width ?? 30,
+      left: hasYAxisName ? (panelSchema.config?.axis_width ?? 30) : 5,
       right: 20,
       top: "15",
-      bottom: (() => {
-        if (
-          legendConfig.orient === "horizontal" &&
-          panelSchema.config?.show_legends
-        ) {
-          return panelSchema.config?.axis_width == null ? 50 : 60;
-        } else {
-          return panelSchema.config?.axis_width == null ? 35 : 40;
-        }
-      })(),
+      bottom: hasXAxisName
+        ? (() => {
+            if (
+              legendConfig.orient === "horizontal" &&
+              panelSchema.config?.show_legends
+            ) {
+              return panelSchema.config?.axis_width == null ? 50 : 60;
+            } else {
+              return panelSchema.config?.axis_width == null ? 35 : 40;
+            }
+          })()
+        : legendConfig.orient === "vertical" && panelSchema.config?.show_legends
+          ? 0
+          : breakDownKeys.length > 0
+            ? 25
+            : 0,
     },
     tooltip: {
       trigger: "axis",
@@ -968,7 +984,8 @@ export const convertSQLData = async (
       enterable: true,
       backgroundColor:
         store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
-      extraCssText: "max-height: 200px; overflow: auto; max-width: 400px",
+      extraCssText:
+        "max-height: 200px; overflow: auto; max-width: 400px; user-select: text;",
       axisPointer: {
         type: "cross",
         label: {
@@ -976,124 +993,137 @@ export const convertSQLData = async (
           fontsize: 12,
           precision: panelSchema.config?.decimals,
           formatter: function (params: any) {
-            let lineBreaks = "";
-            if (
-              panelSchema.type === "h-bar" ||
-              panelSchema.type === "h-stacked"
-            ) {
-              if (params.axisDimension == "x")
+            try {
+              let lineBreaks = "";
+              if (
+                panelSchema.type === "h-bar" ||
+                panelSchema.type === "h-stacked"
+              ) {
+                if (params?.axisDimension == "x")
+                  return formatUnitValue(
+                    getUnitValue(
+                      params?.value,
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals,
+                    ),
+                  );
+
+                //we does not required any linebreaks for h-stacked because we only use one x axis
+                if (panelSchema.type === "h-stacked")
+                  return params?.value?.toString();
+                for (
+                  let i = 0;
+                  i <
+                  xAxisKeys.length +
+                    breakDownKeys.length -
+                    params?.axisIndex -
+                    1;
+                  i++
+                ) {
+                  lineBreaks += " \n \n";
+                }
+                params.value = params?.value?.toString();
+                return `${lineBreaks}  ${params?.value}`;
+              }
+              if (params?.axisDimension == "y")
                 return formatUnitValue(
                   getUnitValue(
-                    params.value,
+                    params?.value,
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
                     panelSchema.config?.decimals,
                   ),
                 );
-
-              //we does not required any linebreaks for h-stacked because we only use one x axis
-              if (panelSchema.type === "h-stacked")
-                return params.value.toString();
               for (
                 let i = 0;
                 i <
-                xAxisKeys.length + breakDownKeys.length - params.axisIndex - 1;
+                xAxisKeys.length + breakDownKeys.length - params?.axisIndex - 1;
                 i++
               ) {
                 lineBreaks += " \n \n";
               }
-              params.value = params.value.toString();
-              return `${lineBreaks}  ${params.value}`;
+              params.value = params?.value?.toString();
+              return `${lineBreaks}  ${params?.value}`;
+            } catch (error) {
+              return params?.value?.toString() ?? "";
             }
-            if (params.axisDimension == "y")
-              return formatUnitValue(
-                getUnitValue(
-                  params.value,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals,
-                ),
-              );
-            for (
-              let i = 0;
-              i <
-              xAxisKeys.length + breakDownKeys.length - params.axisIndex - 1;
-              i++
-            ) {
-              lineBreaks += " \n \n";
-            }
-            params.value = params.value.toString();
-            return `${lineBreaks}  ${params.value}`;
           },
         },
       },
       formatter: function (name: any) {
-        // show tooltip for hovered panel only for other we only need axis so just return empty string
-        if (
-          hoveredSeriesState?.value &&
-          panelSchema.id &&
-          hoveredSeriesState?.value?.panelId != panelSchema.id
-        )
-          return "";
-        if (name.length == 0) return "";
+        try {
+          // show tooltip for hovered panel only for other we only need axis so just return empty string
+          if (
+            hoveredSeriesState?.value &&
+            panelSchema.id &&
+            hoveredSeriesState?.value?.panelId != panelSchema.id
+          )
+            return "";
+          if (name?.length == 0) return "";
 
-        // sort tooltip array based on value
-        name.sort((a: any, b: any) => {
-          return (b.value ?? 0) - (a.value ?? 0);
-        });
+          // sort tooltip array based on value
+          name?.sort((a: any, b: any) => {
+            return (b.value ?? 0) - (a.value ?? 0);
+          });
 
-        // if hovered series name is not null then move it to first position
-        if (hoveredSeriesState?.value?.hoveredSeriesName) {
-          // get the current series index from name
-          const currentSeriesIndex = name.findIndex(
-            (it: any) =>
-              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
-          );
+          // if hovered series name is not null then move it to first position
+          if (hoveredSeriesState?.value?.hoveredSeriesName) {
+            // get the current series index from name
+            const currentSeriesIndex = name?.findIndex(
+              (it: any) =>
+                it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
+            );
 
-          // if hovered series index is not -1 then take it to very first position
-          if (currentSeriesIndex != -1) {
-            // shift all series to next position and place current series at first position
-            const temp = name[currentSeriesIndex];
-            for (let i = currentSeriesIndex; i > 0; i--) {
-              name[i] = name[i - 1];
+            // if hovered series index is not -1 then take it to very first position
+            if (currentSeriesIndex != -1) {
+              // shift all series to next position and place current series at first position
+              const temp = name?.[currentSeriesIndex];
+              for (let i = currentSeriesIndex; i > 0; i--) {
+                name[i] = name?.[i - 1];
+              }
+              name[0] = temp;
             }
-            name[0] = temp;
           }
+
+          const hoverText: string[] = [];
+          name?.forEach((it: any) => {
+            // if value is not null, show in tooltip
+            if (it.value != null) {
+              // check if the series is the current series being hovered
+              // if have than bold it
+              if (
+                it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+              )
+                hoverText.push(
+                  `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
+                    getUnitValue(
+                      it.value,
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals,
+                    ),
+                  )} </strong>`,
+                );
+              // else normal text
+              else
+                hoverText.push(
+                  `${it.marker} ${it.seriesName} : ${formatUnitValue(
+                    getUnitValue(
+                      it.value,
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals,
+                    ),
+                  )}`,
+                );
+            }
+          });
+
+          return `${name?.[0]?.name} <br/> ${hoverText.join("<br/>")}`;
+        } catch (error) {
+          return "";
         }
-
-        const hoverText: string[] = [];
-        name.forEach((it: any) => {
-          // if value is not null, show in tooltip
-          if (it.value != null) {
-            // check if the series is the current series being hovered
-            // if have than bold it
-            if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
-              hoverText.push(
-                `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
-                  getUnitValue(
-                    it.value,
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals,
-                  ),
-                )} </strong>`,
-              );
-            // else normal text
-            else
-              hoverText.push(
-                `${it.marker} ${it.seriesName} : ${formatUnitValue(
-                  getUnitValue(
-                    it.value,
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals,
-                  ),
-                )}`,
-              );
-          }
-        });
-
-        return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
       },
     },
     xAxis: [...xAxisKeys, ...breakDownKeys]?.map((key: any, index: number) => {
@@ -1191,14 +1221,18 @@ export const convertSQLData = async (
       },
       axisLabel: {
         formatter: function (value: any) {
-          return formatUnitValue(
-            getUnitValue(
-              value,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
-            ),
-          );
+          try {
+            return formatUnitValue(
+              getUnitValue(
+                value,
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals,
+              ),
+            );
+          } catch (error) {
+            return "";
+          }
         },
       },
       splitLine: {
@@ -1297,7 +1331,7 @@ export const convertSQLData = async (
   const getAnnotationMarkLine = () => {
     return {
       itemStyle: {
-        color: "rgba(0, 191, 255, 0.5)",
+        color: "rgba(108, 122, 125, 1)",
       },
       silent: false,
       animation: false,
@@ -1472,16 +1506,20 @@ export const convertSQLData = async (
             precision: panelSchema.config?.decimals,
           },
           formatter: function (params: any) {
-            if (params.axisDimension == "y")
-              return formatUnitValue(
-                getUnitValue(
-                  params.value,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals,
-                ),
-              );
-            return params.value.toString();
+            try {
+              if (params?.axisDimension == "y")
+                return formatUnitValue(
+                  getUnitValue(
+                    params?.value,
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals,
+                  ),
+                );
+              return params?.value?.toString();
+            } catch (error) {
+              return params?.value?.toString() ?? "";
+            }
           },
         };
         options.xAxis[0].axisLabel = {};
@@ -1499,72 +1537,76 @@ export const convertSQLData = async (
         panelSchema.type !== "bar"
       ) {
         options.tooltip.formatter = function (name: any) {
-          // show tooltip for hovered panel only for other we only need axis so just return empty string
-          if (
-            hoveredSeriesState?.value &&
-            panelSchema.id &&
-            hoveredSeriesState?.value?.panelId != panelSchema.id
-          )
-            return "";
-          if (name.length == 0) return "";
+          try {
+            // show tooltip for hovered panel only for other we only need axis so just return empty string
+            if (
+              hoveredSeriesState?.value &&
+              panelSchema.id &&
+              hoveredSeriesState?.value?.panelId != panelSchema.id
+            )
+              return "";
+            if (name?.length == 0) return "";
 
-          // sort tooltip array based on value
-          name.sort((a: any, b: any) => {
-            return (b.value ?? 0) - (a.value ?? 0);
-          });
+            // sort tooltip array based on value
+            name?.sort((a: any, b: any) => {
+              return (b.value ?? 0) - (a.value ?? 0);
+            });
 
-          // if hovered series name is not null then move it to first position
-          if (hoveredSeriesState?.value?.hoveredSeriesName) {
-            // get the current series index from name
-            const currentSeriesIndex = name.findIndex(
-              (it: any) =>
-                it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
-            );
+            // if hovered series name is not null then move it to first position
+            if (hoveredSeriesState?.value?.hoveredSeriesName) {
+              // get the current series index from name
+              const currentSeriesIndex = name?.findIndex(
+                (it: any) =>
+                  it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
+              );
 
-            // if hovered series index is not -1 then take it to very first position
-            if (currentSeriesIndex != -1) {
-              // shift all series to next position and place current series at first position
-              const temp = name[currentSeriesIndex];
-              for (let i = currentSeriesIndex; i > 0; i--) {
-                name[i] = name[i - 1];
+              // if hovered series index is not -1 then take it to very first position
+              if (currentSeriesIndex != -1) {
+                // shift all series to next position and place current series at first position
+                const temp = name?.[currentSeriesIndex];
+                for (let i = currentSeriesIndex; i > 0; i--) {
+                  name[i] = name?.[i - 1];
+                }
+                name[0] = temp;
               }
-              name[0] = temp;
             }
-          }
 
-          const hoverText: string[] = [];
-          name.forEach((it: any) => {
-            if (it.data != null) {
-              // check if the series is the current series being hovered
-              // if have than bold it
-              if (
-                it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
-              )
-                hoverText.push(
-                  `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
-                    getUnitValue(
-                      it.data,
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals,
-                    ),
-                  )} </strong>`,
-                );
-              // else normal text
-              else
-                hoverText.push(
-                  `${it.marker} ${it.seriesName} : ${formatUnitValue(
-                    getUnitValue(
-                      it.data,
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals,
-                    ),
-                  )}`,
-                );
-            }
-          });
-          return `${name[0].name} <br/> ${hoverText.join("<br/>")}`;
+            const hoverText: string[] = [];
+            name?.forEach((it: any) => {
+              if (it.data != null) {
+                // check if the series is the current series being hovered
+                // if have than bold it
+                if (
+                  it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+                )
+                  hoverText.push(
+                    `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
+                      getUnitValue(
+                        it.data,
+                        panelSchema.config?.unit,
+                        panelSchema.config?.unit_custom,
+                        panelSchema.config?.decimals,
+                      ),
+                    )} </strong>`,
+                  );
+                // else normal text
+                else
+                  hoverText.push(
+                    `${it.marker} ${it.seriesName} : ${formatUnitValue(
+                      getUnitValue(
+                        it.data,
+                        panelSchema.config?.unit,
+                        panelSchema.config?.unit_custom,
+                        panelSchema.config?.decimals,
+                      ),
+                    )}`,
+                  );
+              }
+            });
+            return `${name?.[0]?.name} <br/> ${hoverText.join("<br/>")}`;
+          } catch (error) {
+            return "";
+          }
         };
       }
 
@@ -1653,21 +1695,25 @@ export const convertSQLData = async (
             ? "rgba(0,0,0,1)"
             : "rgba(255,255,255,1)",
         formatter: function (name: any) {
-          // show tooltip for hovered panel only for other we only need axis so just return empty string
-          if (
-            hoveredSeriesState?.value &&
-            panelSchema.id &&
-            hoveredSeriesState?.value?.panelId != panelSchema.id
-          )
+          try {
+            // show tooltip for hovered panel only for other we only need axis so just return empty string
+            if (
+              hoveredSeriesState?.value &&
+              panelSchema.id &&
+              hoveredSeriesState?.value?.panelId != panelSchema.id
+            )
+              return "";
+            return `${name?.marker} ${name?.name} : <b>${formatUnitValue(
+              getUnitValue(
+                name?.value,
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals,
+              ),
+            )}</b>`;
+          } catch (error) {
             return "";
-          return `${name.marker} ${name.name} : <b>${formatUnitValue(
-            getUnitValue(
-              name.value,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
-            ),
-          )}</b>`;
+          }
         },
       };
       //generate trace based on the y axis keys
@@ -1724,21 +1770,25 @@ export const convertSQLData = async (
             ? "rgba(0,0,0,1)"
             : "rgba(255,255,255,1)",
         formatter: function (name: any) {
-          // show tooltip for hovered panel only for other we only need axis so just return empty string
-          if (
-            hoveredSeriesState?.value &&
-            panelSchema.id &&
-            hoveredSeriesState?.value?.panelId != panelSchema.id
-          )
+          try {
+            // show tooltip for hovered panel only for other we only need axis so just return empty string
+            if (
+              hoveredSeriesState?.value &&
+              panelSchema.id &&
+              hoveredSeriesState?.value?.panelId != panelSchema.id
+            )
+              return "";
+            return `${name?.marker} ${name?.name} : <b>${formatUnitValue(
+              getUnitValue(
+                name?.value,
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals,
+              ),
+            )}<b/>`;
+          } catch (error) {
             return "";
-          return `${name.marker} ${name.name} : <b>${formatUnitValue(
-            getUnitValue(
-              name.value,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
-            ),
-          )}<b/>`;
+          }
         },
       };
       //generate trace based on the y axis keys
@@ -1799,16 +1849,20 @@ export const convertSQLData = async (
           precision: panelSchema.config?.decimals,
         },
         formatter: function (params: any) {
-          if (params.axisDimension == "y")
-            return formatUnitValue(
-              getUnitValue(
-                params.value,
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals,
-              ),
-            );
-          return params.value.toString();
+          try {
+            if (params?.axisDimension == "y")
+              return formatUnitValue(
+                getUnitValue(
+                  params?.value,
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals,
+                ),
+              );
+            return params?.value?.toString();
+          } catch (error) {
+            return params?.value?.toString() ?? "";
+          }
         },
       };
       options.xAxis[0].axisLabel.margin = 5;
@@ -1880,16 +1934,20 @@ export const convertSQLData = async (
               show: true,
               fontSize: 12,
               formatter: (params: any) => {
-                return (
-                  formatUnitValue(
-                    getUnitValue(
-                      params.value[2],
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals,
-                    ),
-                  ) || params.value[2]
-                );
+                try {
+                  return (
+                    formatUnitValue(
+                      getUnitValue(
+                        params?.value?.[2],
+                        panelSchema.config?.unit,
+                        panelSchema.config?.unit_custom,
+                        panelSchema.config?.decimals,
+                      ),
+                    ) || params?.value?.[2]
+                  );
+                } catch (error) {
+                  return params?.value?.[2]?.toString() ?? "";
+                }
               },
             },
           },
@@ -1906,27 +1964,31 @@ export const convertSQLData = async (
             ? "rgba(0,0,0,1)"
             : "rgba(255,255,255,1)",
         formatter: (params: any) => {
-          // show tooltip for hovered panel only for other we only need axis so just return empty string
-          if (
-            hoveredSeriesState?.value &&
-            panelSchema.id &&
-            hoveredSeriesState?.value?.panelId != panelSchema.id
-          )
+          try {
+            // show tooltip for hovered panel only for other we only need axis so just return empty string
+            if (
+              hoveredSeriesState?.value &&
+              panelSchema.id &&
+              hoveredSeriesState?.value?.panelId != panelSchema.id
+            )
+              return "";
+            // we have value[1] which return yaxis index
+            // it is used to get y axis data
+            return `${
+              options?.yAxis?.data[params?.value[1]] || params?.seriesName
+            } <br/> ${params?.marker} ${params?.name} : ${
+              formatUnitValue(
+                getUnitValue(
+                  params?.value?.[2],
+                  panelSchema?.config?.unit,
+                  panelSchema?.config?.unit_custom,
+                  panelSchema?.config?.decimals,
+                ),
+              ) || params?.value?.[2]
+            }`;
+          } catch (error) {
             return "";
-          // we have value[1] which return yaxis index
-          // it is used to get y axis data
-          return `${
-            options?.yAxis?.data[params?.value[1]] || params?.seriesName
-          } <br/> ${params?.marker} ${params?.name} : ${
-            formatUnitValue(
-              getUnitValue(
-                params?.value[2],
-                panelSchema?.config?.unit,
-                panelSchema?.config?.unit_custom,
-                panelSchema?.config?.decimals,
-              ),
-            ) || params.value[2]
-          }`;
+          }
         },
       }),
         (options.tooltip.axisPointer = {
@@ -2053,26 +2115,30 @@ export const convertSQLData = async (
         {
           ...defaultSeriesProps,
           renderItem: function (params: any) {
-            const backgroundColor =
-              panelSchema.config?.background?.value?.color;
-            const isDarkTheme = store.state.theme === "dark";
+            try {
+              const backgroundColor =
+                panelSchema.config?.background?.value?.color;
+              const isDarkTheme = store.state.theme === "dark";
 
-            return {
-              type: "text",
-              style: {
-                text: formatUnitValue(unitValue),
-                fontSize: calculateOptimalFontSize(
-                  formatUnitValue(unitValue),
-                  params.coordSys.cx * 2,
-                ), //coordSys is relative. so that we can use it to calculate the dynamic size
-                fontWeight: 500,
-                align: "center",
-                verticalAlign: "middle",
-                x: params.coordSys.cx,
-                y: params.coordSys.cy,
-                fill: getContrastColor(backgroundColor, isDarkTheme),
-              },
-            };
+              return {
+                type: "text",
+                style: {
+                  text: formatUnitValue(unitValue),
+                  fontSize: calculateOptimalFontSize(
+                    formatUnitValue(unitValue),
+                    params?.coordSys?.cx * 2,
+                  ), //coordSys is relative. so that we can use it to calculate the dynamic size
+                  fontWeight: 500,
+                  align: "center",
+                  verticalAlign: "middle",
+                  x: params?.coordSys?.cx,
+                  y: params?.coordSys?.cy,
+                  fill: getContrastColor(backgroundColor, isDarkTheme),
+                },
+              };
+            } catch (error) {
+              return "";
+            }
           },
         },
       ];
@@ -2100,22 +2166,27 @@ export const convertSQLData = async (
           fontSize: 12,
         },
         valueFormatter: (value: any) => {
-          // unit conversion
-          return formatUnitValue(
-            getUnitValue(
-              value,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
-            ),
-          );
+          try {
+            // unit conversion
+            return formatUnitValue(
+              getUnitValue(
+                value,
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals,
+              ),
+            );
+          } catch (error) {
+            return value ?? "";
+          }
         },
         enterable: true,
         backgroundColor:
           store.state.theme === "dark"
             ? "rgba(0,0,0,1)"
             : "rgba(255,255,255,1)",
-        extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
+        extraCssText:
+          "max-height: 200px; overflow: auto; max-width: 500px; user-select: text;",
       };
       options.angleAxis = {
         show: false,
@@ -2194,13 +2265,17 @@ export const convertSQLData = async (
               value: it,
               detail: {
                 formatter: function (value: any) {
-                  const unitValue = getUnitValue(
-                    value,
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals,
-                  );
-                  return unitValue.value + unitValue.unit;
+                  try {
+                    const unitValue = getUnitValue(
+                      value,
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals,
+                    );
+                    return unitValue.value + unitValue.unit;
+                  } catch (error) {
+                    return value ?? "";
+                  }
                 },
               },
               itemStyle: {
@@ -2404,23 +2479,31 @@ export const convertSQLData = async (
           fontsize: 12,
           precision: panelSchema.config?.decimals,
           formatter: function (params: any) {
-            if (params.axisDimension == "y")
-              return formatUnitValue(
-                getUnitValue(
-                  params.value,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals,
-                ),
-              );
-            return Number.isInteger(params.value)
-              ? formatDate(new Date(params.value))
-              : params.value;
+            try {
+              if (params?.axisDimension == "y")
+                return formatUnitValue(
+                  getUnitValue(
+                    params?.value,
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals,
+                  ),
+                );
+              return Number.isInteger(params?.value)
+                ? formatDate(new Date(params?.value))
+                : params?.value;
+            } catch (error) {
+              return params?.value ?? "";
+            }
           },
         },
         formatter: function (params: any) {
-          const date = new Date(params[0].value[0]);
-          return formatDate(date).toString();
+          try {
+            const date = new Date(params?.[0]?.value?.[0]);
+            return formatDate(date)?.toString() ?? "";
+          } catch (error) {
+            return "";
+          }
         },
       };
     }
@@ -2488,80 +2571,86 @@ export const convertSQLData = async (
 
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
-        // if (
-        //   showTrellisConfig(panelSchema.type) &&
-        //   panelSchema.config.trellis?.layout &&
-        //   breakDownKeys.length
-        // )
-        //   name = [name[0]];
+        try {
+          // if (
+          //   showTrellisConfig(panelSchema.type) &&
+          //   panelSchema.config.trellis?.layout &&
+          //   breakDownKeys.length
+          // )
+          //   name = [name[0]];
 
-        // show tooltip for hovered panel only for other we only need axis so just return empty string
-        if (
-          hoveredSeriesState?.value &&
-          panelSchema.id &&
-          hoveredSeriesState?.value?.panelId != panelSchema.id
-        )
-          return "";
-        if (name.length == 0) return "";
+          // show tooltip for hovered panel only for other we only need axis so just return empty string
+          if (
+            hoveredSeriesState?.value &&
+            panelSchema.id &&
+            hoveredSeriesState?.value?.panelId != panelSchema.id
+          )
+            return "";
+          if (name?.length == 0) return "";
 
-        const date = new Date(name[0].data[0]);
+          const date = new Date(name?.[0]?.data?.[0]);
 
-        // sort tooltip array based on value
-        name.sort((a: any, b: any) => {
-          return (b.value[1] || 0) - (a.value[1] || 0);
-        });
+          // sort tooltip array based on value
+          name?.sort((a: any, b: any) => {
+            return (b?.value?.[1] || 0) - (a?.value?.[1] || 0);
+          });
 
-        // if hovered series name is not null then move it to first position
-        if (hoveredSeriesState?.value?.hoveredSeriesName) {
-          // get the current series index from name
-          const currentSeriesIndex = name.findIndex(
-            (it: any) =>
-              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
-          );
+          // if hovered series name is not null then move it to first position
+          if (hoveredSeriesState?.value?.hoveredSeriesName) {
+            // get the current series index from name
+            const currentSeriesIndex = name?.findIndex(
+              (it: any) =>
+                it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
+            );
 
-          // if hovered series index is not -1 then take it to very first position
-          if (currentSeriesIndex != -1) {
-            // shift all series to next position and place current series at first position
-            const temp = name[currentSeriesIndex];
-            for (let i = currentSeriesIndex; i > 0; i--) {
-              name[i] = name[i - 1];
+            // if hovered series index is not -1 then take it to very first position
+            if (currentSeriesIndex != -1) {
+              // shift all series to next position and place current series at first position
+              const temp = name?.[currentSeriesIndex];
+              for (let i = currentSeriesIndex; i > 0; i--) {
+                name[i] = name?.[i - 1];
+              }
+              name[0] = temp;
             }
-            name[0] = temp;
           }
+
+          const hoverText: string[] = [];
+          name?.forEach((it: any) => {
+            if (it?.data?.[1] != null) {
+              // check if the series is the current series being hovered
+              // if have than bold it
+              if (
+                it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+              )
+                hoverText.push(
+                  `<strong>${it?.marker} ${it?.seriesName} : ${formatUnitValue(
+                    getUnitValue(
+                      it?.data?.[1],
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals,
+                    ),
+                  )} </strong>`,
+                );
+              // else normal text
+              else
+                hoverText.push(
+                  `${it.marker} ${it.seriesName} : ${formatUnitValue(
+                    getUnitValue(
+                      it?.data?.[1],
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals,
+                    ),
+                  )}`,
+                );
+            }
+          });
+
+          return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
+        } catch (error) {
+          return "";
         }
-
-        const hoverText: string[] = [];
-        name.forEach((it: any) => {
-          if (it.data[1] != null) {
-            // check if the series is the current series being hovered
-            // if have than bold it
-            if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
-              hoverText.push(
-                `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
-                  getUnitValue(
-                    it.data[1],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals,
-                  ),
-                )} </strong>`,
-              );
-            // else normal text
-            else
-              hoverText.push(
-                `${it.marker} ${it.seriesName} : ${formatUnitValue(
-                  getUnitValue(
-                    it.data[1],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals,
-                  ),
-                )}`,
-              );
-          }
-        });
-
-        return `${formatDate(date)} <br/> ${hoverText.join("<br/>")}`;
       };
       options.tooltip.axisPointer = {
         type: "cross",
@@ -2569,21 +2658,29 @@ export const convertSQLData = async (
           fontsize: 12,
           precision: panelSchema.config?.decimals,
           formatter: function (params: any) {
-            if (params.axisDimension == "y")
-              return formatUnitValue(
-                getUnitValue(
-                  params.value,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals,
-                ),
-              );
-            return formatDate(new Date(params?.value)).toString();
+            try {
+              if (params?.axisDimension == "y")
+                return formatUnitValue(
+                  getUnitValue(
+                    params?.value,
+                    panelSchema.config?.unit,
+                    panelSchema.config?.unit_custom,
+                    panelSchema.config?.decimals,
+                  ),
+                );
+              return formatDate(new Date(params?.value))?.toString() ?? "";
+            } catch (error) {
+              return params?.value ?? "";
+            }
           },
         },
         formatter: function (params: any) {
-          const date = new Date(params[0].value[0]);
-          return formatDate(date).toString();
+          try {
+            const date = new Date(params?.[0]?.value?.[0]);
+            return formatDate(date)?.toString() ?? "";
+          } catch (error) {
+            return "";
+          }
         },
       };
     }

@@ -112,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Enrichment_tables as destination stream is only available for scheduled pipelines</span>
 
           <span class="tw-flex"> <q-icon name="info" class="q-pr-xs q-pt-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
+
             </div>
         </div>
 
@@ -177,6 +178,7 @@ import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 import pipelineService from "@/services/pipelines";
+import usePipelines from "@/composables/usePipelines";
 
 import AddStream from "@/components/logstream/AddStream.vue";
 
@@ -194,6 +196,7 @@ const { t } = useI18n();
 const store = useStore();
 
 const { addNode, pipelineObj , deletePipelineNode} = useDragAndDrop();
+const { getUsedStreamsList } = usePipelines();
 
 const { getStreams } = useStreams();
 
@@ -218,7 +221,7 @@ onMounted(async () => {
     if(pipelineObj.userSelectedNode){
       pipelineObj.userSelectedNode = {};
     }
-  await getUsedStreamsList();
+  usedStreams.value = await getUsedStreamsList();
   await getStreamList();
 });
 
@@ -232,38 +235,72 @@ watch(
     getStreamList();
   }
 );
+  function sanitizeStreamName(input: string): string {
+    if(input.length > 100){
+      $q.notify({
+        message: "Stream name should be less than 100 characters",
+        color: "negative",
+        position: "bottom",
+        timeout: 2000,
+      });
+      //return empty string so that stream name is not saved and user will be notifid and 
+      //will be able to add another stream name
+      return "";
+    }
+    const regex = /\{[^{}]+\}/g;
+    const parts: string[] = [];
+    let lastIndex = 0;
+    let match;
 
-
-watch(() => dynamic_stream_name.value,
-()=>{
-  if(  dynamic_stream_name.value !== null && dynamic_stream_name.value !== "" && selectedNodeType.value === 'output'){
-    //this regex will check if the value is in the format of { stream_name } or { stream_name }_postfix or prefix_{ stream_name }_postfix or just stream_name 
-    const regex = /^([a-zA-Z][a-zA-Z0-9_]{0,63}|\{[a-zA-Z][a-zA-Z0-9_]{0,63}\})$/;
-    if ( typeof dynamic_stream_name.value == 'object' &&  dynamic_stream_name.value.hasOwnProperty('value') && regex.test(dynamic_stream_name.value.value)) {
-      // dynamic_stream_name.value.value = dynamic_stream_name.value.value.replace(/_/g, '-');
-        saveDynamicStream();
+    while ((match = regex.exec(input)) !== null) {
+      // Sanitize and add the static part before the dynamic part
+      if (match.index > lastIndex) {
+        const staticPart = input.slice(lastIndex, match.index);
+        parts.push(...sanitizeStaticPart(staticPart));
       }
-   
+
+      // Push the dynamic part as-is
+      parts.push(match[0]);
+
+      lastIndex = regex.lastIndex;
+    }
+
+    // Sanitize and add the remaining static part (after the last dynamic part)
+    if (lastIndex < input.length) {
+      const staticPart = input.slice(lastIndex);
+      parts.push(...sanitizeStaticPart(staticPart));
+    }
+
+    return parts.join('');
+  }
+
+  // Only sanitize non-dynamic parts
+  //this will convert all the characters that are not allowed in stream name to _
+  function sanitizeStaticPart(str: string): string[] {
+    return str.split('').map(char => /[a-zA-Z0-9]/.test(char) ? char : '_');
+  }
+
+
+
+
+watch(() => dynamic_stream_name.value, () => {
+  if (
+    dynamic_stream_name.value !== null &&
+    dynamic_stream_name.value !== "" &&
+    selectedNodeType.value === "output"
+  ) {
+    const rawValue =
+      typeof dynamic_stream_name.value === 'object' &&
+      dynamic_stream_name.value.hasOwnProperty('value')
+        ? dynamic_stream_name.value.value
+        : dynamic_stream_name.value;
+
+    const sanitized = sanitizeStreamName(rawValue as string);
+
+    dynamic_stream_name.value = sanitized;
+    saveDynamicStream();
   }
 })
-async function getUsedStreamsList() {
-    const org_identifier = store.state.selectedOrganization.identifier;
-  try {
-    const res = await pipelineService.getPipelineStreams(org_identifier);
-    usedStreams.value = res.data.list;
-  } catch (error:any) {
-    usedStreams.value = [];
-    if(error.response.status != 403){
-      $q.notify({
-      message: error.response?.data?.message || "Error fetching used streams",
-      color: "negative",
-      position: "bottom",
-      timeout: 2000,
-    });
-    }
-   
-  }
-}
 async function getStreamList() {
   const streamType = pipelineObj.currentSelectedNodeData.data.hasOwnProperty("stream_type")
     ? pipelineObj.currentSelectedNodeData.data.stream_type

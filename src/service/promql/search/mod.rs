@@ -58,7 +58,7 @@ pub async fn init() -> Result<()> {
         return Ok(());
     }
     if let Err(e) = cache::init().await {
-        log::error!("Error init metrics disk cache: {}", e);
+        log::error!("Error init metrics disk cache: {e}");
     }
     Ok(())
 }
@@ -148,17 +148,13 @@ async fn search_in_cluster(
                     .with_label_values(&[&req.org_id])
                     .observe((new_start - start) as f64 / (end - start) as f64);
                 log::info!(
-                    "[trace_id {trace_id}] promql->search->cache: hit cache, took: {} ms",
-                    took
+                    "[trace_id {trace_id}] promql->search->cache: hit cache, took: {took} ms"
                 );
                 (new_start, values)
             }
             Ok(None) => (start, vec![]),
             Err(err) => {
-                log::error!(
-                    "[trace_id {trace_id}] promql->search->cache: get cache err: {:?}",
-                    err
-                );
+                log::error!("[trace_id {trace_id}] promql->search->cache: get cache err: {err:?}");
                 (start, vec![])
             }
         }
@@ -354,25 +350,20 @@ async fn search_in_cluster(
     .await;
 
     // cache the result
-    if !cache_disabled {
-        if let Some(matrix) = values.get_ref_matrix_values() {
-            if let Err(err) = cache::set(
-                trace_id,
-                &req.org_id,
-                query,
-                original_start,
-                end,
-                step,
-                matrix.to_vec(),
-            )
-            .await
-            {
-                log::error!(
-                    "[trace_id {trace_id}] promql->search->cache: set cache err: {:?}",
-                    err
-                );
-            }
-        }
+    if !cache_disabled
+        && let Some(matrix) = values.get_ref_matrix_values()
+        && let Err(err) = cache::set(
+            trace_id,
+            &req.org_id,
+            query,
+            original_start,
+            end,
+            step,
+            matrix.to_vec(),
+        )
+        .await
+    {
+        log::error!("[trace_id {trace_id}] promql->search->cache: set cache err: {err:?}");
     }
 
     Ok(values)

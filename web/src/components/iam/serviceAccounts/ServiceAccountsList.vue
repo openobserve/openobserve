@@ -20,16 +20,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-pa-none "  :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'" style="min-height: inherit">
+    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-full-width"
+    :class="store.state.theme =='dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+    >
+
+      <div
+          class="q-table__title full-width"
+          data-test="service-accounts-title-text"
+        >
+          {{ t("serviceAccounts.header") }}
+        </div>
+        <div class="full-width tw-flex tw-justify-end">
+          <q-input
+            v-model="filterQuery"
+            filled
+            dense
+            class="col-6"
+            :placeholder="t('serviceAccounts.search')"
+          >
+            <template #prepend>
+              <q-icon name="search" />
+            </template>
+          </q-input>
+            <q-btn
+              class="q-ml-md text-bold no-border"
+              padding="sm lg"
+              style="float: right; cursor: pointer !important"
+              color="secondary"
+              no-caps
+              dense
+              :label="t(`serviceAccounts.add`)"
+              @click="addRoutePush({})"
+            />
+        </div>
+    </div>
     <q-table
       ref="qTable"
-      class="service-accounts-table"
+      class="o2-quasar-table"
+      :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
       :rows="serviceAccountsState.service_accounts_users"
       :columns="columns"
       row-key="id"
       :pagination="pagination"
       :filter="filterQuery"
       :filter-method="filterData"
-      dense
     >
       <template #no-data>
         <NoData></NoData>
@@ -126,38 +160,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-td>
       </template>
       <template #top="scope">
-        <div
-          class="q-table__title full-width q-mb-md"
-          data-test="service-accounts-title-text"
-        >
-          {{ t("serviceAccounts.header") }}
-        </div>
-        <div class="full-width row q-mb-xs items-start">
-          <q-input
-            v-model="filterQuery"
-            filled
-            dense
-            class="col-6 q-pr-sm"
-            :placeholder="t('serviceAccounts.search')"
-          >
-            <template #prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
-
-          <div class="col-6">
-            <q-btn
-              class="q-ml-md q-mb-xs text-bold no-border"
-              style="float: right; cursor: pointer !important"
-              padding="sm lg"
-              color="secondary"
-              no-caps
-              dense
-              :label="t(`serviceAccounts.add`)"
-              @click="addRoutePush({})"
-            />
-          </div>
-        </div>
         <QTablePagination
           :scope="scope"
           :pageTitle="t('serviceAccounts.header')"
@@ -177,6 +179,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:changeRecordPerPage="changePagination"
         />
       </template>
+
+      <template v-slot:header="props">
+            <q-tr :props="props">
+              <!-- Rendering the rest of the columns -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
     </q-table>
 
     <q-dialog
@@ -367,6 +384,7 @@ export default defineComponent({
         label: "#",
         field: "#",
         align: "left",
+        style: "width: 67px;",
       },
       {
         name: "email",
@@ -378,16 +396,10 @@ export default defineComponent({
       {
         name: "first_name",
         field: "first_name",
-        label: t("user.firstName"),
+        label: t("user.description"),
         align: "left",
         sortable: true,
-      },
-      {
-        name: "last_name",
-        field: "last_name",
-        label: t("user.lastName"),
-        align: "left",
-        sortable: true,
+        style: "width: 150px;",
       },
       {
         name: "token",
@@ -395,6 +407,7 @@ export default defineComponent({
         label: "token",
         align: "left",
         sortable: false,
+        style: "width: 230px;", //because token might take more space for displaying the token , eye button and copy button
       },
       {
         name: "actions",
@@ -402,6 +415,7 @@ export default defineComponent({
         label: t("user.actions"),
         align: "center",
         sortable: false,
+        classes: "actions-column",
       },
     ]);
     const userEmail: any = ref("");
@@ -776,34 +790,6 @@ export default defineComponent({
 
 
 <style lang="scss" scoped>
-
-.service-accounts-table {
-
-  th:last-child,
-  td:last-child {
-    position: sticky;
-    right: 0;
-    z-index: 1;
-    background: #ffffff;
-    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
-  }
-}
-
-.dark-theme {
-  th:last-child,
-  td:last-child {
-    background: var(--q-dark);
-    box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
-  }
-}
-
-.light-theme {
-  th:last-child,
-  td:last-child {
-    background: #ffffff;
-  }
-}
-
 .disabled-opacity {
   opacity: 0.1 !important;
 }

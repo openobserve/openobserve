@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -38,7 +38,7 @@ impl MigrationTrait for Migration {
         let mut orgs_set = HashSet::new();
         let mut org_pages = organization::Entity::find().paginate(&txn, 100);
         while let Some(orgs) = org_pages.fetch_and_next().await? {
-            log::debug!("Orgs found: {:?}", orgs);
+            log::debug!("Orgs found: {orgs:?}");
             for org in orgs {
                 orgs_set.insert(org.identifier.clone());
             }
@@ -50,7 +50,7 @@ impl MigrationTrait for Migration {
             for m in metas {
                 let json_user: meta::DBUser =
                     json::from_str(&m.value).map_err(|e| DbErr::Migration(e.to_string()))?;
-                log::debug!("json_user: {:#?}", json_user);
+                log::debug!("json_user: {json_user:#?}");
                 for org in json_user.organizations.iter() {
                     if !orgs_set.contains(&org.name) {
                         log::debug!("Inserting org: {:#?}", org.name);
@@ -175,7 +175,7 @@ mod meta {
     pub enum UserRole {
         #[serde(rename = "root")]
         Root = 0,
-        #[serde(rename = "admin")]
+        #[serde(rename = "admin", alias = "member")]
         Admin = 1,
         #[serde(rename = "editor")]
         Editor = 2,

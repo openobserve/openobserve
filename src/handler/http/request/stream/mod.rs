@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    cmp::Ordering,
-    io::{Error, ErrorKind},
-};
+use std::{cmp::Ordering, io::Error};
 
 use actix_web::{
     HttpRequest, HttpResponse, Responder, delete, get, http, http::StatusCode, post, put, web,
@@ -76,29 +73,30 @@ async fn schema(
     let schema = stream::get_stream(&org_id, &stream_name, stream_type).await;
     let Some(mut schema) = schema else {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            "stream not found".to_string(),
+            StatusCode::NOT_FOUND,
+            "stream not found",
         )));
     };
-    if let Some(uds_fields) = schema.settings.defined_schema_fields.as_ref() {
+    if !schema.settings.defined_schema_fields.is_empty() {
         let mut schema_fields = schema
             .schema
             .iter()
             .map(|f| (&f.name, f))
             .collect::<HashMap<_, _>>();
-        schema.uds_schema = Some(
-            uds_fields
-                .iter()
-                .filter_map(|f| schema_fields.remove(f).map(|f| f.to_owned()))
-                .collect::<Vec<_>>(),
-        );
+        schema.uds_schema = schema
+            .settings
+            .defined_schema_fields
+            .iter()
+            .filter_map(|f| schema_fields.remove(f))
+            .cloned()
+            .collect::<Vec<_>>();
     }
 
     // filter by keyword
-    if let Some(keyword) = query.get("keyword") {
-        if !keyword.is_empty() {
-            schema.schema.retain(|f| f.name.contains(keyword));
-        }
+    if let Some(keyword) = query.get("keyword")
+        && !keyword.is_empty()
+    {
+        schema.schema.retain(|f| f.name.contains(keyword));
     }
 
     // set total fields
@@ -159,8 +157,8 @@ async fn settings(
     if stream_type == StreamType::EnrichmentTables || stream_type == StreamType::Index {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!("Stream type '{}' not allowed", stream_type),
+                http::StatusCode::BAD_REQUEST,
+                format!("Stream type '{stream_type}' not allowed"),
             )),
         );
     }
@@ -204,8 +202,8 @@ async fn update_settings(
     if stream_type == StreamType::EnrichmentTables || stream_type == StreamType::Index {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!("Stream type '{}' not allowed", stream_type),
+                http::StatusCode::BAD_REQUEST,
+                format!("Stream type '{stream_type}' not allowed"),
             )),
         );
     }
@@ -221,7 +219,7 @@ async fn update_settings(
             if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
                 stream_name.to_string()
             } else {
-                format!("{}_{}", stream_name, stream_type)
+                format!("{stream_name}_{stream_type}")
             };
         if infra::schema::get(&org_id, &index_stream_name, StreamType::Index)
             .await
@@ -241,16 +239,12 @@ async fn update_settings(
             {
                 Ok(_) => {
                     log::debug!(
-                        "Data retention settings for {} synced to index stream {}",
-                        stream_name,
-                        index_stream_name
+                        "Data retention settings for {stream_name} synced to index stream {index_stream_name}"
                     );
                 }
                 Err(e) => {
                     log::error!(
-                        "Failed to sync data retention settings to index stream {}: {}",
-                        index_stream_name,
-                        e
+                        "Failed to sync data retention settings to index stream {index_stream_name}: {e}"
                     );
                 }
             }
@@ -302,13 +296,11 @@ async fn delete_fields(
     .await
     {
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "fields deleted".to_string(),
+            http::StatusCode::OK,
+            "fields deleted",
         ))),
-        Err(e) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            e.to_string(),
-        ))),
+        Err(e) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))),
     }
 }
 
@@ -379,8 +371,7 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
             "true" => true,
             "false" => false,
             _ => {
-                return Err(Error::new(
-                    ErrorKind::Other,
+                return Err(Error::other(
                     " 'fetchSchema' query param with value 'true' or 'false' allowed",
                 ));
             }
@@ -428,62 +419,13 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     .await;
 
     // filter by keyword
-    if let Some(keyword) = query.get("keyword") {
-        if !keyword.is_empty() {
-            indices.retain(|s| s.name.contains(keyword));
-        }
+    if let Some(keyword) = query
+        .get("keyword")
+        .filter(|kw| !kw.is_empty())
+        .map(|kw| kw.to_lowercase())
+    {
+        indices.retain(|s| s.name.to_lowercase().contains(&keyword));
     }
-
-    // sort by
-    let mut sort = "name".to_string();
-    if let Some(s) = query.get("sort") {
-        let s = s.to_lowercase();
-        if !s.is_empty() {
-            sort = s;
-        }
-    }
-    let asc = if let Some(asc) = query.get("asc") {
-        asc.to_lowercase() == "true" || asc.to_lowercase() == "1"
-    } else {
-        true
-    };
-    indices.sort_by(|a, b| match (sort.as_str(), asc) {
-        ("name", true) => a.name.cmp(&b.name),
-        ("name", false) => b.name.cmp(&a.name),
-        ("doc_num", true) => a.stats.doc_num.cmp(&b.stats.doc_num),
-        ("doc_num", false) => b.stats.doc_num.cmp(&a.stats.doc_num),
-        ("storage_size", true) => a
-            .stats
-            .storage_size
-            .partial_cmp(&b.stats.storage_size)
-            .unwrap_or(Ordering::Equal),
-        ("storage_size", false) => b
-            .stats
-            .storage_size
-            .partial_cmp(&a.stats.storage_size)
-            .unwrap_or(Ordering::Equal),
-        ("compressed_size", true) => a
-            .stats
-            .compressed_size
-            .partial_cmp(&b.stats.compressed_size)
-            .unwrap_or(Ordering::Equal),
-        ("compressed_size", false) => b
-            .stats
-            .compressed_size
-            .partial_cmp(&a.stats.compressed_size)
-            .unwrap_or(Ordering::Equal),
-        ("index_size", true) => a
-            .stats
-            .index_size
-            .partial_cmp(&b.stats.index_size)
-            .unwrap_or(Ordering::Equal),
-        ("index_size", false) => b
-            .stats
-            .index_size
-            .partial_cmp(&a.stats.index_size)
-            .unwrap_or(Ordering::Equal),
-        _ => a.name.cmp(&b.name),
-    });
 
     // set total streams
     let total = indices.len();
@@ -499,14 +441,67 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
         .unwrap_or(0);
     if offset >= indices.len() {
         indices = vec![];
-    } else if limit > 0 {
-        let end = std::cmp::min(offset + limit, indices.len());
-        indices = indices[offset..end].to_vec();
+
+        return Ok(HttpResponse::Ok().json(ListStream {
+            list: indices,
+            total,
+        }));
     }
+
+    // sort by
+    let sort = query
+        .get("sort")
+        .filter(|v| !v.is_empty())
+        .map(String::to_string)
+        .unwrap_or_else(|| "name".to_string());
+    let asc = query
+        .get("asc")
+        .map(|asc| asc.eq_ignore_ascii_case("true") || asc.eq_ignore_ascii_case("1"))
+        .unwrap_or(true);
+
+    indices.sort_by(|a, b| stream_comparator(a, b, &sort, asc));
+
+    if limit > 0 {
+        let end = std::cmp::min(offset + limit, indices.len());
+        indices.drain(end..);
+        indices.drain(..offset);
+    }
+
     Ok(HttpResponse::Ok().json(ListStream {
         list: indices,
         total,
     }))
+}
+
+/// Compares two streams for sorting based on the field and ASC/DESC
+fn stream_comparator(
+    a: &meta::stream::Stream,
+    b: &meta::stream::Stream,
+    sort: &str,
+    asc: bool,
+) -> Ordering {
+    let ord = match sort {
+        "name" => a.name.cmp(&b.name),
+        "doc_num" => a.stats.doc_num.cmp(&b.stats.doc_num),
+        "storage_size" => a
+            .stats
+            .storage_size
+            .partial_cmp(&b.stats.storage_size)
+            .unwrap_or(Ordering::Equal),
+        "compressed_size" => a
+            .stats
+            .compressed_size
+            .partial_cmp(&b.stats.compressed_size)
+            .unwrap_or(Ordering::Equal),
+        "index_size" => a
+            .stats
+            .index_size
+            .partial_cmp(&b.stats.index_size)
+            .unwrap_or(Ordering::Equal),
+        _ => a.name.cmp(&b.name),
+    };
+
+    if asc { ord } else { ord.reverse() }
 }
 
 /// StreamDeleteCache
@@ -536,8 +531,8 @@ async fn delete_stream_cache(
 ) -> Result<HttpResponse, Error> {
     if !config::get_config().common.result_cache_enabled {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Result Cache is disabled".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "Result Cache is disabled",
         )));
     }
     let (org_id, mut stream_name) = path.into_inner();
@@ -549,17 +544,17 @@ async fn delete_stream_cache(
     let path = if stream_name.eq("_all") {
         org_id
     } else {
-        format!("{}/{}/{}", org_id, stream_type, stream_name)
+        format!("{org_id}/{stream_type}/{stream_name}")
     };
 
     match crate::service::search::cluster::cacher::delete_cached_results(path).await {
         true => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "cache deleted".to_string(),
+            http::StatusCode::OK,
+            "cache deleted",
         ))),
         false => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Error deleting cache, please retry".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "Error deleting cache, please retry",
         ))),
     }
 }

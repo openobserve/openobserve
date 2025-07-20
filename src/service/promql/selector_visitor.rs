@@ -81,7 +81,7 @@ mod tests {
         let mut visitor = MetricSelectorVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
-        let expected = vec![
+        let expected = [
             "container_fs_reads_bytes_total{container!=\"\",device=~\"(/dev/)?(mmcblk[0-9]p[0-9]+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|md.+|dasd.+)\"}[5m]",
             "container_fs_writes_bytes_total{container!=\"\",device=~\"(/dev/)?(mmcblk[0-9]p[0-9]+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|md.+|dasd.+)\"}[5m]",
         ];
@@ -92,7 +92,7 @@ mod tests {
         let ast = parser::parse(promql).unwrap();
         let mut visitor = MetricSelectorVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
-        let expected = vec![
+        let expected = [
             "http_requests_total{environment=~\"staging|testing|development\",method!=\"GET\"} offset 5m",
         ];
         assert_eq!(visitor.exprs_to_string(), expected.join(","));

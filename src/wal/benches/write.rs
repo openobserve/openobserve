@@ -23,7 +23,7 @@ pub fn write_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("wal/write");
     for buf_size in [4096, 8192, 16384, 32768] {
         for entry_size in [4096, 16384, 32768, 65536] {
-            let mut writer = Writer::new(
+            let (mut writer, _) = Writer::new(
                 build_file_path(dir, "org", "stream", entry_size.to_string()),
                 1024_1024,
                 buf_size,

@@ -33,27 +33,25 @@ use o2_enterprise::enterprise::common::{
 use tokio::sync::mpsc;
 use tracing::Span;
 
+#[cfg(feature = "enterprise")]
+use crate::{
+    common::meta::search::AuditContext,
+    handler::http::request::search::utils::check_stream_permissions,
+    service::self_reporting::audit,
+};
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
-        utils::{
-            http::{
-                get_fallback_order_by_col_from_request, get_or_create_trace_id,
-                get_search_event_context_from_request, get_search_type_from_request,
-                get_stream_type_from_request, get_use_cache_from_request,
-            },
-            websocket::update_histogram_interval_in_query,
+        utils::http::{
+            get_fallback_order_by_col_from_request, get_or_create_trace_id,
+            get_search_event_context_from_request, get_search_type_from_request,
+            get_stream_type_from_request, get_use_cache_from_request,
         },
     },
     handler::http::request::search::{
         build_search_request_per_field, error_utils::map_error_to_http_response,
     },
-    service::{search::search_stream::process_search_stream_request, setup_tracing_with_trace_id},
-};
-#[cfg(feature = "enterprise")]
-use crate::{
-    handler::http::request::search::utils::check_stream_permissions,
-    service::search::search_stream::AuditContext, service::self_reporting::audit,
+    service::{search::streaming::process_search_stream_request, setup_tracing_with_trace_id},
 };
 /// Search HTTP2 streaming endpoint
 ///
@@ -103,10 +101,8 @@ pub async fn search_http2_stream(
         .to_string();
 
     // Log the request
-    log::info!(
-        "[trace_id: {}] Received HTTP/2 stream request at handler for org_id: {}",
-        trace_id,
-        org_id
+    log::debug!(
+        "[HTTP2_STREAM trace_id {trace_id}] Received HTTP/2 stream request at handler for org_id: {org_id}"
     );
 
     #[cfg(feature = "enterprise")]
@@ -182,8 +178,7 @@ pub async fn search_http2_stream(
     }
 
     // Set use_cache from query params
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
-    req.use_cache = Some(use_cache);
+    req.use_cache = get_use_cache_from_request(&query);
 
     // Set search type if not set
     if req.search_type.is_none() {
@@ -286,7 +281,7 @@ pub async fn search_http2_stream(
     {
         Ok(v) => v,
         Err(e) => {
-            log::error!("[trace_id: {}] Error parsing sql: {:?}", trace_id, e);
+            log::error!("[HTTP2_STREAM trace_id {trace_id}] Error parsing sql: {e}");
 
             #[cfg(feature = "enterprise")]
             let error_message = e.to_string();
@@ -310,41 +305,13 @@ pub async fn search_http2_stream(
             return http_response;
         }
     };
+    // Hack for limit in query
+    if sql.limit != 0 {
+        req.query.size = sql.limit;
+    }
 
     if let Some(interval) = sql.histogram_interval {
-        // modify the sql query statement to include the histogram interval
-        if let Ok(updated_query) = update_histogram_interval_in_query(&req.query.sql, interval) {
-            req.query.sql = updated_query;
-        } else {
-            log::error!(
-                "[HTTP2_STREAM] [trace_id: {}] Failed to update query with histogram interval: {}",
-                trace_id,
-                interval
-            );
-
-            // Add audit before closing
-            #[cfg(feature = "enterprise")]
-            {
-                report_to_audit(
-                    user_id,
-                    org_id,
-                    trace_id,
-                    400,
-                    Some("Failed to update query with histogram interval".to_string()),
-                    &in_req,
-                    body_bytes,
-                )
-                .await;
-            }
-
-            return MetaHttpResponse::bad_request("Failed to update query with histogram interval");
-        }
-        log::info!(
-            "[HTTP2_STREAM] [trace_id: {}] Updated query {}; with histogram interval: {}",
-            trace_id,
-            req.query.sql,
-            interval
-        );
+        req.query.histogram_interval = interval;
     }
     let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
 
@@ -392,11 +359,7 @@ pub async fn search_http2_stream(
         let chunks_iter = match result {
             Ok(v) => v.to_chunks(),
             Err(err) => {
-                log::error!(
-                    "[HTTP2_STREAM] trace_id: {} Error in stream: {}",
-                    trace_id,
-                    err
-                );
+                log::error!("[HTTP2_STREAM trace_id {trace_id}] Error in search stream: {err}");
                 let err_res = match err {
                     infra::errors::Error::ErrorCode(ref code) => {
                         // if err code is cancelled return cancelled response
@@ -516,15 +479,13 @@ pub async fn values_http2_stream(
         .to_string();
 
     // Log the request
-    log::info!(
-        "[trace_id: {}] Received values HTTP/2 stream request for org_id: {}",
-        trace_id,
-        org_id
+    log::debug!(
+        "[HTTP2_STREAM trace_id {trace_id}] Received values HTTP/2 stream request for org_id: {org_id}"
     );
 
     // Get query params
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let mut stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     #[cfg(feature = "enterprise")]
     let body_bytes = String::from_utf8_lossy(&body).to_string();
@@ -558,15 +519,25 @@ pub async fn values_http2_stream(
     let no_count = values_req.no_count;
     let top_k = values_req.size;
 
-    // Get use_cache from query params
-    values_req.use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
+    // check stream type from request
+    if values_req.stream_type != stream_type {
+        stream_type = values_req.stream_type;
+    }
 
+    // Get use_cache from query params
+    values_req.use_cache = get_use_cache_from_request(&query);
+
+    let keyword = match query.get("keyword") {
+        None => "".to_string(),
+        Some(v) => v.trim().to_string(),
+    };
     // Build search requests per field and use only the first one
     let reqs = match build_search_request_per_field(
         &values_req,
         &org_id,
         stream_type,
         &values_req.stream_name,
+        &keyword,
     )
     .await
     {
@@ -690,11 +661,7 @@ pub async fn values_http2_stream(
         let chunks_iter = match result {
             Ok(v) => v.to_chunks(),
             Err(err) => {
-                log::error!(
-                    "[HTTP2_STREAM] trace_id: {} Error in stream: {}",
-                    trace_id,
-                    err
-                );
+                log::error!("[HTTP2_STREAM trace_id {trace_id}] Error in values stream: {err}");
                 let err_res = match err {
                     infra::errors::Error::ErrorCode(ref code) => {
                         let message = code.get_message();

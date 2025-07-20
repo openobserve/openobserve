@@ -166,7 +166,7 @@ pub async fn update(
         Err(e) => {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                format!("Invalid query string: {}", e),
+                format!("Invalid query string: {e}"),
             ));
         }
     };
@@ -176,8 +176,7 @@ pub async fn update(
             "true" => true,
             "false" => false,
             _ => {
-                return Err(Error::new(
-                    ErrorKind::Other,
+                return Err(Error::other(
                     " 'rotateToken' query param with value 'true' or 'false' allowed",
                 ));
             }
@@ -191,10 +190,8 @@ pub async fn update(
                 token: passcode.passcode,
                 user: passcode.user,
             })),
-            Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                http::StatusCode::NOT_FOUND.into(),
-                e.to_string(),
-            ))),
+            Err(e) => Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e))),
         };
     };
     let service_account = service_account.into_inner();
@@ -269,9 +266,9 @@ pub async fn get_api_token(path: web::Path<(String, String)>) -> Result<HttpResp
             token: passcode.passcode,
             user: passcode.user,
         })),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => {
+            Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
+        }
     }
 }

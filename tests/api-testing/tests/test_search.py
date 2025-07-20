@@ -37,7 +37,6 @@ def test_e2e_query(create_session, base_url):
                         "end_time": end_time,
                         "from": 0,
                         "size": 150,
-                        "sql_mode": "full",
                 },
             }
 
@@ -64,7 +63,6 @@ def test_e2e_query(create_session, base_url):
                         "end_time": end_time,
                         "from": 0,
                         "size": 150,
-                        "sql_mode": "full",
                 },
             }
 
@@ -93,7 +91,6 @@ def test_e2e_limitadded(create_session, base_url):
                         "end_time": end_time,
                         "from": 0,
                         "size": 150,
-                        "sql_mode": "full",
                 },
             }
 
@@ -181,7 +178,6 @@ def test_e2e_matchallhistogram(create_session, base_url):
             "start_time": one_min_ago,
             "end_time": end_time,
             "size": 0,
-            "sql_mode":"full"
         }
 } 
 
@@ -294,7 +290,6 @@ def test_e2e_matchallsql(create_session, base_url):
                         "end_time": end_time,
                         "from": 0,
                         "size": 150,
-                        "sql_mode": "full",
                 },
             }
 
@@ -321,7 +316,6 @@ def test_e2e_matchallsql(create_session, base_url):
 #                         "end_time": end_time,
 #                         "from": 0,
 #                         "size": 150,
-#                         "sql_mode": "full",
 #                 },
 #             }
 
@@ -360,7 +354,6 @@ def test_e2e_matchallsql(create_session, base_url):
 #                         "end_time": end_time,
 #                         "from": 0,
 #                         "size": 150,
-#                         "sql_mode": "full",
 #                 },
 #             }
 
@@ -401,7 +394,6 @@ def test_e2e_sqlaggregationquery(create_session, base_url):
                 "from": 0,
                 "size": 250,
                 "quick_mode": True,
-                "sql_mode": "full"
             },
 }
     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
@@ -430,7 +422,6 @@ def test_e2e_sqlgroupbytimestamp(create_session, base_url):
                 "from": 0,
                 "size": 250,
                 "quick_mode": True,
-                "sql_mode": "full"
             },
 }
     resp_get_allsearch = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
@@ -456,8 +447,7 @@ def test_e2e_sqlcountaggregationquery(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 250,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         }
         }
 
@@ -485,8 +475,7 @@ def test_e2e_sqlmatchquery(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 250,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         }
         }
 
@@ -513,8 +502,7 @@ def test_e2e_sqlmaxquery(create_session, base_url):
     "end_time": end_time,
     "from": 0,
     "size": 250,
-    "quick_mode": False,
-    "sql_mode": "full"
+    "quick_mode": False
   }
 }
     resp_get_maxquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
@@ -541,8 +529,7 @@ def test_e2e_inquery(create_session, base_url):
     "end_time": end_time,
     "from": 0,
     "size": 250,
-    "quick_mode": False,
-    "sql_mode": "full"
+    "quick_mode": False
   }
 }
     resp_get_inquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
@@ -707,8 +694,7 @@ def test_e2e_cachedscenario(create_session, base_url):
             "sql": "select histogram(_timestamp, '5 minute') AS zo_sql_key, count(*) AS zo_sql_num from \"stream_pytest_data\"  GROUP BY zo_sql_key ORDER BY zo_sql_key",
             "start_time": one_min_ago,
             "end_time": end_time,
-            "size": -1,
-            "sql_mode": "full"
+            "size": -1
         }
     }
 
@@ -718,8 +704,7 @@ def test_e2e_cachedscenario(create_session, base_url):
             "sql": "select histogram(_timestamp, '5 minute') AS zo_sql_key, count(*) AS zo_sql_num from \"stream_pytest_data\"  GROUP BY zo_sql_key ORDER BY zo_sql_key",
             "start_time": three_days_ago,
             "end_time": end_time,
-            "size": -1,
-            "sql_mode": "full"
+            "size": -1
         }
     }
 
@@ -828,8 +813,7 @@ def test_e2e_eventtimestamp(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 10,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         }
     }
 
@@ -862,8 +846,7 @@ def test_e2e_distinctqueries(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 100,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         }
     }
         
@@ -890,8 +873,7 @@ def test_e2e_countcase(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 100,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         }
         }
     resp_get_inquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
@@ -917,8 +899,7 @@ def test_e2e_coalesce(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 100,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         }
         }
     resp_get_inquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
@@ -944,8 +925,7 @@ def test_e2e_percentile(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 100,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         }
         }
     resp_get_inquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
@@ -971,8 +951,7 @@ def test_e2e_float(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 100,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         }
         }
     resp_get_inquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
@@ -999,8 +978,7 @@ def test_e2e_matchallsinglechar(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 100,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         }
         }
     resp_get_inquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)
@@ -1026,8 +1004,7 @@ def test_e2e_floatvalue(create_session, base_url):
             "end_time": end_time,
             "from": 0,
             "size": 100,
-            "quick_mode": False,
-            "sql_mode": "full"
+            "quick_mode": False
         }
         }
     resp_get_inquery = session.post(f"{url}api/{org_id}/_search?type=logs", json=json_data)

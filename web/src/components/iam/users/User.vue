@@ -18,6 +18,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
+    <div class="tw-flex tw-flex-row tw-justify-between tw-items-center tw-px-4 tw-py-3"
+    :class="store.state.theme == 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+    >
+      <div
+          class="q-table__title full-width"
+          data-test="user-title-text"
+        >
+          {{ t("iam.basicUsers") }}
+        </div>
+        <div class="full-width tw-flex tw-justify-end">
+          <q-input
+            v-model="filterQuery"
+            filled
+            dense
+            class="col-6"
+            :placeholder="t('user.search')"
+          >
+            <template #prepend>
+              <q-icon name="search" />
+            </template>
+          </q-input>
+          <div class="col-6" v-if="config.isCloud == 'true'">
+            <member-invitation
+              :key="currentUserRole"
+              v-model:currentrole="currentUserRole"
+            />
+          </div>
+          <div class="col-6" v-else>
+            <q-btn
+              class="q-ml-md text-bold no-border"
+              style="float: right; cursor: pointer !important"
+              padding="sm lg"
+              color="secondary"
+              no-caps
+              dense
+              :label="t(`user.add`)"
+              @click="addRoutePush({})"
+              data-test="add-basic-user"
+            />
+          </div>
+        </div>
+    </div>
     <q-table
       ref="qTable"
       :rows="usersState.users"
@@ -26,6 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :pagination="pagination"
       :filter="filterQuery"
       :filter-method="filterData"
+      class="o2-quasar-table"
+      :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
     >
       <template #no-data>
         <NoData></NoData>
@@ -33,7 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:header="props">
         <q-tr :props="props">
           <q-th v-for="col in props.cols"
-:key="col.name" :props="props">
+          :class="col.classes"
+          :key="col.name" :props="props">
             <span>{{ col.label }}</span>
           </q-th>
         </q-tr>
@@ -55,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`delete-basic-user-${props.row.email}`"
           />
           <q-btn
-            v-if="props.row.enableEdit && props.row.status != 'pending'"
+            v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
             icon="edit"
             :title="t('user.update')"
             class="q-ml-xs"
@@ -71,44 +116,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-td>
       </template>
       <template #top="scope">
-        <div
-          class="q-table__title full-width q-mb-md"
-          data-test="user-title-text"
-        >
-          {{ t("iam.basicUsers") }}
-        </div>
-        <div class="full-width row q-mb-xs items-start">
-          <q-input
-            v-model="filterQuery"
-            filled
-            dense
-            class="col-6 q-pr-sm"
-            :placeholder="t('user.search')"
-          >
-            <template #prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
-          <div class="col-6" v-if="config.isCloud == 'true'">
-            <member-invitation
-              :key="currentUserRole"
-              v-model:currentrole="currentUserRole"
-            />
-          </div>
-          <div class="col-6" v-else>
-            <q-btn
-              class="q-ml-md q-mb-xs text-bold no-border"
-              style="float: right; cursor: pointer !important"
-              padding="sm lg"
-              color="secondary"
-              no-caps
-              dense
-              :label="t(`user.add`)"
-              @click="addRoutePush({})"
-              data-test="add-basic-user"
-            />
-          </div>
-        </div>
         <QTablePagination
           :scope="scope"
           :pageTitle="t('iam.basicUsers')"
@@ -260,7 +267,7 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
-      if (isEnterprise.value || config.isCloud == "true") await _getRoles();
+      await _getRoles();
 
       // if (config.isCloud == "true") {
         // columns.value.push({
@@ -292,6 +299,7 @@ export default defineComponent({
         label: "#",
         field: "#",
         align: "left",
+        style: "width: 67px",
       },
       {
         name: "email",
@@ -306,6 +314,7 @@ export default defineComponent({
         label: t("user.firstName"),
         align: "left",
         sortable: true,
+        style: "width: 150px",
       },
       {
         name: "last_name",
@@ -313,6 +322,7 @@ export default defineComponent({
         label: t("user.lastName"),
         align: "left",
         sortable: true,
+        style: "width: 150px",
       },
       {
         name: "role",
@@ -320,12 +330,14 @@ export default defineComponent({
         label: t("user.role"),
         align: "left",
         sortable: true,
+        style: "width: 150px",
       },
       {
         name: "actions",
         field: "actions",
         label: t("user.actions"),
         align: "left",
+        classes: 'actions-column'
       },
     ]);
     const userEmail: any = ref("");
@@ -524,7 +536,20 @@ export default defineComponent({
     };
 
     const shouldAllowDelete = (user: any) => {
+
       if (isEnterprise.value) {
+      //for cloud
+      //should allow delete for all users when it is root and also when the row user is not root 
+      //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
+        if(config.isCloud == 'true'){
+          return (
+            user.role !== "root" &&
+            (currentUserRole.value == "root" ||
+              currentUserRole.value == "admin") &&
+              store.state.userInfo.email !== user.email
+
+          );
+        }
         return (
           isCurrentUserInternal.value &&
           !user.isExternal &&
@@ -880,12 +905,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
 
 .iconHoverBtn {
   cursor: pointer !important;

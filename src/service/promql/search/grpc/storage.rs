@@ -66,7 +66,7 @@ pub(crate) async fn create_context(
 
     // check if we are allowed to search
     if db::compact::retention::is_deleting_stream(org_id, StreamType::Metrics, stream_name, None) {
-        log::error!("stream [{}] is being deleted", stream_name);
+        log::error!("stream [{stream_name}] is being deleted");
         return Ok(None);
     }
 
@@ -75,7 +75,7 @@ pub(crate) async fn create_context(
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(err) => {
-            log::error!("[trace_id {trace_id}] get schema error: {}", err);
+            log::error!("[trace_id {trace_id}] get schema error: {err}");
             return Err(datafusion::error::DataFusionError::Execution(
                 err.to_string(),
             ));
@@ -130,7 +130,7 @@ pub(crate) async fn create_context(
     let mut scan_stats = match file_list::calculate_files_size(&files.to_vec()).await {
         Ok(size) => size,
         Err(err) => {
-            log::error!("[trace_id {trace_id}] calculate files size error: {}", err);
+            log::error!("[trace_id {trace_id}] calculate files size error: {err}");
             return Err(datafusion::error::DataFusionError::Execution(
                 "calculate files size error".to_string(),
             ));
@@ -186,7 +186,7 @@ pub(crate) async fn create_context(
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
-        format!(" downloading others into {:?} in background,", cache_type)
+        format!(" downloading others into {cache_type:?} in background,")
     };
     log::info!(
         "[trace_id {trace_id}] promql->search->storage: load files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
@@ -211,11 +211,7 @@ pub(crate) async fn create_context(
         cfg.limit.cpu_num
     };
 
-    let schema = Arc::new(
-        schema
-            .to_owned()
-            .with_metadata(std::collections::HashMap::new()),
-    );
+    let schema = Arc::new(schema.to_owned().with_metadata(Default::default()));
 
     let query = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),
@@ -231,7 +227,7 @@ pub(crate) async fn create_context(
     let index_condition = convert_matchers_to_index_condition(&matchers, &schema, &index_fields)?;
     if !index_condition.conditions.is_empty() && cfg.common.inverted_index_enabled {
         let (idx_took, ..) =
-            filter_file_list_by_tantivy_index(query, &mut files, Some(index_condition), None)
+            filter_file_list_by_tantivy_index(query.clone(), &mut files, Some(index_condition), None)
                 .await
                 .map_err(|e| {
                     log::error!(
@@ -261,6 +257,7 @@ pub(crate) async fn create_context(
         true,
     )
     .await?;
+
     Ok(Some((ctx, schema, scan_stats)))
 }
 
@@ -287,7 +284,7 @@ async fn get_file_list(
     {
         Ok(results) => results,
         Err(err) => {
-            log::error!("[trace_id {trace_id}] get file list error: {}", err);
+            log::error!("[trace_id {trace_id}] get file list error: {err}");
             return Err(DataFusionError::Execution(
                 "get file list error".to_string(),
             ));

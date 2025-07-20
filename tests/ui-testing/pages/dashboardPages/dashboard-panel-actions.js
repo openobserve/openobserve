@@ -10,6 +10,12 @@ export default class DashboardactionPage {
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
   }
 
+  // Generate a unique panel name
+  generateUniquePanelName(prefix = "panel") {
+    const randomStr = Math.random().toString(36).substr(2, 5);
+    return `${prefix}_${Date.now()}_${randomStr}`;
+  }
+
   // Add panel name
   async addPanelName(panelName) {
     await this.panelNameInput.click();
@@ -18,6 +24,7 @@ export default class DashboardactionPage {
 
   // Save panel button
   async savePanel() {
+    await this.panelSaveBtn.waitFor({ state: "visible" });
     await this.panelSaveBtn.click();
   }
 

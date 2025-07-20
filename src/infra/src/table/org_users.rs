@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -466,7 +466,7 @@ pub async fn len() -> usize {
     match len {
         Ok(len) => len as usize,
         Err(e) => {
-            log::error!("org_users len error: {}", e);
+            log::error!("org_users len error: {e}");
             0
         }
     }

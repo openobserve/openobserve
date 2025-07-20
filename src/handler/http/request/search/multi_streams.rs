@@ -20,7 +20,7 @@ use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
-        function::VRLResultResolver,
+        function::{RESULT_ARRAY, VRLResultResolver},
         search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
@@ -32,6 +32,8 @@ use config::{
 use hashbrown::HashMap;
 use infra::errors;
 use tracing::{Instrument, Span};
+#[cfg(feature = "cloud")]
+use {crate::service::organization::is_org_in_free_trial_period, actix_web::http::StatusCode};
 
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::get_cipher_key_names;
@@ -135,6 +137,25 @@ pub async fn search_multi(
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
+    #[cfg(feature = "cloud")]
+    {
+        match is_org_in_free_trial_period(&org_id).await {
+            Ok(false) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    format!("org {org_id} has expired its trial period"),
+                )));
+            }
+            Err(e) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    e.to_string(),
+                )));
+            }
+            _ => {}
+        }
+    }
+
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
@@ -161,10 +182,10 @@ pub async fn search_multi(
         .as_ref()
         .and_then(|v| base64::decode_url(v).ok());
 
-    if let Some(vrl_function) = &query_fn {
-        if !vrl_function.trim().ends_with('.') {
-            query_fn = Some(format!("{} \n .", vrl_function));
-        }
+    if let Some(vrl_function) = &query_fn
+        && !vrl_function.trim().ends_with('.')
+    {
+        query_fn = Some(format!("{vrl_function} \n ."));
     }
 
     let mut range_error = String::new();
@@ -265,7 +286,7 @@ pub async fn search_multi(
                 }
             };
             if !keys_used.is_empty() {
-                log::info!("keys used : {:?}", keys_used);
+                log::info!("keys used : {keys_used:?}");
             }
             // Check permissions on stream ends
             // Check permissions on keys
@@ -306,7 +327,7 @@ pub async fn search_multi(
             req.query.query_fn = query_fn.clone();
         }
         for fn_name in functions::get_all_transform_keys(&org_id).await {
-            if req.query.sql.contains(&format!("{}(", fn_name)) {
+            if req.query.sql.contains(&format!("{fn_name}(")) {
                 req.query.uses_zo_fn = true;
                 break;
             }
@@ -314,6 +335,11 @@ pub async fn search_multi(
 
         // add search type to request
         req.search_type = search_type;
+        if let Ok(sql) =
+            config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql)
+        {
+            req.query.sql = sql;
+        }
 
         let trace_id = trace_id.clone();
         // do search
@@ -324,6 +350,7 @@ pub async fn search_multi(
             Some(user_id.to_string()),
             &req,
             range_error.clone(),
+            false,
         )
         .instrument(http_span.clone())
         .await;
@@ -390,7 +417,7 @@ pub async fn search_multi(
                 }
                 multi_res.from = res.from;
                 multi_res.size += res.size;
-                multi_res.file_count += res.file_count;
+                multi_res.scan_files += res.scan_files;
                 multi_res.scan_size += res.scan_size;
                 multi_res.scan_records += res.scan_records;
                 multi_res.columns.extend(res.columns);
@@ -442,33 +469,30 @@ pub async fn search_multi(
                     ])
                     .inc();
 
-                log::error!("search error: {:?}", err);
+                log::error!("search error: {err:?}");
                 multi_res.function_error =
                     vec![multi_res.function_error.join(", "), err.to_string()];
-                if let errors::Error::ErrorCode(code) = err {
-                    if let errors::ErrorCodes::SearchCancelQuery(_) = code {
-                        return Ok(HttpResponse::TooManyRequests().json(
-                            meta::http::HttpResponse::error_code_with_trace_id(
-                                &code,
-                                Some(trace_id),
-                            ),
-                        ));
-                    }
+                if let errors::Error::ErrorCode(code) = err
+                    && let errors::ErrorCodes::SearchCancelQuery(_) = code
+                {
+                    return Ok(HttpResponse::TooManyRequests().json(
+                        meta::http::HttpResponse::error_code_with_trace_id(&code, Some(trace_id)),
+                    ));
                 }
             }
         }
     }
 
     let mut report_function_usage = false;
-    multi_res.hits = if query_fn.is_some() && per_query_resp {
+    multi_res.hits = if let Some(input_fn) = query_fn.as_ref()
+        && per_query_resp
+    {
         // compile vrl function & apply the same before returning the response
-        let mut input_fn = query_fn.unwrap().trim().to_string();
+        let mut input_fn = input_fn.trim().to_string();
 
-        let apply_over_hits = SearchService::RESULT_ARRAY.is_match(&input_fn);
+        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
         if apply_over_hits {
-            input_fn = SearchService::RESULT_ARRAY
-                .replace(&input_fn, "")
-                .to_string();
+            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
         }
         let mut runtime = crate::common::utils::functions::init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, &org_id) {
@@ -481,7 +505,7 @@ pub async fn search_multi(
                 Some(program)
             }
             Err(err) => {
-                log::error!("[trace_id {trace_id}] search->vrl: compile err: {:?}", err);
+                log::error!("[trace_id {trace_id}] search->vrl: compile err: {err:?}");
                 multi_res.function_error =
                     vec![multi_res.function_error.join(", "), err.to_string()];
                 None
@@ -677,6 +701,25 @@ pub async fn _search_partition_multi(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
+    #[cfg(feature = "cloud")]
+    {
+        match is_org_in_free_trial_period(&org_id).await {
+            Ok(false) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    format!("org {org_id} has expired its trial period"),
+                )));
+            }
+            Err(e) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    e.to_string(),
+                )));
+            }
+            _ => {}
+        }
+    }
+
     let req: search::MultiSearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => {
@@ -739,7 +782,7 @@ pub async fn _search_partition_multi(
                     "",
                 ])
                 .inc();
-            log::error!("search error: {:?}", err);
+            log::error!("search error: {err:?}");
             Ok(map_error_to_http_response(&err, Some(trace_id)))
         }
     }
@@ -819,7 +862,7 @@ pub async fn around_multi(
 
     let mut around_sqls = stream_names
         .iter()
-        .map(|name| format!("SELECT * FROM \"{}\" ", name))
+        .map(|name| format!("SELECT * FROM \"{name}\" "))
         .collect::<Vec<String>>();
     if let Some(v) = query.get("sql") {
         let sqls = v.split(',').collect::<Vec<&str>>();
@@ -841,7 +884,7 @@ pub async fn around_multi(
         ..Default::default()
     };
     for (i, stream_name) in stream_names.iter().enumerate() {
-        let trace_id = format!("{}-{}", trace_id, i);
+        let trace_id = format!("{trace_id}-{i}");
         let search_res = super::around::around(
             &trace_id,
             http_span.clone(),
@@ -878,7 +921,7 @@ pub async fn around_multi(
                         "",
                     ])
                     .inc();
-                log::error!("multi search around error: {:?}", err);
+                log::error!("multi search around error: {err:?}");
                 return Ok(map_error_to_http_response(&err, Some(trace_id)));
             }
         };

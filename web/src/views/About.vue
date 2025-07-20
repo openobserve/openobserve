@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <img
         :src="
           store.state.theme == 'dark'
-            ? getImageURL('images/common/open_observe_logo_2.svg')
-            : getImageURL('images/common/open_observe_logo.svg')
+            ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+            : getImageURL('images/common/openobserve_latest_light_2.svg')
         "
         class="logo"
         width="177"
@@ -37,6 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t("about.version") }}:</span
         >
         {{ store.state.zoConfig.version }}
+      </div>
+      <div class="tw-capitalize">
+        <span class="inline-block text-bold" style="width: 100px"
+          >{{ t("about.buildType") }}:</span
+        >
+        {{ store.state.zoConfig.build_type }}
       </div>
       <div>
         <span class="inline-block text-bold" style="width: 100px"
@@ -85,6 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         along with their respective licenses.
       </p>
+      <br />
+      <p v-if="store.state.zoConfig.build_type == 'opensource'">You are using the open source version of OpenObserve, which is available under the <a href="https://github.com/openobserve/openobserve/blob/main/LICENSE" target="_blank" class="hover:tw-underline text-primary">GNU Affero General Public License (AGPL)</a>. By continuing to use OpenObserve, you acknowledge and agree to comply with the terms of the AGPL license.</p>
+      <p v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'">You are using the Enterprise version of OpenObserve, which is governed by either the standard <a href="https://openobserve.ai/enterprise-license/" target="_blank" class="hover:tw-underline text-primary">enterprise license</a> or a separate enterprise license agreement between you/your organization and OpenObserve Inc. By continuing to use the Enterprise version, you acknowledge and agree to comply with the applicable licensing terms.</p>
     </div>
   </q-page>
 </template>
@@ -94,6 +103,7 @@ import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { getImageURL } from "../utils/zincutils";
 import { useI18n } from "vue-i18n";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "PageAbout",
@@ -105,6 +115,7 @@ export default defineComponent({
     return {
       t,
       store,
+      config,
       pageData,
       getImageURL,
     };
@@ -122,7 +133,8 @@ export default defineComponent({
   }
 
   .logo {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.1rem;
+    margin-left: -0.5rem;
     display: block;
   }
 

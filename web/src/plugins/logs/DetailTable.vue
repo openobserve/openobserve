@@ -51,6 +51,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="table"
             :label="t('common.table')"
           />
+          <q-btn
+            :ripple="false"
+            @click.prevent.stop="sendToAiChat(JSON.stringify(rowData))"
+            data-test="menu-link-ai-item"
+            no-caps
+            :borderless="true"
+            flat
+            size="6px"
+            class="tw-px-2 tw-py-2"
+            dense
+            style="border-radius: 100%;"
+          >
+            <div class="row items-center no-wrap">
+              <img :src="getBtnLogo" class="header-icon ai-icon" />
+            </div>
+          </q-btn>
         </q-tabs>
       </div>
       <div
@@ -89,6 +105,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @add-field-to-table="addFieldToTable"
             @add-search-term="toggleIncludeSearchTerm"
             @view-trace="viewTrace"
+            @send-to-ai-chat="sendToAiChat"
+            @closeTable="closeTable"
           />
         </q-card-section>
       </q-tab-panel>
@@ -288,7 +306,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-show="
             streamType !== 'enrichment_tables' &&
-            searchObj.data.stream.selectedStream.length <= 1
+            searchObj.data.stream.selectedStream.length <= 1 &&
+            hasAggregationQuery == false
           "
           class="col-8 row justify-center align-center q-gutter-sm"
         >
@@ -335,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -363,6 +382,8 @@ export default defineComponent({
     "search:timeboxed",
     "add:table",
     "view-trace",
+    "sendToAiChat",
+    "closeTable"
   ],
   props: {
     modelValue: {
@@ -414,9 +435,13 @@ export default defineComponent({
     const selectedRelativeValue = ref("10");
     const recordSizeOptions: any = ref([10, 20, 50, 100, 200, 500, 1000]);
     const shouldWrapValues: any = ref(true);
-    const { searchObj } = useLogs();
+    const { searchObj, fnParsedSQL, hasAggregation } = useLogs();
     const $q = useQuasar();
     let multiStreamFields: any = ref([]);
+    let hasAggregationQuery: any = computed(() => {
+      let parsedSQL = fnParsedSQL();
+      return hasAggregation(parsedSQL?.columns);
+    });
 
     onBeforeMount(() => {
       if (window.localStorage.getItem("wrap-log-details") === null) {
@@ -476,6 +501,18 @@ export default defineComponent({
       emit("view-trace");
     };
 
+    const sendToAiChat = (value: any) => {
+      emit("sendToAiChat", value);
+      emit("closeTable");
+    };
+    const getBtnLogo = computed(() => {
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    });
+    const closeTable = () => {
+      emit("closeTable");
+    }
     return {
       t,
       store,
@@ -493,6 +530,10 @@ export default defineComponent({
       searchObj,
       multiStreamFields,
       viewTrace,
+      hasAggregationQuery,
+      sendToAiChat,
+      getBtnLogo,
+      closeTable
     };
   },
   async created() {

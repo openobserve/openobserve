@@ -26,7 +26,6 @@ import i18n from "./locales";
 import "./styles/quasar-overrides.scss";
 import "./styles/tailwind.css";
 import config from "./aws-exports";
-import SearchPlugin from "./plugins/index";
 import configService from "./services/config";
 
 import { openobserveRum } from "@openobserve/browser-rum";
@@ -47,7 +46,7 @@ app
 
 // const router = createRouter(store);
 app.use(store).use(router);
-app.use(SearchPlugin);
+// app.use(SearchPlugin);
 
 const getConfig = async () => {
   await configService.get_config().then((res: any) => {

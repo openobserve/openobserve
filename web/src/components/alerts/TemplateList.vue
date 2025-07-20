@@ -16,10 +16,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
-    <div v-if="!showImportTemplate && !showTemplateEditor">
+    <div v-if="!showImportTemplate && !showTemplateEditor" style="height: calc(100vh - 112px); overflow-y: auto;">
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
+      :class="store.state.theme == 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+      >
+        <div class="q-table__title" data-test="alert-templates-list-title">
+            {{ t("alert_templates.header") }}
+          </div>
+          <div class="tw-flex tw-justify-end">
+          <q-input
+            data-test="template-list-search-input"
+            v-model="filterQuery"
+            borderless
+            filled
+            dense
+            class="q-ml-auto q-mb-xs no-border"
+            :placeholder="t('alert_templates.search')"
+          >
+            <template #prepend>
+              <q-icon name="search" class="cursor-pointer" />
+            </template>
+          </q-input>
+          <q-btn
+            class="q-ml-md text-bold"
+            padding="sm lg"
+            outline
+            no-caps
+            :label="t(`dashboard.import`)"
+            @click="importTemplate"
+            data-test="template-import"
+          />
+          <q-btn
+            data-test="alert-template-list-add-alert-btn"
+            class="q-ml-md q-mb-xs text-bold no-border"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            :label="t(`alert_templates.add`)"
+            @click="editTemplate(null)"
+          />
+        </div>
+      </div>
       <q-table
         data-test="alert-templates-list-table"
-        ref="q-table"
+        ref="qTableRef"
         :rows="templates"
         :columns="columns"
         row-key="id"
@@ -28,6 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pagination="pagination"
         :filter="filterQuery"
         :filter-method="filterData"
+        class="o2-quasar-table"
+        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
       >
         <template #no-data>
           <NoData />
@@ -72,42 +114,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></q-btn>
           </q-td>
         </template>
-        <template #top>
-          <div class="q-table__title" data-test="alert-templates-list-title">
-            {{ t("alert_templates.header") }}
-          </div>
-          <q-input
-            data-test="template-list-search-input"
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('alert_templates.search')"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
-          <q-btn
-            class="q-ml-md text-bold"
-            padding="sm lg"
-            outline
-            no-caps
-            :label="t(`dashboard.import`)"
-            @click="importTemplate"
-            data-test="template-import"
-          />
-          <q-btn
-            data-test="alert-template-list-add-alert-btn"
-            class="q-ml-md q-mb-xs text-bold no-border"
-            padding="sm lg"
-            color="secondary"
-            no-caps
-            :label="t(`alert_templates.add`)"
-            @click="editTemplate(null)"
+        <template #top="scope">
+          <QTablePagination
+            :scope="scope"
+            :pageTitle="t('alert_templates.header')"
+            :position="'top'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
           />
         </template>
+        <template #bottom="scope">
+          <q-table-pagination
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
+        </template>
+        <template v-slot:header="props">
+            <q-tr :props="props">
+              <!-- render the table headers -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
       </q-table>
     </div>
     <div v-else-if="!showImportTemplate && showTemplateEditor">
@@ -143,6 +182,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ImportTemplate from "./ImportTemplate.vue";
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
 
 const AddTemplate = defineAsyncComponent(
   () => import("@/components/alerts/AddTemplate.vue"),
@@ -159,6 +199,7 @@ const columns: any = ref<QTableProps["columns"]>([
     label: "#",
     field: "#",
     align: "left",
+    style: "width: 67px",
   },
   {
     name: "name",
@@ -173,19 +214,35 @@ const columns: any = ref<QTableProps["columns"]>([
     label: t("alert_templates.actions"),
     align: "center",
     sortable: false,
-    style: "width: 110px",
+    classes:'actions-column'
   },
 ]);
 const showTemplateEditor = ref(false);
 const showImportTemplate = ref(false);
 const editingTemplate: Ref<TemplateData | null> = ref(null);
+  const perPageOptions: any = [
+  { label: "5", value: 5 },
+  { label: "10", value: 10 },
+  { label: "20", value: 20 },
+  { label: "50", value: 50 },
+  { label: "100", value: 100 }
+];
+const resultTotal = ref<number>(0);
+const selectedPerPage = ref<number>(20);
+const qTableRef = ref<any>(null);
+
 const confirmDelete: Ref<{
   visible: boolean;
   data: any;
 }> = ref({ visible: false, data: null });
-const pagination = {
+const pagination: any = ref({
   page: 1,
-  rowsPerPage: 0, // 0 means all rows
+  rowsPerPage: 20, // 0 means all rows
+});
+const changePagination = (val: { label: string; value: any }) => {
+  selectedPerPage.value = val.value;
+  pagination.value.rowsPerPage = val.value;
+  qTableRef.value?.setPagination(pagination.value);
 };
 const filterQuery = ref("");
 onActivated(() => {
@@ -216,6 +273,7 @@ const getTemplates = () => {
       org_identifier: store.state.selectedOrganization.identifier,
     })
     .then((res) => {
+      resultTotal.value = res.data.length;
       templates.value = res.data.map((data: any, index: number) => ({
         ...data,
         "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
@@ -346,6 +404,7 @@ const filterData = (rows: any, terms: any) => {
       filtered.push(rows[i]);
     }
   }
+  resultTotal.value = filtered.length;
   return filtered;
 };
 const exportTemplate = (row: any) => {

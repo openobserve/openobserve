@@ -1,3 +1,5 @@
+//dashboard variables page object
+//methods: addDashboardVariable, selectValueFromVariableDropDown
 import { expect } from "@playwright/test";
 
 export default class DashboardVariables {
@@ -5,6 +7,8 @@ export default class DashboardVariables {
     this.page = page;
   }
 
+  // Method to add a dashboard variable
+  // Parameters: name, streamtype, streamName, field
   async addDashboardVariable(name, streamtype, streamName, field) {
     // Open Variable Tab
     await this.page
@@ -17,8 +21,11 @@ export default class DashboardVariables {
 
     // Select Stream Type
     await this.page
-      .locator('[data-test="dashboard-variable-stream-type-select"]')
+      .locator(
+        'div.row label:has-text("Stream Type") >> [data-test="dashboard-variable-stream-type-select"]'
+      )
       .click();
+
     await this.page
       .getByRole("option", { name: streamtype, exact: true })
       .locator("div")

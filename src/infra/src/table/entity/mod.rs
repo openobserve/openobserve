@@ -12,6 +12,8 @@ pub mod folders;
 pub mod org_users;
 pub mod organizations;
 pub mod rate_limit_rules;
+pub mod report_dashboards;
+pub mod reports;
 pub mod search_job_partitions;
 pub mod search_job_results;
 pub mod search_jobs;

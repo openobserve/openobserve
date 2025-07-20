@@ -25,7 +25,10 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 #[cfg(feature = "cloud")]
 use {
     crate::common::meta::organization::OrganizationInvites,
-    o2_enterprise::enterprise::cloud::billings as cloud_billings,
+    crate::common::meta::organization::{
+        AllOrgListDetails, AllOrganizationResponse, ExtendTrialPeriodRequest,
+    },
+    o2_enterprise::enterprise::cloud::list_customer_billings,
 };
 
 use crate::{
@@ -82,8 +85,8 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
         let Ok(records) = organization::list_all_orgs(limit).await else {
             return Ok(
                 HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    "Something went wrong".to_string(),
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "Something went wrong",
                 )),
             );
         };
@@ -91,20 +94,36 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
     } else {
         let Ok(records) = organization::list_orgs_by_user(user_id).await else {
             return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                http::StatusCode::NOT_FOUND.into(),
-                "Something went wrong".to_string(),
+                http::StatusCode::NOT_FOUND,
+                "Something went wrong",
             )));
         };
         records
     };
+
+    #[cfg(feature = "cloud")]
+    let all_subscriptions = match list_customer_billings().await {
+        Ok(orgs) => orgs
+            .into_iter()
+            .map(|cb| (cb.org_id, cb.subscription_type as i32))
+            .collect::<HashMap<_, _>>(),
+        Err(e) => {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    e.to_string(),
+                )),
+            );
+        }
+    };
+
     for org in all_orgs {
         id += 1;
         #[cfg(feature = "cloud")]
-        let org_subscription: i32 =
-            cloud_billings::get_org_subscription_type(org.identifier.as_str(), user_id)
-                .await
-                .map(|sub_type| sub_type as i32)
-                .unwrap_or_default();
+        let org_subscription: i32 = all_subscriptions
+            .get(&org.identifier)
+            .cloned()
+            .unwrap_or_default();
         #[cfg(not(feature = "cloud"))]
         let org_subscription = 0;
         let org = OrgDetails {
@@ -125,6 +144,94 @@ pub async fn organizations(user_email: UserEmail, req: HttpRequest) -> Result<Ht
     }
     orgs.sort_by(|a, b| a.name.cmp(&b.name));
     let org_response = OrganizationResponse { data: orgs };
+
+    Ok(HttpResponse::Ok().json(org_response))
+}
+
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "GetAllOrganizations",
+    security(
+        ("Authorization"= [])
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = AllOrganizationResponse),
+    )
+)]
+#[get("/{org_id}/organizations")]
+pub async fn all_organizations(
+    org_id: web::Path<String>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let org = org_id.into_inner();
+    if org != "_meta" {
+        return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+            http::StatusCode::UNAUTHORIZED,
+            "not authorized to access this resource".to_string(),
+        )));
+    }
+
+    let mut orgs = vec![];
+    let mut org_names = HashSet::new();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let limit = query
+        .get("page_size")
+        .unwrap_or(&"100".to_string())
+        .parse::<i64>()
+        .ok();
+
+    let all_orgs = match infra::table::organizations::list(limit).await {
+        Ok(orgs) => orgs,
+        Err(e) => {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    e.to_string(),
+                )),
+            );
+        }
+    };
+
+    let all_subscriptions = match list_customer_billings().await {
+        Ok(orgs) => orgs
+            .into_iter()
+            .map(|cb| (cb.org_id, cb.subscription_type as i32))
+            .collect::<HashMap<_, _>>(),
+        Err(e) => {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    e.to_string(),
+                )),
+            );
+        }
+    };
+
+    let mut id = 1;
+    for org in all_orgs {
+        let org = AllOrgListDetails {
+            id,
+            identifier: org.identifier.clone(),
+            name: org.org_name,
+            org_type: org.org_type.to_string(),
+            plan: all_subscriptions
+                .get(&org.identifier)
+                .cloned()
+                .unwrap_or_default(),
+            created_at: org.created_at,
+            updated_at: org.updated_at,
+            trial_expires_at: Some(org.trial_ends_at),
+        };
+        if !org_names.contains(&org.identifier) {
+            org_names.insert(org.identifier.clone());
+            orgs.push(org);
+            id += 1;
+        }
+    }
+    orgs.sort_by(|a, b| a.name.cmp(&b.name));
+    let org_response = AllOrganizationResponse { data: orgs };
 
     Ok(HttpResponse::Ok().json(org_response))
 }
@@ -184,10 +291,10 @@ async fn get_user_passcode(
     }
     match get_passcode(org_id, user_id).await {
         Ok(passcode) => Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode })),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => {
+            Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
+        }
     }
 }
 
@@ -222,10 +329,10 @@ async fn update_user_passcode(
     }
     match update_passcode(org_id, user_id).await {
         Ok(passcode) => Ok(HttpResponse::Ok().json(PasscodeResponse { data: passcode })),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => {
+            Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
+        }
     }
 }
 
@@ -260,10 +367,10 @@ async fn get_user_rumtoken(
     }
     match get_rum_token(org_id, user_id).await {
         Ok(rumtoken) => Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken })),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => {
+            Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
+        }
     }
 }
 
@@ -298,10 +405,10 @@ async fn update_user_rumtoken(
     }
     match update_rum_token(org_id, user_id).await {
         Ok(rumtoken) => Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken })),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => {
+            Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
+        }
     }
 }
 
@@ -336,10 +443,10 @@ async fn create_user_rumtoken(
     }
     match update_rum_token(org_id, user_id).await {
         Ok(rumtoken) => Ok(HttpResponse::Ok().json(RumIngestionResponse { data: rumtoken })),
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
+        Err(e) => {
+            Ok(HttpResponse::NotFound()
+                .json(MetaHttpResponse::error(http::StatusCode::NOT_FOUND, e)))
+        }
     }
 }
 
@@ -368,8 +475,58 @@ async fn create_org(
     let result = organization::create_org(&mut org, &user_email.user_id).await;
     match result {
         Ok(_) => Ok(HttpResponse::Ok().json(org)),
+        Err(err) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
+    }
+}
+
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "ExtendTrialPeriod",
+    security(
+        ("Authorization"= [])
+    ),
+    request_body(content = ExtendTrialPeriodRequest, description = "Extend free trial request", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "text"),
+    )
+)]
+#[put("/{org_id}/extend_trial_period")]
+async fn extend_trial_period(
+    org_id: web::Path<String>,
+    req: web::Json<ExtendTrialPeriodRequest>,
+) -> Result<HttpResponse, Error> {
+    let req = req.into_inner();
+    let org = org_id.into_inner();
+    if org != "_meta" {
+        return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+            http::StatusCode::UNAUTHORIZED,
+            "not authorized to access this resource".to_string(),
+        )));
+    }
+
+    let org = match infra::table::organizations::get(&req.org_id).await {
+        Ok(org) => org,
+        Err(e) => {
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                http::StatusCode::NOT_FOUND,
+                e.to_string(),
+            )));
+        }
+    };
+    if org.trial_ends_at > req.new_end_date {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST,
+            "Existing trial end date is after the provided date".to_string(),
+        )));
+    }
+
+    match infra::table::organizations::set_trial_period_end(&req.org_id, req.new_end_date).await {
+        Ok(_) => Ok(HttpResponse::Ok().body("success")),
         Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
+            http::StatusCode::BAD_REQUEST,
             err.to_string(),
         ))),
     }
@@ -401,18 +558,16 @@ async fn rename_org(
     let new_name = new_name.into_inner().new_name;
     if new_name.is_empty() {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "New name cannot be empty".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "New name cannot be empty",
         )));
     }
 
     let result = organization::rename_org(&org, &new_name, &user_email.user_id).await;
     match result {
         Ok(org) => Ok(HttpResponse::Ok().json(org)),
-        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            err.to_string(),
-        ))),
+        Err(err) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
     }
 }
 
@@ -447,10 +602,8 @@ pub async fn get_org_invites(path: web::Path<String>) -> Result<HttpResponse, Er
                 .collect();
             Ok(HttpResponse::Ok().json(result))
         }
-        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            err.to_string(),
-        ))),
+        Err(err) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
     }
 }
 
@@ -482,10 +635,8 @@ pub async fn generate_org_invite(
     let result = organization::generate_invitation(&org, &user_email.user_id, invites).await;
     match result {
         Ok(org) => Ok(HttpResponse::Ok().json(org)),
-        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            err.to_string(),
-        ))),
+        Err(err) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
     }
 }
 
@@ -516,10 +667,8 @@ async fn accept_org_invite(
     let result = organization::accept_invitation(&user_email.user_id, &invite_token).await;
     match result {
         Ok(_) => Ok(MetaHttpResponse::ok("Invitation accepted successfully")),
-        Err(err) => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            err.to_string(),
-        ))),
+        Err(err) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
     }
 }
 
@@ -568,8 +717,8 @@ pub async fn node_list_impl(
     // Ensure this API is only available for the "_meta" organization
     if org_id != config::META_ORG_ID {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
-            "This API is only available for the _meta organization".to_string(),
+            http::StatusCode::FORBIDDEN,
+            "This API is only available for the _meta organization",
         )));
     }
 
@@ -650,8 +799,8 @@ async fn cluster_info(
     // Ensure this API is only available for the "_meta" organization
     if org != config::META_ORG_ID {
         return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-            http::StatusCode::FORBIDDEN.into(),
-            "This API is only available for the _meta organization".to_string(),
+            http::StatusCode::FORBIDDEN,
+            "This API is only available for the _meta organization",
         )));
     }
 
@@ -720,7 +869,7 @@ async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse,
     {
         Ok(nodes) => nodes,
         Err(e) => {
-            log::error!("Failed to get super clusters: {:?}", e);
+            log::error!("Failed to get super clusters: {e}");
             return Ok(response); // Return empty response instead of failing
         }
     };
@@ -739,12 +888,8 @@ async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse,
                 }
             }
             Err(e) => {
-                log::error!(
-                    "Failed to get node list from cluster {}: {:?}",
-                    cluster_name,
-                    e
-                );
-                return Err(anyhow::anyhow!("Failed to get node list: {:?}", e));
+                log::error!("Failed to get node list from cluster {cluster_name}: {e:?}");
+                return Err(anyhow::anyhow!("Failed to get node list: {e}"));
             }
         }
     }
@@ -790,7 +935,7 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
     {
         Ok(nodes) => nodes,
         Err(e) => {
-            log::error!("Failed to get super cluster nodes: {:?}", e);
+            log::error!("Failed to get super cluster nodes: {e}");
             return Ok(response); // Return empty response instead of failing
         }
     };
@@ -807,13 +952,9 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
                 response.add_cluster_info(cluster_info_obj, cluster_name.clone(), region.clone());
             }
             Err(e) => {
-                log::error!(
-                    "Failed to get cluster info from cluster {}: {:?}",
-                    cluster_name,
-                    e
-                );
+                log::error!("Failed to get cluster info from cluster {cluster_name}: {e:?}");
                 // Return error
-                return Err(anyhow::anyhow!("Failed to get cluster info: {:?}", e));
+                return Err(anyhow::anyhow!("Failed to get cluster info: {e}"));
             }
         }
     }

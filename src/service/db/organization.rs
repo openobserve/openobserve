@@ -38,7 +38,7 @@ pub const ORG_SETTINGS_KEY_PREFIX: &str = "/organization/setting";
 pub const ORG_KEY_PREFIX: &str = "/organization/org/";
 
 pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> errors::Result<()> {
-    let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_name);
+    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_name}");
     db::put(
         &key,
         json::to_vec(&setting).unwrap().into(),
@@ -57,17 +57,51 @@ pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> e
 }
 
 pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error> {
-    let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_id);
+    #[cfg(not(feature = "cloud"))]
+    let trial_period_expiry = None;
+    #[cfg(feature = "cloud")]
+    let trial_period_expiry = {
+        use o2_enterprise::enterprise::{
+            cloud::billings, common::config::get_config as get_o2_config,
+        };
+        let o2_config = get_o2_config();
+
+        // if trial period check is disabled, everything is free trial period
+        if !o2_config.cloud.trial_period_enabled || org_id == "_meta" {
+            None
+        } else {
+            // first check if the org is
+            let subscription = billings::get_billing_by_org_id(org_id).await.ok();
+            match subscription {
+                None | Some(None) => match infra::table::organizations::get(org_id).await {
+                    Ok(org) => Some(org.trial_ends_at),
+                    Err(_) => None,
+                },
+                Some(Some(s)) if s.subscription_type.is_free_sub() => {
+                    match infra::table::organizations::get(org_id).await {
+                        Ok(org) => Some(org.trial_ends_at),
+                        Err(_) => None,
+                    }
+                }
+                _ => None,
+            }
+        }
+    };
+
+    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
     if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
-        return Ok(v.clone());
+        let mut ret = v.clone();
+        ret.free_trial_expiry = trial_period_expiry;
+        return Ok(ret);
     }
     let _settings = db::get(&key).await?;
-    let settings: OrganizationSetting = json::from_slice(&_settings)?;
+    let mut settings: OrganizationSetting = json::from_slice(&_settings)?;
     // cache the org setting
     ORGANIZATION_SETTING
         .write()
         .await
         .insert(key.to_string(), settings.clone());
+    settings.free_trial_expiry = trial_period_expiry;
     Ok(settings)
 }
 
@@ -108,12 +142,12 @@ pub async fn org_settings_watch() -> Result<(), anyhow::Error> {
                 Ok(val) => match json::from_slice(&val) {
                     Ok(val) => val,
                     Err(e) => {
-                        log::error!("Error getting value: {}", e);
+                        log::error!("Error getting value: {e}");
                         continue;
                     }
                 },
                 Err(e) => {
-                    log::error!("Error getting value: {}", e);
+                    log::error!("Error getting value: {e}");
                     continue;
                 }
             };
@@ -162,7 +196,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 match get_org_from_db(item_key).await {
                     Ok(val) => val,
                     Err(e) => {
-                        log::error!("Error getting value: {}", e);
+                        log::error!("Error getting value: {e}");
                         continue;
                     }
                 }
@@ -190,7 +224,7 @@ pub async fn save_org(entry: &Organization) -> Result<(), anyhow::Error> {
     )
     .await
     {
-        log::error!("Error saving org: {}", e);
+        log::error!("Error saving org: {e}");
         return Err(anyhow::anyhow!("Error saving org: {}", e));
     }
 
@@ -207,11 +241,11 @@ pub async fn rename_org(org_id: &str, new_name: &str) -> Result<Organization, an
         return Err(anyhow::anyhow!("Organization name cannot be empty"));
     }
     if let Err(e) = organizations::rename(org_id, new_name).await {
-        log::error!("Error updating org: {}", e);
+        log::error!("Error updating org: {e}");
         return Err(anyhow::anyhow!("Error updating org: {}", e));
     }
     let org = get_org(org_id).await?;
-    let key = format!("{}{}", ORG_KEY_PREFIX, org_id);
+    let key = format!("{ORG_KEY_PREFIX}{org_id}");
     let _ = put_into_db_coordinator(&key, json::to_vec(&org).unwrap().into(), true, None).await;
 
     #[cfg(feature = "enterprise")]
@@ -246,11 +280,11 @@ pub async fn get_org(org_id: &str) -> Result<Organization, anyhow::Error> {
 
 pub async fn delete_org(org_id: &str) -> Result<(), anyhow::Error> {
     if let Err(e) = organizations::remove(org_id).await {
-        log::error!("Error deleting org: {}", e);
+        log::error!("Error deleting org: {e}");
         return Err(anyhow::anyhow!("Error deleting org: {}", e));
     }
     #[cfg(feature = "enterprise")]
-    super_cluster::organization_delete(&format!("{}{}", ORG_KEY_PREFIX, org_id)).await?;
+    super_cluster::organization_delete(&format!("{ORG_KEY_PREFIX}{org_id}")).await?;
     Ok(())
 }
 

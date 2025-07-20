@@ -96,7 +96,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
         let updated_at_utc: Option<DateTime<FixedOffset>> = value
             .updated_at
             .and_then(|secs| Utc.timestamp_opt(secs, 0).single())
-            .map(|dt| dt.into());
+            .map(|dt: DateTime<Utc>| dt.into());
 
         let mut alert: MetaAlert = Default::default();
         alert.id = Some(id);
@@ -313,7 +313,7 @@ pub async fn create<C: TransactionTrait>(
     let alert_m: alerts::Model = alert_am.insert(&txn).await?.try_into_model()?;
     let alert = alert_m.try_into()?;
     txn.commit().await?;
-    log::debug!("Alert created: {:?}", alert);
+    log::debug!("Alert created: {alert:?}");
     Ok(alert)
 }
 

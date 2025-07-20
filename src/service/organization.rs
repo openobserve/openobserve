@@ -24,7 +24,7 @@ use config::{
     },
     utils::rand::generate_random_string,
 };
-use infra::table;
+use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
 #[cfg(feature = "cloud")]
@@ -38,6 +38,8 @@ use {
     o2_enterprise::enterprise::cloud::{OrgInviteStatus, org_invites},
 };
 
+#[cfg(feature = "cloud")]
+use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
 use crate::{
     common::{
         meta::organization::{
@@ -166,8 +168,8 @@ async fn update_passcode_inner(
         return Err(anyhow::Error::msg("User not found"));
     };
 
-    if org_id.is_some() {
-        local_org_id = org_id.unwrap();
+    if let Some(org_id) = org_id {
+        local_org_id = org_id;
     }
     let token = generate_random_string(16);
     let rum_token = format!("rum{}", generate_random_string(16));
@@ -229,6 +231,12 @@ pub async fn list_orgs_by_user(user_email: &str) -> Result<Vec<Organization>, an
         .collect())
 }
 
+pub async fn list_org_users_by_user(
+    user_email: &str,
+) -> Result<Vec<UserOrgExpandedRecord>, anyhow::Error> {
+    db::org_users::list_orgs_by_user(user_email).await
+}
+
 /// Always creates a new org. Also, makes the user an admin of the org
 pub async fn create_org(
     org: &mut Organization,
@@ -249,13 +257,6 @@ pub async fn create_org(
     }
     org.name = org.name.trim().to_owned();
 
-    #[cfg(feature = "cloud")]
-    if !is_root_user(user_email) && !is_add_user_allowed_for_org(None, user_email).await {
-        return Err(anyhow::anyhow!(
-            "User can not be member of more than one free organization"
-        ));
-    }
-
     org.identifier = ider::uuid();
     #[cfg(not(feature = "cloud"))]
     let org_type = CUSTOM.to_owned();
@@ -266,10 +267,20 @@ pub async fn create_org(
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
             add_admin_to_org(&org.identifier, user_email).await?;
+            #[cfg(feature = "cloud")]
+            enqueue_cloud_event(CloudEvent {
+                org_id: org.identifier.clone(),
+                org_name: org.name.clone(),
+                org_type: org.org_type.clone(),
+                user: Some(user_email.to_string()),
+                event: EventType::OrgCreated,
+                subscription_type: None,
+            })
+            .await;
             Ok(org.clone())
         }
         Err(e) => {
-            log::error!("Error creating org: {}", e);
+            log::error!("Error creating org: {e}");
             Err(anyhow::anyhow!("Error creating org: {}", e))
         }
     }
@@ -295,10 +306,20 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
     match db::organization::save_org(org).await {
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
+            #[cfg(feature = "cloud")]
+            enqueue_cloud_event(CloudEvent {
+                org_id: org.identifier.clone(),
+                org_name: org.name.clone(),
+                org_type: org.org_type.clone(),
+                user: None,
+                subscription_type: None,
+                event: EventType::OrgCreated,
+            })
+            .await;
             Ok(org.clone())
         }
         Err(e) => {
-            log::error!("Error creating org: {}", e);
+            log::error!("Error creating org: {e}");
             Err(anyhow::anyhow!("Error creating org: {}", e))
         }
     }
@@ -324,7 +345,7 @@ pub async fn check_and_create_org_without_ofga(
     match db::organization::save_org(org).await {
         Ok(_) => Ok(org.clone()),
         Err(e) => {
-            log::error!("Error creating org: {}", e);
+            log::error!("Error creating org: {e}");
             Err(anyhow::anyhow!("Error creating org: {}", e))
         }
     }
@@ -355,7 +376,7 @@ pub async fn rename_org(
     match db::organization::rename_org(org_id, name).await {
         Ok(org) => Ok(org),
         Err(e) => {
-            log::error!("Error creating org: {}", e);
+            log::error!("Error creating org: {e}");
             Err(anyhow::anyhow!("Error creating org: {}", e))
         }
     }
@@ -365,16 +386,30 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
     if org_id.eq(DEFAULT_ORG) {
         return Err(anyhow::anyhow!("Cannot delete default organization"));
     }
-    if get_org(org_id).await.is_none() {
-        return Err(anyhow::anyhow!("Organization does not exist"));
-    }
+
     match db::organization::delete_org(org_id).await {
         Ok(_) => {
             delete_org_tuples(org_id).await;
+            #[cfg(feature = "cloud")]
+            {
+                let org = match get_org(org_id).await {
+                    Some(org) => org,
+                    None => return Err(anyhow::anyhow!("Organization does not exist")),
+                };
+                enqueue_cloud_event(CloudEvent {
+                    org_id: org.identifier.clone(),
+                    org_name: org.name.clone(),
+                    org_type: org.org_type.clone(),
+                    user: None,
+                    subscription_type: None,
+                    event: EventType::OrgDeleted,
+                })
+                .await;
+            }
             Ok(())
         }
         Err(e) => {
-            log::error!("Error deleting org: {}", e);
+            log::error!("Error deleting org: {e}");
             Err(anyhow::anyhow!("Error deleting org: {}", e))
         }
     }
@@ -480,22 +515,24 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
 
     use crate::service::db::org_users::get_cached_user_org;
 
-    let invite = org_invites::get_by_token_user(invite_token, user_email).await?;
+    let invite = org_invites::get_by_token_user(invite_token, user_email)
+        .await
+        .map_err(|e| {
+            log::info!("error getting token {invite_token} for email {user_email} : {e}");
+            anyhow::anyhow!("Provided Token is not valid for this email id")
+        })?;
 
     let now = chrono::Utc::now().timestamp_micros();
-    if !is_add_user_allowed_for_org(Some(&invite.org_id), user_email).await {
-        return Err(anyhow::anyhow!(
-            "User is already part of a free organization"
-        ));
-    }
+
     if invite.expires_at < now {
         return Err(anyhow::anyhow!("Invalid token"));
     }
     let org_id = invite.org_id.clone();
 
-    if get_org(&org_id).await.is_none() {
-        return Err(anyhow::anyhow!("Organization doesn't exist"));
-    }
+    let org = match get_org(&org_id).await {
+        Some(org) => org,
+        None => return Err(anyhow::anyhow!("Organization doesn't exist")),
+    };
 
     // Check if user is already part of the org
     if get_cached_user_org(&org_id, user_email).is_some() {
@@ -522,56 +559,48 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     {
         log::error!("Error updating the invite status in the db: {e}");
     }
+    enqueue_cloud_event(CloudEvent {
+        org_id: org.identifier.clone(),
+        org_name: org.name.clone(),
+        org_type: org.org_type.clone(),
+        user: Some(user_email.to_string()),
+        event: EventType::UserJoined,
+        subscription_type: None,
+    })
+    .await;
     Ok(())
-}
-
-#[cfg(feature = "cloud")]
-pub async fn is_add_user_allowed_for_org(org_id: Option<&str>, user_email: &str) -> bool {
-    use o2_enterprise::enterprise::cloud::billings as cloud_billings;
-
-    if let Some(org) = org_id {
-        let cb = cloud_billings::get_subscription(user_email, org)
-            .await
-            .unwrap_or_default();
-        if let Some(billing) = cb {
-            if !billing.subscription_type.is_free_sub() {
-                return true;
-            }
-        }
-    };
-
-    let mut is_already_a_free_org = false;
-    let member_orgs = list_orgs_by_user(user_email).await.unwrap_or_default();
-    for member_org in member_orgs {
-        // skip the org we are trying to add the user in
-        if let Some(org) = org_id {
-            if member_org.identifier == org {
-                continue;
-            }
-        }
-        let org_sub = cloud_billings::get_subscription(user_email, &member_org.identifier)
-            .await
-            .unwrap_or_default();
-        match org_sub {
-            Some(sub) => {
-                if sub.subscription_type.is_free_sub() {
-                    is_already_a_free_org = true;
-                    break;
-                }
-            }
-            None => {
-                // if there is no subscription record for that org, then that org is on free plan
-                is_already_a_free_org = true;
-                break;
-            }
-        }
-    }
-
-    !is_already_a_free_org
 }
 
 pub async fn get_org(org: &str) -> Option<Organization> {
     db::organization::get_org(org).await.ok()
+}
+
+#[cfg(feature = "cloud")]
+pub async fn is_org_in_free_trial_period(org_id: &str) -> Result<bool, anyhow::Error> {
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+    let o2_config = get_o2_config();
+
+    // if trial period check is disabled, everything is free trial period
+    if !o2_config.cloud.trial_period_enabled {
+        return Ok(true);
+    }
+
+    // exception for meta org
+    if org_id == "_meta" {
+        return Ok(true);
+    }
+    use o2_enterprise::enterprise::cloud::billings;
+    // first check if the org is
+    let subscription = billings::get_billing_by_org_id(org_id).await?;
+
+    if subscription.is_none() || subscription.unwrap().subscription_type.is_free_sub() {
+        let org = infra::table::organizations::get(org_id).await?;
+        let now = Utc::now().timestamp_micros();
+        if now > org.trial_ends_at {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 #[cfg(test)]

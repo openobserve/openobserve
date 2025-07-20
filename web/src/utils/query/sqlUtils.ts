@@ -296,6 +296,27 @@ export function extractFields(parsedAst: any, timeField: string) {
         column?.expr?.args?.value[0]?.column?.expr?.value ?? timeField;
       field.aggregationFunction =
         column?.expr?.name?.name[0]?.value?.toLowerCase() ?? "histogram";
+
+      if (field.aggregationFunction === "approx_percentile_cont") {
+        // check 2nd argument of function
+        if (
+          column?.expr?.args?.value[1]?.value === "0.5" ||
+          column?.expr?.args?.value[1]?.value === "0.50"
+        ) {
+          field.aggregationFunction = "p50";
+        } else if (
+          column?.expr?.args?.value[1]?.value === "0.9" ||
+          column?.expr?.args?.value[1]?.value === "0.90"
+        ) {
+          field.aggregationFunction = "p90";
+        } else if (column?.expr?.args?.value[1]?.value === "0.95") {
+          field.aggregationFunction = "p95";
+        } else if (column?.expr?.args?.value[1]?.value === "0.99") {
+          field.aggregationFunction = "p99";
+        } else {
+          throw new Error("Unsupported percentile value");
+        }
+      }
     }
 
     field.alias = column?.as ?? field?.column ?? timeField;
@@ -684,53 +705,57 @@ export const changeHistogramInterval = async (
   query: any,
   histogramInterval: any,
 ) => {
-  // if histogramInterval is null or query is null or query is empty, return query
-  if (query === null || query === "") {
-    return query;
-  }
+  try {
+    // if histogramInterval is null or query is null or query is empty, return query
+    if (query === null || query === "") {
+      return query;
+    }
 
-  await importSqlParser();
-  const ast: any = parser.astify(query);
+    await importSqlParser();
+    const ast: any = parser.astify(query);
 
-  // Iterate over the columns to check if the column is histogram
-  ast?.columns?.forEach((column: any) => {
-    // check if the column is histogram
-    if (
-      column.expr.type === "function" &&
-      column?.expr?.name?.name?.[0]?.value === "histogram" &&
-      histogramInterval !== null
-    ) {
-      const histogramExpr = column.expr;
-      if (histogramExpr.args && histogramExpr.args.type === "expr_list") {
-        // if selected histogramInterval is null then remove interval argument
-        if (!histogramInterval) {
-          histogramExpr.args.value = histogramExpr.args.value.slice(0, 1);
-        }
-        // else update interval argument
-        else {
-          // check if there is existing interval value
-          // if have then do not do anything
-          // else insert new arg with given histogramInterval
-          if (histogramExpr.args.value[1]) {
-            // Update existing interval value
-            // histogramExpr.args.value[1] = {
-            //   type: "single_quote_string",
-            //   value: `${histogramInterval}`,
-            // };
-          } else {
-            // create new arg for interval
-            histogramExpr.args.value.push({
-              type: "single_quote_string",
-              value: `${histogramInterval}`,
-            });
+    // Iterate over the columns to check if the column is histogram
+    ast?.columns?.forEach((column: any) => {
+      // check if the column is histogram
+      if (
+        column.expr.type === "function" &&
+        column?.expr?.name?.name?.[0]?.value === "histogram" &&
+        histogramInterval !== null
+      ) {
+        const histogramExpr = column.expr;
+        if (histogramExpr.args && histogramExpr.args.type === "expr_list") {
+          // if selected histogramInterval is null then remove interval argument
+          if (!histogramInterval) {
+            histogramExpr.args.value = histogramExpr.args.value.slice(0, 1);
+          }
+          // else update interval argument
+          else {
+            // check if there is existing interval value
+            // if have then do not do anything
+            // else insert new arg with given histogramInterval
+            if (histogramExpr.args.value[1]) {
+              // Update existing interval value
+              // histogramExpr.args.value[1] = {
+              //   type: "single_quote_string",
+              //   value: `${histogramInterval}`,
+              // };
+            } else {
+              // create new arg for interval
+              histogramExpr.args.value.push({
+                type: "single_quote_string",
+                value: `${histogramInterval}`,
+              });
+            }
           }
         }
       }
-    }
-  });
+    });
 
-  const sql = parser.sqlify(ast);
-  return sql.replace(/`/g, '"');
+    const sql = parser.sqlify(ast);
+    return sql.replace(/`/g, '"');
+  } catch (error) {
+    return query;
+  }
 };
 
 export const convertQueryIntoSingleLine = async (query: any) => {

@@ -18,22 +18,19 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
-    INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        bitvec::BitVec,
         cluster::{IntoArcVec, Node, Role, RoleGroup},
         search::{ScanStats, SearchEventType},
         sql::TableReferenceExt,
-        stream::{FileKey, QueryPartitionStrategy, StreamType},
+        stream::{QueryPartitionStrategy, StreamType},
     },
     metrics,
-    utils::{inverted_index::split_token, json, time::now_micros},
+    utils::{json, time::now_micros},
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
-    error::DataFusionError,
     physical_plan::{ExecutionPlan, displayable, visit_execution_plan},
     prelude::SessionContext,
 };
@@ -44,7 +41,7 @@ use infra::{
     file_list::FileId,
 };
 use itertools::Itertools;
-use proto::cluster_rpc::{self, SearchQuery};
+use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -56,15 +53,13 @@ use crate::{
             DATAFUSION_RUNTIME, SearchResult,
             datafusion::{
                 distributed_plan::{
-                    EmptyExecVisitor,
-                    remote_scan::RemoteScanExec,
-                    rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+                    EmptyExecVisitor, NewEmptyExecCountVisitor, remote_scan::RemoteScanExec,
+                    rewrite::RemoteScanRewriter,
                 },
                 exec::{prepare_datafusion_context, register_udf},
                 optimizer::{generate_analyzer_rules, generate_optimizer_rules},
                 table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
             },
-            generate_filter_from_equal_items,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
             request::Request,
             sql::Sql,
@@ -79,15 +74,10 @@ use crate::{
     skip_all,
     fields(org_id = req.org_id)
 )]
-pub async fn search(
-    trace_id: &str,
-    sql: Arc<Sql>,
-    mut req: Request,
-    query: SearchQuery,
-) -> Result<SearchResult> {
+pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<SearchResult> {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    log::info!("[trace_id {trace_id}] flight->search: start {}", sql);
+    log::info!("[trace_id {trace_id}] flight->search: start {sql}");
 
     let timeout = if req.timeout > 0 {
         req.timeout as u64
@@ -128,26 +118,20 @@ pub async fn search(
                 .component("flight:leader get file id".to_string())
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
-                .desc(format!("get files {} ids", file_id_list_num))
+                .desc(format!("get files {file_id_list_num} ids"))
                 .build()
         )
     );
-    let mut scan_stats = ScanStats {
+
+    let use_inverted_index = super::super::is_use_inverted_index(&sql);
+    req.set_use_inverted_index(use_inverted_index);
+
+    #[cfg(feature = "enterprise")]
+    let scan_stats = ScanStats {
         files: file_id_list_num as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
         ..Default::default()
     };
-
-    // 2. get inverted index file list
-    let (use_ttv_inverted_index, idx_file_list, idx_scan_size, idx_took) =
-        get_inverted_index_file_lists(trace_id, &req, &sql, &query).await?;
-    scan_stats.idx_scan_size = idx_scan_size as i64;
-    req.set_use_inverted_index(use_ttv_inverted_index);
-    log::info!(
-        "[trace_id {trace_id}] flight->search: get get_inverted_index_file_lists idx_scan_size: {:?}, idx_took: {} ms",
-        idx_scan_size,
-        idx_took,
-    );
 
     // 3. get nodes
     let get_node_start = std::time::Instant::now();
@@ -159,7 +143,7 @@ pub async fn search(
                 .ok()
                 .map(RoleGroup::from)
         })
-        .unwrap_or(None);
+        .unwrap_or(Some(RoleGroup::Interactive));
     let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
@@ -283,10 +267,7 @@ pub async fn search(
         }
     }
     log::info!(
-        "[trace_id {trace_id}] flight->search: get files num: {}, need ingester num: {}, need querier num: {}",
-        file_id_list_num,
-        need_ingesters,
-        need_queriers,
+        "[trace_id {trace_id}] flight->search: get files num: {file_id_list_num}, need ingester num: {need_ingesters}, need querier num: {need_queriers}",
     );
 
     #[cfg(feature = "enterprise")]
@@ -334,16 +315,9 @@ pub async fn search(
 
     let trace_id_move = trace_id.to_string();
     let query_task = DATAFUSION_RUNTIME.spawn(async move {
-        run_datafusion(
-            trace_id_move,
-            req,
-            sql,
-            nodes,
-            partitioned_file_lists,
-            idx_file_list,
-        )
-        .instrument(datafusion_span)
-        .await
+        run_datafusion(trace_id_move, req, sql, nodes, partitioned_file_lists)
+            .instrument(datafusion_span)
+            .await
     });
     tokio::pin!(query_task);
 
@@ -353,15 +327,15 @@ pub async fn search(
             match ret {
                 Ok(ret) => Ok(ret),
                 Err(err) => {
-                    log::error!("[trace_id {trace_id}] flight->search: datafusion execute error: {}", err);
-                    Err(DataFusionError::Execution(err.to_string()))
+                    log::error!("[trace_id {trace_id}] flight->search: datafusion execute error: {err}");
+                    Err(Error::Message(err.to_string()))
                 }
             }
         },
         _ = tokio::time::sleep(tokio::time::Duration::from_secs(timeout)) => {
             query_task.abort();
             log::error!("[trace_id {trace_id}] flight->search: search timeout");
-            Err(DataFusionError::ResourcesExhausted("flight->search: search timeout".to_string()))
+            Err(Error::ErrorCode(ErrorCodes::SearchTimeout("flight->search: search timeout".to_string())))
         },
         _ = async {
             #[cfg(feature = "enterprise")]
@@ -371,7 +345,7 @@ pub async fn search(
         } => {
             query_task.abort();
             log::info!("[trace_id {trace_id}] flight->search: search canceled");
-            Err(DataFusionError::ResourcesExhausted("flight->search: search canceled".to_string()))
+            Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery("flight->search: search canceled".to_string())))
         }
     };
 
@@ -382,18 +356,12 @@ pub async fn search(
     let (data, mut scan_stats, partial_err): (Vec<RecordBatch>, ScanStats, String) = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err),
-        Err(err) => match err {
-            DataFusionError::ResourcesExhausted(err) => Err(Error::ErrorCode(
-                ErrorCodes::SearchCancelQuery(err.to_string()),
-            )),
-            _ => Err(Error::Message(err.to_string())),
-        },
+        Err(err) => Err(err),
     }?;
 
     log::info!("[trace_id {trace_id}] flight->search: search finished");
 
     scan_stats.format_to_mb();
-    scan_stats.idx_took += idx_took as i64;
     scan_stats.file_list_took += file_id_list_took as i64;
     Ok((
         data,
@@ -411,7 +379,6 @@ pub async fn run_datafusion(
     sql: Arc<Sql>,
     nodes: Vec<Node>,
     partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
-    idx_file_list: Vec<FileKey>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
@@ -427,7 +394,7 @@ pub async fn run_datafusion(
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
-        print_plan(&physical_plan, "before");
+        print_plan(&trace_id, &physical_plan, "before");
     }
 
     // 7. rewrite physical plan
@@ -459,16 +426,24 @@ pub async fn run_datafusion(
         }
     }
 
+    #[cfg(feature = "enterprise")]
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
+    #[cfg(feature = "enterprise")]
     let streaming_output = req.streaming_output;
+    #[cfg(feature = "enterprise")]
     let streaming_id = req.streaming_id.clone();
+    #[cfg(feature = "enterprise")]
+    let use_cache = req.use_cache;
+    #[cfg(feature = "enterprise")]
+    let org_id = req.org_id.clone();
 
     let context = tracing::Span::current().context();
+
+    // rewrite physical plan
     let mut rewrite = RemoteScanRewriter::new(
         req,
         nodes.into_arc_vec(),
         partitioned_file_lists,
-        idx_file_list,
         equal_keys,
         match_all_keys,
         sql.index_condition.clone(),
@@ -476,6 +451,11 @@ pub async fn run_datafusion(
         false, // for super cluster
         context,
     );
+
+    // TODO: if there is only one table and single node, we can skip the remote scan rewrite
+    let mut empty_exec_count_visitor = NewEmptyExecCountVisitor::default();
+    physical_plan.visit(&mut empty_exec_count_visitor)?;
+    let _empty_exec_count = empty_exec_count_visitor.get_count();
     physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
 
     // add remote scan exec to top if physical plan is not changed
@@ -488,31 +468,82 @@ pub async fn run_datafusion(
     }
 
     // check for streaming aggregation query
+    #[allow(unused_mut)]
+    let mut skip_empty_exec_visitor = false;
+    #[allow(unused_mut)]
+    let mut aggs_cache_ratio = 0;
+    #[cfg(feature = "enterprise")]
     if streaming_output {
         let Some(streaming_id) = streaming_id else {
             return Err(Error::Message(
                 "streaming_id is required for streaming aggregation query".to_string(),
             ));
         };
-        let mut rewriter = StreamingAggsRewriter::new(streaming_id, start_time, end_time);
-        physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+
+        // NOTE: temporary check
+        let org_settings = crate::service::db::organization::get_org_setting(&org_id)
+            .await
+            .unwrap_or_default();
+        let use_cache = use_cache && org_settings.aggregation_cache_enabled;
+        let target_partitions = ctx.state().config().target_partitions();
+        let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) =
+            o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_streaming_agg_plan(
+                streaming_id,
+                start_time,
+                end_time,
+                use_cache,
+                target_partitions,
+                physical_plan,
+            )
+            .await?;
+        physical_plan = plan;
+        // Check for aggs cache hit
+        if is_complete_cache_hit {
+            aggs_cache_ratio = 100;
+            // skip empty exec visitor for streaming aggregation query
+            // since the new plan after rewrite will have a `EmptyExec` for a complete cache
+            // hit
+            skip_empty_exec_visitor = true;
+        }
+
+        // no need to run datafusion, return empty result
+        if is_complete_cache_hit_with_no_data {
+            let scan_stats = ScanStats {
+                aggs_cache_ratio,
+                ..Default::default()
+            };
+            return Ok((vec![], scan_stats, "".to_string()));
+        }
     }
 
-    let mut visitor = EmptyExecVisitor::default();
-    if physical_plan.visit(&mut visitor).is_err() {
-        log::error!(
-            "[trace_id {trace_id}] flight->search: physical plan visit error: there is no EmptyTable"
-        );
-        return Err(Error::Message(
-            "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
-        ));
+    // rewrite physical plan for merge aggregation and get topk
+    #[cfg(feature = "enterprise")]
+    {
+        let plan = o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_topk_agg_plan(
+            sql.limit,
+            physical_plan,
+        )
+        .await?;
+        physical_plan = plan;
     }
-    if visitor.get_data().is_some() {
-        return Ok((vec![], ScanStats::default(), "".to_string()));
+
+    if !skip_empty_exec_visitor {
+        let mut visitor = EmptyExecVisitor::default();
+        if physical_plan.visit(&mut visitor).is_err() {
+            log::error!(
+                "[trace_id {trace_id}] flight->search: physical plan visit error: there is no EmptyTable"
+            );
+            return Err(Error::Message(
+                "flight->search: physical plan visit error: there is no EmptyTable".to_string(),
+            ));
+        }
+        if visitor.get_data().is_some() {
+            return Ok((vec![], ScanStats::default(), "".to_string()));
+        }
     }
 
     if cfg.common.print_key_sql {
-        print_plan(&physical_plan, "after");
+        print_plan(&trace_id, &physical_plan, "after");
     }
 
     // run datafusion
@@ -536,7 +567,10 @@ pub async fn run_datafusion(
                     .build()
             )
         );
-        ret.map(|data| (data, visit.scan_stats, visit.partial_err))
+        let mut scan_stats = visit.scan_stats;
+        // Update scan stats to include aggregation cache ratio
+        scan_stats.aggs_cache_ratio = aggs_cache_ratio;
+        ret.map(|data| (data, scan_stats, visit.partial_err))
             .map_err(|e| e.into())
     }
 }
@@ -590,7 +624,7 @@ pub async fn check_work_group(
     let cfg = get_config();
     let work_group_str = "global".to_string();
 
-    let locker_key = format!("/search/cluster_queue/{}", work_group_str);
+    let locker_key = format!("/search/cluster_queue/{work_group_str}");
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
@@ -643,7 +677,7 @@ pub async fn check_work_group(
 
     let work_group_str = work_group.as_ref().unwrap().to_string();
 
-    let locker_key = format!("/search/cluster_queue/{}", work_group_str);
+    let locker_key = format!("/search/cluster_queue/{work_group_str}");
     // 2. get a cluster search queue lock
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
@@ -699,10 +733,7 @@ pub async fn check_work_group(
     log::info!(
         "{}",
         search_inspector_fields(
-            format!(
-                "[trace_id {trace_id}] search: wait in queue took: {} ms",
-                took_wait
-            ),
+            format!("[trace_id {trace_id}] search: wait in queue took: {took_wait} ms"),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:check_work_group".to_string())
@@ -835,10 +866,7 @@ pub(crate) async fn partition_file_by_hash(
         let idx = match node_idx.get(&node_name) {
             Some(idx) => *idx,
             None => {
-                log::error!(
-                    "partition_file_by_hash: {} not found in node_idx",
-                    node_name
-                );
+                log::error!("partition_file_by_hash: {node_name} not found in node_idx");
                 0
             }
         };
@@ -855,6 +883,7 @@ pub async fn generate_context(
     let analyzer_rules = generate_analyzer_rules(sql);
     let optimizer_rules = generate_optimizer_rules(sql);
     let mut ctx = prepare_datafusion_context(
+        &req.trace_id,
         req.work_group.clone(),
         analyzer_rules,
         optimizer_rules,
@@ -889,7 +918,11 @@ pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
 
     // register table
     for (stream, schema) in &sql.schemas {
-        let schema = schema.schema().as_ref().clone();
+        let schema = schema
+            .schema()
+            .as_ref()
+            .clone()
+            .with_metadata(Default::default());
         let stream_name = stream.to_quoted_string();
         let table = Arc::new(
             NewEmptyTable::new(&stream_name, Arc::new(schema))
@@ -916,12 +949,12 @@ pub async fn get_file_id_lists(
         let name = stream.stream_name();
         let stream_type = stream.get_stream_type(stream_type);
         // if stream is enrich, rewrite the time_range
-        if let Some(schema) = stream.schema() {
-            if schema == "enrich" || schema == "enrichment_tables" {
-                let start = enrichment_table::get_start_time(org_id, &name).await;
-                let end = now_micros();
-                time_range = Some((start, end));
-            }
+        if let Some(schema) = stream.schema()
+            && (schema == "enrich" || schema == "enrichment_tables")
+        {
+            let start = enrichment_table::get_start_time(org_id, &name).await;
+            let end = now_micros();
+            time_range = Some((start, end));
         }
         // get file list
         let file_id_list =
@@ -932,215 +965,10 @@ pub async fn get_file_id_lists(
     Ok(file_lists)
 }
 
-#[tracing::instrument(
-    name = "service:search:cluster:flight:get_inverted_index_file_list",
-    skip_all
-)]
-async fn get_inverted_index_file_lists(
-    trace_id: &str,
-    req: &Request,
-    sql: &Arc<Sql>,
-    query: &SearchQuery,
-) -> Result<(bool, Vec<FileKey>, usize, usize)> {
-    let cfg = get_config();
-    #[allow(deprecated)]
-    let inverted_index_type = cfg.common.inverted_index_search_format.clone();
-    let (use_inverted_index, index_terms) = super::super::is_use_inverted_index(sql);
-    let use_parquet_inverted_index = use_inverted_index && inverted_index_type == "parquet";
-    let use_ttv_inverted_index = use_inverted_index && inverted_index_type == "tantivy";
-    log::info!(
-        "[trace_id {trace_id}] flight->search: use_inverted_index with parquet format {}",
-        use_parquet_inverted_index
-    );
-
-    if !use_parquet_inverted_index {
-        return Ok((use_ttv_inverted_index, vec![], 0, 0));
-    }
-
-    let stream_name = sql.stream_names.first().unwrap().stream_name();
-    let match_terms = sql.match_items.clone().unwrap_or_default();
-    let index_terms = generate_filter_from_equal_items(&index_terms);
-    let (idx_file_list, idx_scan_size, idx_took) = get_inverted_index_file_list(
-        req.clone(),
-        query.clone(),
-        &stream_name, // for inverted index search, only have on stream
-        &match_terms,
-        &index_terms,
-    )
-    .await?;
-    log::info!(
-        "[trace_id {trace_id}] flight->search: get file_list from inverted index time_range: {:?}, files: {}, scan_size: {} mb, took: {} ms",
-        sql.time_range,
-        idx_file_list.len(),
-        idx_scan_size,
-        idx_took,
-    );
-
-    Ok((
-        use_ttv_inverted_index,
-        idx_file_list,
-        idx_scan_size,
-        idx_took,
-    ))
-}
-
-pub async fn get_inverted_index_file_list(
-    mut req: Request,
-    mut query: SearchQuery,
-    stream_name: &str,
-    match_terms: &[String],
-    index_terms: &[(String, Vec<String>)],
-) -> Result<(Vec<FileKey>, usize, usize)> {
-    let start = std::time::Instant::now();
-    let cfg = get_config();
-
-    let org_id = req.org_id.clone();
-    let stream_type = req.stream_type;
-
-    // Get all the unique terms which the user has searched.
-    let terms = match_terms
-        .iter()
-        .filter_map(|t| {
-            #[allow(deprecated)]
-            let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
-            if tokens.is_empty() {
-                None
-            } else {
-                Some(
-                    tokens
-                        .into_iter()
-                        .max_by_key(|key| key.len())
-                        .unwrap_or_default(),
-                )
-            }
-        })
-        .collect::<HashSet<String>>();
-
-    #[allow(deprecated)]
-    let fts_condition = terms
-        .iter()
-        .map(|x| match cfg.common.full_text_search_type.as_str() {
-            "eq" => format!("term = '{x}'"),
-            "contains" => format!("term LIKE '%{x}%'"),
-            _ => format!("term LIKE '{x}%'"),
-        })
-        .collect::<Vec<_>>()
-        .join(" OR ");
-    #[allow(deprecated)]
-    let fts_condition = if fts_condition.is_empty() {
-        fts_condition
-    } else if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
-        format!(
-            "((field = '{}' OR field IS NULL) AND ({}))",
-            INDEX_FIELD_NAME_FOR_ALL, fts_condition
-        )
-    } else {
-        format!(
-            "(field = '{}' AND ({}))",
-            INDEX_FIELD_NAME_FOR_ALL, fts_condition
-        )
-    };
-
-    // Process index terms
-    let index_terms = index_terms
-        .iter()
-        .map(|(field, values)| {
-            if values.len() > 1 {
-                format!("(field = '{field}' AND term IN ('{}'))", values.join("','"))
-            } else {
-                format!(
-                    "(field = '{field}' AND term = '{}')",
-                    values.first().unwrap()
-                )
-            }
-        })
-        .collect::<Vec<_>>();
-    let index_condition = index_terms.join(" OR ");
-    // If both empty return original file list with other params as 0
-    let search_condition = match (index_condition.is_empty(), fts_condition.is_empty()) {
-        (true, true) => {
-            return Ok((vec![], 0, 0));
-        }
-        (true, false) => fts_condition,
-        (false, true) => index_condition,
-        _ => {
-            format!("{} OR {}", fts_condition, index_condition)
-        }
-    };
-
-    #[allow(deprecated)]
-    let index_stream_name =
-        if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
-            stream_name.to_string()
-        } else {
-            format!("{}_{}", stream_name, stream_type)
-        };
-    let sql = format!(
-        "SELECT file_name, segment_ids FROM \"{}\" WHERE {}",
-        index_stream_name, search_condition
-    );
-
-    req.stream_type = StreamType::Index;
-    query.sql = sql;
-    query.from = 0;
-    query.size = QUERY_WITH_NO_LIMIT as i32;
-    query.track_total_hits = false;
-    query.uses_zo_fn = false;
-    query.query_fn = "".to_string();
-    let resp = super::http::search(req, query, vec![], vec![], false).await?;
-
-    // Merge bitmap segment_ids of the same file
-    let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();
-    for item in resp.hits.iter() {
-        let filename = match item.get("file_name") {
-            None => continue,
-            Some(v) => v.as_str().unwrap(),
-        };
-        let prefixed_filename = format!(
-            "files/{}/{}/{}/{}",
-            &org_id, stream_type, stream_name, filename
-        );
-        let segment_ids = match item.get("segment_ids") {
-            None => None,
-            Some(v) => hex::decode(v.as_str().unwrap()).ok(),
-        };
-        let entry = idx_file_list
-            .entry(prefixed_filename.clone())
-            .or_insert(FileKey {
-                key: prefixed_filename,
-                ..Default::default()
-            });
-        match (&entry.segment_ids, &segment_ids) {
-            (_, None) => {}
-            (Some(bin_data), Some(segment_ids)) => {
-                let mut bv = bin_data.clone();
-                bv |= BitVec::from_slice(segment_ids);
-                entry.segment_ids = Some(bv);
-            }
-            (None, Some(segment_ids)) => {
-                entry.segment_ids = Some(BitVec::from_slice(segment_ids));
-            }
-        }
-    }
-    let mut idx_file_list = idx_file_list
-        .into_iter()
-        .map(|(_, f)| f)
-        .collect::<Vec<_>>();
-    // sorted by _timestamp
-    idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
-    Ok((
-        idx_file_list,
-        resp.scan_size,
-        start.elapsed().as_millis() as usize,
-    ))
-}
-
-pub fn print_plan(physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
+pub fn print_plan(trace_id: &str, physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
     let plan = displayable(physical_plan.as_ref())
         .indent(false)
         .to_string();
-    println!("+---------------------------+----------+");
-    println!("leader physical plan {stage} rewrite");
-    println!("+---------------------------+----------+");
-    println!("{}", plan);
+    log::info!("[trace_id {trace_id}] leader physical plan {stage} rewrite");
+    log::info!("[trace_id {trace_id}] \n{plan}");
 }

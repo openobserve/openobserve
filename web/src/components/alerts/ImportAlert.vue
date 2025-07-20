@@ -82,9 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="editor-container-url"
           >
             <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
-              <div 
-              style="width: calc(100% - 10px)"
-              class="q-mb-md flex">
+              <div style="width: calc(100% - 10px)" class="q-mb-md flex">
                 <div style="width: calc(69%)" class="q-pr-sm">
                   <q-input
                     data-test="alert-import-url-input"
@@ -97,18 +95,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label-slot
                   />
                 </div>
-                
+
                 <div
-                    style="width: calc(30%)"
-                    class="alert-folder-dropdown"
-                    data-test="alert-folder-dropdown"
-                  >
-                    <SelectFolderDropDown
-                      :type="'alerts'"
-                      @folder-selected="updateActiveFolderId"
-                      :activeFolderId="activeFolderId"
-                    />
-                  </div>
+                  style="width: calc(30%)"
+                  class="alert-folder-dropdown"
+                  data-test="alert-folder-dropdown"
+                >
+                  <SelectFolderDropDown
+                    :type="'alerts'"
+                    @folder-selected="updateActiveFolderId"
+                    :activeFolderId="activeFolderId"
+                  />
+                </div>
               </div>
               <query-editor
                 data-test="alert-import-sql-editor"
@@ -134,40 +132,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="activeTab == 'import_json_file'"
             class="editor-container-json"
           >
-
             <q-form class="q-mx-md q-mt-md" @submit="onSubmit">
               <div style="width: calc(100% - 10px)" class="q-mb-md flex">
                 <div style="width: calc(69%)" class="q-pr-sm">
                   <q-file
-                  data-test="alert-import-json-file-input"
-                  v-model="jsonFiles"
-                  filled
-                  bottom-slots
-                  :label="t('dashboard.dropFileMsg')"
-                  accept=".json"
-                  multiple
-                >
-                  <template v-slot:prepend>
-                    <q-icon name="cloud_upload" @click.stop.prevent />
-                  </template>
-                  <template v-slot:append>
-                    <q-icon
-                      name="close"
-                      @click.stop.prevent="jsonFiles = null"
-                      class="cursor-pointer"
-                    />
-                  </template>
-                  <template v-slot:hint> .json files only </template>
-                </q-file>
+                    data-test="alert-import-json-file-input"
+                    v-model="jsonFiles"
+                    filled
+                    bottom-slots
+                    :label="t('dashboard.dropFileMsg')"
+                    accept=".json"
+                    multiple
+                  >
+                    <template v-slot:prepend>
+                      <q-icon name="cloud_upload" @click.stop.prevent />
+                    </template>
+                    <template v-slot:append>
+                      <q-icon
+                        name="close"
+                        @click.stop.prevent="jsonFiles = null"
+                        class="cursor-pointer"
+                      />
+                    </template>
+                    <template v-slot:hint> .json files only </template>
+                  </q-file>
                 </div>
-                <div style="width: calc(30%)" class=" alert-folder-dropdown">
+                <div style="width: calc(30%)" class="alert-folder-dropdown">
                   <SelectFolderDropDown
                     :type="'alerts'"
                     @folder-selected="updateActiveFolderId"
                     :activeFolderId="activeFolderId"
                   />
                 </div>
-
               </div>
               <query-editor
                 data-test="alert-import-sql-editor"
@@ -243,7 +239,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dense
                             tabindex="0"
                             @update:model-value="
-                              updateAlertName(userSelectedAlertName[index],index)
+                              updateAlertName(
+                                userSelectedAlertName[index],
+                                index,
+                              )
                             "
                           />
                         </div>
@@ -276,7 +275,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             hide-selected
                             fill-input
                             :input-debounce="400"
-                            @update:model-value="updateStreamFields(userSelectedStreamName[index], index)"
+                            @update:model-value="
+                              updateStreamFields(
+                                userSelectedStreamName[index],
+                                index,
+                              )
+                            "
                             behavior="menu"
                           />
                         </div>
@@ -313,7 +317,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               (val: any) => !!val || 'Field is required!',
                             ]"
                             style="width: 300px"
-                            @update:model-value="updateUserSelectedDestinations(userSelectedDestinations[index],index)"
+                            @update:model-value="
+                              updateUserSelectedDestinations(
+                                userSelectedDestinations[index],
+                                index,
+                              )
+                            "
                           >
                             <template v-slot:option="scope">
                               <q-item
@@ -321,15 +330,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :data-test="`add-alert-destination-${scope.opt}-select-item`"
                               >
                                 <q-item-section side>
-                                  <q-checkbox 
+                                  <q-checkbox
                                     data-test="alert-import-destination-checkbox"
-                                    :model-value="userSelectedDestinations[index]?.includes(scope.opt) ?? false"
+                                    :model-value="
+                                      userSelectedDestinations[index]?.includes(
+                                        scope.opt,
+                                      ) ?? false
+                                    "
                                     dense
-                                    @update:model-value="toggleDestination(scope.opt, index)"
+                                    @update:model-value="
+                                      toggleDestination(scope.opt, index)
+                                    "
                                   />
                                 </q-item-section>
                                 <q-item-section>
-                                  <q-item-label data-test="alert-import-destination-label">{{ scope.opt }}</q-item-label>
+                                  <q-item-label
+                                    data-test="alert-import-destination-label"
+                                    >{{ scope.opt }}</q-item-label
+                                  >
                                 </q-item-section>
                               </q-item>
                             </template>
@@ -350,7 +368,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-model="userSelectedStreamType[index]"
                             :options="streamTypes"
                             :label="t('alerts.streamType') + ' *'"
-                            :popup-content-style="{ textTransform: 'lowercase' }"
+                            :popup-content-style="{
+                              textTransform: 'lowercase',
+                            }"
                             color="input-border"
                             bg-color="input-bg"
                             class="q-py-sm showLabelOnTop no-case"
@@ -358,8 +378,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             outlined
                             filled
                             dense
-                            @update:model-value="updateStreams(userSelectedStreamType[index], index)"
-                            :rules="[(val: any) => !!val || 'Field is required!']"
+                            @update:model-value="
+                              updateStreams(
+                                userSelectedStreamType[index],
+                                index,
+                              )
+                            "
+                            :rules="[
+                              (val: any) => !!val || 'Field is required!',
+                            ]"
                             style="width: 300px"
                           />
                         </div>
@@ -385,14 +412,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             outlined
                             filled
                             dense
-                            @update:model-value="updateTimezone(userSelectedTimezone[index], index)"
+                            @update:model-value="
+                              updateTimezone(userSelectedTimezone[index], index)
+                            "
                             @filter="timezoneFilterFn"
                             use-input
                             hide-selected
                             fill-input
                             :input-debounce="400"
                             behavior="menu"
-                            :rules="[(val: any) => !!val || 'Field is required!']"
+                            :rules="[
+                              (val: any) => !!val || 'Field is required!',
+                            ]"
                             style="width: 300px"
                           />
                         </div>
@@ -424,7 +455,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             hide-selected
                             fill-input
                             :input-debounce="400"
-                            @update:model-value="updateOrgId(userSelectedOrgId[index].value, index)"
+                            @update:model-value="
+                              updateOrgId(userSelectedOrgId[index].value, index)
+                            "
                             behavior="menu"
                           >
                           </q-select>
@@ -438,7 +471,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div class="error-section" v-if="alertCreators.length > 0">
-                <div class="section-title text-primary" data-test="alert-import-creation-title">Alert Creation</div>
+                <div
+                  class="section-title text-primary"
+                  data-test="alert-import-creation-title"
+                >
+                  Alert Creation
+                </div>
                 <div
                   class="error-list"
                   v-for="(val, index) in alertCreators"
@@ -473,6 +511,7 @@ import {
   reactive,
   computed,
   watch,
+  defineAsyncComponent,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -482,8 +521,6 @@ import router from "@/router";
 import { useQuasar } from "quasar";
 import alertsService from "../../services/alerts";
 
-import QueryEditor from "../QueryEditor.vue";
-import { json } from "stream/consumers";
 import useStreams from "@/composables/useStreams";
 import templateService from "@/services/alert_templates";
 import destinationService from "@/services/alert_destination";
@@ -554,20 +591,27 @@ export default defineComponent({
     const splitterModel = ref(60);
     const filteredDestinations = ref<string[]>([]);
     const streamTypes = ["logs", "metrics", "traces"];
-    const selectedFolderId = ref<any>(router.currentRoute.value.query.folder || "default");
-    const activeFolderId = ref(router.currentRoute.value.query.folder || router.currentRoute.value.query?.folderId);
+    const selectedFolderId = ref<any>(
+      router.currentRoute.value.query.folder || "default",
+    );
+    const activeFolderId = ref(
+      router.currentRoute.value.query.folder ||
+        router.currentRoute.value.query?.folderId,
+    );
     const activeFolderAlerts = ref<any>([]);
     const isAlertImporting = ref(false);
     const userSelectedOrgId = ref<any[]>([]);
     const organizationDataList = computed(() => {
-        return store.state.organizations.map((org: any) => {
-          return {
-            label: org.identifier,
-            value: org.identifier,
-            disable: !org.identifier || org.identifier !== store.state.selectedOrganization.identifier
-          };
-        });
+      return store.state.organizations.map((org: any) => {
+        return {
+          label: org.identifier,
+          value: org.identifier,
+          disable:
+            !org.identifier ||
+            org.identifier !== store.state.selectedOrganization.identifier,
+        };
       });
+    });
 
     const getFormattedDestinations: any = computed(() => {
       return props.destinations.map((destination: any) => {
@@ -582,19 +626,22 @@ export default defineComponent({
       return tz;
     });
     const filteredTimezone = ref<any>([]);
-      filteredTimezone.value = [...timezoneOptions];
+    filteredTimezone.value = [...timezoneOptions];
 
-      const browserTime =
+    const browserTime =
       "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
 
-     // Add the UTC option
-      timezoneOptions.unshift("UTC");
-      timezoneOptions.unshift(browserTime);
+    // Add the UTC option
+    timezoneOptions.unshift("UTC");
+    timezoneOptions.unshift(browserTime);
 
-    const updateUserSelectedDestinations = (destinations: string[], index: number) => {
+    const updateUserSelectedDestinations = (
+      destinations: string[],
+      index: number,
+    ) => {
       jsonArrayOfObj.value[index].destinations = destinations;
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    }
+    };
 
     const updateStreamFields = (stream_name: string, index: number) => {
       jsonArrayOfObj.value[index].stream_name = stream_name;
@@ -606,10 +653,10 @@ export default defineComponent({
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
     };
 
-    watch(jsonFiles, async (newVal:any, oldVal:any) => {
+    watch(jsonFiles, async (newVal: any, oldVal: any) => {
       if (newVal && newVal.length > 0) {
         let combinedJson: any[] = [];
-        
+
         for (const file of newVal) {
           try {
             const result: any = await new Promise((resolve) => {
@@ -618,7 +665,9 @@ export default defineComponent({
                 try {
                   const parsedJson = JSON.parse(e.target.result);
                   // Convert to array if it's a single object
-                  const jsonArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+                  const jsonArray = Array.isArray(parsedJson)
+                    ? parsedJson
+                    : [parsedJson];
                   resolve(jsonArray);
                 } catch (error) {
                   q.notify({
@@ -632,13 +681,13 @@ export default defineComponent({
               };
               reader.readAsText(file);
             });
-            
+
             combinedJson = [...combinedJson, ...result];
           } catch (error) {
-            console.error('Error reading file:', error);
+            console.error("Error reading file:", error);
           }
         }
-        
+
         // Update the refs with combined JSON data
         jsonArrayOfObj.value = combinedJson;
         jsonStr.value = JSON.stringify(combinedJson, null, 2);
@@ -704,7 +753,9 @@ export default defineComponent({
     };
 
     onMounted(() => {
-      activeFolderId.value = router.currentRoute.value.query?.folder || router.currentRoute.value.query?.folderId;
+      activeFolderId.value =
+        router.currentRoute.value.query?.folder ||
+        router.currentRoute.value.query?.folderId;
       getActiveFolderAlerts(activeFolderId.value as string);
     });
 
@@ -722,13 +773,15 @@ export default defineComponent({
         } else {
           const parsedJson = JSON.parse(jsonStr.value);
           // Convert single object to array if needed
-          jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+          jsonArrayOfObj.value = Array.isArray(parsedJson)
+            ? parsedJson
+            : [parsedJson];
         }
       } catch (e: any) {
         q.notify({
           message: e.message || "Invalid JSON format",
           color: "negative",
-          position: "bottom", 
+          position: "bottom",
           timeout: 2000,
         });
         return;
@@ -773,9 +826,10 @@ export default defineComponent({
         }
 
         if (alertErrorsToDisplay.value.length === 0 && isValidAlert) {
-          return await createAlert(jsonObj, index , selectedFolderId.value);
+          return await createAlert(jsonObj, index, selectedFolderId.value);
         }
       } catch (e: any) {
+        console.log(e,'e')
         q.notify({
           message: "Error importing Alert(s) please check the JSON",
           color: "negative",
@@ -788,6 +842,7 @@ export default defineComponent({
     };
 
     const validateAlertInputs = async (input: any, index: number) => {
+      console.log(input,'input')
       let alertErrors: (string | { message: string; field: string })[] = [];
 
       // 1. Validate 'name' field
@@ -811,23 +866,19 @@ export default defineComponent({
         input.org_id.trim() === "" ||
         input.org_id != store.state.selectedOrganization.identifier
       ) {
-        alertErrors.push(
-          {
-            message: `Alert - ${index}: Organization Id is mandatory, should exist in organization list and should be equal to ${store.state.selectedOrganization.identifier}.`,
-            field: "org_id",
-          }
-        );
+        alertErrors.push({
+          message: `Alert - ${index}: Organization Id is mandatory, should exist in organization list and should be equal to ${store.state.selectedOrganization.identifier}.`,
+          field: "org_id",
+        });
       }
 
       // 3. Validate 'stream_type' field
       const validStreamTypes = ["logs", "metrics", "traces"];
       if (!input.stream_type || !validStreamTypes.includes(input.stream_type)) {
-        alertErrors.push(
-          {
-            message: `Alert - ${index}: Stream Type is mandatory and should be one of: 'logs', 'metrics', 'traces'.`,
-            field: "stream_type",
-          }
-        );
+        alertErrors.push({
+          message: `Alert - ${index}: Stream Type is mandatory and should be one of: 'logs', 'metrics', 'traces'.`,
+          field: "stream_type",
+        });
       }
 
       try {
@@ -865,29 +916,111 @@ export default defineComponent({
 
       // 6. Validate 'query_condition' field
       if (input.query_condition && input.query_condition.conditions) {
-        if (!Array.isArray(input.query_condition.conditions)) {
+        const validateCondition = (condition: any) => {
+          // Check if it's a simple condition
+          if (condition.column && condition.operator && condition.value !== undefined) {
+            if (
+              input.query_condition.type === "custom" &&
+              !["=", ">", "<", ">=", "<=", "Contains", "NotContains","contains","not_contains"].includes(
+                condition.operator,
+              )
+            ) {
+              alertErrors.push(
+                `Alert - ${index}: Invalid operator in query condition. Allowed operators: '=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
+              );
+            }
+            return;
+          }
+
+          // Check if it's a nested condition with 'and' or 'or'
+          if (condition.and || condition.or) {
+            const conditions = condition.and || condition.or;
+            if (!Array.isArray(conditions)) {
+              alertErrors.push(
+                `Alert - ${index}: 'and'/'or' conditions must be an array.`,
+              );
+              return;
+            }
+            conditions.forEach(validateCondition);
+            return;
+          }
+
+          // If neither a simple condition nor a nested condition
           alertErrors.push(
-            `Alert - ${index}: Query conditions should be an array.`,
+            `Alert - ${index}: Invalid condition format. Must have either column/operator/value or and/or operators.`,
           );
-        }
+        };
 
-        for (let condition of input.query_condition.conditions) {
-          if (!condition.column || !condition.operator || !condition.value) {
-            alertErrors.push(
-              `Alert - ${index}: Each query condition must have 'column', 'operator', and 'value'.`,
-            );
-          }
-
-          if (
-            input.query_condition.type === "custom" &&
-            !["=", ">", "<", ">=", "<=", "Contains", "NotContains"].includes(
-              condition.operator,
-            )
-          ) {
-            alertErrors.push(
-              `Alert - ${index}: Invalid operator in query condition. Allowed operators: '=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
-            );
-          }
+        // Handle both array format and nested format
+        //because old alerts are having direct array which is and by default 
+        //new alerts are having nested conditions with and/or and can have multiple conditions
+        if (Array.isArray(input.query_condition.conditions)) {
+          // Old format - array of conditions
+          input.query_condition.conditions.forEach((condition) => {
+            if (!condition.column || !condition.operator || !condition.value) {
+              alertErrors.push(
+                `Alert - ${index}: Each query condition must have 'column', 'operator', and 'value'.`,
+              );
+            }
+          });
+        } else {
+          // New format - nested conditions with and/or
+          //the new format looks like this
+            //             {
+            //     "or": [
+            //         {
+            //             "column": "_timestamp",
+            //             "operator": "<=",
+            //             "value": "100",
+            //             "ignore_case": false
+            //         },
+            //         {
+            //             "column": "job",
+            //             "operator": "not_contains",
+            //             "value": "12",
+            //             "ignore_case": true
+            //         },
+            //         {
+            //             "or": [
+            //                 {
+            //                     "column": "job",
+            //                     "operator": "contains",
+            //                     "value": "1222",
+            //                     "ignore_case": true
+            //                 },
+            //                 {
+            //                     "column": "level",
+            //                     "operator": "not_contains",
+            //                     "value": "dsff",
+            //                     "ignore_case": true
+            //                 },
+            //                 {
+            //                     "or": [
+            //                         {
+            //                             "column": "job",
+            //                             "operator": "=",
+            //                             "value": "111",
+            //                             "ignore_case": true
+            //                         },
+            //                         {
+            //                             "column": "level",
+            //                             "operator": "contains",
+            //                             "value": "1222",
+            //                             "ignore_case": true
+            //                         }
+            //                     ]
+            //                 },
+            //                 {
+            //                     "column": "log",
+            //                     "operator": "!=",
+            //                     "value": "33",
+            //                     "ignore_case": true
+            //                 }
+            //             ]
+            //         }
+            //     ]
+            // }  
+          validateCondition(input.query_condition.conditions);
         }
       }
       // 7. Validate 'sql' and 'promql'
@@ -920,9 +1053,12 @@ export default defineComponent({
       }
 
       // 9. Validate 'multi_time_range'
-      if (input.query_condition.type === 'custom' && 
-          input.query_condition.multi_time_range !== null && 
-          (!Array.isArray(input.query_condition.multi_time_range) || input.query_condition.multi_time_range.length > 0)) {
+      if (
+        input.query_condition.type === "custom" &&
+        input.query_condition.multi_time_range !== null &&
+        (!Array.isArray(input.query_condition.multi_time_range) ||
+          input.query_condition.multi_time_range.length > 0)
+      ) {
         alertErrors.push(
           `Alert - ${index}: Multi Time Range should be an empty array or null.`,
         );
@@ -959,7 +1095,6 @@ export default defineComponent({
         );
       }
 
-
       if (
         isNaN(Number(triggerCondition.frequency)) ||
         triggerCondition.frequency < 1 ||
@@ -988,27 +1123,29 @@ export default defineComponent({
 
       if (
         isNaN(Number(triggerCondition.silence)) ||
-        triggerCondition.silence < 1 ||
+        triggerCondition.silence < 0 ||
         typeof triggerCondition.silence !== "number"
       ) {
         alertErrors.push(
-          `Alert - ${index}: Silence should be a positive number greater than 0 and should be a number.`,
+          `Alert - ${index}: Silence should be a positive number greater than or equal to 0 and should be a number.`,
         );
       }
 
       if (
-        triggerCondition.frequency_type !== "minutes" &&
-        triggerCondition.frequency_type !== "cron" ||
+        (triggerCondition.frequency_type !== "minutes" &&
+          triggerCondition.frequency_type !== "cron") ||
         typeof triggerCondition.frequency_type !== "string"
-
       ) {
-          alertErrors.push(
-            `Alert - ${index}: Frequency Type must be 'minutes' or 'cron' and should be a string.`,
-          );
-        
+        alertErrors.push(
+          `Alert - ${index}: Frequency Type must be 'minutes' or 'cron' and should be a string.`,
+        );
       }
 
-      if (triggerCondition.frequency_type === "cron" && (triggerCondition.cron.trim() === "" || typeof triggerCondition.cron !== "string")) {
+      if (
+        triggerCondition.frequency_type === "cron" &&
+        (triggerCondition.cron.trim() === "" ||
+          typeof triggerCondition.cron !== "string")
+      ) {
         alertErrors.push(
           `Alert - ${index}: Cron expression should be a valid cron expression.`,
         );
@@ -1038,7 +1175,11 @@ export default defineComponent({
         );
       }
 
-      if(input.trigger_condition.frequency_type == 'cron' && !input.trigger_condition.hasOwnProperty('timezone') || input.trigger_condition.timezone === ""){
+      if (
+        (input.trigger_condition.frequency_type == "cron" &&
+          !input.trigger_condition.hasOwnProperty("timezone")) ||
+        input.trigger_condition.timezone === ""
+      ) {
         alertErrors.push({
           message: `Alert - ${index}: Timezone is required when frequency type is 'cron'.`,
           field: "timezone",
@@ -1054,13 +1195,11 @@ export default defineComponent({
         }
       });
 
-      //this condition is added to avoid the error when the updated_at is not a number 
-      //with the new alert api the updated_at is a nummer 
-      if( typeof input.updated_at !== 'number'){
+      //this condition is added to avoid the error when the updated_at is not a number
+      //with the new alert api the updated_at is a nummer
+      if (typeof input.updated_at !== "number") {
         input.updated_at = null;
       }
-
-
 
       // Log all alert errors at the end
       if (alertErrors.length > 0) {
@@ -1086,26 +1225,26 @@ export default defineComponent({
     };
 
     const createAlert = async (input: any, index: any, folderId: any) => {
-      if(!input.hasOwnProperty('context_attributes')){
+      if (!input.hasOwnProperty("context_attributes")) {
         input.context_attributes = {};
       }
-      if(!input.trigger_condition.hasOwnProperty('timezone')){
+      if (!input.trigger_condition.hasOwnProperty("timezone")) {
         input.trigger_condition.timezone = store.state.timezone;
       }
-      if(!input.trigger_condition.hasOwnProperty("tolerance_in_secs")){
+      if (!input.trigger_condition.hasOwnProperty("tolerance_in_secs")) {
         input.trigger_condition.tolerance_in_secs = null;
       }
       input.folder_id = folderId;
       //assigning the owner from the alert payload because the current logged in user will be the owner of the alert
-        input.owner = store.state.userInfo.email;
+      input.owner = store.state.userInfo.email;
       //assigning the last_edited_by from the alert payload because the current logged in user will be the last_edited_by of the alert
-        input.last_edited_by = store.state.userInfo.email;
-      
+      input.last_edited_by = store.state.userInfo.email;
+
       try {
         await alertsService.create_by_alert_id(
           store.state.selectedOrganization.identifier,
           input,
-          folderId
+          folderId,
         );
 
         // Success
@@ -1114,7 +1253,7 @@ export default defineComponent({
           success: true,
         });
         // Emit update after each successful creation
-        emit("update:alerts",store,selectedFolderId.value);
+        emit("update:alerts", store, selectedFolderId.value);
         getActiveFolderAlerts(selectedFolderId.value);
         return true;
       } catch (error: any) {
@@ -1133,55 +1272,56 @@ export default defineComponent({
     const updateStreams = async (streamType: string, index: number) => {
       jsonArrayOfObj.value[index].stream_type = streamType;
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-      
+
       try {
         const streamResponse: any = await getStreams(streamType, false);
         streamList.value = streamResponse.list.map(
           (stream: any) => stream.name,
         );
       } catch (error) {
-        console.error('Error fetching streams:', error);
+        console.error("Error fetching streams:", error);
       }
     };
     const filterDestinations = (val: string, update: Function) => {
-        if (val === "") {
-          update(() => {
-            filteredDestinations.value = getFormattedDestinations.value;
-          });
-          return;
-        }
-
+      if (val === "") {
         update(() => {
-          filteredDestinations.value = getFormattedDestinations.value.filter((destination: string) =>
-            destination.toLowerCase().includes(val.toLowerCase())
-          );
+          filteredDestinations.value = getFormattedDestinations.value;
         });
-      };
+        return;
+      }
+
+      update(() => {
+        filteredDestinations.value = getFormattedDestinations.value.filter(
+          (destination: string) =>
+            destination.toLowerCase().includes(val.toLowerCase()),
+        );
+      });
+    };
 
     const toggleDestination = (destination: string, index: number) => {
       if (!userSelectedDestinations.value[index]) {
         userSelectedDestinations.value[index] = [];
       }
-      
+
       const destinations = userSelectedDestinations.value[index];
       const destinationIndex = destinations.indexOf(destination);
-      
+
       if (destinationIndex === -1) {
         destinations.push(destination);
       } else {
         destinations.splice(destinationIndex, 1);
       }
-      
+
       updateUserSelectedDestinations(destinations, index);
     };
 
-      const updateTimezone = (timezone: string, index: number) => {
-        jsonArrayOfObj.value[index].trigger_condition.timezone = timezone;
-        jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-      };
+    const updateTimezone = (timezone: string, index: number) => {
+      jsonArrayOfObj.value[index].trigger_condition.timezone = timezone;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    };
 
     const timezoneFilterFn = (val: string, update: Function) => {
-      if (val === '') {
+      if (val === "") {
         update(() => {
           filteredTimezone.value = timezoneOptions;
         });
@@ -1190,19 +1330,19 @@ export default defineComponent({
 
       update(() => {
         const needle = val.toLowerCase();
-        filteredTimezone.value = timezoneOptions.filter(
-          (timezone: string) => timezone.toLowerCase().includes(needle)
+        filteredTimezone.value = timezoneOptions.filter((timezone: string) =>
+          timezone.toLowerCase().includes(needle),
         );
       });
     };
     const updateActiveFolderId = (newVal: any) => {
       selectedFolderId.value = newVal.value;
       getActiveFolderAlerts(selectedFolderId.value);
-    }
+    };
 
     const getActiveFolderAlerts = async (folderId: string) => {
-      if(!store.state.organizationData.allAlertsListByNames[folderId]){
-      const response: any = await alertsService.listByFolderId(
+      if (!store.state.organizationData.allAlertsListByNames[folderId]) {
+        const response: any = await alertsService.listByFolderId(
           1,
           1000,
           "name",
@@ -1210,21 +1350,21 @@ export default defineComponent({
           "",
           store.state.selectedOrganization.identifier,
           folderId,
-          ""
-      );
+          "",
+        );
 
-          store.dispatch("setAllAlertsListByNames", {
-            ...store.state.organizationData.allAlertsListByNames,
-            [folderId]: response.data.list.map((alert: any) => alert.name)
-            }) 
+        store.dispatch("setAllAlertsListByNames", {
+          ...store.state.organizationData.allAlertsListByNames,
+          [folderId]: response.data.list.map((alert: any) => alert.name),
+        });
       }
-        activeFolderAlerts.value = store.state.organizationData.allAlertsListByNames[folderId];
-      
-    }
+      activeFolderAlerts.value =
+        store.state.organizationData.allAlertsListByNames[folderId];
+    };
     const updateOrgId = (orgId: string, index: number) => {
       jsonArrayOfObj.value[index].org_id = orgId;
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    }
+    };
 
     return {
       t,
@@ -1279,7 +1419,9 @@ export default defineComponent({
     };
   },
   components: {
-    QueryEditor,
+    QueryEditor: defineAsyncComponent(
+      () => import("@/components/CodeQueryEditor.vue"),
+    ),
     AppTabs,
     SelectFolderDropDown,
   },

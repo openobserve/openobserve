@@ -242,6 +242,7 @@ impl From<&[parquet::file::metadata::KeyValue]> for FileMeta {
 
 #[derive(Clone, Debug, Default)]
 pub struct FileListDeleted {
+    pub id: i64,
     pub account: String,
     pub file: String,
     pub index_file: bool,
@@ -552,8 +553,7 @@ pub struct UpdateSettingsWrapper<D> {
 pub struct UpdateStreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub partition_keys: UpdateSettingsWrapper<StreamPartition>,
     #[serde(default)]
     pub full_text_search_keys: UpdateSettingsWrapper<String>,
@@ -561,11 +561,9 @@ pub struct UpdateStreamSettings {
     pub index_fields: UpdateSettingsWrapper<String>,
     #[serde(default)]
     pub bloom_filter_fields: UpdateSettingsWrapper<String>,
-    #[serde(skip_serializing_if = "Option::None")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::None", default)]
     pub data_retention: Option<i64>,
-    #[serde(skip_serializing_if = "Option::None")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::None", default)]
     pub flatten_level: Option<i64>,
     #[serde(default)]
     pub defined_schema_fields: UpdateSettingsWrapper<String>,
@@ -612,7 +610,7 @@ impl Display for TimeRange {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let time_range_start: DateTime<Utc> = Utc.timestamp_nanos(self.start * 1000);
         let time_range_end: DateTime<Utc> = Utc.timestamp_nanos(self.end * 1000);
-        write!(f, "{} to {}", time_range_start, time_range_end)
+        write!(f, "{time_range_start} to {time_range_end}")
     }
 }
 impl TimeRange {
@@ -676,18 +674,15 @@ impl TimeRange {
         result
     }
 }
-#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Deserialize, ToSchema, PartialEq)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub partition_keys: Vec<StreamPartition>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub full_text_search_keys: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub index_fields: Vec<String>,
     #[serde(default)]
     pub bloom_filter_fields: Vec<String>,
@@ -695,16 +690,15 @@ pub struct StreamSettings {
     pub data_retention: i64,
     #[serde(skip_serializing_if = "Option::None")]
     pub flatten_level: Option<i64>,
-    #[serde(skip_serializing_if = "Option::None")]
-    pub defined_schema_fields: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub defined_schema_fields: Vec<String>,
     #[serde(default)]
     pub max_query_range: i64, // hours
     #[serde(default)]
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub distinct_value_fields: Vec<DistinctField>,
     #[serde(default)]
     pub index_updated_at: i64,
@@ -744,20 +738,13 @@ impl Serialize for StreamSettings {
         state.serialize_field("index_original_data", &self.index_original_data)?;
         state.serialize_field("index_all_values", &self.index_all_values)?;
 
-        match self.defined_schema_fields.as_ref() {
-            Some(fields) => {
-                if !fields.is_empty() {
-                    let mut fields = fields.clone();
-                    fields.sort_unstable();
-                    fields.dedup();
-                    state.serialize_field("defined_schema_fields", &fields)?;
-                } else {
-                    state.skip_field("defined_schema_fields")?;
-                }
-            }
-            None => {
-                state.skip_field("defined_schema_fields")?;
-            }
+        if !self.defined_schema_fields.is_empty() {
+            let mut fields = self.defined_schema_fields.clone();
+            fields.sort_unstable();
+            fields.dedup();
+            state.serialize_field("defined_schema_fields", &fields)?;
+        } else {
+            state.skip_field("defined_schema_fields")?;
         }
         match self.flatten_level.as_ref() {
             Some(flatten_level) => {
@@ -836,7 +823,7 @@ impl From<&str> for StreamSettings {
             max_query_range = v.as_i64().unwrap();
         };
 
-        let mut defined_schema_fields: Option<Vec<String>> = None;
+        let mut defined_schema_fields = Vec::<String>::new();
         if let Some(value) = settings.get("defined_schema_fields") {
             let mut fields = value
                 .as_array()
@@ -844,11 +831,10 @@ impl From<&str> for StreamSettings {
                 .iter()
                 .map(|item| item.as_str().unwrap().to_string())
                 .collect::<Vec<_>>();
-            if !fields.is_empty() {
-                fields.sort_unstable();
-                fields.dedup();
-                defined_schema_fields = Some(fields);
-            }
+
+            fields.sort_unstable();
+            fields.dedup();
+            defined_schema_fields = fields;
         }
 
         let flatten_level = settings.get("flatten_level").map(|v| v.as_i64().unwrap());
@@ -861,7 +847,11 @@ impl From<&str> for StreamSettings {
         let approx_partition = settings
             .get("approx_partition")
             .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .unwrap_or(
+                get_config()
+                    .common
+                    .use_stream_settings_for_partitions_enabled,
+            );
 
         let mut distinct_value_fields = Vec::new();
         let fields = settings.get("distinct_value_fields");
@@ -1159,6 +1149,107 @@ mod tests {
         assert_eq!(file_meta, resp);
     }
 
+    #[test]
+    fn test_stream_stats_add_file_meta() {
+        let mut stats = StreamStats::default();
+        let meta = FileMeta {
+            min_ts: 1000,
+            max_ts: 2000,
+            records: 100,
+            original_size: 1000,
+            compressed_size: 500,
+            index_size: 50,
+            flattened: false,
+        };
+
+        stats.add_file_meta(&meta);
+        assert_eq!(stats.file_num, 1);
+        assert_eq!(stats.doc_num, 100);
+        assert_eq!(stats.doc_time_min, 1000);
+        assert_eq!(stats.doc_time_max, 2000);
+        assert_eq!(stats.storage_size, 1000.0);
+        assert_eq!(stats.compressed_size, 500.0);
+
+        // Test with negative values (should be clamped to 0)
+        let negative_meta = FileMeta {
+            original_size: -100,
+            compressed_size: -50,
+            index_size: -10,
+            ..meta
+        };
+        let mut negative_stats = StreamStats {
+            storage_size: 50.0,
+            compressed_size: 25.0,
+            index_size: 5.0,
+            ..Default::default()
+        };
+        negative_stats.add_file_meta(&negative_meta);
+        assert_eq!(negative_stats.storage_size, 0.0);
+        assert_eq!(negative_stats.compressed_size, 0.0);
+        assert_eq!(negative_stats.index_size, 0.0);
+    }
+
+    #[test]
+    fn test_stream_stats_operations() {
+        let stats1 = StreamStats {
+            file_num: 5,
+            doc_num: 100,
+            storage_size: 1000.0,
+            compressed_size: 500.0,
+            doc_time_min: 1000,
+            doc_time_max: 2000,
+            ..Default::default()
+        };
+
+        let stats2 = StreamStats {
+            file_num: 3,
+            doc_num: 50,
+            storage_size: 300.0,
+            compressed_size: 150.0,
+            doc_time_min: 1500,
+            doc_time_max: 2500,
+            ..Default::default()
+        };
+
+        // Test addition
+        let sum = &stats1 + &stats2;
+        assert_eq!(sum.file_num, 8);
+        assert_eq!(sum.doc_num, 150);
+        assert_eq!(sum.storage_size, 1300.0);
+        assert_eq!(sum.doc_time_min, 1000);
+        assert_eq!(sum.doc_time_max, 2500);
+
+        // Test subtraction
+        let diff = &stats1 - &stats2;
+        assert_eq!(diff.file_num, 2);
+        assert_eq!(diff.doc_num, 50);
+        assert_eq!(diff.storage_size, 700.0);
+    }
+
+    #[test]
+    fn test_stream_partition_types() {
+        // Test prefix partition
+        let prefix_part = StreamPartition::new_prefix("field");
+        assert_eq!(prefix_part.types, StreamPartitionType::Prefix);
+        assert_eq!(prefix_part.get_partition_value("Hello"), "h");
+        assert_eq!(prefix_part.get_partition_value(""), "_");
+        assert_eq!(prefix_part.get_partition_value("123"), "1");
+
+        // Test value partition
+        let value_part = StreamPartition::new("field");
+        assert_eq!(value_part.get_partition_value("test_value"), "test_value");
+
+        // Test non-ASCII encoding
+        let non_ascii_part = StreamPartition::new("field");
+        let encoded = non_ascii_part.get_partition_value("测试");
+        assert!(encoded.contains("%"));
+
+        // Test Display for StreamPartitionType
+        assert_eq!(format!("{}", StreamPartitionType::Value), "value");
+        assert_eq!(format!("{}", StreamPartitionType::Hash(32)), "hash");
+        assert_eq!(format!("{}", StreamPartitionType::Prefix), "prefix");
+    }
+
     #[cfg(feature = "gxhash")]
     #[test]
     fn test_hash_partition() {
@@ -1173,11 +1264,6 @@ mod tests {
             r#"{"field":"field","types":{"hash":32},"disabled":false}"#
         );
 
-        for key in &[
-            "hello", "world", "foo", "bar", "test", "test1", "test2", "test3",
-        ] {
-            println!("{}: {}", key, part.get_partition_key(key));
-        }
         assert_eq!(part.get_partition_key("hello"), "field=20");
         assert_eq!(part.get_partition_key("world"), "field=13");
         assert_eq!(part.get_partition_key("foo"), "field=21");

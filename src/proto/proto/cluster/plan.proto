@@ -20,6 +20,12 @@ message NewEmptyExecNode {
     datafusion_common.Schema        full_schema = 7;
 }
 
+message AggregateTopkExecNode {
+    string  sort_field = 1;
+    bool    descending = 2;
+    uint64       limit = 3;
+}
+
 // Search request
 message FlightSearchRequest {
     QueryIdentifier         query_identifier = 1;
@@ -39,10 +45,11 @@ message QueryIdentifier {
 message SearchInfo {
     bytes                            plan = 1;
     repeated int64           file_id_list = 2;
-    repeated IdxFileName    idx_file_list = 3;
     int64                      start_time = 4;
     int64                        end_time = 5;
     int64                         timeout = 6;
+    bool                        use_cache = 7;
+    int64              histogram_interval = 8;
 }
 
 message IndexInfo {
@@ -63,9 +70,11 @@ message SuperClusterInfo {
 
 message IdxOptimizeMode {
   oneof mode {
-    SimpleSelect    simple_select = 1;
-    SimpleCount     simple_count = 2;
-    SimpleHistogram simple_histogram = 3;
+    SimpleSelect    simple_select     = 1;
+    SimpleCount     simple_count      = 2;
+    SimpleHistogram simple_histogram  = 3;
+    SimpleTopN      simple_topn       = 4;
+    SimpleDistinct  simple_distinct   = 5;
   }
 }
 
@@ -80,6 +89,18 @@ message SimpleHistogram {
   int64 min_value = 1;
   uint64 bucket_width = 2;
   uint32 num_buckets = 3;
+}
+
+message SimpleTopN {
+  string field = 1;
+  uint32 limit = 2;
+  bool     asc = 3;
+}
+
+message SimpleDistinct {
+  string field = 1;
+  uint32 limit = 2;
+  bool     asc = 3;
 }
 
 message KvItem {

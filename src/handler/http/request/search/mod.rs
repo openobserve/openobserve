@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::Reverse, collections::BinaryHeap, io::Error};
+use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, get, post, web};
 use arrow_schema::Schema;
@@ -21,7 +21,7 @@ use chrono::Utc;
 use config::{
     DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        search::{SearchEventType, SearchHistoryHitResponse},
+        search::{SearchEventType, SearchHistoryHitResponse, default_use_cache},
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -33,6 +33,8 @@ use hashbrown::HashMap;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::check_stream_permissions;
+#[cfg(feature = "cloud")]
+use {crate::service::organization::is_org_in_free_trial_period, actix_web::http::StatusCode};
 
 #[cfg(feature = "enterprise")]
 use crate::service::search::sql::get_cipher_key_names;
@@ -206,6 +208,26 @@ pub async fn search(
 
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
+
+    #[cfg(feature = "cloud")]
+    {
+        match is_org_in_free_trial_period(&org_id).await {
+            Ok(false) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    format!("org {org_id} has expired its trial period"),
+                )));
+            }
+            Err(e) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    e.to_string(),
+                )));
+            }
+            _ => {}
+        }
+    }
+
     let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
         tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone())
     } else {
@@ -223,7 +245,6 @@ pub async fn search(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
@@ -232,7 +253,10 @@ pub async fn search(
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
-    req.use_cache = Some(use_cache);
+    if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
+        req.query.sql = sql;
+    };
+    req.use_cache = get_use_cache_from_request(&query);
 
     // set search event type
     if req.search_type.is_none() {
@@ -269,8 +293,7 @@ pub async fn search(
             {
                 req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
                 range_error = format!(
-                    "Query duration is modified due to query range restriction of {} hours",
-                    max_query_range
+                    "Query duration is modified due to query range restriction of {max_query_range} hours"
                 );
             }
         }
@@ -292,16 +315,12 @@ pub async fn search(
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
-                return Ok(
-                    HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                        StatusCode::BAD_REQUEST.into(),
-                        e.to_string(),
-                    )),
-                );
+                return Ok(HttpResponse::BadRequest()
+                    .json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)));
             }
         };
         if !keys_used.is_empty() {
-            log::info!("keys used : {:?}", keys_used);
+            log::info!("keys used : {keys_used:?}");
         }
         for key in keys_used {
             // Check permissions on keys
@@ -354,6 +373,7 @@ pub async fn search(
         Some(user_id),
         &req,
         range_error,
+        false,
     )
     .instrument(http_span)
     .await;
@@ -376,7 +396,7 @@ pub async fn search(
                 &search_type,
                 "",
             );
-            log::error!("[trace_id {trace_id}] search error: {}", err);
+            log::error!("[trace_id {trace_id}] search error: {err}");
             Ok(error_utils::map_error_to_http_response(
                 &err,
                 Some(trace_id),
@@ -475,7 +495,7 @@ pub async fn around_v1(
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, "500", "_around", "", "");
-            log::error!("search around error: {:?}", err);
+            log::error!("search around error: {err:?}");
             Ok(error_utils::map_error_to_http_response(
                 &err,
                 Some(trace_id),
@@ -584,7 +604,7 @@ pub async fn around_v2(
         Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, "500", "_around", "", "");
-            log::error!("search around error: {:?}", err);
+            log::error!("search around error: {err:?}");
             Ok(error_utils::map_error_to_http_response(
                 &err,
                 Some(trace_id),
@@ -709,6 +729,7 @@ pub async fn build_search_request_per_field(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
+    keyword: &str,
 ) -> Result<Vec<(config::meta::search::Request, StreamType, FieldName)>, Error> {
     let query_fn = req
         .vrl_fn
@@ -716,7 +737,7 @@ pub async fn build_search_request_per_field(
         .and_then(|v| base64::decode_url(v.as_ref()).ok())
         .map(|vrl| {
             if !vrl.trim().ends_with('.') {
-                format!("{} \n .", vrl)
+                format!("{vrl} \n .")
             } else {
                 vrl
             }
@@ -768,7 +789,7 @@ pub async fn build_search_request_per_field(
     let mut query = config::meta::search::Query {
         sql: decoded_sql.clone(), // Will be populated per field in the loop below
         from: 0,
-        size: config::meta::sql::MAX_LIMIT,
+        size: req.size.unwrap_or(10),
         start_time,
         end_time,
         query_fn: query_fn.clone(),
@@ -781,12 +802,12 @@ pub async fn build_search_request_per_field(
                 query.uses_zo_fn = functions::get_all_transform_keys(org_id)
                     .await
                     .iter()
-                    .any(|fn_name| decoded_sql.contains(&format!("{}(", fn_name)));
+                    .any(|fn_name| decoded_sql.contains(&format!("{fn_name}(")));
 
                 // pick up where clause from sql
                 let sql_where_from_query =
                     match SearchService::sql::pickup_where(&decoded_sql, None) {
-                        Ok(Some(v)) => format!("WHERE {}", v),
+                        Ok(Some(v)) => format!("WHERE {v}"),
                         Ok(None) => "".to_string(),
                         Err(e) => {
                             return Err(Error::other(e));
@@ -815,12 +836,12 @@ pub async fn build_search_request_per_field(
                     return Err(Error::other("Invalid filter format"));
                 }
                 let vals = columns[1].split(',').collect::<Vec<_>>().join("','");
-                let sql_where = format!("WHERE {} IN ('{}')", columns[0], vals);
+                let sql_where = format!("WHERE {} IN ('{vals}')", columns[0]);
 
                 // Define the default_sql here
-                let default_sql = format!("SELECT {} FROM \"{stream_name}\"", TIMESTAMP_COL_NAME);
+                let default_sql = format!("SELECT {TIMESTAMP_COL_NAME} FROM \"{stream_name}\"");
 
-                query.sql = format!("{} {}", default_sql, sql_where);
+                query.sql = format!("{default_sql} {sql_where}");
 
                 let can_use_distinct_stream = can_use_distinct_stream(
                     org_id,
@@ -847,7 +868,7 @@ pub async fn build_search_request_per_field(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
-        use_cache: Some(req.use_cache),
+        use_cache: req.use_cache,
         local_mode: None,
     };
 
@@ -869,17 +890,23 @@ pub async fn build_search_request_per_field(
         stream_type
     };
 
+    let size = req.query.size;
     let mut requests = Vec::new();
     for field in fields {
+        let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
+            format!("{sql_where} AND str_match_ignore_case({field}, '{keyword}')")
+        } else if !keyword.is_empty() {
+            format!("WHERE str_match_ignore_case({field}, '{keyword}')")
+        } else {
+            sql_where.clone()
+        };
         let sql = if no_count {
-            // we use min(0) as a hack to do streaming aggregation but actually return 0,
-            // essentially we are not counting the values
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, min(0) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
+                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_key asc limit {size}"
             )
         } else {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key"
+                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_num desc limit {size}"
             )
         };
 
@@ -906,7 +933,6 @@ async fn values_v1(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
-    let cfg = get_config();
 
     let mut uses_fn = false;
     let fields = match query.get("fields") {
@@ -918,13 +944,13 @@ async fn values_v1(
         .and_then(|v| base64::decode_url(v.as_ref()).ok())
         .map(|vrl_function| {
             if !vrl_function.trim().ends_with('.') {
-                format!("{} \n .", vrl_function)
+                format!("{vrl_function} \n .")
             } else {
                 vrl_function
             }
         });
 
-    let default_sql = format!("SELECT {} FROM \"{stream_name}\"", TIMESTAMP_COL_NAME);
+    let default_sql = format!("SELECT {TIMESTAMP_COL_NAME} FROM \"{stream_name}\"");
     let mut query_sql = match query.get("filter") {
         None => default_sql,
         Some(v) => {
@@ -936,10 +962,13 @@ async fn values_v1(
                     return Ok(MetaHttpResponse::bad_request("Invalid filter format"));
                 }
                 let vals = columns[1].split(',').collect::<Vec<_>>().join("','");
-                format!("{} WHERE {} IN ('{}')", default_sql, columns[0], vals)
+                format!("{default_sql} WHERE {} IN ('{vals}')", columns[0])
             }
         }
     };
+    if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&query_sql) {
+        query_sql = sql;
+    }
 
     let keyword = match query.get("keyword") {
         None => "".to_string(),
@@ -953,14 +982,14 @@ async fn values_v1(
         }
     };
 
-    if let Some(v) = query.get("sql") {
-        if let Ok(sql) = base64::decode_url(v) {
-            uses_fn = functions::get_all_transform_keys(org_id)
-                .await
-                .iter()
-                .any(|fn_name| sql.contains(&format!("{}(", fn_name)));
-            query_sql = sql;
-        }
+    if let Some(v) = query.get("sql")
+        && let Ok(sql) = base64::decode_url(v)
+    {
+        uses_fn = functions::get_all_transform_keys(org_id)
+            .await
+            .iter()
+            .any(|fn_name| sql.contains(&format!("{fn_name}(")));
+        query_sql = sql;
     };
 
     // pick up where clause from sql
@@ -1018,13 +1047,13 @@ async fn values_v1(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(query);
-
     // search
     let req_query = config::meta::search::Query {
         sql: query_sql,
         from: 0,
-        size: config::meta::sql::MAX_LIMIT,
+        size: query
+            .get("size")
+            .map_or(10, |v| v.parse::<i64>().unwrap_or(10)),
         start_time,
         end_time,
         uses_zo_fn: uses_fn,
@@ -1042,7 +1071,7 @@ async fn values_v1(
     )
     .await;
 
-    let req = config::meta::search::Request {
+    let mut req = config::meta::search::Request {
         query: req_query,
         encoding: config::meta::search::RequestEncoding::Empty,
         regions,
@@ -1050,9 +1079,14 @@ async fn values_v1(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
-        use_cache: Some(use_cache),
+        use_cache: default_use_cache(),
         local_mode: None,
     };
+
+    req.use_cache = get_use_cache_from_request(query);
+
+    // Get the size from query parameter for limiting results
+    let size = req.query.size;
 
     // skip fields which aren't part of the schema
     let schema = infra::schema::get(org_id, stream_name, stream_type)
@@ -1063,7 +1097,7 @@ async fn values_v1(
     let sql_where = if where_str.is_empty() {
         "".to_string()
     } else {
-        format!("WHERE {}", where_str)
+        format!("WHERE {where_str}")
     };
     for field in &fields {
         let http_span = http_span.clone();
@@ -1072,9 +1106,9 @@ async fn values_v1(
             continue;
         }
         let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
-            format!("{sql_where} AND {field} ILIKE '%{keyword}%'")
+            format!("{sql_where} AND str_match_ignore_case({field}, '{keyword}')")
         } else if !keyword.is_empty() {
-            format!("WHERE {field} ILIKE '%{keyword}%'")
+            format!("WHERE str_match_ignore_case({field}, '{keyword}')")
         } else {
             sql_where.clone()
         };
@@ -1099,15 +1133,20 @@ async fn values_v1(
 
         let sql = if no_count {
             format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
+                "SELECT \"{field}\" AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC limit {size}"
             )
         } else {
             format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
+                "SELECT \"{field}\" AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC limit {size}"
             )
         };
         let mut req = req.clone();
         req.query.sql = sql;
+        if let Ok(sql) =
+            config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql)
+        {
+            req.query.sql = sql;
+        }
 
         let search_res = SearchService::cache::search(
             &trace_id,
@@ -1116,6 +1155,7 @@ async fn values_v1(
             Some(user_id.to_string()),
             &req,
             "".to_string(),
+            false,
         )
         .instrument(http_span)
         .await;
@@ -1123,7 +1163,7 @@ async fn values_v1(
             Ok(res) => res,
             Err(err) => {
                 http_report_metrics(start, org_id, stream_type, "500", "_values/v1", "", "");
-                log::error!("search values error: {:?}", err);
+                log::error!("search values error: {err:?}");
                 return Ok(error_utils::map_error_to_http_response(
                     &err,
                     Some(trace_id),
@@ -1137,13 +1177,8 @@ async fn values_v1(
     let mut hit_values: Vec<json::Value> = Vec::new();
     let mut work_group_set = Vec::with_capacity(query_results.len());
 
-    // Get the size from query parameter for limiting results
-    let size = query
-        .get("size")
-        .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
-
     for (key, ret) in query_results {
-        let mut top_hits: HashMap<String, i64> = HashMap::default();
+        let mut top_hits: Vec<(String, i64)> = Vec::with_capacity(size as usize);
         for row in ret.hits {
             let key = row
                 .get("zo_sql_key")
@@ -1153,67 +1188,23 @@ async fn values_v1(
                 .get("zo_sql_num")
                 .map(|v| v.as_i64().unwrap_or(0))
                 .unwrap_or(0);
-            let key_num = top_hits.entry(key).or_insert(0);
-            *key_num += num;
+            top_hits.push((key, num));
         }
 
-        // Use a min heap (BinaryHeap with Reverse) to find top k elements
-        let mut min_heap: BinaryHeap<Reverse<(i64, String)>> =
-            BinaryHeap::with_capacity(size as usize);
+        let top_hits = top_hits
+            .into_iter()
+            .map(|(k, v)| {
+                let mut item = json::Map::new();
+                item.insert("zo_sql_key".to_string(), json::Value::String(k));
+                item.insert("zo_sql_num".to_string(), json::Value::Number(v.into()));
+                json::Value::Object(item)
+            })
+            .collect::<Vec<_>>();
 
-        if no_count {
-            // For alphabetical sorting, collect all entries first
-            let mut all_entries: Vec<_> = top_hits.into_iter().collect();
-            all_entries.sort_by(|a, b| a.0.cmp(&b.0));
-            all_entries.truncate(size as usize);
-
-            let top_hits = all_entries
-                .into_iter()
-                .map(|(k, v)| {
-                    let mut item = json::Map::new();
-                    item.insert("zo_sql_key".to_string(), json::Value::String(k));
-                    item.insert("zo_sql_num".to_string(), json::Value::Number(v.into()));
-                    json::Value::Object(item)
-                })
-                .collect::<Vec<_>>();
-
-            let mut field_value: json::Map<String, json::Value> = json::Map::new();
-            field_value.insert("field".to_string(), json::Value::String(key));
-            field_value.insert("values".to_string(), json::Value::Array(top_hits));
-            hit_values.push(json::Value::Object(field_value));
-        } else {
-            // For value-based sorting, use a min heap to get top k elements
-            for (k, v) in top_hits {
-                if min_heap.len() < size as usize {
-                    // If heap not full, just add
-                    min_heap.push(Reverse((v, k)));
-                } else if !min_heap.is_empty() && v > min_heap.peek().unwrap().0.0 {
-                    // If current value is larger than smallest in heap, replace it
-                    min_heap.pop();
-                    min_heap.push(Reverse((v, k)));
-                }
-            }
-
-            // Convert heap to vector and sort in descending order
-            let mut top_elements: Vec<_> =
-                min_heap.into_iter().map(|Reverse((v, k))| (k, v)).collect();
-            top_elements.sort_by(|a, b| b.1.cmp(&a.1));
-
-            let top_hits = top_elements
-                .into_iter()
-                .map(|(k, v)| {
-                    let mut item = json::Map::new();
-                    item.insert("zo_sql_key".to_string(), json::Value::String(k));
-                    item.insert("zo_sql_num".to_string(), json::Value::Number(v.into()));
-                    json::Value::Object(item)
-                })
-                .collect::<Vec<_>>();
-
-            let mut field_value: json::Map<String, json::Value> = json::Map::new();
-            field_value.insert("field".to_string(), json::Value::String(key));
-            field_value.insert("values".to_string(), json::Value::Array(top_hits));
-            hit_values.push(json::Value::Object(field_value));
-        }
+        let mut field_value: json::Map<String, json::Value> = json::Map::new();
+        field_value.insert("field".to_string(), json::Value::String(key));
+        field_value.insert("values".to_string(), json::Value::Array(top_hits));
+        hit_values.push(json::Value::Object(field_value));
 
         resp.scan_size = std::cmp::max(resp.scan_size, ret.scan_size);
         resp.scan_records = std::cmp::max(resp.scan_records, ret.scan_records);
@@ -1233,6 +1224,11 @@ async fn values_v1(
         records: resp.hits.len() as i64,
         response_time: time,
         size: resp.scan_size as f64,
+        scan_files: if resp.scan_files > 0 {
+            Some(resp.scan_files as i64)
+        } else {
+            None
+        },
         request_body: Some(req.query.sql),
         user_email: Some(user_id.to_string()),
         min_ts: Some(start_time),
@@ -1318,10 +1314,33 @@ pub async fn search_partition(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
+    #[cfg(feature = "cloud")]
+    {
+        match is_org_in_free_trial_period(&org_id).await {
+            Ok(false) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    format!("org {org_id} has expired its trial period"),
+                )));
+            }
+            Err(e) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    e.to_string(),
+                )));
+            }
+            _ => {}
+        }
+    }
+
     let mut req: config::meta::search::SearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
+    if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.sql) {
+        req.sql = sql;
+    }
+
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
@@ -1362,7 +1381,7 @@ pub async fn search_partition(
                 "",
                 "",
             );
-            log::error!("search error: {:?}", err);
+            log::error!("search error: {err:?}");
             Ok(error_utils::map_error_to_http_response(
                 &err,
                 Some(trace_id),
@@ -1501,7 +1520,7 @@ pub async fn search_history(
                 "",
                 "",
             );
-            log::error!("[trace_id {}] Search history error : {:?}", trace_id, err);
+            log::error!("[trace_id {trace_id}] Search history error : {err:?}");
             return Ok(error_utils::map_error_to_http_response(
                 &err,
                 Some(trace_id),
@@ -1516,12 +1535,12 @@ pub async fn search_history(
             Ok(response) => match serde_json::to_value(response) {
                 Ok(json_value) => Some(json_value),
                 Err(e) => {
-                    log::error!("[trace_id {}] Serialization error: {:?}", trace_id, e);
+                    log::error!("[trace_id {trace_id}] Serialization error: {e:?}");
                     None
                 }
             },
             Err(e) => {
-                log::error!("[trace_id {}] Deserialization error: {:?}", trace_id, e);
+                log::error!("[trace_id {trace_id}] Deserialization error: {e:?}");
                 None
             }
         })

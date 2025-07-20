@@ -19,9 +19,11 @@ pub mod ai;
 pub mod alerts;
 pub mod authz;
 #[cfg(feature = "cloud")]
-pub mod billings;
+pub mod cloud;
 pub mod clusters;
 pub mod dashboards;
+#[cfg(feature = "enterprise")]
+pub mod domain_management;
 pub mod enrichment_table;
 #[allow(deprecated)]
 pub mod folders;
@@ -45,7 +47,6 @@ pub mod stream;
 pub mod syslog;
 pub mod traces;
 pub mod users;
-pub mod ws;
 
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";

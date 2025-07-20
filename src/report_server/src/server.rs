@@ -28,7 +28,7 @@ pub async fn spawn_server() -> Result<(), anyhow::Error> {
         };
         format!("{}:{}", ip, cfg.report_server.port).parse()?
     };
-    log::info!("starting Report server at: {}", haddr);
+    log::info!("starting Report server at: {haddr}");
     let server = HttpServer::new(move || {
         App::new()
             .service(web::scope("/api").service(send_report).service(healthz))
@@ -40,9 +40,7 @@ pub async fn spawn_server() -> Result<(), anyhow::Error> {
     .run();
 
     let handle = server.handle();
-    tokio::task::spawn(async move {
-        graceful_shutdown(handle).await;
-    });
+    tokio::task::spawn(graceful_shutdown(handle));
     server.await?;
     log::info!("Report server stopped");
     Ok(())

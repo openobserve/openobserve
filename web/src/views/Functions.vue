@@ -91,14 +91,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="tw-overflow-auto q-mx-sm q-my-sm"
+          class="tw-overflow-auto q-mx-sm"
           style="height: calc(100vh - 57px)"
         >
           <!-- :templates="templates"
             :functionAssociatedStreams="functionAssociatedStreams"
             @get:functionAssociatedStreams="getFunctionAssociatedStreams"
             @get:templates="getTemplates" -->
-          <RouterView />
+          <RouterView v-slot="{ Component }">
+            <component :is="Component" @sendToAiChat="sendToAiChat" />
+          </RouterView>
         </div>
       </template>
     </q-splitter>
@@ -113,7 +115,8 @@ import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "AppFunctions",
-  setup() {
+  emits: ["sendToAiChat"],
+  setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
@@ -168,6 +171,10 @@ export default defineComponent({
       }
     };
 
+    const sendToAiChat = (value: any) => {
+      emit("sendToAiChat", value);
+    };
+
     return {
       t,
       store,
@@ -179,6 +186,7 @@ export default defineComponent({
       templates,
       collapseSidebar,
       showSidebar,
+      sendToAiChat
     };
   },
 });

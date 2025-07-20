@@ -15,101 +15,72 @@
 
 use proto::cluster_rpc;
 
-/// Supported inverted index formats:
-///  - Parquet (v2): Index is stored in parquet format
-///  - Tantivy (v3): Index is stored in custom puffin format files
-///  - both: Use both Parquet and Tantivy. Note that this will generate two inverted index files.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Default)]
-pub enum InvertedIndexFormat {
-    #[default]
-    Parquet,
-    Both,
-    Tantivy,
-}
-
-impl From<&String> for InvertedIndexFormat {
-    fn from(s: &String) -> Self {
-        match s.to_lowercase().as_str() {
-            "both" => InvertedIndexFormat::Both,
-            "tantivy" => InvertedIndexFormat::Tantivy,
-            _ => InvertedIndexFormat::Parquet,
-        }
-    }
-}
-
-impl std::fmt::Display for InvertedIndexFormat {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InvertedIndexFormat::Parquet => write!(f, "parquet"),
-            InvertedIndexFormat::Both => write!(f, "both"),
-            InvertedIndexFormat::Tantivy => write!(f, "tantivy"),
-        }
-    }
-}
-
-pub enum InvertedIndexTantivyMode {
-    Puffin,
-    Mmap,
-}
-
-impl std::fmt::Display for InvertedIndexTantivyMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InvertedIndexTantivyMode::Puffin => write!(f, "puffin"),
-            InvertedIndexTantivyMode::Mmap => write!(f, "mmap"),
-        }
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum InvertedIndexOptimizeMode {
+pub enum IndexOptimizeMode {
     SimpleSelect(usize, bool),
     SimpleCount,
     SimpleHistogram(i64, u64, usize),
+    SimpleTopN(String, usize, bool),
+    SimpleDistinct(String, usize, bool),
 }
 
-impl std::fmt::Display for InvertedIndexOptimizeMode {
+impl std::fmt::Display for IndexOptimizeMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            InvertedIndexOptimizeMode::SimpleSelect(limit, ascend) => {
-                write!(f, "simple_select(limit: {}, ascend: {})", limit, ascend)
+            IndexOptimizeMode::SimpleSelect(limit, ascend) => {
+                write!(f, "select(limit: {limit}, ascend: {ascend})")
             }
-            InvertedIndexOptimizeMode::SimpleCount => write!(f, "simple_count"),
-            InvertedIndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
+            IndexOptimizeMode::SimpleCount => write!(f, "count"),
+            IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
                 write!(
                     f,
-                    "simple_histogram(min_value: {min_value}, bucket_width: {bucket_width}, num_buckets: {num_buckets})"
+                    "histogram(min_value: {min_value}, bucket_width: {bucket_width}, num_buckets: {num_buckets})"
+                )
+            }
+            IndexOptimizeMode::SimpleTopN(field, limit, ascend) => {
+                write!(f, "topn(field: {field}, limit: {limit}, ascend: {ascend})")
+            }
+            IndexOptimizeMode::SimpleDistinct(field, limit, ascend) => {
+                write!(
+                    f,
+                    "distinct(field: {field}, limit: {limit}, ascend: {ascend})"
                 )
             }
         }
     }
 }
 
-impl From<cluster_rpc::IdxOptimizeMode> for InvertedIndexOptimizeMode {
+impl From<cluster_rpc::IdxOptimizeMode> for IndexOptimizeMode {
     fn from(cluster_rpc_mode: cluster_rpc::IdxOptimizeMode) -> Self {
         match cluster_rpc_mode.mode {
             Some(cluster_rpc::idx_optimize_mode::Mode::SimpleSelect(select)) => {
-                InvertedIndexOptimizeMode::SimpleSelect(select.index as usize, select.asc)
+                IndexOptimizeMode::SimpleSelect(select.index as usize, select.asc)
             }
             Some(cluster_rpc::idx_optimize_mode::Mode::SimpleCount(_)) => {
-                InvertedIndexOptimizeMode::SimpleCount
+                IndexOptimizeMode::SimpleCount
             }
             Some(cluster_rpc::idx_optimize_mode::Mode::SimpleHistogram(select)) => {
-                InvertedIndexOptimizeMode::SimpleHistogram(
+                IndexOptimizeMode::SimpleHistogram(
                     select.min_value,
                     select.bucket_width,
                     select.num_buckets as usize,
                 )
             }
-            None => panic!("Invalid InvertedIndexOptimizeMode"),
+            Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopn(select)) => {
+                IndexOptimizeMode::SimpleTopN(select.field, select.limit as usize, select.asc)
+            }
+            Some(cluster_rpc::idx_optimize_mode::Mode::SimpleDistinct(select)) => {
+                IndexOptimizeMode::SimpleDistinct(select.field, select.limit as usize, select.asc)
+            }
+            None => panic!("Invalid IndexOptimizeMode"),
         }
     }
 }
 
-impl From<InvertedIndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
-    fn from(mode: InvertedIndexOptimizeMode) -> Self {
+impl From<IndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
+    fn from(mode: IndexOptimizeMode) -> Self {
         match mode {
-            InvertedIndexOptimizeMode::SimpleSelect(index, asc) => cluster_rpc::IdxOptimizeMode {
+            IndexOptimizeMode::SimpleSelect(index, asc) => cluster_rpc::IdxOptimizeMode {
                 mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleSelect(
                     cluster_rpc::SimpleSelect {
                         index: index as u32,
@@ -117,12 +88,12 @@ impl From<InvertedIndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
                     },
                 )),
             },
-            InvertedIndexOptimizeMode::SimpleCount => cluster_rpc::IdxOptimizeMode {
+            IndexOptimizeMode::SimpleCount => cluster_rpc::IdxOptimizeMode {
                 mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleCount(
                     cluster_rpc::SimpleCount {},
                 )),
             },
-            InvertedIndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
+            IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
                 cluster_rpc::IdxOptimizeMode {
                     mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleHistogram(
                         cluster_rpc::SimpleHistogram {
@@ -133,6 +104,24 @@ impl From<InvertedIndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
                     )),
                 }
             }
+            IndexOptimizeMode::SimpleTopN(field, limit, asc) => cluster_rpc::IdxOptimizeMode {
+                mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopn(
+                    cluster_rpc::SimpleTopN {
+                        field,
+                        limit: limit as u32,
+                        asc,
+                    },
+                )),
+            },
+            IndexOptimizeMode::SimpleDistinct(field, limit, asc) => cluster_rpc::IdxOptimizeMode {
+                mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleDistinct(
+                    cluster_rpc::SimpleDistinct {
+                        field,
+                        limit: limit as u32,
+                        asc,
+                    },
+                )),
+            },
         }
     }
 }

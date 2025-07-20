@@ -18,7 +18,7 @@ use std::io::Error;
 use actix_web::{HttpResponse, http, http::StatusCode};
 use arrow_schema::DataType;
 use config::{
-    SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME, is_local_disk_storage,
+    SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
         promql,
         stream::{
@@ -34,7 +34,7 @@ use infra::{
     cache::stats,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        unwrap_partition_time_level, unwrap_stream_settings,
+        unwrap_partition_time_level, unwrap_stream_created_at, unwrap_stream_settings,
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
@@ -91,7 +91,7 @@ pub async fn get_streams(
         };
         match permitted_streams {
             Some(permitted_streams) => {
-                if permitted_streams.contains(&format!("{}:_all_{}", s_type, org_id)) {
+                if permitted_streams.contains(&format!("{s_type}:_all_{org_id}")) {
                     indices
                 } else {
                     indices
@@ -160,7 +160,7 @@ pub fn stream_res(
         .collect::<Vec<_>>();
 
     let mut stats = stats.unwrap_or_default();
-    stats.created_at = stream_created(&schema).unwrap_or_default();
+    stats.created_at = unwrap_stream_created_at(&schema).unwrap_or_default();
 
     let metrics_meta = if stream_type == StreamType::Metrics {
         let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or(promql::Metadata {
@@ -182,6 +182,12 @@ pub fn stream_res(
     };
 
     let mut settings = unwrap_stream_settings(&schema).unwrap_or_default();
+    if settings == StreamSettings::default() {
+        settings.approx_partition = get_config()
+            .common
+            .use_stream_settings_for_partitions_enabled;
+    }
+
     settings.partition_time_level = Some(unwrap_partition_time_level(
         settings.partition_time_level,
         stream_type,
@@ -193,7 +199,7 @@ pub fn stream_res(
         stream_type,
         total_fields: mappings.len(),
         schema: mappings,
-        uds_schema: None,
+        uds_schema: vec![],
         stats,
         settings,
         metrics_meta,
@@ -216,19 +222,16 @@ pub async fn save_stream_settings(
                 format!("stream [{stream_name}] is being deleted"),
             ))
             .json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST,
                 format!("stream [{stream_name}] is being deleted"),
             )));
     }
 
     // only allow setting user defined schema for logs stream
-    if stream_type != StreamType::Logs
-        && settings.defined_schema_fields.is_some()
-        && !settings.defined_schema_fields.as_ref().unwrap().is_empty()
-    {
+    if stream_type != StreamType::Logs && !settings.defined_schema_fields.is_empty() {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "only logs stream can have user defined schema".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "only logs stream can have user defined schema",
         )));
     }
 
@@ -236,16 +239,16 @@ pub async fn save_stream_settings(
     for key in settings.full_text_search_keys.iter() {
         if key == &cfg.common.column_all {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!("field [{}] can't be used for full text search", key),
+                http::StatusCode::BAD_REQUEST,
+                format!("field [{key}] can't be used for full text search"),
             )));
         }
     }
     for key in settings.index_fields.iter() {
         if key == &cfg.common.column_all {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!("field [{}] can't be used for secondary index", key),
+                http::StatusCode::BAD_REQUEST,
+                format!("field [{key}] can't be used for secondary index"),
             )));
         }
     }
@@ -253,7 +256,7 @@ pub async fn save_stream_settings(
     for key in settings.partition_keys.iter() {
         if SQL_FULL_TEXT_SEARCH_FIELDS.contains(&key.field) || key.field == cfg.common.column_all {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST,
                 format!("field [{}] can't be used for partition key", key.field),
             )));
         }
@@ -266,7 +269,7 @@ pub async fn save_stream_settings(
             return Ok(HttpResponse::InternalServerError()
                 .append_header((ERROR_HEADER, format!("error in getting schema : {e}")))
                 .json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
                     format!("error in getting schema : {e}"),
                 )));
         }
@@ -281,14 +284,14 @@ pub async fn save_stream_settings(
     for key in settings.full_text_search_keys.iter() {
         let Some(field) = schema_fields.get(key) else {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!("field [{}] not found in schema", key),
+                http::StatusCode::BAD_REQUEST,
+                format!("field [{key}] not found in schema"),
             )));
         };
         if field.data_type() != &DataType::Utf8 {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!("full text search field [{}] must be text field", key),
+                http::StatusCode::BAD_REQUEST,
+                format!("full text search field [{key}] must be text field"),
             )));
         }
     }
@@ -307,7 +310,7 @@ pub async fn save_stream_settings(
         if let Some(old_field) = old_partition_keys.iter_mut().find(|k| k.field == v.field) {
             if old_field.types != v.types {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
+                    http::StatusCode::BAD_REQUEST,
                     format!("field [{}] partition types can't be changed", v.field),
                 )));
             }
@@ -321,8 +324,8 @@ pub async fn save_stream_settings(
     for range in settings.extended_retention_days.iter() {
         if range.start > range.end {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "start day should be less than end day".to_string(),
+                http::StatusCode::BAD_REQUEST,
+                "start day should be less than end day",
             )));
         }
     }
@@ -336,10 +339,7 @@ pub async fn save_stream_settings(
         .await
         .unwrap();
 
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        http::StatusCode::OK.into(),
-        "".to_string(),
-    )))
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(http::StatusCode::OK, "")))
 }
 
 #[tracing::instrument(skip(new_settings))]
@@ -386,9 +386,8 @@ pub async fn update_stream_settings(
             // index_original_data & index_all_values only can open one at a time
             if settings.index_original_data && settings.index_all_values {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    "index_original_data & index_all_values cannot be true at the same time"
-                        .to_string(),
+                    http::StatusCode::BAD_REQUEST,
+                    "index_original_data & index_all_values cannot be true at the same time",
                 )));
             }
 
@@ -396,34 +395,27 @@ pub async fn update_stream_settings(
             if !new_settings.defined_schema_fields.add.is_empty() {
                 if !cfg.common.allow_user_defined_schemas {
                     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        "user defined schema is not allowed, you need to set ZO_ALLOW_USER_DEFINED_SCHEMAS=true".to_string(),
+                        http::StatusCode::BAD_REQUEST,
+                        "user defined schema is not allowed, you need to set ZO_ALLOW_USER_DEFINED_SCHEMAS=true",
                     )));
                 }
-                settings.defined_schema_fields =
-                    if let Some(mut schema_fields) = settings.defined_schema_fields {
-                        schema_fields.extend(new_settings.defined_schema_fields.add);
-                        Some(schema_fields)
-                    } else {
-                        Some(new_settings.defined_schema_fields.add)
-                    }
+                settings
+                    .defined_schema_fields
+                    .extend(new_settings.defined_schema_fields.add);
             }
             if !new_settings.defined_schema_fields.remove.is_empty() {
-                if let Some(schema_fields) = settings.defined_schema_fields.as_mut() {
-                    schema_fields
-                        .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
-                }
+                settings
+                    .defined_schema_fields
+                    .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
             }
-            if let Some(schema_fields) = settings.defined_schema_fields.as_ref() {
-                if schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
-                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        format!(
-                            "user defined schema fields count exceeds the limit: {}",
-                            cfg.limit.user_defined_schema_max_fields
-                        ),
-                    )));
-                }
+            if settings.defined_schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST,
+                    format!(
+                        "user defined schema fields count exceeds the limit: {}",
+                        cfg.limit.user_defined_schema_max_fields
+                    ),
+                )));
             }
 
             // check for bloom filter fields
@@ -466,7 +458,7 @@ pub async fn update_stream_settings(
                     if f == "count" || f == TIMESTAMP_COL_NAME {
                         return Ok(HttpResponse::InternalServerError().json(
                             MetaHttpResponse::error(
-                                http::StatusCode::BAD_REQUEST.into(),
+                                http::StatusCode::BAD_REQUEST,
                                 format!("count and {TIMESTAMP_COL_NAME} are reserved fields and cannot be added"),
                             ),
                         ));
@@ -492,7 +484,7 @@ pub async fn update_stream_settings(
                                 format!("error in updating settings : {e}"),
                             ))
                             .json(MetaHttpResponse::error(
-                                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                http::StatusCode::INTERNAL_SERVER_ERROR,
                                 format!("error in updating settings : {e}"),
                             )));
                     }
@@ -519,7 +511,7 @@ pub async fn update_stream_settings(
                                         format!("error in updating settings : {e}"),
                                     ))
                                     .json(MetaHttpResponse::error(
-                                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                        http::StatusCode::INTERNAL_SERVER_ERROR,
                                         format!("error in updating settings : {e}"),
                                     )));
                             }
@@ -528,21 +520,21 @@ pub async fn update_stream_settings(
                     if usage.len() > 1 {
                         return Ok(HttpResponse::BadRequest().json(
                             MetaHttpResponse::error(
-                                http::StatusCode::BAD_REQUEST.into(),
+                                http::StatusCode::BAD_REQUEST,
                                 format!("error in removing distinct field : field {f} if used in dashboards/reports"),
                             ),
                         ));
                     }
                     // here we can be sure that usage is at most 1 record
-                    if let Some(entry) = usage.first() {
-                        if entry.origin != OriginType::Stream {
-                            return Ok(HttpResponse::BadRequest().json(
+                    if let Some(entry) = usage.first()
+                        && entry.origin != OriginType::Stream
+                    {
+                        return Ok(HttpResponse::BadRequest().json(
                                 MetaHttpResponse::error(
-                                    http::StatusCode::BAD_REQUEST.into(),
+                                    http::StatusCode::BAD_REQUEST,
                                     format!("error in removing distinct field : field {f} if used in dashboards/reports"),
                                 ),
-                            ));
-                        }
+                        ));
                     }
                 }
                 // here we are sure that all fields to be removed can be removed,
@@ -586,8 +578,8 @@ pub async fn update_stream_settings(
             save_stream_settings(org_id, stream_name, stream_type, settings).await
         }
         None => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "stream settings could not be found".to_string(),
+            http::StatusCode::BAD_REQUEST,
+            "stream settings could not be found",
         ))),
     }
 }
@@ -603,8 +595,8 @@ pub async fn delete_stream(
         .unwrap();
     if schema.is_empty() {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            "stream not found".to_string(),
+            StatusCode::NOT_FOUND,
+            "stream not found",
         )));
     }
 
@@ -613,7 +605,7 @@ pub async fn delete_stream(
         return Ok(HttpResponse::InternalServerError()
             .append_header((ERROR_HEADER, format!("failed to delete stream schema: {e}")))
             .json(MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                StatusCode::INTERNAL_SERVER_ERROR,
                 format!("failed to delete stream schema: {e}"),
             )));
     }
@@ -621,24 +613,23 @@ pub async fn delete_stream(
     // delete associated pipelines
     if let Some(pipeline) =
         db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
+        && let Err(e) = db::pipeline::delete(&pipeline.id).await
     {
-        if let Err(e) = db::pipeline::delete(&pipeline.id).await {
-            return Ok(HttpResponse::InternalServerError()
-                .append_header((
-                    ERROR_HEADER,
-                    format!(
-                        "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
-                        pipeline.name
-                    ),
-                ))
-                .json(MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    format!(
-                        "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
-                        pipeline.name
-                    ),
-                )));
-        }
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((
+                ERROR_HEADER,
+                format!(
+                    "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
+                    pipeline.name
+                ),
+            ))
+            .json(MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!(
+                    "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
+                    pipeline.name
+                ),
+            )));
     }
 
     // delete related resource
@@ -646,7 +637,7 @@ pub async fn delete_stream(
         return Ok(HttpResponse::InternalServerError()
             .append_header((ERROR_HEADER, format!("failed to delete stream: {e}")))
             .json(MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                StatusCode::INTERNAL_SERVER_ERROR,
                 format!("failed to delete stream: {e}"),
             )));
     }
@@ -659,10 +650,7 @@ pub async fn delete_stream(
     )
     .await;
 
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        StatusCode::OK.into(),
-        "stream deleted".to_string(),
-    )))
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(StatusCode::OK, "stream deleted")))
 }
 
 pub async fn stream_delete_inner(
@@ -675,11 +663,7 @@ pub async fn stream_delete_inner(
         db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
     {
         log::error!(
-            "Failed to create retention job for stream: {}/{}/{}, error: {}",
-            org_id,
-            stream_type,
-            stream_name,
-            e
+            "Failed to create retention job for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
         );
         return Err(e);
     }
@@ -707,11 +691,7 @@ pub async fn stream_delete_inner(
     // delete stream compaction offset
     if let Err(e) = db::compact::files::del_offset(org_id, stream_type, stream_name).await {
         log::error!(
-            "Failed to delete stream compact offset for stream: {}/{}/{}, error: {}",
-            org_id,
-            stream_type,
-            stream_name,
-            e
+            "Failed to delete stream compact offset for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
         );
         return Err(e);
     }
@@ -728,19 +708,12 @@ async fn transform_stats(
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
     stats.index_size /= SIZE_IN_MB;
-    if stream_type == StreamType::EnrichmentTables {
-        if let Some(meta) = enrichment_table::get_meta_table_stats(org_id, stream_name).await {
-            stats.doc_time_min = meta.start_time;
-            stats.doc_time_max = meta.end_time;
-        }
+    if stream_type == StreamType::EnrichmentTables
+        && let Some(meta) = enrichment_table::get_meta_table_stats(org_id, stream_name).await
+    {
+        stats.doc_time_min = meta.start_time;
+        stats.doc_time_max = meta.end_time;
     }
-}
-
-pub fn stream_created(schema: &Schema) -> Option<i64> {
-    schema
-        .metadata()
-        .get("created_at")
-        .map(|v| v.parse().unwrap())
 }
 
 pub async fn delete_fields(

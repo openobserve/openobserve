@@ -35,7 +35,7 @@
 use std::sync::Arc;
 
 use arrow_schema::{DataType, Schema, SchemaRef};
-use config::{INDEX_SEGMENT_LENGTH, PARQUET_MAX_ROW_GROUP_SIZE};
+use config::PARQUET_MAX_ROW_GROUP_SIZE;
 use datafusion::{
     common::{
         Column, DataFusionError, Result, project_schema,
@@ -150,86 +150,7 @@ pub async fn list_files<'a>(
     ))
 }
 
-/// Partition the list of files into `n` groups
-pub fn split_files(
-    mut partitioned_files: Vec<PartitionedFile>,
-    n: usize,
-) -> Vec<Vec<PartitionedFile>> {
-    if partitioned_files.is_empty() {
-        return vec![];
-    }
-
-    // ObjectStore::list does not guarantee any consistent order and for some
-    // implementations such as LocalFileSystem, it may be inconsistent. Thus
-    // Sort files by path to ensure consistent plans when run more than once.
-    partitioned_files.sort_by(|a, b| a.path().cmp(b.path()));
-
-    // effectively this is div with rounding up instead of truncating
-    let chunk_size = partitioned_files.len().div_ceil(n);
-    partitioned_files
-        .chunks(chunk_size)
-        .map(|c| c.to_vec())
-        .collect()
-}
-
 pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
-    #[allow(deprecated)]
-    if config::get_config()
-        .common
-        .inverted_index_search_format
-        .eq("tantivy")
-    {
-        return generate_access_plan_row_level(file);
-    };
-    let index_segment_length = INDEX_SEGMENT_LENGTH;
-    let segment_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
-    let stats = file.statistics.as_ref()?;
-    let Precision::Exact(num_rows) = stats.num_rows else {
-        return None;
-    };
-    let row_group_count = num_rows.div_ceil(PARQUET_MAX_ROW_GROUP_SIZE);
-    let segment_count = num_rows.div_ceil(index_segment_length);
-    let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
-    let mut selection = Vec::with_capacity(segment_ids.len());
-    let mut last_group_id = 0;
-    for (segment_id, val) in segment_ids.iter().enumerate() {
-        if segment_id >= segment_count {
-            break;
-        }
-        let row_group_id = (segment_id * index_segment_length) / PARQUET_MAX_ROW_GROUP_SIZE;
-        if row_group_id != last_group_id && !selection.is_empty() {
-            if selection.iter().any(|s: &RowSelector| !s.skip) {
-                access_plan.scan(last_group_id);
-                access_plan.scan_selection(last_group_id, RowSelection::from(selection.clone()));
-            }
-            selection.clear();
-            last_group_id = row_group_id;
-        }
-        let length = if (segment_id + 1) * index_segment_length > num_rows {
-            num_rows % index_segment_length
-        } else {
-            index_segment_length
-        };
-        if *val {
-            selection.push(RowSelector::select(length));
-        } else {
-            selection.push(RowSelector::skip(length));
-        }
-    }
-    if !selection.is_empty() && selection.iter().any(|s: &RowSelector| !s.skip) {
-        access_plan.scan(last_group_id);
-        access_plan.scan_selection(last_group_id, RowSelection::from(selection));
-    }
-    log::debug!(
-        "file path: {:?}, row_group_count: {}, access_plan: {:?}",
-        file.path().as_ref(),
-        row_group_count,
-        access_plan
-    );
-    Some(Arc::new(access_plan))
-}
-
-pub fn generate_access_plan_row_level(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
     let row_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
     let stats = file.statistics.as_ref()?;
     let Precision::Exact(num_rows) = stats.num_rows else {
@@ -349,46 +270,6 @@ mod tests {
     use datafusion::logical_expr::{case, col, lit};
 
     use super::*;
-
-    #[test]
-    fn test_split_files() {
-        let new_partitioned_file = |path: &str| PartitionedFile::new(path.to_owned(), 10);
-        let files = vec![
-            new_partitioned_file("a"),
-            new_partitioned_file("b"),
-            new_partitioned_file("c"),
-            new_partitioned_file("d"),
-            new_partitioned_file("e"),
-        ];
-
-        let chunks = split_files(files.clone(), 1);
-        assert_eq!(1, chunks.len());
-        assert_eq!(5, chunks[0].len());
-
-        let chunks = split_files(files.clone(), 2);
-        assert_eq!(2, chunks.len());
-        assert_eq!(3, chunks[0].len());
-        assert_eq!(2, chunks[1].len());
-
-        let chunks = split_files(files.clone(), 5);
-        assert_eq!(5, chunks.len());
-        assert_eq!(1, chunks[0].len());
-        assert_eq!(1, chunks[1].len());
-        assert_eq!(1, chunks[2].len());
-        assert_eq!(1, chunks[3].len());
-        assert_eq!(1, chunks[4].len());
-
-        let chunks = split_files(files, 123);
-        assert_eq!(5, chunks.len());
-        assert_eq!(1, chunks[0].len());
-        assert_eq!(1, chunks[1].len());
-        assert_eq!(1, chunks[2].len());
-        assert_eq!(1, chunks[3].len());
-        assert_eq!(1, chunks[4].len());
-
-        let chunks = split_files(vec![], 2);
-        assert_eq!(0, chunks.len());
-    }
 
     #[test]
     fn test_expr_applicable_for_cols() {

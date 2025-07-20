@@ -114,7 +114,7 @@ async fn lock_stream(org_id: &str, stream_type: StreamType, stream_name: &str) -
     }
 
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-        let lock_key = format!("/compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
+        let lock_key = format!("/compact/merge/{org_id}/{stream_type}/{stream_name}");
         let locker = match dist_lock::lock(&lock_key, 0).await {
             Ok(v) => v,
             Err(_) => return None,
@@ -315,6 +315,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, anyhow::Er
     let batch_size = files.len();
 
     let mut field_id = Int64Builder::with_capacity(batch_size);
+    let mut field_account = StringBuilder::with_capacity(batch_size, batch_size * 128);
     let mut field_org = StringBuilder::with_capacity(batch_size, batch_size * 128);
     let mut field_stream = StringBuilder::with_capacity(batch_size, batch_size * 256);
     let mut field_date = StringBuilder::with_capacity(batch_size, batch_size * 10);
@@ -330,6 +331,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, anyhow::Er
 
     for file in files {
         field_id.append_value(file.id);
+        field_account.append_value(file.account);
         field_org.append_value(file.org);
         field_stream.append_value(file.stream);
         field_date.append_value(file.date);
@@ -348,6 +350,7 @@ fn create_record_batch(files: Vec<FileRecord>) -> Result<RecordBatch, anyhow::Er
         schema.clone(),
         vec![
             Arc::new(field_id.finish()),
+            Arc::new(field_account.finish()),
             Arc::new(field_org.finish()),
             Arc::new(field_stream.finish()),
             Arc::new(field_date.finish()),

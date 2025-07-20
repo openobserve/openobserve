@@ -173,4 +173,8 @@ export const restHandlers = [
       ],
     });
   }),
+
+  http.get(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/short/:id`, ({ request }) => {
+    return HttpResponse.json("http://localhost:5080/web/logs?stream_type=logs&stream=default1&from=1749120770351000&to=1749121670351000&refresh=0&defined_schemas=user_defined_schema&org_identifier=default&quick_mode=false&show_histogram=true");
+  }),
 ];

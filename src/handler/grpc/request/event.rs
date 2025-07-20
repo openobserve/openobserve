@@ -18,7 +18,7 @@ use std::ops::Range;
 use anyhow::Result;
 use config::{
     cluster::LOCAL_NODE, get_config, meta::stream::FileKey, metrics,
-    utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
+    utils::inverted_index::convert_parquet_file_name_to_tantivy_file,
 };
 use infra::cache::file_data::{CacheType, TRACE_ID_FOR_CACHE_LATEST_FILE, disk};
 use opentelemetry::global;
@@ -76,17 +76,17 @@ impl Event for Eventer {
                 }
 
                 // cache index for the parquet
-                if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
-                    if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
-                    {
-                        files_to_download.push((
-                            item.id,
-                            item.account.clone(),
-                            ttv_file,
-                            item.meta.index_size,
-                            item.meta.max_ts,
-                        ));
-                    }
+                if cfg.cache_latest_files.cache_index
+                    && item.meta.index_size > 0
+                    && let Some(ttv_file) = convert_parquet_file_name_to_tantivy_file(&item.key)
+                {
+                    files_to_download.push((
+                        item.id,
+                        item.account.clone(),
+                        ttv_file,
+                        item.meta.index_size,
+                        item.meta.max_ts,
+                    ));
                 }
             }
 
@@ -99,7 +99,7 @@ impl Event for Eventer {
                     match crate::job::download_from_node(&grpc_addr, &files_to_download).await {
                         Ok(failed) => failed_files = failed,
                         Err(e) => {
-                            log::error!("[gRPC:Event] Failed to get files from notifier: {}", e);
+                            log::error!("[gRPC:Event] Failed to get files from notifier: {e}");
                             failed_files = files_to_download;
                         }
                     }
@@ -118,7 +118,7 @@ impl Event for Eventer {
                     )
                     .await
                     {
-                        log::error!("[gRPC:Event] Failed to cache file data: {}", e);
+                        log::error!("[gRPC:Event] Failed to cache file data: {e}");
                     }
                 }
             } else {
@@ -135,7 +135,7 @@ impl Event for Eventer {
                     )
                     .await
                     {
-                        log::error!("[gRPC:Event] Failed to cache file data: {}", e);
+                        log::error!("[gRPC:Event] Failed to cache file data: {e}");
                     }
                 }
             }
@@ -158,7 +158,7 @@ impl Event for Eventer {
                             if v.deleted {
                                 match v.meta.as_ref() {
                                     Some(m) if m.index_size > 0 => {
-                                        convert_parquet_idx_file_name_to_tantivy_file(&v.key)
+                                        convert_parquet_file_name_to_tantivy_file(&v.key)
                                     }
                                     _ => None,
                                 }
@@ -195,7 +195,7 @@ impl Event for Eventer {
         tokio::spawn(async move {
             for path in file_list.files.iter() {
                 if let Err(e) = handle_file_chunked(path, tx.clone()).await {
-                    log::error!("[gRPC:Event] Failed to handle file {}: {}", path, e);
+                    log::error!("[gRPC:Event] Failed to handle file {path}: {e}");
                     break;
                 }
             }
@@ -211,11 +211,11 @@ async fn handle_file_chunked(
 ) -> Result<(), Status> {
     let start = std::time::Instant::now();
     let filename = path.to_string();
-    let mut offset = 0usize;
-    let total_size = disk::get_size(path).await.unwrap_or(0);
+    let mut offset = 0u64;
+    let total_size = disk::get_size(path).await.unwrap_or(0) as u64;
 
-    while offset < total_size as usize {
-        let chunk_size = std::cmp::min(CHUNK_SIZE, total_size - offset);
+    while offset < total_size {
+        let chunk_size = std::cmp::min(CHUNK_SIZE as u64, total_size - offset);
         let chunk = match infra::cache::file_data::disk::get(
             path,
             Some(Range {
@@ -228,7 +228,7 @@ async fn handle_file_chunked(
             Some(file_data) => file_data,
             None => {
                 if let Err(e) = tx.send(Err(Status::not_found(path))).await {
-                    log::error!("[gRPC:Event] Failed to send error: {}", e);
+                    log::error!("[gRPC:Event] Failed to send error: {e}");
                 }
                 return Err(Status::not_found(path));
             }
@@ -242,7 +242,7 @@ async fn handle_file_chunked(
         };
 
         if let Err(e) = tx.send(Ok(response)).await {
-            log::error!("[gRPC:Event] Failed to send file chunk: {}", e);
+            log::error!("[gRPC:Event] Failed to send file chunk: {e}");
             return Err(Status::internal("Failed to send file chunk"));
         }
 

@@ -41,7 +41,8 @@ pub struct TimedAnnotationRes {
     pub timed_annotation_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
 pub struct TimedAnnotation {
     pub annotation_id: Option<String>,
     pub start_time: i64,
@@ -54,10 +55,10 @@ pub struct TimedAnnotation {
 
 impl TimedAnnotation {
     pub fn validate(&self) -> Result<(), String> {
-        if let Some(end_time) = self.end_time {
-            if end_time <= self.start_time {
-                return Err("end time must be greater than start time".to_string());
-            }
+        if let Some(end_time) = self.end_time
+            && end_time <= self.start_time
+        {
+            return Err("end time must be greater than start time".to_string());
         }
 
         if self.title.is_empty() {

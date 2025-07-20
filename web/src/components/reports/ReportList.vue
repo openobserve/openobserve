@@ -21,7 +21,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="height: calc(100vh - 57px)"
     :class="store.state.theme === 'dark' ? 'dark-mode' : ''"
   >
-    <div class="full-width">
+  <div class="tw-flex tw-justify-between tw-items-center tw-w-full tw-py-3 tw-px-4"
+    :class="store.state.theme === 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+    >
+      <div class="q-table__title" data-test="report-list-title">
+        {{ t("reports.header") }}
+      </div>
+
+      <div class="tw-flex tw-items-center">
+        <div class="app-tabs-container q-mr-md">
+        <app-tabs
+          class="tabs-selection-container"
+          :tabs="tabs"
+          :class="store.state.theme === 'dark' ? 'tabs-selection-container-dark' : 'tabs-selection-container-light'"
+          v-model:active-tab="activeTab"
+          @update:active-tab="filterReports"
+        />
+        </div>
+        <q-input
+          data-test="report-list-search-input"
+          v-model="filterQuery"
+          borderless
+          filled
+          dense
+          class="q-ml-auto no-border"
+          :placeholder="t('reports.search')"
+        >
+          <template #prepend>
+            <q-icon name="search" class="cursor-pointer" />
+          </template>
+        </q-input>
+        <q-btn
+          data-test="report-list-add-report-btn"
+          class="q-ml-md text-bold no-border"
+          padding="sm lg"
+          color="secondary"
+          no-caps
+          :label="t(`reports.add`)"
+          @click="createNewReport"
+        />
+      </div>
+    </div>
+    <div class="full-width o2-quasar-table"
+    style="height: calc(100vh - 112px) ; overflow-y: auto;"
+    :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+    >
       <q-table
         data-test="report-list-table"
         ref="reportListTableRef"
@@ -105,43 +149,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #top="scope">
-          <div class="tw-flex tw-justify-between tw-w-full">
-            <div class="q-table__title" data-test="report-list-title">
-              {{ t("reports.header") }}
-            </div>
-
-            <div class="tw-flex tw-items-center report-list-tabs">
-              <app-tabs
-                class="q-mr-md"
-                :tabs="tabs"
-                v-model:active-tab="activeTab"
-                @update:active-tab="filterReports"
-              />
-              <q-input
-                data-test="report-list-search-input"
-                v-model="filterQuery"
-                borderless
-                filled
-                dense
-                class="q-ml-auto q-mb-xs no-border"
-                :placeholder="t('reports.search')"
-              >
-                <template #prepend>
-                  <q-icon name="search" class="cursor-pointer" />
-                </template>
-              </q-input>
-              <q-btn
-                data-test="report-list-add-report-btn"
-                class="q-ml-md q-mb-xs text-bold no-border"
-                padding="sm lg"
-                color="secondary"
-                no-caps
-                :label="t(`reports.add`)"
-                @click="createNewReport"
-              />
-            </div>
-          </div>
-
           <QTablePagination
             :scope="scope"
             :pageTitle="t('reports.header')"
@@ -161,6 +168,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:changeRecordPerPage="changePagination"
           />
         </template>
+
+        <template v-slot:header="props">
+            <q-tr :props="props">
+              <!-- Rendering the of the columns -->
+               <!-- here we can add the classes class so that the head will be sticky -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
       </q-table>
     </div>
 
@@ -258,6 +281,7 @@ const columns: any = ref<QTableProps["columns"]>([
     label: "#",
     field: "#",
     align: "left",
+    style: "width: 67px",
   },
   {
     name: "name",
@@ -272,6 +296,7 @@ const columns: any = ref<QTableProps["columns"]>([
     label: t("alerts.owner"),
     align: "center",
     sortable: true,
+    style: "width: 150px",
   },
   {
     name: "description",
@@ -279,21 +304,23 @@ const columns: any = ref<QTableProps["columns"]>([
     label: t("alerts.description"),
     align: "center",
     sortable: false,
+    style: "width: 300px",
   },
   {
     name: "last_triggered_at",
-    field: "lastTriggeredAt",
+    field: "last_triggered_at",
     label: t("alerts.lastTriggered"),
     align: "left",
     sortable: true,
+    style: "width: 150px",
   },
   {
     name: "actions",
     field: "actions",
     label: t("alerts.actions"),
     align: "center",
-    style: "width: 300px",
     sortable: false,
+    classes: "actions-column",
   },
 ]);
 
@@ -312,22 +339,22 @@ onBeforeMount(() => {
       reportsTableRows.value = res.data.map((report: any, index: number) => ({
         "#": index + 1,
         ...report,
-        lastTriggeredAt: report.lastTriggeredAt
-          ? convertUnixToQuasarFormat(report.lastTriggeredAt)
+        last_triggered_at: report.last_triggered_at
+          ? convertUnixToQuasarFormat(report.last_triggered_at)
           : "-",
       }));
       resultTotal.value = reportsTableRows.value.length;
       staticReportsList.value = JSON.parse(
-        JSON.stringify(reportsTableRows.value)
+        JSON.stringify(reportsTableRows.value),
       );
       filterReports();
     })
     .catch((err) => {
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         q.notify({
-        type: "negative",
-        message: err?.data?.message || "Error while fetching reports!",
-        timeout: 3000,
+          type: "negative",
+          message: err?.data?.message || "Error while fetching reports!",
+          timeout: 3000,
         });
       }
     })
@@ -372,25 +399,43 @@ const toggleReportState = (report: any) => {
     .toggleReportState(
       store.state.selectedOrganization.identifier,
       report.name,
-      !report.enabled
+      !report.enabled,
     )
     .then(() => {
-      report.enabled = !report.enabled;
+      // Create a new report object with updated enabled status
+      const updatedReport = { ...report, enabled: !report.enabled };
+
+      // Update in staticReportsList
+      staticReportsList.value = staticReportsList.value.map((r: any) => {
+        if (r.name === report.name) {
+          return updatedReport;
+        }
+        return r;
+      });
+
+      // Update in reportsTableRows
+      reportsTableRows.value = reportsTableRows.value.map((r: any) => {
+        if (r.name === report.name) {
+          return { ...r, enabled: !r.enabled };
+        }
+        return r;
+      });
+
       q.notify({
         type: "positive",
         message: `${
-          report.enabled ? "Started" : "Stopped"
+          updatedReport.enabled ? "Started" : "Stopped"
         } report successfully.`,
         timeout: 2000,
       });
     })
     .catch((err) => {
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         q.notify({
-        type: "negative",
-        message: err?.data?.message || "Error while stopping report!",
-        timeout: 4000,
-      });
+          type: "negative",
+          message: err?.data?.message || "Error while stopping report!",
+          timeout: 4000,
+        });
       }
     })
     .finally(() => {
@@ -423,24 +468,16 @@ const deleteReport = (report: any) => {
   reports
     .deleteReport(
       store.state.selectedOrganization.identifier,
-      deleteDialog.value.data
+      deleteDialog.value.data,
     )
     .then(() => {
       // Find the index of the row that matches the condition
-      const deleteIndex = reportsTableRows.value.findIndex(
-        (row: any) => row.name === deleteDialog.value.data
+      // update in staticReportsList and call filterReports
+      staticReportsList.value = staticReportsList.value.filter(
+        (r: any) => r.name !== deleteDialog.value.data,
       );
 
-      // Check if a matching row was found
-      if (deleteIndex !== -1) {
-        // Remove the row from the array
-        reportsTableRows.value.splice(deleteIndex, 1);
-
-        // Update the "#" property for the remaining rows
-        reportsTableRows.value.forEach((row: any, index: number) => {
-          row["#"] = index + 1;
-        });
-      }
+      filterReports();
 
       q.notify({
         type: "positive",
@@ -449,12 +486,12 @@ const deleteReport = (report: any) => {
       });
     })
     .catch((err: any) => {
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         q.notify({
-        type: "negative",
-        message: err?.data?.message || "Error while deleting report!",
-        timeout: 4000,
-      });
+          type: "negative",
+          message: err?.data?.message || "Error while deleting report!",
+          timeout: 4000,
+        });
       }
     })
     .finally(() => dismiss());
@@ -469,11 +506,11 @@ const filterReports = () => {
   // If reports are cached, show only cached reports
   if (activeTab.value === "cached") {
     reportsTableRows.value = (staticReportsList.value as any).filter(
-      (report: any) => !report.destinations.length
+      (report: any) => !report.destinations.length,
     );
   } else {
     reportsTableRows.value = (staticReportsList.value as any).filter(
-      (report: any) => report.destinations.length
+      (report: any) => report.destinations.length,
     );
   }
 
@@ -483,7 +520,7 @@ const filterReports = () => {
         ...report,
         "#": index + 1,
       };
-    }
+    },
   ) as any[];
 
   resultTotal.value = reportsTableRows.value.length;

@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    cmp::min,
     collections::HashMap,
     ops::Bound,
     sync::{Arc, atomic::Ordering},
@@ -187,7 +186,9 @@ pub async fn register_and_keep_alive() -> Result<()> {
             panic!("Local mode only support NODE_ROLE=all");
         }
         // cache local node
-        let node = load_local_node();
+        let mut node = load_local_node();
+        node.status = NodeStatus::Online;
+        node.scheduled = true;
         add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Interactive)).await;
         add_node_to_consistent_hash(&node, &Role::Querier, Some(RoleGroup::Background)).await;
         add_node_to_consistent_hash(&node, &Role::Compactor, None).await;
@@ -203,16 +204,15 @@ pub async fn register_and_keep_alive() -> Result<()> {
 
     // check node heatbeat
     tokio::task::spawn(async move {
-        let cfg = get_config();
         let client = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
-        let ttl_keep_alive = min(10, (cfg.limit.node_heartbeat_ttl / 2) as u64);
+        let ttl_keep_alive = std::cmp::max(1, (get_config().limit.node_heartbeat_ttl / 2) as u64);
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             if let Err(e) = check_nodes_status(&client).await {
-                log::error!("[CLUSTER] check_nodes_status failed: {}", e);
+                log::error!("[CLUSTER] check_nodes_status failed: {e}");
             }
         }
     });
@@ -293,13 +293,13 @@ pub async fn list_nodes() -> Result<Vec<Node>> {
     let mut nodes = Vec::new();
     let client = get_coordinator().await;
     let items = client.list_values("/nodes/").await.map_err(|e| {
-        log::error!("[CLUSTER] error getting nodes: {}", e);
+        log::error!("[CLUSTER] error getting nodes: {e}");
         e
     })?;
 
     for item in items {
         let node: Node = json::from_slice(&item).map_err(|e| {
-            log::error!("[CLUSTER] error parsing node: {}, payload: {:#?}", e, item);
+            log::error!("[CLUSTER] error parsing node: {e}, payload: {item:#?}");
             e
         })?;
         nodes.push(node.to_owned());
@@ -326,7 +326,18 @@ async fn watch_node_list() -> Result<()> {
         match ev {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let mut item_value: Node = json::from_slice(&ev.value.unwrap()).unwrap();
+                let mut item_value: Node = match json::from_slice(ev.value.as_ref().unwrap()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let value_str = String::from_utf8_lossy(ev.value.as_ref().unwrap());
+                        log::error!(
+                            "[CLUSTER] watch_node_list: error parsing node: {}, payload: {}",
+                            e,
+                            value_str
+                        );
+                        continue;
+                    }
+                };
                 let (_broadcasted, exist) = match NODES.read().await.get(item_key) {
                     Some(v) => (v.broadcasted, item_value.is_same(v)),
                     None => (false, false),
@@ -337,7 +348,7 @@ async fn watch_node_list() -> Result<()> {
                     continue;
                 }
                 if item_value.status == NodeStatus::Offline {
-                    log::info!("[CLUSTER] offline {:?}", item_value);
+                    log::info!("[CLUSTER] offline {item_value:?}");
                     if item_value.is_interactive_querier() {
                         remove_node_from_consistent_hash(
                             &item_value,
@@ -354,9 +365,6 @@ async fn watch_node_list() -> Result<()> {
                         )
                         .await;
                     }
-                    if item_value.is_querier() && LOCAL_NODE.is_router() {
-                        crate::router::http::remove_querier_from_handler(&item_value.name).await;
-                    }
                     if item_value.is_compactor() {
                         remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
                     }
@@ -371,13 +379,13 @@ async fn watch_node_list() -> Result<()> {
                     NODES.write().await.remove(item_key);
                     continue;
                 }
-                log::info!("[CLUSTER] join {:?}", item_value);
+                log::info!("[CLUSTER] join {item_value:?}");
                 item_value.broadcasted = true;
                 // check if the same node is already in the cluster
-                if let Some(node) = get_cached_node_by_name(&item_value.name).await {
-                    if node.uuid.ne(&item_value.uuid) {
-                        NODES.write().await.remove(&node.uuid);
-                    }
+                if let Some(node) = get_cached_node_by_name(&item_value.name).await
+                    && node.uuid.ne(&item_value.uuid)
+                {
+                    NODES.write().await.remove(&node.uuid);
                 }
                 if item_value.is_interactive_querier() {
                     add_node_to_consistent_hash(
@@ -411,7 +419,7 @@ async fn watch_node_list() -> Result<()> {
                         continue;
                     }
                 };
-                log::info!("[CLUSTER] leave {:?}", item_value);
+                log::info!("[CLUSTER] leave {item_value:?}");
                 if item_value.is_interactive_querier() {
                     remove_node_from_consistent_hash(
                         &item_value,
@@ -427,9 +435,6 @@ async fn watch_node_list() -> Result<()> {
                         Some(RoleGroup::Background),
                     )
                     .await;
-                }
-                if item_value.is_querier() && LOCAL_NODE.is_router() {
-                    crate::router::http::remove_querier_from_handler(&item_value.name).await;
                 }
                 if item_value.is_compactor() {
                     remove_node_from_consistent_hash(&item_value, &Role::Compactor, None).await;
@@ -688,6 +693,65 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_set_online() {
+        register_and_keep_alive().await.unwrap();
+        set_online(true).await.unwrap();
+        assert!(get_cached_online_nodes().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_set_offline() {
+        register_and_keep_alive().await.unwrap();
+        set_offline(true).await.unwrap();
+        // doesn't work for local mode
+        assert!(get_cached_online_nodes().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_set_unschedulable() {
+        register_and_keep_alive().await.unwrap();
+        set_unschedulable().await.unwrap();
+        // doesn't work for local mode
+        assert!(get_cached_online_ingester_nodes().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_set_schedulable() {
+        register_and_keep_alive().await.unwrap();
+        set_schedulable().await.unwrap();
+        assert!(get_cached_online_ingester_nodes().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_update_local_node() {
+        let node = LOCAL_NODE.clone();
+        register_and_keep_alive().await.unwrap();
+        update_local_node(&node).await.unwrap();
+        assert!(get_cached_node_by_name(&node.name).await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_get_cached_nodes() {
+        let node = LOCAL_NODE.clone();
+        register_and_keep_alive().await.unwrap();
+        assert!(get_node_by_addr(&node.grpc_addr).await.is_some());
+        assert!(get_node_by_uuid(&node.uuid).await.is_some());
+        assert!(get_cached_node_by_name(&node.name).await.is_some());
+        assert!(get_cached_online_nodes().await.is_some());
+        assert!(get_cached_online_query_nodes(None).await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_set_node_status_metrics() {
+        let node = LOCAL_NODE.clone();
+        register_and_keep_alive().await.unwrap();
+        update_local_node(&node).await.unwrap();
+        set_node_status_metrics(&node).await;
+        assert!(get_cached_node_by_name(&node.name).await.is_some());
+        assert!(get_cached_online_nodes().await.is_some());
+    }
+
+    #[tokio::test]
     async fn test_cluster() {
         register_and_keep_alive().await.unwrap();
         set_online(false).await.unwrap();
@@ -716,6 +780,9 @@ mod tests {
                 role: [Role::Compactor].to_vec(),
                 ..node.clone()
             };
+            add_node_to_consistent_hash(&node_q, &Role::Querier, Some(RoleGroup::Interactive))
+                .await;
+            add_node_to_consistent_hash(&node_q, &Role::Querier, Some(RoleGroup::Background)).await;
             add_node_to_consistent_hash(&node_q, &Role::Querier, None).await;
             add_node_to_consistent_hash(&node_c, &Role::Compactor, None).await;
             add_node_to_consistent_hash(&node_c, &Role::FlattenCompactor, None).await;
@@ -761,5 +828,12 @@ mod tests {
                 Some(key.get(2).unwrap().to_string())
             );
         }
+
+        let ret = print_consistent_hash().await;
+        assert_eq!(ret.len(), 4);
+        assert_eq!(ret["querier_interactive"].len(), 10);
+        assert_eq!(ret["querier_background"].len(), 10);
+        assert_eq!(ret["compactor"].len(), 10);
+        assert_eq!(ret["flatten_compactor"].len(), 10);
     }
 }

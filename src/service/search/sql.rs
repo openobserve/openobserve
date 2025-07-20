@@ -15,19 +15,23 @@
 
 use std::{ops::ControlFlow, sync::Arc};
 
-use arrow_schema::FieldRef;
-use chrono::Duration;
+use arrow_schema::{DataType, Field, FieldRef};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        inverted_index::InvertedIndexOptimizeMode,
+        inverted_index::IndexOptimizeMode,
         search::SearchEventType,
-        sql::{OrderBy, Sql as MetaSql, TableReferenceExt, resolve_stream_names_with_type},
+        sql::{
+            MAX_LIMIT, OrderBy, Sql as MetaSql, TableReferenceExt, resolve_stream_names_with_type,
+        },
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
 };
-use datafusion::{arrow::datatypes::Schema, common::TableReference};
+use datafusion::{
+    arrow::datatypes::Schema,
+    common::{TableReference, tree_node::TreeNode},
+};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes},
@@ -42,21 +46,37 @@ use regex::Regex;
 use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
-        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, OrderByExpr,
-        Query, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, Value,
-        VisitMut, VisitorMut, helpers::attached_token::AttachedToken,
+        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, ObjectNamePart,
+        OrderByExpr, OrderByKind, Query, Select, SelectFlavor, SelectItem, SetExpr, Statement,
+        TableFactor, TableWithJoins, Value, ValueWithSpan, VisitMut, VisitorMut,
+        helpers::attached_token::AttachedToken,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
+    tokenizer::Span,
 };
 
 #[cfg(feature = "enterprise")]
-use super::datafusion::udf::cipher_udf::{DECRYPT_UDF_NAME, ENCRYPT_UDF_NAME};
+use super::datafusion::udf::cipher_udf::{
+    DECRYPT_SLOW_UDF_NAME, DECRYPT_UDF_NAME, ENCRYPT_UDF_NAME,
+};
 use super::{
     datafusion::udf::match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
     index::{Condition, IndexCondition, get_index_condition_from_expr},
     request::Request,
     utils::{conjunction, is_field, is_value, split_conjunction, trim_quotes},
+};
+use crate::service::search::{
+    cluster::flight::{generate_context, register_table},
+    datafusion::{
+        distributed_plan::rewrite::GroupByFieldVisitor,
+        udf::{
+            MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+            STR_MATCH_UDF_NAME,
+        },
+    },
+    index::get_arg_name,
+    utils::get_field_name,
 };
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
@@ -89,7 +109,7 @@ pub struct Sql {
     pub sorted_by_time: bool,     // if only order by _timestamp
     pub use_inverted_index: bool, // if can use inverted index
     pub index_condition: Option<IndexCondition>, // use for tantivy index
-    pub index_optimize_mode: Option<InvertedIndexOptimizeMode>,
+    pub index_optimize_mode: Option<IndexOptimizeMode>,
 }
 
 impl Sql {
@@ -111,14 +131,15 @@ impl Sql {
         let sql = query.sql.clone();
         let offset = query.from as i64;
         let mut limit = query.size as i64;
-
+        let sql =
+            config::utils::query_select_utils::replace_o2_custom_patterns(&sql).unwrap_or(sql);
         // 1. get table name
-        let stream_names =
-            resolve_stream_names_with_type(&sql).map_err(|e| Error::Message(e.to_string()))?;
+        let stream_names = resolve_stream_names_with_type(&sql)
+            .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?;
         if stream_names.len() > 1 && stream_names.iter().any(|s| s.schema() == Some("index")) {
-            return Err(Error::Message(
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Index stream is not supported in multi-stream query".to_string(),
-            ));
+            )));
         }
         let mut total_schemas = HashMap::with_capacity(stream_names.len());
         for stream in stream_names.iter() {
@@ -131,17 +152,23 @@ impl Sql {
         }
 
         let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, &sql)
-            .map_err(|e| Error::Message(e.to_string()))?
+            .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?
             .pop()
             .unwrap();
 
+        //********************Change the sql start*********************************//
         // 2. rewrite track_total_hits
         if query.track_total_hits {
             let mut trace_total_hits_visitor = TrackTotalHitsVisitor::new();
             let _ = statement.visit(&mut trace_total_hits_visitor);
         }
 
-        // 3. get column name, alias, group by, order by
+        // 3. rewrite all filter that include DASHBOARD_ALL with true
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
+        //********************Change the sql end*********************************//
+
+        // 4. get column name, alias, group by, order by
         let mut column_visitor = ColumnVisitor::new(&total_schemas);
         let _ = statement.visit(&mut column_visitor);
 
@@ -167,21 +194,20 @@ impl Sql {
         let need_sort_by_time = order_by.len() == 1
             && order_by[0].0 == TIMESTAMP_COL_NAME
             && order_by[0].1 == OrderBy::Desc;
-        let use_inverted_index = column_visitor.use_inverted_index;
 
         // check if need exact limit and offset
-        if limit == -1 || limit == 0 {
-            if let Some(n) = column_visitor.limit {
-                limit = n;
-            }
+        if (limit == -1 || limit == 0)
+            && let Some(n) = column_visitor.limit
+        {
+            limit = n;
         }
 
-        // 4. get match_all() value
+        // 5. get match_all() value
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
         let need_fst_fields = match_visitor.match_items.is_some();
 
-        // 5. check if have full text search filed in stream
+        // 6. check if have full text search filed in stream
         if stream_names.len() == 1 && need_fst_fields {
             let schema = total_schemas.values().next().unwrap();
             let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
@@ -191,14 +217,14 @@ impl Sql {
                 .into_iter()
                 .all(|field| !schema.contains_field(&field))
             {
-                return Err(Error::Message(
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                     "Using match_all() function in a stream that don't have full text search field"
                         .to_string(),
-                ));
+                )));
             }
         }
 
-        // 6. generate used schema
+        // 7. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
             let has_original_column = has_original_column(&column_visitor.columns);
@@ -221,21 +247,26 @@ impl Sql {
             }
         }
 
-        // 7. get partition column value
+        // 8. get partition column value
         let mut partition_column_visitor = PartitionColumnVisitor::new(&used_schemas);
         let _ = statement.visit(&mut partition_column_visitor);
 
-        // 8. get prefix column value
+        // 9. get prefix column value
         let mut prefix_column_visitor = PrefixColumnVisitor::new(&used_schemas);
         let _ = statement.visit(&mut prefix_column_visitor);
 
-        // 9. pick up histogram interval
+        // 10. pick up histogram interval
         let mut histogram_interval_visitor =
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         let _ = statement.visit(&mut histogram_interval_visitor);
+        let histogram_interval = if query.histogram_interval > 0 {
+            Some(query.histogram_interval)
+        } else {
+            histogram_interval_visitor.interval
+        };
 
-        // NOTE: only this place modify the sql
-        // 10. add _timestamp and _o2_id if need
+        //********************Change the sql start*********************************//
+        // 11. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
@@ -245,16 +276,11 @@ impl Sql {
             }
         }
 
-        // NOTE: only this place modify the sql
-        // 11. generate tantivy query
+        // 12. generate tantivy query
+        // TODO: merge IndexVisitor and IndexOptimizeModeVisitor
         let mut index_condition = None;
         let mut can_optimize = false;
-        #[allow(deprecated)]
-        if cfg.common.inverted_index_search_format.eq("tantivy")
-            && stream_names.len() == 1
-            && cfg.common.inverted_index_enabled
-            && use_inverted_index
-        {
+        if stream_names.len() == 1 && cfg.common.inverted_index_enabled {
             let mut index_visitor = IndexVisitor::new(
                 &used_schemas,
                 cfg.common.feature_query_remove_filter_with_index,
@@ -264,34 +290,42 @@ impl Sql {
             index_condition = index_visitor.index_condition;
             can_optimize = index_visitor.can_optimize;
         }
+        //********************Change the sql end*********************************//
+
         // use all condition for histogram without filter
-        if use_inverted_index && can_optimize && index_condition.is_none() {
+        if can_optimize && index_condition.is_none() {
             index_condition = Some(IndexCondition {
                 conditions: vec![Condition::All()],
             });
         }
 
-        // 12. check `select * from table where match_all()` optimizer
+        // set use_inverted_index use index_condition
+        let use_inverted_index = index_condition.is_some();
+
+        // 13. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
             && order_by.len() == 1
             && order_by[0].0 == TIMESTAMP_COL_NAME
             && can_optimize
         {
-            index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleSelect(
+            index_optimize_mode = Some(IndexOptimizeMode::SimpleSelect(
                 (offset + limit) as usize,
                 order_by[0].1 == OrderBy::Asc,
             ));
         }
 
-        // 13. check other inverted index optimize modes
+        // 14. check other inverted index optimize modes
         // `select count(*) from table where match_all` -> SimpleCount
         // or `select histogram(..), count(*) from table where match_all` -> SimpleHistogram
+        // or `select id, count(*) from t group by id order by cnt desc limit 10` -> SimpleTopN
+        // or `select id from t where str_match(id, 'value') group by id order by id asc limit 10`
+        // -> SimpleDistinct
         if can_optimize && index_optimize_mode.is_none() {
-            let mut visitor = OtherIndexOptimizeModeVisitor::new();
+            let mut visitor = IndexOptimizeModeVisitor::new(&used_schemas);
             let _ = statement.visit(&mut visitor);
             if visitor.is_simple_count {
-                index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
+                index_optimize_mode = Some(IndexOptimizeMode::SimpleCount);
             } else if visitor.is_simple_histogram && histogram_interval_visitor.interval.is_some() {
                 let bucket_width = histogram_interval_visitor.interval.unwrap() as u64 * 1_000_000;
                 // round the bucket edges to even start
@@ -300,15 +334,45 @@ impl Sql {
                 let max_value = (query.end_time / rounding_by) * rounding_by;
                 let num_buckets =
                     ((max_value - min_value) as f64 / bucket_width as f64).ceil() as usize;
-                index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleHistogram(
+                index_optimize_mode = Some(IndexOptimizeMode::SimpleHistogram(
                     min_value,
                     bucket_width,
                     num_buckets,
                 ));
+            } else if let Some((field, limit, asc)) = visitor.simple_topn {
+                index_optimize_mode = Some(IndexOptimizeMode::SimpleTopN(field, limit, asc));
+            } else if let Some((field, limit, asc)) = visitor.simple_distinct {
+                index_optimize_mode = Some(IndexOptimizeMode::SimpleDistinct(field, limit, asc));
             }
         }
 
+        // 15. replace the Utf8 to Utf8View type
+        let final_schemas = if cfg.common.utf8_view_enabled {
+            let mut final_schemas = HashMap::with_capacity(used_schemas.len());
+            for (stream, schema) in used_schemas.iter() {
+                let fields = schema
+                    .schema()
+                    .fields()
+                    .iter()
+                    .map(|f| {
+                        if f.data_type() == &DataType::Utf8 {
+                            Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
+                        } else {
+                            f.clone()
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let new_schema =
+                    Schema::new(fields).with_metadata(schema.schema().metadata().clone());
+                final_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(new_schema)));
+            }
+            final_schemas
+        } else {
+            used_schemas.clone()
+        };
+
         let is_complex = is_complex_query(&mut statement);
+
         Ok(Sql {
             sql: statement.to_string(),
             is_complex,
@@ -320,13 +384,13 @@ impl Sql {
             prefix_items: prefix_column_visitor.prefix_items,
             columns,
             aliases,
-            schemas: used_schemas,
+            schemas: final_schemas,
             limit,
             offset,
             time_range: Some((query.start_time, query.end_time)),
             group_by,
             order_by,
-            histogram_interval: histogram_interval_visitor.interval,
+            histogram_interval,
             sorted_by_time: need_sort_by_time,
             use_inverted_index,
             index_condition,
@@ -339,7 +403,7 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, index_optimize_mode: {:?}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -357,6 +421,7 @@ impl std::fmt::Display for Sql {
             self.sorted_by_time,
             self.use_inverted_index,
             self.index_condition,
+            self.index_optimize_mode,
         )
     }
 }
@@ -510,31 +575,31 @@ fn generate_quick_mode_fields(
     }
 
     // check _timestamp column
-    if !fields_name.contains(TIMESTAMP_COL_NAME) {
-        if let Ok(field) = schema.field_with_name(TIMESTAMP_COL_NAME) {
-            fields.push(Arc::new(field.clone()));
-            fields_name.insert(TIMESTAMP_COL_NAME.to_string());
-        }
+    if !fields_name.contains(TIMESTAMP_COL_NAME)
+        && let Ok(field) = schema.field_with_name(TIMESTAMP_COL_NAME)
+    {
+        fields.push(Arc::new(field.clone()));
+        fields_name.insert(TIMESTAMP_COL_NAME.to_string());
     }
     // add the selected columns
     if let Some(columns) = columns {
         for column in columns {
-            if !fields_name.contains(&column) {
-                if let Ok(field) = schema.field_with_name(&column) {
-                    fields.push(Arc::new(field.clone()));
-                    fields_name.insert(column.to_string());
-                }
+            if !fields_name.contains(&column)
+                && let Ok(field) = schema.field_with_name(&column)
+            {
+                fields.push(Arc::new(field.clone()));
+                fields_name.insert(column.to_string());
             }
         }
     }
     // check fts fields
     if need_fst_fields {
         for field in fts_fields {
-            if !fields_name.contains(field) {
-                if let Ok(field) = schema.field_with_name(field) {
-                    fields.push(Arc::new(field.clone()));
-                    fields_name.insert(field.to_string());
-                }
+            if !fields_name.contains(field)
+                && let Ok(field) = schema.field_with_name(field)
+            {
+                fields.push(Arc::new(field.clone()));
+                fields_name.insert(field.to_string());
             }
         }
     } else if fields_name.contains(ALL_VALUES_COL_NAME) {
@@ -543,11 +608,11 @@ fn generate_quick_mode_fields(
 
     // check quick mode fields
     for field in config::QUICK_MODEL_FIELDS.iter() {
-        if !fields_name.contains(field) {
-            if let Ok(field) = schema.field_with_name(field) {
-                fields.push(Arc::new(field.clone()));
-                fields_name.insert(field.to_string());
-            }
+        if !fields_name.contains(field)
+            && let Ok(field) = schema.field_with_name(field)
+        {
+            fields.push(Arc::new(field.clone()));
+            fields_name.insert(field.to_string());
         }
     }
     if !need_fst_fields && skip_original_column && fields_name.contains(ORIGINAL_DATA_COL_NAME) {
@@ -689,15 +754,17 @@ impl VisitorMut for ColumnVisitor<'_> {
     }
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let Some(order_by) = query.order_by.as_mut() {
-            for order in order_by.exprs.iter_mut() {
+        if let Some(order_by) = query.order_by.as_mut()
+            && let OrderByKind::Expressions(exprs) = &mut order_by.kind
+        {
+            for order in exprs.iter_mut() {
                 let mut name_visitor = FieldNameVisitor::new();
                 let _ = order.expr.visit(&mut name_visitor);
                 if name_visitor.field_names.len() == 1 {
                     let expr_name = name_visitor.field_names.iter().next().unwrap().to_string();
                     self.order_by.push((
                         expr_name,
-                        if order.asc.unwrap_or(true) {
+                        if order.options.asc.unwrap_or(true) {
                             OrderBy::Asc
                         } else {
                             OrderBy::Desc
@@ -762,17 +829,19 @@ impl VisitorMut for ColumnVisitor<'_> {
                 }
             }
         }
-        if let Some(Expr::Value(Value::Number(n, _))) = query.limit.as_ref() {
-            if let Ok(num) = n.to_string().parse::<i64>() {
-                self.limit = Some(num);
-            }
+        if let Some(limit) = query.limit.as_ref()
+            && let Expr::Value(ValueWithSpan { value, span: _ }) = limit
+            && let Value::Number(n, _) = value
+            && let Ok(num) = n.to_string().parse::<i64>()
+        {
+            self.limit = Some(num);
         }
-        if let Some(offset) = query.offset.as_ref() {
-            if let Expr::Value(Value::Number(n, _)) = &offset.value {
-                if let Ok(num) = n.to_string().parse::<i64>() {
-                    self.offset = Some(num);
-                }
-            }
+        if let Some(offset) = query.offset.as_ref()
+            && let Expr::Value(ValueWithSpan { value, span: _ }) = &offset.value
+            && let Value::Number(n, _) = value
+            && let Ok(num) = n.to_string().parse::<i64>()
+        {
+            self.offset = Some(num);
         }
         ControlFlow::Continue(())
     }
@@ -809,7 +878,7 @@ impl IndexVisitor {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     fn new_from_index_fields(
         index_fields: HashSet<String>,
         is_remove_filter: bool,
@@ -833,11 +902,15 @@ impl VisitorMut for IndexVisitor {
             if let Some(expr) = select.selection.as_mut() {
                 let (index, other_expr) = get_index_condition_from_expr(&self.index_fields, expr);
                 self.index_condition = index;
+
+                // if all filter is secondary index or full text index that term is simple, we can
+                // always remove the filter
                 let can_remove_filter = self
                     .index_condition
                     .as_ref()
                     .map(|v| v.can_remove_filter())
                     .unwrap_or(true);
+
                 // make sure all filter in where clause can be used in inverted index
                 if other_expr.is_none()
                     && select.selection.is_some()
@@ -845,11 +918,34 @@ impl VisitorMut for IndexVisitor {
                 {
                     self.can_optimize = true;
                 }
+
+                // remove filter when we can
                 if self.is_remove_filter || can_remove_filter {
                     select.selection = other_expr;
                 }
+
+                // addational check for simple distinct query
+                // filter should all extract to index condition and index condition should have
+                // the same field as the distinct field
+                if can_remove_filter
+                    && let Some(distinct) = is_simple_distinct_query(query)
+                    && let Some(index) = self.index_condition.as_ref()
+                    && !index.is_simple_str_match(&distinct.0)
+                {
+                    self.can_optimize = false;
+                }
             } else if is_simple_count_query(select) || is_simple_histogram_query(select) {
-                // if there is no selection, but have histogram, also can use inverted index
+                // if there is no filter, but have histogram or count, also can use index
+                self.can_optimize = true;
+            } else if let Some(topn) = is_simple_topn_query(query)
+                && self.index_fields.contains(&topn.0)
+            {
+                // if there is no filter, but have topn, also can use index
+                self.can_optimize = true;
+            } else if let Some(distinct) = is_simple_distinct_query(query)
+                && self.index_fields.contains(&distinct.0)
+            {
+                // if there is no filter, but have distinct, also can use index
                 self.can_optimize = true;
             }
         }
@@ -876,106 +972,106 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
-            if let Some(expr) = select.selection.as_ref() {
-                let exprs = split_conjunction(expr);
-                for e in exprs {
-                    match e {
-                        Expr::BinaryOp {
-                            left,
-                            op: BinaryOperator::Eq,
-                            right,
-                        } => {
-                            let (left, right) = if is_value(left) && is_field(right) {
-                                (right, left)
-                            } else if is_value(right) && is_field(left) {
-                                (left, right)
-                            } else {
-                                continue;
-                            };
-                            match left.as_ref() {
-                                Expr::Identifier(ident) => {
-                                    let mut count = 0;
-                                    let field_name = ident.value.clone();
-                                    let mut table_name = "".to_string();
-                                    for (name, schema) in self.schemas.iter() {
-                                        if schema.contains_field(&field_name) {
-                                            count += 1;
-                                            table_name = name.to_string();
-                                        }
-                                    }
-                                    if count == 1 {
-                                        self.equal_items
-                                            .entry(TableReference::from(table_name))
-                                            .or_default()
-                                            .push((
-                                                field_name,
-                                                trim_quotes(right.to_string().as_str()),
-                                            ));
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref()
+            && let Some(expr) = select.selection.as_ref()
+        {
+            let exprs = split_conjunction(expr);
+            for e in exprs {
+                match e {
+                    Expr::BinaryOp {
+                        left,
+                        op: BinaryOperator::Eq,
+                        right,
+                    } => {
+                        let (left, right) = if is_value(left) && is_field(right) {
+                            (right, left)
+                        } else if is_value(right) && is_field(left) {
+                            (left, right)
+                        } else {
+                            continue;
+                        };
+                        match left.as_ref() {
+                            Expr::Identifier(ident) => {
+                                let mut count = 0;
+                                let field_name = ident.value.clone();
+                                let mut table_name = "".to_string();
+                                for (name, schema) in self.schemas.iter() {
+                                    if schema.contains_field(&field_name) {
+                                        count += 1;
+                                        table_name = name.to_string();
                                     }
                                 }
-                                Expr::CompoundIdentifier(idents) => {
-                                    let (table_name, field_name) = generate_table_reference(idents);
-                                    // check if table_name is in schemas, otherwise the table_name
-                                    // maybe is a alias
-                                    if self.schemas.contains_key(&table_name) {
-                                        self.equal_items.entry(table_name).or_default().push((
+                                if count == 1 {
+                                    self.equal_items
+                                        .entry(TableReference::from(table_name))
+                                        .or_default()
+                                        .push((
                                             field_name,
                                             trim_quotes(right.to_string().as_str()),
                                         ));
-                                    }
                                 }
-                                _ => {}
                             }
-                        }
-                        Expr::InList {
-                            expr,
-                            list,
-                            negated: false,
-                        } => {
-                            match expr.as_ref() {
-                                Expr::Identifier(ident) => {
-                                    let mut count = 0;
-                                    let field_name = ident.value.clone();
-                                    let mut table_name = "".to_string();
-                                    for (name, schema) in self.schemas.iter() {
-                                        if schema.contains_field(&field_name) {
-                                            count += 1;
-                                            table_name = name.to_string();
-                                        }
-                                    }
-                                    if count == 1 {
-                                        let entry = self
-                                            .equal_items
-                                            .entry(TableReference::from(table_name))
-                                            .or_default();
-                                        for val in list.iter() {
-                                            entry.push((
-                                                field_name.clone(),
-                                                trim_quotes(val.to_string().as_str()),
-                                            ));
-                                        }
-                                    }
+                            Expr::CompoundIdentifier(idents) => {
+                                let (table_name, field_name) = generate_table_reference(idents);
+                                // check if table_name is in schemas, otherwise the table_name
+                                // maybe is a alias
+                                if self.schemas.contains_key(&table_name) {
+                                    self.equal_items.entry(table_name).or_default().push((
+                                        field_name,
+                                        trim_quotes(right.to_string().as_str()),
+                                    ));
                                 }
-                                Expr::CompoundIdentifier(idents) => {
-                                    let (table_name, field_name) = generate_table_reference(idents);
-                                    // check if table_name is in schemas, otherwise the table_name
-                                    // maybe is a alias
-                                    if self.schemas.contains_key(&table_name) {
-                                        let entry = self.equal_items.entry(table_name).or_default();
-                                        for val in list.iter() {
-                                            entry.push((
-                                                field_name.clone(),
-                                                trim_quotes(val.to_string().as_str()),
-                                            ));
-                                        }
-                                    }
-                                }
-                                _ => {}
                             }
+                            _ => {}
                         }
-                        _ => {}
                     }
+                    Expr::InList {
+                        expr,
+                        list,
+                        negated: false,
+                    } => {
+                        match expr.as_ref() {
+                            Expr::Identifier(ident) => {
+                                let mut count = 0;
+                                let field_name = ident.value.clone();
+                                let mut table_name = "".to_string();
+                                for (name, schema) in self.schemas.iter() {
+                                    if schema.contains_field(&field_name) {
+                                        count += 1;
+                                        table_name = name.to_string();
+                                    }
+                                }
+                                if count == 1 {
+                                    let entry = self
+                                        .equal_items
+                                        .entry(TableReference::from(table_name))
+                                        .or_default();
+                                    for val in list.iter() {
+                                        entry.push((
+                                            field_name.clone(),
+                                            trim_quotes(val.to_string().as_str()),
+                                        ));
+                                    }
+                                }
+                            }
+                            Expr::CompoundIdentifier(idents) => {
+                                let (table_name, field_name) = generate_table_reference(idents);
+                                // check if table_name is in schemas, otherwise the table_name
+                                // maybe is a alias
+                                if self.schemas.contains_key(&table_name) {
+                                    let entry = self.equal_items.entry(table_name).or_default();
+                                    for val in list.iter() {
+                                        entry.push((
+                                            field_name.clone(),
+                                            trim_quotes(val.to_string().as_str()),
+                                        ));
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -1002,58 +1098,58 @@ impl VisitorMut for PrefixColumnVisitor<'_> {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
-            if let Some(expr) = select.selection.as_ref() {
-                let exprs = split_conjunction(expr);
-                for e in exprs {
-                    if let Expr::Like {
-                        negated: false,
-                        expr,
-                        pattern,
-                        escape_char: _,
-                        any: _,
-                    } = e
-                    {
-                        match expr.as_ref() {
-                            Expr::Identifier(ident) => {
-                                let mut count = 0;
-                                let field_name = ident.value.clone();
-                                let mut table_name = "".to_string();
-                                for (name, schema) in self.schemas.iter() {
-                                    if schema.contains_field(&field_name) {
-                                        count += 1;
-                                        table_name = name.to_string();
-                                    }
-                                }
-                                if count == 1 {
-                                    let pattern = trim_quotes(pattern.to_string().as_str());
-                                    if !pattern.starts_with('%') && pattern.ends_with('%') {
-                                        self.prefix_items
-                                            .entry(TableReference::from(table_name))
-                                            .or_default()
-                                            .push((
-                                                field_name,
-                                                pattern.trim_end_matches('%').to_string(),
-                                            ));
-                                    }
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref()
+            && let Some(expr) = select.selection.as_ref()
+        {
+            let exprs = split_conjunction(expr);
+            for e in exprs {
+                if let Expr::Like {
+                    negated: false,
+                    expr,
+                    pattern,
+                    escape_char: _,
+                    any: _,
+                } = e
+                {
+                    match expr.as_ref() {
+                        Expr::Identifier(ident) => {
+                            let mut count = 0;
+                            let field_name = ident.value.clone();
+                            let mut table_name = "".to_string();
+                            for (name, schema) in self.schemas.iter() {
+                                if schema.contains_field(&field_name) {
+                                    count += 1;
+                                    table_name = name.to_string();
                                 }
                             }
-                            Expr::CompoundIdentifier(idents) => {
-                                let (table_name, field_name) = generate_table_reference(idents);
-                                // check if table_name is in schemas, otherwise the table_name
-                                // maybe is a alias
-                                if self.schemas.contains_key(&table_name) {
-                                    let pattern = trim_quotes(pattern.to_string().as_str());
-                                    if !pattern.starts_with('%') && pattern.ends_with('%') {
-                                        self.prefix_items.entry(table_name).or_default().push((
+                            if count == 1 {
+                                let pattern = trim_quotes(pattern.to_string().as_str());
+                                if !pattern.starts_with('%') && pattern.ends_with('%') {
+                                    self.prefix_items
+                                        .entry(TableReference::from(table_name))
+                                        .or_default()
+                                        .push((
                                             field_name,
                                             pattern.trim_end_matches('%').to_string(),
                                         ));
-                                    }
                                 }
                             }
-                            _ => {}
                         }
+                        Expr::CompoundIdentifier(idents) => {
+                            let (table_name, field_name) = generate_table_reference(idents);
+                            // check if table_name is in schemas, otherwise the table_name
+                            // maybe is a alias
+                            if self.schemas.contains_key(&table_name) {
+                                let pattern = trim_quotes(pattern.to_string().as_str());
+                                if !pattern.starts_with('%') && pattern.ends_with('%') {
+                                    self.prefix_items.entry(table_name).or_default().push((
+                                        field_name,
+                                        pattern.trim_end_matches('%').to_string(),
+                                    ));
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -1079,15 +1175,14 @@ impl VisitorMut for MatchVisitor {
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Function(func) = expr {
             let name = func.name.to_string().to_lowercase();
-            if name == MATCH_ALL_UDF_NAME || name == FUZZY_MATCH_ALL_UDF_NAME {
-                if let FunctionArguments::List(list) = &func.args {
-                    if !list.args.is_empty() {
-                        let value = trim_quotes(list.args[0].to_string().as_str());
-                        match &mut self.match_items {
-                            Some(items) => items.push(value),
-                            None => self.match_items = Some(vec![value]),
-                        }
-                    }
+            if (name == MATCH_ALL_UDF_NAME || name == FUZZY_MATCH_ALL_UDF_NAME)
+                && let FunctionArguments::List(list) = &func.args
+                && !list.args.is_empty()
+            {
+                let value = trim_quotes(list.args[0].to_string().as_str());
+                match &mut self.match_items {
+                    Some(items) => items.push(value),
+                    None => self.match_items = Some(vec![value]),
                 }
             }
         }
@@ -1231,21 +1326,47 @@ impl VisitorMut for AddO2IdVisitor {
 //
 // either only has count(*) -> SimpleCount
 // or has histogram(...) and count(*) -> SimpleHistogram
-struct OtherIndexOptimizeModeVisitor {
+// or select id, count(*) as cnt from stream group by id order by cnt -> SimpleTopN
+struct IndexOptimizeModeVisitor {
+    index_fields: HashSet<String>,
     pub is_simple_count: bool,
     pub is_simple_histogram: bool,
+    pub simple_topn: Option<(String, usize, bool)>,
+    pub simple_distinct: Option<(String, usize, bool)>,
 }
 
-impl OtherIndexOptimizeModeVisitor {
-    fn new() -> Self {
+impl IndexOptimizeModeVisitor {
+    fn new(schemas: &HashMap<TableReference, Arc<SchemaCache>>) -> Self {
+        let index_fields = if let Some((_, schema)) = schemas.iter().next() {
+            let stream_settings = unwrap_stream_settings(schema.schema());
+            let index_fields = get_stream_setting_index_fields(&stream_settings);
+            index_fields.into_iter().collect::<HashSet<_>>()
+        } else {
+            HashSet::new()
+        };
+
         Self {
+            index_fields,
             is_simple_count: false,
             is_simple_histogram: false,
+            simple_topn: None,
+            simple_distinct: None,
+        }
+    }
+
+    #[cfg(test)]
+    fn new_from_index_fields(index_fields: HashSet<String>) -> Self {
+        Self {
+            index_fields,
+            is_simple_count: false,
+            is_simple_histogram: false,
+            simple_topn: None,
+            simple_distinct: None,
         }
     }
 }
 
-impl VisitorMut for OtherIndexOptimizeModeVisitor {
+impl VisitorMut for IndexOptimizeModeVisitor {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
@@ -1270,9 +1391,21 @@ impl VisitorMut for OtherIndexOptimizeModeVisitor {
                 self.is_simple_count = is_simple_count_query(select);
             } else if is_simple_histogram_query(select) {
                 self.is_simple_histogram = true;
+            } else if let Some(topn) = is_simple_topn_query(query)
+                && self.index_fields.contains(&topn.0)
+            {
+                self.simple_topn = Some(topn);
+            } else if let Some(distinct) = is_simple_distinct_query(query)
+                && self.index_fields.contains(&distinct.0)
+            {
+                self.simple_distinct = Some(distinct);
             }
         }
-        if self.is_simple_count || self.is_simple_histogram {
+        if self.is_simple_count
+            || self.is_simple_histogram
+            || self.simple_topn.is_some()
+            || self.simple_distinct.is_some()
+        {
             return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
@@ -1307,6 +1440,200 @@ fn is_simple_histogram_query(select: &Select) -> bool {
     select.projection.len() == 2
         && is_sql_func(&select.projection[0], "histogram", false)
         && is_sql_func(&select.projection[1], "count", true)
+}
+
+// check if the query is only topn query
+// the topn query: `select id, count(*) as cnt from stream group by id order by cnt desc limit 10`
+fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
+    let select = match query.body.as_ref() {
+        sqlparser::ast::SetExpr::Select(select) => select,
+        _ => return None,
+    };
+
+    // Must have exactly 2 projections: a field and count(*)
+    if select.projection.len() != 2 {
+        return None;
+    }
+
+    // First projection should be a simple field (not a function)
+    let field_name = match &select.projection[0] {
+        SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. }
+            if matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_)) =>
+        {
+            get_field_name(expr)
+        }
+        _ => return None,
+    };
+
+    // Second projection should be count(*)
+    if !is_sql_func(&select.projection[1], "count", true) {
+        return None;
+    }
+
+    // Must have GROUP BY with exactly one expression
+    match &select.group_by {
+        GroupByExpr::Expressions(exprs, _) if exprs.len() == 1 => {}
+        _ => return None,
+    };
+
+    // Check if ORDER BY references the count(*) function (with alias support)
+    let count_alias = match &select.projection[1] {
+        SelectItem::ExprWithAlias { alias, .. } => Some(alias.value.clone()),
+        _ => None,
+    };
+
+    let mut order_by_references_count = false;
+    if let Some(order_by) = &query.order_by
+        && let OrderByKind::Expressions(exprs) = &order_by.kind
+        && exprs.len() == 1
+    {
+        match &exprs[0].expr {
+            Expr::Identifier(ident) => {
+                // Check if it's the count alias
+                if let Some(alias) = &count_alias
+                    && ident.value == *alias
+                    && exprs[0].options.asc == Some(false)
+                {
+                    order_by_references_count = true;
+                }
+            }
+            Expr::Function(func) => {
+                // Check if it's count(*) function directly
+                let name = trim_quotes(&func.name.to_string().to_lowercase());
+                if name == "count"
+                    && let FunctionArguments::List(list) = &func.args
+                    && list.args.len() == 1
+                    && trim_quotes(&list.args[0].to_string()) == "*"
+                    && exprs[0].options.asc == Some(false)
+                {
+                    order_by_references_count = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // check if limit is present
+    let limit = match &query.limit {
+        Some(Expr::Value(ValueWithSpan {
+            value: Value::Number(v, _b),
+            ..
+        })) => {
+            let v: i64 = v.parse().unwrap_or(0);
+            std::cmp::min(v, MAX_LIMIT) as usize
+        }
+        _ => return None,
+    };
+
+    if order_by_references_count {
+        Some((field_name, limit, order_by_references_count))
+    } else {
+        None
+    }
+}
+
+// check if the query is only distinct query
+// the distinct query: `select id from stream group by id order by id asc limit 10`
+fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> {
+    let select = match query.body.as_ref() {
+        sqlparser::ast::SetExpr::Select(select) => select,
+        _ => return None,
+    };
+
+    // Must have exactly 1 projection: a simple field (not a function)
+    if select.projection.len() != 1 {
+        return None;
+    }
+
+    // First projection should be a simple field (not a function)
+    let field_name = match &select.projection[0] {
+        SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. }
+            if matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_)) =>
+        {
+            get_field_name(expr)
+        }
+        _ => return None,
+    };
+
+    // Check if ORDER BY references the field (with alias support)
+    let field_alias = match &select.projection[0] {
+        SelectItem::ExprWithAlias { alias, .. } => Some(alias.value.clone()),
+        _ => None,
+    };
+
+    // Must have GROUP BY with exactly one expression that references the same field
+    let group_by_field = match &select.group_by {
+        GroupByExpr::Expressions(exprs, _) if exprs.len() == 1 => match &exprs[0] {
+            Expr::Identifier(ident) => Some(ident.value.clone()),
+            Expr::CompoundIdentifier(idents) => {
+                if !idents.is_empty() {
+                    Some(idents.last().unwrap().value.clone())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        },
+        _ => return None,
+    };
+
+    // GROUP BY field must match SELECT field (with alias support)
+    if let Some(group_by_field_name) = group_by_field.as_ref() {
+        if !field_matches_with_alias(&field_name, field_alias.as_deref(), group_by_field_name) {
+            return None;
+        }
+    } else {
+        return None;
+    }
+
+    // Check if ORDER BY references the same field
+    let mut order_by_references_field = false;
+    let mut is_asc = false;
+    if let Some(order_by) = &query.order_by
+        && let OrderByKind::Expressions(exprs) = &order_by.kind
+        && exprs.len() == 1
+    {
+        match &exprs[0].expr {
+            Expr::Identifier(ident) => {
+                if field_matches_with_alias(&field_name, field_alias.as_deref(), &ident.value) {
+                    order_by_references_field = true;
+                    is_asc = exprs[0].options.asc.unwrap_or(true);
+                }
+            }
+            Expr::CompoundIdentifier(idents) => {
+                if !idents.is_empty()
+                    && field_matches_with_alias(
+                        &field_name,
+                        field_alias.as_deref(),
+                        &idents.last().unwrap().value,
+                    )
+                {
+                    order_by_references_field = true;
+                    is_asc = exprs[0].options.asc.unwrap_or(true);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // ORDER BY field must match SELECT field
+    if !order_by_references_field {
+        return None;
+    }
+
+    // check if limit is present
+    let limit = match &query.limit {
+        Some(Expr::Value(ValueWithSpan {
+            value: Value::Number(v, _b),
+            ..
+        })) => {
+            let v: i64 = v.parse().unwrap_or(0);
+            std::cmp::min(v, MAX_LIMIT) as usize
+        }
+        _ => return None,
+    };
+
+    Some((field_name, limit, is_asc))
 }
 
 // Check if the query is a simple `select sql_func(*)` without modifiers
@@ -1437,30 +1764,31 @@ impl VisitorMut for HistogramIntervalVisitor {
     type Break = ();
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
-        if let Expr::Function(func) = expr {
-            if func.name.to_string().to_lowercase() == "histogram" {
-                if let FunctionArguments::List(list) = &func.args {
-                    let mut args = list.args.iter();
-                    // first is field
-                    let _ = args.next();
-                    // second is interval
-                    let interval = if let Some(interval) = args.next() {
-                        let interval = interval
-                            .to_string()
-                            .trim_matches(|v| v == '\'' || v == '"')
-                            .to_string();
-                        match interval.parse::<u16>() {
-                            Ok(v) => generate_histogram_interval(self.time_range, v),
-                            Err(_) => interval,
-                        }
-                    } else {
-                        generate_histogram_interval(self.time_range, 0)
-                    };
-                    self.interval =
-                        Some(convert_histogram_interval_to_seconds(&interval).unwrap_or_default());
-                }
-                return ControlFlow::Break(());
+        if let Expr::Function(func) = expr
+            && func.name.to_string().eq_ignore_ascii_case("histogram")
+        {
+            if let FunctionArguments::List(list) = &func.args {
+                let mut args = list.args.iter();
+                // first is field
+                let _ = args.next();
+                // second is interval
+                let interval = if let Some(interval) = args.next() {
+                    interval
+                        .to_string()
+                        .trim_matches(|v| v == '\'' || v == '"')
+                        .to_string()
+                } else {
+                    generate_histogram_interval(self.time_range).to_string()
+                };
+                self.interval = match convert_histogram_interval_to_seconds(&interval) {
+                    Ok(v) => Some(v),
+                    Err(e) => {
+                        log::error!("{e:?}");
+                        Some(0)
+                    }
+                };
             }
+            return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
     }
@@ -1501,7 +1829,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                 select.sort_by = vec![];
                 select.projection = vec![SelectItem::ExprWithAlias {
                     expr: Expr::Function(Function {
-                        name: ObjectName(vec![Ident::new("count")]),
+                        name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("count"))]),
                         parameters: FunctionArguments::None,
                         args: FunctionArguments::List(FunctionArgumentList {
                             args: vec![FunctionArg::Unnamed(field_expr)],
@@ -1527,7 +1855,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     top_before_distinct: false,
                     projection: vec![SelectItem::ExprWithAlias {
                         expr: Expr::Function(Function {
-                            name: ObjectName(vec![Ident::new("count")]),
+                            name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("count"))]),
                             parameters: FunctionArguments::None,
                             args: FunctionArguments::List(FunctionArgumentList {
                                 args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
@@ -1564,6 +1892,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     window_before_qualify: false,
                     connect_by: None,
                     value_table_mode: None,
+                    flavor: SelectFlavor::Standard,
                 })));
                 *query = Query {
                     with: None,
@@ -1587,12 +1916,12 @@ impl VisitorMut for TrackTotalHitsVisitor {
 
 fn generate_table_reference(idents: &[Ident]) -> (TableReference, String) {
     if idents.len() == 2 {
-        let table_name = idents[0].value.clone();
+        let table_name = idents[0].value.as_str();
         let field_name = idents[1].value.clone();
         (TableReference::from(table_name), field_name)
     } else {
-        let stream_type = idents[0].value.clone();
-        let table_name = idents[1].value.clone();
+        let stream_type = idents[0].value.as_str();
+        let table_name = idents[1].value.as_str();
         let field_name = idents[2].value.clone();
         (TableReference::partial(stream_type, table_name), field_name)
     }
@@ -1627,74 +1956,97 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
             escape_char: _,
             any: _,
         } => checking_inverted_index_inner(index_fields, expr),
-        Expr::Function(f) => {
-            let f = f.name.to_string().to_lowercase();
-            f == MATCH_ALL_UDF_NAME || f == FUZZY_MATCH_ALL_UDF_NAME
+        Expr::Function(func) => {
+            let f = func.name.to_string().to_lowercase();
+
+            if f == MATCH_ALL_UDF_NAME || f == FUZZY_MATCH_ALL_UDF_NAME {
+                return true;
+            }
+
+            if (f == STR_MATCH_UDF_NAME
+                || f == STR_MATCH_UDF_IGNORE_CASE_NAME
+                || f == MATCH_FIELD_UDF_NAME
+                || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME)
+                && let FunctionArguments::List(list) = &func.args
+            {
+                return list.args.len() == 2 && index_fields.contains(&get_arg_name(&list.args[0]));
+            }
+
+            false
         }
         _ => false,
     }
 }
 
-pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
-    if time_range.is_none() || time_range.unwrap().eq(&(0, 0)) {
-        return "1 hour".to_string();
-    }
-    let time_range = time_range.unwrap();
-    if num > 0 {
-        return format!(
-            "{} second",
-            std::cmp::max(
-                (time_range.1 - time_range.0)
-                    / Duration::try_seconds(1)
-                        .unwrap()
-                        .num_microseconds()
-                        .unwrap()
-                    / num as i64,
-                1
-            )
-        );
-    }
+/// Utility macro to generate microsecond-duration pairs concisely
+macro_rules! intervals {
+    ($(($unit:tt, $amount:expr, $label:expr)),+ $(,)?) => {
+        [
+            $((intervals!(@unit $unit)($amount).num_microseconds().unwrap(), $label)),+
+        ]
+    };
 
-    let intervals = [
-        (Duration::try_hours(24 * 60), "1 day"),
-        (Duration::try_hours(24 * 30), "12 hour"),
-        (Duration::try_hours(24 * 28), "6 hour"),
-        (Duration::try_hours(24 * 21), "3 hour"),
-        (Duration::try_hours(24 * 15), "2 hour"),
-        (Duration::try_hours(6), "1 hour"),
-        (Duration::try_hours(2), "1 minute"),
-        (Duration::try_hours(1), "30 second"),
-        (Duration::try_minutes(30), "15 second"),
-        (Duration::try_minutes(15), "10 second"),
+    (@unit h) => { chrono::Duration::hours };
+    (@unit m) => { chrono::Duration::minutes };
+}
+
+pub fn generate_histogram_interval(time_range: Option<(i64, i64)>) -> &'static str {
+    let Some((start, end)) = time_range else {
+        return "1 hour";
+    };
+    if (start, end).eq(&(0, 0)) {
+        return "1 hour";
+    }
+    let duration = end - start;
+
+    const INTERVALS: [(i64, &str); 10] = intervals![
+        (h, 24 * 60, "1 day"),
+        (h, 24 * 30, "12 hour"),
+        (h, 24 * 28, "6 hour"),
+        (h, 24 * 21, "3 hour"),
+        (h, 24 * 15, "2 hour"),
+        (h, 6, "1 hour"),
+        (h, 2, "1 minute"),
+        (h, 1, "30 second"),
+        (m, 30, "15 second"),
+        (m, 15, "10 second"),
     ];
-    for (time, interval) in intervals.iter() {
-        let time = time.unwrap().num_microseconds().unwrap();
-        if (time_range.1 - time_range.0) >= time {
-            return interval.to_string();
+
+    for (time, interval) in INTERVALS.iter() {
+        if duration >= *time {
+            return interval;
         }
     }
-    "10 second".to_string()
+    "10 second"
 }
 
 pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
     let interval = interval.trim();
-    let (num, unit) = interval
+    let pos = interval
         .find(|c: char| !c.is_numeric())
-        .map(|pos| interval.split_at(pos))
-        .ok_or_else(|| Error::Message("Invalid interval format".to_string()))?;
+        .ok_or_else(|| Error::Message(format!("Invalid interval format: '{interval}'")))?;
 
-    let seconds = match unit.trim().to_lowercase().as_str() {
-        "second" | "seconds" | "s" | "secs" | "sec" => num.parse::<i64>(),
-        "minute" | "minutes" | "m" | "mins" | "min" => num.parse::<i64>().map(|n| n * 60),
-        "hour" | "hours" | "h" | "hrs" | "hr" => num.parse::<i64>().map(|n| n * 3600),
-        "day" | "days" | "d" => num.parse::<i64>().map(|n| n * 86400),
+    let (num_str, unit_str) = interval.split_at(pos);
+    let num = num_str.parse::<i64>().map_err(|_| {
+        Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+            "Invalid number format".to_string(),
+        ))
+    })?;
+
+    let unit = unit_str.trim().to_lowercase();
+    let seconds = match unit.as_str() {
+        "second" | "seconds" | "s" | "secs" | "sec" => num,
+        "minute" | "minutes" | "m" | "mins" | "min" => num * 60,
+        "hour" | "hours" | "h" | "hrs" | "hr" => num * 3600,
+        "day" | "days" | "d" => num * 86400,
         _ => {
-            return Err(Error::Message(
+            return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Unsupported histogram interval unit".to_string(),
-            ));
+            )));
         }
     };
-    seconds.map_err(|_| Error::Message("Invalid number format".to_string()))
+
+    Ok(seconds)
 }
 
 pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, Error> {
@@ -1714,17 +2066,28 @@ pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, 
         return Ok(None);
     };
     let mut where_str = caps.get(1).unwrap().as_str().to_string();
-    if !meta.group_by.is_empty() {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" group ").unwrap()].to_string();
+    let where_str_lower = where_str.to_lowercase();
+
+    let clause_to_strip = if !meta.group_by.is_empty() {
+        Some(" group ")
     } else if meta.having {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" having ").unwrap()].to_string();
+        Some(" having ")
     } else if !meta.order_by.is_empty() {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" order ").unwrap()].to_string();
-    } else if meta.limit > 0 || where_str.to_lowercase().ends_with(" limit 0") {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" limit ").unwrap()].to_string();
+        Some(" order ")
+    } else if meta.limit > 0 || where_str_lower.ends_with(" limit 0") {
+        Some(" limit ")
     } else if meta.offset > 0 {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" offset ").unwrap()].to_string();
+        Some(" offset ")
+    } else {
+        None
+    };
+
+    if let Some(clause) = clause_to_strip
+        && let Some(pos) = where_str_lower.rfind(clause)
+    {
+        where_str.truncate(pos);
     }
+
     Ok(Some(where_str))
 }
 
@@ -1773,7 +2136,11 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                 return ControlFlow::Continue(());
             }
             let fname = names.first().unwrap();
-            if fname.value == ENCRYPT_UDF_NAME || fname.value == DECRYPT_UDF_NAME {
+            let fname = fname.as_ident().unwrap();
+            if fname.value == ENCRYPT_UDF_NAME
+                || fname.value == DECRYPT_UDF_NAME
+                || fname.value == DECRYPT_SLOW_UDF_NAME
+            {
                 let list = match args {
                     FunctionArguments::List(list) => list,
                     _ => {
@@ -1783,9 +2150,9 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                         return ControlFlow::Continue(());
                     }
                 };
-                if list.args.len() != 2 {
+                if list.args.len() < 2 {
                     self.error = Some(Error::Message(
-                        "invalid number of arguments to cipher function".to_string(),
+                        "invalid number of arguments to cipher function, expected at least 2: column, key and optional path".to_string(),
                     ));
                     return ControlFlow::Continue(());
                 }
@@ -1795,9 +2162,10 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                     FunctionArg::ExprNamed { arg, .. } => arg,
                 };
                 match arg {
-                    FunctionArgExpr::Expr(Expr::Value(
-                        sqlparser::ast::Value::SingleQuotedString(s),
-                    )) => {
+                    FunctionArgExpr::Expr(Expr::Value(ValueWithSpan {
+                        value: Value::SingleQuotedString(s),
+                        span: _,
+                    })) => {
                         self.keys.push(s.to_owned());
                     }
                     _ => {
@@ -1821,7 +2189,7 @@ pub fn get_cipher_key_names(sql: &str) -> Result<Vec<String>, Error> {
         .pop()
         .unwrap();
     let mut visitor = ExtractKeyNamesVisitor::new();
-    statement.visit(&mut visitor);
+    let _ = statement.visit(&mut visitor);
     if let Some(e) = visitor.error {
         Err(e)
     } else {
@@ -1860,12 +2228,14 @@ impl VisitorMut for AddOrderingTermVisitor {
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         if query.order_by.is_none() {
             query.order_by = Some(sqlparser::ast::OrderBy {
-                exprs: vec![OrderByExpr {
+                kind: OrderByKind::Expressions(vec![OrderByExpr {
                     expr: Expr::Identifier(Ident::new(self.field.clone())),
-                    asc: Some(self.is_asc),
-                    nulls_first: None,
                     with_fill: None,
-                }],
+                    options: sqlparser::ast::OrderByOptions {
+                        asc: Some(self.is_asc),
+                        nulls_first: None,
+                    },
+                }]),
                 interpolate: None,
             });
         }
@@ -1914,7 +2284,10 @@ impl AddNewFiltersWithAndOperatorVisitor {
             exprs.push(Expr::BinaryOp {
                 left: Box::new(Expr::Identifier(Ident::new(key.to_string()))),
                 op: BinaryOperator::Eq,
-                right: Box::new(Expr::Value(Value::SingleQuotedString(value.to_string()))),
+                right: Box::new(Expr::Value(ValueWithSpan {
+                    value: Value::SingleQuotedString(value.to_string()),
+                    span: Span::empty(),
+                })),
             });
         }
         let exprs = exprs.iter().collect();
@@ -1961,9 +2334,178 @@ impl VisitorMut for AddNewFiltersWithAndOperatorVisitor {
     }
 }
 
+// replace _o2_all_ with true
+struct RemoveDashboardAllVisitor {}
+
+impl RemoveDashboardAllVisitor {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VisitorMut for RemoveDashboardAllVisitor {
+    type Break = ();
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        match expr {
+            Expr::BinaryOp {
+                left,
+                op:
+                    BinaryOperator::Eq
+                    | BinaryOperator::GtEq
+                    | BinaryOperator::LtEq
+                    | BinaryOperator::Gt
+                    | BinaryOperator::Lt,
+                right,
+            } => {
+                if is_eq_placeholder(left.as_ref(), &placeholder)
+                    || is_eq_placeholder(right.as_ref(), &placeholder)
+                {
+                    *expr = expr_boolean(true);
+                }
+            }
+            // Not equal
+            Expr::BinaryOp {
+                left,
+                op: BinaryOperator::NotEq,
+                right,
+            } => {
+                if is_eq_placeholder(left.as_ref(), &placeholder)
+                    || is_eq_placeholder(right.as_ref(), &placeholder)
+                {
+                    *expr = expr_boolean(false);
+                }
+            }
+            // Like
+            Expr::Like {
+                pattern,
+                negated: false,
+                ..
+            }
+            | Expr::ILike {
+                pattern,
+                negated: false,
+                ..
+            } => {
+                if is_eq_placeholder(pattern.as_ref(), &placeholder) {
+                    *expr = expr_boolean(true);
+                }
+            }
+            // Not Like
+            Expr::Like {
+                pattern,
+                negated: true,
+                ..
+            }
+            | Expr::ILike {
+                pattern,
+                negated: true,
+                ..
+            } => {
+                if is_eq_placeholder(pattern.as_ref(), &placeholder) {
+                    *expr = expr_boolean(false);
+                }
+            }
+            // In list
+            Expr::InList { list, negated, .. } if !(*negated) => {
+                for item in list.iter() {
+                    if is_eq_placeholder(item, &placeholder) {
+                        *expr = expr_boolean(true);
+                        break;
+                    }
+                }
+            }
+            // Not in list
+            Expr::InList { list, negated, .. } if *negated => {
+                for item in list.iter() {
+                    if is_eq_placeholder(item, &placeholder) {
+                        *expr = expr_boolean(false);
+                        break;
+                    }
+                }
+            }
+            Expr::Function(func) => {
+                let f = func.name.to_string().to_lowercase();
+                if (f == STR_MATCH_UDF_NAME
+                    || f == STR_MATCH_UDF_IGNORE_CASE_NAME
+                    || f == MATCH_FIELD_UDF_NAME
+                    || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME)
+                    && let FunctionArguments::List(list) = &func.args
+                    && list.args.len() == 2
+                {
+                    let value = trim_quotes(list.args[1].to_string().as_str());
+                    if *value == placeholder {
+                        *expr = expr_boolean(true);
+                    }
+                }
+            }
+            _ => {}
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+// get group by fields from sql, if sql is not a single table query, return empty vector
+#[allow(dead_code)]
+pub async fn get_group_by_fields(sql: &Sql) -> Result<Vec<String>, Error> {
+    if sql.schemas.len() != 1 {
+        return Ok(vec![]);
+    }
+    let sql_arc = Arc::new(sql.clone());
+    let ctx = generate_context(&Request::default(), &sql_arc, 0).await?;
+    register_table(&ctx, &sql_arc).await?;
+    let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+
+    // visit group by fields
+    let mut group_by_visitor = GroupByFieldVisitor::new();
+    physical_plan.visit(&mut group_by_visitor)?;
+    Ok(group_by_visitor.get_group_by_fields())
+}
+
+fn expr_boolean(value: bool) -> Expr {
+    Expr::Value(ValueWithSpan {
+        value: Value::Boolean(value),
+        span: Span::empty(),
+    })
+}
+
+fn is_eq_placeholder(expr: &Expr, placeholder: &str) -> bool {
+    if let Expr::Value(ValueWithSpan {
+        value: Value::SingleQuotedString(value),
+        span: _,
+    }) = expr
+        && value == placeholder
+    {
+        true
+    } else {
+        false
+    }
+}
+
+/// Helper function to resolve field names considering aliases
+/// Returns true if the given field_name matches either the actual field name or its alias
+fn field_matches_with_alias(field_name: &str, alias: Option<&str>, target_field: &str) -> bool {
+    // Direct match with field name
+    if field_name == target_field {
+        return true;
+    }
+
+    // Match with alias if present
+    if let Some(alias_name) = alias
+        && alias_name == target_field
+    {
+        return true;
+    }
+
+    false
+}
+
 #[cfg(test)]
 mod tests {
 
+    use arrow_schema::{DataType, Field};
     use sqlparser::dialect::GenericDialect;
 
     use super::*;
@@ -1971,7 +2513,7 @@ mod tests {
     #[test]
     fn test_index_visitor1() {
         let sql = "SELECT * FROM t WHERE name = 'a' AND age = 1 AND (name = 'b' OR (match_all('good') AND match_all('bar'))) AND (match_all('foo') OR age = 2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -1991,7 +2533,7 @@ mod tests {
     #[test]
     fn test_index_visitor2() {
         let sql = "SELECT * FROM t WHERE name is not null AND age > 1 AND (match_all('foo') OR abs(age) = 2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2015,7 +2557,7 @@ mod tests {
     #[test]
     fn test_index_visitor3() {
         let sql = "SELECT * FROM t WHERE (name = 'b' OR (match_all('good') AND match_all('bar'))) OR (match_all('foo') OR age = 2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2039,7 +2581,7 @@ mod tests {
     #[test]
     fn test_index_visitor4() {
         let sql = "SELECT * FROM t WHERE (name = 'b' OR (match_all('good') AND match_all('bar'))) OR (match_all('foo') AND name = 'c')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2059,7 +2601,7 @@ mod tests {
     #[test]
     fn test_index_visitor5() {
         let sql = "SELECT * FROM t WHERE (foo = 'b' OR foo = 'c') AND foo = 'd' AND ((match_all('good') AND match_all('bar')) OR (match_all('foo') AND name = 'c'))";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2076,10 +2618,48 @@ mod tests {
         assert_eq!(statement.to_string(), expected_sql);
     }
 
+    // test index_visitor for str_match
+    #[test]
+    fn test_index_visitor_str_match() {
+        let sql = "SELECT * FROM t WHERE str_match(name, 'value')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
+        let _ = statement.visit(&mut index_visitor);
+        let expected = "str_match(name, 'value')";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
+    }
+
+    // test index_visitor for str_match_ignore_case
+    #[test]
+    fn test_index_visitor_str_match_ignore_case() {
+        let sql = "SELECT * FROM t WHERE str_match_ignore_case(name, 'value')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
+        let _ = statement.visit(&mut index_visitor);
+        let expected = "str_match_ignore_case(name, 'value')";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
+    }
+
     #[test]
     fn test_track_total_hits1() {
         let sql = "SELECT * FROM t WHERE name = 'a'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2092,7 +2672,7 @@ mod tests {
     #[test]
     fn test_track_total_hits2() {
         let sql = "SELECT name, count(*) FROM t WHERE name = 'a' group by name order by name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2105,7 +2685,7 @@ mod tests {
     #[test]
     fn test_track_total_hits3() {
         let sql = "SELECT t1.name, t2.name from t1 join t2 on t1.name = t2.name where t1.name = 'openobserve' group by t1.name, t2.name order by t1.name, t2.name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2118,7 +2698,7 @@ mod tests {
     #[test]
     fn test_track_total_hits4() {
         let sql = "SELECT name from t1 where name not in (select name from t2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2132,7 +2712,7 @@ mod tests {
     #[test]
     fn test_track_total_hits5() {
         let sql = "SELECT name from t1 union select name from t2";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2146,7 +2726,7 @@ mod tests {
     #[test]
     fn test_track_total_hits6() {
         let sql = "(SELECT name from t1) union (select name from t2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2159,7 +2739,7 @@ mod tests {
     #[test]
     fn test_track_total_hits7() {
         let sql = "SELECT name from t1 union select name from t2 union select name from t3";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2170,7 +2750,8 @@ mod tests {
     }
 
     fn is_simple_count_query(statement: &mut Statement) -> bool {
-        let mut visitor = OtherIndexOptimizeModeVisitor::new();
+        let index_fields = ["name".to_string()].into_iter().collect();
+        let mut visitor = IndexOptimizeModeVisitor::new_from_index_fields(index_fields);
         let _ = statement.visit(&mut visitor);
         visitor.is_simple_count
     }
@@ -2178,65 +2759,66 @@ mod tests {
     #[test]
     fn test_is_simple_count_visit1() {
         let sql = "SELECT count(*) from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), true);
+        assert!(is_simple_count_query(&mut statement),);
     }
 
     #[test]
     fn test_is_simple_count_visit2() {
         let sql = "SELECT count(*) as cnt from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), true);
+        assert!(is_simple_count_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_count_visit3() {
         let sql = "SELECT count(*) as cnt from t where name = 'a'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), true);
+        assert!(is_simple_count_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_count_visit4() {
         let sql = "SELECT name, count(*) as cnt from t group by name order by name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), false);
+        assert!(!is_simple_count_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_count_visit5() {
         let sql = "SELECT count(_timestamp) as cnt from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), false);
+        assert!(!is_simple_count_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_count_visit6() {
         let sql = "SELECT count(*) as cnt from (select * from t)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), false);
+        assert!(!is_simple_count_query(&mut statement));
     }
 
     fn is_simple_histogram_query(statement: &mut Statement) -> bool {
-        let mut visitor = OtherIndexOptimizeModeVisitor::new();
+        let index_fields = ["_timestamp".to_string()].into_iter().collect();
+        let mut visitor = IndexOptimizeModeVisitor::new_from_index_fields(index_fields);
         let _ = statement.visit(&mut visitor);
         visitor.is_simple_histogram
     }
@@ -2244,66 +2826,66 @@ mod tests {
     #[test]
     fn test_is_simple_histogram_visit1() {
         let sql = "select histogram(_timestamp, '10 second') AS zo_sql_key, count(*) AS zo_sql_num from \"default\"  GROUP BY zo_sql_key ORDER BY zo_sql_key";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), true);
+        assert!(is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit2() {
         // Test with additional where clause
         let sql = "select histogram(_timestamp, '1m') as h, count(*) from t where name = 'test'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), true);
+        assert!(is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit3() {
         // Test with wrong order of projections (count before histogram)
         let sql = "select count(*), histogram(_timestamp, '1m') from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), false);
+        assert!(!is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit4() {
         // Test with subquery - should fail
         let sql = "select histogram(_timestamp, '1m'), count(*) from (select * from t)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), false);
+        assert!(!is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit5() {
         // Test with additional projection - should fail
         let sql = "select histogram(_timestamp, '1m'), count(*), name from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), false);
+        assert!(!is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit6() {
         // Test with join - should fail
         let sql = "select histogram(_timestamp, '1m'), count(*) from t1 join t2";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), false);
+        assert!(!is_simple_histogram_query(&mut statement));
     }
 
     #[test]
@@ -2667,5 +3249,517 @@ mod tests {
 
         // we support this type of query
         assert_eq!(result, sql.to_string());
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor() {
+        let sql = "select * from t where field1 = '_o2_all_'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_in_list() {
+        let sql = "select * from t where field1 in ('_o2_all_')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_in_list_and_negated() {
+        let sql = "select * from t where field1 not in ('_o2_all_')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE false";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_in_list_and_negated_and_other_filter() {
+        let sql = "select * from t where field1 not in ('_o2_all_') and field2 = 'value2'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE false AND field2 = 'value2'";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    // test multi and/or with _o2_all_
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_multi_and_or_with_o2_all() {
+        let sql = "select * from t where field1 = '_o2_all_' and (field2 = '_o2_all_' or field3 = '_o2_all_')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true AND (true OR true)";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    // test _o2_all_ with like and not like
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_like_and_not_like() {
+        let sql = "select * from t where field1 like '_o2_all_' and field2 not like '_o2_all_'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true AND false";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    // test _o2_all_ with like and not like
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_like_and_not_like_and_other_filter() {
+        let sql = "select * from t where field1 like '_o2_all_' and field2 not like '_o2_all_' and field3 = 'value3'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true AND false AND field3 = 'value3'";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_str_match_and_other_filter() {
+        let sql = "select * from t where str_match(field1, '_o2_all_') and field2 = 'value2'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true AND field2 = 'value2'";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_remove_dashboard_all_visitor_with_match_field_and_other_filter() {
+        let sql = "select * from t where match_field(field1, '_o2_all_') and field2 = 'value2'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
+        let expected = "SELECT * FROM t WHERE true AND field2 = 'value2'";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_histogram_interval_visitor() {
+        // Test with time range and histogram function
+        let sql = "SELECT histogram(_timestamp, '10 second') FROM logs";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let time_range = Some((1640995200000000, 1641081600000000)); // 2022-01-01 to 2022-01-02
+        let mut histogram_interval_visitor = HistogramIntervalVisitor::new(time_range);
+        let _ = statement.visit(&mut histogram_interval_visitor);
+
+        // Should extract the interval from the histogram function
+        assert_eq!(histogram_interval_visitor.interval, Some(10));
+    }
+
+    #[test]
+    fn test_histogram_interval_visitor_with_zero_time_range() {
+        // Test with zero time range
+        let sql = "SELECT histogram(_timestamp) FROM logs";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let time_range = Some((0, 0));
+        let mut histogram_interval_visitor = HistogramIntervalVisitor::new(time_range);
+        let _ = statement.visit(&mut histogram_interval_visitor);
+
+        // Should return default interval of 1 hour (3600 seconds)
+        assert_eq!(histogram_interval_visitor.interval, Some(3600));
+    }
+
+    #[test]
+    fn test_column_visitor() {
+        let sql = "SELECT name, age, COUNT(*) FROM users WHERE status = 'active' GROUP BY name, age ORDER BY name";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut schemas = HashMap::new();
+        let schema = Schema::new(vec![
+            Arc::new(Field::new("name", DataType::Utf8, false)),
+            Arc::new(Field::new("age", DataType::Int32, false)),
+            Arc::new(Field::new("status", DataType::Utf8, false)),
+        ]);
+        schemas.insert(
+            TableReference::from("users"),
+            Arc::new(SchemaCache::new(schema)),
+        );
+
+        let mut column_visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut column_visitor);
+
+        // Should extract columns, group by, order by, and detect aggregate function
+        assert!(column_visitor.has_agg_function);
+        assert_eq!(column_visitor.group_by, vec!["name", "age"]);
+        assert_eq!(
+            column_visitor.order_by,
+            vec![("name".to_string(), OrderBy::Asc)]
+        );
+    }
+
+    #[test]
+    fn test_partition_column_visitor() {
+        let sql = "SELECT * FROM users WHERE name = 'john' AND age = 25 AND city IN ('NYC', 'LA')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut schemas = HashMap::new();
+        let schema = Schema::new(vec![
+            Arc::new(Field::new("name", DataType::Utf8, false)),
+            Arc::new(Field::new("age", DataType::Int32, false)),
+            Arc::new(Field::new("city", DataType::Utf8, false)),
+        ]);
+        schemas.insert(
+            TableReference::from("users"),
+            Arc::new(SchemaCache::new(schema)),
+        );
+
+        let mut partition_visitor = PartitionColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut partition_visitor);
+
+        // Should extract equal conditions and IN list values
+        let users_table = TableReference::from("users");
+        assert!(partition_visitor.equal_items.contains_key(&users_table));
+        let items = &partition_visitor.equal_items[&users_table];
+        assert!(items.contains(&("name".to_string(), "john".to_string())));
+        assert!(items.contains(&("age".to_string(), "25".to_string())));
+        assert!(items.contains(&("city".to_string(), "NYC".to_string())));
+        assert!(items.contains(&("city".to_string(), "LA".to_string())));
+    }
+
+    #[test]
+    fn test_prefix_column_visitor() {
+        let sql = "SELECT * FROM users WHERE name LIKE 'john%' AND email LIKE 'test%'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut schemas = HashMap::new();
+        let schema = Schema::new(vec![
+            Arc::new(Field::new("name", DataType::Utf8, false)),
+            Arc::new(Field::new("email", DataType::Utf8, false)),
+        ]);
+        schemas.insert(
+            TableReference::from("users"),
+            Arc::new(SchemaCache::new(schema)),
+        );
+
+        let mut prefix_visitor = PrefixColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut prefix_visitor);
+
+        // Should extract prefix patterns
+        let users_table = TableReference::from("users");
+        assert!(prefix_visitor.prefix_items.contains_key(&users_table));
+        let items = &prefix_visitor.prefix_items[&users_table];
+        assert!(items.contains(&("name".to_string(), "john".to_string())));
+        assert!(items.contains(&("email".to_string(), "test".to_string())));
+    }
+
+    #[test]
+    fn test_match_visitor() {
+        let sql = "SELECT * FROM logs WHERE match_all('error') AND match_all('critical')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut match_visitor = MatchVisitor::new();
+        let _ = statement.visit(&mut match_visitor);
+
+        // Should extract match_all values
+        assert!(match_visitor.match_items.is_some());
+        let items = match_visitor.match_items.unwrap();
+        assert!(items.contains(&"error".to_string()));
+        assert!(items.contains(&"critical".to_string()));
+    }
+
+    #[test]
+    fn test_field_name_visitor() {
+        let sql = "SELECT name, age FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut field_visitor = FieldNameVisitor::new();
+        let _ = statement.visit(&mut field_visitor);
+
+        // Should extract field names
+        assert!(field_visitor.field_names.contains("name"));
+        assert!(field_visitor.field_names.contains("age"));
+    }
+
+    #[test]
+    fn test_add_timestamp_visitor() {
+        let sql = "SELECT name, age FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut add_timestamp_visitor = AddTimestampVisitor::new();
+        let _ = statement.visit(&mut add_timestamp_visitor);
+
+        // Should add _timestamp to the beginning of projection
+        let expected = "SELECT _timestamp, name, age FROM users";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_add_o2_id_visitor() {
+        let sql = "SELECT name, age FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut add_o2_id_visitor = AddO2IdVisitor::new();
+        let _ = statement.visit(&mut add_o2_id_visitor);
+
+        // Should add _o2_id to the beginning of projection
+        let expected = "SELECT _o2_id, name, age FROM users";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    #[test]
+    fn test_complex_query_visitor() {
+        let sql = "SELECT * FROM users WHERE name IN (SELECT name FROM admins)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut complex_visitor = ComplexQueryVisitor::new();
+        let _ = statement.visit(&mut complex_visitor);
+
+        // Should detect complex query due to subquery
+        assert!(complex_visitor.is_complex);
+    }
+
+    #[test]
+    fn test_add_ordering_term_visitor() {
+        let sql = "SELECT * FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut ordering_visitor = AddOrderingTermVisitor::new("name".to_string(), true);
+        let _ = statement.visit(&mut ordering_visitor);
+
+        // Should add ORDER BY clause
+        let expected = "SELECT * FROM users ORDER BY name ASC";
+        assert_eq!(statement.to_string(), expected);
+    }
+
+    fn is_simple_topn_query(statement: &mut Statement) -> bool {
+        let index_fields = ["id".to_string(), "name".to_string()].into_iter().collect();
+        let mut visitor = IndexOptimizeModeVisitor::new_from_index_fields(index_fields);
+        let _ = statement.visit(&mut visitor);
+        visitor.simple_topn.is_some()
+    }
+
+    #[test]
+    fn test_is_simple_topn_visit1() {
+        // Test basic topn query
+        let sql = "select id, count(*) as cnt from stream group by id order by cnt desc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_topn_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_topn_visit2() {
+        // Test with additional where clause
+        let sql = "select name, count(*) as cnt from t where status = 'active' group by name order by cnt desc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_topn_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_topn_visit3() {
+        // test with count(*) asc
+        let sql = "select id, count(*) from stream group by id order by count(*) asc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(!is_simple_topn_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_topn_visit4() {
+        // Test without group by - should fail
+        let sql = "select id, count(*) from stream order by count(*) desc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(!is_simple_topn_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_topn_visit5() {
+        // Test without order by - should fail
+        let sql = "select id, count(*) from stream group by id limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(!is_simple_topn_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_topn_visit6() {
+        // Test with function as first projection - should fail
+        let sql = "select upper(name), count(*) from stream group by upper(name) order by count(*) desc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(!is_simple_topn_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_topn_visit7() {
+        // Test with non-count function as second projection - should fail
+        let sql = "select id, sum(value) from stream group by id order by sum(value) desc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(!is_simple_topn_query(&mut statement));
+    }
+
+    fn is_simple_distinct_query(statement: &mut Statement) -> bool {
+        let index_fields = ["id".to_string(), "name".to_string()].into_iter().collect();
+        let mut visitor = IndexOptimizeModeVisitor::new_from_index_fields(index_fields);
+        let _ = statement.visit(&mut visitor);
+        visitor.simple_distinct.is_some()
+    }
+
+    #[test]
+    fn test_is_simple_distinct_visit1() {
+        // Test basic distinct query
+        let sql = "select id from stream group by id order by id asc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_distinct_visit2() {
+        // Test with additional where clause
+        let sql =
+            "select name from t where status = 'active' group by name order by name asc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_distinct_visit3() {
+        // Test with desc order by
+        let sql = "select id from stream group by id order by id desc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_field_matches_with_alias() {
+        // Test direct field name match
+        assert!(field_matches_with_alias("field1", None, "field1"));
+
+        // Test alias match
+        assert!(field_matches_with_alias("field1", Some("alias1"), "alias1"));
+
+        // Test no match
+        assert!(!field_matches_with_alias("field1", None, "field2"));
+        assert!(!field_matches_with_alias(
+            "field1",
+            Some("alias1"),
+            "field2"
+        ));
+        assert!(!field_matches_with_alias(
+            "field1",
+            Some("alias1"),
+            "alias2"
+        ));
+    }
+
+    #[test]
+    fn test_is_simple_distinct_with_alias() {
+        // Test with field alias in SELECT and ORDER BY using alias
+        let sql = "select id as user_id from stream group by id order by user_id asc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_distinct_with_alias_group_by_alias() {
+        // Test with field alias in SELECT and GROUP BY using alias
+        let sql = "select id as user_id from stream group by user_id order by user_id asc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_distinct_query(&mut statement));
     }
 }

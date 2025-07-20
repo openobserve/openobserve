@@ -211,12 +211,7 @@ pub async fn delete_by_stream(
         }
 
         log::debug!(
-            "[COMPACTOR] delete_by_stream {}/{}/{}/{},{}",
-            org_id,
-            stream_type,
-            stream_name,
-            time_range_start,
-            time_range_end,
+            "[COMPACTOR] delete_by_stream {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end}",
         );
 
         db::compact::retention::delete_stream(
@@ -272,27 +267,17 @@ pub async fn delete_all(
         if path.exists() {
             tokio::fs::remove_dir_all(path).await?;
         }
-        log::info!("deleted all files: {:?}", path);
+        log::info!("deleted all files: {path:?}");
     }
 
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, (start_time, end_time)).await?;
     super::super::file_list_dump::delete_all_for_stream(org_id, stream_type, stream_name).await?;
-    log::info!(
-        "deleted file list for: {}/{}/{}/all",
-        org_id,
-        stream_type,
-        stream_name
-    );
+    log::info!("deleted file list for: {org_id}/{stream_type}/{stream_name}/all");
 
     // mark delete done
     db::compact::retention::delete_stream_done(org_id, stream_type, stream_name, None).await?;
-    log::info!(
-        "deleted stream all: {}/{}/{}",
-        org_id,
-        stream_type,
-        stream_name
-    );
+    log::info!("deleted stream all: {org_id}/{stream_type}/{stream_name}");
 
     Ok(())
 }
@@ -310,8 +295,7 @@ pub async fn delete_by_date(
             .await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::warn!(
-            "[COMPACTOR] stream {org_id}/{stream_type}/{stream_name}/{:?} is deleting by {node}",
-            date_range
+            "[COMPACTOR] stream {org_id}/{stream_type}/{stream_name}/{date_range:?} is deleting by {node}"
         );
         dist_lock::unlock(&locker).await?;
         return Ok(()); // not this node, just skip
@@ -365,8 +349,7 @@ pub async fn delete_by_date(
         let mut delete_tasks = vec![];
         for dir in dirs_to_delete {
             log::info!(
-                "[COMPACTOR] stream {org_id}/{stream_type}/{stream_name} delete dir: {:?}",
-                dir
+                "[COMPACTOR] stream {org_id}/{stream_type}/{stream_name} delete dir: {dir:?}"
             );
             delete_tasks.push(tokio::fs::remove_dir_all(dir));
         }
@@ -483,15 +466,15 @@ async fn write_file_list(
         let created_at = Utc::now().timestamp_micros();
         for _ in 0..5 {
             // only store the file_list into history, don't delete files
-            if cfg.compact.data_retention_history {
-                if let Err(e) = infra_file_list::batch_add_history(events).await {
-                    log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
-                    return Err(e.into());
-                }
+            if cfg.compact.data_retention_history
+                && let Err(e) = infra_file_list::batch_add_history(events).await
+            {
+                log::error!("[COMPACTOR] file_list batch_add_history failed: {e}");
+                return Err(e.into());
             }
             // delete from file_list table
             if let Err(e) = infra_file_list::batch_process(events).await {
-                log::error!("[COMPACTOR] batch_delete to db failed, retrying: {}", e);
+                log::error!("[COMPACTOR] batch_delete to db failed, retrying: {e}");
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
@@ -500,6 +483,7 @@ async fn write_file_list(
                 let del_items = events
                     .iter()
                     .map(|v| FileListDeleted {
+                        id: 0,
                         account: v.account.clone(),
                         file: v.key.clone(),
                         index_file: v.meta.index_size > 0,
@@ -509,10 +493,7 @@ async fn write_file_list(
                 if let Err(e) =
                     infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
                 {
-                    log::error!(
-                        "[COMPACTOR] batch_add_deleted to db failed, retrying: {}",
-                        e
-                    );
+                    log::error!("[COMPACTOR] batch_add_deleted to db failed, retrying: {e}");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
                 }
@@ -577,9 +558,8 @@ mod tests {
         let lifecycle_end = DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
             .unwrap()
             .to_utc();
-        delete_by_stream(&lifecycle_end, org_id, stream_type, stream_name, &[])
-            .await
-            .unwrap();
+        let res = delete_by_stream(&lifecycle_end, org_id, stream_type, stream_name, &[]).await;
+        assert!(res.is_ok());
     }
 
     #[tokio::test]
@@ -588,7 +568,8 @@ mod tests {
         let org_id = "test";
         let stream_name = "test";
         let stream_type = config::meta::stream::StreamType::Logs;
-        delete_all(org_id, stream_type, stream_name).await.unwrap();
+        let res = delete_all(org_id, stream_type, stream_name).await;
+        assert!(res.is_ok());
     }
 
     #[tokio::test]
@@ -603,8 +584,8 @@ mod tests {
             now.timestamp_micros(),
         );
         let last_retained_time = (now - Duration::try_days(5).unwrap()).timestamp_micros();
-        println!("original time range : {}", original_time_range);
-        println!("red day time range : {}", exclude_range);
+        println!("original time range : {original_time_range}");
+        println!("red day time range : {exclude_range}");
         let time_ranges_to_delete = generate_time_ranges_for_deletion(
             vec![exclude_range],
             original_time_range.clone(),
@@ -629,8 +610,8 @@ mod tests {
             (now - Duration::try_days(2).unwrap()).timestamp_micros(),
         );
         let last_retained_time = (now - Duration::try_days(5).unwrap()).timestamp_micros();
-        println!("original time range : {}", original_time_range);
-        println!("red day time range : {}", exclude_range);
+        println!("original time range : {original_time_range}");
+        println!("red day time range : {exclude_range}");
         let res_time_ranges = generate_time_ranges_for_deletion(
             vec![exclude_range],
             original_time_range.clone(),
@@ -684,7 +665,7 @@ mod tests {
             last_retained_time,
         );
 
-        println!("original time range : {}", original_time_range);
+        println!("original time range : {original_time_range}");
         println!("res time ranges : {}", res_time_ranges.iter().join(", "));
         assert_eq!(res_time_ranges.len(), 2);
     }

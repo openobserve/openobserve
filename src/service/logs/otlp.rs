@@ -16,7 +16,6 @@
 use std::collections::{HashMap, HashSet};
 
 use actix_web::{HttpResponse, http};
-use anyhow::Result;
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
 use config::{
@@ -27,8 +26,12 @@ use config::{
         stream::{StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json},
+    utils::{
+        flatten,
+        json::{self, estimate_json_bytes},
+    },
 };
+use infra::errors::Result;
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
@@ -64,7 +67,7 @@ pub async fn handle_request(
 
     // check stream
     let stream_name = in_stream_name.map_or_else(|| "default".to_owned(), format_stream_name);
-    check_ingestion_allowed(org_id, Some(&stream_name))?;
+    check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
 
     let cfg = get_config();
     let log_ingestion_errors = ingestion_log_enabled().await;
@@ -110,6 +113,7 @@ pub async fn handle_request(
 
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
+    let mut size_by_stream = HashMap::new();
 
     let mut res = ExportLogsServiceResponse {
         partial_success: None,
@@ -225,12 +229,12 @@ pub async fn handle_request(
                         streams_need_original_map
                             .get(&stream_name)
                             .is_some_and(|v| *v)
-                            .then_some(rec.to_string())
+                            .then(|| rec.to_string())
                     } else {
                         // 3. with pipeline, storing original as long as streams_need_original_set
                         //    is not empty
                         // because not sure the pipeline destinations
-                        store_original_when_pipeline_exists.then_some(rec.to_string())
+                        store_original_when_pipeline_exists.then(|| rec.to_string())
                     }
                 } else {
                     None // `item` won't be flattened, no need to store original
@@ -242,6 +246,8 @@ pub async fn handle_request(
                     original_options.push(original_data);
                     timestamps.push(timestamp);
                 } else {
+                    let _size = size_by_stream.entry(stream_name.clone()).or_insert(0);
+                    *_size += estimate_json_bytes(&rec);
                     // JSON Flattening
                     rec = flatten::flatten_with_level(rec, cfg.limit.ingest_flatten_level)?;
 
@@ -259,12 +265,9 @@ pub async fn handle_request(
                     if streams_need_original_map
                         .get(&stream_name)
                         .is_some_and(|v| *v)
-                        && original_data.is_some()
+                        && let Some(original_data) = original_data
                     {
-                        local_val.insert(
-                            ORIGINAL_DATA_COL_NAME.to_string(),
-                            original_data.unwrap().into(),
-                        );
+                        local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
 
                         let record_id = crate::service::ingestion::generate_record_id(
                             org_id,
@@ -316,13 +319,10 @@ pub async fn handle_request(
         {
             Err(e) => {
                 log::error!(
-                    "[Pipeline] for stream {}/{}: Batch execution error: {}.",
-                    org_id,
-                    stream_name,
-                    e
+                    "[Pipeline] for stream {org_id}/{stream_name}: Batch execution error: {e}."
                 );
                 stream_status.status.failed += records_count as u32;
-                stream_status.status.error = format!("Pipeline batch execution error: {}", e);
+                stream_status.status.error = format!("Pipeline batch execution error: {e}");
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,
@@ -352,6 +352,7 @@ pub async fn handle_request(
                     }
 
                     for (idx, mut res) in stream_pl_results {
+                        let original_size = estimate_json_bytes(&res);
                         // get json object
                         let mut local_val = match res.take() {
                             json::Value::Object(v) => v,
@@ -364,9 +365,10 @@ pub async fn handle_request(
                         }
 
                         // add `_original` and '_record_id` if required by StreamSettings
-                        if streams_need_original_map
-                            .get(&destination_stream)
-                            .is_some_and(|v| *v)
+                        if idx != usize::MAX
+                            && streams_need_original_map
+                                .get(&destination_stream)
+                                .is_some_and(|v| *v)
                             && original_options[idx].is_some()
                         {
                             local_val.insert(
@@ -404,6 +406,11 @@ pub async fn handle_request(
 
                             local_val.insert(ALL_VALUES_COL_NAME.to_string(), values.into());
                         }
+
+                        let _size = size_by_stream
+                            .entry(destination_stream.clone())
+                            .or_insert(0);
+                        *_size += original_size;
 
                         let (ts_data, fn_num) = json_data_by_stream
                             .entry(destination_stream.clone())
@@ -456,6 +463,7 @@ pub async fn handle_request(
         UsageType::Logs,
         &mut status,
         json_data_by_stream,
+        size_by_stream,
     )
     .await
     {
@@ -465,7 +473,7 @@ pub async fn handle_request(
             ("200", out)
         }
         Err(e) => {
-            log::error!("Error while writing logs: {}", e);
+            log::error!("Error while writing logs: {e}");
             stream_status.status = match status {
                 IngestionStatus::Record(status) => status,
                 IngestionStatus::Bulk(_) => unreachable!(),

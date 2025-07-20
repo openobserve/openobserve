@@ -17,7 +17,6 @@ export interface Query {
   from: number;
   size: number;
   sql: string;
-  sql_mode: string;
   track_total_hits?: boolean;
 }
 
@@ -67,7 +66,7 @@ export interface WebSocketSearchResponse {
 
 export interface WebSocketSearchPayload {
   queryReq: SearchRequestPayload;
-  type: "search" | "histogram" | "pageCount";
+  type: "search" | "histogram" | "pageCount" | "values";
   isPagination: boolean;
   traceId: string;
   org_id: string;

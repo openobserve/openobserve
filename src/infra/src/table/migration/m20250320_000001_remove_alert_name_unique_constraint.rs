@@ -84,7 +84,7 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
     let db = manager.get_connection();
     let backend = db.get_database_backend();
 
-    log::debug!("[SCHEDULED_TRIGGERS_MIGRATION] db backend: {:?}", backend);
+    log::debug!("[SCHEDULED_TRIGGERS_MIGRATION] db backend: {backend:?}");
 
     let select_query = Query::select()
         .column(ScheduledJobs::ModuleKey)
@@ -99,13 +99,13 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
         sea_orm::DatabaseBackend::Sqlite => select_query.build(SqliteQueryBuilder),
     };
     let statement = Statement::from_sql_and_values(backend, sql, values);
-    log::debug!("[SCHEDULED_TRIGGERS_MIGRATION] select_query: {}", statement);
+    log::debug!("[SCHEDULED_TRIGGERS_MIGRATION] select_query: {statement}");
 
     // 1. Get all alert triggers from the scheduled jobs table
     let triggers_result = db
         .query_all(statement)
         .await
-        .map_err(|e| DbErr::Custom(format!("Failed to query scheduled jobs: {}", e)))?;
+        .map_err(|e| DbErr::Custom(format!("Failed to query scheduled jobs: {e}")))?;
 
     log::debug!(
         "[SCHEDULED_TRIGGERS_MIGRATION] triggers_result length: {}",
@@ -115,11 +115,11 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
     for trigger_row in triggers_result {
         let org = trigger_row
             .try_get::<String>("", "org")
-            .map_err(|e| DbErr::Custom(format!("Failed to get org: {}", e)))?;
+            .map_err(|e| DbErr::Custom(format!("Failed to get org: {e}")))?;
 
         let module_key = trigger_row
             .try_get::<String>("", "module_key")
-            .map_err(|e| DbErr::Custom(format!("Failed to get module_key: {}", e)))?;
+            .map_err(|e| DbErr::Custom(format!("Failed to get module_key: {e}")))?;
 
         // Skip if the module_key doesn't match the expected pattern
         let parts: Vec<&str> = module_key.split('/').collect();
@@ -148,14 +148,11 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
             sea_orm::DatabaseBackend::Sqlite => alert_query.build(SqliteQueryBuilder),
         };
         let statement = Statement::from_sql_and_values(backend, sql, values);
-        log::debug!(
-            "[SCHEDULED_TRIGGERS_MIGRATION] alert_query to get id: {}",
-            statement
-        );
+        log::debug!("[SCHEDULED_TRIGGERS_MIGRATION] alert_query to get id: {statement}");
         let alert_result = db
             .query_one(statement)
             .await
-            .map_err(|e| DbErr::Custom(format!("Failed to query alert: {}", e)))?;
+            .map_err(|e| DbErr::Custom(format!("Failed to query alert: {e}")))?;
         log::debug!(
             "[SCHEDULED_TRIGGERS_MIGRATION] alert_result is found: {}",
             alert_result.is_some()
@@ -165,12 +162,9 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
         if let Some(alert_row) = alert_result {
             let alert_id = alert_row
                 .try_get::<String>("", "id")
-                .map_err(|e| DbErr::Custom(format!("Failed to get alert ID: {}", e)))?;
+                .map_err(|e| DbErr::Custom(format!("Failed to get alert ID: {e}")))?;
 
-            log::debug!(
-                "[SCHEDULED_TRIGGERS_MIGRATION] alert_id to upgrade: {}",
-                alert_id
-            );
+            log::debug!("[SCHEDULED_TRIGGERS_MIGRATION] alert_id to upgrade: {alert_id}");
             // Update the trigger module_key
             let update_query = Query::update()
                 .table(ScheduledJobs::Table)
@@ -186,12 +180,11 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
             };
             let statement = Statement::from_sql_and_values(backend, sql, values);
             log::debug!(
-                "[SCHEDULED_TRIGGERS_MIGRATION] update_query alert scheduled job statement: {}",
-                statement
+                "[SCHEDULED_TRIGGERS_MIGRATION] update_query alert scheduled job statement: {statement}"
             );
             db.execute(statement)
                 .await
-                .map_err(|e| DbErr::Custom(format!("Failed to update scheduled job: {}", e)))?;
+                .map_err(|e| DbErr::Custom(format!("Failed to update scheduled job: {e}")))?;
         }
     }
 

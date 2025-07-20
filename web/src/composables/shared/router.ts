@@ -24,10 +24,11 @@ import Tickets from "@/views/TicketsView.vue";
 import About from "@/views/About.vue";
 import MemberSubscription from "@/views/MemberSubscription.vue";
 import Error404 from "@/views/Error404.vue";
+import ShortUrl from "@/views/ShortUrl.vue";
 
-const Search = () => import("@/views/Search.vue");
-const AppMetrics = () => import("@/views/AppMetrics.vue");
-const AppTraces = () => import("@/views/AppTraces.vue");
+const Search = () => import("@/plugins/logs/Index.vue");
+const AppMetrics = () => import("@/plugins/metrics/Index.vue");
+const AppTraces = () => import("@/plugins/traces/Index.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
 
@@ -191,7 +192,7 @@ const useRoutes = () => {
       name: "dashboards",
       component: Dashboards,
       meta: {
-        keepAlive: true,
+        keepAlive: false,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -312,6 +313,15 @@ const useRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
+    },
+    {
+      path: "short/:id",
+      name: "shortUrl",
+      component: ShortUrl,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+      props: true,
     },
     {
       path: "rum",

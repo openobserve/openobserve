@@ -411,6 +411,7 @@ import {
   defineComponent,
   onBeforeUnmount,
   onMounted,
+  onUnmounted,
   ref,
   watch,
 } from "vue";
@@ -494,6 +495,8 @@ export default defineComponent({
 
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
+
+    let currentSearchAbortController = null;
       const columns = computed(() => {
         // Define the default columns
         const baseColumns = [
@@ -685,9 +688,44 @@ export default defineComponent({
       }
     });
 
-    // Cleanup debounced function 
+    // Comprehensive cleanup function
+    const cleanup = () => {
+      // Cancel debounced search
+      if (debouncedSearch?.cancel) {
+        debouncedSearch.cancel();
+      }
+
+      // Cancel any in-flight search requests
+      if (currentSearchAbortController) {
+        currentSearchAbortController.abort();
+        currentSearchAbortController = null;
+      }
+
+
+      // Clear reactive refs to prevent memory leaks
+      if (qTable.value) {
+        qTable.value = null;
+      }
+
+      // Clear arrays and objects
+      dashboardList.value = [];
+      filteredResults.value = [];
+      selected.value = [];
+
+      // Reset refs to null
+      selectedDelete.value = null;
+      selectedDashboardToMove.value = null;
+      selectedFolderDelete.value = null;
+      selectedFolderToEdit.value = null;
+    };
+
+    // Cleanup on component unmount
     onBeforeUnmount(() => { 
-      debouncedSearch.cancel(); 
+      cleanup();
+    });
+
+    onUnmounted(() => {
+      cleanup();
     });
 
     const changePagination = (val: { label: string; value: any }) => {

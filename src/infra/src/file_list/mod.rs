@@ -66,7 +66,7 @@ pub trait FileList: Sync + Send + 'static {
         created_at: i64,
         files: &[FileListDeleted],
     ) -> Result<()>;
-    async fn batch_remove_deleted(&self, files: &[String]) -> Result<()>;
+    async fn batch_remove_deleted(&self, files: &[FileKey]) -> Result<()>;
     async fn get(&self, file: &str) -> Result<FileMeta>;
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
@@ -237,7 +237,7 @@ pub async fn batch_add_deleted(
 }
 
 #[inline]
-pub async fn batch_remove_deleted(files: &[String]) -> Result<()> {
+pub async fn batch_remove_deleted(files: &[FileKey]) -> Result<()> {
     CLIENT.batch_remove_deleted(files).await
 }
 
@@ -521,12 +521,12 @@ pub async fn local_cache_gc() -> Result<()> {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
         interval.tick().await; // the first tick is immediate
         loop {
-            if let Ok(min_id) = get_min_pk_value().await {
-                if min_id > 0 {
-                    match LOCAL_CACHE.clean_by_min_pk_value(min_id).await {
-                        Ok(_) => log::info!("[file_list] local cache gc done"),
-                        Err(e) => log::error!("[file_list] local cache gc failed: {}", e),
-                    }
+            if let Ok(min_id) = get_min_pk_value().await
+                && min_id > 0
+            {
+                match LOCAL_CACHE.clean_by_min_pk_value(min_id).await {
+                    Ok(_) => log::info!("[file_list] local cache gc done"),
+                    Err(e) => log::error!("[file_list] local cache gc failed: {e}"),
                 }
             }
             interval.tick().await;
@@ -537,10 +537,10 @@ pub async fn local_cache_gc() -> Result<()> {
 }
 
 fn validate_time_range(time_range: Option<(i64, i64)>) -> Result<()> {
-    if let Some((start, end)) = time_range {
-        if start > end || start == 0 || end == 0 {
-            return Err(Error::Message("[file_list] invalid time range".to_string()));
-        }
+    if let Some((start, end)) = time_range
+        && (start > end || start == 0 || end == 0)
+    {
+        return Err(Error::Message("[file_list] invalid time range".to_string()));
     }
     Ok(())
 }
@@ -636,6 +636,8 @@ impl From<&StatsRecord> for StreamStats {
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct FileDeletedRecord {
     #[sqlx(default)]
+    pub id: i64,
+    #[sqlx(default)]
     pub account: String,
     pub stream: String,
     pub date: String,
@@ -659,12 +661,23 @@ pub struct MergeJobPendingRecord {
 }
 
 #[derive(Debug, Clone, sqlx::Type, PartialEq, Default)]
-#[repr(i32)]
+#[repr(i64)]
 pub enum FileListJobStatus {
     #[default]
     Pending,
     Running,
     Done,
+}
+
+impl From<i64> for FileListJobStatus {
+    fn from(status: i64) -> Self {
+        match status {
+            0 => Self::Pending,
+            1 => Self::Running,
+            2 => Self::Done,
+            _ => Self::Pending,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, sqlx::FromRow)]

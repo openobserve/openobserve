@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         
           <div class="flex items-center">
             <q-btn
-            v-if="config.isEnterprise == 'true'"
+            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
             :ripple="false"
             @click="toggleAIChat"
             data-test="menu-link-ai-item"
@@ -1038,8 +1038,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :expandedRows="expandedLogs"
                     @expand-row="expandLog"
                     @copy="copyLogToClipboard"
-
-
+                    @sendToAiChat="sendToAiChat"
                   />
                   <div v-if="loading" style="height: calc(100vh - 190px) !important;" class="flex justify-center items-center" >
                     <q-spinner-hourglass color="primary" size="lg" />
@@ -1133,7 +1132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div  class="q-ml-sm" v-if="store.state.isAiChatEnabled " style="width: 25%; max-width: 100%; min-width: 75px; height: calc(100vh - 70px) !important;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-              <O2AIChat style="height: calc(100vh - 70px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" />
+              <O2AIChat style="height: calc(100vh - 70px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" :aiChatInputContext="aiChatInputContext" />
 
             </div>
 
@@ -1196,9 +1195,12 @@ import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
 
 import config from "../../../aws-exports";
 
+import useAiChat from "@/composables/useAiChat";
+import { onBeforeUnmount } from "vue";
+
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue"),
+  () => import("@/components/CodeQueryEditor.vue"),
 );
 
 const props = defineProps([
@@ -1250,11 +1252,13 @@ const emits = defineEmits([
 const {  pipelineObj } = useDragAndDrop();
 const { searchObj } = useLogs();
 const { getStream, getStreams } = useStreams ();
+const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 let parser: any;
 
 const selectedStreamName = ref("");
 
 const streamOptions = ref([]);
+
 
 const getColumns = computed(() => {
   return [
@@ -1281,7 +1285,7 @@ const getColumns = computed(() => {
         showWrap: false,
         wrapContent: true
       },
-      size: 200
+      size: 260
     },
     {
       name: "source",
@@ -1343,6 +1347,10 @@ const previewPromqlQueryRef : any = ref(null);
 const isHovered = ref(false);
 const loading = ref(false);
 
+const aiChatInputContext = ref("");
+
+const userDefinedFields = ref<any[]>([]);
+
 
 const selectedStreamType = ref(props.streamType || "logs");
 
@@ -1399,7 +1407,13 @@ onMounted(async ()=>{
     getStreamFields();
   }
   }, 200);
+
+  registerAiContextHandler();
   
+})
+
+onBeforeUnmount(()=>{
+  removeAiContextHandler();
 })
 
 const importSqlParser = async () => {
@@ -1890,12 +1904,18 @@ const getStreamFields = () => {
     getStream(selectedStreamName.value, selectedStreamType.value, true)
       .then((stream: any) => {
         streamFields.value = [];
+        userDefinedFields.value = [];
         stream.schema?.forEach((field: any) => {
             streamFields.value.push({
               ...field,
               showValues: true,
             });
           
+        });
+        stream.uds_schema?.forEach((field: any) => {
+          userDefinedFields.value.push({
+            ...field,
+          });
         });
       })
       .finally(() => {
@@ -1907,7 +1927,6 @@ const getStreamFields = () => {
         }
         expandState.value.query = true;
         expandState.value.output = false;
-
         resolve(true);
       });
   });
@@ -2110,6 +2129,71 @@ const getBtnLogo = computed(() => {
     })
 
 
+    // [START] O2 AI Context Handler
+
+    const registerAiContextHandler = () => {
+      registerAiChatHandler(getContext);
+    };
+
+    const getContext = async () => {
+      return new Promise(async (resolve, reject) => {
+        try {
+          const payload : any = {};
+
+
+          if (!selectedStreamType.value || !selectedStreamName.value) {
+            resolve("");
+            return;
+          }
+
+          const schema = streamFields.value.map((field: any) => {
+            return {
+              name: field.name,
+              type: field.type
+            }
+          })
+
+          //if uds is enabled we need to push the timestamp and all fields name in the schema
+          const hasTimestampColumn = userDefinedFields.value.some((field: any) => field.name === store.state.zoConfig.timestamp_column);
+          const hasAllFieldsName = userDefinedFields.value.some((field: any) => field.name === store.state.zoConfig.all_fields_name);
+            if(userDefinedFields.value.length > 0){ 
+              if(!hasTimestampColumn){
+              userDefinedFields.value.push({
+                name:store.state.zoConfig.timestamp_column,
+                type:'Int64'
+              })
+            }
+            if(!hasAllFieldsName){
+              userDefinedFields.value.push({
+                name:store.state.zoConfig.all_fields_name,
+                type:'Utf8'
+              })
+            }
+          }
+
+          payload["stream_name"] = selectedStreamName.value;
+          payload["schema_"] = userDefinedFields.value.length > 0 ? userDefinedFields.value : schema;
+
+          resolve(payload);
+        } catch (error) {
+          console.error("Error in getContext for logs page", error);
+          resolve("");
+        }
+      });
+    };
+
+    const removeAiContextHandler = () => {
+      removeAiChatHandler();
+    };
+
+    // [END] O2 AI Context Handler
+
+    const sendToAiChat = (value: any) => {
+      aiChatInputContext.value = value;
+      store.dispatch("setIsAiChatEnabled", true);
+    };
+
+
 defineExpose({
   tab,
   validateInputs,
@@ -2143,7 +2227,9 @@ defineExpose({
   delayCondition,
   toggleAIChat,
   isHovered,
-  getBtnLogo
+  getBtnLogo,
+  sendToAiChat,
+  aiChatInputContext
 });
 
 </script>

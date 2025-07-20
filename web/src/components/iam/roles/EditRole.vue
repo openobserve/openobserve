@@ -75,13 +75,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="flex justify-between items-center"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-            :style="{
-              'box-shadow':
-                store.state.theme === 'dark'
-                  ? 'rgb(45 45 45) 0px 4px 7px 0px'
-                  : 'rgb(240 240 240) 0px 4px 7px 0px',
-              height: '56px',
-            }"
           >
             <div
               v-show="permissionsUiType === 'table'"
@@ -200,7 +193,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             data-test="edit-role-permissions-table-section"
-            class="q-px-md q-my-sm"
           >
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
@@ -286,12 +278,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex justify-end q-px-md q-py-sm full-width"
         style="position: sticky; bottom: 0px; z-index: 2"
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        :style="{
-          'box-shadow':
-            store.state.theme === 'dark'
-              ? 'rgb(45 45 45) 0px -4px 7px 0px'
-              : 'rgb(240 240 240) 0px -4px 7px 0px',
-        }"
       >
         <q-btn
           data-test="edit-role-cancel-btn"
@@ -357,7 +343,7 @@ import config from "@/aws-exports";
 import commonService from "@/services/common";
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue"),
+  () => import("@/components/CodeQueryEditor.vue"),
 );
 
 onBeforeMount(() => {
@@ -1581,7 +1567,13 @@ const getPipelines = async () => {
     store.state.selectedOrganization.identifier,
   );
 
-  updateResourceEntities("pipeline", ["pipeline_id"], [...pipelines.data.list],false,"name");
+  updateResourceEntities(
+    "pipeline",
+    ["pipeline_id"],
+    [...pipelines.data.list],
+    false,
+    "name",
+  );
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1668,8 +1660,13 @@ const getActionScripts = async () => {
     store.state.selectedOrganization.identifier,
   );
 
-
-  updateResourceEntities("action_scripts", ["id"], [...actionScripts.data],false,"name");
+  updateResourceEntities(
+    "action_scripts",
+    ["id"],
+    [...actionScripts.data],
+    false,
+    "name",
+  );
 
   return new Promise((resolve) => {
     resolve(true);

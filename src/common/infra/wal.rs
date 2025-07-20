@@ -77,7 +77,7 @@ impl SearchingFileLocker {
     }
 
     pub fn exist(&self, file: &str) -> bool {
-        self.inner.get(file).is_some()
+        self.inner.contains_key(file)
     }
 
     pub fn clean(&mut self) {
@@ -159,12 +159,8 @@ impl Manager {
         );
         let locker = self.data.get(thread_id)?;
         let manager = locker.read().await;
-        let file = match manager.get(&full_key) {
-            Some(file) => file.clone(),
-            None => {
-                return None;
-            }
-        };
+        let file = manager.get(&full_key)?.clone();
+
         drop(manager);
 
         // check size & ttl
@@ -220,19 +216,19 @@ impl Manager {
     }
 
     pub async fn check_in_use(&self, stream: StreamParams, file_name: &str) -> bool {
-        let columns = file_name.split('/').collect::<Vec<&str>>();
+        let mut columns = file_name.split('/');
         let thread_id: usize = columns
-            .first()
+            .next()
             .unwrap()
             .parse()
             .unwrap_or_else(|_| panic!("need a thread id, but the file is: {file_name}"));
-        let key = columns[1..columns.len() - 1].join("/");
-        if let Some(file) = self.get(thread_id, stream, &key).await {
-            if file.name() == file_name {
-                return true;
-            }
-        }
-        false
+        // Remove the last element which is the file name
+        // and join the rest to form the key
+        columns.next_back();
+        let key = itertools::Itertools::join(&mut columns, "/");
+        self.get(thread_id, stream, &key)
+            .await
+            .is_some_and(|file| file.name() == file_name)
     }
 }
 
@@ -254,7 +250,7 @@ impl RwFile {
             dir_path = dir_path.replace(file_list_prefix, "/file_list/");
         }
         let id = ider::generate();
-        let file_name = format!("{thread_id}/{key}/{id}{}", FILE_EXT_JSON);
+        let file_name = format!("{thread_id}/{key}/{id}{FILE_EXT_JSON}");
         let file_path = format!("{dir_path}{file_name}");
         create_dir_all(Path::new(&file_path).parent().unwrap())
             .await
@@ -404,7 +400,7 @@ pub fn clean_lock_files() {
 }
 
 pub fn lock_request(trace_id: &str, files: &[String]) {
-    log::info!("[trace_id: {}] lock_request for wal files", trace_id);
+    log::info!("[trace_id: {trace_id}] lock_request for wal files");
     let mut locker = SEARCHING_REQUESTS.write();
     locker.insert(trace_id.to_string(), files.to_vec());
 }
@@ -413,7 +409,7 @@ pub fn release_request(trace_id: &str) {
     if !config::cluster::LOCAL_NODE.is_ingester() {
         return;
     }
-    log::info!("[trace_id: {}] release_request for wal files", trace_id);
+    log::info!("[trace_id: {trace_id}] release_request for wal files");
     let mut locker = SEARCHING_REQUESTS.write();
     let files = locker.remove(trace_id);
     locker.shrink_to_fit();
@@ -425,6 +421,7 @@ pub fn release_request(trace_id: &str) {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[tokio::test]
@@ -434,13 +431,13 @@ mod tests {
         let stream_name = "test_stream";
         let stream_type = StreamType::Logs;
         let stream = StreamParams::new(org_id, stream_name, stream_type);
-        let key = "test_key";
+        let key = "test_key1";
         let file = get_or_create(thread_id, stream, None, key).await;
         let data = "test_data".to_string().into_bytes();
         file.write(&data).await;
         assert_eq!(file.read().await.unwrap(), data);
         assert_eq!(file.size().await, data.len() as i64);
-        assert!(file.name().contains(&format!("{}/{}", thread_id, key)));
+        assert!(file.name().contains(&format!("{thread_id}/{key}")));
     }
 
     #[tokio::test]
@@ -450,12 +447,133 @@ mod tests {
         let stream_name = "test_stream";
         let stream_type = StreamType::Logs;
         let stream = StreamParams::new(org_id, stream_name, stream_type);
-        let key = "test_key";
+        let key = "test_key2";
         let file = RwFile::new(thread_id, stream, None, key).await;
         let data = "test_data".to_string().into_bytes();
         file.write(&data).await;
         assert_eq!(file.read().await.unwrap(), data);
         assert_eq!(file.size().await, data.len() as i64);
-        assert!(file.name().contains(&format!("{}/{}", thread_id, key)));
+        assert!(file.name().contains(&format!("{thread_id}/{key}")));
+    }
+
+    #[tokio::test]
+    async fn test_wal_file_locking() {
+        let files = vec![
+            "files/test_org/logs/test_stream/1/2025/06/06/01/1/md5/test_key1.json".to_string(),
+            "files/test_org/logs/test_stream/1/2025/06/06/01/1/md5/test_key2.json".to_string(),
+        ];
+
+        // Test locking files
+        lock_files(&files);
+        assert!(lock_files_exists(&files[0]));
+        assert!(lock_files_exists(&files[1]));
+
+        // Test releasing files
+        release_files(&files);
+        assert!(!lock_files_exists(&files[0]));
+        assert!(!lock_files_exists(&files[1]));
+    }
+
+    #[tokio::test]
+    async fn test_wal_request_locking() {
+        let trace_id = "test_trace_1234";
+        let files = vec![
+            "files/test_org/logs/test_stream/1/2025/06/06/01/1/md5/test_key3.json".to_string(),
+            "files/test_org/logs/test_stream/1/2025/06/06/01/1/md5/test_key4.json".to_string(),
+        ];
+
+        // Test locking request
+        lock_files(&files);
+        lock_request(trace_id, &files);
+        assert!(lock_files_exists(&files[0]));
+        assert!(lock_files_exists(&files[1]));
+
+        // Test releasing request
+        release_request(trace_id);
+        assert!(!lock_files_exists(&files[0]));
+        assert!(!lock_files_exists(&files[1]));
+    }
+
+    #[tokio::test]
+    async fn test_wal_file_expiration() {
+        let thread_id = 1;
+        let org_id = "test_org";
+        let stream_name = "test_stream";
+        let stream_type = StreamType::Logs;
+        let stream = StreamParams::new(org_id, stream_name, stream_type);
+        let key = "test_key5";
+
+        // Create a file with short retention time
+        let file = get_or_create(thread_id, stream.clone(), None, key).await;
+        let initial_expired = file.expired();
+
+        // Wait a bit and check if file is still accessible
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        let file_after = get_or_create(thread_id, stream.clone(), None, key).await;
+        assert_eq!(file_after.expired(), initial_expired);
+    }
+
+    #[tokio::test]
+    async fn test_wal_manager_operations() {
+        let thread_id = 1;
+        let org_id = "test_org";
+        let stream_name = "test_stream";
+        let stream_type = StreamType::Logs;
+        let stream = StreamParams::new(org_id, stream_name, stream_type);
+        let key = "test_key6";
+
+        // Test get_or_create
+        let file1 = get_or_create(thread_id, stream.clone(), None, key).await;
+        let file2 = get_or_create(thread_id, stream.clone(), None, key).await;
+        assert_eq!(file1.name(), file2.name());
+
+        // Test check_in_use
+        assert!(check_in_use(stream.clone(), file1.name()).await);
+        assert!(!check_in_use(stream.clone(), "1/2025/06/06/01/md5/test_key.json").await);
+    }
+
+    #[tokio::test]
+    async fn test_wal_file_size_limits() {
+        let thread_id = 1;
+        let org_id = "test_org";
+        let stream_name = "test_stream";
+        let stream_type = StreamType::Logs;
+        let stream = StreamParams::new(org_id, stream_name, stream_type);
+        let key = "test_key7";
+
+        let file = get_or_create(thread_id, stream.clone(), None, key).await;
+
+        // Write some data
+        let data = "test_data".to_string().into_bytes();
+        file.write(&data).await;
+        file.sync().await;
+
+        // Check size
+        assert_eq!(file.size().await, data.len() as i64);
+
+        // Sync to disk
+        file.sync().await;
+    }
+
+    #[tokio::test]
+    async fn test_wal_file_operations() {
+        let thread_id = 1;
+        let org_id = "test_org";
+        let stream_name = "test_stream";
+        let stream_type = StreamType::Logs;
+        let stream = StreamParams::new(org_id, stream_name, stream_type);
+        let key = "test_key8";
+
+        let file = RwFile::new(thread_id, stream, None, key).await;
+
+        // Test write and read
+        let data = "test_data".to_string().into_bytes();
+        file.write(&data).await;
+        assert_eq!(file.read().await.unwrap(), data);
+
+        // Test file names
+        assert!(file.name().contains(&format!("{thread_id}/{key}")));
+        assert!(file.wal_name().contains(&format!("{thread_id}/{key}")));
+        assert!(file.full_name().contains(&format!("{thread_id}/{key}")));
     }
 }

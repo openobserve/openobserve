@@ -139,6 +139,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </q-tooltip>
         </q-btn>
+        <q-btn
+          v-if="isPartialData && !isPanelLoading"
+          :icon="symOutlinedClockLoader20"
+          flat
+          size="xs"
+          padding="2px"
+          data-test="dashboard-panel-partial-data-warning"
+          class="warning"
+        >
+          <q-tooltip anchor="bottom right" self="top right">
+            <div style="white-space: pre-wrap">
+              The data shown is incomplete because the loading was interrupted.
+              Refresh to load complete data.
+            </div>
+          </q-tooltip>
+        </q-btn>
         <span v-if="lastTriggeredAt && !viewOnly" class="lastRefreshedAt">
           <span class="lastRefreshedAtIcon"
             >🕑
@@ -330,6 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         (...args) => $emit('update:initial-variable-values', ...args)
       "
       @error="onError"
+      @is-partial-data-update="handleIsPartialDataUpdate"
       ref="PanleSchemaRendererRef"
       :allowAnnotationsAdd="true"
     ></PanelSchemaRenderer>
@@ -364,7 +381,7 @@ import {
   computed,
   defineAsyncComponent,
   watch,
-  onBeforeMount,
+  onBeforeUnmount,
 } from "vue";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
@@ -376,7 +393,10 @@ import {
   outlinedWarning,
   outlinedRunningWithErrors,
 } from "@quasar/extras/material-icons-outlined";
-import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
+import {
+  symOutlinedClockLoader20,
+  symOutlinedDataInfoAlert,
+} from "@quasar/extras/material-symbols-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
@@ -494,7 +514,9 @@ export default defineComponent({
 
     //check if dependent adhoc variable exists
     const dependentAdHocVariable = computed(() => {
-      if (!metaData.value) return false;
+      if (!metaData.value) {
+        return false;
+      }
 
       const adhocVariables = props.variablesData.values
         ?.filter((it: any) => it.type === "dynamic_filters")
@@ -508,6 +530,10 @@ export default defineComponent({
         );
         return vars?.length == adhocVariables?.length;
       });
+
+      if (adhocVariables?.length == 0 || adhocVariables == undefined) {
+        return false;
+      }
       return !metaDataDynamic;
     });
 
@@ -571,24 +597,6 @@ export default defineComponent({
 
       return logsUrl;
     };
-    let parser: any;
-    onBeforeMount(async () => {
-      await importSqlParser();
-    });
-
-    const importSqlParser = async () => {
-      const useSqlParser: any = await import("@/composables/useParser");
-      const { sqlParser }: any = useSqlParser.default();
-      parser = await sqlParser();
-    };
-    const parseQuery = async (originalQuery: string, parser: any) => {
-      try {
-        return parser.astify(originalQuery);
-      } catch (error) {
-        console.error("Failed to parse query:", error);
-        return null;
-      }
-    };
 
     const onLogPanel = async () => {
       const queryDetails = props.data;
@@ -600,13 +608,6 @@ export default defineComponent({
       const { originalQuery, streamName } =
         getOriginalQueryAndStream(queryDetails, metaData) || {};
       if (!originalQuery || !streamName) return;
-
-      if (!parser) {
-        await importSqlParser();
-      }
-
-      const ast = await parseQuery(originalQuery, parser);
-      if (!ast) return;
 
       let modifiedQuery = originalQuery;
 
@@ -782,6 +783,25 @@ export default defineComponent({
       }
     };
 
+    const isPartialData = ref(false);
+
+    const handleIsPartialDataUpdate = (isPartial: boolean) => {
+      isPartialData.value = isPartial;
+    };
+
+    // Add cleanup on component unmount
+    onBeforeUnmount(() => {
+      // Clear any pending timeouts or intervals
+      // Reset refs to help with garbage collection
+      metaData.value = null;
+      errorData.value = "";
+
+      // Clear the PanelSchemaRenderer reference
+      if (PanleSchemaRendererRef.value) {
+        PanleSchemaRendererRef.value = null;
+      }
+    });
+
     return {
       props,
       onEditPanel,
@@ -790,6 +810,7 @@ export default defineComponent({
       deletePanelDialog,
       isCurrentlyHoveredPanel,
       outlinedWarning,
+      symOutlinedClockLoader20,
       symOutlinedDataInfoAlert,
       outlinedRunningWithErrors,
       store,
@@ -816,6 +837,8 @@ export default defineComponent({
       handleLoadingStateChange,
       limitNumberOfSeriesWarningMessage,
       handleLimitNumberOfSeriesWarningMessageUpdate,
+      isPartialData,
+      handleIsPartialDataUpdate,
     };
   },
   methods: {

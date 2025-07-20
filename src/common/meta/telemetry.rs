@@ -53,17 +53,15 @@ impl Telemetry {
             return;
         }
 
-        log::info!("sending a track event {}", event);
+        log::info!("sending a track event {event}");
         let mut props = if send_base_info {
             self.base_info.clone()
         } else {
             HashMap::new()
         };
 
-        if data.is_some() {
-            for item in data.unwrap() {
-                props.insert(item.0, item.1);
-            }
+        if let Some(data) = data {
+            props.extend(data);
         }
 
         if send_zo_data {
@@ -88,7 +86,7 @@ impl Telemetry {
             .await;
 
         if res.is_err() {
-            log::error!("Error sending event {}, {:?}", event, res);
+            log::error!("Error sending event {event}, {res:?}");
         }
     }
 
@@ -180,7 +178,7 @@ pub async fn add_zo_info(data: &mut HashMap<String, json::Value>) {
             data.insert("num_dashboards".to_string(), keys.len().into());
         }
         Err(e) => {
-            log::error!("Error getting dashboards {}", e);
+            log::error!("Error getting dashboards {e}");
         }
     }
 
@@ -306,5 +304,13 @@ mod test_telemetry {
         let mut props = tel.base_info.clone();
         add_zo_info(&mut props).await;
         assert!(!tel.base_info.is_empty())
+    }
+
+    #[tokio::test]
+    async fn test_telemetry_send_track_event_without_base_info_or_zo_data() {
+        let mut telemetry = Telemetry::new();
+        telemetry
+            .send_track_event("test_event", None, false, false)
+            .await;
     }
 }

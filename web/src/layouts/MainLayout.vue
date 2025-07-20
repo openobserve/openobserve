@@ -60,8 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             loading="lazy"
             :src="
               store?.state?.theme == 'dark'
-                ? getImageURL('images/common/open_observe_logo_2.svg')
-                : getImageURL('images/common/open_observe_logo.svg')
+                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                : getImageURL('images/common/openobserve_latest_light_2.svg')
             "
             @click="goToHome"
           />
@@ -70,7 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <img
             class="appLogo"
             loading="lazy"
-            :src="getImageURL('images/common/open_observe_logo.svg')"
+            :src="
+              store?.state?.theme == 'dark'
+                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                : getImageURL('images/common/openobserve_latest_light_2.svg')
+            "
             @click="goToHome"
           />
         </div>
@@ -103,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>   
         <q-btn
-          v-if="config.isEnterprise == 'true'"
+          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
           :ripple="false"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"
@@ -116,7 +120,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="border-radius: 100%;"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
-
         >
           <div class="row items-center no-wrap tw-gap-2  ">
             <img  :src="getBtnLogo" class="header-icon ai-icon" />
@@ -428,18 +431,11 @@ class="padding-none" />
       :style="{ width: store.state.isAiChatEnabled ? '75%' : '100%' }"
       :key="store.state.selectedOrganization?.identifier"
     >
-      <q-page-container>
-        <router-view v-slot="{ Component }">
-          <template v-if="$route.meta.keepAlive">
-            <keep-alive>
-              <component :is="Component" />
-            </keep-alive>
-          </template>
-          <template v-else>
-            <component :is="Component" />
-          </template>
-        </router-view>
-      </q-page-container>
+    <q-page-container v-if="isLoading">
+      <router-view v-slot="{ Component }">
+        <component :is="Component"  @sendToAiChat="sendToAiChat" />
+      </router-view>
+    </q-page-container>
     </div>
 
     <!-- Right Panel (AI Chat) -->
@@ -450,9 +446,13 @@ class="padding-none" />
       style="width: 25%; max-width: 100%; min-width: 75px; z-index: 10 "
       :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
     >
-      <O2AIChat :header-height="82.5" :is-open="store.state.isAiChatEnabled" @close="closeChat" />
+      <O2AIChat :header-height="82.5" :is-open="store.state.isAiChatEnabled" @close="closeChat"   :aiChatInputContext="aiChatInputContext"  />
     </div>
   </div>
+  <q-dialog v-model="showGetStarted" maximized full-height>
+    <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
+  </q-dialog>
+
   </q-layout>
 </template>
 
@@ -484,6 +484,8 @@ import {
   useLocalUserInfo,
   getImageURL,
   invlidateLoginData,
+  getDueDays,
+  trialPeriodAllowedPath,
 } from "../utils/zincutils";
 
 import {
@@ -511,6 +513,7 @@ import configService from "@/services/config";
 import streamService from "@/services/stream";
 import billings from "@/services/billings";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
+import GetStarted from "@/components/login/GetStarted.vue";
 import {
   outlinedHome,
   outlinedSearch,
@@ -569,6 +572,7 @@ export default defineComponent({
     ManagementIcon,
     ThemeSwitcher,
     O2AIChat,
+    GetStarted,
   },
   methods: {
     navigateToDocs() {
@@ -617,7 +621,9 @@ export default defineComponent({
     const { closeSocket } = useSearchWebSocket();
 
     const isMonacoEditorLoaded = ref(false);
+    const showGetStarted = ref(localStorage.getItem('isFirstTimeLogin') == 'true' ?? false);
     const isHovered = ref(false);
+    const aiChatInputContext = ref("");
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier",
@@ -922,6 +928,7 @@ export default defineComponent({
 
     const updateOrganization = async () => {
       resetStreams();
+      store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
       const orgIdentifier = selectedOrg.value.identifier;
       const queryParams =
@@ -1124,10 +1131,6 @@ export default defineComponent({
           });
         }
 
-        if (selectedOrg.value.identifier != "" && config.isCloud == "true") {
-          mainLayoutMixin.setup().getOrganizationThreshold(store);
-        }
-
         if (
           Object.keys(selectedOrg.value).length > 0 &&
           selectedOrg.value.identifier != "" &&
@@ -1163,7 +1166,20 @@ export default defineComponent({
             orgSettings?.data?.data?.enable_websocket_search ?? false,
           enable_streaming_search:
             orgSettings?.data?.data?.enable_streaming_search ?? false,
+          aggregation_cache_enabled:
+            orgSettings?.data?.data?.aggregation_cache_enabled ?? false,
+          free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? "",
         });
+
+        if(orgSettings?.data?.data?.free_trial_expiry != null && orgSettings?.data?.data?.free_trial_expiry != "") {
+          const trialDueDays = getDueDays(orgSettings?.data?.data?.free_trial_expiry);
+          if(trialDueDays <= 0 && trialPeriodAllowedPath.indexOf(router.currentRoute.value.name) == -1) {
+            router.push({name: "plans", query: {
+              org_identifier: selectedOrg.value.identifier,
+            },})
+          }
+        }
+        
       } catch (error) {
         console.error("Error in getOrganizationSettings:", error);
       }
@@ -1257,6 +1273,22 @@ export default defineComponent({
         ? getImageURL('images/common/ai_icon_dark.svg')
         : getImageURL('images/common/ai_icon.svg')
     })
+    //this will be the function used to cancel the get started dialog and remove the isFirstTimeLogin from local storage
+    //this will be called from the get started component whenever users clicks on the submit button
+    const removeFirstTimeLogin = (val: boolean) => {
+      showGetStarted.value = val;
+      localStorage.removeItem('isFirstTimeLogin');
+    }
+
+    const sendToAiChat = (value: any) => {
+      store.dispatch("setIsAiChatEnabled", true);
+      //here we reset the value befoere setting it because if user clears the input then again click on the same value it wont trigger the watcher that is there in the child component
+      //so to force trigger we do this
+      aiChatInputContext.value = '';
+      nextTick(() => {
+        aiChatInputContext.value = value;
+      });
+    }
 
     return {
       t,
@@ -1290,6 +1322,10 @@ export default defineComponent({
       closeChat,
       getBtnLogo,
       isHovered,
+      showGetStarted,
+      removeFirstTimeLogin,
+      sendToAiChat,
+      aiChatInputContext
     };
   },
   computed: {
@@ -1326,6 +1362,14 @@ export default defineComponent({
       await this.getOrganizationSettings();
 
       this.isLoading = true;
+      // Find the matching organization from orgOptions
+      const matchingOrg = this.orgOptions.find(org => 
+        org.identifier === this.store.state.selectedOrganization.identifier
+      );
+      
+      if (matchingOrg) {
+        this.selectedOrg = matchingOrg;
+      }
     },
     changeUserInfo(newVal) {
       if (JSON.stringify(newVal) != "{}") {
@@ -1380,9 +1424,7 @@ export default defineComponent({
   }
 
   .appLogo {
-    margin-left: 0.5rem;
-    margin-right: 0;
-    width: 150px;
+    width: 120px;
     max-width: 150px;
     max-height: 31px;
     cursor: pointer;

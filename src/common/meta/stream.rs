@@ -35,8 +35,8 @@ pub struct Stream {
     pub stats: StreamStats,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub schema: Vec<StreamProperty>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub uds_schema: Option<Vec<StreamProperty>>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub uds_schema: Vec<StreamProperty>,
     pub settings: StreamSettings,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics_meta: Option<Metadata>,
@@ -88,6 +88,8 @@ pub struct StreamDeleteFields {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::stream::{StreamSettings, StreamType};
+
     use super::*;
 
     #[test]
@@ -96,5 +98,148 @@ mod tests {
         let stats_str: String = stats.clone().into();
         let stats_frm_str = StreamStats::from(stats_str.as_str());
         assert_eq!(stats, stats_frm_str);
+    }
+
+    #[test]
+    fn test_stream_property() {
+        let property = StreamProperty {
+            name: "test_field".to_string(),
+            prop_type: "string".to_string(),
+        };
+
+        assert_eq!(property.name, "test_field");
+        assert_eq!(property.prop_type, "string");
+    }
+
+    #[test]
+    fn test_stream_query_params() {
+        let params = StreamQueryParams {
+            stream_type: Some(StreamType::Logs),
+        };
+
+        assert_eq!(params.stream_type, Some(StreamType::Logs));
+    }
+
+    #[test]
+    fn test_stream_schema() {
+        let schema = Schema::new(vec![
+            Field::new("field1", arrow_schema::DataType::Utf8, false),
+            Field::new("field2", arrow_schema::DataType::Int64, true),
+        ]);
+
+        let stream_schema = StreamSchema {
+            stream_name: "test_stream".to_string(),
+            stream_type: StreamType::Logs,
+            schema,
+        };
+
+        assert_eq!(stream_schema.stream_name, "test_stream");
+        assert_eq!(stream_schema.stream_type, StreamType::Logs);
+        assert_eq!(stream_schema.schema.fields().len(), 2);
+    }
+
+    #[test]
+    fn test_list_stream() {
+        let stream = Stream {
+            name: "test_stream".to_string(),
+            storage_type: "local".to_string(),
+            stream_type: StreamType::Logs,
+            stats: StreamStats::default(),
+            schema: vec![StreamProperty {
+                name: "field1".to_string(),
+                prop_type: "string".to_string(),
+            }],
+            uds_schema: vec![],
+            settings: StreamSettings::default(),
+            metrics_meta: None,
+            total_fields: 1,
+        };
+
+        let list_stream = ListStream {
+            list: vec![stream],
+            total: 1,
+        };
+
+        assert_eq!(list_stream.total, 1);
+        assert_eq!(list_stream.list.len(), 1);
+        assert_eq!(list_stream.list[0].name, "test_stream");
+    }
+
+    #[test]
+    fn test_schema_evolution() {
+        let evolution = SchemaEvolution {
+            is_schema_changed: true,
+            types_delta: Some(vec![Field::new(
+                "new_field",
+                arrow_schema::DataType::Utf8,
+                false,
+            )]),
+        };
+
+        assert!(evolution.is_schema_changed);
+        assert!(evolution.types_delta.is_some());
+        assert_eq!(evolution.types_delta.unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_schema_records() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "field1",
+            arrow_schema::DataType::Utf8,
+            false,
+        )]));
+
+        let records = vec![Arc::new(json::json!({
+            "field1": "value1"
+        }))];
+
+        let schema_records = SchemaRecords {
+            schema_key: "test_key".to_string(),
+            schema: schema.clone(),
+            records: records.clone(),
+            records_size: 1,
+        };
+
+        assert_eq!(schema_records.schema_key, "test_key");
+        assert!(Arc::ptr_eq(&schema_records.schema, &schema));
+        assert_eq!(schema_records.records.len(), 1);
+        assert_eq!(schema_records.records_size, 1);
+    }
+
+    #[test]
+    fn test_stream_delete_fields() {
+        let delete_fields = StreamDeleteFields {
+            fields: vec!["field1".to_string(), "field2".to_string()],
+        };
+
+        assert_eq!(delete_fields.fields.len(), 2);
+        assert_eq!(delete_fields.fields[0], "field1");
+        assert_eq!(delete_fields.fields[1], "field2");
+    }
+
+    #[test]
+    fn test_stream_with_uds_schema() {
+        let stream = Stream {
+            name: "test_stream".to_string(),
+            storage_type: "local".to_string(),
+            stream_type: StreamType::Logs,
+            stats: StreamStats::default(),
+            schema: vec![],
+            uds_schema: vec![StreamProperty {
+                name: "uds_field".to_string(),
+                prop_type: "string".to_string(),
+            }],
+            settings: StreamSettings::default(),
+            metrics_meta: None,
+            total_fields: 1,
+        };
+
+        assert!(stream.uds_schema.len() == 1);
+    }
+
+    #[test]
+    fn test_empty_stream_delete_fields_default() {
+        let delete_fields = StreamDeleteFields::default();
+        assert!(delete_fields.fields.is_empty());
     }
 }

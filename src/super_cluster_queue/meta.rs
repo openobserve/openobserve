@@ -31,8 +31,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 let name = key_parts[2];
                 if let Err(e) = notify_update(org_id, name).await {
                     log::error!(
-                        "super cluster meta queue enrichment table notify_update error: {:?}",
-                        e
+                        "super cluster meta queue enrichment table notify_update error: {e:?}"
                     );
                 }
             }

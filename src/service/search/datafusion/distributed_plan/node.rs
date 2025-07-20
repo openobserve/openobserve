@@ -16,14 +16,12 @@
 use std::sync::Arc;
 
 use config::{
-    meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey},
+    meta::{cluster::NodeInfo, inverted_index::IndexOptimizeMode},
     utils::json,
 };
 use datafusion::common::TableReference;
 use hashbrown::HashMap;
-use proto::cluster_rpc::{
-    IdxFileName, IndexInfo, KvItem, QueryIdentifier, SearchInfo, SuperClusterInfo,
-};
+use proto::cluster_rpc::{IndexInfo, KvItem, QueryIdentifier, SearchInfo, SuperClusterInfo};
 
 use crate::service::search::{
     index::IndexCondition,
@@ -34,11 +32,10 @@ pub struct RemoteScanNodes {
     pub req: Request,
     pub nodes: Vec<Arc<dyn NodeInfo>>,
     pub file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
-    pub idx_file_list: Vec<FileKey>,
     pub equal_keys: HashMap<TableReference, Vec<KvItem>>,
     pub match_all_keys: Vec<String>,
     pub index_condition: Option<IndexCondition>,
-    pub index_optimize_mode: Option<InvertedIndexOptimizeMode>,
+    pub index_optimize_mode: Option<IndexOptimizeMode>,
     pub is_leader: bool, // for super cluster
     pub opentelemetry_context: opentelemetry::Context,
 }
@@ -49,11 +46,10 @@ impl RemoteScanNodes {
         req: Request,
         nodes: Vec<Arc<dyn NodeInfo>>,
         file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
-        idx_file_list: Vec<FileKey>,
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
-        index_optimize_mode: Option<InvertedIndexOptimizeMode>,
+        index_optimize_mode: Option<IndexOptimizeMode>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
     ) -> Self {
@@ -61,7 +57,6 @@ impl RemoteScanNodes {
             req,
             nodes,
             file_id_lists,
-            idx_file_list,
             equal_keys,
             match_all_keys,
             index_condition,
@@ -87,10 +82,11 @@ impl RemoteScanNodes {
                 .get(table_name)
                 .unwrap_or(&vec![])
                 .clone(),
-            idx_file_list: self.idx_file_list.clone(),
             start_time: self.req.time_range.as_ref().map(|x| x.0).unwrap_or(0),
             end_time: self.req.time_range.as_ref().map(|x| x.1).unwrap_or(0),
             timeout: self.req.timeout as u64,
+            use_cache: self.req.use_cache,
+            histogram_interval: self.req.histogram_interval,
         };
 
         let index_condition = match &self.index_condition {
@@ -190,10 +186,11 @@ impl RemoteScanNode {
 pub struct SearchInfos {
     pub plan: Vec<u8>,
     pub file_id_list: Vec<Vec<i64>>,
-    pub idx_file_list: Vec<FileKey>,
     pub start_time: i64,
     pub end_time: i64,
     pub timeout: u64,
+    pub use_cache: bool,
+    pub histogram_interval: i64,
 }
 
 impl SearchInfos {
@@ -203,24 +200,14 @@ impl SearchInfos {
         } else {
             self.file_id_list[partition].clone()
         };
-        let idx_file_list = if !file_id_list.is_empty() {
-            self.idx_file_list
-                .iter()
-                .map(|f| IdxFileName {
-                    key: f.key.clone(),
-                    segment_ids: f.segment_ids.clone().map(|s| s.into_vec()),
-                })
-                .collect()
-        } else {
-            vec![]
-        };
         SearchInfo {
             plan: self.plan.clone(),
             file_id_list,
-            idx_file_list,
             start_time: self.start_time,
             end_time: self.end_time,
             timeout: self.timeout as i64,
+            use_cache: self.use_cache,
+            histogram_interval: self.histogram_interval,
         }
     }
 }
