@@ -943,45 +943,6 @@ async fn handle_derived_stream_triggers(
         }
     }
 
-    if !pipeline.enabled {
-        // Pipeline not enabled, check again in 5 mins
-        let msg = format!(
-            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
-        );
-        new_trigger.next_run_at += Duration::try_minutes(5)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
-        let trigger_data_stream = TriggerData {
-            _timestamp: now_micros(),
-            org: new_trigger.org.clone(),
-            module: TriggerDataType::DerivedStream,
-            key: new_trigger.module_key.clone(),
-            next_run_at: new_trigger.next_run_at,
-            is_realtime: new_trigger.is_realtime,
-            is_silenced: new_trigger.is_silenced,
-            status: TriggerDataStatus::Failed,
-            start_time: 0,
-            end_time: 0,
-            retries: new_trigger.retries,
-            error: Some(msg.clone()),
-            success_response: None,
-            is_partial: None,
-            delay_in_secs: None,
-            evaluation_took_in_secs: None,
-            source_node: Some(LOCAL_NODE.name.clone()),
-            query_took: None,
-            scheduler_trace_id: Some(scheduler_trace_id.clone()),
-            time_in_queue_ms: Some(time_in_queue),
-        };
-        log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
-        new_trigger_data.reset();
-        new_trigger.data = new_trigger_data.to_json_string();
-        db::scheduler::update_trigger(new_trigger).await?;
-        publish_triggers_usage(trigger_data_stream).await;
-        return Ok(());
-    }
-
     let Some(derived_stream) = pipeline.get_derived_stream() else {
         let err_msg = format!(
             "DerivedStream associated with the trigger not found in pipeline: {org_id}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
@@ -1112,6 +1073,45 @@ async fn handle_derived_stream_triggers(
         end = aligned_curr_time;
     }
 
+    if !pipeline.enabled {
+        // Pipeline not enabled, check again in 5 mins
+        let msg = format!(
+            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
+        );
+        new_trigger.next_run_at += Duration::try_minutes(5)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        let trigger_data_stream = TriggerData {
+            _timestamp: now_micros(),
+            org: new_trigger.org.clone(),
+            module: TriggerDataType::DerivedStream,
+            key: new_trigger.module_key.clone(),
+            next_run_at: new_trigger.next_run_at,
+            is_realtime: new_trigger.is_realtime,
+            is_silenced: new_trigger.is_silenced,
+            status: TriggerDataStatus::Skipped,
+            start_time: 0,
+            end_time: 0,
+            retries: new_trigger.retries,
+            error: Some(msg.clone()),
+            success_response: None,
+            is_partial: None,
+            delay_in_secs: None,
+            evaluation_took_in_secs: None,
+            source_node: Some(LOCAL_NODE.name.clone()),
+            query_took: None,
+            scheduler_trace_id: Some(scheduler_trace_id.clone()),
+            time_in_queue_ms: Some(time_in_queue),
+        };
+        log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
+        // new_trigger_data.reset();
+        // new_trigger.data = new_trigger_data.to_json_string();
+        db::scheduler::update_trigger(new_trigger).await?;
+        publish_triggers_usage(trigger_data_stream).await;
+        return Ok(());
+    }
+
     // In case the scheduler background job (watch_timeout) updates the trigger retries
     // (not through this handler), we need to skip to the next run at but with the same
     // trigger start time. If we don't handle here, in that case, the `clean_complete`
@@ -1144,7 +1144,7 @@ async fn handle_derived_stream_triggers(
     );
 
     let mut trigger_data_stream = TriggerData {
-        _timestamp: Utc::now().timestamp_micros(),
+        _timestamp: now_micros(),
         org: new_trigger.org.clone(),
         module: TriggerDataType::DerivedStream,
         key: new_trigger.module_key.to_lowercase(),

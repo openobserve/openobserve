@@ -290,13 +290,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-dialog>
 
     <q-dialog v-model="confirmDelete">
-      <q-card style="width: 240px">
-        <q-card-section class="confirmBody">
+      <q-card style="width: 420px">
+        <q-card-section class="confirmBodyLogStream">
           <div class="head">{{ t("logStream.confirmDeleteHead") }}</div>
           <div class="para">{{ t("logStream.confirmDeleteMsg") }}</div>
         </q-card-section>
-
-        <q-card-actions class="confirmActions">
+        <div class="tw-w-full tw-flex tw-justify-center tw-items-center tw-text-sm tw-text-gray-500">
+            <q-checkbox class="checkbox-delete-associated-alerts-pipelines" v-model="deleteAssociatedAlertsPipelines" />
+          <span class="delete-associated-alerts-pipelines-text">
+            Delete all pipelines and alerts associated with the stream
+          </span>
+          </div>
+        <q-card-actions class="confirmActionsLogStream">
           <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
@@ -314,13 +319,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card>
     </q-dialog>
     <q-dialog v-model="confirmBatchDelete">
-      <q-card style="width: 240px">
-        <q-card-section class="confirmBody">
+      <q-card style="width: 420px">
+        <q-card-section class="confirmBodyLogStream">
           <div class="head">{{ t("logStream.confirmBatchDeleteHead") }}</div>
           <div class="para">{{ t("logStream.confirmBatchDeleteMsg") }}</div>
         </q-card-section>
-
-        <q-card-actions class="confirmActions">
+        <div class="tw-w-full tw-flex tw-justify-center tw-items-center tw-text-sm tw-text-gray-500">
+            <q-checkbox class="checkbox-delete-associated-alerts-pipelines" v-model="deleteAssociatedAlertsPipelines" />
+          <span class="delete-associated-alerts-pipelines-text">
+            Delete all pipelines and alerts associated with the selected streams
+          </span>
+          </div>
+        <q-card-actions class="confirmActionsLogStream">
           <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
@@ -396,6 +406,7 @@ export default defineComponent({
     const selectedStreamType = ref("logs");
     const loadingState = ref(true);
     const searchKeyword = ref("");
+    const deleteAssociatedAlertsPipelines = ref(true);
 
     const perPageOptions: any = [20, 50, 100, 250, 500];
     const maxRecordToReturn = ref<number>(100);
@@ -629,7 +640,7 @@ export default defineComponent({
             dismiss();
           })
           .catch((err) => {
-            if (err.response.status != 403) {
+            if (err.response?.status != 403) {
               $q.notify({
                 type: "negative",
                 message:
@@ -638,6 +649,10 @@ export default defineComponent({
                 timeout: 2000,
               });
             }
+            loadingState.value = false;
+            dismiss();
+          })
+          .finally(() => {
             loadingState.value = false;
             dismiss();
           });
@@ -687,6 +702,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           deleteStreamName,
           deleteStreamType,
+          deleteAssociatedAlertsPipelines.value
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -706,6 +722,9 @@ export default defineComponent({
               message: "Error while deleting stream.",
             });
           }
+        })
+        .finally(() => {
+          deleteAssociatedAlertsPipelines.value = true;
         });
     };
     const deleteBatchStream = () => {
@@ -719,6 +738,7 @@ export default defineComponent({
             store.state.selectedOrganization.identifier,
             stream.name,
             stream.stream_type,
+            deleteAssociatedAlertsPipelines.value
           ),
         );
       });
@@ -769,6 +789,7 @@ export default defineComponent({
           }
         })
         .finally(() => {
+          deleteAssociatedAlertsPipelines.value = true;
           isDeleting.value = false;
         });
     };
@@ -979,6 +1000,7 @@ export default defineComponent({
       getRowKey,
       searchKeyword,
       onRequest,
+      deleteAssociatedAlertsPipelines,
     };
   },
 });
@@ -999,15 +1021,15 @@ export default defineComponent({
   width: 10vw;
 }
 
-.confirmBody {
-  padding: 11px 1.375rem 0;
+.confirmBodyLogStream {
+  padding: 22px 1.375rem 0;
   font-size: 0.875rem;
   text-align: center;
   font-weight: 700;
 
   .head {
-    line-height: 2.125rem;
-    margin-bottom: 0.5rem;
+    line-height: 2.15em;
+    margin-bottom: 4px;
   }
 
   .para {
@@ -1015,14 +1037,32 @@ export default defineComponent({
   }
 }
 
-.confirmActions {
+.delete-associated-alerts-pipelines-text{
+  color: $light-text;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.confirmActionsLogStream {
   justify-content: center;
-  padding: 1.25rem 1.375rem 1.625rem;
+  padding: 16px 22px 22px;
   display: flex;
 
   .q-btn {
     font-size: 0.75rem;
     font-weight: 700;
+  }
+}
+.checkbox-delete-associated-alerts-pipelines{
+  .q-checkbox__inner{
+    height: 28px !important;
+    min-height: 28px !important;
+    width: 28px !important;
+    min-width: 28px !important;
+  }
+  .q-checkbox__bg{
+    height: 16px !important;
+    width: 16px !important;
   }
 }
 </style>

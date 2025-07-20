@@ -63,8 +63,14 @@ pub async fn save_alert(
     path: web::Path<(String, String)>,
     alert: web::Json<Alert>,
     user_email: UserEmail,
+    req: HttpRequest,
 ) -> HttpResponse {
     let (org_id, stream_name) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let overwrite = match query.get("overwrite") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    };
 
     // Hack for frequency: convert minutes to seconds
     let mut alert = alert.into_inner();
@@ -77,7 +83,7 @@ pub async fn save_alert(
     alert.set_last_satisfied_at(None);
     alert.set_last_triggered_at(None);
 
-    match alert::save(&org_id, &stream_name, "", alert, true).await {
+    match alert::save(&org_id, &stream_name, "", alert, true, overwrite).await {
         Ok(_) => MetaHttpResponse::ok("Alert saved"),
         Err(e) => e.into(),
     }
@@ -118,7 +124,7 @@ pub async fn update_alert(
     alert.trigger_condition.frequency *= 60;
     alert.last_edited_by = Some(user_email.user_id);
     alert.updated_at = Some(datetime_now());
-    match alert::save(&org_id, &stream_name, &name, alert, false).await {
+    match alert::save(&org_id, &stream_name, &name, alert, false, false).await {
         Ok(_) => MetaHttpResponse::ok("Alert Updated"),
         Err(e) => e.into(),
     }

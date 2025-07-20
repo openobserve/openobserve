@@ -21,6 +21,7 @@ use config::{ider, meta::pipeline::Pipeline};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::models::pipelines::PipelineList,
     service::{db::pipeline::PipelineError, pipeline},
 };
 
@@ -58,13 +59,20 @@ impl From<PipelineError> for HttpResponse {
 pub async fn save_pipeline(
     path: web::Path<String>,
     pipeline: web::Json<Pipeline>,
-    _req: HttpRequest,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let mut pipeline = pipeline.into_inner();
     pipeline.name = pipeline.name.trim().to_lowercase();
     pipeline.org = org_id;
-    pipeline.id = ider::generate();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let overwrite = match query.get("overwrite") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    };
+    if !overwrite {
+        pipeline.id = ider::generate();
+    }
     match pipeline::save_pipeline(pipeline).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK,
@@ -96,6 +104,7 @@ async fn list_pipelines(
     org_id: web::Path<String>,
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
+    let org_id = org_id.into_inner();
     let mut _permitted = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
@@ -125,10 +134,17 @@ async fn list_pipelines(
         // Get List of allowed objects ends
     }
 
-    match pipeline::list_pipelines(org_id.into_inner(), _permitted).await {
-        Ok(pipeline_list) => Ok(HttpResponse::Ok().json(pipeline_list)),
-        Err(e) => Ok(e.into()),
-    }
+    let pipelines = match pipeline::list_pipelines(&org_id, _permitted).await {
+        Ok(pipelines) => pipelines,
+        Err(e) => return Ok(e.into()),
+    };
+
+    let pipeline_triggers = match pipeline::list_pipeline_triggers(&org_id).await {
+        Ok(pipelines) => pipelines,
+        Err(e) => return Ok(e.into()),
+    };
+
+    Ok(HttpResponse::Ok().json(PipelineList::from(pipelines, pipeline_triggers)))
 }
 
 /// GetStreamsWithPipeline
@@ -149,10 +165,7 @@ async fn list_pipelines(
     )
 )]
 #[get("/{org_id}/pipelines/streams")]
-async fn list_streams_with_pipeline(
-    path: web::Path<String>,
-    _req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     match pipeline::list_streams_with_pipeline(&org_id).await {
         Ok(stream_params) => Ok(HttpResponse::Ok().json(stream_params)),
@@ -180,10 +193,7 @@ async fn list_streams_with_pipeline(
     )
 )]
 #[delete("/{org_id}/pipelines/{pipeline_id}")]
-async fn delete_pipeline(
-    path: web::Path<(String, String)>,
-    _req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (_org_id, pipeline_id) = path.into_inner();
     match pipeline::delete_pipeline(&pipeline_id).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
@@ -214,10 +224,7 @@ async fn delete_pipeline(
     )
 )]
 #[put("/{org_id}/pipelines")]
-pub async fn update_pipeline(
-    pipeline: web::Json<Pipeline>,
-    _req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+pub async fn update_pipeline(pipeline: web::Json<Pipeline>) -> Result<HttpResponse, Error> {
     let pipeline = pipeline.into_inner();
     match pipeline::update_pipeline(pipeline).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
@@ -260,9 +267,13 @@ pub async fn enable_pipeline(
         Some(v) => v.parse::<bool>().unwrap_or_default(),
         None => false,
     };
+    let starts_from_now = match query.get("from_now") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    };
     let resp_msg =
         "Pipeline successfully ".to_string() + if enable { "enabled" } else { "disabled" };
-    match pipeline::enable_pipeline(&org_id, &pipeline_id, enable).await {
+    match pipeline::enable_pipeline(&org_id, &pipeline_id, enable, starts_from_now).await {
         Ok(()) => {
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(http::StatusCode::OK, resp_msg)))
         }
