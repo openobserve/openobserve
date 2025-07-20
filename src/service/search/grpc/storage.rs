@@ -23,7 +23,7 @@ use config::{
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
-        inverted_index::InvertedIndexOptimizeMode,
+        inverted_index::IndexOptimizeMode,
         search::{ScanStats, StorageType},
         stream::{FileKey, StreamType},
     },
@@ -75,7 +75,7 @@ pub async fn search(
     file_stat_cache: Option<FileStatisticsCache>,
     mut index_condition: Option<IndexCondition>,
     mut fst_fields: Vec<String>,
-    idx_optimize_rule: Option<InvertedIndexOptimizeMode>,
+    idx_optimize_rule: Option<IndexOptimizeMode>,
 ) -> super::SearchTable {
     let enter_span = tracing::span::Span::current();
     log::info!("[trace_id {}] search->storage: enter", query.trace_id);
@@ -125,8 +125,12 @@ pub async fn search(
         files.len(),
     );
 
-    // check inverted index
-    let use_inverted_index = query.use_inverted_index && index_condition.is_some();
+    // Condition:All() means search tantivy without filter,
+    // so we should not use inverted index in datafusion search
+    // Condition:All() is used for TantivyOptimizeExec
+    let use_inverted_index = query.use_inverted_index
+        && index_condition.is_some()
+        && !index_condition.as_ref().unwrap().is_condition_all();
     if use_inverted_index {
         log::info!(
             "[trace_id {}] flight->search: use_inverted_index with tantivy format {}",
@@ -190,9 +194,8 @@ pub async fn search(
             Ok(size) => size,
             Err(err) => {
                 log::error!(
-                    "[trace_id {}] calculate files size error: {}",
-                    query.trace_id,
-                    err
+                    "[trace_id {}] calculate files size error: {err}",
+                    query.trace_id
                 );
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     "calculate files size error".to_string(),
@@ -524,7 +527,7 @@ pub async fn filter_file_list_by_tantivy_index(
     query: Arc<super::QueryParams>,
     file_list: &mut Vec<FileKey>,
     index_condition: Option<IndexCondition>,
-    idx_optimize_mode: Option<InvertedIndexOptimizeMode>,
+    idx_optimize_mode: Option<IndexOptimizeMode>,
 ) -> Result<(usize, bool, TantivyMultiResult), Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -713,13 +716,6 @@ pub async fn filter_file_list_by_tantivy_index(
                     }
                     match result {
                         TantivyResult::RowIdsBitVec(num_rows, bitvec) => {
-                            log::debug!(
-                                "[trace_id {}] search->tantivy: hits for index_condition: {:?} found {} in {}",
-                                query.trace_id,
-                                index_condition,
-                                num_rows,
-                                file_name
-                            );
                             if num_rows == 0 {
                                 // if the bitmap is empty then we remove the file from the list
                                 file_list_map.remove(&file_name);
@@ -735,25 +731,15 @@ pub async fn filter_file_list_by_tantivy_index(
                             file_list_map.remove(&file_name); // maybe we do not need to remove it?
                         }
                         TantivyResult::Histogram(histogram) => {
-                            log::debug!(
-                                "[trace_id {}] search->tantivy: histogram hits for index_condition {:?} found {} in {}",
-                                query.trace_id,
-                                index_condition,
-                                histogram.len(),
-                                file_name
-                            );
                             tantivy_result_builder.add_histogram(histogram);
                             file_list_map.remove(&file_name);
                         }
                         TantivyResult::TopN(top_n) => {
-                            log::debug!(
-                                "[trace_id {}] search->tantivy: top_n hits for index_condition {:?} found {} in {}",
-                                query.trace_id,
-                                index_condition,
-                                top_n.len(),
-                                file_name
-                            );
                             tantivy_result_builder.add_top_n(top_n);
+                            file_list_map.remove(&file_name);
+                        }
+                        TantivyResult::Distinct(distinct) => {
+                            tantivy_result_builder.add_distinct(distinct);
                             file_list_map.remove(&file_name);
                         }
                         TantivyResult::RowIds(_) => {
@@ -836,7 +822,7 @@ async fn search_tantivy_index(
     trace_id: &str,
     time_range: (i64, i64),
     index_condition: Option<IndexCondition>,
-    idx_optimize_rule: Option<InvertedIndexOptimizeMode>,
+    idx_optimize_rule: Option<IndexOptimizeMode>,
     parquet_file: &FileKey,
 ) -> anyhow::Result<(String, TantivyResult)> {
     let file_account = parquet_file.account.clone();
@@ -912,8 +898,9 @@ async fn search_tantivy_index(
     let need_all_term_fields = condition
         .need_all_term_fields()
         .into_iter()
+        .chain(get_simple_distinct_field(&idx_optimize_rule).into_iter())
         .filter_map(|filed| tantivy_schema.get_field(&filed).ok())
-        .collect::<Vec<_>>();
+        .collect::<HashSet<_>>();
 
     // warm up the terms in the query
     let mut warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> =
@@ -925,8 +912,8 @@ async fn search_tantivy_index(
     });
 
     let need_fast_field = idx_optimize_rule.as_ref().and_then(|rule| match rule {
-        InvertedIndexOptimizeMode::SimpleHistogram(..) => Some(TIMESTAMP_COL_NAME.to_string()),
-        InvertedIndexOptimizeMode::SimpleTopN(field, ..) => Some(field.to_string()),
+        IndexOptimizeMode::SimpleHistogram(..) => Some(TIMESTAMP_COL_NAME.to_string()),
+        IndexOptimizeMode::SimpleTopN(field, ..) => Some(field.to_string()),
         _ => None,
     });
     warm_up_terms(
@@ -943,16 +930,13 @@ async fn search_tantivy_index(
     let idx_optimize_rule_clone = idx_optimize_rule.clone();
     let res = tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule_clone) {
         (false, _) | (true, None) => TantivyResult::handle_matched_docs(&searcher, query),
-        (true, Some(InvertedIndexOptimizeMode::SimpleSelect(limit, ascend))) => {
+        (true, Some(IndexOptimizeMode::SimpleSelect(limit, ascend))) => {
             TantivyResult::handle_simple_select(&searcher, query, limit, ascend)
         }
-        (true, Some(InvertedIndexOptimizeMode::SimpleCount)) => {
+        (true, Some(IndexOptimizeMode::SimpleCount)) => {
             TantivyResult::handle_simple_count(&searcher, query)
         }
-        (
-            true,
-            Some(InvertedIndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets)),
-        ) => {
+        (true, Some(IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets))) => {
             // fail the function if field not in tantivy schema
             if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
                 log::warn!("_timestamp not index in tantivy file: {ttv_file_name}");
@@ -966,8 +950,16 @@ async fn search_tantivy_index(
                 num_buckets,
             )
         }
-        (true, Some(InvertedIndexOptimizeMode::SimpleTopN(field, limit, ascend))) => {
+        (true, Some(IndexOptimizeMode::SimpleTopN(field, limit, ascend))) => {
             TantivyResult::handle_simple_top_n(&searcher, query, &field, limit, ascend)
+        }
+        (true, Some(IndexOptimizeMode::SimpleDistinct(field, limit, ascend))) => {
+            if tantivy_schema.get_field(&field).is_err() {
+                log::warn!("search->tantivy: {field} not index in tantivy file: {ttv_file_name}");
+                Ok(TantivyResult::Distinct(HashSet::new()))
+            } else {
+                TantivyResult::handle_simple_distinct(&searcher, &condition, &field, limit, ascend)
+            }
         }
     })
     .await??;
@@ -977,6 +969,7 @@ async fn search_tantivy_index(
         TantivyResult::Count(count) => Ok((key, TantivyResult::Count(count))),
         TantivyResult::Histogram(histogram) => Ok((key, TantivyResult::Histogram(histogram))),
         TantivyResult::TopN(top_n) => Ok((key, TantivyResult::TopN(top_n))),
+        TantivyResult::Distinct(distinct) => Ok((key, TantivyResult::Distinct(distinct))),
         TantivyResult::RowIds(row_ids) => {
             if row_ids.is_empty() {
                 return Ok((key, TantivyResult::RowIdsBitVec(0, BitVec::EMPTY)));
@@ -986,10 +979,7 @@ async fn search_tantivy_index(
                 && row_ids.len()
                     > (parquet_file.meta.records as usize / 100
                         * cfg.limit.inverted_index_skip_threshold)
-                && !matches!(
-                    idx_optimize_rule,
-                    Some(InvertedIndexOptimizeMode::SimpleCount)
-                )
+                && !matches!(idx_optimize_rule, Some(IndexOptimizeMode::SimpleCount))
             {
                 log::debug!(
                     "[trace_id {trace_id}] matched docs over [{}/100] in tantivy index, skip this file: {}",
@@ -1017,17 +1007,28 @@ async fn search_tantivy_index(
             }
             Ok((key, TantivyResult::RowIdsBitVec(num_rows, res)))
         }
-        TantivyResult::RowIdsBitVec(..) => unreachable!("unsupported tantivy search result"),
+        TantivyResult::RowIdsBitVec(..) => {
+            unreachable!("unsupported tantivy search result in search_tantivy_index")
+        }
+    }
+}
+
+/// if simple distinct without filter, we need to warm up the field
+fn get_simple_distinct_field(idx_optimize_rule: &Option<IndexOptimizeMode>) -> Vec<String> {
+    if let Some(IndexOptimizeMode::SimpleDistinct(field, ..)) = idx_optimize_rule {
+        vec![field.to_string()]
+    } else {
+        vec![]
     }
 }
 
 // partition the tantivy files by time range
 fn partition_tantivy_files(
     index_parquet_files: Vec<FileKey>,
-    idx_optimize_mode: &Option<InvertedIndexOptimizeMode>,
+    idx_optimize_mode: &Option<IndexOptimizeMode>,
     target_partitions: usize,
 ) -> (Vec<Vec<FileKey>>, usize) {
-    if let Some(InvertedIndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_mode
+    if let Some(IndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_mode
         && *limit > 0
     {
         (

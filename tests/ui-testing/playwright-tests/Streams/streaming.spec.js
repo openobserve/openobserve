@@ -1,169 +1,169 @@
 import { test, expect } from "../baseFixtures.js";
-import { StreamsPage } from '../../pages/streamsPages/streamsPage.js';
+import PageManager from '../../pages/page-manager.js';
 
 test.describe.configure({ mode: 'parallel' });
 
 test.describe("Streaming for logs", () => {
-    let streamsPage;
+    let pageManager;
 
     test.beforeEach(async ({ page }) => {
-        streamsPage = new StreamsPage(page);
-        await streamsPage.gotoLoginPage();
-        await streamsPage.loginAsInternalUser();
-        await streamsPage.login(); // Login as root user
-        await streamsPage.ingestion();
-        await streamsPage.ingestionJoin();
-        await streamsPage.goToManagement();
+        pageManager = new PageManager(page);
+        await pageManager.streamsPage.gotoLoginPage();
+        await pageManager.streamsPage.loginAsInternalUser();
+        await pageManager.streamsPage.login(); // Login as root user
+        await pageManager.streamsPage.ingestion();
+        await pageManager.streamsPage.ingestionJoin();
+        await pageManager.streamsPage.goToManagement();
         await page.waitForTimeout(3000); // Reduced from 5000
-        await streamsPage.checkStreaming();
+        await pageManager.streamsPage.checkStreaming();
     });
 
     test("Run query after selecting two streams after enabling streaming", {
         tag: ['@streaming', '@all', '@streams']
     }, async ({ page }) => {
-        await streamsPage.navigateToLogs();
-        await streamsPage.selectIndexAndStreamJoin();
-        await streamsPage.displayTwoStreams();
-        await streamsPage.selectRunQuery();
+        await pageManager.streamsPage.navigateToLogs();
+        await pageManager.streamsPage.selectIndexAndStreamJoin();
+        await pageManager.streamsPage.displayTwoStreams();
+        await pageManager.streamsPage.selectRunQuery();
     });
 
     test("Enable Streaming for running query after selecting two streams and SQL Mode On", {
         tag: ['@streaming', '@sqlMode', '@all', '@streams']
     }, async ({ page }) => {
-        await streamsPage.navigateToLogs();
-        await streamsPage.selectIndexAndStreamJoin();
-       // await streamsPage.enableSQLMode();
-        await streamsPage.selectRunQuery();
-        await streamsPage.displayTwoStreams();
+        await pageManager.streamsPage.navigateToLogs();
+        await pageManager.streamsPage.selectIndexAndStreamJoin();
+       // await pageManager.streamsPage.enableSQLMode();
+        await pageManager.streamsPage.selectRunQuery();
+        await pageManager.streamsPage.displayTwoStreams();
     });
 
     test("Enable Streaming for running query after selecting two streams, selecting field and SQL Mode On", {
         tag: ['@streaming', '@sqlMode', '@all', '@streams']
     }, async ({ page }) => {
-        await streamsPage.navigateToLogs();
-        await streamsPage.selectIndexAndStreamJoin();
-        await streamsPage.kubernetesContainerName();
-       // await streamsPage.enableSQLMode();
-        await streamsPage.selectRunQuery();
-        await streamsPage.validateResult();
+        await pageManager.streamsPage.navigateToLogs();
+        await pageManager.streamsPage.selectIndexAndStreamJoin();
+        await pageManager.streamsPage.kubernetesContainerName();
+       // await pageManager.streamsPage.enableSQLMode();
+        await pageManager.streamsPage.selectRunQuery();
+        await pageManager.streamsPage.validateResult();
     });
 
     test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering join queries", {
         tag: ['@streaming', '@sqlMode', '@joins', '@all', '@streams']
     }, async ({ page }) => {
-        await streamsPage.navigateToLogs();
-        await streamsPage.selectIndexAndStreamJoin();
-        await streamsPage.kubernetesContainerNameJoin();
-       // await streamsPage.enableSQLMode();
-        await streamsPage.selectRunQuery();
+        await pageManager.streamsPage.navigateToLogs();
+        await pageManager.streamsPage.selectIndexAndStreamJoin();
+        await pageManager.streamsPage.kubernetesContainerNameJoin();
+       // await pageManager.streamsPage.enableSQLMode();
+        await pageManager.streamsPage.selectRunQuery();
         await page.waitForTimeout(3000); // Wait for query results
-        await streamsPage.displayCountQuery();
+        await pageManager.streamsPage.displayCountQuery();
         await page.waitForTimeout(3000); // Wait for query results
-        await streamsPage.validateResult();
+        await pageManager.streamsPage.validateResult();
     });
 
     test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering join limit", {
         tag: ['@streaming', '@sqlMode', '@joins', '@all', '@streams']
     }, async ({ page }) => {
-        await streamsPage.navigateToLogs();
-        await streamsPage.selectIndexAndStreamJoin();
-        await streamsPage.kubernetesContainerNameJoinLimit();
-       // await streamsPage.enableSQLMode();
-        await streamsPage.selectRunQuery();
+        await pageManager.streamsPage.navigateToLogs();
+        await pageManager.streamsPage.selectIndexAndStreamJoin();
+        await pageManager.streamsPage.kubernetesContainerNameJoinLimit();
+       // await pageManager.streamsPage.enableSQLMode();
+        await pageManager.streamsPage.selectRunQuery();
         await page.waitForTimeout(3000); // Wait for query results
-        await streamsPage.validateResult();
+        await pageManager.streamsPage.validateResult();
     });
 
     test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering join like", {
         tag: ['@streaming', '@sqlMode', '@joins', '@all', '@streams']
     }, async ({ page }) => {
-        await streamsPage.navigateToLogs();
-        await streamsPage.selectIndexAndStreamJoin();
-        await streamsPage.kubernetesContainerNameJoinLike();
-        await streamsPage.enableSQLMode();
-        await streamsPage.selectRunQuery();
-        await streamsPage.validateResult();
+        await pageManager.streamsPage.navigateToLogs();
+        await pageManager.streamsPage.selectIndexAndStreamJoin();
+        await pageManager.streamsPage.kubernetesContainerNameJoinLike();
+        await pageManager.streamsPage.enableSQLMode();
+        await pageManager.streamsPage.selectRunQuery();
+        await pageManager.streamsPage.validateResult();
     });
 
     test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering Left join queries", {
         tag: ['@streaming', '@sqlMode', '@joins', '@all', '@streams']
     }, async ({ page }) => {
-        await streamsPage.navigateToLogs();
-        await streamsPage.selectIndexAndStreamJoin();
-        await streamsPage.kubernetesContainerNameLeftJoin();
-        await streamsPage.enableSQLMode();
-        await streamsPage.selectRunQuery();
-        await streamsPage.validateResult();
+        await pageManager.streamsPage.navigateToLogs();
+        await pageManager.streamsPage.selectIndexAndStreamJoin();
+        await pageManager.streamsPage.kubernetesContainerNameLeftJoin();
+        await pageManager.streamsPage.enableSQLMode();
+        await pageManager.streamsPage.selectRunQuery();
+        await pageManager.streamsPage.validateResult();
     });
 
     test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering Right join queries", {
         tag: ['@streaming', '@sqlMode', '@joins', '@all', '@streams']
     }, async ({ page }) => {
-        await streamsPage.navigateToLogs();
-        await streamsPage.selectIndexAndStreamJoin();
-        await streamsPage.kubernetesContainerNameRightJoin();
-        await streamsPage.enableSQLMode();
-        await streamsPage.selectRunQuery();
-        await streamsPage.validateResult();
+        await pageManager.streamsPage.navigateToLogs();
+        await pageManager.streamsPage.selectIndexAndStreamJoin();
+        await pageManager.streamsPage.kubernetesContainerNameRightJoin();
+        await pageManager.streamsPage.enableSQLMode();
+        await pageManager.streamsPage.selectRunQuery();
+        await pageManager.streamsPage.validateResult();
     });
 
     test("Enable Streaming for running query after selecting two streams, SQL Mode On and entering Full join queries", {
         tag: ['@streaming', '@sqlMode', '@joins', '@all', '@streams']
     }, async ({ page }) => {
-        await streamsPage.navigateToLogs();
-        await streamsPage.selectIndexAndStreamJoin();
-        await streamsPage.kubernetesContainerNameFullJoin();
-       // await streamsPage.enableSQLMode();
-        await streamsPage.selectRunQuery();
-        await streamsPage.validateResult();
+        await pageManager.streamsPage.navigateToLogs();
+        await pageManager.streamsPage.selectIndexAndStreamJoin();
+        await pageManager.streamsPage.kubernetesContainerNameFullJoin();
+       // await pageManager.streamsPage.enableSQLMode();
+        await pageManager.streamsPage.selectRunQuery();
+        await pageManager.streamsPage.validateResult();
     });
 
     test("Enable Streaming for clicking on interesting field icon and display field in editor", {
         tag: ['@streaming', '@interestingFields', '@all', '@streams']
     }, async ({ page }) => {
-        await streamsPage.navigateToLogs();
-        await streamsPage.selectIndexAndStreamJoin();
-        await streamsPage.enableSQLMode();
-        await streamsPage.clickQuickModeToggle();
-        await streamsPage.selectRunQuery();
-        await streamsPage.clickInterestingFields();
-        await streamsPage.validateInterestingFields();
+        await pageManager.streamsPage.navigateToLogs();
+        await pageManager.streamsPage.selectIndexAndStreamJoin();
+        await pageManager.streamsPage.enableSQLMode();
+        await pageManager.streamsPage.clickQuickModeToggle();
+        await pageManager.streamsPage.selectRunQuery();
+        await pageManager.streamsPage.clickInterestingFields();
+        await pageManager.streamsPage.validateInterestingFields();
     });
 
     test("Enable Streaming for clicking on interesting field icon and display query in editor", {
         tag: ['@streaming', '@interestingFields', '@all', '@streams']
     }, async ({ page }) => {
-        await streamsPage.navigateToLogs();
-        await streamsPage.selectIndexAndStreamJoin();
-        await streamsPage.enableSQLMode();
-        await streamsPage.clickQuickModeToggle();
-        await streamsPage.selectRunQuery();
-        await streamsPage.clickInterestingFields();
-        await streamsPage.validateInterestingFieldsQuery();
+        await pageManager.streamsPage.navigateToLogs();
+        await pageManager.streamsPage.selectIndexAndStreamJoin();
+        await pageManager.streamsPage.enableSQLMode();
+        await pageManager.streamsPage.clickQuickModeToggle();
+        await pageManager.streamsPage.selectRunQuery();
+        await pageManager.streamsPage.clickInterestingFields();
+        await pageManager.streamsPage.validateInterestingFieldsQuery();
     });
 
     test("Enable Streaming for Adding or removing interesting field removes it from editor and results too", {
         tag: ['@streaming', '@interestingFields', '@all', '@streams']
     }, async ({ page }) => {
-        await streamsPage.navigateToLogs();
-        await streamsPage.selectIndexAndStreamJoin();
-       // await streamsPage.enableSQLMode();
-        await streamsPage.clickQuickModeToggle();
-        await streamsPage.selectRunQuery();
-        await streamsPage.clickInterestingFields();
-        await streamsPage.addRemoveInteresting();
+        await pageManager.streamsPage.navigateToLogs();
+        await pageManager.streamsPage.selectIndexAndStreamJoin();
+       // await pageManager.streamsPage.enableSQLMode();
+        await pageManager.streamsPage.clickQuickModeToggle();
+        await pageManager.streamsPage.selectRunQuery();
+        await pageManager.streamsPage.clickInterestingFields();
+        await pageManager.streamsPage.addRemoveInteresting();
     });
 
     test("Streaming enabled histogram is disabled and run query, results appear and then user switches on Histogram, getting error", {
         tag: ['@streaming', '@histogram', '@all', '@streams']
     }, async ({ page }) => {
-        await streamsPage.navigateToLogs();
-        await streamsPage.selectIndexStreamDefault();
-        await streamsPage.selectRunQuery();
-        await streamsPage.toggleHistogram();
-        await streamsPage.selectRunQuery();
+        await pageManager.streamsPage.navigateToLogs();
+        await pageManager.streamsPage.selectIndexStreamDefault();
+        await pageManager.streamsPage.selectRunQuery();
+        await pageManager.streamsPage.toggleHistogram();
+        await pageManager.streamsPage.selectRunQuery();
     
-        await streamsPage.toggleHistogram();
+        await pageManager.streamsPage.toggleHistogram();
         
         // Check that the error message is not visible
         const errorHeading = page.getByRole('heading', { name: 'Error while fetching' });
@@ -177,12 +177,12 @@ test.describe("Streaming for logs", () => {
     test("No Histogram should be displayed if Data is not available", {
         tag: ['@streaming', '@histogram', '@all', '@streams']
     }, async ({ page }) => {
-        await streamsPage.navigateToLogs();
-        await streamsPage.selectIndexStreamDefault();
-        await streamsPage.enableSQLMode();
-        await streamsPage.clearAndFillQueryEditor('SELECT count(_timestamp)  FROM "default" where code = 201');
+        await pageManager.streamsPage.navigateToLogs();
+        await pageManager.streamsPage.selectIndexStreamDefault();
+        await pageManager.streamsPage.enableSQLMode();
+        await pageManager.streamsPage.clearAndFillQueryEditor('SELECT count(_timestamp)  FROM "default" where code = 201');
         await page.waitForTimeout(1000);
-        await streamsPage.selectRunQuery();
-        await streamsPage.expectNoDataFoundForHistogram();
+        await pageManager.streamsPage.selectRunQuery();
+        await pageManager.streamsPage.expectNoDataFoundForHistogram();
     });
 }); 

@@ -164,15 +164,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("short url cache failed");
 
     // initialize metadata watcher
-    tokio::task::spawn(db::schema::watch());
-    tokio::task::spawn(db::functions::watch());
-    tokio::task::spawn(db::compact::retention::watch());
-    tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
-    tokio::task::spawn(db::alerts::templates::watch());
-    tokio::task::spawn(db::alerts::destinations::watch());
-    tokio::task::spawn(db::alerts::realtime_triggers::watch());
-    tokio::task::spawn(db::alerts::alert::watch());
-    tokio::task::spawn(db::organization::org_settings_watch());
+    tokio::task::spawn(async move { db::schema::watch().await });
+    tokio::task::spawn(async move { db::functions::watch().await });
+    tokio::task::spawn(async move { db::compact::retention::watch().await });
+    tokio::task::spawn(async move { db::metrics::watch_prom_cluster_leader().await });
+    tokio::task::spawn(async move { db::alerts::templates::watch().await });
+    tokio::task::spawn(async move { db::alerts::destinations::watch().await });
+    tokio::task::spawn(async move { db::alerts::realtime_triggers::watch().await });
+    tokio::task::spawn(async move { db::alerts::alert::watch().await });
+    tokio::task::spawn(async move { db::organization::org_settings_watch().await });
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(
+        async move { o2_enterprise::enterprise::domain_management::db::watch().await },
+    );
 
     // pipeline not used on compactors
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
@@ -218,6 +222,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::syslog::cache_syslog_settings()
         .await
         .expect("syslog settings cache failed");
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::domain_management::db::cache()
+        .await
+        .expect("domain management cache failed");
 
     infra_file_list::create_table_index().await?;
     infra_file_list::LOCAL_CACHE.create_table_index().await?;

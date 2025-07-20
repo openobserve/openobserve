@@ -566,7 +566,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Expect error message
     await expect(
-      page.getByText("sql parser error: Expected:").first()
+      page.getByText("Schema error: No field named").first()
     ).toBeVisible();
 
     // Fix filter condition (change to "=" operator)

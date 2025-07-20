@@ -140,14 +140,22 @@ pub async fn save(
     let mut user = UserRequest::from(&user.into_inner());
     user.email = user.email.trim().to_lowercase();
 
-    if user.role.base_role.eq(&config::meta::user::UserRole::Root) {
+    let bad_req_msg = if user.password.len() < 8 {
+        Some("Password must be at least 8 characters long".to_string())
+    } else if user.role.eq(&meta::user::UserRole::Root) {
+        Some("Not allowed".to_string())
+    } else {
+        None
+    };
+    if let Some(msg) = bad_req_msg {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                "Not allowed",
+                msg,
             )),
         );
     }
+
     #[cfg(not(feature = "enterprise"))]
     {
         user.role.base_role = config::meta::user::UserRole::Admin;
@@ -191,6 +199,19 @@ pub async fn update(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
                 "Please specify appropriate fields to update user",
+            )),
+        );
+    }
+    if user.change_password
+        && user
+            .new_password
+            .as_deref()
+            .is_some_and(|pass| pass.len() < 8)
+    {
+        return Ok(
+            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                "Password must be at least 8 characters long".to_string(),
             )),
         );
     }

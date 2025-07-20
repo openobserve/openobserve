@@ -14,12 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::{
-    pipeline::{Pipeline, PipelineList, components::PipelineSource},
+    pipeline::{Pipeline, components::PipelineSource},
     search::SearchEventType,
     stream::ListStreamParams,
+    triggers::{Trigger, TriggerModule},
 };
 
-use super::db::pipeline::{self, PipelineError};
+use super::db::{
+    pipeline::{self, PipelineError},
+    scheduler,
+};
 use crate::common::{
     meta::authz::Authz,
     utils::auth::{remove_ownership, set_ownership},
@@ -29,6 +33,12 @@ pub mod batch_execution;
 
 #[tracing::instrument(skip(pipeline))]
 pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
+    // check if id is missing
+    if pipeline.id.is_empty() {
+        return Err(PipelineError::InvalidPipeline(
+            "Missing pipeline ID".to_string(),
+        ));
+    }
     // check if another realtime pipeline with the same source stream already exists
     if let PipelineSource::Realtime(stream) = &pipeline.source
         && pipeline::list_streams_with_pipeline(&pipeline.org)
@@ -142,10 +152,10 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
 
 #[tracing::instrument]
 pub async fn list_pipelines(
-    org_id: String,
+    org_id: &str,
     permitted: Option<Vec<String>>,
-) -> Result<PipelineList, PipelineError> {
-    let list = pipeline::list_by_org(&org_id)
+) -> Result<Vec<Pipeline>, PipelineError> {
+    Ok(pipeline::list_by_org(org_id)
         .await?
         .into_iter()
         .filter(|pipeline| {
@@ -159,8 +169,16 @@ pub async fn list_pipelines(
                     .unwrap()
                     .contains(&format!("pipeline:_all_{org_id}"))
         })
-        .collect();
-    Ok(PipelineList { list })
+        .collect())
+}
+
+#[tracing::instrument]
+pub async fn list_pipeline_triggers(org_id: &str) -> Result<Vec<Trigger>, PipelineError> {
+    Ok(
+        scheduler::list_by_org(org_id, Some(TriggerModule::DerivedStream))
+            .await
+            .unwrap_or_default(),
+    )
 }
 
 #[tracing::instrument]
@@ -173,29 +191,40 @@ pub async fn list_streams_with_pipeline(org: &str) -> Result<ListStreamParams, P
 pub async fn enable_pipeline(
     org_id: &str,
     pipeline_id: &str,
-    value: bool,
+    enable: bool,
+    starts_from_now: bool,
 ) -> Result<(), PipelineError> {
     let Ok(mut pipeline) = pipeline::get_by_id(pipeline_id).await else {
         return Err(PipelineError::NotFound(pipeline_id.to_string()));
     };
 
-    pipeline.enabled = value;
+    pipeline.enabled = enable;
     // add or remove trigger if it's a scheduled pipeline
     if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
-        if pipeline.enabled {
-            super::alerts::derived_streams::save(
-                derived_stream.clone(),
-                &pipeline.name,
-                pipeline_id,
-                false,
-            )
-            .await
-            .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
-        } else {
-            super::alerts::derived_streams::delete(derived_stream, &pipeline.name, pipeline_id)
+        if enable {
+            if starts_from_now {
+                super::alerts::derived_streams::delete(derived_stream, &pipeline.name, pipeline_id)
+                    .await
+                    .map_err(|e| PipelineError::DeleteDerivedStream(e.to_string()))?;
+                super::alerts::derived_streams::save(
+                    derived_stream.clone(),
+                    &pipeline.name,
+                    pipeline_id,
+                    false,
+                )
                 .await
-                .map_err(|e| PipelineError::DeleteDerivedStream(e.to_string()))?;
+                .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
+            } else {
+                super::alerts::derived_streams::save(
+                    derived_stream.clone(),
+                    &pipeline.name,
+                    pipeline_id,
+                    false,
+                )
+                .await
+                .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
+            }
         }
     }
 

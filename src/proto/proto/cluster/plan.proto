@@ -74,6 +74,7 @@ message IdxOptimizeMode {
     SimpleCount     simple_count      = 2;
     SimpleHistogram simple_histogram  = 3;
     SimpleTopN      simple_topn       = 4;
+    SimpleDistinct  simple_distinct   = 5;
   }
 }
 
@@ -91,6 +92,12 @@ message SimpleHistogram {
 }
 
 message SimpleTopN {
+  string field = 1;
+  uint32 limit = 2;
+  bool     asc = 3;
+}
+
+message SimpleDistinct {
   string field = 1;
   uint32 limit = 2;
   bool     asc = 3;

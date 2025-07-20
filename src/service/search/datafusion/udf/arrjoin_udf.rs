@@ -65,19 +65,17 @@ pub fn arr_join_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
             match (arr_field1, val) {
                 // in arrow, any value can be null.
                 // Here we decide to make our UDF to return null when either argument is null.
-                (Some(arr_field1), Some(delim)) => {
-                    let arr_field1: json::Value =
-                        json::from_str(arr_field1).expect("Failed to deserialize arrzip field1");
-                    let mut join_arrs = vec![];
-                    if let json::Value::Array(field1) = arr_field1 {
-                        field1.iter().for_each(|field| {
-                            let field = super::stringify_json_value(field);
-                            join_arrs.push(field);
-                        });
-                    }
-                    let join_arrs = join_arrs.join(delim);
-                    Some(join_arrs)
-                }
+                (Some(arr_field1), Some(delim)) => json::from_str::<json::Value>(arr_field1)
+                    .ok()
+                    .and_then(|arr_field1| {
+                        if let json::Value::Array(field1) = arr_field1 {
+                            let join_arrs: Vec<String> =
+                                field1.iter().map(super::stringify_json_value).collect();
+                            Some(join_arrs.join(delim))
+                        } else {
+                            None
+                        }
+                    }),
                 _ => None,
             }
         })
@@ -102,12 +100,49 @@ mod tests {
 
     use super::*;
 
+    // Helper function to run a single test case
+    async fn run_single_test(arr_field: &str, delimiter: &str, expected_output: Vec<&str>) {
+        let sql = format!("select arrjoin(arr_field, '{}') as ret from t", delimiter);
+        let sqls = [(sql.as_str(), expected_output)];
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "arr_field",
+            DataType::Utf8,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(vec![arr_field]))],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_JOIN_UDF.clone());
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        for item in sqls {
+            let df = ctx.sql(item.0).await.unwrap();
+            let data = df.collect().await.unwrap();
+            assert_batches_eq!(item.1, &data);
+        }
+    }
+
+    // Helper function to run multiple test cases that should all return null
+    async fn run_null_returning_tests(test_cases: &[(&str, &str)]) {
+        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
+
+        for &(arr_field, delimiter) in test_cases {
+            run_single_test(arr_field, delimiter, expected_output.clone()).await;
+        }
+    }
+
     #[tokio::test]
-    async fn test_arr_join_udf() {
-        let sqls = [
+    async fn test_arr_join_valid_arrays() {
+        let test_cases = [
             (
-                // Should include values at index 0 to index 1 (inclusive)
-                "select arrjoin(bools, ',') as ret from t",
+                r#"[true,false,true]"#,
+                ",",
                 vec![
                     "+-----------------+",
                     "| ret             |",
@@ -117,8 +152,8 @@ mod tests {
                 ],
             ),
             (
-                // Should include all the elements
-                "select arrjoin(names, ',') as ret from t",
+                r#"["hello2","hi2","bye2"]"#,
+                ",",
                 vec![
                     "+-----------------+",
                     "| ret             |",
@@ -128,7 +163,8 @@ mod tests {
                 ],
             ),
             (
-                "select arrjoin(nums, ',') as ret from t",
+                r#"[12, 345, 23, 45]"#,
+                ",",
                 vec![
                     "+--------------+",
                     "| ret          |",
@@ -138,7 +174,8 @@ mod tests {
                 ],
             ),
             (
-                "select arrjoin(floats, ',') as ret from t",
+                r#"[1.9, 34.5, 2.6, 4.5]"#,
+                ",",
                 vec![
                     "+------------------+",
                     "| ret              |",
@@ -148,7 +185,8 @@ mod tests {
                 ],
             ),
             (
-                "select arrjoin(mixed, ',') as ret from t",
+                r#"["hello2","hi2",123, 23.9, false]"#,
+                ",",
                 vec![
                     "+---------------------------+",
                     "| ret                       |",
@@ -157,48 +195,135 @@ mod tests {
                     "+---------------------------+",
                 ],
             ),
+            (
+                r#"["a", "b", "c"]"#,
+                "|",
+                vec![
+                    "+-------+",
+                    "| ret   |",
+                    "+-------+",
+                    "| a|b|c |",
+                    "+-------+",
+                ],
+            ),
+            (
+                r#"["single"]"#,
+                ",",
+                vec![
+                    "+--------+",
+                    "| ret    |",
+                    "+--------+",
+                    "| single |",
+                    "+--------+",
+                ],
+            ),
         ];
 
-        // define a schema.
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("log", DataType::Utf8, false),
-            Field::new("bools", DataType::Utf8, false),
-            Field::new("names", DataType::Utf8, false),
-            Field::new("nums", DataType::Utf8, false),
-            Field::new("floats", DataType::Utf8, false),
-            Field::new("mixed", DataType::Utf8, false),
-        ]));
+        for (arr_field, delimiter, expected_output) in test_cases {
+            run_single_test(arr_field, delimiter, expected_output).await;
+        }
+    }
 
-        // define data.
+    #[tokio::test]
+    async fn test_arr_join_null_returning_cases() {
+        // Test cases that should return null
+        let null_cases = [
+            (r#"[]"#, ","),               // empty array
+            (r#"not json"#, ","),         // invalid JSON
+            (r#"{"key": "value"}"#, ","), // object
+            (r#""just a string""#, ","),  // string
+            (r#"42"#, ","),               // number
+            (r#"true"#, ","),             // boolean
+            (r#"null"#, ","),             // null
+        ];
+
+        run_null_returning_tests(&null_cases).await;
+    }
+
+    #[tokio::test]
+    async fn test_arr_join_null_input() {
+        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "arr_field",
+            DataType::Utf8,
+            true,
+        )]));
         let batch = RecordBatch::try_new(
             schema.clone(),
-            vec![
-                Arc::new(StringArray::from(vec!["a"])),
-                Arc::new(StringArray::from(vec!["[true,false,true]"])),
-                Arc::new(StringArray::from(vec!["[\"hello2\",\"hi2\",\"bye2\"]"])),
-                Arc::new(StringArray::from(vec!["[12, 345, 23, 45]"])),
-                Arc::new(StringArray::from(vec!["[1.9, 34.5, 2.6, 4.5]"])),
-                Arc::new(StringArray::from(vec![
-                    "[\"hello2\",\"hi2\",123, 23.9, false]",
-                ])),
-            ],
+            vec![Arc::new(StringArray::from(vec![None::<String>]))],
         )
         .unwrap();
 
-        // declare a new context. In spark API, this corresponds to a new spark
-        // SQLsession
         let ctx = SessionContext::new();
         ctx.register_udf(ARR_JOIN_UDF.clone());
-
-        // declare a table in memory. In spark API, this corresponds to
-        // createDataFrame(...).
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
-        for item in sqls {
-            let df = ctx.sql(item.0).await.unwrap();
-            let data = df.collect().await.unwrap();
-            assert_batches_eq!(item.1, &data);
-        }
+        let sql = "select arrjoin(arr_field, ',') as ret from t";
+        let df = ctx.sql(sql).await.unwrap();
+        let data = df.collect().await.unwrap();
+        assert_batches_eq!(expected_output, &data);
+    }
+
+    #[tokio::test]
+    async fn test_arr_join_multiple_rows() {
+        let arr_fields = vec![
+            r#"["a", "b", "c"]"#,
+            r#"[]"#,
+            r#"not json"#,
+            r#"["x", "y"]"#,
+            r#"{"key": "value"}"#,
+        ];
+        let sql = "select arrjoin(arr_field, ',') as ret from t";
+        let expected_output = vec![
+            "+-------+",
+            "| ret   |",
+            "+-------+",
+            "| a,b,c |",
+            "|       |",
+            "|       |",
+            "| x,y   |",
+            "|       |",
+            "+-------+",
+        ];
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "arr_field",
+            DataType::Utf8,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(arr_fields))],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_JOIN_UDF.clone());
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let df = ctx.sql(sql).await.unwrap();
+        let data = df.collect().await.unwrap();
+        assert_batches_eq!(expected_output, &data);
+    }
+
+    #[tokio::test]
+    async fn test_arr_join_wrong_arguments() {
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_JOIN_UDF.clone());
+
+        // Test with no arguments
+        let result = ctx.sql("select arrjoin() as ret").await;
+        assert!(result.is_err());
+
+        // Test with one argument
+        let result = ctx.sql("select arrjoin('a') as ret").await;
+        assert!(result.is_err());
+
+        // Test with three arguments
+        let result = ctx.sql("select arrjoin('a', 'b', 'c') as ret").await;
+        assert!(result.is_err());
     }
 }

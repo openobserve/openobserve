@@ -23,7 +23,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        inverted_index::InvertedIndexOptimizeMode,
+        inverted_index::IndexOptimizeMode,
         search::ScanStats,
         sql::TableReferenceExt,
         stream::{FileKey, StreamType},
@@ -180,7 +180,7 @@ pub async fn search(
 
     // construct tantivy related params
     let index_condition = generate_index_condition(&req.index_info.index_condition)?;
-    let idx_optimize_rule: Option<InvertedIndexOptimizeMode> =
+    let idx_optimize_rule: Option<IndexOptimizeMode> =
         req.index_info.index_optimize_mode.clone().map(|x| x.into());
 
     // get all tables
@@ -420,16 +420,17 @@ fn generate_index_condition(index_condition: &str) -> Result<Option<IndexConditi
 async fn handle_tantivy_optimize(
     trace_id: &str,
     req: &FlightSearchRequest,
-    idx_optimize_rule: &mut Option<InvertedIndexOptimizeMode>,
+    idx_optimize_rule: &mut Option<IndexOptimizeMode>,
     file_list: Vec<FileKey>,
     index_updated_at: i64,
 ) -> Result<(Vec<FileKey>, Vec<FileKey>), Error> {
     // early return if not simple count, histogram or topn
     if !matches!(
         idx_optimize_rule,
-        Some(InvertedIndexOptimizeMode::SimpleCount)
-            | Some(InvertedIndexOptimizeMode::SimpleHistogram(..))
-            | Some(InvertedIndexOptimizeMode::SimpleTopN(..))
+        Some(IndexOptimizeMode::SimpleCount)
+            | Some(IndexOptimizeMode::SimpleHistogram(..))
+            | Some(IndexOptimizeMode::SimpleTopN(..))
+            | Some(IndexOptimizeMode::SimpleDistinct(..))
     ) {
         return Ok((vec![], file_list));
     }
@@ -458,22 +459,19 @@ async fn handle_tantivy_optimize(
 
 /// update index_updated_at if needed
 async fn update_index_updated_at(
-    idx_optimize_rule: &Option<InvertedIndexOptimizeMode>,
+    idx_optimize_rule: &Option<IndexOptimizeMode>,
     index_updated_at: i64,
 ) -> i64 {
     if matches!(
         idx_optimize_rule,
-        Some(InvertedIndexOptimizeMode::SimpleHistogram(..))
+        Some(IndexOptimizeMode::SimpleHistogram(..))
     ) {
         let ttv_timestamp_updated_at =
             db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
         return index_updated_at.max(ttv_timestamp_updated_at);
     }
 
-    if matches!(
-        idx_optimize_rule,
-        Some(InvertedIndexOptimizeMode::SimpleTopN(..))
-    ) {
+    if matches!(idx_optimize_rule, Some(IndexOptimizeMode::SimpleTopN(..))) {
         let ttv_secondary_index_updated_at =
             db::metas::tantivy_index::get_ttv_secondary_index_updated_at().await;
         return index_updated_at.max(ttv_secondary_index_updated_at);

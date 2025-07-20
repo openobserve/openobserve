@@ -2,8 +2,7 @@ import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../../test-data/logs_data.json";
-import { PipelinesPage } from "../../pages/pipelinesPages/pipelinesPage.js";
-import { LogsPage } from '../../pages/logsPages/logsPage.js';
+import PageManager from "../../pages/page-manager.js";
 // import { pipeline } from "stream";
 // import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
@@ -73,7 +72,7 @@ const selectStream = async (page, stream) => {
 
 
 test.describe("Enrichment data testcases", () => {
-  let logsPage;
+  let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -95,7 +94,7 @@ test.describe("Enrichment data testcases", () => {
  
   test.beforeEach(async ({ page }) => {
     await login(page);
-    logsPage = new LogsPage(page);
+    pageManager = new PageManager(page);
     await page.waitForTimeout(5000);
     
 
@@ -116,7 +115,7 @@ test.describe("Enrichment data testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStream("e2e_automate");
+    await pageManager.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
   });
 
@@ -125,8 +124,7 @@ test.describe("Enrichment data testcases", () => {
   test("should upload an enrichment table under functions", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
-    await pipelinePage.navigateToAddEnrichmentTable();
+    await pageManager.pipelinesPage.navigateToAddEnrichmentTable();
   
     // Generate a unique file name and replace hyphens with underscores
     let fileName = `enrichment_info_${uuidv4()}_csv`.replace(/-/g, "_");
@@ -159,14 +157,13 @@ test.describe("Enrichment data testcases", () => {
     await page.locator('[data-test="function-enrichment-table-tab"]').click();
 
     // Verify and delete enrichment tables
-    await pipelinePage.deleteEnrichmentTableByName(fileName)
+    await pageManager.pipelinesPage.deleteEnrichmentTableByName(fileName)
   });
 
   test("should upload an enrichment table under functions with VRL", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
-    await pipelinePage.navigateToAddEnrichmentTable();
+    await pageManager.pipelinesPage.navigateToAddEnrichmentTable();
 
     // Generate a unique file name
     let fileName = `protocols_${uuidv4()}_csv`;
@@ -248,7 +245,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     // Return to the pipeline menu and delete the uploaded table
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
     await page.locator('[data-test="function-enrichment-table-tab"]').click();
-    await pipelinePage.deleteEnrichmentTableByName(fileName)
+    await pageManager.pipelinesPage.deleteEnrichmentTableByName(fileName)
 
   });
 
@@ -256,8 +253,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
   test("should display error when CSV not added in enrichment table", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
-    await pipelinePage.navigateToAddEnrichmentTable();
+    await pageManager.pipelinesPage.navigateToAddEnrichmentTable();
     await page.getByLabel('Name').fill('test')
   
     await page.getByRole('button', { name: 'Save' }).click();
@@ -266,8 +262,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
 
   test("should append an enrichment table under functions", async ({ page }) => {
-    const pipelinePage = new PipelinesPage(page);
-    await pipelinePage.navigateToAddEnrichmentTable();
+    await pageManager.pipelinesPage.navigateToAddEnrichmentTable();
   
     // Generate a unique file name and replace hyphens with underscores
     let fileName = `append_${uuidv4()}_csv`.replace(/-/g, "_");
@@ -324,7 +319,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
   await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
   await page.locator('[data-test="function-enrichment-table-tab"]').click();
   await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
-  await pipelinePage.deleteEnrichmentTableByName(fileName)
+  await pageManager.pipelinesPage.deleteEnrichmentTableByName(fileName)
    });
   
 });
