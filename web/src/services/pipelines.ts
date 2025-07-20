@@ -21,8 +21,9 @@ const pipelines = {
     org_identifier: string,
     pipeline_id: string,
     enable: boolean,
+    from_now: boolean
   ) => {
-    const url = `/api/${org_identifier}/pipelines/${pipeline_id}/enable?value=${enable}`;
+    const url = `/api/${org_identifier}/pipelines/${pipeline_id}/enable?value=${enable}&from_now=${from_now}`;
     return http().put(url);
   },
 
