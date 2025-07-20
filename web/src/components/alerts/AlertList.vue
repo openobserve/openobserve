@@ -841,6 +841,8 @@ export default defineComponent({
         },
       ];
 
+      // insert folder_name column if applicable
+      if (searchAcrossFolders.value && searchQuery.value !== "") {
         baseColumns.splice(2, 0, {
           name: "folder_name",
           field: "folder_name",
