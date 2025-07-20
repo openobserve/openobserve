@@ -142,7 +142,7 @@ pub async fn save(
 
     let bad_req_msg = if user.password.len() < 8 {
         Some("Password must be at least 8 characters long".to_string())
-    } else if user.role.eq(&meta::user::UserRole::Root) {
+    } else if user.role.base_role == UserRole::Root {
         Some("Not allowed".to_string())
     } else {
         None
@@ -158,7 +158,7 @@ pub async fn save(
 
     #[cfg(not(feature = "enterprise"))]
     {
-        user.role.base_role = config::meta::user::UserRole::Admin;
+        user.role.base_role = UserRole::Admin;
     }
     users::post_user(&org_id, user, &initiator_id).await
 }
@@ -210,7 +210,7 @@ pub async fn update(
     {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
+                http::StatusCode::BAD_REQUEST,
                 "Password must be at least 8 characters long".to_string(),
             )),
         );
@@ -218,7 +218,7 @@ pub async fn update(
     #[cfg(not(feature = "enterprise"))]
     {
         user.role = Some(UserRoleRequest {
-            role: config::meta::user::UserRole::Admin.to_string(),
+            role: UserRole::Admin.to_string(),
             custom: None,
         });
     }
