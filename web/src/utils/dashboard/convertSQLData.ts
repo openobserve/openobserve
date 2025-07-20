@@ -944,24 +944,36 @@ export const convertSQLData = async (
       : Math.max(configValue, dataValue);
   };
 
+  const hasXAxisName = panelSchema.queries[0]?.fields?.x[0]?.label;
+
+  const hasYAxisName =
+    panelSchema.queries[0]?.fields?.y?.length == 1 &&
+    panelSchema.queries[0]?.fields?.y[0]?.label;
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
       containLabel: panelSchema.config?.axis_width == null ? true : false,
-      left: panelSchema.config?.axis_width ?? 30,
+      left: hasYAxisName ? (panelSchema.config?.axis_width ?? 30) : 5,
       right: 20,
       top: "15",
-      bottom: (() => {
-        if (
-          legendConfig.orient === "horizontal" &&
-          panelSchema.config?.show_legends
-        ) {
-          return panelSchema.config?.axis_width == null ? 50 : 60;
-        } else {
-          return panelSchema.config?.axis_width == null ? 35 : 40;
-        }
-      })(),
+      bottom: hasXAxisName
+        ? (() => {
+            if (
+              legendConfig.orient === "horizontal" &&
+              panelSchema.config?.show_legends
+            ) {
+              return panelSchema.config?.axis_width == null ? 50 : 60;
+            } else {
+              return panelSchema.config?.axis_width == null ? 35 : 40;
+            }
+          })()
+        : legendConfig.orient === "vertical" && panelSchema.config?.show_legends
+          ? 0
+          : breakDownKeys.length > 0
+            ? 25
+            : 0,
     },
     tooltip: {
       trigger: "axis",

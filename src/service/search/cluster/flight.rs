@@ -394,7 +394,7 @@ pub async fn run_datafusion(
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
-        print_plan(&physical_plan, "before");
+        print_plan(&trace_id, &physical_plan, "before");
     }
 
     // 7. rewrite physical plan
@@ -543,7 +543,7 @@ pub async fn run_datafusion(
     }
 
     if cfg.common.print_key_sql {
-        print_plan(&physical_plan, "after");
+        print_plan(&trace_id, &physical_plan, "after");
     }
 
     // run datafusion
@@ -965,12 +965,10 @@ pub async fn get_file_id_lists(
     Ok(file_lists)
 }
 
-pub fn print_plan(physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
+pub fn print_plan(trace_id: &str, physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
     let plan = displayable(physical_plan.as_ref())
         .indent(false)
         .to_string();
-    println!("+---------------------------+----------+");
-    println!("leader physical plan {stage} rewrite");
-    println!("+---------------------------+----------+");
-    println!("{plan}");
+    log::info!("[trace_id {trace_id}] leader physical plan {stage} rewrite");
+    log::info!("[trace_id {trace_id}] \n{plan}");
 }

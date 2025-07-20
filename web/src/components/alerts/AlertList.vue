@@ -25,18 +25,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
-      class="flex justify-between full-width q-px-md q-pt-md"
+      class="flex justify-between full-width tw-py-3 tw-px-4 items-center"
     >
       <div class="q-table__title" data-test="alerts-list-title">
         {{ t("alerts.header") }}
       </div>
-      <div class="flex q-ml-auto tw-ps-2 alerts-list-tabs items-center">
-        <app-tabs
-          class="q-mr-md"
+      <div class="flex q-ml-auto tw-ps-2 items-center">
+        <div class="app-tabs-container q-mr-md">
+          <app-tabs
+          class="tabs-selection-container"
+          :class="store.state.theme === 'dark' ? 'tabs-selection-container-dark' : 'tabs-selection-container-light'"
           :tabs="tabs"
           v-model:active-tab="activeTab"
           @update:active-tab="filterAlertsByTab"
         />
+        </div>
         <q-input
           v-model="dynamicQueryModel"
           dense
@@ -83,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <q-btn
         data-test="alert-list-add-alert-btn"
-        class="q-ml-md q-mb-xs text-bold no-border"
+        class="q-ml-md text-bold no-border"
         padding="sm lg"
         color="secondary"
         no-caps
@@ -122,14 +125,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="alert_id"
             :pagination="pagination"
             style="width: 100%"
+            class="o2-quasar-table"
+            :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
           >
-            <template #header-selection="scope">
-              <q-checkbox
-                v-model="scope.selected"
-                size="sm"
-                color="secondary"
-              />
-            </template>
+          <template v-slot:header="props">
+            <q-tr :props="props">
+              <!-- Adding this block to render the select-all checkbox -->
+              <q-th auto-width>
+                <q-checkbox
+                  v-model="props.selected"
+                  size="sm"
+                  color="secondary"
+                  @update:model-value="props.select"
+                />
+              </q-th>
+
+              <!-- Rendering the rest of the columns -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
+
             <template v-slot:body-selection="scope">
               <q-checkbox
                 v-model="scope.selected"
@@ -196,118 +219,121 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                   <template v-else-if="col.name == 'actions'">
-                    <div
-                      data-test="alert-list-loading-alert"
-                      v-if="alertStateLoadingMap[props.row.uuid]"
-                      style="
-                        display: inline-block;
-                        width: 33.14px;
-                        height: auto;
-                      "
-                      class="flex justify-center items-center q-ml-xs"
-                      :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
+                    <div class="tw-flex tw-items-center actions-container"
                     >
-                      <q-circular-progress
-                        indeterminate
-                        rounded
-                        size="16px"
-                        :value="1"
-                        color="secondary"
+                      <div
+                        data-test="alert-list-loading-alert"
+                        v-if="alertStateLoadingMap[props.row.uuid]"
+                        style="
+                          display: inline-block;
+                          width: 33.14px;
+                          height: auto;
+                        "
+                        class="flex justify-center items-center q-ml-xs"
+                        :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
+                      >
+                        <q-circular-progress
+                          indeterminate
+                          rounded
+                          size="16px"
+                          :value="1"
+                          color="secondary"
+                        />
+                      </div>
+                      <q-btn
+                        v-else
+                        :data-test="`alert-list-${props.row.name}-pause-start-alert`"
+                        :icon="
+                          props.row.enabled ? outlinedPause : outlinedPlayArrow
+                        "
+                        class="q-ml-xs material-symbols-outlined"
+                        padding="sm"
+                        unelevated
+                        size="sm"
+                        :color="props.row.enabled ? 'negative' : 'positive'"
+                        round
+                        flat
+                        :title="
+                          props.row.enabled
+                            ? t('alerts.pause')
+                            : t('alerts.start')
+                        "
+                        @click.stop="toggleAlertState(props.row)"
                       />
-                    </div>
-                    <q-btn
-                      v-else
-                      :data-test="`alert-list-${props.row.name}-pause-start-alert`"
-                      :icon="
-                        props.row.enabled ? outlinedPause : outlinedPlayArrow
-                      "
-                      class="q-ml-xs material-symbols-outlined"
-                      padding="sm"
-                      unelevated
-                      size="sm"
-                      :color="props.row.enabled ? 'negative' : 'positive'"
-                      round
-                      flat
-                      :title="
-                        props.row.enabled
-                          ? t('alerts.pause')
-                          : t('alerts.start')
-                      "
-                      @click.stop="toggleAlertState(props.row)"
-                    />
-                    <q-btn
-                      :data-test="`alert-list-${props.row.name}-update-alert`"
-                      icon="edit"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      :title="t('alerts.edit')"
-                      @click.stop="editAlert(props.row)"
-                    ></q-btn>
-                    <q-btn
-                      icon="content_copy"
-                      :title="t('alerts.clone')"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      @click.stop="duplicateAlert(props.row)"
-                      :data-test="`alert-list-${props.row.name}-clone-alert`"
-                    ></q-btn>
-                    <q-btn
-                      :icon="outlinedMoreVert"
-                      unelevated
-                      size="sm"
-                      round
-                      flat
-                      @click.stop="openMenu($event, props.row)"
-                      :data-test="`alert-list-${props.row.name}-more-options`"
-                    >
-                      <q-menu>
-                        <q-list style="min-width: 100px">
-                          <q-item
-                            class="flex items-center"
-                            clickable
-                            v-close-popup
-                            @click="moveAlertToAnotherFolder(props.row)"
-                          >
-                            <q-item-section dense avatar>
-                              <q-icon
-                                size="16px"
-                                :name="outlinedDriveFileMove"
-                              />
-                            </q-item-section>
-                            <q-item-section>Move</q-item-section>
-                          </q-item>
+                      <q-btn
+                        :data-test="`alert-list-${props.row.name}-update-alert`"
+                        icon="edit"
+                        unelevated
+                        size="sm"
+                        round
+                        flat
+                        :title="t('alerts.edit')"
+                        @click.stop="editAlert(props.row)"
+                      ></q-btn>
+                      <q-btn
+                        icon="content_copy"
+                        :title="t('alerts.clone')"
+                        unelevated
+                        size="sm"
+                        round
+                        flat
+                        @click.stop="duplicateAlert(props.row)"
+                        :data-test="`alert-list-${props.row.name}-clone-alert`"
+                      ></q-btn>
+                      <q-btn
+                        :icon="outlinedMoreVert"
+                        unelevated
+                        size="sm"
+                        round
+                        flat
+                        @click.stop="openMenu($event, props.row)"
+                        :data-test="`alert-list-${props.row.name}-more-options`"
+                      >
+                        <q-menu>
+                          <q-list style="min-width: 100px">
+                            <q-item
+                              class="flex items-center"
+                              clickable
+                              v-close-popup
+                              @click="moveAlertToAnotherFolder(props.row)"
+                            >
+                              <q-item-section dense avatar>
+                                <q-icon
+                                  size="16px"
+                                  :name="outlinedDriveFileMove"
+                                />
+                              </q-item-section>
+                              <q-item-section>Move</q-item-section>
+                            </q-item>
 
-                          <q-item
-                            class="flex items-center justify-center"
-                            clickable
-                            v-close-popup
-                            @click="showDeleteDialogFn(props)"
-                          >
-                            <q-item-section dense avatar>
-                              <q-icon size="16px" :name="outlinedDelete" />
-                            </q-item-section>
-                            <q-item-section>{{
-                              t("alerts.delete")
-                            }}</q-item-section>
-                          </q-item>
-                          <q-item
-                            class="flex items-center justify-center"
-                            clickable
-                            v-close-popup
-                            @click="exportAlert(props.row)"
-                          >
-                            <q-item-section dense avatar>
-                              <q-icon size="16px" name="download" />
-                            </q-item-section>
-                            <q-item-section>Export</q-item-section>
-                          </q-item>
-                        </q-list>
-                      </q-menu>
-                    </q-btn>
+                            <q-item
+                              class="flex items-center justify-center"
+                              clickable
+                              v-close-popup
+                              @click="showDeleteDialogFn(props)"
+                            >
+                              <q-item-section dense avatar>
+                                <q-icon size="16px" :name="outlinedDelete" />
+                              </q-item-section>
+                              <q-item-section>{{
+                                t("alerts.delete")
+                              }}</q-item-section>
+                            </q-item>
+                            <q-item
+                              class="flex items-center justify-center"
+                              clickable
+                              v-close-popup
+                              @click="exportAlert(props.row)"
+                            >
+                              <q-item-section dense avatar>
+                                <q-icon size="16px" name="download" />
+                              </q-item-section>
+                              <q-item-section>Export</q-item-section>
+                            </q-item>
+                          </q-list>
+                        </q-menu>
+                      </q-btn>
+                  </div>
                   </template>
                   <template v-else>
                     {{ props.row[col.field] }}
@@ -754,6 +780,7 @@ export default defineComponent({
           label: "#",
           field: "#",
           align: "left",
+          style: "width: 67px",
         },
         {
           name: "name",
@@ -809,6 +836,7 @@ export default defineComponent({
           align: "center",
           sortable: false,
           style: "width: 150px",
+          classes: 'actions-column' //this is the class that we are adding to the actions column so that we can apply the styling to the actions column only
         },
       ];
       if (searchAcrossFolders.value && searchQuery.value != "") {
@@ -2023,40 +2051,6 @@ export default defineComponent({
   width: calc(14vw);
 }
 
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-
-.alert-list-table {
-  th:last-child,
-  td:last-child {
-    //the fixed width as we have moved some actions to the menu so lot of space is occupied by actions section so remvoed that
-    padding: 10px !important;
-    position: sticky;
-    right: 0;
-    z-index: 1;
-    background: #ffffff;
-    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
-  }
-}
-
-.dark-theme {
-  th:last-child,
-  td:last-child {
-    background: var(--q-dark);
-    box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
-  }
-}
-
-.light-theme {
-  th:last-child,
-  td:last-child {
-    background: #ffffff;
-  }
-}
 
 .alerts-tabs {
   .q-tabs {
@@ -2118,8 +2112,9 @@ export default defineComponent({
 </style>
 
 <style lang="scss" scoped>
-.dark-mode {
+.dark-theme {
   background-color: $dark-page;
+  
 
   .alerts-list-tabs {
     height: fit-content;
@@ -2129,6 +2124,7 @@ export default defineComponent({
     }
 
     :deep(.rum-tab) {
+      
       &:hover {
         background: #464646;
       }

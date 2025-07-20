@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
+use config::meta::{cluster::NodeInfo, inverted_index::IndexOptimizeMode, stream::FileKey};
 use datafusion::{
     common::{
         Result, TableReference,
@@ -54,7 +54,7 @@ impl RemoteScanRewriter {
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
-        index_optimize_mode: Option<InvertedIndexOptimizeMode>,
+        index_optimize_mode: Option<IndexOptimizeMode>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
     ) -> Self {
@@ -237,7 +237,7 @@ pub fn tantivy_optimize_rewrite(
     query: Arc<QueryParams>,
     file_list: Vec<FileKey>,
     index_condition: Option<IndexCondition>,
-    index_optimize_mode: InvertedIndexOptimizeMode,
+    index_optimize_mode: IndexOptimizeMode,
     mut physical_plan: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
     let tantivy_exec = Arc::new(TantivyOptimizeExec::new(

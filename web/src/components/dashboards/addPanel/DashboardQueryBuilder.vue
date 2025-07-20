@@ -203,7 +203,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.x[index].label
                           "
-                          :rules="[(val: any) => val.length > 0 || 'Required']"
                         />
                         <div
                           v-if="
@@ -457,7 +456,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.breakdown[index].label
                           "
-                          :rules="[(val: any) => val.length > 0 || 'Required']"
                         />
                         <div
                           v-if="
@@ -713,7 +711,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.layout.currentQueryIndex
                         ].fields.y[index].label
                       "
-                      :rules="[(val: any) => val.length > 0 || 'Required']"
                     />
                     <div
                       style="width: 100%"
@@ -954,7 +951,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.layout.currentQueryIndex
                           ].fields.z[index].label
                         "
-                        :rules="[(val: any) => val.length > 0 || 'Required']"
                       />
                       <div style="width: 100%" class="tw-mb-2">
                         <span class="tw-block tw-mb-1 tw-font-bold"
