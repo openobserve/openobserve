@@ -1251,6 +1251,7 @@ const useLogs = () => {
           start_time: queryReq.query.start_time,
           end_time: queryReq.query.end_time,
         };
+        //if the sql_base64_enabled is true, then we will encode the query
         if (store.state.zoConfig.sql_base64_enabled) {
           partitionQueryReq["encoding"] = "base64";
         }
@@ -1308,13 +1309,36 @@ const useLogs = () => {
               traceparent,
             })
             .then(async (res: any) => {
+              //this is called to get data into partitions array
+              //the structure of the response would look like this
+              //{
+              //     "trace_id": "7258352812fc49b8a007f5777f4ab385",
+              //     "file_num": 0,
+              //     "records": 0,
+              //     "original_size": 0,
+              //     "compressed_size": 0,
+              //     "max_query_range": 0,
+              //     "partitions": [
+              //         [
+              //             1749627783934000,
+              //             1749627843934000
+              //         ],
+              //         [
+              //             1749625143934000,
+              //             1749627783934000
+              //         ]
+              //     ],
+              //     "order_by": "desc",
+              //     "limit": 0,
+              //     "streaming_output": true,
+              //     "streaming_aggs": false,
+              //     "streaming_id": null
+              // }
               searchObj.data.queryResults.partitionDetail = {
                 partitions: [],
                 partitionTotal: [],
                 paginations: [],
               };
-
-              searchObj.data.queryResults.histogram_interval = res.data?.histogram_interval;
 
               if (typeof partitionQueryReq.sql != "string") {
                 const partitionSize = 0;
@@ -1350,16 +1374,39 @@ const useLogs = () => {
                   }
                 }
                 // });
-              } else {
+              }
+              //this condition will satisfy only in the case of single stream because 
+              //we will send the query in string format in case of single stream
+              //eg: select * from stream1
+               else {
+                //we need to reset the total as 0 because we are getting the total from the response 
+                //the previous total would not be valid
                 searchObj.data.queryResults.total = 0;
                 // delete searchObj.data.histogram.chartParams.title;
 
                 // generateHistogramData();
                 const partitions = res.data.partitions;
                 let pageObject = [];
+                //we use res.data.partitions in the paritionDetail.partitions array
+                // so here this would become as per the response we are getting 2 partitions
+                // [
+                //   [1749627783934000, 1749627843934000],
+                //   [1749625143934000, 1749627783934000]
+                // ]
                 searchObj.data.queryResults.partitionDetail.partitions =
                   partitions;
-
+                  //now we will iterate over the partitions and create the pageObject
+                  //the pageObject would look like this
+                  // [
+                  //   {
+                  //     startTime: 1749627783934000,
+                  //     endTime: 1749627843934000,
+                  //     from: 0,
+                  //     size: 50, this depends on the rows per page that we have 
+                  //     streaming_output: false,
+                  //     streaming_id: null
+                  //   }
+                  // ]
                 for (const [index, item] of partitions.entries()) {
                   pageObject = [
                     {
@@ -1374,6 +1421,9 @@ const useLogs = () => {
                   searchObj.data.queryResults.partitionDetail.paginations.push(
                     pageObject,
                   );
+                  //and we will push the partitionTotal as -1 because we are not getting the total from the response
+                  //so we inititate with -1 for all the paginations 
+                  //it will be [ -1, -1 ] for 2 partitions
                   searchObj.data.queryResults.partitionDetail.partitionTotal.push(
                     -1,
                   );
@@ -1476,7 +1526,7 @@ const useLogs = () => {
       const partitionDetail = searchObj.data.queryResults.partitionDetail;
       let remainingRecords = rowsPerPage;
       let lastPartitionSize = 0;
-
+      //we generally get the pagination upto 3 pages ahead of the current page
       if (
         partitionDetail.paginations.length <= currentPage + 3 ||
         regenrateFlag
@@ -1699,6 +1749,29 @@ const useLogs = () => {
     }
   }
 
+  const setMultiStreamHistogramQuery = (queryReq: any) => {
+    let histogramQuery = `select histogram(${store.state.zoConfig.timestamp_column}, '${searchObj.meta.resultGrid.chartInterval}') AS zo_sql_key, count(*) AS zo_sql_num from "[INDEX_NAME]" [WHERE_CLAUSE] GROUP BY zo_sql_key`;
+    let multiSql = [];
+
+    for (const stream of searchObj.data.stream.selectedStream) {
+      // one or more filter fields are missing in this stream so no need to include in histogram query
+      // this is to avoid the issue of missing fields in multi stream histogram query
+      if(searchObj.data.stream.missingStreamMultiStreamFilter.includes(stream)) {
+        continue;
+      }
+      // Replace the index name and where clause in the histogram query for each stream
+      multiSql.push(histogramQuery.replace(
+        "[INDEX_NAME]",
+        stream
+      ).replace(
+        "[WHERE_CLAUSE]",
+        searchObj.data.query ? 'WHERE ' + searchObj.data.query : ''
+      ));
+    }
+
+    return `with multistream_histogram as (` + multiSql.join(" UNION ALL ") + `) select zo_sql_key, sum(zo_sql_num) as zo_sql_num from multistream_histogram group by zo_sql_key order by zo_sql_key`;
+  }
+
   const getQueryData = async (isPagination = false) => {
     try {
       //remove any data that has been cached 
@@ -1887,18 +1960,16 @@ const useLogs = () => {
             searchObj.meta.refreshHistogram == true &&
             searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
-            searchObj.data.stream.selectedStream.length <= 1 &&
             (!searchObj.meta.sqlMode ||
               isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.meta.sqlMode == false &&
-            searchObj.data.stream.selectedStream.length <= 1 &&
             searchObj.meta.refreshHistogram == true)
         ) {
           searchObj.meta.refreshHistogram = false;
           if (searchObj.data.queryResults.hits.length > 0) {
-            if (searchObj.data.stream.selectedStream.length > 1) {
+            if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == true) {
               searchObj.data.histogram = {
                 xData: [],
                 yData: [],
@@ -1908,10 +1979,13 @@ const useLogs = () => {
                   timezone: "",
                 },
                 errorCode: 0,
-                errorMsg: "Histogram is not available for multi stream search.",
+                errorMsg: "Histogram is not available for multi-stream SQL mode search.",
                 errorDetail: "",
               };
             } else {
+              if(searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false) {
+                searchObj.data.histogramQuery.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query);
+              }
               searchObjDebug["histogramStartTime"] = performance.now();
               searchObj.data.histogram.errorMsg = "";
               searchObj.data.histogram.errorCode = 0;
@@ -1963,7 +2037,9 @@ const useLogs = () => {
               searchObj.loadingHistogram = false;
             }
           }
-          await generateHistogramData();
+          if (searchObj.data.stream.selectedStream.length == 1 || (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false)) {
+            await generateHistogramData();
+          }
           if(!queryReq.query?.streaming_output) refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
           resetHistogramWithError(
@@ -2018,21 +2094,6 @@ const useLogs = () => {
               await getPageCount(queryReq);
               searchObjDebug["pagecountEndTime"] = performance.now();
             }, 0);
-          }
-
-          if (searchObj.data.stream.selectedStream.length > 1) {
-            searchObj.data.histogram = {
-              xData: [],
-              yData: [],
-              chartParams: {
-                title: getHistogramTitle(),
-                unparsed_x_data: [],
-                timezone: "",
-              },
-              errorCode: 0,
-              errorMsg: "Histogram is not available for multi stream search.",
-              errorDetail: "",
-            };
           }
         }
       } else {
@@ -2436,6 +2497,8 @@ const useLogs = () => {
     //extract fields from query response
     extractFields();
 
+
+
     //update grid columns
     updateGridColumns();
 
@@ -2445,24 +2508,28 @@ const useLogs = () => {
 
 
   const fetchAllParitions = async(queryReq: any) => {
-    if (
-      searchObj.data.queryResults.partitionDetail.partitions[
-        searchObj.data.queryResults.subpage
-      ]?.length
-    ) {
-      queryReq.query.start_time =
+    return new Promise(async (resolve) => {
+      if (
         searchObj.data.queryResults.partitionDetail.partitions[
           searchObj.data.queryResults.subpage
-        ][0];
-      queryReq.query.end_time =
-        searchObj.data.queryResults.partitionDetail.partitions[
-          searchObj.data.queryResults.subpage
-        ][1];
-      queryReq.query.from = 0;
-      queryReq.query.size = -1;
-      searchObj.data.queryResults.subpage++;
-      await getPaginatedData(queryReq, true, false);
-    }
+        ]?.length
+      ) {
+        queryReq.query.start_time =
+          searchObj.data.queryResults.partitionDetail.partitions[
+            searchObj.data.queryResults.subpage
+          ][0];
+        queryReq.query.end_time =
+          searchObj.data.queryResults.partitionDetail.partitions[
+            searchObj.data.queryResults.subpage
+          ][1];
+        queryReq.query.from = 0;
+        queryReq.query.size = -1;
+        searchObj.data.queryResults.subpage++;
+        await getPaginatedData(queryReq, true, false);
+        resolve(true);
+      }
+      resolve(true);
+    });
   }
 
   const getPaginatedData = async (
@@ -2470,7 +2537,7 @@ const useLogs = () => {
     appendResult: boolean = false,
     isInitialRequest: boolean = true
   ) => {
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
       // // set track_total_hits true for first request of partition to get total records in partition
       // // it will be used to send pagination request
       // if (queryReq.query.from == 0) {
@@ -2483,6 +2550,8 @@ const useLogs = () => {
       // ) {
       //   delete queryReq.query.track_total_hits;
       // }
+      //so here if user clicks cancel query then it will not cancel immediately but it will get cancelled whenever next request is sent 
+      //and we will check isOperationCancelled to show the notification
       if (searchObj.data.isOperationCancelled) {
         notificationMsg.value = "Search operation is cancelled.";
 
@@ -2504,10 +2573,11 @@ const useLogs = () => {
       if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
         // if query has aggregation or groupby then we need to set size to -1 to get all records
         // issue #5432
+        //here BE return all the records if we set the size to -1 and we are doing it as we dont support pagination for aggregation and groupby
         if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
           queryReq.query.size = -1;
         }
-
+        //if the query has limit then we need to set the size to the limit and we are doing it as we also don't support pagination for limit
         if (isLimitQuery(parsedSQL)) {
           queryReq.query.size = parsedSQL.limit.value[0].value;
           searchObj.meta.resultGrid.showPagination = false;
@@ -2532,6 +2602,8 @@ const useLogs = () => {
       
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
+      //here we are deciding search because when we have jobID present (search schedule job ) then we need to call get_scheduled_search_result
+      //else we will call search
       const decideSearch = searchObj.meta.jobId
         ? "get_scheduled_search_result"
         : "search";
@@ -2546,6 +2618,36 @@ const useLogs = () => {
           "ui",
         )
         .then(async (res) => {
+          //the res.data would look like this
+          //{
+          //     "took": 33,
+          //     "took_detail": {
+          //         "total": 33,
+          //         "cache_took": 1,
+          //         "file_list_took": 5,
+          //         "wait_in_queue": 0,
+          //         "idx_took": 0,
+          //         "search_took": 24
+          //     },
+          //     "hits": [
+          //         {
+          //             "_timestamp": 1749626987957218,
+          //             "job": "test",
+          //             "level": "info",
+          //             "log": "test message for openobserve"
+          //         }
+          //     ],
+          //     "from": 0,
+          //     "size": 50,
+          //     "cached_ratio": 0,
+          //     "scan_size": 0,
+          //     "idx_scan_size": 0,
+          //     "scan_records": 0,
+          //     "trace_id": "5e1ba640f7524326a153d04e0da01a49",
+          //     "is_partial": false,
+          //     "result_cache_ratio": 0,
+          //     "order_by": "desc"
+          // }
           if (
             res.data.hasOwnProperty("function_error") &&
             res.data.function_error != ""
@@ -2587,6 +2689,15 @@ const useLogs = () => {
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
           if (searchObj.meta.jobId == "") {
+            //here we will check if the partitionTotal is -1 that means we havenot updated the particular partition yet 
+            //so we will check start_time of the query_req and compare it with the start_time of the partition
+            //if it matches then we will update the partitionTotal with the total records in the partition
+            //so here we will iterate over the partitions and update the partitionTotal
+            //the structure of the partitions would look like this
+            // [
+            //   [1749627138202000, 1749627198202000],
+            //   [1749624498202000, 1749627138202000]
+            // ]
             for (const [
               index,
               item,
@@ -2602,6 +2713,10 @@ const useLogs = () => {
                 ] = res.data.total;
               }
             }
+            //final outupt would look like this 
+            //if res.data.total = 2 like this it will loop over all partitions like 
+            // the whole function will be called with the updated queryReq with differnt partitions
+            //partitionTotal = [2,-1]
           }
 
           searchAggData.total = 0;
@@ -2637,17 +2752,19 @@ const useLogs = () => {
           if(queryReq.query?.streaming_output) {
             searchObj.data.queryResults.total = searchObj.data.queryResults.hits.length;
             searchObj.data.queryResults.from = res.data.from;
-            searchObj.data.queryResults.scan_size = (searchObj.data.queryResults.scan_size || 0) + res.data.scan_size;
-            searchObj.data.queryResults.took = (searchObj.data.queryResults.took || 0) + res.data.took;
+            searchObj.data.queryResults.scan_size = isInitialRequest ? res.data.scan_size : (searchObj.data.queryResults.scan_size || 0) + res.data.scan_size ;
+            searchObj.data.queryResults.took = isInitialRequest ? res.data.took : (searchObj.data.queryResults.took || 0) + res.data.took;
             searchObj.data.queryResults.hits = res.data.hits;
-            fetchAllParitions(queryReq);
+            await processPostPaginationData();
+            await fetchAllParitions(queryReq);
           } else if(isAggregation) {
             searchObj.data.queryResults.from = res.data.from;
-            searchObj.data.queryResults.total = (searchObj.data.queryResults.total || 0) + res.data.total;
-            searchObj.data.queryResults.scan_size = (searchObj.data.queryResults.scan_size || 0) + res.data.scan_size;
-            searchObj.data.queryResults.took = (searchObj.data.queryResults.took || 0) + res.data.took;
+            searchObj.data.queryResults.total = isInitialRequest ? res.data.total : (searchObj.data.queryResults.total || 0) + res.data.total;
+            searchObj.data.queryResults.scan_size = isInitialRequest ? res.data.scan_size : (searchObj.data.queryResults.scan_size || 0) + res.data.scan_size;
+            searchObj.data.queryResults.took = isInitialRequest ? res.data.took : (searchObj.data.queryResults.took || 0) + res.data.took;
             searchObj.data.queryResults.hits.push(...res.data.hits);
-            fetchAllParitions(queryReq);
+            await processPostPaginationData();
+            await fetchAllParitions(queryReq);
           } else if (res.data.from > 0 || searchObj.data.queryResults.subpage > 1) {
             if (appendResult && !queryReq.query?.streaming_output) {
               searchObj.data.queryResults.from += res.data.from;
@@ -2701,7 +2818,6 @@ const useLogs = () => {
               };
             }
           }
-
           // check for pagination request for the partition and check for subpage if we have to pull data from multiple partitions
           // it will check for subpage and if subpage is present then it will send pagination request for next partition
           if (
@@ -3569,16 +3685,14 @@ const useLogs = () => {
           : {};
       const logFieldSelectedValue: any = [];
       const stream = searchObj.data.stream.selectedStream.sort().join("_");
+      // Check if logFilterField has keys (since it's an object, not an array)
       if (
-        logFilterField.length > 0 &&
-        logFilterField[
-          `${store.state.selectedOrganization.identifier}_${stream}`
-        ] != undefined
+        Object.keys(logFilterField).length > 0 &&
+        logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`] != undefined &&
+        Array.isArray(logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`])
       ) {
         logFieldSelectedValue.push(
-          ...logFilterField[
-            `${store.state.selectedOrganization.identifier}_${stream}`
-          ],
+          ...logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`]
         );
       }
       let selectedFields = (logFilterField && logFieldSelectedValue) || [];
@@ -4585,7 +4699,7 @@ const useLogs = () => {
       searchObj.meta.searchApplied = false;
 
       // Update histogram visibility
-      if (streams.length > 1) {
+      if (streams.length > 1 && searchObj.meta.sqlMode == true) {
         searchObj.meta.showHistogram = false;
       }
 
@@ -6128,21 +6242,16 @@ const useLogs = () => {
   };
 
   const shouldShowHistogram = (parsedSQL: any) => {
-    return (isHistogramDataMissing(searchObj) &&
-    isHistogramEnabled(searchObj) &&
-    isSingleStreamSelected(searchObj) &&
-    (!searchObj.meta.sqlMode ||
-      isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
-  (isHistogramEnabled(searchObj) &&
-    isSingleStreamSelected(searchObj) &&
-    !searchObj.meta.sqlMode);
+    return ((isHistogramDataMissing(searchObj) && isHistogramEnabled(searchObj) && (!searchObj.meta.sqlMode || isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
+            (isHistogramEnabled(searchObj) && !searchObj.meta.sqlMode)) &&
+            (searchObj.data.stream.selectedStream.length === 1 || (searchObj.data.stream.selectedStream.length > 1 && !searchObj.meta.sqlMode));
   }
 
   const processHistogramRequest = async (queryReq: SearchRequestPayload) => {
     const parsedSQL: any = fnParsedSQL();
 
-    if (searchObj.data.stream.selectedStream.length > 1) {
-      const errMsg = "Histogram is not available for multi stream search.";
+    if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == true) {
+      const errMsg = "Histogram is not available for multi-stream SQL mode search.";
       resetHistogramWithError(errMsg, 0);
     }
 
@@ -6173,6 +6282,14 @@ const useLogs = () => {
           false,
           "histogram",
         );
+
+        if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false) {
+          payload.queryReq.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query);
+        } else {
+          payload.queryReq.query.sql = searchObj.data.histogramQuery.query.sql.replace("[INTERVAL]",
+            searchObj.meta.resultGrid.chartInterval,
+          );
+        }
 
         payload.meta = {
           isHistogramOnly: searchObj.meta.histogramDirtyFlag,
@@ -6636,11 +6753,21 @@ const useLogs = () => {
     isDistinctQuery,
     isWithQuery,
     getStream,
+    getQueryPartitions,
+    getPaginatedData,
+    updateFieldValues,
+    getHistogramTitle,
+    processPostPaginationData,
+    fnHistogramParsedSQL,
+    parser,
+    router,
+    $q,
+    getPageCount,
     initialLogsState,
     clearSearchObj,
     setCommunicationMethod,
     hasAggregation,
-  };
+    };
 };
 
 export default useLogs;

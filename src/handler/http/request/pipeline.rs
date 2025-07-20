@@ -21,6 +21,7 @@ use config::{ider, meta::pipeline::Pipeline};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::models::pipelines::PipelineList,
     service::{db::pipeline::PipelineError, pipeline},
 };
 
@@ -99,7 +100,11 @@ pub async fn save_pipeline(
     )
 )]
 #[get("/{org_id}/pipelines")]
-async fn list_pipelines(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
+async fn list_pipelines(
+    org_id: web::Path<String>,
+    _req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let org_id = org_id.into_inner();
     let mut _permitted = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
@@ -129,10 +134,17 @@ async fn list_pipelines(org_id: web::Path<String>) -> Result<HttpResponse, Error
         // Get List of allowed objects ends
     }
 
-    match pipeline::list_pipelines(org_id.into_inner(), _permitted).await {
-        Ok(pipeline_list) => Ok(HttpResponse::Ok().json(pipeline_list)),
-        Err(e) => Ok(e.into()),
-    }
+    let pipelines = match pipeline::list_pipelines(&org_id, _permitted).await {
+        Ok(pipelines) => pipelines,
+        Err(e) => return Ok(e.into()),
+    };
+
+    let pipeline_triggers = match pipeline::list_pipeline_triggers(&org_id).await {
+        Ok(pipelines) => pipelines,
+        Err(e) => return Ok(e.into()),
+    };
+
+    Ok(HttpResponse::Ok().json(PipelineList::from(pipelines, pipeline_triggers)))
 }
 
 /// GetStreamsWithPipeline
@@ -255,9 +267,13 @@ pub async fn enable_pipeline(
         Some(v) => v.parse::<bool>().unwrap_or_default(),
         None => false,
     };
+    let starts_from_now = match query.get("from_now") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    };
     let resp_msg =
         "Pipeline successfully ".to_string() + if enable { "enabled" } else { "disabled" };
-    match pipeline::enable_pipeline(&org_id, &pipeline_id, enable).await {
+    match pipeline::enable_pipeline(&org_id, &pipeline_id, enable, starts_from_now).await {
         Ok(()) => {
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(http::StatusCode::OK, resp_msg)))
         }

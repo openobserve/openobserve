@@ -1751,6 +1751,10 @@ export default defineComponent({
       isStreamingEnabled,
       setCommunicationMethod,
       sendToAiChat,
+      processInterestingFiledInSQLQuery,
+      removeFieldByName,
+      setFieldsAndConditions,
+      dashboardPanelData
     };
   },
   computed: {
@@ -1852,7 +1856,7 @@ export default defineComponent({
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
-        } else if (this.searchObj.data.stream.selectedStream.length > 1) {
+        } else if (this.searchObj.data.stream.selectedStream.length > 1 && this.searchObj.meta.sqlMode == true) {
           this.resetHistogramWithError(
             "Histogram is not available for multi stream search.",
           );

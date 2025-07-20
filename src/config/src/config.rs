@@ -1105,6 +1105,8 @@ pub struct Common {
         help = "Enable to show symbol in dashboard"
     )]
     pub dashboard_show_symbol_enabled: bool,
+    #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")]
+    pub default_hec_stream: String,
 }
 
 #[derive(EnvConfig)]
@@ -2238,6 +2240,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // incorrectly each time
     cfg.common.file_list_dump_debug_check =
         cfg.common.file_list_dump_dual_write && cfg.common.file_list_dump_debug_check;
+
+    if cfg.common.default_hec_stream.is_empty() {
+        cfg.common.default_hec_stream = "_hec".to_string();
+    }
 
     Ok(())
 }
