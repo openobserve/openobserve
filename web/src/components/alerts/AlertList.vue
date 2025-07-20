@@ -203,11 +203,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ props.row[col.field] }}
                   </template>
                   <template v-else-if="col.name === 'period'">
-                    {{ props.row[col.field] }} Mins
+                    {{ props.row[col.field] ?  props.row[col.field] + " Mins" : "--" }}
                   </template>
                   <template v-else-if="col.name === 'frequency'">
-                    {{ props.row[col.field] }}
-                    {{ props.row?.frequency_type == "cron" ? "" : "Mins" }}
+                    {{ props.row[col.field] ? props.row[col.field] + (props.row?.frequency_type == "cron" ? "" : "Mins") : "--" }}
                   </template>
                   <template v-else-if="col.name === 'folder_name'">
                     <div
@@ -797,22 +796,24 @@ export default defineComponent({
           sortable: true,
           style: "width: 150px",
         },
-        {
+        // "period" column — conditional
+        ...(activeTab.value !== 'realTime' ? [{
           name: "period",
           field: "period",
           label: t("alerts.period"),
           align: "center",
           sortable: true,
           style: "width: 150px",
-        },
-        {
+        }] : []),
+        // "frequency" column — conditional
+        ...(activeTab.value !== 'realTime' ? [{
           name: "frequency",
           field: "frequency",
           label: t("alerts.frequency"),
           align: "left",
           sortable: true,
           style: "width: 150px",
-        },
+        }] : []),
         {
           name: "last_triggered_at",
           field: "last_triggered_at",
@@ -839,7 +840,7 @@ export default defineComponent({
           classes: 'actions-column' //this is the class that we are adding to the actions column so that we can apply the styling to the actions column only
         },
       ];
-      if (searchAcrossFolders.value && searchQuery.value != "") {
+
         baseColumns.splice(2, 0, {
           name: "folder_name",
           field: "folder_name",
@@ -849,8 +850,10 @@ export default defineComponent({
           style: "width: 150px",
         });
       }
+
       return baseColumns;
     });
+
     const destinations = ref([0]);
     const templates = ref([0]);
     const selectedAlerts: Ref<any> = ref([]);
@@ -1001,8 +1004,8 @@ export default defineComponent({
               description: data.description,
               uuid: data.uuid,
               owner: data.owner,
-              period: data?.trigger_condition?.period,
-              frequency: frequency,
+              period: data.is_real_time ? "" :  data?.trigger_condition?.period,
+              frequency: data.is_real_time ? "" : frequency,
               frequency_type: data?.trigger_condition?.frequency_type,
               last_triggered_at: convertUnixToQuasarFormat(
                 data.last_triggered_at,
