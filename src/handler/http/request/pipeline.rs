@@ -59,13 +59,20 @@ impl From<PipelineError> for HttpResponse {
 pub async fn save_pipeline(
     path: web::Path<String>,
     pipeline: web::Json<Pipeline>,
-    _req: HttpRequest,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let mut pipeline = pipeline.into_inner();
     pipeline.name = pipeline.name.trim().to_lowercase();
     pipeline.org = org_id;
-    pipeline.id = ider::generate();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let overwrite = match query.get("overwrite") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    };
+    if !overwrite {
+        pipeline.id = ider::generate();
+    }
     match pipeline::save_pipeline(pipeline).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK,
@@ -158,10 +165,7 @@ async fn list_pipelines(
     )
 )]
 #[get("/{org_id}/pipelines/streams")]
-async fn list_streams_with_pipeline(
-    path: web::Path<String>,
-    _req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+async fn list_streams_with_pipeline(path: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     match pipeline::list_streams_with_pipeline(&org_id).await {
         Ok(stream_params) => Ok(HttpResponse::Ok().json(stream_params)),
@@ -189,10 +193,7 @@ async fn list_streams_with_pipeline(
     )
 )]
 #[delete("/{org_id}/pipelines/{pipeline_id}")]
-async fn delete_pipeline(
-    path: web::Path<(String, String)>,
-    _req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+async fn delete_pipeline(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (_org_id, pipeline_id) = path.into_inner();
     match pipeline::delete_pipeline(&pipeline_id).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
@@ -223,10 +224,7 @@ async fn delete_pipeline(
     )
 )]
 #[put("/{org_id}/pipelines")]
-pub async fn update_pipeline(
-    pipeline: web::Json<Pipeline>,
-    _req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+pub async fn update_pipeline(pipeline: web::Json<Pipeline>) -> Result<HttpResponse, Error> {
     let pipeline = pipeline.into_inner();
     match pipeline::update_pipeline(pipeline).await {
         Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
