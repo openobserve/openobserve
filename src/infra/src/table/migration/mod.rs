@@ -59,6 +59,7 @@ mod m20250520_000001_add_trial_end_col;
 mod m20250611_000001_create_reports_table;
 mod m20250611_000002_populate_reports_table;
 mod m20250611_000003_populate_reports_scheduled_jobs;
+mod m20250716_000001_create_enrichment_table;
 
 pub struct Migrator;
 
@@ -110,6 +111,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250611_000001_create_reports_table::Migration),
             Box::new(m20250611_000002_populate_reports_table::Migration),
             Box::new(m20250611_000003_populate_reports_scheduled_jobs::Migration),
+            Box::new(m20250716_000001_create_enrichment_table::Migration),
         ]
     }
 }
