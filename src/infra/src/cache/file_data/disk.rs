@@ -30,6 +30,7 @@ use config::{
     utils::{
         file::*,
         hash::{Sum64, gxhash},
+        time::{get_ymdh_from_micros, now_micros},
     },
 };
 use hashbrown::HashMap;
@@ -168,7 +169,7 @@ impl FileData {
                 .multi_dir
                 .split(',')
                 .filter(|s| !s.trim().is_empty())
-                .map(|s| s.to_string())
+                .map(|s| s.trim().to_string())
                 .collect(),
             file_type,
             data: CacheStrategy::new(strategy),
@@ -202,8 +203,13 @@ impl FileData {
         }
     }
 
-    async fn set(&mut self, trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
-        let data_size = data.len();
+    async fn set(
+        &mut self,
+        trace_id: &str,
+        file: &str,
+        tmp_file: &str,
+        data_size: usize,
+    ) -> Result<(), anyhow::Error> {
         if self.cur_size + data_size >= self.max_size {
             log::info!(
                 "[CacheType:{} trace_id: {trace_id}] File disk cache is full, can't cache extra {} bytes",
@@ -218,10 +224,18 @@ impl FileData {
             self.gc(trace_id, need_release_size).await?;
         }
 
-        // write file into local disk
+        // rename tmp file to real file
         let file_path = self.get_file_path(file);
         fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
-        put_file_contents(&file_path, &data)?;
+        fs::rename(tmp_file, &file_path).map_err(|e| {
+            anyhow::anyhow!(
+                "[CacheType:{} trace_id: {trace_id}] File disk cache rename tmp file {} to real file {} error: {}",
+                self.file_type,
+                tmp_file,
+                file_path,
+                e
+            )
+        })?;
 
         // set size
         self.set_size(file, data_size).await
@@ -436,6 +450,12 @@ impl FileData {
 
 pub async fn init() -> Result<(), anyhow::Error> {
     let cfg = get_config();
+    // clean the tmp dir
+    if let Err(e) = std::fs::remove_dir_all(&cfg.common.data_tmp_dir) {
+        log::warn!("clean tmp dir error: {}", e);
+    }
+    std::fs::create_dir_all(&cfg.common.data_tmp_dir).expect("create tmp dir success");
+
     for file in FILES.iter() {
         let root_dir = file.read().await.root_dir.clone();
         std::fs::create_dir_all(&root_dir).expect("create cache dir success");
@@ -521,6 +541,7 @@ pub async fn exist(file: &str) -> bool {
     if !get_config().disk_cache.enabled {
         return false;
     }
+    let start = std::time::Instant::now();
     let idx = get_bucket_idx(file);
     let files = if file.starts_with("files") {
         FILES[idx].read().await
@@ -531,11 +552,20 @@ pub async fn exist(file: &str) -> bool {
     } else {
         RESULT_FILES[idx].read().await
     };
+    let get_lock_took = start.elapsed().as_millis() as usize;
+    if get_lock_took > 100 {
+        log::info!("disk->cache: check file {file} exist get lock took: {get_lock_took} ms",);
+    }
     // file not exist, we can fast return
     if !files.exist(file).await {
         return false;
     }
     drop(files);
+
+    let exist_took = start.elapsed().as_millis() as usize;
+    if exist_took > 100 {
+        log::info!("disk->cache: check file {file} exist took: {exist_took} ms",);
+    }
 
     // check if the file is really exist
     if get_size(file).await.is_some() {
@@ -544,6 +574,10 @@ pub async fn exist(file: &str) -> bool {
 
     // file is not exist, need remove it from cache index
     _ = remove("", file).await;
+    let remove_took = start.elapsed().as_millis() as usize;
+    if remove_took > 100 {
+        log::info!("disk->cache: check file {file} exist remove took: {remove_took} ms",);
+    }
 
     // finally return false
     false
@@ -555,8 +589,12 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
         return Ok(());
     }
 
+    // write to tmp file
+    let data_size = data.len();
+    let (file, tmp_file) = write_tmp_file(file, data).await?;
+
     // hash the file name and get the bucket index
-    let idx = get_bucket_idx(file);
+    let idx = get_bucket_idx(&file);
 
     // get all the files from the bucket
     let mut files = if file.starts_with("files") {
@@ -568,10 +606,19 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
     } else {
         RESULT_FILES[idx].write().await
     };
-    if files.exist(file).await {
+    if files.exist(&file).await {
+        // remove the tmp file
+        if let Err(e) = std::fs::remove_file(&tmp_file) {
+            log::warn!(
+                "[CacheType:{} trace_id: {trace_id}] File disk cache remove tmp file {} error: {}",
+                files.file_type,
+                tmp_file,
+                e
+            );
+        }
         return Ok(());
     }
-    files.set(trace_id, file, data).await
+    files.set(trace_id, &file, &tmp_file, data_size).await
 }
 
 #[inline]
@@ -964,27 +1011,58 @@ pub fn parse_aggregation_cache_key(
     Some((org_id, stream_type, query_key, meta))
 }
 
+// Write data to a temporary random file and return the file path
+async fn write_tmp_file(file: &str, data: Bytes) -> Result<(String, String), anyhow::Error> {
+    let tmp_path = format!(
+        "{}/{}",
+        get_config().common.data_tmp_dir,
+        get_ymdh_from_micros(now_micros())
+    );
+    if let Err(e) = std::fs::create_dir_all(&tmp_path) {
+        return Err(anyhow::anyhow!(
+            "[FileData::Disk] create tmp dir {}, failed: {}",
+            tmp_path,
+            e
+        ));
+    }
+    let tmp_path = Path::new(&tmp_path).canonicalize().unwrap();
+    let tmp_file = tmp_path.join(format!("{}.tmp", config::ider::generate()));
+    let tmp_file = tmp_file.to_str().unwrap();
+    if let Err(e) = config::utils::async_file::put_file_contents(tmp_file, &data).await {
+        return Err(anyhow::anyhow!(
+            "[FileData::Disk] write tmp file {}, failed: {}",
+            tmp_file,
+            e
+        ));
+    }
+    Ok((file.to_string(), tmp_file.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_lru_cache_set_file() {
+    async fn test_disk_lru_cache_set_file() {
         let trace_id = "session_1";
         let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 1024, "lru");
         let content = Bytes::from("Some text Need to store in cache");
+        let data_size = content.len();
         for i in 0..50 {
             let file_key = format!(
                 "files/default/logs/disk/2022/10/03/10/6982652937134804993_1_{}.parquet",
                 i
             );
-            let resp = file_data.set(trace_id, &file_key, content.clone()).await;
+            let (_file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
+            let resp = file_data
+                .set(trace_id, &file_key, &tmp_file, data_size)
+                .await;
             assert!(resp.is_ok());
         }
     }
 
     #[tokio::test]
-    async fn test_lru_cache_get_file() {
+    async fn test_disk_lru_cache_get_file() {
         let trace_id = "session_2";
         let mut file_data = FileData::with_capacity_and_cache_strategy(
             FileType::Data,
@@ -993,56 +1071,66 @@ mod tests {
         );
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_2_1.parquet";
         let content = Bytes::from("Some text");
+        let data_size = content.len();
+        let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
 
         file_data
-            .set(trace_id, file_key, content.clone())
+            .set(trace_id, &file_key, &tmp_file, data_size)
             .await
             .unwrap();
-        assert!(file_data.exist(file_key).await);
+        assert!(file_data.exist(&file_key).await);
 
+        let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
         file_data
-            .set(trace_id, file_key, content.clone())
+            .set(trace_id, &file_key, &tmp_file, data_size)
             .await
             .unwrap();
-        assert!(file_data.exist(file_key).await);
+        assert!(file_data.exist(&file_key).await);
         assert!(file_data.size().0 > 0);
     }
 
     #[tokio::test]
-    async fn test_lru_cache_miss() {
+    async fn test_disk_lru_cache_miss() {
         let trace_id = "session_3";
         let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 10, "lru");
         let file_key1 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_1.parquet";
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_3_2.parquet";
         let content = Bytes::from("Some text");
+        let data_size = content.len();
+        let (file_key1, tmp_file) = write_tmp_file(&file_key1, content.clone()).await.unwrap();
         // set one key
         file_data
-            .set(trace_id, file_key1, content.clone())
+            .set(trace_id, &file_key1, &tmp_file, data_size)
             .await
             .unwrap();
-        assert!(file_data.exist(file_key1).await);
+        assert!(file_data.exist(&file_key1).await);
         // set another key, will release first key
+        let (file_key2, tmp_file) = write_tmp_file(&file_key2, content.clone()).await.unwrap();
         file_data
-            .set(trace_id, file_key2, content.clone())
+            .set(trace_id, &file_key2, &tmp_file, data_size)
             .await
             .unwrap();
-        assert!(file_data.exist(file_key2).await);
+        assert!(file_data.exist(&file_key2).await);
         // get first key, should get error
-        assert!(!file_data.exist(file_key1).await);
+        assert!(!file_data.exist(&file_key1).await);
     }
 
     #[tokio::test]
-    async fn test_fifo_cache_set_file() {
+    async fn test_disk_fifo_cache_set_file() {
         let trace_id = "session_4";
         let mut file_data =
             FileData::with_capacity_and_cache_strategy(FileType::Data, 1024, "fifo");
         let content = Bytes::from("Some text Need to store in cache");
+        let data_size = content.len();
         for i in 0..50 {
             let file_key = format!(
                 "files/default/logs/disk/2022/10/03/10/6982652937134804993_4_{}.parquet",
                 i
             );
-            let resp = file_data.set(trace_id, &file_key, content.clone()).await;
+            let (_file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
+            let resp = file_data
+                .set(trace_id, &file_key, &tmp_file, data_size)
+                .await;
             if let Some(e) = resp.as_ref().err() {
                 println!("set file_key: {} error: {:?}", file_key, e);
             }
@@ -1051,7 +1139,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fifo_cache_get_file() {
+    async fn test_disk_fifo_cache_get_file() {
         let trace_id = "session_5";
         let mut file_data = FileData::with_capacity_and_cache_strategy(
             FileType::Data,
@@ -1060,50 +1148,56 @@ mod tests {
         );
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_5_1.parquet";
         let content = Bytes::from("Some text");
+        let data_size = content.len();
+        let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
 
         file_data
-            .set(trace_id, file_key, content.clone())
+            .set(trace_id, &file_key, &tmp_file, data_size)
             .await
             .unwrap();
-        assert!(file_data.exist(file_key).await);
+        assert!(file_data.exist(&file_key).await);
 
+        let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
         file_data
-            .set(trace_id, file_key, content.clone())
+            .set(trace_id, &file_key, &tmp_file, data_size)
             .await
             .unwrap();
-        assert!(file_data.exist(file_key).await);
+        assert!(file_data.exist(&file_key).await);
         assert!(file_data.size().0 > 0);
     }
 
     #[tokio::test]
-    async fn test_fifo_cache_miss() {
+    async fn test_disk_fifo_cache_miss() {
         let trace_id = "session_6";
         let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 10, "fifo");
         let file_key1 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_1.parquet";
         let file_key2 = "files/default/logs/disk/2022/10/03/10/6982652937134804993_6_2.parquet";
         let content = Bytes::from("Some text");
+        let data_size = content.len();
+        let (file_key1, tmp_file) = write_tmp_file(&file_key1, content.clone()).await.unwrap();
         // set one key
         file_data
-            .set(trace_id, file_key1, content.clone())
+            .set(trace_id, &file_key1, &tmp_file, data_size)
             .await
             .unwrap();
-        assert!(file_data.exist(file_key1).await);
+        assert!(file_data.exist(&file_key1).await);
         // set another key, will release first key
+        let (file_key2, tmp_file) = write_tmp_file(&file_key2, content.clone()).await.unwrap();
         file_data
-            .set(trace_id, file_key2, content.clone())
+            .set(trace_id, &file_key2, &tmp_file, data_size)
             .await
             .unwrap();
-        assert!(file_data.exist(file_key2).await);
+        assert!(file_data.exist(&file_key2).await);
         // get first key, should get error
-        assert!(!file_data.exist(file_key1).await);
+        assert!(!file_data.exist(&file_key1).await);
     }
 
     #[tokio::test]
-    async fn test_multi_dir() {
+    async fn test_disk_multi_dir() {
         let multi_dir: Vec<String> = "dir1 , dir2 , dir3"
             .split(',')
             .filter(|s| !s.trim().is_empty())
-            .map(|s| s.to_string())
+            .map(|s| s.trim().to_string())
             .collect();
 
         let trace_id = "session_7";
@@ -1115,25 +1209,28 @@ mod tests {
         file_data.multi_dir = multi_dir;
         let file_key = "files/default/logs/disk/2022/10/03/10/6982652937134804993_7_1.parquet";
         let content = Bytes::from("Some text");
+        let data_size = content.len();
+        let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
 
         file_data
-            .set(trace_id, file_key, content.clone())
+            .set(trace_id, &file_key, &tmp_file, data_size)
             .await
             .unwrap();
-        assert!(file_data.exist(file_key).await);
+        assert!(file_data.exist(&file_key).await);
 
+        let (file_key, tmp_file) = write_tmp_file(&file_key, content.clone()).await.unwrap();
         file_data
-            .set(trace_id, file_key, content.clone())
+            .set(trace_id, &file_key, &tmp_file, data_size)
             .await
             .unwrap();
-        assert!(file_data.exist(file_key).await);
+        assert!(file_data.exist(&file_key).await);
         assert!(file_data.size().0 > 0);
 
         assert_eq!(file_data.get(&file_key, None).await, Some(content))
     }
 
     #[tokio::test]
-    async fn test_parse_result_cache_key() {
+    async fn test_disk_parse_result_cache_key() {
         let file_key = "results/default/logs/default/16042959487540176184_30_zo_sql_key/1744081170000000_1744081170000000_1_0.json";
         let Some((org_id, stream_type, query_key, meta)) = parse_result_cache_key(file_key) else {
             panic!("parse result cache key error");
@@ -1148,5 +1245,74 @@ mod tests {
         assert_eq!(meta.end_time, 1744081170000000);
         assert_eq!(meta.is_aggregate, true);
         assert_eq!(meta.is_descending, false);
+    }
+
+    #[tokio::test]
+    async fn test_disk_write_tmp_file() {
+        let file_key = "files/default/logs/disk/2022/10/03/10/test_file.parquet";
+        let test_data = Bytes::from("test content for temporary file");
+
+        // Test successful write
+        let result = write_tmp_file(file_key, test_data.clone()).await;
+        assert!(result.is_ok());
+
+        let (returned_file_key, tmp_file_path) = result.unwrap();
+        assert_eq!(returned_file_key, file_key);
+
+        // Verify the temporary file exists and contains the correct data
+        let tmp_path = Path::new(&tmp_file_path);
+        assert!(tmp_path.exists());
+        assert!(tmp_path.is_file());
+
+        // Read back the file content to verify it matches
+        let file_content = std::fs::read(tmp_path).unwrap();
+        assert_eq!(file_content, test_data);
+
+        // Clean up
+        let _ = std::fs::remove_file(tmp_path);
+    }
+
+    #[tokio::test]
+    async fn test_disk_write_tmp_file_with_empty_data() {
+        let file_key = "files/default/logs/disk/2022/10/03/10/empty_file.parquet";
+        let empty_data = Bytes::new();
+
+        let result = write_tmp_file(file_key, empty_data).await;
+        assert!(result.is_ok());
+
+        let (returned_file_key, tmp_file_path) = result.unwrap();
+        assert_eq!(returned_file_key, file_key);
+
+        // Verify the temporary file exists but is empty
+        let tmp_path = Path::new(&tmp_file_path);
+        assert!(tmp_path.exists());
+        assert_eq!(tmp_path.metadata().unwrap().len(), 0);
+
+        // Clean up
+        let _ = std::fs::remove_file(tmp_path);
+    }
+
+    #[tokio::test]
+    async fn test_disk_write_tmp_file_with_large_data() {
+        let file_key = "files/default/logs/disk/2022/10/03/10/large_file.parquet";
+        let large_data = Bytes::from(vec![b'a'; 1024 * 1024]); // 1MB of data
+
+        let result = write_tmp_file(file_key, large_data.clone()).await;
+        assert!(result.is_ok());
+
+        let (returned_file_key, tmp_file_path) = result.unwrap();
+        assert_eq!(returned_file_key, file_key);
+
+        // Verify the temporary file exists and has correct size
+        let tmp_path = Path::new(&tmp_file_path);
+        assert!(tmp_path.exists());
+        assert_eq!(tmp_path.metadata().unwrap().len(), 1024 * 1024);
+
+        // Read back the file content to verify it matches
+        let file_content = std::fs::read(tmp_path).unwrap();
+        assert_eq!(file_content, large_data);
+
+        // Clean up
+        let _ = std::fs::remove_file(tmp_path);
     }
 }
