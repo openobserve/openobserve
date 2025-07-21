@@ -308,22 +308,10 @@ pub async fn search(
         tables.extend(tbls);
         scan_stats.add(&stats);
     }
-    log::info!(
-        "stream_type: {:?} stream_name: {:?} empty_exec.name()={} ,enrich_mode {}",
-        stream_type,
-        stream_name,
-        empty_exec.name(),
-        req.query_identifier.enrich_mode
-    );
+
     // if the stream type is enrichment tables and the enrich mode is true, we need to load
     // enrichment data from db to datafusion tables
     if stream_type == StreamType::EnrichmentTables && req.query_identifier.enrich_mode {
-        log::debug!(
-            "Creating enrichment table for org_id={}, stream_name={}, empty_exec.name()={}",
-            org_id,
-            stream_name,
-            empty_exec.name()
-        );
         // get the enrichment table from db
         let enrichment_table =
             NewEnrichTable::new(&org_id, &stream_name, empty_exec.schema().clone());
