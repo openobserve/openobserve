@@ -2457,6 +2457,14 @@ const useLogs = () => {
         queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
       }
 
+      // check if histogram interval is undefined, then set current response as histogram response
+      // for visualization, will require to set histogram interval to fill missing values
+      // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+      // created new attribute visualization_histogram_interval to avoid this issue
+      if(searchObj.data.queryResults.visualization_histogram_interval == undefined && searchObj?.data?.queryResults?.histogram_interval) {
+        searchObj.data.queryResults.visualization_histogram_interval = searchObj?.data?.queryResults?.histogram_interval;
+      }
+
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
       const decideSearch = searchObj.meta.jobId
