@@ -1111,6 +1111,12 @@ pub struct Common {
     pub dashboard_show_symbol_enabled: bool,
     #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")] // use comma to split
     pub default_hec_stream: String,
+    #[env_config(
+        name = "ZO_ALIGN_PARTITIONS_FOR_INDEX",
+        default = false,
+        help = "Enable to use large partition for index. This will apply for all streams"
+    )]
+    pub align_partitions_for_index: bool,
 }
 
 #[derive(EnvConfig)]
