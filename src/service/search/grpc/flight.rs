@@ -52,7 +52,6 @@ use crate::service::{
                 empty_exec::NewEmptyExec, rewrite::tantivy_optimize_rewrite,
             },
             exec::{prepare_datafusion_context, register_udf},
-            plan::tantivy_count_exec::TantivyCountExec,
             table_provider::{enrich_table::NewEnrichTable, uniontable::NewUnionTable},
         },
         index::IndexCondition,

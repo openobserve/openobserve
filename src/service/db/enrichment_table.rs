@@ -57,53 +57,6 @@ pub async fn get_enrichment_table_data(
         timeout: 0,
         search_type: None,
         search_event_context: None,
-        use_cache: None,
-        local_mode: Some(true),
-    };
-    log::debug!(
-        "get enrichment table {} data req start time: {}",
-        name,
-        start_time
-    );
-    // do search
-    match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
-        Ok(res) => {
-            if !res.hits.is_empty() {
-                Ok(res.hits)
-            } else {
-                Ok(vec![])
-            }
-        }
-        Err(err) => {
-            log::error!("get enrichment table data error: {:?}", err);
-            Ok(vec![])
-        }
-    }
-}
-
-pub async fn get_enrichment_table_data(
-    org_id: &str,
-    name: &str,
-) -> Result<Vec<serde_json::Value>, anyhow::Error> {
-    let start_time = get_start_time(org_id, name).await;
-    let end_time = now_micros();
-
-    let query = config::meta::search::Query {
-        sql: format!("SELECT * FROM \"{name}\""),
-        start_time,
-        end_time,
-        size: -1, // -1 means no limit, enrichment table should not be limited
-        ..Default::default()
-    };
-
-    let req = config::meta::search::Request {
-        query,
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 0,
-        search_type: None,
-        search_event_context: None,
         use_cache: false,
         local_mode: Some(true),
     };

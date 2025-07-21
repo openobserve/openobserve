@@ -74,49 +74,17 @@ pub mod remote {
     ) -> Result<()> {
         // Create remote key with enrichment table prefix
         let remote_key = create_remote_key(org_id, table_name, created_at);
+        let account = infra::storage::get_account(&remote_key).unwrap_or_default();
 
         // Use existing storage::put function for remote upload
-        infra::storage::put(&remote_key, Bytes::from(data.to_owned()))
+        infra::storage::put(&account, &remote_key, Bytes::from(data.to_owned()))
             .await
             .map_err(|e| anyhow!("Failed to upload enrichment table to remote: {}", e))?;
 
-        crate::service::db::file_list::set(&remote_key, Some(file_meta), false).await?;
+        crate::service::db::file_list::set(&account, &remote_key, Some(file_meta), false).await?;
 
         log::debug!("Uploaded enrichment table {} to remote", table_name);
         Ok(())
-    }
-
-    /// Fetch data from remote using existing infra::storage::get_bytes function
-    pub async fn retrieve(org_id: &str, table_name: &str) -> Result<Vec<Value>> {
-        // Create remote key with enrichment table prefix
-        let remote_key = get_remote_key_prefix(org_id, table_name);
-
-        let files = infra::storage::list(&remote_key).await?;
-
-        let mut records = Vec::new();
-        for file in files {
-            match infra::storage::get(&file).await {
-                Ok(data_bytes) => {
-                    let data_bytes = data_bytes
-                        .bytes()
-                        .await
-                        .map_err(|e| anyhow!("Failed to get data bytes: {}", e))?;
-                    let (_schema, batches) = read_recordbatch_from_bytes(&data_bytes).await?;
-                    let batches: Vec<_> = batches.iter().collect();
-                    let table_data = record_batches_to_json_rows(&batches)?;
-                    let table_data = table_data
-                        .iter()
-                        .map(|row| Value::Object(row.clone()))
-                        .collect::<Vec<_>>();
-                    log::debug!("Fetched enrichment table {} from remote", remote_key);
-                    records.extend(table_data);
-                }
-                Err(e) => {
-                    log::warn!("Enrichment table {} not found in remote: {}", remote_key, e);
-                }
-            }
-        }
-        Ok(records)
     }
 
     /// Merge and upload data to remote
@@ -217,11 +185,15 @@ pub mod remote {
     pub async fn delete(org_id: &str, table_name: &str) -> Result<()> {
         // Create remote key with enrichment table prefix
         let remote_key = get_remote_key_prefix(org_id, table_name);
+        let account = infra::storage::get_account(&remote_key).unwrap_or_default();
 
-        let files = infra::storage::list(&remote_key)
+        let files = infra::storage::list(&account, &remote_key)
             .await
             .map_err(|e| anyhow!("Failed to list remote keys for deletion: {}", e))?;
-        let files: Vec<_> = files.iter().map(|file| file.as_str()).collect();
+        let files: Vec<_> = files
+            .iter()
+            .map(|file| (account.as_str(), file.as_str()))
+            .collect();
 
         if files.is_empty() {
             return Ok(());
@@ -233,7 +205,7 @@ pub mod remote {
             table_name
         );
 
-        infra::storage::del(&files)
+        infra::storage::del(files)
             .await
             .map_err(|e| anyhow!("Failed to delete enrichment table from remote: {}", e))?;
 

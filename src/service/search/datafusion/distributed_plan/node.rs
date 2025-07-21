@@ -16,10 +16,7 @@
 use std::sync::Arc;
 
 use config::{
-    meta::{
-        cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, sql::TableReferenceExt,
-        stream::FileKey,
-    },
+    meta::{cluster::NodeInfo, inverted_index::IndexOptimizeMode, sql::TableReferenceExt},
     utils::json,
 };
 use datafusion::common::TableReference;

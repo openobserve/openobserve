@@ -83,23 +83,19 @@ impl NewEnrichExec {
 }
 
 impl DisplayAs for NewEnrichExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match t {
-            DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                let name_string = format!("name={:?}", self.name);
-                let projection_string = format!(
-                    ", projection={:?}",
-                    self.schema
-                        .fields()
-                        .iter()
-                        .map(|f| f.name())
-                        .collect::<Vec<_>>()
-                );
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let name_string = format!("name={:?}", self.name);
+        let projection_string = format!(
+            ", projection={:?}",
+            self.schema
+                .fields()
+                .iter()
+                .map(|f| f.name())
+                .collect::<Vec<_>>()
+        );
 
-                write!(f, "NewEnrichExec: ")?;
-                write!(f, "{}{}", name_string, projection_string,)
-            }
-        }
+        write!(f, "NewEnrichExec: ")?;
+        write!(f, "{}{}", name_string, projection_string)
     }
 }
 
