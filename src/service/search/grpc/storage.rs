@@ -407,7 +407,6 @@ pub async fn cache_files(
     let (mut cache_hits, mut cache_misses) = (0, 0);
     let start = std::time::Instant::now();
     for (file, _, max_ts) in files.iter() {
-        let start = std::time::Instant::now();
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
             cached_files.insert(file);
@@ -419,12 +418,6 @@ pub async fn cache_files(
         } else {
             cache_misses += 1;
         };
-        let check_cache_took = start.elapsed().as_millis() as usize;
-        if check_cache_took > 100 {
-            log::info!(
-                "[trace_id {trace_id}] search->storage: check file {file} took: {check_cache_took} ms",
-            );
-        }
 
         // Record file access metrics
         let stream_type = if file_type == "index" {
@@ -453,10 +446,12 @@ pub async fn cache_files(
         }
     }
 
-    let cache_took = start.elapsed().as_millis() as usize;
-    log::info!(
-        "[trace_id {trace_id}] search->storage: check all {file_type} files cache took: {cache_took} ms, cache_hits: {cache_hits}, cache_misses: {cache_misses}",
-    );
+    let check_cache_took = start.elapsed().as_millis() as usize;
+    if check_cache_took > 1000 {
+        log::warn!(
+            "[trace_id {trace_id}] search->storage: check file cache took: {check_cache_took} ms",
+        );
+    }
 
     let files_num = files.len() as i64;
     if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
@@ -495,8 +490,8 @@ pub async fn cache_files(
         .collect_vec();
     let file_type = file_type.to_string();
     tokio::spawn(async move {
-        let files_num = files.len();
         let start = std::time::Instant::now();
+        let files_num = files.len();
         for (file, size, ts) in files {
             if let Err(e) =
                 crate::job::queue_background_download(&trace_id, &file, size, ts, cache_type).await

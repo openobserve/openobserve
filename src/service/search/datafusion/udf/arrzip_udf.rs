@@ -64,38 +64,39 @@ pub fn arr_zip_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Columna
 
     // 2. perform the computation
     let array = zip(arr_field1.iter(), zip(arr_field2.iter(), delim.iter()))
-        .map(|(arr_field1, val)| {
-            match (arr_field1, val) {
-                (Some(arr_field1), (Some(arr_field2), Some(delim))) => {
-                    json::from_str::<json::Value>(arr_field1)
-                        .ok()
-                        .and_then(|arr_field1| {
-                            json::from_str::<json::Value>(arr_field2)
-                                .ok()
-                                .and_then(|arr_field2| {
-                                    if let (json::Value::Array(field1), json::Value::Array(field2)) =
-                                        (arr_field1, arr_field2)
-                                    {
-                                        if field1.is_empty() || field2.is_empty() {
-                                            None
-                                        } else {
-                                            let zipped_arrs: Vec<String> = zip(field1.iter(), field2.iter())
+        .map(|(arr_field1, val)| match (arr_field1, val) {
+            (Some(arr_field1), (Some(arr_field2), Some(delim))) => {
+                json::from_str::<json::Value>(arr_field1)
+                    .ok()
+                    .and_then(|arr_field1| {
+                        json::from_str::<json::Value>(arr_field2)
+                            .ok()
+                            .and_then(|arr_field2| {
+                                if let (json::Value::Array(field1), json::Value::Array(field2)) =
+                                    (arr_field1, arr_field2)
+                                {
+                                    if field1.is_empty() || field2.is_empty() {
+                                        None
+                                    } else {
+                                        let zipped_arrs: Vec<String> =
+                                            zip(field1.iter(), field2.iter())
                                                 .map(|(field1, field2)| {
-                                                    let field1 = super::stringify_json_value(field1);
-                                                    let field2 = super::stringify_json_value(field2);
+                                                    let field1 =
+                                                        super::stringify_json_value(field1);
+                                                    let field2 =
+                                                        super::stringify_json_value(field2);
                                                     format!("{field1}{delim}{field2}")
                                                 })
                                                 .collect();
-                                            json::to_string(&zipped_arrs).ok()
-                                        }
-                                    } else {
-                                        None
+                                        json::to_string(&zipped_arrs).ok()
                                     }
-                                })
-                        })
-                }
-                _ => None,
+                                } else {
+                                    None
+                                }
+                            })
+                    })
             }
+            _ => None,
         })
         .collect::<StringArray>();
 
@@ -119,8 +120,16 @@ mod tests {
     use super::*;
 
     // Helper function to run a single test case
-    async fn run_single_test(arr_field1: &str, arr_field2: &str, delimiter: &str, expected_output: Vec<&str>) {
-        let sql = format!("select arrzip(arr_field1, arr_field2, '{}') as ret from t", delimiter);
+    async fn run_single_test(
+        arr_field1: &str,
+        arr_field2: &str,
+        delimiter: &str,
+        expected_output: Vec<&str>,
+    ) {
+        let sql = format!(
+            "select arrzip(arr_field1, arr_field2, '{}') as ret from t",
+            delimiter
+        );
         let sqls = [(sql.as_str(), expected_output)];
 
         let schema = Arc::new(Schema::new(vec![
@@ -150,13 +159,7 @@ mod tests {
 
     // Helper function to run multiple test cases that should all return null
     async fn run_null_returning_tests(test_cases: &[(&str, &str, &str)]) {
-        let expected_output = vec![
-            "+-----+",
-            "| ret |",
-            "+-----+",
-            "|     |",
-            "+-----+",
-        ];
+        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
 
         for &(arr_field1, arr_field2, delimiter) in test_cases {
             run_single_test(arr_field1, arr_field2, delimiter, expected_output.clone()).await;
@@ -237,15 +240,15 @@ mod tests {
     async fn test_arr_zip_null_returning_cases() {
         // Test cases that should return null
         let null_cases = [
-            (r#"[]"#, r#"[1,2,3]"#, ","),                    // empty array
-            (r#"not json"#, r#"[1,2,3]"#, ","),              // invalid JSON
-            (r#"{"key": "value"}"#, r#"[1,2,3]"#, ","),      // object
-            (r#""just a string""#, r#"[1,2,3]"#, ","),       // string
-            (r#"42"#, r#"[1,2,3]"#, ","),                    // number
-            (r#"true"#, r#"[1,2,3]"#, ","),                  // boolean
-            (r#"null"#, r#"[1,2,3]"#, ","),                  // null
-            (r#"[1,2,3]"#, r#"[]"#, ","),                    // second array empty
-            (r#"[1,2,3]"#, r#"not json"#, ","),              // second array invalid JSON
+            (r#"[]"#, r#"[1,2,3]"#, ","),               // empty array
+            (r#"not json"#, r#"[1,2,3]"#, ","),         // invalid JSON
+            (r#"{"key": "value"}"#, r#"[1,2,3]"#, ","), // object
+            (r#""just a string""#, r#"[1,2,3]"#, ","),  // string
+            (r#"42"#, r#"[1,2,3]"#, ","),               // number
+            (r#"true"#, r#"[1,2,3]"#, ","),             // boolean
+            (r#"null"#, r#"[1,2,3]"#, ","),             // null
+            (r#"[1,2,3]"#, r#"[]"#, ","),               // second array empty
+            (r#"[1,2,3]"#, r#"not json"#, ","),         // second array invalid JSON
         ];
 
         run_null_returning_tests(&null_cases).await;
@@ -253,13 +256,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_arr_zip_null_input() {
-        let expected_output = vec![
-            "+-----+",
-            "| ret |",
-            "+-----+",
-            "|     |",
-            "+-----+",
-        ];
+        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
 
         let schema = Arc::new(Schema::new(vec![
             Field::new("arr_field1", DataType::Utf8, true),

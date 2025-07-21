@@ -99,7 +99,8 @@ pub fn arr_index_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Colum
                                                 index_arrs.push(item);
                                             }
                                         }
-                                        // If start > end or end >= field1.len(), index_arrs remains empty
+                                        // If start > end or end >= field1.len(), index_arrs remains
+                                        // empty
                                     } else {
                                         index_arrs.push(field1[start].clone());
                                     }
@@ -316,8 +317,6 @@ mod tests {
         );
     }
 
-
-
     #[tokio::test]
     async fn test_arr_index_wrong_arguments() {
         let ctx = SessionContext::new();
@@ -335,7 +334,11 @@ mod tests {
     #[tokio::test]
     async fn test_arr_index_invalid_json_no_panic() {
         // Test that invalid JSON doesn't cause a panic
-        let schema = Arc::new(Schema::new(vec![Field::new("test_col", DataType::Utf8, false)]));
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "test_col",
+            DataType::Utf8,
+            false,
+        )]));
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![Arc::new(StringArray::from(vec!["not json"]))],
@@ -352,6 +355,9 @@ mod tests {
             .await
             .unwrap();
         let data = df.collect().await.unwrap();
-        assert_batches_eq!(vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"], &data);
+        assert_batches_eq!(
+            vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"],
+            &data
+        );
     }
 }
