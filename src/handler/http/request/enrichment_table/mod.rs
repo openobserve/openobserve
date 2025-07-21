@@ -51,6 +51,18 @@ pub async fn save_enrichment_table(
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, table_name) = path.into_inner();
+
+    let bad_req_msg = if org_id.trim().is_empty() {
+        Some("Organization cannot be empty")
+    } else if table_name.trim().is_empty() {
+        Some("Table name cannot be empty")
+    } else {
+        None
+    };
+
+    if let Some(msg) = bad_req_msg {
+        return Ok(MetaHttpResponse::bad_request(msg));
+    }
     let content_type = req.headers().get("content-type");
     let content_length = match req.headers().get("content-length") {
         None => 0.0,
