@@ -608,15 +608,6 @@ const getColumnsForActiveTab = (tab: any) => {
       align: "left",
       sortable: false,
     },
-    {
-      name: "sql_query",
-      field: "sql_query",
-      label: "SQL Query",
-      align: "left",
-      sortable: false,
-      style:
-        "white-space: no-wrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis;",
-    },
   ];
 
   const actionsColumn = {
@@ -688,6 +679,10 @@ const getPipelines = async () => {
       if (pipeline.source.source_type === "realtime") {
         pipeline.stream_name = pipeline.source.stream_name;
         pipeline.stream_type = pipeline.source.stream_type;
+        pipeline.frequency = "--"
+        pipeline.period = "--"
+        pipeline.cron = "--"
+        pipeline.sql_query = "--"
       } else {
         pipeline.stream_type = pipeline.source.stream_type;
         pipeline.frequency =
