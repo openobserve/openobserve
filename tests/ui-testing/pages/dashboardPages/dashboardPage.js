@@ -67,7 +67,8 @@ export class DashboardPage {
   }
   async deleteDashboard() {
     await this.page.reload();
-    await this.page.waitForTimeout(2000);
+    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForTimeout(5000);
     await this.page.locator("//td[contains(text(),'" + this.dashboardName + "')]/following-sibling::td[@class='q-td text-center']/child::button[@data-test='dashboard-delete']").click({ force: true });
     await this.page.waitForTimeout(2000);
     await this.page.locator('[data-test="confirm-button"]:visible').click();
