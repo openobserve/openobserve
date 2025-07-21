@@ -1239,6 +1239,8 @@ const useLogs = () => {
 
           partitionQueryReq["streaming_output"] = true;
 
+          searchObj.data.queryResults.histogram_interval = null;
+
           await searchService
             .partition({
               org_identifier: searchObj.organizationIdentifier,
@@ -2451,12 +2453,8 @@ const useLogs = () => {
 
       const isAggregation = searchObj.meta.sqlMode && parsedSQL != undefined && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
 
-      if(isAggregation && !queryReq.query?.streaming_output && searchObj.data.queryResults.histogram_interval) {
-        const interval = searchObj.data.queryResults.histogram_interval ? searchObj.data.queryResults.histogram_interval + ' seconds' : null;
-        let query = await changeHistogramInterval(queryReq.query.sql, interval);
-        if(query) {
-          queryReq.query.sql = query;
-        }
+      if(searchObj.data.queryResults.histogram_interval) {
+        queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
       }
 
       const { traceparent, traceId } = generateTraceContext();
