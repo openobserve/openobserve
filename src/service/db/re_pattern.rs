@@ -41,7 +41,7 @@ pub async fn add(entry: PatternEntry) -> Result<PatternEntry, anyhow::Error> {
             ));
         }
         Err(e) => {
-            log::info!("error while saving pattern to db : {}", e);
+            log::error!("error while saving pattern to db : {}", e);
             return Err(anyhow::anyhow!(e));
         }
     }
@@ -362,8 +362,28 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
                 let stype = StreamType::from(splits[1]);
                 let stream = splits[2];
 
+                let v = match ev.value.as_ref() {
+                    Some(v) => v,
+                    None => {
+                        log::error!(
+                            "expected value with pattern association message, found none, event : {:?}",
+                            ev
+                        );
+                        continue;
+                    }
+                };
+
                 let updates: UpdateSettingsWrapper<PatternAssociation> =
-                    serde_json::from_slice(&ev.value.unwrap()).unwrap();
+                    match serde_json::from_slice(v) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            log::error!(
+                                "error deserializing pattern association message : error: {e} event: {:?}",
+                                ev
+                            );
+                            continue;
+                        }
+                    };
 
                 let mgr = get_pattern_manager().await?;
                 mgr.update_associations(org, stype, stream, updates.remove, updates.add)?;

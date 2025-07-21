@@ -16,6 +16,7 @@
 use std::io::Error;
 
 use actix_web::{HttpRequest, HttpResponse, delete, get, http, post, put, web};
+use infra::table::re_pattern::PatternEntry;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -42,6 +43,19 @@ struct PatternGetResponse {
     updated_at: i64,
 }
 
+impl From<PatternEntry> for PatternGetResponse {
+    fn from(value: PatternEntry) -> Self {
+        Self {
+            id: value.id,
+            name: value.name,
+            description: value.description,
+            pattern: value.pattern,
+            created_at: value.created_at,
+            updated_at: value.updated_at,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct PatternInfo {
     id: String,
@@ -50,6 +64,19 @@ struct PatternInfo {
     description: String,
     created_at: i64,
     updated_at: i64,
+}
+
+impl From<PatternEntry> for PatternInfo {
+    fn from(value: PatternEntry) -> Self {
+        Self {
+            id: value.id,
+            name: value.name,
+            pattern: value.pattern,
+            description: value.description,
+            created_at: value.created_at,
+            updated_at: value.updated_at,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -189,14 +216,7 @@ pub async fn get(path: web::Path<(String, String)>) -> Result<HttpResponse, Erro
             Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
         };
 
-        let res = PatternGetResponse {
-            id: pattern.id,
-            name: pattern.name,
-            description: pattern.description,
-            pattern: pattern.pattern,
-            created_at: pattern.created_at,
-            updated_at: pattern.updated_at,
-        };
+        let res: PatternGetResponse = pattern.into();
         Ok(HttpResponse::Ok().json(res))
     }
     #[cfg(not(feature = "enterprise"))]
@@ -231,17 +251,7 @@ pub async fn list(path: web::Path<String>) -> Result<HttpResponse, Error> {
             Err(e) => return Ok(MetaHttpResponse::internal_error(e)),
         };
 
-        let patterns = patterns
-            .into_iter()
-            .map(|p| PatternInfo {
-                id: p.id,
-                name: p.name,
-                pattern: p.pattern,
-                description: p.description,
-                created_at: p.created_at,
-                updated_at: p.updated_at,
-            })
-            .collect::<Vec<_>>();
+        let patterns = patterns.into_iter().map(|p| p.into()).collect::<Vec<_>>();
 
         let res = PatternListResponse { patterns };
         Ok(HttpResponse::Ok().json(res))
@@ -300,9 +310,7 @@ pub async fn delete(path: web::Path<(String, String)>) -> Result<HttpResponse, E
         if !pattern_usage.is_empty() {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                format!(
-                    "Cannot delete pattern, associated with {pattern_streams:?}{extra}",
-                ),
+                format!("Cannot delete pattern, associated with {pattern_streams:?}{extra}",),
             )));
         }
         match crate::service::db::re_pattern::remove(&id).await {
@@ -393,7 +401,6 @@ pub async fn update(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(in_req);
         drop(path);
         drop(body);
         Ok(MetaHttpResponse::forbidden("not supported"))
@@ -452,7 +459,6 @@ pub async fn test(body: web::Bytes) -> Result<HttpResponse, Error> {
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        drop(org_id);
         drop(body);
         Ok(MetaHttpResponse::forbidden("not supported"))
     }

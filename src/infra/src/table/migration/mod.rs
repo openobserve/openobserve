@@ -109,11 +109,11 @@ impl MigratorTrait for Migrator {
             Box::new(m20250422_000001_add_alert_align_time::Migration),
             #[cfg(feature = "cloud")]
             Box::new(m20250520_000001_add_trial_end_col::Migration),
-            Box::new(m20250612_000001_create_re_pattern_table::Migration),
+            Box::new(m20250611_000001_create_reports_table::Migration),
             Box::new(m20250611_000002_populate_reports_table::Migration),
             Box::new(m20250611_000003_populate_reports_scheduled_jobs::Migration),
+            Box::new(m20250612_000001_create_re_pattern_table::Migration),
             Box::new(m20250612_000002_create_re_pattern_stream_map_table::Migration),
-            Box::new(m20250611_000001_create_reports_table::Migration),
         ]
     }
 }

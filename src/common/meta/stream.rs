@@ -41,6 +41,7 @@ pub struct Stream {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics_meta: Option<Metadata>,
     pub total_fields: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub pattern_associations: Vec<PatternAssociation>,
 }
 

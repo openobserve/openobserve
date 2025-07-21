@@ -34,7 +34,7 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(RePatterns::Table).to_owned())
+            .drop_table(Table::drop().table(RePatternStreamMap::Table).to_owned())
             .await?;
         Ok(())
     }
@@ -92,7 +92,7 @@ fn create_re_stream_map_table_statement() -> TableCreateStatement {
         .to_owned()
 }
 
-/// Identifiers used in queries on the cipher keys table.
+/// Identifiers used in queries on the re pattern stream map table.
 #[derive(DeriveIden)]
 enum RePatternStreamMap {
     Table,

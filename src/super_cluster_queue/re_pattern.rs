@@ -27,7 +27,18 @@ use o2_enterprise::enterprise::{
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
         MessageType::RePatternsTable => {
-            let actual_message: RePatternsMessage = serde_json::from_slice(&msg.value.unwrap())?;
+            let v = match msg.value {
+                Some(v) => v,
+                None => {
+                    log::error!(
+                        "expected value with re patterns message, found none, message : key : {}, src clusters : {:?}",
+                        msg.key,
+                        msg.source_cluster
+                    );
+                    return Err(anyhow::anyhow!("missing value in re pattern message").into());
+                }
+            };
+            let actual_message: RePatternsMessage = serde_json::from_slice(&v)?;
             match actual_message {
                 RePatternsMessage::Delete { id } => {
                     log::info!("[SUPER_CLUSTER:DB] deleting pattern with id {id}");
@@ -100,7 +111,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     );
 
                     let update: UpdateSettingsWrapper<PatternAssociation> =
-                        serde_json::from_slice(&updates).unwrap();
+                        serde_json::from_slice(&updates)?;
 
                     if update.add.is_empty() && update.remove.is_empty() {
                         return Ok(());

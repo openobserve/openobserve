@@ -88,7 +88,7 @@ fn create_pattern_org_name_idx_stmnt() -> IndexCreateStatement {
         .to_owned()
 }
 
-/// Identifiers used in queries on the cipher keys table.
+/// Identifiers used in queries on the re_patterns table.
 #[derive(DeriveIden)]
 pub(super) enum RePatterns {
     Table,
