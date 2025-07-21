@@ -253,6 +253,10 @@ impl ObjectStoreExt for StorageClientFactory {
         self.get_name_by_path(&file.into())
     }
 
+    fn list_accounts(&self) -> Vec<String> {
+        self.accounts.keys().cloned().collect()
+    }
+
     async fn put(&self, account: &str, location: &Path, payload: PutPayload) -> Result<PutResult> {
         self.get_client_by_name(account)
             .put(location, payload)

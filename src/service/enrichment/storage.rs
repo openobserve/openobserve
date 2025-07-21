@@ -29,9 +29,7 @@ pub mod remote {
     use config::{
         meta::stream::{FileMeta, StreamType},
         utils::{
-            arrow::record_batches_to_json_rows,
-            parquet::{read_recordbatch_from_bytes, write_recordbatch_to_parquet},
-            record_batch_ext::convert_json_to_record_batch,
+            parquet::write_recordbatch_to_parquet, record_batch_ext::convert_json_to_record_batch,
         },
     };
 
@@ -185,27 +183,32 @@ pub mod remote {
     pub async fn delete(org_id: &str, table_name: &str) -> Result<()> {
         // Create remote key with enrichment table prefix
         let remote_key = get_remote_key_prefix(org_id, table_name);
-        let account = infra::storage::get_account(&remote_key).unwrap_or_default();
+        let accounts = infra::storage::list_accounts();
+        let mut account_file_pairs = Vec::new();
+        let mut all_files = Vec::new();
+        for account in &accounts {
+            let files = infra::storage::list(account, &remote_key)
+                .await
+                .map_err(|e| anyhow!("Failed to list S3 keys for deletion: {}", e))?;
+            all_files.push((account.clone(), files));
+        }
+        for (account, files) in &all_files {
+            for file in files {
+                account_file_pairs.push((account.as_str(), file.as_str()));
+            }
+        }
 
-        let files = infra::storage::list(&account, &remote_key)
-            .await
-            .map_err(|e| anyhow!("Failed to list remote keys for deletion: {}", e))?;
-        let files: Vec<_> = files
-            .iter()
-            .map(|file| (account.as_str(), file.as_str()))
-            .collect();
-
-        if files.is_empty() {
+        if account_file_pairs.is_empty() {
             return Ok(());
         }
 
         log::debug!(
             "Attempting to delete {} files for enrichment table {} from remote",
-            files.len(),
+            account_file_pairs.len(),
             table_name
         );
 
-        infra::storage::del(files)
+        infra::storage::del(account_file_pairs)
             .await
             .map_err(|e| anyhow!("Failed to delete enrichment table from remote: {}", e))?;
 
