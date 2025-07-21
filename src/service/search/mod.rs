@@ -994,7 +994,7 @@ pub async fn search_partition(
         is_histogram,
     );
 
-    if cfg.common.align_partitions_for_index && is_use_inverted_index(&Arc::new(sql)).0 {
+    if cfg.common.align_partitions_for_index && is_use_inverted_index(&Arc::new(sql)) {
         step *= step_factor;
     }
 
