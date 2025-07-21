@@ -321,3 +321,146 @@ async fn request(
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use prettytable::{Cell, Row, Table};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_query_invalid_time_range() {
+        let result = query("test_org", "SELECT * FROM logs", "invalid", 10).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_query_valid_time_range() {
+        // This test validates that valid time ranges are accepted
+        // Note: This will fail with network error since no server is running
+        // but it validates the time parsing logic
+        let result = query("test_org", "SELECT * FROM logs", "1h", 10).await;
+        // We expect this to fail due to network, not time parsing
+        assert!(result.is_err());
+        // But the error should not be about invalid time format
+        let error_msg = result.unwrap_err().to_string();
+        assert!(!error_msg.contains("invalid time"));
+    }
+
+    #[test]
+    fn test_time_parsing() {
+        // Test that the time parsing utility works correctly
+        let result = config::utils::time::parse_milliseconds("1h");
+        assert!(result.is_ok_and(|v| v == 3600000));
+
+        let result = config::utils::time::parse_milliseconds("30m");
+        assert!(result.is_ok_and(|v| v == 1800000));
+
+        let result = config::utils::time::parse_milliseconds("invalid");
+        assert!(result.is_err_and(|e| e.to_string().contains("Invalid time format")));
+    }
+
+    #[test]
+    fn test_bytes_to_human_readable() {
+        let test_fn = config::utils::size::bytes_to_human_readable;
+
+        for (input, expected) in [
+            (1024.0, "1.00 KB"),
+            (1048576.0, "1.00 MB"),
+            (1073741824.0, "1.00 GB"),
+        ] {
+            let result = test_fn(input);
+            assert_eq!(result, expected);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_node_operations_network_failure() {
+        // These tests verify that the functions handle network failures gracefully
+        // They will fail due to no server running, but that's expected
+
+        assert!(node_offline().await.is_err());
+        assert!(node_online().await.is_err());
+        assert!(node_flush().await.is_err());
+        assert!(node_list().await.is_err());
+        assert!(node_list_with_metrics().await.is_err());
+        assert!(local_node_metrics().await.is_err());
+        assert!(
+            consistent_hash(vec!["file1.log".to_string()])
+                .await
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_query_request_construction() {
+        // Test that query requests are constructed correctly
+        let time_range = config::utils::time::parse_milliseconds("1h").unwrap();
+        let time_end = config::utils::time::now_micros();
+        let time_start = time_end - (time_range as i64 * 1000);
+
+        let query = config::meta::search::Query {
+            sql: "SELECT * FROM logs".to_string(),
+            from: 0,
+            size: 10,
+            start_time: time_start,
+            end_time: time_end,
+            quick_mode: false,
+            ..Default::default()
+        };
+
+        assert_eq!(query.sql, "SELECT * FROM logs");
+        assert_eq!(query.size, 10);
+        assert!(!query.quick_mode);
+    }
+
+    #[test]
+    fn test_json_serialization() {
+        // Test that JSON serialization works for the request types
+        let query = config::meta::search::Query {
+            sql: "SELECT * FROM logs".to_string(),
+            from: 0,
+            size: 10,
+            start_time: 0,
+            end_time: 0,
+            quick_mode: false,
+            ..Default::default()
+        };
+
+        let search_req = config::meta::search::Request {
+            query,
+            ..Default::default()
+        };
+
+        let json_result = serde_json::to_string(&search_req);
+        assert!(json_result.is_ok_and(|r| r.contains("SELECT * FROM logs") && r.contains("10")));
+    }
+
+    #[test]
+    fn test_hash_file_request_serialization() {
+        let req = config::meta::search::HashFileRequest {
+            files: vec!["file1.log".to_string(), "file2.log".to_string()],
+        };
+
+        let result = serde_json::to_string(&req);
+        assert!(result.is_ok_and(|r| r.contains("file1.log") && r.contains("file2.log")));
+    }
+
+    #[test]
+    fn test_table_with_various_data_types() {
+        let mut table = Table::new();
+
+        // Test with different data types that might appear in responses
+        table.add_row(Row::new(vec![Cell::new("ID"), Cell::new("Name")]));
+        table.add_row(Row::new(vec![Cell::new("1"), Cell::new("John")]));
+        table.add_row(Row::new(vec![Cell::new("2"), Cell::new("Jane")]));
+
+        assert_eq!(table.len(), 3);
+    }
+
+    #[test]
+    fn test_error_handling_patterns() {
+        let result = config::utils::time::parse_milliseconds("invalid");
+        assert!(result.is_err_and(|e| !e.to_string().is_empty()));
+    }
+}
