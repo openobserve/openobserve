@@ -46,7 +46,17 @@ export class ReportsPage {
 
   async reportsPageDefaultMultiOrg() {
     await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click({ force: true });
-    await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click({ force: true });
+    await this.page.waitForTimeout(2000);
+
+    // Search for the organization
+    await this.page.locator('[data-test="organization-search-input"]').fill('defaulttestmulti');
+    await this.page.waitForTimeout(2000);
+
+    // Validate that search results are displayed
+    await this.page.getByText('1-1 of').waitFor({ state: 'visible', timeout: 10000 });
+
+    // Click the organization from search results
+    await this.page.locator('[data-test="organization-menu-item-label-item-label"]').first().click({ force: true });
   }
 
   async reportsPageURLValidation() {
@@ -77,7 +87,12 @@ export class ReportsPage {
     await this.folderInput.dblclick({ force: true });
     await this.page.waitForLoadState("networkidle");
     await this.folderInput.pressSequentially('de', { delay: 100 });
-    await this.page.getByRole('option', { name: 'default' }).click({ force: true });
+    
+    // Search for the default option
+    await this.page.locator('[data-test="organization-search-input"]').fill('default');
+    await this.page.waitForTimeout(2000);
+    await this.page.getByText('1-1 of').waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.locator('[data-test="organization-menu-item-label-item-label"]').first().click({ force: true });
   }
 
   async createReportDashboardInput(dashboardName) {
@@ -91,7 +106,12 @@ export class ReportsPage {
     await this.dashboardTabInput.dblclick({ force: true });
     await this.page.waitForLoadState("networkidle");
     await this.dashboardTabInput.pressSequentially('de', { delay: 100 });
-    await this.page.getByRole('option', { name: 'default' }).click({ force: true });
+    
+    // Search for the default option
+    await this.page.locator('[data-test="organization-search-input"]').fill('default');
+    await this.page.waitForTimeout(2000);
+    await this.page.getByText('1-1 of').waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.locator('[data-test="organization-menu-item-label-item-label"]').first().click({ force: true });
   }
 
   async createReportContinueButtonStep1() {
