@@ -80,6 +80,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
     let in_stream_name = &route.stream_name;
     let org_id = &route.org_id;
     let log_ingestion_errors = ingestion_log_enabled().await;
+    let mut derived_streams = HashSet::new();
 
     // check stream
     let stream_name = format_stream_name(in_stream_name);
@@ -277,6 +278,10 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                     }
 
                     let destination_stream = stream_params.stream_name.to_string();
+                    if !derived_streams.contains(&destination_stream) {
+                        derived_streams.insert(destination_stream.clone());
+                    }
+
                     if !user_defined_schema_map.contains_key(&destination_stream) {
                         // a new dynamically created stream. need to check the two maps again
                         crate::service::ingestion::get_uds_and_original_data_streams(
@@ -437,6 +442,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
             &mut status,
             json_data_by_stream,
             size_by_stream,
+            derived_streams,
         )
         .await;
         stream_status.status = match status {

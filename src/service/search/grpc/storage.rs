@@ -408,6 +408,7 @@ pub async fn cache_files(
     let mut cached_files = HashSet::with_capacity(files.len());
     let (mut cache_hits, mut cache_misses) = (0, 0);
 
+    let start = std::time::Instant::now();
     for (_id, _account, file, _size, max_ts) in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
@@ -446,6 +447,13 @@ pub async fn cache_files(
                 .with_label_values(&[&stream_type.to_string()])
                 .observe(file_age_hours);
         }
+    }
+
+    let check_cache_took = start.elapsed().as_millis() as usize;
+    if check_cache_took > 1000 {
+        log::warn!(
+            "[trace_id {trace_id}] search->storage: check file cache took: {check_cache_took} ms",
+        );
     }
 
     let files_num = files.len() as i64;

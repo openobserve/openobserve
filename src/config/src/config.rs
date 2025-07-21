@@ -713,6 +713,8 @@ pub struct Common {
     pub data_db_dir: String,
     #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
     pub data_cache_dir: String,
+    #[env_config(name = "ZO_DATA_TMP_DIR", default = "")] // ./data/openobserve/tmp/
+    pub data_tmp_dir: String,
     // TODO: should rename to column_all
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub column_all: String,
@@ -1107,6 +1109,12 @@ pub struct Common {
     pub dashboard_show_symbol_enabled: bool,
     #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")]
     pub default_hec_stream: String,
+    #[env_config(
+        name = "ZO_ALIGN_PARTITIONS_FOR_INDEX",
+        default = false,
+        help = "Enable to use large partition for index. This will apply for all streams"
+    )]
+    pub align_partitions_for_index: bool,
 }
 
 #[derive(EnvConfig)]
@@ -2329,6 +2337,12 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.data_cache_dir.ends_with('/') {
         cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);
+    }
+    if cfg.common.data_tmp_dir.is_empty() {
+        cfg.common.data_tmp_dir = format!("{}tmp/", cfg.common.data_dir);
+    }
+    if !cfg.common.data_tmp_dir.ends_with('/') {
+        cfg.common.data_tmp_dir = format!("{}/", cfg.common.data_tmp_dir);
     }
     if cfg.common.mmdb_data_dir.is_empty() {
         cfg.common.mmdb_data_dir = format!("{}mmdb/", cfg.common.data_dir);
