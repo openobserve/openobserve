@@ -718,11 +718,11 @@ async fn build_sql(
         AggFunction::Sum => format!("SUM(\"{}\")", agg.having.column),
         AggFunction::Count => format!("COUNT(\"{}\")", agg.having.column),
         AggFunction::Median => format!("MEDIAN(\"{}\")", agg.having.column),
-        AggFunction::P50 => format!("approx_percentile_cont(\"{}\", 0.5)", agg.having.column),
-        AggFunction::P75 => format!("approx_percentile_cont(\"{}\", 0.75)", agg.having.column),
-        AggFunction::P90 => format!("approx_percentile_cont(\"{}\", 0.9)", agg.having.column),
-        AggFunction::P95 => format!("approx_percentile_cont(\"{}\", 0.95)", agg.having.column),
-        AggFunction::P99 => format!("approx_percentile_cont(\"{}\", 0.99)", agg.having.column),
+        AggFunction::P50 => format!("approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY \"{}\")", agg.having.column),
+        AggFunction::P75 => format!("approx_percentile_cont(0.75) WITHIN GROUP (ORDER BY \"{}\")", agg.having.column),
+        AggFunction::P90 => format!("approx_percentile_cont(0.9) WITHIN GROUP (ORDER BY \"{}\")", agg.having.column),
+        AggFunction::P95 => format!("approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY \"{}\")", agg.having.column),
+        AggFunction::P99 => format!("approx_percentile_cont(0.99) WITHIN GROUP (ORDER BY \"{}\")", agg.having.column),
     };
 
     if let Some(group) = agg.group_by.as_ref()
