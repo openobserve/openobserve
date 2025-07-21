@@ -47,8 +47,8 @@ use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
         FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, ObjectNamePart,
-        OrderByExpr, OrderByKind, Query, Select, SelectFlavor, SelectItem, SetExpr, Statement,
-        TableFactor, TableWithJoins, Value, ValueWithSpan, VisitMut, VisitorMut,
+        OrderByExpr, OrderByKind, OrderByOptions, Query, Select, SelectFlavor, SelectItem, SetExpr,
+        Statement, TableFactor, TableWithJoins, Value, ValueWithSpan, VisitMut, VisitorMut,
         helpers::attached_token::AttachedToken,
     },
     dialect::PostgreSqlDialect,
@@ -266,7 +266,11 @@ impl Sql {
         };
 
         //********************Change the sql start*********************************//
-        // 11. add _timestamp and _o2_id if need
+        // 11. replace approx_percentile_cont to new format
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+
+        // 12. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
@@ -276,7 +280,7 @@ impl Sql {
             }
         }
 
-        // 12. generate tantivy query
+        // 13. generate tantivy query
         // TODO: merge IndexVisitor and IndexOptimizeModeVisitor
         let mut index_condition = None;
         let mut can_optimize = false;
@@ -302,7 +306,7 @@ impl Sql {
         // set use_inverted_index use index_condition
         let use_inverted_index = index_condition.is_some();
 
-        // 13. check `select * from table where match_all()` optimizer
+        // 14. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
             && order_by.len() == 1
@@ -315,7 +319,7 @@ impl Sql {
             ));
         }
 
-        // 14. check other inverted index optimize modes
+        // 15. check other inverted index optimize modes
         // `select count(*) from table where match_all` -> SimpleCount
         // or `select histogram(..), count(*) from table where match_all` -> SimpleHistogram
         // or `select id, count(*) from t group by id order by cnt desc limit 10` -> SimpleTopN
@@ -346,7 +350,7 @@ impl Sql {
             }
         }
 
-        // 15. replace the Utf8 to Utf8View type
+        // 16. replace the Utf8 to Utf8View type
         let final_schemas = if cfg.common.utf8_view_enabled {
             let mut final_schemas = HashMap::with_capacity(used_schemas.len());
             for (stream, schema) in used_schemas.iter() {
@@ -1911,6 +1915,108 @@ impl VisitorMut for TrackTotalHitsVisitor {
             _ => {}
         }
         ControlFlow::Break(())
+    }
+}
+
+struct ReplaceApproxPercentiletVisitor {}
+
+impl ReplaceApproxPercentiletVisitor {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VisitorMut for ReplaceApproxPercentiletVisitor {
+    type Break = ();
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        if let Expr::Function(func) = expr {
+            let name = func.name.to_string().to_lowercase();
+            if name == "approx_percentile_cont" {
+                let (first, others) = splite_function_args(&func.args);
+                *expr = Expr::Function(Function {
+                    name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new(
+                        "approx_percentile_cont",
+                    ))]),
+                    parameters: FunctionArguments::None,
+                    args: FunctionArguments::List(FunctionArgumentList {
+                        args: others,
+                        duplicate_treatment: None,
+                        clauses: vec![],
+                    }),
+                    filter: None,
+                    null_treatment: None,
+                    over: None,
+                    within_group: vec![convert_args_to_order_expr(first)],
+                    uses_odbc_syntax: false,
+                });
+            } else if name == "approx_percentile_cont_with_weight" {
+                let (first, others) = splite_function_args(&func.args);
+                *expr = Expr::Function(Function {
+                    name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new(
+                        "approx_percentile_cont_with_weight",
+                    ))]),
+                    parameters: FunctionArguments::None,
+                    args: FunctionArguments::List(FunctionArgumentList {
+                        args: others,
+                        duplicate_treatment: None,
+                        clauses: vec![],
+                    }),
+                    filter: None,
+                    null_treatment: None,
+                    over: None,
+                    within_group: vec![convert_args_to_order_expr(first)],
+                    uses_odbc_syntax: false,
+                });
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+fn splite_function_args(args: &FunctionArguments) -> (FunctionArg, Vec<FunctionArg>) {
+    match args {
+        FunctionArguments::List(list) => {
+            let (first, others) = list.args.split_first().unwrap();
+            (first.clone(), others.to_vec())
+        }
+        _ => {
+            log::error!("Unsupported function arguments: {:?}", args);
+            (FunctionArg::Unnamed(FunctionArgExpr::Wildcard), vec![])
+        }
+    }
+}
+
+fn convert_args_to_order_expr(args: FunctionArg) -> OrderByExpr {
+    let expr = convert_function_args_to_expr(args);
+    OrderByExpr {
+        expr: expr.clone(),
+        options: OrderByOptions {
+            asc: None,
+            nulls_first: None,
+        },
+        with_fill: None,
+    }
+}
+
+fn convert_function_args_to_expr(args: FunctionArg) -> Expr {
+    match args {
+        FunctionArg::Named {
+            name: _,
+            arg: FunctionArgExpr::Expr(arg),
+            operator: _,
+        } => arg,
+        FunctionArg::Named {
+            name: _,
+            arg: FunctionArgExpr::Wildcard,
+            operator: _,
+        } => Expr::Wildcard(AttachedToken::empty()),
+        FunctionArg::Unnamed(FunctionArgExpr::Expr(arg)) => arg,
+        FunctionArg::Unnamed(FunctionArgExpr::Wildcard) => Expr::Wildcard(AttachedToken::empty()),
+        _ => {
+            log::error!("Unsupported function argument: {:?}", args);
+            Expr::Wildcard(AttachedToken::empty())
+        }
     }
 }
 
@@ -3761,5 +3867,35 @@ mod tests {
             .pop()
             .unwrap();
         assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_replace_approx_percentilet_visitor1() {
+        let sql = "select approx_percentile_cont(a, 0.5) from stream";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+        assert_eq!(
+            statement.to_string(),
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY a) FROM stream"
+        );
+    }
+
+    #[test]
+    fn test_replace_approx_percentilet_visitor2() {
+        let sql = "select approx_percentile_cont(arrow_cast(a, 'int'), 0.5) from stream";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+        assert_eq!(
+            statement.to_string(),
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY arrow_cast(a, 'int'))"
+        );
     }
 }
