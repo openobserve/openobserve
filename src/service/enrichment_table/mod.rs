@@ -196,6 +196,7 @@ pub async fn save_enrichment_data(
         &mut stream_schema_map,
         record_vals,
         timestamp,
+        false,
     )
     .await;
 
