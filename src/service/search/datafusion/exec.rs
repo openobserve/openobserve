@@ -656,7 +656,7 @@ pub async fn create_parquet_table(
     let mut listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(target_partitions)
-        .with_collect_stat(true);
+        .with_collect_stat(true); // current is default to true
 
     if sorted_by_time {
         // specify sort columns for parquet file

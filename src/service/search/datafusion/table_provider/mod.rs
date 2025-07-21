@@ -296,7 +296,7 @@ impl NewListingTable {
         source = source
             .with_parquet_file_reader_factory(Arc::new(NewParquetFileReaderFactory::new(store)));
         if let Some(predicate) = predicate {
-            source = source.with_predicate(Arc::clone(&conf.file_schema), predicate);
+            source = source.with_predicate(predicate);
         }
         if let Some(metadata_size_hint) = metadata_size_hint {
             source = source.with_metadata_size_hint(metadata_size_hint)
@@ -727,7 +727,7 @@ pub fn compute_all_files_statistics(
     // Then summary statistics across all file groups
     let file_groups_statistics = file_groups_with_stats
         .iter()
-        .filter_map(|file_group| file_group.statistics());
+        .filter_map(|file_group| file_group.file_statistics(None));
 
     let mut statistics = Statistics::try_merge_iter(file_groups_statistics, &table_schema)?;
 
