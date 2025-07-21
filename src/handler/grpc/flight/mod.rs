@@ -156,10 +156,10 @@ impl FlightService for FlightServiceImpl {
             let plan = displayable(physical_plan.as_ref())
                 .indent(false)
                 .to_string();
-            println!("+---------------------------+--------------------------+");
-            println!("follow physical plan, is_super_cluster_follower_leader: {is_super_cluster}");
-            println!("+---------------------------+--------------------------+");
-            println!("{plan}");
+            log::info!(
+                "[trace_id {trace_id}] follow physical plan, is_super_cluster_follower_leader: {is_super_cluster}"
+            );
+            log::info!("[trace_id {trace_id}] \n{plan}");
         }
 
         schema = add_scan_stats_to_schema(schema, scan_stats);

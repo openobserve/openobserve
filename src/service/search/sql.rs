@@ -19,7 +19,7 @@ use arrow_schema::{DataType, Field, FieldRef};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        inverted_index::InvertedIndexOptimizeMode,
+        inverted_index::IndexOptimizeMode,
         search::SearchEventType,
         sql::{
             MAX_LIMIT, OrderBy, Sql as MetaSql, TableReferenceExt, resolve_stream_names_with_type,
@@ -109,7 +109,7 @@ pub struct Sql {
     pub sorted_by_time: bool,     // if only order by _timestamp
     pub use_inverted_index: bool, // if can use inverted index
     pub index_condition: Option<IndexCondition>, // use for tantivy index
-    pub index_optimize_mode: Option<InvertedIndexOptimizeMode>,
+    pub index_optimize_mode: Option<IndexOptimizeMode>,
 }
 
 impl Sql {
@@ -277,6 +277,7 @@ impl Sql {
         }
 
         // 12. generate tantivy query
+        // TODO: merge IndexVisitor and IndexOptimizeModeVisitor
         let mut index_condition = None;
         let mut can_optimize = false;
         if stream_names.len() == 1 && cfg.common.inverted_index_enabled {
@@ -289,6 +290,7 @@ impl Sql {
             index_condition = index_visitor.index_condition;
             can_optimize = index_visitor.can_optimize;
         }
+        //********************Change the sql end*********************************//
 
         // use all condition for histogram without filter
         if can_optimize && index_condition.is_none() {
@@ -300,7 +302,6 @@ impl Sql {
         // set use_inverted_index use index_condition
         let use_inverted_index = index_condition.is_some();
 
-        //********************Change the sql end*********************************//
         // 13. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
@@ -308,7 +309,7 @@ impl Sql {
             && order_by[0].0 == TIMESTAMP_COL_NAME
             && can_optimize
         {
-            index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleSelect(
+            index_optimize_mode = Some(IndexOptimizeMode::SimpleSelect(
                 (offset + limit) as usize,
                 order_by[0].1 == OrderBy::Asc,
             ));
@@ -318,11 +319,13 @@ impl Sql {
         // `select count(*) from table where match_all` -> SimpleCount
         // or `select histogram(..), count(*) from table where match_all` -> SimpleHistogram
         // or `select id, count(*) from t group by id order by cnt desc limit 10` -> SimpleTopN
+        // or `select id from t where str_match(id, 'value') group by id order by id asc limit 10`
+        // -> SimpleDistinct
         if can_optimize && index_optimize_mode.is_none() {
             let mut visitor = IndexOptimizeModeVisitor::new(&used_schemas);
             let _ = statement.visit(&mut visitor);
             if visitor.is_simple_count {
-                index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleCount);
+                index_optimize_mode = Some(IndexOptimizeMode::SimpleCount);
             } else if visitor.is_simple_histogram && histogram_interval_visitor.interval.is_some() {
                 let bucket_width = histogram_interval_visitor.interval.unwrap() as u64 * 1_000_000;
                 // round the bucket edges to even start
@@ -331,14 +334,15 @@ impl Sql {
                 let max_value = (query.end_time / rounding_by) * rounding_by;
                 let num_buckets =
                     ((max_value - min_value) as f64 / bucket_width as f64).ceil() as usize;
-                index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleHistogram(
+                index_optimize_mode = Some(IndexOptimizeMode::SimpleHistogram(
                     min_value,
                     bucket_width,
                     num_buckets,
                 ));
             } else if let Some((field, limit, asc)) = visitor.simple_topn {
-                index_optimize_mode =
-                    Some(InvertedIndexOptimizeMode::SimpleTopN(field, limit, asc));
+                index_optimize_mode = Some(IndexOptimizeMode::SimpleTopN(field, limit, asc));
+            } else if let Some((field, limit, asc)) = visitor.simple_distinct {
+                index_optimize_mode = Some(IndexOptimizeMode::SimpleDistinct(field, limit, asc));
             }
         }
 
@@ -898,6 +902,7 @@ impl VisitorMut for IndexVisitor {
             if let Some(expr) = select.selection.as_mut() {
                 let (index, other_expr) = get_index_condition_from_expr(&self.index_fields, expr);
                 self.index_condition = index;
+
                 // if all filter is secondary index or full text index that term is simple, we can
                 // always remove the filter
                 let can_remove_filter = self
@@ -905,6 +910,7 @@ impl VisitorMut for IndexVisitor {
                     .as_ref()
                     .map(|v| v.can_remove_filter())
                     .unwrap_or(true);
+
                 // make sure all filter in where clause can be used in inverted index
                 if other_expr.is_none()
                     && select.selection.is_some()
@@ -912,8 +918,21 @@ impl VisitorMut for IndexVisitor {
                 {
                     self.can_optimize = true;
                 }
+
+                // remove filter when we can
                 if self.is_remove_filter || can_remove_filter {
                     select.selection = other_expr;
+                }
+
+                // addational check for simple distinct query
+                // filter should all extract to index condition and index condition should have
+                // the same field as the distinct field
+                if can_remove_filter
+                    && let Some(distinct) = is_simple_distinct_query(query)
+                    && let Some(index) = self.index_condition.as_ref()
+                    && !index.is_simple_str_match(&distinct.0)
+                {
+                    self.can_optimize = false;
                 }
             } else if is_simple_count_query(select) || is_simple_histogram_query(select) {
                 // if there is no filter, but have histogram or count, also can use index
@@ -922,6 +941,11 @@ impl VisitorMut for IndexVisitor {
                 && self.index_fields.contains(&topn.0)
             {
                 // if there is no filter, but have topn, also can use index
+                self.can_optimize = true;
+            } else if let Some(distinct) = is_simple_distinct_query(query)
+                && self.index_fields.contains(&distinct.0)
+            {
+                // if there is no filter, but have distinct, also can use index
                 self.can_optimize = true;
             }
         }
@@ -1308,6 +1332,7 @@ struct IndexOptimizeModeVisitor {
     pub is_simple_count: bool,
     pub is_simple_histogram: bool,
     pub simple_topn: Option<(String, usize, bool)>,
+    pub simple_distinct: Option<(String, usize, bool)>,
 }
 
 impl IndexOptimizeModeVisitor {
@@ -1325,6 +1350,7 @@ impl IndexOptimizeModeVisitor {
             is_simple_count: false,
             is_simple_histogram: false,
             simple_topn: None,
+            simple_distinct: None,
         }
     }
 
@@ -1335,6 +1361,7 @@ impl IndexOptimizeModeVisitor {
             is_simple_count: false,
             is_simple_histogram: false,
             simple_topn: None,
+            simple_distinct: None,
         }
     }
 }
@@ -1368,9 +1395,17 @@ impl VisitorMut for IndexOptimizeModeVisitor {
                 && self.index_fields.contains(&topn.0)
             {
                 self.simple_topn = Some(topn);
+            } else if let Some(distinct) = is_simple_distinct_query(query)
+                && self.index_fields.contains(&distinct.0)
+            {
+                self.simple_distinct = Some(distinct);
             }
         }
-        if self.is_simple_count || self.is_simple_histogram || self.simple_topn.is_some() {
+        if self.is_simple_count
+            || self.is_simple_histogram
+            || self.simple_topn.is_some()
+            || self.simple_distinct.is_some()
+        {
             return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
@@ -1408,7 +1443,7 @@ fn is_simple_histogram_query(select: &Select) -> bool {
 }
 
 // check if the query is only topn query
-// the topn query like select id, count(*) as cnt from stream group by id order by cnt desc limit 10
+// the topn query: `select id, count(*) as cnt from stream group by id order by cnt desc limit 10`
 fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
     let select = match query.body.as_ref() {
         sqlparser::ast::SetExpr::Select(select) => select,
@@ -1495,6 +1530,110 @@ fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
     } else {
         None
     }
+}
+
+// check if the query is only distinct query
+// the distinct query: `select id from stream group by id order by id asc limit 10`
+fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> {
+    let select = match query.body.as_ref() {
+        sqlparser::ast::SetExpr::Select(select) => select,
+        _ => return None,
+    };
+
+    // Must have exactly 1 projection: a simple field (not a function)
+    if select.projection.len() != 1 {
+        return None;
+    }
+
+    // First projection should be a simple field (not a function)
+    let field_name = match &select.projection[0] {
+        SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. }
+            if matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_)) =>
+        {
+            get_field_name(expr)
+        }
+        _ => return None,
+    };
+
+    // Check if ORDER BY references the field (with alias support)
+    let field_alias = match &select.projection[0] {
+        SelectItem::ExprWithAlias { alias, .. } => Some(alias.value.clone()),
+        _ => None,
+    };
+
+    // Must have GROUP BY with exactly one expression that references the same field
+    let group_by_field = match &select.group_by {
+        GroupByExpr::Expressions(exprs, _) if exprs.len() == 1 => match &exprs[0] {
+            Expr::Identifier(ident) => Some(ident.value.clone()),
+            Expr::CompoundIdentifier(idents) => {
+                if !idents.is_empty() {
+                    Some(idents.last().unwrap().value.clone())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        },
+        _ => return None,
+    };
+
+    // GROUP BY field must match SELECT field (with alias support)
+    if let Some(group_by_field_name) = group_by_field.as_ref() {
+        if !field_matches_with_alias(&field_name, field_alias.as_deref(), group_by_field_name) {
+            return None;
+        }
+    } else {
+        return None;
+    }
+
+    // Check if ORDER BY references the same field
+    let mut order_by_references_field = false;
+    let mut is_asc = false;
+    if let Some(order_by) = &query.order_by
+        && let OrderByKind::Expressions(exprs) = &order_by.kind
+        && exprs.len() == 1
+    {
+        match &exprs[0].expr {
+            Expr::Identifier(ident) => {
+                if field_matches_with_alias(&field_name, field_alias.as_deref(), &ident.value) {
+                    order_by_references_field = true;
+                    is_asc = exprs[0].options.asc.unwrap_or(true);
+                }
+            }
+            Expr::CompoundIdentifier(idents) => {
+                if !idents.is_empty()
+                    && field_matches_with_alias(
+                        &field_name,
+                        field_alias.as_deref(),
+                        &idents.last().unwrap().value,
+                    )
+                {
+                    order_by_references_field = true;
+                    is_asc = exprs[0].options.asc.unwrap_or(true);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // ORDER BY field must match SELECT field
+    if !order_by_references_field {
+        return None;
+    }
+
+    // check if limit is present
+    let limit = match &query.limit {
+        Some(Expr::Value(ValueWithSpan {
+            value: Value::Number(v, _b),
+            ..
+        })) => {
+            let v: i64 = v.parse().unwrap_or(0);
+            std::cmp::min(v, MAX_LIMIT) as usize
+        }
+        _ => return None,
+    };
+
+    Some((field_name, limit, is_asc))
 }
 
 // Check if the query is a simple `select sql_func(*)` without modifiers
@@ -2343,6 +2482,24 @@ fn is_eq_placeholder(expr: &Expr, placeholder: &str) -> bool {
     } else {
         false
     }
+}
+
+/// Helper function to resolve field names considering aliases
+/// Returns true if the given field_name matches either the actual field name or its alias
+fn field_matches_with_alias(field_name: &str, alias: Option<&str>, target_field: &str) -> bool {
+    // Direct match with field name
+    if field_name == target_field {
+        return true;
+    }
+
+    // Match with alias if present
+    if let Some(alias_name) = alias
+        && alias_name == target_field
+    {
+        return true;
+    }
+
+    false
 }
 
 #[cfg(test)]
@@ -3519,5 +3676,90 @@ mod tests {
             .pop()
             .unwrap();
         assert!(!is_simple_topn_query(&mut statement));
+    }
+
+    fn is_simple_distinct_query(statement: &mut Statement) -> bool {
+        let index_fields = ["id".to_string(), "name".to_string()].into_iter().collect();
+        let mut visitor = IndexOptimizeModeVisitor::new_from_index_fields(index_fields);
+        let _ = statement.visit(&mut visitor);
+        visitor.simple_distinct.is_some()
+    }
+
+    #[test]
+    fn test_is_simple_distinct_visit1() {
+        // Test basic distinct query
+        let sql = "select id from stream group by id order by id asc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_distinct_visit2() {
+        // Test with additional where clause
+        let sql =
+            "select name from t where status = 'active' group by name order by name asc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_distinct_visit3() {
+        // Test with desc order by
+        let sql = "select id from stream group by id order by id desc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_field_matches_with_alias() {
+        // Test direct field name match
+        assert!(field_matches_with_alias("field1", None, "field1"));
+
+        // Test alias match
+        assert!(field_matches_with_alias("field1", Some("alias1"), "alias1"));
+
+        // Test no match
+        assert!(!field_matches_with_alias("field1", None, "field2"));
+        assert!(!field_matches_with_alias(
+            "field1",
+            Some("alias1"),
+            "field2"
+        ));
+        assert!(!field_matches_with_alias(
+            "field1",
+            Some("alias1"),
+            "alias2"
+        ));
+    }
+
+    #[test]
+    fn test_is_simple_distinct_with_alias() {
+        // Test with field alias in SELECT and ORDER BY using alias
+        let sql = "select id as user_id from stream group by id order by user_id asc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_is_simple_distinct_with_alias_group_by_alias() {
+        // Test with field alias in SELECT and GROUP BY using alias
+        let sql = "select id as user_id from stream group by user_id order by user_id asc limit 10";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(is_simple_distinct_query(&mut statement));
     }
 }

@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('common.table')"
           />
           <q-btn
+            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
             :ripple="false"
             @click.prevent.stop="sendToAiChat(JSON.stringify(rowData))"
             data-test="menu-link-ai-item"
@@ -364,6 +365,7 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import JsonPreview from "./JsonPreview.vue";
+import config from "@/aws-exports";
 
 const defaultValue: any = () => {
   return {
@@ -533,7 +535,8 @@ export default defineComponent({
       hasAggregationQuery,
       sendToAiChat,
       getBtnLogo,
-      closeTable
+      closeTable,
+      config
     };
   },
   async created() {

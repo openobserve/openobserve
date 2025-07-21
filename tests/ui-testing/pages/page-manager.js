@@ -2,9 +2,9 @@
 import DashboardCreate from "./dashboardPages/dashboard-create";
 import DashboardListPage from "./dashboardPages/dashboard-list";
 import DashboardFolder from "./dashboardPages/dashboard-folder";
-import DashboardPanelActions from "./dashboardPages/dashboard-panel-actions";
+import DashboardactionPage from "./dashboardPages/dashboard-panel-actions";
 import DashboardPanelConfigs from "./dashboardPages/dashboard-panel-configs";
-import DashboardPanelEdit from "./dashboardPages/dashboard-panel-edit";
+import DashboardPanel from "./dashboardPages/dashboard-panel-edit";
 import DashboardSetting from "./dashboardPages/dashboard-settings";
 import DashboardVariables from "./dashboardPages/dashboard-variables";
 import ChartTypeSelector from "./dashboardPages/dashboard-chart";
@@ -41,6 +41,9 @@ import { CreateOrgPage } from "./generalPages/createOrgPage.js";
 import { CommonActions } from "./commonActions.js";
 import { UserPage } from "./generalPages/userPage.js";
 
+// ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
+import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
+import UnflattenedPage from "./logsPages/unflattened.js";
 
 class PageManager {
   /**
@@ -53,9 +56,9 @@ class PageManager {
     this.dashboardCreate = new DashboardCreate(page);
     this.dashboardList = new DashboardListPage(page);
     this.dashboardFolder = new DashboardFolder(page);
-    this.dashboardPanelActions = new DashboardPanelActions(page);
+    this.dashboardPanelActions = new DashboardactionPage(page);
     this.dashboardPanelConfigs = new DashboardPanelConfigs(page);
-    this.dashboardPanelEdit = new DashboardPanelEdit(page);
+    this.dashboardPanelEdit = new DashboardPanel(page);
     this.dashboardSetting = new DashboardSetting(page);
     this.dashboardVariables = new DashboardVariables(page);
     this.chartTypeSelector = new ChartTypeSelector(page);
@@ -93,6 +96,10 @@ class PageManager {
     this.createOrgPage = new CreateOrgPage(page);
     this.commonActions = new CommonActions(page);
     this.userPage = new UserPage(page);
+    
+    // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
+    this.logsQueryPage = new LogsQueryPage(page);
+    this.unflattenedPage = new UnflattenedPage(page);
   }
 }
 
