@@ -55,10 +55,6 @@ impl ObjectStoreExt for CacheFS {
         storage::get_account(file)
     }
 
-    fn list_accounts(&self) -> Vec<String> {
-        storage::list_accounts()
-    }
-
     async fn put(
         &self,
         _account: &str,

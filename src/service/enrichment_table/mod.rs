@@ -350,9 +350,6 @@ pub async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_typ
         log::error!("Error deleting stream schema: {e}");
     }
 
-    if let Err(e) = crate::service::enrichment::storage::remote::delete(org_id, stream_name).await {
-        log::error!("Error deleting enrichment table from S3: {e}");
-    }
     if let Err(e) = crate::service::enrichment::storage::local::delete(org_id, stream_name).await {
         log::error!("Error deleting enrichment table from local cache: {e}");
     }
@@ -473,9 +470,6 @@ pub async fn cleanup_enrichment_table_resources(
 ) {
     log::info!("cleaning up enrichment table  resources {stream_name}");
 
-    if let Err(e) = crate::service::enrichment::storage::remote::delete(org_id, stream_name).await {
-        log::error!("Error deleting enrichment table from S3: {e}");
-    }
     if let Err(e) = crate::service::enrichment::storage::local::delete(org_id, stream_name).await {
         log::error!("Error deleting enrichment table from local cache: {e}");
     }

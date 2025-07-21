@@ -43,7 +43,6 @@ static MULTI_ACCOUNTS: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(accounts::defau
 #[async_trait]
 pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
     fn get_account(&self, file: &str) -> Option<String>;
-    fn list_accounts(&self) -> Vec<String>;
     async fn put(&self, account: &str, location: &Path, payload: PutPayload) -> Result<PutResult>;
     async fn put_opts(
         &self,
@@ -111,10 +110,6 @@ pub async fn list(account: &str, prefix: &str) -> Result<Vec<String>> {
 
 pub fn get_account(file: &str) -> Option<String> {
     MULTI_ACCOUNTS.get_account(file)
-}
-
-pub fn list_accounts() -> Vec<String> {
-    MULTI_ACCOUNTS.list_accounts()
 }
 
 pub async fn get(account: &str, file: &str) -> Result<GetResult> {
