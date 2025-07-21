@@ -254,16 +254,16 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "47.0.0"
-datafusion-proto = "47.0.0"
-datafusion-functions-aggregate-common = "47.0.0"
-datafusion-functions-json = "0.47.0"
+datafusion = "48.0.1"
+datafusion-proto = "48.0.1"
+datafusion-functions-aggregate-common = "48.0.1"
+datafusion-functions-json = "0.48.0"
 expect-test = "1.4"
-arrow = { version = "55.0.0", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "55.0.0"
-arrow-json = "55.0.0"
-arrow-schema = { version = "55.0.0", features = ["serde"] }
-parquet = { version = "55.0.0", features = ["arrow", "async", "object_store"] }
+arrow = { version = "55.1.0", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "55.1.0"
+arrow-json = "55.1.0"
+arrow-schema = { version = "55.1.0", features = ["serde"] }
+parquet = { version = "55.1.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.12.0", features = ["aws", "azure", "gcp"] }
 sqlparser = { version = "0.55.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.2"
