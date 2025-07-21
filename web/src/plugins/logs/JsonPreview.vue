@@ -216,7 +216,7 @@
                 >
               </q-item-section>
             </q-item>
-            <q-item v-if="config.isEnterprise == 'true'" clickable v-close-popup>
+            <q-item v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled" clickable v-close-popup>
               <q-item-section>
                 <q-item-label
                   data-test="redirect-to-regex-pattern-btn"
@@ -527,7 +527,7 @@ export default {
       };
 
       // Add event listeners
-      if(config.isEnterprise == 'true'){
+      if(config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled){
         window.addEventListener('click', handleOutsideClick);
         window.addEventListener('contextmenu', handleContextMenu);
       }
@@ -536,7 +536,7 @@ export default {
       //this is used to remove the event listeners when the component is unmounted 
       //it is used to avoid memory leaks
       onUnmounted(() => {
-        if(config.isEnterprise == 'true'){
+        if(config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled){
           window.removeEventListener('click', handleOutsideClick);
           window.removeEventListener('contextmenu', handleContextMenu);
         }
