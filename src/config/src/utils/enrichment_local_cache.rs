@@ -51,7 +51,7 @@ pub async fn delete(org_id: &str, table_name: &str) -> Result<()> {
 }
 
 pub fn get_key(org_id: &str, table_name: &str) -> String {
-    format!("{}/{}", org_id, table_name)
+    format!("{org_id}/{table_name}")
 }
 
 pub fn get_table_dir(key: &str) -> PathBuf {

@@ -95,7 +95,7 @@ impl DisplayAs for NewEnrichExec {
         );
 
         write!(f, "NewEnrichExec: ")?;
-        write!(f, "{}{}", name_string, projection_string)
+        write!(f, "{name_string}{projection_string}")
     }
 }
 
@@ -149,8 +149,7 @@ async fn get_data(
 ) -> Result<SendableRecordBatchStream> {
     let clean_name = name.trim_matches('"');
     let data = match crate::service::db::enrichment_table::get_enrichment_data_from_db(
-        &org_id,
-        &clean_name,
+        &org_id, clean_name,
     )
     .await
     {

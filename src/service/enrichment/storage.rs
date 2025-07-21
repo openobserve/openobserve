@@ -343,15 +343,15 @@ pub mod local {
                 e
             )
         })? {
-            if let Ok(file_name) = entry.file_name().into_string() {
-                if file_name.ends_with(".json") && file_name.starts_with(&prefix.replace("/", "_"))
-                {
-                    let key = file_name
-                        .strip_suffix(".json")
-                        .unwrap_or(&file_name)
-                        .replace("_", "/");
-                    keys.push(key);
-                }
+            if let Ok(file_name) = entry.file_name().into_string()
+                && file_name.ends_with(".json")
+                && file_name.starts_with(&prefix.replace("/", "_"))
+            {
+                let key = file_name
+                    .strip_suffix(".json")
+                    .unwrap_or(&file_name)
+                    .replace("_", "/");
+                keys.push(key);
             }
         }
 
