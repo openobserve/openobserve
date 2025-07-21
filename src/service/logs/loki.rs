@@ -60,6 +60,7 @@ pub async fn handle_request(
             IngestionRequest::Loki(&records),
             user_email,
             None,
+            false,
         )
         .await
         .map_err(|e| {

@@ -34,7 +34,8 @@ use infra::{
     cache::stats,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        unwrap_partition_time_level, unwrap_stream_created_at, unwrap_stream_settings,
+        unwrap_partition_time_level, unwrap_stream_created_at, unwrap_stream_is_derived,
+        unwrap_stream_settings,
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
@@ -217,6 +218,7 @@ pub fn stream_res(
         Some(m) => m.get_associations(_org_id, stream_type, stream_name),
         None => vec![],
     };
+    let is_derived = unwrap_stream_is_derived(&schema);
 
     Stream {
         name: stream_name.to_string(),
@@ -229,6 +231,7 @@ pub fn stream_res(
         settings,
         metrics_meta,
         pattern_associations,
+        is_derived,
     }
 }
 

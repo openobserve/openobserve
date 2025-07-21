@@ -67,6 +67,7 @@ pub async fn ingest(
     in_req: IngestionRequest<'_>,
     user_email: &str,
     extend_json: Option<&HashMap<String, serde_json::Value>>,
+    is_derived: bool,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     let started_at: i64 = Utc::now().timestamp_micros();
@@ -93,6 +94,11 @@ pub async fn ingest(
         .timestamp_micros();
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
+    let mut derived_streams = HashSet::new();
+
+    if is_derived {
+        derived_streams.insert(stream_name.to_string());
+    }
 
     // Start retrieve associated pipeline and construct pipeline components
     let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
@@ -344,6 +350,10 @@ pub async fn ingest(
                     }
 
                     let destination_stream = stream_params.stream_name.to_string();
+                    if !derived_streams.contains(&destination_stream) {
+                        derived_streams.insert(destination_stream.clone());
+                    }
+
                     if !user_defined_schema_map.contains_key(&destination_stream) {
                         // a new dynamically created stream. need to check the two maps again
                         crate::service::ingestion::get_uds_and_original_data_streams(
@@ -501,6 +511,7 @@ pub async fn ingest(
             &mut status,
             json_data_by_stream,
             size_by_stream,
+            derived_streams,
         )
         .await;
         stream_status.status = match status {

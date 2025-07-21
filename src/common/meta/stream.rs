@@ -43,6 +43,8 @@ pub struct Stream {
     pub total_fields: usize,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub pattern_associations: Vec<PatternAssociation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_derived: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -156,6 +158,7 @@ mod tests {
             metrics_meta: None,
             total_fields: 1,
             pattern_associations: vec![],
+            is_derived: None,
         };
 
         let list_stream = ListStream {
@@ -236,6 +239,7 @@ mod tests {
             metrics_meta: None,
             total_fields: 1,
             pattern_associations: vec![],
+            is_derived: None,
         };
 
         assert!(stream.uds_schema.len() == 1);
