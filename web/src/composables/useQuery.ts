@@ -1,6 +1,6 @@
 import { useStore } from "vuex";
 import useNotifications from "@/composables/useNotifications";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, addSpacesToOperators } from "@/utils/zincutils";
 import { onBeforeMount } from "vue";
 
 interface BuildQueryPayload {
@@ -113,16 +113,9 @@ const useQuery = () => {
       }
 
       if (whereClause.trim() != "") {
-        whereClause = whereClause
-          .replace(/=(?=(?:[^"'()]*(?:"[^"]*"|'[^']*'|\([^)]*\))*)*[^"'()]*$)/g, " =")
-          .replace(/>(?=(?:[^"'()]*(?:"[^"]*"|'[^']*'|\([^)]*\))*)*[^"'()]*$)/g, " >")
-          .replace(/<(?=(?:[^"'()]*(?:"[^"]*"|'[^']*'|\([^)]*\))*)*[^"'()]*$)/g, " <");
-
-        whereClause = whereClause
-          .replace(/!=(?=(?:[^"'()]*(?:"[^"]*"|'[^']*'|\([^)]*\))*)*[^"'()]*$)/g, " !=")
-          .replace(/! =(?=(?:[^"'()]*(?:"[^"]*"|'[^']*'|\([^)]*\))*)*[^"'()]*$)/g, " !=")
-          .replace(/< =(?=(?:[^"'()]*(?:"[^"]*"|'[^']*'|\([^)]*\))*)*[^"'()]*$)/g, " <=")
-          .replace(/> =(?=(?:[^"'()]*(?:"[^"]*"|'[^']*'|\([^)]*\))*)*[^"'()]*$)/g, " >=");
+        // More efficient approach: replace operators only when not inside quotes or parentheses
+        // This avoids catastrophic backtracking by using a simpler state-based approach
+        whereClause = addSpacesToOperators(whereClause);
 
         // const parsedSQL = whereClause.split(" ");
         // searchObj.data.stream.selectedStreamFields.forEach((field: any) => {

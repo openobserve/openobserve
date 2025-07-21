@@ -53,7 +53,8 @@ import {
   generateTraceContext,
   arraysMatch,
   isWebSocketEnabled,
-  isStreamingEnabled
+  isStreamingEnabled,
+  addSpacesToOperators
 } from "@/utils/zincutils";
 import {
   convertDateToTimestamp,
@@ -952,17 +953,8 @@ const useLogs = () => {
           .filter((line: string) => !line.trim().startsWith("--"))
           .join("\n");
         if (whereClause.trim() != "") {
-          // Improved regex to avoid replacing operators inside quotes or parentheses (functions)
-          whereClause = whereClause
-            .replace(/=(?=(?:[^"'()]*(?:"[^"]*"|'[^']*'|\([^)]*\))*)*[^"'()]*$)/g, " =")
-            .replace(/>(?=(?:[^"'()]*(?:"[^"]*"|'[^']*'|\([^)]*\))*)*[^"'()]*$)/g, " >")
-            .replace(/<(?=(?:[^"'()]*(?:"[^"]*"|'[^']*'|\([^)]*\))*)*[^"'()]*$)/g, " <");
-
-          whereClause = whereClause
-            .replace(/!=(?=(?:[^"'()]*(?:"[^"]*"|'[^']*'|\([^)]*\))*)*[^"'()]*$)/g, " !=")
-            .replace(/! =(?=(?:[^"'()]*(?:"[^"]*"|'[^']*'|\([^)]*\))*)*[^"'()]*$)/g, " !=")
-            .replace(/< =(?=(?:[^"'()]*(?:"[^"]*"|'[^']*'|\([^)]*\))*)*[^"'()]*$)/g, " <=")
-            .replace(/> =(?=(?:[^"'()]*(?:"[^"]*"|'[^']*'|\([^)]*\))*)*[^"'()]*$)/g, " >=");
+          // Use efficient state-based approach to avoid regex backtracking
+          whereClause = addSpacesToOperators(whereClause);
 
           //remove everything after -- in where clause
           const parsedSQL = whereClause.split(" ");
