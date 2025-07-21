@@ -524,7 +524,6 @@ pub async fn values_http2_stream(
 
     // Get query params
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     #[cfg(feature = "enterprise")]
     let body_bytes = String::from_utf8_lossy(&body).to_string();
@@ -565,7 +564,7 @@ pub async fn values_http2_stream(
     let reqs = match build_search_request_per_field(
         &values_req,
         &org_id,
-        stream_type,
+        values_req.stream_type,
         &values_req.stream_name,
     )
     .await
