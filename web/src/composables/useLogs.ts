@@ -1301,6 +1301,8 @@ const useLogs = () => {
 
           partitionQueryReq["streaming_output"] = true;
 
+          searchObj.data.queryResults.histogram_interval = null;
+
           await searchService
             .partition({
               org_identifier: searchObj.organizationIdentifier,
@@ -1339,6 +1341,8 @@ const useLogs = () => {
                 partitionTotal: [],
                 paginations: [],
               };
+
+              searchObj.data.queryResults.histogram_interval = res.data.histogram_interval;
 
               if (typeof partitionQueryReq.sql != "string") {
                 const partitionSize = 0;
@@ -2596,7 +2600,7 @@ const useLogs = () => {
 
       const isAggregation = searchObj.meta.sqlMode && parsedSQL != undefined && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
 
-      if(!queryReq.query?.streaming_output && searchObj.data.queryResults.histogram_interval) {
+      if(searchObj.data.queryResults.histogram_interval) {
         queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
       }
       
