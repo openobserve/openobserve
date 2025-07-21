@@ -186,10 +186,11 @@ pub async fn get_result_schema(
         return Ok(ResultSchemaExtractor::new());
     }
 
-    if !is_streaming && use_cache {
-        if let Some(interval) = sql.histogram_interval {
-            handle_histogram(&mut sql.sql, sql.time_range, interval);
-        }
+    if !is_streaming
+        && use_cache
+        && let Some(interval) = sql.histogram_interval
+    {
+        handle_histogram(&mut sql.sql, sql.time_range, interval);
     }
 
     let sql_arc = Arc::new(sql.clone());
