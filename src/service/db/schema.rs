@@ -400,6 +400,19 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     })
                     .or_insert(schema_versions);
                 drop(w);
+                let keys = item_key.split('/').collect::<Vec<&str>>();
+                let org_id = keys[0];
+
+                // if create_org_through_ingestion is enabled, we need to create the org
+                // if it doesn't exist. Hence, we need to check if the org exists in the cache
+                if (cfg.common.create_org_through_ingestion
+                    || cfg.common.usage_enabled
+                    || audit_enabled)
+                    && !ORGANIZATIONS.read().await.contains_key(org_id)
+                    && let Err(e) = check_and_create_org(org_id).await
+                {
+                    log::error!("Failed to save organization in database: {e}");
+                }
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
