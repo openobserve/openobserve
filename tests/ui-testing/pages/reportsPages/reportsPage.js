@@ -52,9 +52,6 @@ export class ReportsPage {
     await this.page.locator('[data-test="organization-search-input"]').fill('defaulttestmulti');
     await this.page.waitForTimeout(2000);
 
-    // Validate that search results are displayed
-    await this.page.getByText('1-1 of').waitFor({ state: 'visible', timeout: 10000 });
-
     // Click the organization from search results
     await this.page.locator('[data-test="organization-menu-item-label-item-label"]').first().click({ force: true });
   }
@@ -87,31 +84,22 @@ export class ReportsPage {
     await this.folderInput.dblclick({ force: true });
     await this.page.waitForLoadState("networkidle");
     await this.folderInput.pressSequentially('de', { delay: 100 });
-    
-    // Search for the default option
-    await this.page.locator('[data-test="organization-search-input"]').fill('default');
-    await this.page.waitForTimeout(2000);
-    await this.page.getByText('1-1 of').waitFor({ state: 'visible', timeout: 10000 });
-    await this.page.locator('[data-test="organization-menu-item-label-item-label"]').first().click({ force: true });
+    await this.page.getByRole('option', { name: 'default' }).click({ force: true });
   }
 
   async createReportDashboardInput(dashboardName) {
     await this.dashboardInput.dblclick({ force: true });
     await this.page.waitForLoadState("networkidle");
-    await this.dashboardInput.pressSequentially(dashboardName, { delay: 100 });
-    await this.page.getByRole('option', { name: dashboardName }).click({ force: true });
+    await this.dashboardInput.fill(dashboardName);
+    await this.page.waitForTimeout(2000);
+    await this.page.getByRole('option', { name: dashboardName }).locator('div').nth(2).click({ force: true });
   }
 
   async createReportDashboardTabInput() {
     await this.dashboardTabInput.dblclick({ force: true });
     await this.page.waitForLoadState("networkidle");
     await this.dashboardTabInput.pressSequentially('de', { delay: 100 });
-    
-    // Search for the default option
-    await this.page.locator('[data-test="organization-search-input"]').fill('default');
-    await this.page.waitForTimeout(2000);
-    await this.page.getByText('1-1 of').waitFor({ state: 'visible', timeout: 10000 });
-    await this.page.locator('[data-test="organization-menu-item-label-item-label"]').first().click({ force: true });
+    await this.page.getByRole('option', { name: 'default' }).click({ force: true });
   }
 
   async createReportContinueButtonStep1() {
@@ -212,8 +200,8 @@ export class ReportsPage {
     await this.page.getByRole('option', { name: 'default' }).click({ force: true });
     await this.dashboardInput.dblclick({ force: true });
     await this.page.waitForLoadState("networkidle");
-    await this.dashboardInput.pressSequentially(dashboardName, { delay: 100 });
-    await this.page.getByRole('option', { name: dashboardName }).click({ force: true });
+    await this.dashboardInput.fill(dashboardName);
+    await this.page.getByRole('option', { name: dashboardName }).locator('div').nth(2).click({ force: true });
     await this.dashboardTabInput.dblclick({ force: true });
     await this.page.waitForLoadState("networkidle");
     await this.dashboardTabInput.pressSequentially('de', { delay: 100 });

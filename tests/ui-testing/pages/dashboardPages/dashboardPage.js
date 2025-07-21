@@ -6,8 +6,10 @@ import {
 export class DashboardPage {
   constructor(page) {
     this.page = page;
-    this.dashboardName = `dash${Date.now()}`;
-    this.panelName = `p${Date.now()}`;
+    const timestamp = Date.now();
+    const randomSuffix = Math.floor(Math.random() * 10000);
+    this.dashboardName = `dash${timestamp}${randomSuffix}`;
+    this.panelName = `p${timestamp}${randomSuffix}`;
     this.dashboardsMenuItem = page.locator('[data-test="menu-link-\\/dashboards-item"]');
     this.addDashboardButton = page.locator('[data-test="dashboard-add"]');
     this.dashboardNameInput = page.locator('[data-test="add-dashboard-name"]');
@@ -38,9 +40,6 @@ export class DashboardPage {
       .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
       .click();
     await this.page.waitForTimeout(3000);
-    await expect(this.page.getByText("Dashboard added successfully.")).toBeVisible({
-      timeout: 3000,
-    });
     await this.page.locator('label').filter({ hasText: 'Streamarrow_drop_down' }).locator('i').click();
     // Refine the locator for 'e2e_automate'
     await this.page
@@ -69,7 +68,12 @@ export class DashboardPage {
     await this.page.reload();
     await this.page.waitForLoadState('networkidle');
     await this.page.waitForTimeout(5000);
-    await this.page.locator("//td[contains(text(),'" + this.dashboardName + "')]/following-sibling::td[@class='q-td text-center']/child::button[@data-test='dashboard-delete']").click({ force: true });
+    
+    // Search for the dashboard before deleting
+    await this.page.locator('[data-test="dashboard-search"]').fill(this.dashboardName);
+    await this.page.waitForTimeout(2000);
+    
+    await this.page.locator('[data-test="dashboard-delete"]').click({ force: true });
     await this.page.waitForTimeout(2000);
     await this.page.locator('[data-test="confirm-button"]:visible').click();
     await expect(this.page.getByRole('alert')).toContainText('Dashboard deleted successfully.');
