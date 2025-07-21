@@ -754,13 +754,17 @@ pub async fn search_partition(
 
     let mut files = Vec::new();
 
+    let mut step_factor = 1;
+
     let mut max_query_range = 0;
     let mut max_query_range_in_hour = 0;
+    let mut index_size = 0;
+    let mut original_size = 0;
     for (stream, schema) in sql.schemas.iter() {
         let stream_type = stream.get_stream_type(stream_type);
         let stream_name = stream.stream_name();
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
-
+        let stats = stats::get_stream_stats(org_id, &stream_name, stream_type);
         let use_stream_stats_for_partition =
             if stream_settings == config::meta::stream::StreamSettings::default() {
                 cfg.common.use_stream_settings_for_partitions_enabled
@@ -800,7 +804,6 @@ pub async fn search_partition(
             let mut data_retention = data_retention * 24 * 60 * 60;
             // data duration in seconds
             let query_duration = (req.end_time - req.start_time) / 1000 / 1000;
-            let stats = stats::get_stream_stats(org_id, &stream_name, stream_type);
 
             // if stats.doc_time_max is 0, handle the case by using current time
             let data_end_time = if stats.doc_time_max == 0 {
@@ -829,6 +832,13 @@ pub async fn search_partition(
                 original_size,
                 deleted: false,
             });
+        }
+        index_size = max(index_size, stats.index_size as i64);
+        original_size = max(original_size, stats.storage_size as i64);
+        if index_size > 0 {
+            step_factor = max(step_factor, original_size / index_size);
+        } else {
+            step_factor = 1;
         }
     }
     log::info!(
@@ -983,6 +993,10 @@ pub async fn search_partition(
         cfg.limit.search_mini_partition_duration_secs,
         is_histogram,
     );
+
+    if cfg.common.align_partitions_for_index && is_use_inverted_index(&Arc::new(sql)).0 {
+        step *= step_factor;
+    }
 
     // Generate partitions
     let partitions = generator.generate_partitions(
