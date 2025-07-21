@@ -1265,6 +1265,8 @@ const useLogs = () => {
 
           partitionQueryReq["streaming_output"] = true;
 
+          searchObj.data.queryResults.histogram_interval = 0;
+
           await searchService
             .partition({
               org_identifier: searchObj.organizationIdentifier,
@@ -2867,7 +2869,14 @@ const useLogs = () => {
       const dismiss = () => {};
       try {
         // Set histogram interval
-        searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
+        if(searchObj.data.queryResults.histogram_interval) searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
+
+
+        if(!searchObj.data.histogramInterval) {
+          console.error("Error processing histogram data:", "histogramInterval is not set");
+          searchObj.loadingHistogram = false;
+          return;
+        }
 
         const { traceparent, traceId } = generateTraceContext();
         addTraceId(traceId);
@@ -5608,6 +5617,13 @@ const useLogs = () => {
         time,
         "UTC",
       );
+
+      if(!searchObj.data.histogramInterval) {
+        console.error("Error processing histogram data:", "histogramInterval is not set");
+        searchObj.loadingHistogram = false;
+        return;
+      }
+
       for (
         let currentTime: any = currentTimeToBePassed.timestamp / 1000;
         currentTime < endDateTime;
@@ -5672,6 +5688,9 @@ const useLogs = () => {
     searchObj.data.queryResults.took += response.content.results.took;
     searchObj.data.queryResults.result_cache_ratio +=
       response.content.results.result_cache_ratio;
+
+    searchObj.data.queryResults.histogram_interval = response.content.results.histogram_interval;
+    if(searchObj.data.queryResults.histogram_interval) searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
   }
 
   const handlePageCountStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
@@ -6112,6 +6131,8 @@ const useLogs = () => {
     const _shouldShowHistogram = shouldShowHistogram(parsedSQL);
 
     searchObj.data.queryResults.aggs = [];
+    searchObj.data.queryResults.histogram_interval = 0;
+
     if (_shouldShowHistogram) {
       searchObj.meta.refreshHistogram = false;
       if (searchObj.data.queryResults.hits?.length > 0) {
