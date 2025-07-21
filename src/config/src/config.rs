@@ -1118,6 +1118,8 @@ pub struct Common {
         help = "Enable to show symbol in dashboard"
     )]
     pub dashboard_show_symbol_enabled: bool,
+    #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")] // use comma to split
+    pub default_hec_stream: String,
 }
 
 #[derive(EnvConfig)]
