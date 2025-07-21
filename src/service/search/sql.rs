@@ -1931,6 +1931,9 @@ impl VisitorMut for ReplaceApproxPercentiletVisitor {
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Function(func) = expr {
+            if !func.within_group.is_empty() {
+                return ControlFlow::Continue(());
+            }
             let name = func.name.to_string().to_lowercase();
             if name == "approx_percentile_cont" {
                 let (first, others) = splite_function_args(&func.args);
