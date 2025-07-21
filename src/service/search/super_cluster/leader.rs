@@ -241,10 +241,8 @@ async fn run_datafusion(
         let plan = displayable(physical_plan.as_ref())
             .indent(false)
             .to_string();
-        println!("+---------------------------+----------+");
-        println!("leader physical plan before rewrite");
-        println!("+---------------------------+----------+");
-        println!("{plan}");
+        log::info!("[trace_id {trace_id}] leader physical plan before rewrite");
+        log::info!("[trace_id {trace_id}] \n{plan}");
     }
 
     // 6. rewrite physical plan
@@ -350,10 +348,8 @@ async fn run_datafusion(
         let plan = displayable(physical_plan.as_ref())
             .indent(false)
             .to_string();
-        println!("+---------------------------+----------+");
-        println!("leader physical plan after rewrite");
-        println!("+---------------------------+----------+");
-        println!("{plan}");
+        log::info!("[trace_id {trace_id}] leader physical plan after rewrite");
+        log::info!("[trace_id {trace_id}] \n{plan}");
     }
 
     let datafusion_start = std::time::Instant::now();

@@ -1,6 +1,6 @@
 import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
-import { LogsPage } from '../../pages/logsPages/logsPage.js';
+import PageManager from '../../pages/page-manager.js';
 
 test.describe.configure({ mode: "parallel" });
 
@@ -53,7 +53,7 @@ const sendRequest = async (page, url, payload, headers) => {
 };
 
 test.describe("Stream multiselect testcases", () => {
-  let logsPage;
+  let pageManager;
   function removeUTFCharacters(text) {
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
@@ -69,7 +69,7 @@ test.describe("Stream multiselect testcases", () => {
 
   test.beforeEach(async ({ page }) => {
     await login(page);
-    logsPage = new LogsPage(page);
+    pageManager = new PageManager(page);
     
 
     await page.waitForTimeout(5000);
@@ -97,9 +97,9 @@ test.describe("Stream multiselect testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStream("e2e_automate"); 
+    await pageManager.logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
-    await logsPage.clickQuickModeToggle();
+    await pageManager.logsPage.clickQuickModeToggle();
 
   });
 
@@ -242,7 +242,7 @@ await page.waitForTimeout(1000);
     page,
   }) => {
     await multistreamselect(page);
-    await logsPage.setDateTimeToToday(); 
+    await pageManager.logsPage.setDateTimeToToday(); 
     await expect(page.locator('[data-test="logs-search-index-list"]')).toContainText('e2e_automate, e2e_stream1');
 
   });

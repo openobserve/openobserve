@@ -127,17 +127,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
         <div
           data-test="navbar-organizations-select"
-          class="q-mx-sm current-organization"
+          class="q-mx-sm row"
         >
-          <q-select
-            v-model="selectedOrg"
-            borderless
-            dense
-            :options="orgOptions"
-            option-label="label"
-            class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
-            @update:model-value="updateOrganization()"
-          />
+          <q-btn 
+            style="max-width: 250px;" 
+            dense 
+            no-caps 
+            flat 
+            class="tw-text-ellipsis tw-overflow-hidden"
+          >
+            <div class="row items-center no-wrap full-width">
+              <div class="col tw-truncate">{{ userClickedOrg?.label || '' }}</div>
+              <q-icon name="arrow_drop_down" class="q-ml-xs" />
+            </div>
+            <q-menu
+              anchor="bottom middle"
+              self="top middle"
+              class="organization-menu-o2"
+            >
+              <q-list data-test="organization-menu-list" style="width: 250px">
+                <q-item data-test="organization-menu-item" style="padding: 0">
+                  <q-item-section data-test="organization-menu-item-section" class="column" style="padding: 0px">
+                    <q-table
+                      data-test="organization-menu-table"
+                      :rows="filteredOrganizations"
+                      :row-key="row => 'org_' + row.identifier"
+                      :visible-columns="['label']"
+                      hide-header
+                      :pagination="{ rowsPerPage }"
+                      :rows-per-page-options="[]"
+                      class="org-table"
+                    >
+                    <template #top>
+                      <div class="full-width">
+                        <q-input
+                          data-test="organization-search-input"
+                          v-model="searchQuery"
+                          data-cy="index-field-search-input"
+                          filled
+                          borderless
+                          dense
+                          clearable
+                          debounce="1"
+                          :placeholder="'Search Organization'"
+                        >
+                          <template #prepend>
+                            <q-icon name="search"/>
+                          </template>
+                        </q-input>
+                      </div>
+                    </template>
+
+                      <template v-slot:body-cell-label="props">
+                        <q-td data-test="organization-menu-item-label" :props="props" class="org-list-item">
+                          <q-item
+                            data-test="organization-menu-item-label-item"
+                            clickable
+                            v-close-popup
+                            dense
+                            :class="{'text-primary': props.row.identifier === userClickedOrg?.identifier                            }"
+                            @click="selectedOrg = props.row; updateOrganization()"
+                          >
+                            <q-item-section>
+                              <q-item-label
+                                  data-test="organization-menu-item-label-item-label"
+                                  class="tw-overflow-hidden tw-whitespace-nowrap tw-text-ellipsis tw-max-w-[230px]"
+                                >
+                                  {{ props.row.label }}
+                                  <q-tooltip v-if="props.row.label.length > 35"  anchor="bottom middle" self="top start">
+                                    {{ props.row.label }}
+                                  </q-tooltip>
+                                </q-item-label>
+                            </q-item-section>
+                          </q-item>
+                        </q-td>
+                      </template>
+                      <template  v-slot:no-data>
+                        <div data-test="organization-menu-no-data" class="text-center q-pa-sm tw-w-full tw-flex tw-justify-center">
+                          No organizations found
+                        </div>
+                      </template>
+                    </q-table>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-menu>
+          </q-btn>
         </div>
         <!-- <div>
           <q-btn-dropdown
@@ -624,6 +699,16 @@ export default defineComponent({
     const showGetStarted = ref(localStorage.getItem('isFirstTimeLogin') == 'true' ?? false);
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
+    const rowsPerPage = ref(10);
+    const searchQuery = ref('');
+    
+    const filteredOrganizations = computed(() => {
+      if (!searchQuery.value) return orgOptions.value;
+      const toBeSearched = searchQuery.value.toLowerCase();
+      return orgOptions.value.filter((org: any) => 
+        org.label?.toLowerCase().includes(toBeSearched)
+      );
+    });
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier",
@@ -631,6 +716,7 @@ export default defineComponent({
       ? router.currentRoute.value.query.org_identifier
       : undefined;
     const selectedOrg = ref(store.state.selectedOrganization);
+    const userClickedOrg = ref(store.state.selectedOrganization);
     const excludeParentRedirect = [
       "pipeline",
       "functionList",
@@ -1291,6 +1377,15 @@ export default defineComponent({
         aiChatInputContext.value = value;
       });
     }
+    //this is the used to set the selected org to the user clicked org because all the operations are happening on the selected org
+    //to make sync with the user clicked org
+    //we dont need search query after selectedOrg has been changed so resetting it
+    watch(selectedOrg, (newVal) => {
+      userClickedOrg.value = newVal;
+      searchQuery.value = "";
+    }, { immediate: true });
+
+
 
     return {
       t,
@@ -1327,7 +1422,11 @@ export default defineComponent({
       showGetStarted,
       removeFirstTimeLogin,
       sendToAiChat,
-      aiChatInputContext
+      aiChatInputContext,
+      userClickedOrg,
+      searchQuery,
+      filteredOrganizations,
+      rowsPerPage
     };
   },
   computed: {
@@ -1696,4 +1795,74 @@ body.ai-chat-open {
   .ai-hover-btn:hover .ai-icon {
     transform: rotate(-180deg);
   }
+
+.organization-menu-o2 {
+  .org-table {
+  td {
+    padding: 0;
+    height: 25px !important;
+    min-height: 25px !important;
+  }
+
+  .q-table__control {
+    margin: 0px !important;
+    width: 100% !important;
+    text-align: right;
+  }
+
+  .q-table__bottom {
+    padding: 0px !important;
+    min-height: 35px;
+
+    .q-table__control {
+      padding: 0px 10px !important;
+    }
+  }
+
+  .q-table__top {
+    padding: 0px !important;
+    margin: 0px !important;
+    left: 0px;
+    width: 100%;
+
+    .q-table__separator {
+      display: none;
+    }
+
+    .q-table__control {
+      padding: 0px !important;
+    }
+  }
+
+  .q-field--filled .q-field__control {
+    padding: 0px 5px !important;
+  }
+
+  .saved-view-item {
+    padding: 4px 5px 4px 10px !important;
+  }
+
+  .q-item__section--main ~ .q-item__section--side {
+    padding-left: 5px !important;
+  }
+  .org-table {
+    .text-primary {
+      color: var(--q-primary) !important;
+      font-weight: 500;
+      background: rgba(89, 96, 178, 0.08);
+    }
+  }
+}
+  .q-menu {
+  .q-input {
+    .q-field__control {
+      height: 40px;
+    }
+
+    input {
+      font-size: 14px;
+    }
+  }
+  }
+}
 </style>

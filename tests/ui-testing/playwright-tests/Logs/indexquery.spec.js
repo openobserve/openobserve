@@ -1,6 +1,7 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
+import PageManager from '../../pages/page-manager.js';
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -29,9 +30,7 @@ async function applyQueryButton(page) {
   await expect.poll(async () => (await search).status()).toBe(200);
 }
 
-
 async function runQuery(page, query) {
-
     const startTime = Date.now();
     const response = await page.evaluate(async (query, url, streamName, orgId) => {
       let response
@@ -134,7 +133,6 @@ test.describe("Compare SQL query execution times", () => {
       console.error('Assertion failed: match_all query did not take less time than match_all_raw query.');
     }
   });
-
 
   test("should compare match_all and match_all_raw_ignore_case query times", async ({ page }) => {
     const oneMinuteAgo = Date.now() - 60 * 1000;

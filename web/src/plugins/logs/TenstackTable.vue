@@ -346,9 +346,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     highlightQuery
                   "
                 />
-                <!-- Add copy button floating between columns -->
+                <!-- show o2 ai button only for timestamp column -->
                 <q-btn
-                v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column"
+                    v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column && config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
                     :ripple="false"
                     @click.stop="sendToAiChat(JSON.stringify(cell.row.original),true)"
                     data-test="menu-link-ai-item"
@@ -403,6 +403,7 @@ import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import { debounce } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
+import config from "@/aws-exports";
 
 const props = defineProps({
   rows: {
@@ -896,7 +897,9 @@ defineExpose({
   parentRef,
   virtualRows,
   getBtnLogo,
-  sendToAiChat
+  sendToAiChat,
+  store,
+  config
 });
 </script>
 <style scoped lang="scss">

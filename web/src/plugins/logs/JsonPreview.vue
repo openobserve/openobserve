@@ -196,7 +196,7 @@
                 >
               </q-item-section>
             </q-item>
-            <q-item  clickable v-close-popup>
+            <q-item  clickable v-close-popup v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled">
               <q-item-section>
                 <q-item-label
                   data-test="send-to-ai-chat-btn"
@@ -766,6 +766,7 @@ export default {
       addOrRemoveLabel,
       sendToAiChat,
       getBtnLogo,
+      config,
       regexIcon,
       createRegexPatternFromLogs,
       showMenu,
@@ -778,7 +779,6 @@ export default {
       typeOfRegexPattern,
       regexPatternType,
       confirmRegexPatternType,
-      config
     };
   },
 };

@@ -768,10 +768,20 @@ const useStreams = () => {
   
 
   const isStreamExists = (streamName: string, streamType: string) => {
-    return Object.prototype.hasOwnProperty.call(
-      store.state.streams.streamsIndexMapping[streamType],
-      streamName,
-    )
+    try {
+      // Check if the required objects exist before accessing them
+      if (!store.state?.streams?.streamsIndexMapping?.[streamType]) {
+        return false;
+      }
+
+      return Object.prototype.hasOwnProperty.call(
+        store.state.streams.streamsIndexMapping[streamType],
+        streamName,
+      );
+    } catch (error) {
+      console.warn('Error checking if stream exists:', error);
+      return false;
+    }
   }
 
   const addNewStreams = (streamType: string, streamList: any[]) => {

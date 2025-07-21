@@ -1,8 +1,8 @@
-import { test, expect } from "../baseFixtures";
+import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../../test-data/logs_data.json";
-import { PipelinesPage } from "../../pages/pipelinesPages/pipelinesPage.js";
+import PageManager from "../../pages/page-manager.js";
 // import { pipeline } from "stream";
 // import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
@@ -200,6 +200,7 @@ async function deletePipeline(page, randomPipelineName) {
   await page.locator('[data-test="confirm-button"]').click();
 }
 test.describe("Pipeline testcases", () => {
+  let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -223,15 +224,14 @@ test.describe("Pipeline testcases", () => {
 
   test.beforeEach(async ({ page }) => {
     await login(page);
+    pageManager = new PageManager(page);
     await page.waitForTimeout(5000);
-    // ("ingests logs via API", () => {
+
     const orgId = process.env["ORGNAME"];
     const streamName = "e2e_automate";
     const basicAuthCredentials = Buffer.from(
       `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
     ).toString("base64");
-    //this needs to be filled with the authorization (basic) token if exists otherwise it will be filled with the same environment authorization (not remote)
-    AuthorizationToken = "";
 
     const headers = {
       Authorization: `Basic ${basicAuthCredentials}`,
@@ -242,17 +242,8 @@ test.describe("Pipeline testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStream(page, logData.Stream);
+    await pageManager.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
-    //this only be called when no authorization token is present so that the remote will destination will be the same as the environment
-    if (AuthorizationToken.length == 0) {
-      const passcodeUrl = getPasscodeUrl(orgId);
-      const response = await getPasscode(page, passcodeUrl, headers);
-      AuthorizationToken = b64EncodeStandard(
-        `${process.env["ZO_ROOT_USER_EMAIL"]}:${response.data.passcode}`
-      );
-    }
   });
 
   async function exploreStreamAndDeletePipeline(
@@ -276,7 +267,7 @@ test.describe("Pipeline testcases", () => {
   test.skip("should add source & remote destination node and then delete the pipeline", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -316,7 +307,7 @@ test.describe("Pipeline testcases", () => {
   test.skip("should add source, function, remote destination and then delete pipeline", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -378,7 +369,7 @@ test.describe("Pipeline testcases", () => {
   test.skip("should add source, condition & remote destination node and then delete the pipeline", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
 
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
@@ -430,7 +421,7 @@ test.describe("Pipeline testcases", () => {
   test("should add source, function,destination and then delete pipeline", async ({
     page,
   }) => {
-    const pipelinePage = new PipelinesPage(page);
+    const pipelinePage = pageManager.pipelinesPage;
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pipelinePage.addPipeline();

@@ -15,18 +15,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
-    <div v-if="!showDestinationEditor && !showImportDestination">
+  <q-page class="q-pa-none" style="height: 100%; min-height: inherit" >
+
+    <div v-if="!showDestinationEditor && !showImportDestination" style="height: calc(100vh - 112px); overflow-y: auto;" >
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
+      :class="store.state.theme == 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+      >
+        <div class="q-table__title" data-test="alert-destinations-list-title">
+            {{ t("alert_destinations.header") }}
+          </div>
+          <div class="tw-flex tw-justify-end">
+            <q-input
+            data-test="destination-list-search-input"
+            v-model="filterQuery"
+            borderless
+            filled
+            dense
+            class="q-ml-auto no-border"
+            :placeholder="t('alert_destinations.search')"
+          >
+            <template #prepend>
+              <q-icon name="search" class="cursor-pointer" />
+            </template>
+          </q-input>
+          <q-btn
+            class="q-ml-md text-bold"
+            padding="sm lg"
+            outline
+            no-caps
+            :label="t(`dashboard.import`)"
+            @click="importDestination"
+            data-test="destination-import"
+          />
+          <q-btn
+            data-test="alert-destination-list-add-alert-btn"
+            class="q-ml-md text-bold no-border"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            :disable="!templates.length"
+            :label="t(`alert_destinations.add`)"
+            @click="editDestination(null)"
+          />
+          </div>
+      </div>
       <q-table
         data-test="alert-destinations-list-table"
         ref="qTable"
         :rows="destinations"
         :columns="columns"
         row-key="id"
-        style="width: 100%"
+        style="width: 100%;"
         :pagination="pagination"
         :filter="filterQuery"
         :filter-method="filterData"
+        class="o2-quasar-table"
+        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
       >
         <template #no-data>
           <div
@@ -97,41 +141,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </template>
         <template #top="scope">
-          <div class="q-table__title" data-test="alert-destinations-list-title">
-            {{ t("alert_destinations.header") }}
-          </div>
-          <q-input
-            data-test="destination-list-search-input"
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border"
-            :placeholder="t('alert_destinations.search')"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
-          <q-btn
-            class="q-ml-md text-bold"
-            padding="sm lg"
-            outline
-            no-caps
-            :label="t(`dashboard.import`)"
-            @click="importDestination"
-            data-test="destination-import"
-          />
-          <q-btn
-            data-test="alert-destination-list-add-alert-btn"
-            class="q-ml-md q-mb-xs text-bold no-border"
-            padding="sm lg"
-            color="secondary"
-            no-caps
-            :disable="!templates.length"
-            :label="t(`alert_destinations.add`)"
-            @click="editDestination(null)"
-          />
 
           <QTablePagination
             :scope="scope"
@@ -152,6 +161,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:changeRecordPerPage="changePagination"
           />
         </template>
+        <template v-slot:header="props">
+            <q-tr :props="props">
+              <!-- Render the table headers -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
       </q-table>
     </div>
     <div v-else-if="showDestinationEditor && !showImportDestination">
@@ -228,12 +251,14 @@ export default defineComponent({
     const { t } = useI18n();
     const q = useQuasar();
     const { getAllActions } = useActions();
+
     const columns: any = ref<QTableProps["columns"]>([
       {
         name: "#",
         label: "#",
         field: "#",
         align: "left",
+        style: "width: 67px",
       },
       {
         name: "name",
@@ -255,6 +280,7 @@ export default defineComponent({
         label: t("alert_destinations.method"),
         align: "left",
         sortable: true,
+        style: "width: 150px",
       },
       {
         name: "actions",
@@ -262,7 +288,7 @@ export default defineComponent({
         label: t("alert_destinations.actions"),
         align: "center",
         sortable: false,
-        style: "width: 110px",
+        classes:'actions-column'
       },
     ]);
     const destinations: Ref<DestinationPayload[]> = ref([]);
@@ -551,6 +577,7 @@ export default defineComponent({
       exportDestination,
       showImportDestination,
       importDestination,
+      store,
     };
   },
 });

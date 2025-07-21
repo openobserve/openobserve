@@ -138,4 +138,18 @@ export class CommonActions {
             });
         });
     }
+
+    /**
+     * Helper method to conditionally ingest test data based on test title
+     * Skips data ingestion for scheduled alert tests
+     * @param {string} testTitle - The title of the current test
+     * @param {string} streamName - The stream name for data ingestion
+     */
+    async skipDataIngestionForScheduledAlert(testTitle, streamName = 'auto_playwright_stream') {
+        // Skip data ingestion for scheduled alert test
+        if (!testTitle.includes('Scheduled Alert')) {
+            // Ingest test data using common actions
+            await this.ingestTestData(streamName);
+        }
+    }
 } 

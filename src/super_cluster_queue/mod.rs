@@ -19,6 +19,7 @@ mod cipher_keys;
 mod dashboards;
 mod destinations;
 mod distinct_values;
+mod domain_management;
 mod folders;
 mod meta;
 mod org_user;
@@ -57,6 +58,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_cipher_key_msg: cipher_keys::process,
         on_rate_limit_msg: ratelimit::process,
         on_re_patterns_msg: re_pattern::process,
+        on_domain_management_msg: domain_management::process,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,
