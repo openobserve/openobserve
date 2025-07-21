@@ -196,7 +196,7 @@
                 >
               </q-item-section>
             </q-item>
-            <q-item  clickable v-close-popup>
+            <q-item  clickable v-close-popup v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled">
               <q-item-section>
                 <q-item-label
                   data-test="send-to-ai-chat-btn"
@@ -255,6 +255,7 @@ import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
 import { useQuasar } from "quasar";
+import config from "@/aws-exports";
 
 export default {
   name: "JsonPreview",
@@ -544,7 +545,8 @@ export default {
       getOriginalData,
       addOrRemoveLabel,
       sendToAiChat,
-      getBtnLogo
+      getBtnLogo,
+      config
     };
   },
 };
