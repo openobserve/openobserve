@@ -3895,7 +3895,7 @@ mod tests {
         let _ = statement.visit(&mut replace_approx_percentilet_visitor);
         assert_eq!(
             statement.to_string(),
-            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY arrow_cast(a, 'int'))"
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY arrow_cast(a, 'int')) FROM stream"
         );
     }
 }
