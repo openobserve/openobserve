@@ -153,7 +153,8 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                             args[0]
                         )));
                     };
-                    let Expr::Literal(ScalarValue::Int64(Some(distance)), _) = args[1].clone() else {
+                    let Expr::Literal(ScalarValue::Int64(Some(distance)), _) = args[1].clone()
+                    else {
                         return Err(DataFusionError::Internal(format!(
                             "Unexpected argument type for fuzzy_match_all() distance: {:?}",
                             args[1]

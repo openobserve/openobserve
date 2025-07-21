@@ -161,7 +161,10 @@ impl TreeNodeRewriter for HistogramToDatebin {
                     // construct optional origin-timestamp
                     let arg3 = Expr::ScalarFunction(ScalarFunction {
                         func: Arc::new(ScalarUDF::from(ToTimestampFunc::new())),
-                        args: vec![Expr::Literal(ScalarValue::from("2001-01-01T00:00:00"), None)],
+                        args: vec![Expr::Literal(
+                            ScalarValue::from("2001-01-01T00:00:00"),
+                            None,
+                        )],
                     });
                     return Ok(Transformed::yes(Expr::ScalarFunction(ScalarFunction {
                         func: new_func,
