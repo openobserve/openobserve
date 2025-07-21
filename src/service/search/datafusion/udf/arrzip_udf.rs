@@ -64,33 +64,39 @@ pub fn arr_zip_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Columna
 
     // 2. perform the computation
     let array = zip(arr_field1.iter(), zip(arr_field2.iter(), delim.iter()))
-        .map(|(arr_field1, val)| {
-            match (arr_field1, val) {
-                // in arrow, any value can be null.
-                // Here we decide to make our UDF to return null when either argument is null.
-                (Some(arr_field1), (Some(arr_field2), Some(delim))) => {
-                    let arr_field1: json::Value =
-                        json::from_str(arr_field1).expect("Failed to deserialize arrzip field1");
-                    let arr_field2: json::Value =
-                        json::from_str(arr_field2).expect("Failed to deserialize arrzip field2");
-                    let mut zipped_arrs = vec![];
-                    if let (json::Value::Array(field1), json::Value::Array(field2)) =
-                        (arr_field1, arr_field2)
-                    {
-                        // Field1 and field2 can be of different types
-                        zip(field1.iter(), field2.iter()).for_each(|(field1, field2)| {
-                            let field1 = super::stringify_json_value(field1);
-                            let field2 = super::stringify_json_value(field2);
-
-                            zipped_arrs.push(format!("{field1}{delim}{field2}"));
-                        });
-                    }
-                    let zipped_arrs =
-                        json::to_string(&zipped_arrs).expect("Failed to stringify zipped arrs");
-                    Some(zipped_arrs)
-                }
-                _ => None,
+        .map(|(arr_field1, val)| match (arr_field1, val) {
+            (Some(arr_field1), (Some(arr_field2), Some(delim))) => {
+                json::from_str::<json::Value>(arr_field1)
+                    .ok()
+                    .and_then(|arr_field1| {
+                        json::from_str::<json::Value>(arr_field2)
+                            .ok()
+                            .and_then(|arr_field2| {
+                                if let (json::Value::Array(field1), json::Value::Array(field2)) =
+                                    (arr_field1, arr_field2)
+                                {
+                                    if field1.is_empty() || field2.is_empty() {
+                                        None
+                                    } else {
+                                        let zipped_arrs: Vec<String> =
+                                            zip(field1.iter(), field2.iter())
+                                                .map(|(field1, field2)| {
+                                                    let field1 =
+                                                        super::stringify_json_value(field1);
+                                                    let field2 =
+                                                        super::stringify_json_value(field2);
+                                                    format!("{field1}{delim}{field2}")
+                                                })
+                                                .collect();
+                                        json::to_string(&zipped_arrs).ok()
+                                    }
+                                } else {
+                                    None
+                                }
+                            })
+                    })
             }
+            _ => None,
         })
         .collect::<StringArray>();
 
@@ -113,12 +119,60 @@ mod tests {
 
     use super::*;
 
+    // Helper function to run a single test case
+    async fn run_single_test(
+        arr_field1: &str,
+        arr_field2: &str,
+        delimiter: &str,
+        expected_output: Vec<&str>,
+    ) {
+        let sql = format!(
+            "select arrzip(arr_field1, arr_field2, '{}') as ret from t",
+            delimiter
+        );
+        let sqls = [(sql.as_str(), expected_output)];
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("arr_field1", DataType::Utf8, false),
+            Field::new("arr_field2", DataType::Utf8, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec![arr_field1])),
+                Arc::new(StringArray::from(vec![arr_field2])),
+            ],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_ZIP_UDF.clone());
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        for item in sqls {
+            let df = ctx.sql(item.0).await.unwrap();
+            let data = df.collect().await.unwrap();
+            assert_batches_eq!(item.1, &data);
+        }
+    }
+
+    // Helper function to run multiple test cases that should all return null
+    async fn run_null_returning_tests(test_cases: &[(&str, &str, &str)]) {
+        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
+
+        for &(arr_field1, arr_field2, delimiter) in test_cases {
+            run_single_test(arr_field1, arr_field2, delimiter, expected_output.clone()).await;
+        }
+    }
+
     #[tokio::test]
-    async fn test_arr_zip_udf() {
-        let sqls = [
+    async fn test_arr_zip_valid_arrays() {
+        let test_cases = [
             (
-                // Should include values at index 0 to index 1 (inclusive)
-                "select arrzip(bools, names, ',') as ret from t",
+                r#"[true,false,true]"#,
+                r#"["hello2","hi2","bye2"]"#,
+                ",",
                 vec![
                     "+-----------------------------------------+",
                     "| ret                                     |",
@@ -128,8 +182,9 @@ mod tests {
                 ],
             ),
             (
-                // Should include all the elements
-                "select arrzip(nums, floats, ',') as ret from t",
+                r#"[12, 345, 23, 45]"#,
+                r#"[1.9, 34.5, 2.6, 4.5]"#,
+                ",",
                 vec![
                     "+-----------------------------------------+",
                     "| ret                                     |",
@@ -139,7 +194,9 @@ mod tests {
                 ],
             ),
             (
-                "select arrzip(nums, mixed, ',') as ret from t",
+                r#"[12, 345, 23, 45]"#,
+                r#"["hello2","hi2",123, 23.9, false]"#,
+                ",",
                 vec![
                     "+--------------------------------------------+",
                     "| ret                                        |",
@@ -148,48 +205,154 @@ mod tests {
                     "+--------------------------------------------+",
                 ],
             ),
+            (
+                r#"["a", "b", "c"]"#,
+                r#"[1, 2, 3]"#,
+                "|",
+                vec![
+                    "+---------------------+",
+                    "| ret                 |",
+                    "+---------------------+",
+                    "| [\"a|1\",\"b|2\",\"c|3\"] |",
+                    "+---------------------+",
+                ],
+            ),
+            (
+                r#"["single"]"#,
+                r#"[42]"#,
+                "-",
+                vec![
+                    "+---------------+",
+                    "| ret           |",
+                    "+---------------+",
+                    "| [\"single-42\"] |",
+                    "+---------------+",
+                ],
+            ),
         ];
 
-        // define a schema.
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("log", DataType::Utf8, false),
-            Field::new("bools", DataType::Utf8, false),
-            Field::new("names", DataType::Utf8, false),
-            Field::new("nums", DataType::Utf8, false),
-            Field::new("floats", DataType::Utf8, false),
-            Field::new("mixed", DataType::Utf8, false),
-        ]));
+        for (arr_field1, arr_field2, delimiter, expected_output) in test_cases {
+            run_single_test(arr_field1, arr_field2, delimiter, expected_output).await;
+        }
+    }
 
-        // define data.
+    #[tokio::test]
+    async fn test_arr_zip_null_returning_cases() {
+        // Test cases that should return null
+        let null_cases = [
+            (r#"[]"#, r#"[1,2,3]"#, ","),               // empty array
+            (r#"not json"#, r#"[1,2,3]"#, ","),         // invalid JSON
+            (r#"{"key": "value"}"#, r#"[1,2,3]"#, ","), // object
+            (r#""just a string""#, r#"[1,2,3]"#, ","),  // string
+            (r#"42"#, r#"[1,2,3]"#, ","),               // number
+            (r#"true"#, r#"[1,2,3]"#, ","),             // boolean
+            (r#"null"#, r#"[1,2,3]"#, ","),             // null
+            (r#"[1,2,3]"#, r#"[]"#, ","),               // second array empty
+            (r#"[1,2,3]"#, r#"not json"#, ","),         // second array invalid JSON
+        ];
+
+        run_null_returning_tests(&null_cases).await;
+    }
+
+    #[tokio::test]
+    async fn test_arr_zip_null_input() {
+        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("arr_field1", DataType::Utf8, true),
+            Field::new("arr_field2", DataType::Utf8, true),
+        ]));
         let batch = RecordBatch::try_new(
             schema.clone(),
             vec![
-                Arc::new(StringArray::from(vec!["a"])),
-                Arc::new(StringArray::from(vec!["[true,false,true]"])),
-                Arc::new(StringArray::from(vec!["[\"hello2\",\"hi2\",\"bye2\"]"])),
-                Arc::new(StringArray::from(vec!["[12, 345, 23, 45]"])),
-                Arc::new(StringArray::from(vec!["[1.9, 34.5, 2.6, 4.5]"])),
-                Arc::new(StringArray::from(vec![
-                    "[\"hello2\",\"hi2\",123, 23.9, false]",
-                ])),
+                Arc::new(StringArray::from(vec![None::<String>])),
+                Arc::new(StringArray::from(vec![None::<String>])),
             ],
         )
         .unwrap();
 
-        // declare a new context. In spark API, this corresponds to a new spark
-        // SQLsession
         let ctx = SessionContext::new();
         ctx.register_udf(ARR_ZIP_UDF.clone());
-
-        // declare a table in memory. In spark API, this corresponds to
-        // createDataFrame(...).
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
-        for item in sqls {
-            let df = ctx.sql(item.0).await.unwrap();
-            let data = df.collect().await.unwrap();
-            assert_batches_eq!(item.1, &data);
-        }
+        let sql = "select arrzip(arr_field1, arr_field2, ',') as ret from t";
+        let df = ctx.sql(sql).await.unwrap();
+        let data = df.collect().await.unwrap();
+        assert_batches_eq!(expected_output, &data);
+    }
+
+    #[tokio::test]
+    async fn test_arr_zip_multiple_rows() {
+        let arr_fields1 = vec![
+            r#"[1, 2, 3]"#,
+            r#"[]"#,
+            r#"not json"#,
+            r#"["a", "b"]"#,
+            r#"{"key": "value"}"#,
+        ];
+        let arr_fields2 = vec![
+            r#"[4, 5, 6]"#,
+            r#"[1, 2]"#,
+            r#"[1, 2]"#,
+            r#"[x, y]"#,
+            r#"[1, 2]"#,
+        ];
+        let sql = "select arrzip(arr_field1, arr_field2, ',') as ret from t";
+        let expected_output = vec![
+            "+---------------------+",
+            "| ret                 |",
+            "+---------------------+",
+            "| [\"1,4\",\"2,5\",\"3,6\"] |",
+            "|                     |",
+            "|                     |",
+            "|                     |",
+            "|                     |",
+            "+---------------------+",
+        ];
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("arr_field1", DataType::Utf8, false),
+            Field::new("arr_field2", DataType::Utf8, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(arr_fields1)),
+                Arc::new(StringArray::from(arr_fields2)),
+            ],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_ZIP_UDF.clone());
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let df = ctx.sql(sql).await.unwrap();
+        let data = df.collect().await.unwrap();
+        assert_batches_eq!(expected_output, &data);
+    }
+
+    #[tokio::test]
+    async fn test_arr_zip_wrong_arguments() {
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_ZIP_UDF.clone());
+
+        // Test with no arguments
+        let result = ctx.sql("select arrzip() as ret").await;
+        assert!(result.is_err());
+
+        // Test with one argument
+        let result = ctx.sql("select arrzip('a') as ret").await;
+        assert!(result.is_err());
+
+        // Test with two arguments
+        let result = ctx.sql("select arrzip('a', 'b') as ret").await;
+        assert!(result.is_err());
+
+        // Test with four arguments
+        let result = ctx.sql("select arrzip('a', 'b', 'c', 'd') as ret").await;
+        assert!(result.is_err());
     }
 }

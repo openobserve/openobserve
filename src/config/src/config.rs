@@ -1105,6 +1105,8 @@ pub struct Common {
         help = "Enable to show symbol in dashboard"
     )]
     pub dashboard_show_symbol_enabled: bool,
+    #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")]
+    pub default_hec_stream: String,
 }
 
 #[derive(EnvConfig)]
@@ -1865,6 +1867,24 @@ pub struct Pipeline {
     )]
     pub batch_size_bytes: usize,
     #[env_config(
+        name = "ZO_PIPELINE_BATCH_RETRY_MAX_ATTEMPTS",
+        default = 3,
+        help = "Maximum number of retries for batch flush"
+    )]
+    pub batch_retry_max_attempts: u32,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_RETRY_INITIAL_DELAY_MS",
+        default = 1000, // 1 second
+        help = "Initial delay for batch flush retry (in milliseconds)"
+    )]
+    pub batch_retry_initial_delay_ms: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_RETRY_MAX_DELAY_MS",
+        default = 30000, // 30 seconds
+        help = "Maximum delay for batch flush retry (in milliseconds)"
+    )]
+    pub batch_retry_max_delay_ms: u64,
+    #[env_config(
         name = "ZO_PIPELINE_USE_SHARED_HTTP_CLIENT",
         default = false,
         help = "Use shared HTTP client instances for better connection pooling"
@@ -2238,6 +2258,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // incorrectly each time
     cfg.common.file_list_dump_debug_check =
         cfg.common.file_list_dump_dual_write && cfg.common.file_list_dump_debug_check;
+
+    if cfg.common.default_hec_stream.is_empty() {
+        cfg.common.default_hec_stream = "_hec".to_string();
+    }
 
     Ok(())
 }

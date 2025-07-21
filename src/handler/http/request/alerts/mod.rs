@@ -32,7 +32,7 @@ use crate::{
             },
             responses::{EnableAlertResponseBody, GetAlertResponseBody, ListAlertsResponseBody},
         },
-        request::dashboards::get_folder,
+        request::dashboards::{get_folder, is_overwrite},
     },
     service::{
         alerts::alert::{self, AlertError},
@@ -112,7 +112,9 @@ pub async fn create_alert(
     let org_id = path.into_inner();
     let req_body = req_body.into_inner();
 
-    let folder_id = get_folder(req);
+    let query_str = req.query_string();
+    let folder_id = get_folder(query_str);
+    let overwrite = is_overwrite(query_str);
     let mut alert: MetaAlert = req_body.into();
     if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
         alert.owner = Some(user_email.user_id.clone());
@@ -120,7 +122,7 @@ pub async fn create_alert(
     alert.last_edited_by = Some(user_email.user_id);
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    match alert::create(client, &org_id, &folder_id, alert).await {
+    match alert::create(client, &org_id, &folder_id, alert, overwrite).await {
         Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Alert saved")
                 .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())

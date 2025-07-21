@@ -170,6 +170,15 @@ pub fn is_field(e: &Expr) -> bool {
     matches!(e, Expr::Identifier(_) | Expr::CompoundIdentifier(_))
 }
 
+// Note: the expr should be Identifier or CompoundIdentifier
+pub fn get_field_name(expr: &Expr) -> String {
+    match expr {
+        Expr::Identifier(ident) => trim_quotes(ident.to_string().as_str()),
+        Expr::CompoundIdentifier(ident) => trim_quotes(ident[1].to_string().as_str()),
+        _ => unreachable!(),
+    }
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn collect_scan_stats(
     nodes: &[Arc<dyn NodeInfo>],
@@ -201,4 +210,169 @@ pub async fn collect_scan_stats(
         scan_stats.add(&(&stats).into());
     }
     scan_stats
+}
+
+#[cfg(test)]
+mod tests {
+    use sqlparser::ast::{BinaryOperator, Expr, Ident, Value};
+
+    use super::*;
+
+    #[test]
+    fn test_split_conjunction() {
+        // Test simple expression
+        let expr = Expr::Value(Value::Number("1".to_string(), false).into());
+        let result = split_conjunction(&expr);
+        assert_eq!(result.len(), 1);
+        assert!(matches!(result[0], Expr::Value(_)));
+
+        // Test AND expression
+        let left = Expr::Value(Value::Number("1".to_string(), false).into());
+        let right = Expr::Value(Value::Number("2".to_string(), false).into());
+        let and_expr = Expr::BinaryOp {
+            left: Box::new(left),
+            op: BinaryOperator::And,
+            right: Box::new(right),
+        };
+        let result = split_conjunction(&and_expr);
+        assert_eq!(result.len(), 2);
+        assert!(matches!(result[0], Expr::Value(_)));
+        assert!(matches!(result[1], Expr::Value(_)));
+
+        // Test nested AND expressions
+        let nested_right = Expr::Value(Value::Number("3".to_string(), false).into());
+        let nested_and = Expr::BinaryOp {
+            left: Box::new(and_expr),
+            op: BinaryOperator::And,
+            right: Box::new(nested_right),
+        };
+        let result = split_conjunction(&nested_and);
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn test_conjunction() {
+        // Test empty vector
+        let exprs: Vec<&Expr> = vec![];
+        let result = conjunction(exprs);
+        assert!(result.is_none());
+
+        // Test single expression
+        let expr = Expr::Value(Value::Number("1".to_string(), false).into());
+        let exprs = vec![&expr];
+        let result = conjunction(exprs);
+        assert!(result.is_some());
+        assert!(matches!(result.unwrap(), Expr::Value(_)));
+
+        // Test multiple expressions
+        let expr1 = Expr::Value(Value::Number("1".to_string(), false).into());
+        let expr2 = Expr::Value(Value::Number("2".to_string(), false).into());
+        let exprs = vec![&expr1, &expr2];
+        let result = conjunction(exprs);
+        assert!(result.is_some());
+        if let Some(Expr::BinaryOp { op, .. }) = result {
+            assert!(matches!(op, BinaryOperator::And));
+        } else {
+            panic!("Expected BinaryOp with And operator");
+        }
+    }
+
+    #[test]
+    fn test_trim_quotes() {
+        let inp_exp_arr = [
+            ("\"hello\"", "hello"),
+            ("'world'", "world"),
+            ("no_quotes", "no_quotes"),
+            ("\"partial", "\"partial"),
+            ("partial\"", "partial\""),
+            ("", ""),
+            ("\"mixed'quotes\"", "mixed'quotes"),
+        ];
+        for (input, expected) in inp_exp_arr {
+            assert_eq!(trim_quotes(input), expected);
+        }
+    }
+
+    #[test]
+    fn test_is_value() {
+        // Test value expression
+        let value_expr = Expr::Value(Value::Number("123".to_string(), false).into());
+        assert!(is_value(&value_expr));
+
+        // Test non-value expression
+        let ident_expr = Expr::Identifier(Ident::new("field".to_string()));
+        assert!(!is_value(&ident_expr));
+    }
+
+    #[test]
+    fn test_is_field() {
+        // Test identifier expression
+        let ident_expr = Expr::Identifier(Ident::new("field".to_string()));
+        assert!(is_field(&ident_expr));
+
+        // Test compound identifier expression
+        let compound_expr = Expr::CompoundIdentifier(vec![
+            Ident::new("table".to_string()),
+            Ident::new("field".to_string()),
+        ]);
+        assert!(is_field(&compound_expr));
+
+        // Test non-field expression
+        let value_expr = Expr::Value(Value::Number("123".to_string(), false).into());
+        assert!(!is_field(&value_expr));
+    }
+
+    #[test]
+    fn test_get_field_name() {
+        // Test simple identifier
+        let ident_expr = Expr::Identifier(Ident::new("\"field_name\"".to_string()));
+        assert_eq!(get_field_name(&ident_expr), "field_name");
+
+        // Test compound identifier
+        let compound_expr = Expr::CompoundIdentifier(vec![
+            Ident::new("table".to_string()),
+            Ident::new("'field_name'".to_string()),
+        ]);
+        assert_eq!(get_field_name(&compound_expr), "field_name");
+
+        // Test identifier without quotes
+        let unquoted_expr = Expr::Identifier(Ident::new("field_name".to_string()));
+        assert_eq!(get_field_name(&unquoted_expr), "field_name");
+    }
+
+    #[tokio::test]
+    async fn test_async_defer() {
+        let cleanup_called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let cleanup_called_clone = cleanup_called.clone();
+
+        {
+            let _defer = AsyncDefer::new(async move {
+                cleanup_called_clone.store(true, std::sync::atomic::Ordering::Relaxed);
+            });
+            // Defer should be dropped here and cleanup should be called
+        }
+
+        // Give some time for the async cleanup to run
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        assert!(cleanup_called.load(std::sync::atomic::Ordering::Relaxed));
+    }
+
+    #[test]
+    fn test_scan_stats_visitor_new() {
+        let visitor = ScanStatsVisitor::new();
+        assert_eq!(visitor.partial_err, "");
+    }
+
+    #[test]
+    fn test_scan_stats_visitor_pre_visit() {
+        let mut visitor = ScanStatsVisitor::new();
+
+        // Create a mock execution plan that's not a RemoteScanExec
+        let mock_plan = datafusion::physical_plan::empty::EmptyExec::new(Arc::new(
+            datafusion::arrow::datatypes::Schema::empty(),
+        ));
+
+        let result = visitor.pre_visit(&mock_plan);
+        assert!(result.is_ok_and(|v| v));
+    }
 }

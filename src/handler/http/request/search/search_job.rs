@@ -458,7 +458,7 @@ pub async fn get_job_result(
         }
 
         if let Some(msg) = model.error_message {
-            Ok(MetaHttpResponse::ok(format!(
+            Ok(MetaHttpResponse::internal_error(format!(
                 "job_id: {job_id} error: {msg}",
             )))
         } else if model.status == 1 && model.partition_num != Some(1) {
@@ -636,6 +636,7 @@ pub async fn retry_job(
         Ok(HttpResponse::Forbidden().json("Not Supported"))
     }
 }
+
 #[cfg(feature = "enterprise")]
 async fn cancel_job_inner(
     org_id: &str,

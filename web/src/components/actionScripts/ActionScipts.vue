@@ -19,13 +19,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="action-scripts-list-page"
-    class="q-pa-none flex tw-w-full"
-    style="height: calc(100vh - 42px)"
+    class="q-pa-none tw-w-full"
+    style="height: calc(100vh - 57px)"
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   >
+  <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-w-full"
+    :class="store.state.theme =='dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+    >
+    <div class="q-table__title" data-test="alerts-list-title">
+            {{ t("actions.header") }}
+          </div>
+          <div class="tw-full-width tw-flex tw-items-center tw-justify-end">
+            <q-input
+            data-test="action-list-search-input"
+            v-model="filterQuery"
+            borderless
+            filled
+            dense
+            class="q-ml-auto no-border tw-w-[350px]"
+            :placeholder="t('actions.search')"
+          >
+            <template #prepend>
+              <q-icon name="search" class="cursor-pointer" />
+            </template>
+          </q-input>
+          <q-btn
+            data-test="action-list-add-btn"
+            class="q-ml-md text-bold no-border"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            :label="t(`actions.add`)"
+            @click="showAddUpdateFn({})"
+          />
+          </div>
+  </div>
     <div
       v-if="!showAddActionScriptDialog"
       class="full-width action-scripts-table"
+      style="height: calc(100vh - 112px) ; overflow-y: auto;"
+
     >
       <q-table
         data-test="action-scripts-table"
@@ -37,7 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter="filterQuery"
         :filter-method="filterData"
         style="width: 100%"
-      >
+        class="o2-quasar-table"
+        :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+        >
         <template #no-data>
           <NoData />
         </template>
@@ -95,32 +130,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #top="scope">
-          <div class="q-table__title" data-test="alerts-list-title">
-            {{ t("actions.header") }}
-          </div>
-          <q-input
-            data-test="action-list-search-input"
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border tw-w-[350px]"
-            :placeholder="t('actions.search')"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
-          <q-btn
-            data-test="action-list-add-btn"
-            class="q-ml-md q-mb-xs text-bold no-border"
-            padding="sm lg"
-            color="secondary"
-            no-caps
-            :label="t(`actions.add`)"
-            @click="showAddUpdateFn({})"
-          />
-
           <QTablePagination
             :scope="scope"
             :pageTitle="t('actions.header')"
@@ -140,6 +149,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:changeRecordPerPage="changePagination"
           />
         </template>
+
+        <template v-slot:header="props">
+            <q-tr :props="props">
+              <!-- Rendering the of the columns -->
+               <!-- here we can add the classes class so that the head will be sticky -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
+          </template>
       </q-table>
     </div>
     <template v-else>
@@ -355,6 +380,7 @@ export default defineComponent({
         label: "#",
         field: "#",
         align: "left",
+        style: "width: 67px;",
       },
       {
         name: "name",
@@ -411,6 +437,7 @@ export default defineComponent({
         label: t("alerts.actions"),
         align: "center",
         sortable: false,
+        classes: "actions-column",
       },
     ]);
     const activeTab: any = ref("alerts");
@@ -948,39 +975,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-
-.alert-list-table {
-  th:last-child,
-  td:last-child {
-    position: sticky;
-    right: 0;
-    z-index: 1;
-    background: #ffffff;
-    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
-  }
-}
-
-.dark-theme {
-  th:last-child,
-  td:last-child {
-    background: var(--q-dark);
-    box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
-  }
-}
-
-.light-theme {
-  th:last-child,
-  td:last-child {
-    background: #ffffff;
-  }
-}
-
 .alerts-tabs {
   .q-tabs {
     &--vertical {
