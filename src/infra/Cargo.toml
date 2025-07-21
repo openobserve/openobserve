@@ -48,3 +48,4 @@ reqwest.workspace = true
 [dev-dependencies]
 collapse.workspace = true
 sea-orm = { workspace = true, features = ["mock"] }
+tempfile.workspace = true

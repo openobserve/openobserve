@@ -714,6 +714,8 @@ pub struct Common {
     pub data_db_dir: String,
     #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
     pub data_cache_dir: String,
+    #[env_config(name = "ZO_DATA_TMP_DIR", default = "")] // ./data/openobserve/tmp/
+    pub data_tmp_dir: String,
     // TODO: should rename to column_all
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub column_all: String,
@@ -2358,6 +2360,12 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.data_cache_dir.ends_with('/') {
         cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);
+    }
+    if cfg.common.data_tmp_dir.is_empty() {
+        cfg.common.data_tmp_dir = format!("{}tmp/", cfg.common.data_dir);
+    }
+    if !cfg.common.data_tmp_dir.ends_with('/') {
+        cfg.common.data_tmp_dir = format!("{}/", cfg.common.data_tmp_dir);
     }
     if cfg.common.mmdb_data_dir.is_empty() {
         cfg.common.mmdb_data_dir = format!("{}mmdb/", cfg.common.data_dir);

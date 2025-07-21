@@ -58,8 +58,8 @@ pub async fn file_list(
 
 fn group_by_file_size(mut file_list: Vec<FileKey>, group_size: i64) -> Vec<Vec<FileKey>> {
     file_list.sort_by_key(|f| f.meta.original_size);
-    let mut groups = Vec::new();
-    let mut current_group = Vec::new();
+    let mut groups = Vec::with_capacity(file_list.len());
+    let mut current_group = Vec::with_capacity(file_list.len());
     let mut current_size = 0;
     for file in file_list {
         if !current_group.is_empty() && current_size + file.meta.original_size > group_size {
@@ -78,8 +78,8 @@ fn group_by_file_size(mut file_list: Vec<FileKey>, group_size: i64) -> Vec<Vec<F
 
 fn group_by_file_time(mut file_list: Vec<FileKey>, group_size: i64) -> Vec<Vec<FileKey>> {
     file_list.sort_by_key(|f| f.meta.min_ts);
-    let mut groups = Vec::new();
-    let mut current_group = Vec::new();
+    let mut groups = Vec::with_capacity(file_list.len());
+    let mut current_group = Vec::with_capacity(file_list.len());
     let mut current_size = 0;
     for file in file_list {
         if !current_group.is_empty() && current_size + file.meta.original_size > group_size {
@@ -105,8 +105,7 @@ fn group_by_time_range(mut file_list: Vec<FileKey>, group_size: i64) -> Vec<Vec<
         for (i, group) in groups.iter().enumerate() {
             if group
                 .last()
-                .map(|f| file.meta.min_ts >= f.meta.max_ts)
-                .unwrap_or(false)
+                .is_some_and(|f| file.meta.min_ts >= f.meta.max_ts)
             {
                 inserted = Some(i);
                 break;
@@ -119,7 +118,7 @@ fn group_by_time_range(mut file_list: Vec<FileKey>, group_size: i64) -> Vec<Vec<
         }
     }
     // then sort each group by file size
-    let mut new_groups = Vec::new();
+    let mut new_groups = Vec::with_capacity(groups.len());
     for group in groups {
         new_groups.extend(group_by_file_time(group, group_size));
     }
