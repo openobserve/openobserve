@@ -3239,21 +3239,6 @@ export default defineComponent({
       return searchObj.data.stream.selectedStream.length > 1;
     });
 
-    const changeLogsVisualizeToggle = () => {
-      // change logs visualize toggle
-      searchObj.meta.logsVisualizeToggle = "logs";
-      confirmLogsVisualizeModeChangeDialog.value = false;
-
-      // store dashboardPanelData meta object
-      const dashboardPanelDataMetaObj = dashboardPanelData.meta;
-
-      // reset old dashboardPanelData
-      resetDashboardPanelData();
-
-      // assign, old dashboardPanelData meta object
-      dashboardPanelData.meta = dashboardPanelDataMetaObj;
-    };
-
     // [START] cancel running queries
 
     const variablesAndPanelsDataLoadingState =
