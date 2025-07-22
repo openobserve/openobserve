@@ -603,7 +603,7 @@ export default defineComponent({
       advancedSetup: true,
       realTimeMode: true,
       thresholds: true,
-      multiWindowSelection: true,
+      multiWindowSelection: false,
     });
     var triggerOperators: any = ref([
 

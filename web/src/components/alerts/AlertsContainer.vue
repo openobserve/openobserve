@@ -48,7 +48,7 @@
           <q-icon
             :name="expanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down'"
             @click.stop="expanded = !expanded"
-            class="  tw-rounded-full tw-p-1 cursor-pointer"
+            class="  tw-rounded-full tw-p-1 cursor-pointer tw-mt-2"
 
             :class="[
               store.state.theme === 'dark'
