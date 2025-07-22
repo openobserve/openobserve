@@ -70,17 +70,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
             <!-- alerts setup  section -->
             <div
-              class="flex tw-mt-2 justify-start items-center q-col-gutter-md flex-wrap "
+              class="flex tw-mt-1 justify-start items-center flex-wrap "
             >
-            <div class=" tw-w-full row alert-setup-container">
+            <div class="tw-w-full tw-ml-2   ">
               <AlertsContainer 
                 name="query"
                 v-model:is-expanded="expandState.alertSetup"
                 label="Alert Setup"
                 subLabel="Set the stage for your alert."
                 icon="edit"
-                class="tw-mt-1 tw-w-full col-12"
+                class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
             />
+            </div>
+            <div v-if="expandState.alertSetup" class=" tw-w-full row alert-setup-container">
+  
              <div v-show="expandState.alertSetup" class="tw-w-full ">
 
               <div
@@ -285,18 +288,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- additional setup starts here -->
             <div
-              class="flex tw-mt-2 justify-start items-center q-pb-sm q-col-gutter-md flex-wrap "
+              class="flex tw-mt-1 justify-start items-center q-pb-sm flex-wrap "
             >
-            <div class=" tw-w-full row alert-setup-container" >
+              <div class="tw-w-full tw-ml-2   ">
+                <AlertsContainer 
+                    name="advanced"
+                    v-model:is-expanded="expandState.advancedSetup"
+                    label="Advanced Setup"
+                    :icon="'add'"
+                    subLabel="Go deeper with custom options"
+                   class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
+                    />
+            </div>
+            <div v-if="expandState.advancedSetup" class=" tw-w-full row alert-setup-container" >
 
-              <AlertsContainer 
-                name="advanced"
-                v-model:is-expanded="expandState.advancedSetup"
-                label="Advanced Setup"
-                :icon="'add'"
-                subLabel="Go deeper with custom options"
-                class="tw-mt-1 tw-w-full col-12"
-            />
             <div class="tw-w-full row" >
               <div v-if="expandState.advancedSetup" class="tw-mt-2 tw-w-full">
               <variables-input
@@ -381,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
         <div
-          style="width: 420px; height: 300px; position: sticky; top: 0 "
+          style="width: 420px; height: 320px; position: sticky; top: 0 "
           class=" col-2"
         >
           <preview-alert
@@ -2078,10 +2083,12 @@ export default defineComponent({
 .dark-mode{
   .alert-setup-container{
   background-color: #212121;
-  padding: 16px 16px 16px 16px;
-  margin-left: 24px;
-  border-radius: 4px;
+  padding: 8px;
+  margin-left: 8px;
   border: 1px solid #343434;
+  border-top: 0px !important;
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px ;
 }
 .q-text-area-input > div > div  { 
   background-color:rgb(30, 31, 31) !important;
@@ -2098,10 +2105,12 @@ export default defineComponent({
 .light-mode{
   .alert-setup-container{
     background-color: #ffffff;
-    padding: 16px 16px 16px 16px;
-    margin-left: 24px;
-    border-radius: 4px;
+    padding: 8px;
+    margin-left: 8px;
     border: 1px solid #e6e6e6;
+    border-top: 0px !important;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px ;
   }
   .custom-input-label{
     color: #5C5C5C;
