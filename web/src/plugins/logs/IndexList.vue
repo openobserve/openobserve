@@ -641,8 +641,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="scope.lastPage"
             />
           </div>
-          <div class="q-ml-xs text-right" :class="scope.pagesNumber > 1 ? 'col-1' : 'col'">
-            <q-icon name="restart_alt" size="21px" data-test="logs-page-fields-list-reset-icon" class="cursor-pointer	" @click="resetSelectedFileds" />
+          <div
+            class="q-ml-xs text-right"
+            :class="scope.pagesNumber > 1 ? 'col-1' : 'col'"
+          >
+            <q-icon
+              name="restart_alt"
+              size="21px"
+              data-test="logs-page-fields-list-reset-icon"
+              class="cursor-pointer"
+              @click="resetSelectedFileds"
+            />
             <q-tooltip
               data-test="logs-page-fields-list-reset-tooltip"
               anchor="center right"
@@ -687,6 +696,7 @@ import {
   isStreamingEnabled,
   b64EncodeStandard,
   addSpacesToOperators,
+  deepCopy,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import {
@@ -741,6 +751,7 @@ export default defineComponent({
       extractValueQuery,
       fnParsedSQL,
       fnUnparsedSQL,
+      streamSchemaFieldsIndexMapping,
     } = useLogs();
 
     const {
@@ -795,7 +806,6 @@ export default defineComponent({
     });
 
     const checkSelectedFields = computed(() => {
-      console.log("checkSelectedFields", searchObj.data.stream.selectedFields);
       return (
         searchObj.data.stream.selectedFields &&
         searchObj.data.stream.selectedFields.length > 0
@@ -977,7 +987,9 @@ export default defineComponent({
             //   "[WHERE_CLAUSE]",
             //   " WHERE " + whereClause,
             // );
-            query_context = query_context.split("[WHERE_CLAUSE]").join(" WHERE " + whereClause);
+            query_context = query_context
+              .split("[WHERE_CLAUSE]")
+              .join(" WHERE " + whereClause);
           } else {
             query_context = query_context.replace("[WHERE_CLAUSE]", "");
           }
@@ -1102,8 +1114,10 @@ export default defineComponent({
                   action_id,
                   type: searchObj.data.stream.streamType,
                   clusters:
-                    Object.hasOwn(searchObj.meta, "clusters") &&
-                    searchObj.meta.clusters.length > 0
+                    Object.prototype.hasOwnProperty.call(
+                      searchObj.meta,
+                      "clusters",
+                    ) && searchObj.meta.clusters.length > 0
                       ? searchObj.meta.clusters.join(",")
                       : "",
                 });
@@ -1194,17 +1208,15 @@ export default defineComponent({
     //   handleQueryData();
     // };
 
-    let selectedFieldsName: any = [];
     let fieldIndex: any = -1;
     const addToInterestingFieldList = (
       field: any,
       isInterestingField: boolean,
     ) => {
-      if (selectedFieldsName.length == 0) {
-        selectedFieldsName = searchObj.data.stream.selectedStreamFields.map(
-          (item: any) => item.name,
-        );
+      if (!Object.keys(streamSchemaFieldsIndexMapping.value).length) {
+        return;
       }
+
       if (isInterestingField) {
         const index = searchObj.data.stream.interestingFieldList.indexOf(
           field.name,
@@ -1214,7 +1226,7 @@ export default defineComponent({
           searchObj.data.stream.interestingFieldList.splice(index, 1); // 2nd parameter means remove one item only
 
           field.isInterestingField = !isInterestingField;
-          fieldIndex = selectedFieldsName.indexOf(field.name);
+          fieldIndex = streamSchemaFieldsIndexMapping.value[field.name];
           if (fieldIndex > -1) {
             searchObj.data.stream.selectedStreamFields[
               fieldIndex
@@ -1250,7 +1262,7 @@ export default defineComponent({
           searchObj.data.stream.interestingFieldList.push(field.name);
           const localInterestingFields: any = useLocalInterestingFields();
           field.isInterestingField = !isInterestingField;
-          fieldIndex = selectedFieldsName.indexOf(field.name);
+          fieldIndex = streamSchemaFieldsIndexMapping.value[field.name];
           if (fieldIndex > -1) {
             searchObj.data.stream.selectedStreamFields[
               fieldIndex
@@ -1291,7 +1303,131 @@ export default defineComponent({
         }
       }
 
+      // Optimized reordering for large datasets (80k-100k fields)
+      // Only move field when adding/removing from interesting fields
+
+      // Call optimized reorder function after updating interesting field status
+      updateFieldPosition(field, isInterestingField);
+
       emit("setInterestingFieldInSQLQuery", field, isInterestingField);
+    };
+
+    const updateFieldPosition = (field: any, isInterestingField: boolean) => {
+      const fieldName = field.name;
+      const currentIndex = streamSchemaFieldsIndexMapping.value[fieldName];
+
+      console.log("currentIndex", currentIndex, field);
+      console.log(
+        "streamSchemaFieldsIndexMapping",
+        streamSchemaFieldsIndexMapping.value,
+      );
+      console.log(
+        "searchObj.data.stream.selectedStreamFields",
+        searchObj.data.stream.selectedStreamFields,
+      );
+      console.log("streamFieldsRows", streamFieldsRows.value);
+
+      console.log(
+        "searchObj.data.stream.expandGroupRows",
+        searchObj.data.stream.expandGroupRows,
+      );
+      console.log(
+        "searchObj.data.stream.expandGroupRowsFieldCount",
+        searchObj.data.stream.expandGroupRowsFieldCount,
+      );
+
+      if (currentIndex === undefined) return;
+
+      const defaultFields = new Set([
+        store.state.zoConfig?.timestamp_column,
+        store.state.zoConfig?.all_fields_name,
+      ]);
+
+      // Get the current field and determine its current category
+      const currentField =
+        searchObj.data.stream.selectedStreamFields[currentIndex];
+
+      let currentCategory: "default" | "interesting" | "common" | "schema";
+      if (defaultFields.has(currentField.name)) {
+        currentCategory = "default";
+      } else if (isInterestingField) {
+        currentCategory = "interesting";
+      } else {
+        currentCategory = "schema";
+      }
+
+      // Determine target category based on the new isInterestingField state
+      let targetCategory: "default" | "interesting" | "common" | "schema";
+      if (defaultFields.has(fieldName)) {
+        targetCategory = "default";
+      } else if (field.isInterestingField) {
+        targetCategory = "interesting";
+      } else {
+        targetCategory = "schema";
+      }
+
+      let targetIndex = 0;
+
+      if (searchObj.data.stream.selectedStream.length > 1) {
+        let expandKeys = Object.keys(searchObj.data.stream.expandGroupRows);
+
+        for (const key of expandKeys) {
+          if (key === field.group) {
+            targetIndex = targetIndex + 1;
+            break;
+          } else {
+            targetIndex =
+              targetIndex +
+              searchObj.data.stream.expandGroupRowsFieldCount[key] +
+              searchObj.data.stream.interestingStreamFields[field.streams[0]]
+                .size;
+          }
+        }
+      } else {
+        if (targetCategory === "default") {
+          targetIndex = 0;
+        } else if (targetCategory === "interesting") {
+          targetIndex = defaultFields.size;
+        } else {
+          targetIndex =
+            defaultFields.size +
+            searchObj.data.stream.interestingFieldList.length;
+        }
+      }
+
+      console.log("targetIndex", targetIndex);
+      // Only move if the category actually changed
+      if (currentCategory === targetCategory) {
+        console.log("No movement needed - field already in correct category");
+        return;
+      }
+
+      // If the field needs to move to a different position
+      if (currentIndex !== targetIndex) {
+        // Remove the field from its current position
+        const fieldToMove = searchObj.data.stream.selectedStreamFields.splice(
+          currentIndex,
+          1,
+        )[0];
+
+        // Insert it at the target position
+        searchObj.data.stream.selectedStreamFields.splice(
+          targetIndex,
+          0,
+          fieldToMove,
+        );
+
+        // Update index mappings for affected fields (only those between old and new positions)
+        const startIndex = Math.min(currentIndex, targetIndex);
+        const endIndex = Math.max(currentIndex, targetIndex);
+
+        console.log("currentIndex", currentIndex, "targetIndex", targetIndex);
+
+        for (let i = startIndex; i <= endIndex; i++) {
+          const fieldObj = searchObj.data.stream.selectedStreamFields[i];
+          streamSchemaFieldsIndexMapping.value[fieldObj.name] = i;
+        }
+      }
     };
 
     const pagination = ref({
@@ -1301,7 +1437,7 @@ export default defineComponent({
 
     const toggleSchema = async () => {
       searchObj.loadingStream = true;
-      selectedFieldsName = [];
+      streamSchemaFieldsIndexMapping.value = {};
       setTimeout(async () => {
         await extractFields();
         searchObj.loadingStream = false;
@@ -1373,8 +1509,8 @@ export default defineComponent({
       };
 
       if (
-        Object.hasOwn(queryReq.queryReq, "regions") &&
-        Object.hasOwn(queryReq.queryReq, "clusters")
+        Object.prototype.hasOwnProperty.call(queryReq.queryReq, "regions") &&
+        Object.prototype.hasOwnProperty.call(queryReq.queryReq, "clusters")
       ) {
         payload.content.payload["regions"] = queryReq.queryReq.regions;
         payload.content.payload["clusters"] = queryReq.queryReq.clusters;
@@ -1597,6 +1733,50 @@ export default defineComponent({
       }
     };
 
+    const streamFieldsRows = computed(() => {
+      let expandKeys = Object.keys(
+        searchObj.data.stream.expandGroupRows,
+      ).reverse();
+
+      console.log("expandKeys", expandKeys);
+
+      let startIndex = 0;
+      // Iterate over the keys in reverse order
+      let selectedStreamFields = cloneDeep(
+        searchObj.data.stream.selectedStreamFields,
+      );
+      let count = 0;
+      // console.log(searchObj.data.stream.selectedStreamFields);
+      // console.log(searchObj.data.stream.expandGroupRows);
+      // console.log(searchObj.data.stream.expandGroupRowsFieldCount);
+      for (let key of expandKeys) {
+        if (
+          searchObj.data.stream.expandGroupRows[key] == false &&
+          selectedStreamFields != undefined &&
+          selectedStreamFields?.length > 0
+        ) {
+          startIndex =
+            selectedStreamFields.length -
+            searchObj.data.stream.expandGroupRowsFieldCount[key];
+          if (startIndex > 0) {
+            // console.log("startIndex", startIndex);
+            // console.log("count", count);
+            // console.log("selectedStreamFields", selectedStreamFields.length);
+            // console.log(searchObj.data.stream.expandGroupRowsFieldCount[key]);
+            // console.log("========");
+            selectedStreamFields.splice(
+              startIndex - count,
+              searchObj.data.stream.expandGroupRowsFieldCount[key],
+            );
+          }
+        } else {
+          count += searchObj.data.stream.expandGroupRowsFieldCount[key];
+        }
+        count++;
+      }
+      return selectedStreamFields;
+    });
+
     return {
       t,
       store,
@@ -1622,48 +1802,7 @@ export default defineComponent({
       userDefinedSchemaBtnGroupOption,
       pagination,
       toggleSchema,
-      streamFieldsRows: computed(() => {
-        let expandKeys = Object.keys(
-          searchObj.data.stream.expandGroupRows,
-        ).reverse();
-
-        let startIndex = 0;
-        // Iterate over the keys in reverse order
-        let selectedStreamFields = cloneDeep(
-          searchObj.data.stream.selectedStreamFields,
-        );
-        let count = 0;
-        // console.log(searchObj.data.stream.selectedStreamFields)
-        // console.log(searchObj.data.stream.expandGroupRows)
-        // console.log(searchObj.data.stream.expandGroupRowsFieldCount)
-        for (let key of expandKeys) {
-          if (
-            searchObj.data.stream.expandGroupRows[key] == false &&
-            selectedStreamFields != undefined &&
-            selectedStreamFields?.length > 0
-          ) {
-            startIndex =
-              selectedStreamFields.length -
-              searchObj.data.stream.expandGroupRowsFieldCount[key];
-            if (startIndex > 0) {
-              // console.log("startIndex", startIndex)
-              // console.log("count", count)
-              // console.log("selectedStreamFields", selectedStreamFields.length)
-              // console.log(searchObj.data.stream.expandGroupRowsFieldCount[key])
-              // console.log("========")
-              selectedStreamFields.splice(
-                startIndex - count,
-                searchObj.data.stream.expandGroupRowsFieldCount[key],
-              );
-            }
-          } else {
-            count += searchObj.data.stream.expandGroupRowsFieldCount[key];
-          }
-          count++;
-        }
-        // console.log(JSON.parse(JSON.stringify(selectedStreamFields)))
-        return selectedStreamFields;
-      }),
+      streamFieldsRows,
       formatLargeNumber,
       sortedStreamFields,
       placeHolderText,
