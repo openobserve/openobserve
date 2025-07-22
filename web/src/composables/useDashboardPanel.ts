@@ -26,7 +26,6 @@ import {
 import { extractFields } from "@/utils/query/sqlUtils";
 import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
-import { extractTimestampAndGroupBy } from "@/utils/query/extractFields";
 import queryService from "@/services/search";
 
 const colors = [
@@ -3149,13 +3148,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     (newVal, oldVal) => {
-      console.log(
-        "query",
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query,
-        "customQuery",
-      );
       // Check if customQuery mode has changed
       const customQueryChanged = newVal[1] !== oldVal[1];
 
