@@ -2508,8 +2508,7 @@ export const convertSQLData = async (
       };
     }
   }
-  console.log("options", options.xAxis[0]);
-  
+
   //custom SQL: check if it is timeseries or not
   if (
     panelSchema.type != "h-bar" &&
@@ -2529,8 +2528,7 @@ export const convertSQLData = async (
     );
 
     const isTimeSeriesData = isTimeSeries(sample);
-    console.log("options.xAxis[0].data", options.xAxis[0].data);
-    
+
     const isTimeStampData = isTimeStamp(sample, null);
 
     if (isTimeSeriesData || isTimeStampData) {

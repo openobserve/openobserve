@@ -1168,28 +1168,16 @@ export default defineComponent({
 
     // Initialize axisType for existing fields (only for table charts)
     const initializeAxisTypes = () => {
-      console.log(
-        `[DashboardQueryBuilder] Initializing axisTypes for existing fields`,
-      );
       const currentQuery =
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ];
-      console.log(
-        `[DashboardQueryBuilder] currentQuery: ${dashboardPanelData.data.type}`,
-      );
 
       // Check if this is a new panel (no ID means it's new)
       const isNewPanel = !dashboardPanelData.data.id;
-      console.log(
-        `[DashboardQueryBuilder] isNewPanel: ${isNewPanel}, currentQueryIndex: ${dashboardPanelData.layout.currentQueryIndex}`,
-      );
 
       // Helper: set axisType for X/Y fields only
       const setAxisTypeForField = (field: any) => {
-        console.log(
-          `[DashboardQueryBuilder] Setting axisType for field ${field.column}`,
-        );
         // Always ensure axisType is set for existing panels
         if (isNewPanel) {
           // For new panels: set based on field name
@@ -1204,17 +1192,11 @@ export default defineComponent({
 
       // Only X and Y axes for table charts
       if (currentQuery?.fields?.x) {
-        console.log(
-          `[DashboardQueryBuilder] Found ${currentQuery.fields.x.length} X axis fields`,
-        );
         currentQuery.fields.x.forEach((field: any) => {
           setAxisTypeForField(field);
         });
       }
       if (currentQuery?.fields?.y) {
-        console.log(
-          `[DashboardQueryBuilder] Found ${currentQuery.fields.y.length} Y axis fields`,
-        );
         currentQuery.fields.y.forEach((field: any) => {
           setAxisTypeForField(field);
         });
@@ -1232,9 +1214,6 @@ export default defineComponent({
       (newType: string, oldType: string) => {
         if (newType !== oldType) {
           // Reset axis types when chart type changes
-          console.log(
-            `[DashboardQueryBuilder] Chart type changed from ${oldType} to ${newType}, resetting axis types`,
-          );
           initializeAxisTypes();
         }
       },

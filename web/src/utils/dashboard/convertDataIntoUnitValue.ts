@@ -270,8 +270,6 @@ export const formatDate = (date: any) => {
 
 // Check if the sample is time series
 export const isTimeSeries = (sample: any) => {
-  console.log("Checking if sample is time series:", sample);
-
   const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
   return sample.every((value: any) => {
     return iso8601Pattern.test(value);
@@ -288,32 +286,21 @@ export const isTimeSeries = (sample: any) => {
  * - Otherwise: Return false
  */
 export const isTimeStamp = (sample: any, axisType: any) => {
-  console.log("Axis Type for timestamp check:", axisType);
-
   const microsecondsPattern = /^\d{16}$/;
-
-  console.log("Axis Type:", axisType);
 
   // If axisType is true (not timestamp field), return false
   if (axisType === true) {
-    console.log("Axis Type is true (not timestamp field), returning false");
     return false;
   }
 
   // If axisType is false (timestamp field), check if all values are 16 digit numbers
   if (axisType === false) {
-    console.log(
-      "Axis Type is false (timestamp field), checking if all values are 16 digits",
-    );
     return sample.every((value: any) =>
       microsecondsPattern.test(value?.toString()),
     );
   }
   // If axisType is null or undefined, check if all values are 16 digits
   if (axisType === null || axisType === undefined) {
-    console.log(
-      "Axis Type is null/undefined, checking if all values are 16 digits",
-    );
     return sample.every((value: any) =>
       microsecondsPattern.test(value?.toString()),
     );
