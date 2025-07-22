@@ -709,7 +709,11 @@ pub fn handle_histogram(
     q_time_range: Option<(i64, i64)>,
     histogram_interval: i64,
 ) {
-    let caps = RE_HISTOGRAM.captures(origin_sql.as_str()).unwrap();
+    let caps = if let Some(caps) = RE_HISTOGRAM.captures(origin_sql.as_str()) {
+        caps
+    } else {
+        return;
+    };
     let interval = if histogram_interval > 0 {
         format!("{histogram_interval} second")
     } else {

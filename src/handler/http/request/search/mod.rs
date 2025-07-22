@@ -1315,6 +1315,9 @@ pub async fn search_partition(
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let search_type = get_search_type_from_request(&query).map_or(SearchEventType::Other, |opt| {
+        opt.unwrap_or(SearchEventType::Other)
+    });
 
     #[cfg(feature = "cloud")]
     {
@@ -1342,6 +1345,7 @@ pub async fn search_partition(
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.sql) {
         req.sql = sql;
     }
+    req.search_type = Some(search_type);
 
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
