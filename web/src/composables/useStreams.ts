@@ -691,21 +691,28 @@ const useStreams = () => {
                 JSON.stringify(previousItem) === JSON.stringify(currentItem),
             ),
         );
-      } else if (attribute === "defined_schema_fields") {
-        add = currentArray.filter(
-          (item: any) =>
-            !previousArray.some(
-              (prev: any) => prev.name === item.name && prev.type === item.type
-            )
-        );
+      } else if (attribute === "defined_schema_fields") {      
+        if (currentSettings.definedSchemaIsObject) {
+          add = currentArray.filter(
+            (item: any) =>
+              !previousArray.some(
+                (prev: any) => prev.name === item.name && prev.type === item.type
+              )
+          );
       
-        remove = previousArray.filter(
-          (item: any) =>
-            !currentArray.some(
-              (curr: any) => curr.name === item.name && curr.type === item.type
-            )
-        );
+          remove = previousArray.filter(
+            (item: any) =>
+              !currentArray.some(
+                (curr: any) => curr.name === item.name && curr.type === item.type
+              )
+          );
+        } else {
+          // Assume it's an array of strings
+          add = currentArray.filter((item: string) => !previousArray.includes(item));
+          remove = previousArray.filter((item: string) => !currentArray.includes(item));
+        }
       }
+      
       
       else {
         // For other attributes, do a simple array comparison
