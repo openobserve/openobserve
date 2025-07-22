@@ -472,7 +472,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             : null,
         isDerived,
         havingConditions: [],
-        axisType: row.name === "_timestamp" ? true : false,
+        axisType: row.name === "_timestamp" ? false : true,
       });
     }
 
@@ -534,7 +534,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             : null,
         isDerived,
         havingConditions: [],
-        axisType: row.name === "_timestamp" ? true : false,
       });
     }
 
@@ -589,7 +588,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             : "count",
         isDerived,
         havingConditions: [],
-        axisType: row.name === "_timestamp" ? true : false,
+        axisType: row.name === "_timestamp" ? false : true,
       });
     }
     updateArrayAlias();
@@ -640,7 +639,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         aggregationFunction: isDerived ? null : "count",
         isDerived,
         havingConditions: [],
-        axisType: row.name === "_timestamp" ? true : false,
       });
     }
     updateArrayAlias();
@@ -663,7 +661,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
         havingConditions: [],
-        axisType: null,
+        
       };
     }
   };
@@ -685,7 +683,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
         havingConditions: [],
-        axisType: null,
+        
       };
     }
   };
@@ -707,7 +705,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         aggregationFunction: isDerived ? null : "count", // You can set the appropriate aggregation function here
         isDerived,
         havingConditions: [],
-        axisType: null,
+        
       };
     }
   };
@@ -727,7 +725,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
         havingConditions: [],
-        axisType: null,
+        
       };
     }
   };
@@ -747,7 +745,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: "count", // You can set the appropriate aggregation function here
         havingConditions: [],
-        axisType: null,
+        
       };
     }
   };
@@ -769,7 +767,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
         havingConditions: [],
-        axisType: null,
+        
       };
     }
   };
@@ -791,7 +789,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
         havingConditions: [],
-        axisType: null,
+        
       };
     }
   };
@@ -813,7 +811,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         aggregationFunction: isDerived ? null : "sum", // You can set the appropriate aggregation function here
         isDerived,
         havingConditions: [],
-        axisType: null,
+        
       };
     }
   };

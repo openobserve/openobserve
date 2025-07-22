@@ -282,9 +282,9 @@ export const isTimeSeries = (sample: any) => {
 /**
  * Checks if the sample is timestamp (16 digit microseconds) based on axisType object.
  * axisType: { value: true | false | null | undefined | "auto" }
- * - If axisType.value === true: Only return true if all values are 16 digits
- * - If axisType.value === null or undefined: Check if all values are 16 digits, return true if they are
- * - If axisType.value === false: Return false
+ * - If axisType.value === true (not timestamp field): Return false
+ * - If axisType.value === false (timestamp field): Check if all values are 16 digits, return true if they are
+ * - If axisType.value === null or undefined (auto mode): Check if all values are 16 digits, return true if they are
  * - Otherwise: Return false
  */
 export const isTimeStamp = (sample: any, axisType: any) => {
@@ -294,20 +294,21 @@ export const isTimeStamp = (sample: any, axisType: any) => {
 
   console.log("Axis Type:", axisType);
 
-  // If axisType is false, return false
-  if (axisType === false) {
-    console.log("Axis Type is false, returning false");
+  // If axisType is true (not timestamp field), return false
+  if (axisType === true) {
+    console.log("Axis Type is true (not timestamp field), returning false");
     return false;
   }
 
-  // If axisType is true, only return true if all values are 16 digit numbers
-  if (axisType === true) {
-    console.log("Axis Type is true, checking if all values are 16 digits");
+  // If axisType is false (timestamp field), check if all values are 16 digit numbers
+  if (axisType === false) {
+    console.log(
+      "Axis Type is false (timestamp field), checking if all values are 16 digits",
+    );
     return sample.every((value: any) =>
       microsecondsPattern.test(value?.toString()),
     );
   }
-
   // If axisType is null or undefined, check if all values are 16 digits
   if (axisType === null || axisType === undefined) {
     console.log(
@@ -317,12 +318,6 @@ export const isTimeStamp = (sample: any, axisType: any) => {
       microsecondsPattern.test(value?.toString()),
     );
   }
-
-  // For any other case ("auto", etc.), return false
-  console.log(
-    "Axis Type is neither true nor false nor null/undefined, returning false",
-  );
-  return false;
 };
 
 export function convertOffsetToSeconds(
