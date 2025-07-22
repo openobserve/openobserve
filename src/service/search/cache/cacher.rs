@@ -696,7 +696,11 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
 }
 
 fn handle_histogram(origin_sql: &mut String, q_time_range: Option<(i64, i64)>) {
-    let caps = RE_HISTOGRAM.captures(origin_sql.as_str()).unwrap();
+    let caps = if let Some(caps) = RE_HISTOGRAM.captures(origin_sql.as_str()) {
+        caps
+    } else {
+        return;
+    };
     let attrs = caps
         .get(1)
         .unwrap()

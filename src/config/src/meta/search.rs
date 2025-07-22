@@ -505,6 +505,8 @@ pub struct SearchPartitionRequest {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub streaming_output: bool,
+    #[serde(default)]
+    pub search_type: Option<SearchEventType>,
 }
 
 impl SearchPartitionRequest {
@@ -537,6 +539,7 @@ impl From<&Request> for SearchPartitionRequest {
             clusters: req.clusters.clone(),
             query_fn: req.query.query_fn.clone(),
             streaming_output: req.query.streaming_output,
+            search_type: req.search_type,
         }
     }
 }
