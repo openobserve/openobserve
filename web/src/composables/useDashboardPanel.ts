@@ -3288,7 +3288,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             : {}),
         },
         page_type: "dashboards",
-        is_streaming: isStreamingEnabled(store.state)
+        is_streaming: isStreamingEnabled()
       },
       "dashboards",
     );

@@ -125,7 +125,7 @@ export class TimestampVisitor {
           funcExpr.name.toLowerCase() === "histogram"
         ) {
           if (funcExpr.args && funcExpr.args.value) {
-            return funcExpr.args.value.some((arg) => this.isTimestampExpr(arg));
+            return funcExpr.args.value.some((arg: any) => this.isTimestampExpr(arg));
           }
         } else if (
           funcExpr?.name &&
@@ -618,7 +618,7 @@ export function extractTimestampAndGroupBy(sql: string): {
       } else if (col.expr) {
         // use generic helper
 
-        const stringifyExpression = (expr: any): string => stringifyAstExpr(expr, defaultTable);
+        const stringifyExpression = (expr: any): string => stringifyAstExpr(expr, defaultTable ?? undefined);
 
         // Handle column references
         if (col.expr.type === "column_ref") {
