@@ -1890,6 +1890,18 @@ pub struct Pipeline {
         help = "pipeline exporter client max retry time in hours"
     )]
     pub max_retry_time_in_hours: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_FILE_SIZE_ON_DISK_MB",
+        default = 128,
+        help = "pipeline max file size on disk in MB"
+    )]
+    pub max_file_size_on_disk_mb: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_FILE_RETENTION_TIME_SECONDS",
+        default = 600,
+        help = "pipeline max file retention time in seconds"
+    )]
+    pub max_file_retention_time_seconds: u64,
 }
 
 #[derive(EnvConfig)]
