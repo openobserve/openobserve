@@ -403,7 +403,7 @@ pub async fn handle_cache_responses_and_deltas(
     // so that deltas are processed in the reverse order
     let search_type = req.payload.search_type.expect("search_type is required");
     let cache_order_by = if search_type == SearchEventType::Dashboards
-        || (req.query.size == -1 && search_type != SearchEventType::UI)
+        || (req.payload.query.size == -1 && search_type != SearchEventType::UI)
     {
         &OrderBy::Desc
     } else {
