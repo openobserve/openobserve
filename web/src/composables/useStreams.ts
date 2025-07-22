@@ -780,17 +780,17 @@ const useStreams = () => {
     // Determine and store the format of the array
     //because we might sometimes get array of strings and sometimes get array of object
     streamData.settings.definedSchemaIsObject =
-      Array.isArray(fields) &&
-      typeof fields[0] === 'object' &&
-      fields[0] !== null &&
-      'name' in fields[0];
+    fields === undefined ||
+    (Array.isArray(fields) &&
+      (fields.length === 0 || (typeof fields[0] === 'object' && fields[0] !== null && 'name' in fields[0])));
   
+    
     // Store the original before any conversion
     streamData.settings.defined_schema_fields_original = fields ? [...fields] : [];
   
     // Convert only if it's an array of objects
     if (streamData.settings.definedSchemaIsObject) {
-      streamData.settings.defined_schema_fields = fields.map((field: any) => field.name);
+      streamData.settings.defined_schema_fields = (fields && fields.length > 0) ?  fields.map((field: any) => field.name) : [];
     }
   
     return streamData;
