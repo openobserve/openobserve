@@ -176,8 +176,11 @@
             </div>
           </div>
           <div v-if="isLoading" class="">
-            <q-spinner-dots color="primary" size="2em" />
-            <span>Generating response...</span>
+            <div class="dots-loader q-mt-md">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+              </div>            
           </div>
         </div>
       </div>
@@ -1310,4 +1313,40 @@ export default defineComponent({
   flex: 1;
   overflow-y: auto;
 }
+
+.dots-loader {
+      display: flex;
+      gap: 2px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: bounce-color 1.2s infinite cubic-bezier(0.5, 0, 0.5, 1);
+    }
+
+    .dot:nth-child(1) {
+      animation-delay: 0s;
+    }
+
+    .dot:nth-child(2) {
+      animation-delay: 0.1s;
+    }
+
+    .dot:nth-child(3) {
+      animation-delay: 0.2s;
+    }
+
+    @keyframes bounce-color {
+      0%, 100% {
+        transform: translateY(0);
+        background-color: #0099ff; /* base color */
+      }
+      50% {
+        transform: translateY(-10px);
+        background-color: orange; /* highlight color at peak */
+      }
+    }
+
 </style> 
