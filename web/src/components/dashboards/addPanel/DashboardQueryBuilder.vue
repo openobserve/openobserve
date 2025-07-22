@@ -1237,34 +1237,42 @@ export default defineComponent({
         ];
       const isNewPanel = !dashboardPanelData.data.id;
 
+      // Helper function to set axisType for a field
+      const setAxisTypeForField = (field: any, axisName: string) => {
+        console.log(
+          `[DashboardQueryBuilder] Checking axisType for ${axisName} axis field ${field.column}`,
+        );
+
+        // If axisType is null, set it based on the logic
+        if (field.axisType === null) {
+          console.log(
+            `[DashboardQueryBuilder] Setting axisType for ${axisName} axis field ${field.column}`,
+          );
+          console.log(`[DashboardQueryBuilder] isNewPanel: ${isNewPanel}`);
+
+          if (isNewPanel) {
+            // For new panels: check if timestamp field and set accordingly
+            field.axisType = field.column === "_timestamp" ? true : false;
+            console.log(
+              `[DashboardQueryBuilder] Setting axisType to ${field.axisType} for ${axisName} axis field ${field.column} (new panel)`,
+            );
+          } else {
+            // For existing panels: set all existing fields to null
+            field.axisType = null;
+            console.log(
+              `[DashboardQueryBuilder] Setting axisType to null for ${axisName} axis field ${field.column} (existing panel)`,
+            );
+          }
+        }
+      };
+
       // Initialize X axis fields
       if (currentQuery?.fields?.x) {
         console.log(
           `[DashboardQueryBuilder] Initializing X axis fields for query ${dashboardPanelData.layout.currentQueryIndex}`,
         );
         currentQuery.fields.x.forEach((field: any) => {
-          console.log(
-            `[DashboardQueryBuilder] Checking axisType for X axis field ${field.column}`,
-          );
-          // If axisType is undefined, set it based on the field column
-          if (field.axisType === null) {
-            console.log(
-              `[DashboardQueryBuilder] Setting axisType for X axis field ${field.column}`,
-            );
-            console.log(`[DashboardQueryBuilder] isNewPanel: ${isNewPanel}`);
-
-            if (isNewPanel) {
-              field.axisType = field.column === "_timestamp" ? true : false;
-              console.log(
-                `[DashboardQueryBuilder] Setting axisType to ${field.axisType} for X axis field ${field.column}`,
-              );
-            } else if (!isNewPanel) {
-              field.axisType = field.column === "_timestamp" ? true : null;
-              console.log(
-                `[DashboardQueryBuilder] Setting axisType to null for X axis field ${field.column}`,
-              );
-            }
-          }
+          setAxisTypeForField(field, "X");
         });
       }
 
@@ -1274,28 +1282,7 @@ export default defineComponent({
           `[DashboardQueryBuilder] Initializing breakdown fields for query ${dashboardPanelData.layout.currentQueryIndex}`,
         );
         currentQuery.fields.breakdown.forEach((field: any) => {
-          console.log(
-            `[DashboardQueryBuilder] Checking axisType for breakdown field ${field.column}`,
-          );
-          // If axisType is undefined, set it based on the field column
-          if (field.axisType === null) {
-            console.log(
-              `[DashboardQueryBuilder] Setting axisType for breakdown field ${field.column}`,
-            );
-            console.log(`[DashboardQueryBuilder] isNewPanel: ${isNewPanel}`);
-
-            if (isNewPanel) {
-              field.axisType = field.column === "_timestamp" ? true : false;
-              console.log(
-                `[DashboardQueryBuilder] Setting axisType to ${field.axisType} for breakdown field ${field.column}`,
-              );
-            } else if (!isNewPanel) {
-              field.axisType = field.column === "_timestamp" ? true : null;
-              console.log(
-                `[DashboardQueryBuilder] Setting axisType to null for breakdown field ${field.column}`,
-              );
-            }
-          }
+          setAxisTypeForField(field, "breakdown");
         });
       }
 
@@ -1310,28 +1297,7 @@ export default defineComponent({
         );
 
         currentQuery.fields.y.forEach((field: any) => {
-          console.log(
-            `[DashboardQueryBuilder] Checking axisType for Y axis field ${field.column}`,
-          );
-          // If axisType is undefined, set it based on the field column
-          if (field.axisType === null) {
-            console.log(
-              `[DashboardQueryBuilder] Setting axisType for Y axis field ${field.column}`,
-            );
-            console.log(`[DashboardQueryBuilder] isNewPanel: ${isNewPanel}`);
-
-            if (isNewPanel) {
-              field.axisType = field.column === "_timestamp" ? true : false;
-              console.log(
-                `[DashboardQueryBuilder] Setting axisType to ${field.axisType} for Y axis field ${field.column}`,
-              );
-            } else if (!isNewPanel) {
-              field.axisType = field.column === "_timestamp" ? true : null;
-              console.log(
-                `[DashboardQueryBuilder] Setting axisType to null for Y axis field ${field.column}`,
-              );
-            }
-          }
+          setAxisTypeForField(field, "Y");
         });
       }
 
@@ -1341,28 +1307,7 @@ export default defineComponent({
           `[DashboardQueryBuilder] Initializing Z axis fields for query ${dashboardPanelData.layout.currentQueryIndex}`,
         );
         currentQuery.fields.z.forEach((field: any) => {
-          console.log(
-            `[DashboardQueryBuilder] Checking axisType for Z axis field ${field.column}`,
-          );
-          // If axisType is undefined, set it based on the field column
-          if (field.axisType === null) {
-            console.log(
-              `[DashboardQueryBuilder] Setting axisType for Z axis field ${field.column}`,
-            );
-            console.log(`[DashboardQueryBuilder] isNewPanel: ${isNewPanel}`);
-
-            if (isNewPanel) {
-              field.axisType = field.column === "_timestamp" ? true : false;
-              console.log(
-                `[DashboardQueryBuilder] Setting axisType to ${field.axisType} for Z axis field ${field.column}`,
-              );
-            } else if (!isNewPanel) {
-              field.axisType = field.column === "_timestamp" ? true : null;
-              console.log(
-                `[DashboardQueryBuilder] Setting axisType to null for Z axis field ${field.column}`,
-              );
-            }
-          }
+          setAxisTypeForField(field, "Z");
         });
       }
     };
