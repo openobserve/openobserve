@@ -218,8 +218,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dense
                           outlined
                           filled
-                          :label="'Axis Type'"
-                          class="q-mb-sm"
+                          :label="'Timestamp Field'"
+                          class="q-mt-sm"
                           emit-value
                           map-options
                           :display-value="
@@ -498,8 +498,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dense
                           outlined
                           filled
-                          :label="'Axis Type'"
-                          class="q-mb-sm"
+                          :label="'Timestamp Field'"
+                          class="q-mt-sm"
                           emit-value
                           map-options
                           :display-value="
@@ -779,8 +779,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dense
                       outlined
                       filled
-                      :label="'Axis Type'"
-                      class="q-mb-sm"
+                      :label="'Timestamp Field'"
+                      class="q-mt-sm"
                       emit-value
                       map-options
                       :display-value="
@@ -1045,8 +1045,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dense
                         outlined
                         filled
-                        :label="'Axis Type'"
-                        class="q-mb-sm"
+                        :label="'Timestamp Field'"
+                        class="q-mt-sm"
                         emit-value
                         map-options
                         :display-value="
