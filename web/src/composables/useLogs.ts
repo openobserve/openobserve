@@ -1620,9 +1620,9 @@ const useLogs = () => {
     return Math.ceil(partitionTotal / searchObj.meta.resultGrid.rowsPerPage);
   }
 
-  const replaceHistogramInterval = (queryReq: any) => {
+  const replaceHistogramInterval = async (queryReq: any) => {
     if(searchObj.data.queryResults.histogram_interval) {
-      queryReq.query.sql = queryReq.query.sql.replaceAll("[INTERVAL]", searchObj.data.queryResults.histogram_interval + " seconds");
+      queryReq.query.sql = await changeHistogramInterval(queryReq.query.sql, 0);
     } else {
       queryReq.query.sql = queryReq.query.sql.replaceAll("[INTERVAL]", searchObj.meta.resultGrid.chartInterval);
     }
@@ -1769,7 +1769,7 @@ const useLogs = () => {
           JSON.stringify(queryReq),
         );
 
-        replaceHistogramInterval(searchObj.data.histogramQuery);
+        await replaceHistogramInterval(searchObj.data.histogramQuery);
 
         // get the current page detail and set it into query request
         queryReq.query.start_time =
@@ -2827,7 +2827,10 @@ const useLogs = () => {
 
       try {
         // Set histogram interval
-        if(searchObj.data.queryResults.histogram_interval) searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
+        if(searchObj.data.queryResults.histogram_interval) {
+          searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
+          queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
+        }
 
 
         if(!searchObj.data.histogramInterval) {
