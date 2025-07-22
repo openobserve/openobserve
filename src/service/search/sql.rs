@@ -3916,4 +3916,34 @@ mod tests {
             "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY a) FROM stream"
         );
     }
+
+    #[test]
+    fn test_replace_approx_percentilet_visitor4() {
+        let sql = "select approx_percentile_cont(arrow_cast(a, 'int') / 1000, 0.5) from stream";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+        assert_eq!(
+            statement.to_string(),
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY arrow_cast(a, 'int') / 1000) FROM stream"
+        );
+    }
+
+    #[test]
+    fn test_replace_approx_percentilet_visitor5() {
+        let sql = "select approx_percentile_cont(CAST(json_get_str(array_element(cast_to_arr(spath(log, 'error')), 1), 'code') AS INT), 0.5) from stream";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+        assert_eq!(
+            statement.to_string(),
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY CAST(json_get_str(array_element(cast_to_arr(spath(log, 'error')), 1), 'code') AS INT)) FROM stream"
+        );
+    }
 }
