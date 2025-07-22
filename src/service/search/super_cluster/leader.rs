@@ -28,10 +28,7 @@ use config::{
     metrics,
     utils::json,
 };
-use datafusion::{
-    common::tree_node::TreeNode,
-    physical_plan::{displayable, visit_execution_plan},
-};
+use datafusion::{common::tree_node::TreeNode, physical_plan::visit_execution_plan};
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
@@ -238,13 +235,11 @@ async fn run_datafusion(
     };
 
     if cfg.common.print_key_sql {
-        let plan = displayable(physical_plan.as_ref())
-            .indent(false)
-            .to_string();
-        println!("+---------------------------+----------+");
-        println!("leader physical plan before rewrite");
-        println!("+---------------------------+----------+");
-        println!("{}", plan);
+        log::info!("[trace_id {trace_id}] leader physical plan before rewrite");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+        );
     }
 
     // 6. rewrite physical plan
@@ -349,13 +344,11 @@ async fn run_datafusion(
     physical_plan = plan;
 
     if cfg.common.print_key_sql {
-        let plan = displayable(physical_plan.as_ref())
-            .indent(false)
-            .to_string();
-        println!("+---------------------------+----------+");
-        println!("leader physical plan after rewrite");
-        println!("+---------------------------+----------+");
-        println!("{}", plan);
+        log::info!("[trace_id {trace_id}] leader physical plan after rewrite");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+        );
     }
 
     let datafusion_start = std::time::Instant::now();
