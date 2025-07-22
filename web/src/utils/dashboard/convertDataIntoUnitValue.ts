@@ -281,25 +281,47 @@ export const isTimeSeries = (sample: any) => {
 // Check if the sample is timestamp (16 digit microseconds)
 /**
  * Checks if the sample is timestamp (16 digit microseconds) based on axisType object.
- * axisType: { value: true | false | null | "auto" }
- * Only treat as timestamp if axisType.value === true and all values are 16 digits.
- * Otherwise, return false.
+ * axisType: { value: true | false | null | undefined | "auto" }
+ * - If axisType.value === true: Only return true if all values are 16 digits
+ * - If axisType.value === null or undefined: Check if all values are 16 digits, return true if they are
+ * - If axisType.value === false: Return false
+ * - Otherwise: Return false
  */
 export const isTimeStamp = (sample: any, axisType: any) => {
   console.log("Axis Type for timestamp check:", axisType);
 
-  // Only treat as timestamp if axisType.value === true
   const microsecondsPattern = /^\d{16}$/;
-  if (!axisType || axisType === null || axisType === false) {
-    // Not a timestamp
+
+  console.log("Axis Type:", axisType);
+
+  // If axisType is false, return false
+  if (axisType === false) {
+    console.log("Axis Type is false, returning false");
     return false;
   }
+
+  // If axisType is true, only return true if all values are 16 digit numbers
   if (axisType === true) {
-    // Only return true if all values are 16 digit numbers
+    console.log("Axis Type is true, checking if all values are 16 digits");
     return sample.every((value: any) =>
       microsecondsPattern.test(value?.toString()),
     );
   }
+
+  // If axisType is null or undefined, check if all values are 16 digits
+  if (axisType === null || axisType === undefined) {
+    console.log(
+      "Axis Type is null/undefined, checking if all values are 16 digits",
+    );
+    return sample.every((value: any) =>
+      microsecondsPattern.test(value?.toString()),
+    );
+  }
+
+  // For any other case ("auto", etc.), return false
+  console.log(
+    "Axis Type is neither true nor false nor null/undefined, returning false",
+  );
   return false;
 };
 

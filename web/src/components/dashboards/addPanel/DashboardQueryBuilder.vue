@@ -210,11 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.x[index].axisType
                           "
-                          :options="[
-                            { label: 'Auto', value: null },
-                            { label: 'Timestamp', value: true },
-                            { label: 'Not Timestamp', value: false },
-                          ]"
+                          :options="timeStampFieldsOrNot"
                           dense
                           outlined
                           filled
@@ -490,11 +486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.breakdown[index].axisType
                           "
-                          :options="[
-                            { label: 'Auto', value: null },
-                            { label: 'Timestamp', value: true },
-                            { label: 'Not Timestamp', value: false },
-                          ]"
+                          :options="timeStampFieldsOrNot"
                           dense
                           outlined
                           filled
@@ -771,11 +763,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.layout.currentQueryIndex
                         ].fields.y[index].axisType
                       "
-                      :options="[
-                        { label: 'Auto', value: null },
-                        { label: 'Timestamp', value: true },
-                        { label: 'Not Timestamp', value: false },
-                      ]"
+                      :options="timeStampFieldsOrNot"
                       dense
                       outlined
                       filled
@@ -1037,11 +1025,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.layout.currentQueryIndex
                           ].fields.z[index].axisType
                         "
-                        :options="[
-                          { label: 'Auto', value: null },
-                          { label: 'Timestamp', value: true },
-                          { label: 'Not Timestamp', value: false },
-                        ]"
+                        :options="timeStampFieldsOrNot"
                         dense
                         outlined
                         filled
@@ -1821,10 +1805,16 @@ export default defineComponent({
 
     const getAxisTypeLabel = (axisType: any) => {
       if (axisType === null) return "Auto";
-      if (axisType === true) return "Timestamp";
-      if (axisType === false) return "Not Timestamp";
+      if (axisType === true) return "Yes";
+      if (axisType === false) return "No";
       return "Auto";
     };
+
+    const timeStampFieldsOrNot = [
+      { label: "Auto", value: null },
+      { label: "Yes", value: true },
+      { label: "No", value: false },
+    ];
 
     const isHavingFilterVisible = (index: any, axis: any) => {
       const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
@@ -1925,6 +1915,7 @@ export default defineComponent({
       cancelHavingFilter,
       getHavingCondition,
       getAxisTypeLabel,
+      timeStampFieldsOrNot,
     };
   },
 });

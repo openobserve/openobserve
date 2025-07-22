@@ -2531,7 +2531,7 @@ export const convertSQLData = async (
     const isTimeSeriesData = isTimeSeries(sample);
     console.log("options.xAxis[0].data", options.xAxis[0].data);
     
-    const isTimeStampData = isTimeStamp(sample);
+    const isTimeStampData = isTimeStamp(sample, null);
 
     if (isTimeSeriesData || isTimeStampData) {
       // set timeseries flag as a true
