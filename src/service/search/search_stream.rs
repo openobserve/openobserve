@@ -637,8 +637,10 @@ pub async fn do_partitioned_search(
     // unless the query is a dashboard or histogram
     let mut partition_order_by = req_order_by;
     // sort partitions in desc by _timestamp for dashboards & histograms
-    if req.search_type.expect("populate search_type") == SearchEventType::Dashboards
-        || req.query.size == -1
+    // expect if search_type is UI
+    let search_type = req.search_type.expect("populate search_type");
+    if search_type == SearchEventType::Dashboards
+        || (req.query.size == -1 && search_type != SearchEventType::UI)
     {
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
         partition_order_by = &OrderBy::Desc;
@@ -1180,9 +1182,10 @@ async fn process_delta(
         trace_id
     );
 
-    // for dashboards & histograms
-    if req.search_type.expect("search_type is required") == SearchEventType::Dashboards
-        || req.query.size == -1
+    // for dashboards & histograms, expect for ui
+    let search_type = req.search_type.expect("populate search_type");
+    if search_type == SearchEventType::Dashboards
+        || (req.query.size == -1 && search_type != SearchEventType::UI)
     {
         // sort partitions by timestamp in desc
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
