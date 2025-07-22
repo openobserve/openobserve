@@ -430,6 +430,7 @@ pub struct Config {
     pub pipeline: Pipeline,
     pub health_check: HealthCheck,
     pub encryption: Encryption,
+    pub enrichment_table: EnrichmentTable,
 }
 
 #[derive(EnvConfig)]
@@ -713,6 +714,8 @@ pub struct Common {
     pub data_db_dir: String,
     #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
     pub data_cache_dir: String,
+    #[env_config(name = "ZO_DATA_TMP_DIR", default = "")] // ./data/openobserve/tmp/
+    pub data_tmp_dir: String,
     // TODO: should rename to column_all
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub column_all: String,
@@ -1107,6 +1110,12 @@ pub struct Common {
     pub dashboard_show_symbol_enabled: bool,
     #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")]
     pub default_hec_stream: String,
+    #[env_config(
+        name = "ZO_ALIGN_PARTITIONS_FOR_INDEX",
+        default = false,
+        help = "Enable to use large partition for index. This will apply for all streams"
+    )]
+    pub align_partitions_for_index: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1936,6 +1945,28 @@ pub struct HealthCheck {
     pub failed_times: usize,
 }
 
+#[derive(EnvConfig)]
+pub struct EnrichmentTable {
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_CACHE_DIR",
+        default = "",
+        help = "Local cache directory for enrichment tables"
+    )]
+    pub cache_dir: String,
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_MERGE_THRESHOLD_MB",
+        default = 60,
+        help = "Threshold for merging small files before S3 upload (in MB)"
+    )]
+    pub merge_threshold_mb: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_MERGE_INTERVAL",
+        default = 600,
+        help = "Background sync interval in seconds"
+    )]
+    pub merge_interval: u64,
+}
+
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().expect("config init error");
@@ -2329,6 +2360,12 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.data_cache_dir.ends_with('/') {
         cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);
+    }
+    if cfg.common.data_tmp_dir.is_empty() {
+        cfg.common.data_tmp_dir = format!("{}tmp/", cfg.common.data_dir);
+    }
+    if !cfg.common.data_tmp_dir.ends_with('/') {
+        cfg.common.data_tmp_dir = format!("{}/", cfg.common.data_tmp_dir);
     }
     if cfg.common.mmdb_data_dir.is_empty() {
         cfg.common.mmdb_data_dir = format!("{}mmdb/", cfg.common.data_dir);
