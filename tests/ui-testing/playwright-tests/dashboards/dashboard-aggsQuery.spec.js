@@ -1,6 +1,6 @@
 import { test, expect } from "../baseFixtures.js";
 import logData from "../../cypress/fixtures/log.json";
-import logsdata from "../../../test-data/logs_data.json";
+import dashboardAggriData from "../../../test-data/dashboardAggri.json";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
@@ -17,12 +17,20 @@ test.describe("dashboard aggregations testcases", () => {
     console.log("running before each");
     await login(page);
     await page.waitForTimeout(1000);
-    await ingestion(page);
+    await ingestion(page, "orders", dashboardAggriData);
     await page.waitForTimeout(2000);
 
-    // Ensure Streaming is disabled for consistent test behaviour
+    // 1️⃣  Force-disable both streaming and websocket at runtime
+    await page.addInitScript(() => {
+      // Available globally in the frontend; see zincutils.ts
+      window.use_streaming = false;
+      window.use_web_socket = false;
+      window.use_aggregation_cache = false;
+    });
+
+    // You can keep the UI toggle for streaming if you like
     const pm = new PageManager(page);
-    await pm.managementPage.ensureStreamingDisabled();
+    // await pm.managementPage.ensureStreamingDisabled();
 
     const orgNavigation = page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
@@ -46,7 +54,7 @@ test.describe("dashboard aggregations testcases", () => {
 
     await pm.chartTypeSelector.selectStreamType("logs");
 
-    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.selectStream("orders");
 
     await page.waitForTimeout(2000);
     // await page
@@ -56,39 +64,36 @@ test.describe("dashboard aggregations testcases", () => {
       .locator('[data-test="dashboard-x-item-_timestamp-remove"]')
       .click();
 
-    await pm.chartTypeSelector.searchAndAddField(
-      "kubernetes_namespace_name",
-      "y"
-    );
+    await pm.chartTypeSelector.searchAndAddField("order_date", "x");
 
-    await pm.chartTypeSelector.searchAndAddField(
-      "kubernetes_container_name",
-      "x"
-    );
+    await pm.chartTypeSelector.searchAndAddField("product", "y");
 
-    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
+    await pm.dateTimeHelper.setRelativeTimeRange("10-m");
 
-    await pm.dashboardPanelActions.applyDashboardBtn();
+    // await pm.dashboardPanelActions.applyDashboardBtn();
 
-    await pm.dashboardPanelActions.waitForChartToRender();
+    await page.waitForTimeout(2000);
+
+    // 2️⃣  Start listening BEFORE triggering the search
+    const [partitionResp] = await Promise.all([
+      page.waitForResponse(
+        (res) =>
+          res.url().includes("/_search_partition") &&
+          res.url().includes("type=logs") &&
+          res.status() === 200,
+        { timeout: 15_000 } // tighten if you like
+      ),
+      pm.dashboardPanelActions.applyDashboardBtn(), // this fires the query
+    ]);
+
+    const body = await partitionResp.json();
+    expect(body.streaming_aggs).toBe(true);
 
     // Wait for response
 
-    // Apply query and wait for response
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await page.waitForResponse(async (res) => {
-      const url = res.url();
-      const isValid =
-        url.includes("/_search_partition") &&
-        url.includes("type=logs") &&
-        res.status() === 200;
+    await pm.dashboardPanelActions.waitForChartToRender();
 
-      if (isValid) {
-        const body = await res.json().catch(() => null);
-        return body?.streaming_aggs === true;
-      }
-      return false;
-    });
+    await pm.dashboardPanelActions.applyDashboardBtn();
 
     await page
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
@@ -97,7 +102,7 @@ test.describe("dashboard aggregations testcases", () => {
     await expect(
       page
         .getByRole("cell", {
-          name: 'SELECT kubernetes_container_name as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1',
+          name: 'SELECT order_date as "x_axis_1", count(product) as "y_axis_1" FROM "orders" GROUP BY x_axis_1',
         })
         .first()
     ).toBeVisible();
@@ -130,14 +135,27 @@ test.describe("dashboard aggregations testcases", () => {
 
     await pm.chartTypeSelector.selectStreamType("logs");
 
-    await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.selectStream("orders");
 
-    await pm.chartTypeSelector.searchAndAddField(
-      "kubernetes_namespace_name",
-      "y"
-    );
+    await pm.chartTypeSelector.searchAndAddField("product", "y");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
+
+    await page.waitForResponse(async (res) => {
+      console.log("response", res);
+
+      const url = res.url();
+      console.log("url", url);
+      const isValid = url.includes("/_search_partition");
+      console.log("isValid", isValid);
+      if (isValid) {
+        const body = await res.json().catch(() => null);
+        console.log("body", body);
+
+        return body?.streaming_aggs === false;
+      }
+      return false;
+    });
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -145,19 +163,6 @@ test.describe("dashboard aggregations testcases", () => {
 
     // Apply query and wait for response
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await page.waitForResponse(async (res) => {
-      const url = res.url();
-      const isValid =
-        url.includes("/_search_partition") &&
-        url.includes("type=logs") &&
-        res.status() === 200;
-
-      if (isValid) {
-        const body = await res.json().catch(() => null);
-        return body?.streaming_aggs === false;
-      }
-      return false;
-    });
 
     await page
       .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
@@ -166,7 +171,7 @@ test.describe("dashboard aggregations testcases", () => {
     await expect(
       page
         .getByRole("cell", {
-          name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+          name: 'SELECT histogram(_timestamp) as "x_axis_1", count(product) as "y_axis_1" FROM "orders" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
         })
         .first()
     ).toBeVisible();
