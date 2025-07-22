@@ -31,7 +31,7 @@ use config::{
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
-    physical_plan::{ExecutionPlan, displayable, visit_execution_plan},
+    physical_plan::{ExecutionPlan, visit_execution_plan},
     prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
@@ -966,9 +966,9 @@ pub async fn get_file_id_lists(
 }
 
 pub fn print_plan(trace_id: &str, physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
-    let plan = displayable(physical_plan.as_ref())
-        .indent(false)
-        .to_string();
     log::info!("[trace_id {trace_id}] leader physical plan {stage} rewrite");
-    log::info!("[trace_id {trace_id}] \n{plan}");
+    log::info!(
+        "{}",
+        config::meta::plan::generate_plan_string(trace_id, physical_plan.as_ref())
+    );
 }
