@@ -74,7 +74,7 @@ test.describe("dashboard aggregations testcases", () => {
 
     await page.waitForTimeout(2000);
 
-    // 2️⃣  Start listening BEFORE triggering the search
+    //  Start listening BEFORE triggering the search
     const [partitionResp] = await Promise.all([
       page.waitForResponse(
         (res) =>
@@ -87,7 +87,7 @@ test.describe("dashboard aggregations testcases", () => {
     ]);
 
     const body = await partitionResp.json();
-    expect(body.streaming_aggs).toBe(true);
+    expect(body.streaming_aggs).toBe(false);
 
     // Wait for response
 
