@@ -664,6 +664,17 @@ pub async fn delete_stream(
             )));
     }
 
+    // enrichment table cleanup
+
+    if stream_type == StreamType::EnrichmentTables {
+        crate::service::enrichment_table::cleanup_enrichment_table_resources(
+            org_id,
+            stream_name,
+            stream_type,
+        )
+        .await;
+    }
+
     // delete ownership
     crate::common::utils::auth::remove_ownership(
         org_id,
