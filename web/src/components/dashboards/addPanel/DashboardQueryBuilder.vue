@@ -1180,7 +1180,7 @@ export default defineComponent({
       );
 
       // Check if this is a new panel (no ID means it's new)
-      const isNewPanel = !!dashboardPanelData.data.id;
+      const isNewPanel = !dashboardPanelData.data.id;
       console.log(
         `[DashboardQueryBuilder] isNewPanel: ${isNewPanel}, currentQueryIndex: ${dashboardPanelData.layout.currentQueryIndex}`,
       );
@@ -1226,6 +1226,19 @@ export default defineComponent({
         initializeAxisTypes();
       });
     });
+
+    watch(
+      () => dashboardPanelData.data.type,
+      (newType: string, oldType: string) => {
+        if (newType !== oldType) {
+          // Reset axis types when chart type changes
+          console.log(
+            `[DashboardQueryBuilder] Chart type changed from ${oldType} to ${newType}, resetting axis types`,
+          );
+          initializeAxisTypes();
+        }
+      },
+    );
 
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },

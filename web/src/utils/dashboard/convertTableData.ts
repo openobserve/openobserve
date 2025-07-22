@@ -93,7 +93,7 @@ export const convertTableData = (
       column: key,
       color: null,
       isDerived: false,
-      axisType: null,
+      axisType: false,
     }));
 
     // add responseKeys to columnData
