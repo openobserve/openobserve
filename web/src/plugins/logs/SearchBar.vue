@@ -362,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </q-item-section>
                           <q-item-section
-                            :data-test="`logs-search-bar-update-${props.row.view_name}-saved-view-btn`"
+                            :data-test="`logs-search-bar-update-${props.row.view_name}-favorite-saved-view-btn`"
                             side
                             @click.stop="handleUpdateSavedView(props.row)"
                           >
@@ -378,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ></q-btn>
                           </q-item-section>
                           <q-item-section
-                            :data-test="`logs-search-bar-delete-${props.row.view_name}-saved-view-btn`"
+                            :data-test="`logs-search-bar-delete-${props.row.view_name}-favorite-saved-view-btn`"
                             side
                             @click.stop="handleDeleteSavedView(props.row)"
                           >
