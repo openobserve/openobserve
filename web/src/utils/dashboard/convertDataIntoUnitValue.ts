@@ -270,18 +270,37 @@ export const formatDate = (date: any) => {
 
 // Check if the sample is time series
 export const isTimeSeries = (sample: any) => {
+  console.log("Checking if sample is time series:", sample);
+
   const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/;
   return sample.every((value: any) => {
     return iso8601Pattern.test(value);
   });
 };
 
-//Check if the sample is timestamp
-export const isTimeStamp = (sample: any) => {
+// Check if the sample is timestamp (16 digit microseconds)
+/**
+ * Checks if the sample is timestamp (16 digit microseconds) based on axisType object.
+ * axisType: { value: true | false | null | "auto" }
+ * Only treat as timestamp if axisType.value === true and all values are 16 digits.
+ * Otherwise, return false.
+ */
+export const isTimeStamp = (sample: any, axisType: any) => {
+  console.log("Axis Type for timestamp check:", axisType);
+
+  // Only treat as timestamp if axisType.value === true
   const microsecondsPattern = /^\d{16}$/;
-  return sample.every((value: any) =>
-    microsecondsPattern.test(value?.toString()),
-  );
+  if (!axisType || axisType === null || axisType === false) {
+    // Not a timestamp
+    return false;
+  }
+  if (axisType === true) {
+    // Only return true if all values are 16 digit numbers
+    return sample.every((value: any) =>
+      microsecondsPattern.test(value?.toString()),
+    );
+  }
+  return false;
 };
 
 export function convertOffsetToSeconds(

@@ -109,7 +109,7 @@ export const convertTableData = (
           ?.slice(0, Math.min(20, tableRows.length))
           ?.map((it: any) => it[field.alias]);
         const isTimeSeriesData = isTimeSeries(sample);
-        const isTimeStampData = isTimeStamp(sample);
+        const isTimeStampData = isTimeStamp(sample, field.axisType);
 
         if (isTimeSeriesData || isTimeStampData) {
           histogramFields.push(field.alias);
@@ -126,7 +126,7 @@ export const convertTableData = (
           ?.slice(0, Math.min(20, tableRows.length))
           ?.map((it: any) => it[field.alias]);
         const isTimeSeriesData = isTimeSeries(sample);
-        const isTimeStampData = isTimeStamp(sample);
+        const isTimeStampData = isTimeStamp(sample, field.axisType);
 
         if (isTimeSeriesData || isTimeStampData) {
           histogramFields.push(field.alias);

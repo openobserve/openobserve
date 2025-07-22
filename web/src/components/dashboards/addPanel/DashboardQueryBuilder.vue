@@ -204,6 +204,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ].fields.x[index].label
                           "
                         />
+                        <q-select
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.x[index].axisType
+                          "
+                          :options="[
+                            { label: 'Auto', value: null },
+                            { label: 'Timestamp', value: true },
+                            { label: 'Not Timestamp', value: false },
+                          ]"
+                          dense
+                          outlined
+                          filled
+                          :label="'Axis Type'"
+                          class="q-mb-sm"
+                          emit-value
+                          map-options
+                          :display-value="
+                            getAxisTypeLabel(
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.x[index].axisType,
+                            )
+                          "
+                        />
+
                         <div
                           v-if="
                             !dashboardPanelData.data.queries[
@@ -455,6 +482,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.data.queries[
                               dashboardPanelData.layout.currentQueryIndex
                             ].fields.breakdown[index].label
+                          "
+                        />
+                        <q-select
+                          v-model="
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.breakdown[index].axisType
+                          "
+                          :options="[
+                            { label: 'Auto', value: null },
+                            { label: 'Timestamp', value: true },
+                            { label: 'Not Timestamp', value: false },
+                          ]"
+                          dense
+                          outlined
+                          filled
+                          :label="'Axis Type'"
+                          class="q-mb-sm"
+                          emit-value
+                          map-options
+                          :display-value="
+                            getAxisTypeLabel(
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.breakdown[index].axisType,
+                            )
                           "
                         />
                         <div
@@ -712,6 +765,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ].fields.y[index].label
                       "
                     />
+                    <q-select
+                      v-model="
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ].fields.y[index].axisType
+                      "
+                      :options="[
+                        { label: 'Auto', value: null },
+                        { label: 'Timestamp', value: true },
+                        { label: 'Not Timestamp', value: false },
+                      ]"
+                      dense
+                      outlined
+                      filled
+                      :label="'Axis Type'"
+                      class="q-mb-sm"
+                      emit-value
+                      map-options
+                      :display-value="
+                        getAxisTypeLabel(
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.y[index].axisType,
+                        )
+                      "
+                    />
                     <div
                       style="width: 100%"
                       class="tw-mb-2"
@@ -952,6 +1031,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ].fields.z[index].label
                         "
                       />
+                      <q-select
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.z[index].axisType
+                        "
+                        :options="[
+                          { label: 'Auto', value: null },
+                          { label: 'Timestamp', value: true },
+                          { label: 'Not Timestamp', value: false },
+                        ]"
+                        dense
+                        outlined
+                        filled
+                        :label="'Axis Type'"
+                        class="q-mb-sm"
+                        emit-value
+                        map-options
+                        :display-value="
+                          getAxisTypeLabel(
+                            dashboardPanelData.data.queries[
+                              dashboardPanelData.layout.currentQueryIndex
+                            ].fields.z[index].axisType,
+                          )
+                        "
+                      />
                       <div style="width: 100%" class="tw-mb-2">
                         <span class="tw-block tw-mb-1 tw-font-bold"
                           >Having</span
@@ -1070,6 +1175,7 @@ import {
   computed,
   inject,
   nextTick,
+  onMounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
@@ -1135,6 +1241,169 @@ export default defineComponent({
       cleanupDraggingFields,
       selectedStreamFieldsBasedOnUserDefinedSchema,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
+
+    // Initialize axisType for existing fields
+    const initializeAxisTypes = () => {
+      console.log(
+        `[DashboardQueryBuilder] initializeAxisTypes called for query ${dashboardPanelData.layout.currentQueryIndex}`,
+      );
+      const currentQuery =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ];
+      const isNewPanel = !dashboardPanelData.data.id;
+
+      // Initialize X axis fields
+      if (currentQuery?.fields?.x) {
+        console.log(
+          `[DashboardQueryBuilder] Initializing X axis fields for query ${dashboardPanelData.layout.currentQueryIndex}`,
+        );
+        currentQuery.fields.x.forEach((field: any) => {
+          console.log(
+            `[DashboardQueryBuilder] Checking axisType for X axis field ${field.column}`,
+          );
+          // If axisType is undefined, set it based on the field column
+          if (field.axisType === null) {
+            console.log(
+              `[DashboardQueryBuilder] Setting axisType for X axis field ${field.column}`,
+            );
+            console.log(`[DashboardQueryBuilder] isNewPanel: ${isNewPanel}`);
+
+            if (isNewPanel) {
+              field.axisType = field.column === "_timestamp" ? true : false;
+              console.log(
+                `[DashboardQueryBuilder] Setting axisType to ${field.axisType} for X axis field ${field.column}`,
+              );
+            } else if (!isNewPanel) {
+              field.axisType = field.column === "_timestamp" ? true : null;
+              console.log(
+                `[DashboardQueryBuilder] Setting axisType to null for X axis field ${field.column}`,
+              );
+            }
+          }
+        });
+      }
+
+      // Initialize breakdown fields
+      if (currentQuery?.fields?.breakdown) {
+        console.log(
+          `[DashboardQueryBuilder] Initializing breakdown fields for query ${dashboardPanelData.layout.currentQueryIndex}`,
+        );
+        currentQuery.fields.breakdown.forEach((field: any) => {
+          console.log(
+            `[DashboardQueryBuilder] Checking axisType for breakdown field ${field.column}`,
+          );
+          // If axisType is undefined, set it based on the field column
+          if (field.axisType === null) {
+            console.log(
+              `[DashboardQueryBuilder] Setting axisType for breakdown field ${field.column}`,
+            );
+            console.log(`[DashboardQueryBuilder] isNewPanel: ${isNewPanel}`);
+
+            if (isNewPanel) {
+              field.axisType = field.column === "_timestamp" ? true : false;
+              console.log(
+                `[DashboardQueryBuilder] Setting axisType to ${field.axisType} for breakdown field ${field.column}`,
+              );
+            } else if (!isNewPanel) {
+              field.axisType = field.column === "_timestamp" ? true : null;
+              console.log(
+                `[DashboardQueryBuilder] Setting axisType to null for breakdown field ${field.column}`,
+              );
+            }
+          }
+        });
+      }
+
+      // Initialize Y axis fields
+      if (currentQuery?.fields?.y) {
+        console.log(
+          `[DashboardQueryBuilder] Initializing Y axis fields for query ${dashboardPanelData.layout.currentQueryIndex}`,
+        );
+        console.log(
+          `[DashboardQueryBuilder] Current query index: ${currentQuery}`,
+          currentQuery,
+        );
+
+        currentQuery.fields.y.forEach((field: any) => {
+          console.log(
+            `[DashboardQueryBuilder] Checking axisType for Y axis field ${field.column}`,
+          );
+          // If axisType is undefined, set it based on the field column
+          if (field.axisType === null) {
+            console.log(
+              `[DashboardQueryBuilder] Setting axisType for Y axis field ${field.column}`,
+            );
+            console.log(`[DashboardQueryBuilder] isNewPanel: ${isNewPanel}`);
+
+            if (isNewPanel) {
+              field.axisType = field.column === "_timestamp" ? true : false;
+              console.log(
+                `[DashboardQueryBuilder] Setting axisType to ${field.axisType} for Y axis field ${field.column}`,
+              );
+            } else if (!isNewPanel) {
+              field.axisType = field.column === "_timestamp" ? true : null;
+              console.log(
+                `[DashboardQueryBuilder] Setting axisType to null for Y axis field ${field.column}`,
+              );
+            }
+          }
+        });
+      }
+
+      // Initialize Z axis fields
+      if (currentQuery?.fields?.z) {
+        console.log(
+          `[DashboardQueryBuilder] Initializing Z axis fields for query ${dashboardPanelData.layout.currentQueryIndex}`,
+        );
+        currentQuery.fields.z.forEach((field: any) => {
+          console.log(
+            `[DashboardQueryBuilder] Checking axisType for Z axis field ${field.column}`,
+          );
+          // If axisType is undefined, set it based on the field column
+          if (field.axisType === null) {
+            console.log(
+              `[DashboardQueryBuilder] Setting axisType for Z axis field ${field.column}`,
+            );
+            console.log(`[DashboardQueryBuilder] isNewPanel: ${isNewPanel}`);
+
+            if (isNewPanel) {
+              field.axisType = field.column === "_timestamp" ? true : false;
+              console.log(
+                `[DashboardQueryBuilder] Setting axisType to ${field.axisType} for Z axis field ${field.column}`,
+              );
+            } else if (!isNewPanel) {
+              field.axisType = field.column === "_timestamp" ? true : null;
+              console.log(
+                `[DashboardQueryBuilder] Setting axisType to null for Z axis field ${field.column}`,
+              );
+            }
+          }
+        });
+      }
+    };
+
+    // Watch for changes in the current query fields and initialize axisType
+    watch(
+      () =>
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields,
+      (newFields) => {
+        if (newFields) {
+          nextTick(() => {
+            initializeAxisTypes();
+          });
+        }
+      },
+      { deep: true, immediate: true },
+    );
+
+    onMounted(() => {
+      nextTick(() => {
+        initializeAxisTypes();
+      });
+    });
 
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
@@ -1550,6 +1819,13 @@ export default defineComponent({
 
     const operators = ["=", "<>", ">=", "<=", ">", "<"];
 
+    const getAxisTypeLabel = (axisType: any) => {
+      if (axisType === null) return "Auto";
+      if (axisType === true) return "Timestamp";
+      if (axisType === false) return "Not Timestamp";
+      return "Auto";
+    };
+
     const isHavingFilterVisible = (index: any, axis: any) => {
       const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
       const currentField =
@@ -1648,6 +1924,7 @@ export default defineComponent({
       toggleHavingFilter,
       cancelHavingFilter,
       getHavingCondition,
+      getAxisTypeLabel,
     };
   },
 });
