@@ -197,6 +197,7 @@ const defaultObject = {
       filteredField: <any>[],
       missingStreamMultiStreamFilter: <any>[],
       pipelineQueryStream: <any>[],
+      interestingStreamFields: <{ [key: string]: Set<string> }>{},
     },
     resultGrid: {
       currentDateTime: new Date(),
@@ -294,6 +295,8 @@ const searchAggData = reactive({
 });
 
 const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
+
+const streamSchemaFieldsIndexMapping = ref({});
 
 let histogramResults: any = [];
 let histogramMappedData: any = [];
@@ -709,7 +712,7 @@ const useLogs = () => {
   const updateUrlQueryParams = () => {
     const query = generateURLQuery(false);
     if (
-      (Object.hasOwn(query, "type") &&
+      (Object.prototype.hasOwnProperty.call(query, "type") &&
         query.type == "search_history_re_apply") ||
       query.type == "search_scheduler"
     ) {
@@ -1036,7 +1039,7 @@ const useLogs = () => {
           let node: any;
           let index: any;
           for (field of searchObj.data.stream.selectedStreamFields) {
-            for ([node, index] of parsedSQL) {
+            for (const [node, index] of parsedSQL.entries()) {
               if (node === field.name) {
                 parsedSQL[index] = '"' + node.replaceAll('"', "") + '"';
               }
@@ -3151,6 +3154,7 @@ const useLogs = () => {
 
   async function extractFields() {
     try {
+      let currentIndex = 0;
       searchObjDebug["extractFieldsStartTime"] = performance.now();
       searchObjDebug["extractFieldsWithAPI"] = "";
       searchObj.data.errorMsg = "";
@@ -3158,6 +3162,10 @@ const useLogs = () => {
       searchObj.data.countErrorMsg = "";
       searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.stream.interestingFieldList = [];
+      
+      let interestingFieldSchema = [];
+      const defaultFieldsSchema = [];
+
       const schemaFields: any = [];
       const commonSchemaFields: any = [];
       if (searchObj.data.streamResults.list.length > 0) {
@@ -3203,9 +3211,13 @@ const useLogs = () => {
 
         searchObj.data.datetime.queryRangeRestrictionMsg = "";
         searchObj.data.datetime.queryRangeRestrictionInHour = -1;
+
+        const defaultFields = new Set([store.state.zoConfig?.timestamp_column, store.state.zoConfig?.all_fields_name]);
+
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
             if (searchObj.data.stream.selectedStream.length > 1) {
+              console.log("stream", stream);
               schemaMaps.push({
                 name: convertToCamelCase(stream.name),
                 label: true,
@@ -3221,6 +3233,8 @@ const useLogs = () => {
               schemaFields.push("dummylabel");
               // searchObj.data.stream.expandGroupRowsFieldCount[stream.name] = searchObj.data.stream.expandGroupRowsFieldCount[stream.name] + 1;
             }
+
+            let schemaMapStartIndex = schemaMaps.length;
 
             userDefineSchemaSettings =
               stream.settings?.defined_schema_fields?.slice() || [];
@@ -3317,6 +3331,8 @@ const useLogs = () => {
             );
             searchObj.data.stream.interestingFieldList = [...intField];
 
+
+
             // create a schema field mapping based on field name to avoid iteration over object.
             // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
             let UDSFieldCount = 0;
@@ -3382,6 +3398,7 @@ const useLogs = () => {
                     //remove the element from the index
                     schemaFields.splice(schemaFieldsIndex, 1);
                     schemaMaps.splice(schemaFieldsIndex, 1);
+                    schemaMapStartIndex = schemaMapStartIndex - 1;
                   } else if (commonSchemaFieldsIndex > -1) {
                     commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
                       stream.name,
@@ -3391,7 +3408,14 @@ const useLogs = () => {
                     //     "common"
                     //   ] + 1;
                   } else {
-                    schemaMaps.push(fieldObj);
+                    if(intField.has(field)) {
+                      interestingFieldSchema.push(fieldObj);
+                    } else if(defaultFields.has(field) && searchObj.data.stream.selectedStream.length === 1) {
+                      defaultFieldsSchema.push(fieldObj);
+                    } else {
+                      schemaMaps.push(fieldObj);
+                    }
+
                     schemaFields.push(field);
                     searchObj.data.stream.expandGroupRowsFieldCount[
                       stream.name
@@ -3440,6 +3464,7 @@ const useLogs = () => {
                   //remove the element from the index
                   schemaFields.splice(schemaFieldsIndex, 1);
                   schemaMaps.splice(schemaFieldsIndex, 1);
+                  schemaMapStartIndex = schemaMapStartIndex - 1;
                 } else if (commonSchemaFieldsIndex > -1) {
                   commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
                     stream.name,
@@ -3448,7 +3473,14 @@ const useLogs = () => {
                   //   searchObj.data.stream.expandGroupRowsFieldCount["common"] +
                   //   1;
                 } else {
-                  schemaMaps.push(fieldObj);
+                    if(intField.has(field)) {
+                      interestingFieldSchema.push(fieldObj);
+                    } else if(defaultFields.has(field) && searchObj.data.stream.selectedStream.length == 1) {
+                      defaultFieldsSchema.push(fieldObj);
+                    } else {
+                      schemaMaps.push(fieldObj);
+                    }
+
                   schemaFields.push(field);
                   searchObj.data.stream.expandGroupRowsFieldCount[stream.name] =
                     searchObj.data.stream.expandGroupRowsFieldCount[
@@ -3546,26 +3578,46 @@ const useLogs = () => {
                         : false,
                     streams: [],
                   };
-                  schemaMaps.push(fieldObj);
+
+                    if(intField.has(key)) {
+                      interestingFieldSchema.push(fieldObj);
+                    } else if(defaultFields.has(key) && searchObj.data.stream.selectedStream.length == 1) {
+                      defaultFieldsSchema.push(fieldObj);
+                    } else {
+                      schemaMaps.push(fieldObj);
+                    }
+
                   schemaFields.push(key);
                 }
               }
             }
             searchObj.data.stream.userDefinedSchema =
               userDefineSchemaSettings || [];
+
+
+            // Add interesting fields to the schema maps at start of the section
+            searchObj.data.stream.interestingStreamFields[stream.name] = new Set(interestingFieldSchema);
+            schemaMaps.splice(schemaMapStartIndex, 0, ...interestingFieldSchema);
+            interestingFieldSchema = [];
           }
         }
 
         // searchObj.data.stream.selectedStreamFields = schemaMaps;
         searchObj.data.stream.selectedStreamFields = [
+          ...defaultFieldsSchema,
           ...commonSchemaMaps,
           ...schemaMaps,
         ];
+
+
+        
         if (
           searchObj.data.stream.selectedStreamFields != undefined &&
           searchObj.data.stream.selectedStreamFields.length
         )
           updateFieldKeywords(searchObj.data.stream.selectedStreamFields);
+
+        createFieldIndexMapping();
       }
       searchObjDebug["extractFieldsEndTime"] = performance.now();
     } catch (e: any) {
@@ -3573,6 +3625,16 @@ const useLogs = () => {
       console.log("Error while extracting fields.", e);
       notificationMsg.value = "Error while extracting stream fields.";
     }
+  }
+
+  const createFieldIndexMapping = async () => {
+    new Promise((resolve) => {
+      streamSchemaFieldsIndexMapping.value = {};
+      for (let i = 0; i < searchObj.data.stream.selectedStreamFields.length; i++) {
+        streamSchemaFieldsIndexMapping.value[searchObj.data.stream.selectedStreamFields[i].name] = i;
+      }
+      resolve(true);
+    });
   }
 
   const updateGridColumns = () => {
@@ -4275,10 +4337,10 @@ const useLogs = () => {
       searchObj.meta.refreshHistogram = true;
       initialQueryPayload.value = null;
       searchObj.data.queryResults.aggs = null;
-      if (
-        Object.hasOwn(router.currentRoute.value.query, "type") &&
-        router.currentRoute.value.query.type == "search_history_re_apply"
-      ) {
+              if (
+          Object.prototype.hasOwnProperty.call(router.currentRoute.value.query, "type") &&
+          router.currentRoute.value.query.type == "search_history_re_apply"
+        ) {
         delete router.currentRoute.value.query.type;
       }
       // const queryTimeout = setTimeout(() => {
@@ -4421,7 +4483,7 @@ const useLogs = () => {
 
     searchObj.shouldIgnoreWatcher = false;
     if (
-      Object.hasOwn(queryParams, "type") &&
+      Object.prototype.hasOwnProperty.call(queryParams, "type") &&
       queryParams.type == "search_history_re_apply"
     ) {
       delete queryParams.type;
@@ -4823,7 +4885,7 @@ const useLogs = () => {
           {},
         );
 
-      if (Object.hasOwn(fieldTypeList, field)) {
+      if (Object.prototype.hasOwnProperty.call(fieldTypeList, field)) {
         fieldType = fieldTypeList[field];
       }
 
@@ -4862,7 +4924,7 @@ const useLogs = () => {
     try {
       const parsedSQL = fnParsedSQL();
 
-      if (!Object.hasOwn(parsedSQL, "from") || parsedSQL?.from == null || parsedSQL?.from?.length == 0) {
+      if (!Object.prototype.hasOwnProperty.call(parsedSQL, "from") || parsedSQL?.from == null || parsedSQL?.from?.length == 0) {
         console.info("Failed to parse SQL query:", value);
         return;
         // throw new Error("Invalid SQL syntax");
@@ -6625,7 +6687,9 @@ const useLogs = () => {
     getStream,
     initialLogsState,
     clearSearchObj,
-    setCommunicationMethod
+    setCommunicationMethod,
+    hasAggregation,
+    streamSchemaFieldsIndexMapping
   };
 };
 
