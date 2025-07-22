@@ -33,7 +33,7 @@ use config::{cluster::LOCAL_NODE, meta::search::ScanStats, metrics};
 use datafusion::{
     common::{DataFusionError, Result},
     execution::SendableRecordBatchStream,
-    physical_plan::{displayable, execute_stream},
+    physical_plan::execute_stream,
 };
 use futures::{Stream, StreamExt, TryStreamExt, stream::BoxStream};
 use prost::Message;
@@ -153,13 +153,13 @@ impl FlightService for FlightServiceImpl {
         let mut schema = physical_plan.schema();
 
         if cfg.common.print_key_sql {
-            let plan = displayable(physical_plan.as_ref())
-                .indent(false)
-                .to_string();
             log::info!(
                 "[trace_id {trace_id}] follow physical plan, is_super_cluster_follower_leader: {is_super_cluster}"
             );
-            log::info!("[trace_id {trace_id}] \n{plan}");
+            log::info!(
+                "{}",
+                config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+            );
         }
 
         schema = add_scan_stats_to_schema(schema, scan_stats);
