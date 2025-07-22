@@ -1303,6 +1303,9 @@ const useLogs = () => {
 
           searchObj.data.queryResults.histogram_interval = null;
 
+          // for visualization, will require to set histogram interval to fill missing values
+          searchObj.data.queryResults.visualization_histogram_interval = null;
+
           await searchService
             .partition({
               org_identifier: searchObj.organizationIdentifier,
@@ -1348,7 +1351,7 @@ const useLogs = () => {
               // for visualization, will require to set histogram interval to fill missing values
               // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
               // created new attribute visualization_histogram_interval to avoid this issue
-              if(searchObj.data.queryResults.visualization_histogram_interval == undefined && res.data?.histogram_interval) {
+              if(searchObj.data.queryResults.visualization_histogram_interval && res.data?.histogram_interval) {
                 searchObj.data.queryResults.visualization_histogram_interval = res.data?.histogram_interval;
               }
 
@@ -3159,7 +3162,7 @@ const useLogs = () => {
             // for visualization, will require to set histogram interval to fill missing values
             // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
             // created new attribute visualization_histogram_interval to avoid this issue
-            if(searchObj.data.queryResults.visualization_histogram_interval == undefined && res.data?.histogram_interval) {
+            if(searchObj.data.queryResults.visualization_histogram_interval && res.data?.histogram_interval) {
               searchObj.data.queryResults.visualization_histogram_interval = res.data?.histogram_interval;
             }
 
@@ -5861,7 +5864,7 @@ const useLogs = () => {
     // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
     // created new attribute visualization_histogram_interval to avoid this issue
     if (
-      searchObj.data.queryResults.visualization_histogram_interval == undefined &&
+      searchObj.data.queryResults.visualization_histogram_interval &&
       response.content?.results?.histogram_interval
     ) {
       searchObj.data.queryResults.visualization_histogram_interval  =
