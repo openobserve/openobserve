@@ -1768,7 +1768,7 @@ const useLogs = () => {
           JSON.stringify(queryReq),
         );
 
-        replaceHistogramInterval(queryReq);
+        replaceHistogramInterval(searchObj.data.histogramQuery);
 
         // get the current page detail and set it into query request
         queryReq.query.start_time =
