@@ -98,7 +98,7 @@
           />
         </div>
         <div
-          v-if="visibleInputs.index_type"
+          v-if="visibleInputs.data_type"
           data-test="add-stream-field-type-select-input"
           class="q-ml-none flex items-end o2-input"
         >
@@ -191,7 +191,7 @@ defineProps({
     type: Object,
     default: () => ({
       name: true,
-      type: true,
+      data_type: true,
       index_type: true,
     }),
   },

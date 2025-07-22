@@ -281,9 +281,11 @@ const useStreams = () => {
               );
               const streamList = deepCopy(streamsCache[streamType].value || {});
               streamList.list[streamIndex] = removeSchemaFields(_stream.data);
-
+              streamList.list[streamIndex] = restructureDefinedSchemaFields(_stream.data);
+              //here we need to update
               updateStreamsInStore(streamType, streamList);
             } catch (err) {
+              console.log(err,'err')
               return reject("Error while fetching schema");
             }
           }
@@ -689,7 +691,23 @@ const useStreams = () => {
                 JSON.stringify(previousItem) === JSON.stringify(currentItem),
             ),
         );
-      } else {
+      } else if (attribute === "defined_schema_fields") {
+        add = currentArray.filter(
+          (item: any) =>
+            !previousArray.some(
+              (prev: any) => prev.name === item.name && prev.type === item.type
+            )
+        );
+      
+        remove = previousArray.filter(
+          (item: any) =>
+            !currentArray.some(
+              (curr: any) => curr.name === item.name && curr.type === item.type
+            )
+        );
+      }
+      
+      else {
         // For other attributes, do a simple array comparison
         add = currentArray.filter((item: any) => !previousArray.includes(item));
         remove = previousArray.filter(
@@ -749,6 +767,29 @@ const useStreams = () => {
     }
   }
 
+  const restructureDefinedSchemaFields = (streamData: any) => {
+    const fields = streamData.settings.defined_schema_fields;
+  
+    // Determine and store the format of the array
+    //because we might sometimes get array of strings and sometimes get array of object
+    streamData.settings.definedSchemaIsObject =
+      Array.isArray(fields) &&
+      typeof fields[0] === 'object' &&
+      fields[0] !== null &&
+      'name' in fields[0];
+  
+    // Store the original before any conversion
+    streamData.settings.defined_schema_fields_original = fields ? [...fields] : [];
+  
+    // Convert only if it's an array of objects
+    if (streamData.settings.definedSchemaIsObject) {
+      streamData.settings.defined_schema_fields = fields.map((field: any) => field.name);
+    }
+  
+    return streamData;
+  };
+  
+
   return {
     getStreams,
     getStream,
@@ -762,7 +803,8 @@ const useStreams = () => {
     getPaginatedStreams,
     isStreamExists,
     isStreamFetched,
-    addNewStreams
+    addNewStreams,
+    restructureDefinedSchemaFields
   };
 };
 
