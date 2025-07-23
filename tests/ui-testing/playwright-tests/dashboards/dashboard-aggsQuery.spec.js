@@ -87,7 +87,7 @@ test.describe("dashboard aggregations testcases", () => {
     ]);
 
     const body = await partitionResp.json();
-    expect(body.streaming_aggs).toBe(false);
+    expect(body.streaming_aggs).toBe(true);
 
     // Wait for response
 
