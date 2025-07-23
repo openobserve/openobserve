@@ -66,6 +66,8 @@ pub struct TriggerData {
     pub start_time: i64,
     pub end_time: i64,
     pub retries: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skipped_alerts_count: Option<i64>,
     pub error: Option<String>,
     pub success_response: Option<String>,
     pub is_partial: Option<bool>,
