@@ -423,6 +423,7 @@ export default defineComponent({
       const decoder = new TextDecoder();
       let buffer = '';
       let messageComplete = false;
+      let firstEventReceived = false; // Add this flag
       
       try {
         while (true) {
@@ -449,6 +450,12 @@ export default defineComponent({
                 try {
                   const data = JSON.parse(jsonStr);
                   if (data && typeof data.content === 'string') {
+                    // Hide loading indicator after first event
+                    if (!firstEventReceived) {
+                      isLoading.value = false;
+                      firstEventReceived = true;
+                    }
+
                     // Format code blocks with proper line breaks
                     let content = data.content;
                     
@@ -520,6 +527,7 @@ export default defineComponent({
         }
       } catch (error) {
         console.error('Error reading stream:', error);
+        isLoading.value = false; 
       }
     };
 
