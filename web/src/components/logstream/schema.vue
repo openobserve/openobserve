@@ -467,9 +467,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       outlined
                       filled
                       dense
-                      style="min-width: 300px; max-width: 300px"
+                      style="min-width: 15rem; max-width: 15rem"
                       @update:model-value="markFormDirty(props.row.name, 'fts')"
                     />
+                  </q-td>
+                </template>
+                <!-- here we will render the number of regex patterns associated with the specific field -->
+                <template v-slot:body-cell-patterns="props">
+                  <q-td v-if="!(props.row.name == store.state.zoConfig.timestamp_column) && (props.row.type == 'Utf8' || props.row.type == 'utf8')" class="field-name text-left tw-text-[#5960B2] tw-cursor-pointer " style="padding-left: 12px !important;" @click="openPatternAssociationDialog(props.row.name)">
+                    {{ patternAssociations[props.row.name]?.length ? `View ${patternAssociations[props.row.name]?.length} Patterns` : 'Add Pattern' }}
+                    <span>
+                      <q-icon name="arrow_forward" size="xs" />
+                    </span>
+                  </q-td>
+                  <q-td v-else>
                   </q-td>
                 </template>
 
@@ -663,6 +674,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card v-else class="column q-pa-md full-height no-wrap">
     <h5>Wait while loading...</h5>
   </q-card>
+  <q-dialog v-model="patternAssociationDialog.show" position="right" full-height maximized>
+    <AssociatedRegexPatterns :data="patternAssociationDialog.data" :fieldName="patternAssociationDialog.fieldName" @closeDialog="patternAssociationDialog.show = false" @addPattern="handleAddPattern" @removePattern="handleRemovePattern" @updateSettings="onSubmit" @updateAppliedPattern="handleUpdateAppliedPattern" />
+  </q-dialog>
 
   <ConfirmDialog
     title="Delete Action"
@@ -718,6 +732,8 @@ import {
 
 import DateTime from "@/components/DateTime.vue";
 
+import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
+
 const defaultValue: any = () => {
   return {
     name: "",
@@ -743,8 +759,16 @@ export default defineComponent({
     AppTabs,
     QTablePagination,
     DateTime,
+    AssociatedRegexPatterns
   },
   setup({ modelValue }) {
+    type PatternAssociation = {
+      field: string;
+      pattern_name: string;
+      pattern_id: string;
+      policy: string;
+      apply_at: string;
+    };
     const { t } = useI18n();
     const store = useStore();
     const q = useQuasar();
@@ -767,11 +791,14 @@ export default defineComponent({
     const IsdeleteBtnVisible = ref(false);
     const redBtnRows = ref([]);
 
+    const patternIdToApplyAtMap = new Map();
+
     const newSchemaFields = ref([]);
     const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
     const isDialogOpen = ref(false);
+    const patternAssociations = ref([]);
     const redDaysList = ref([]);
     const resultTotal = ref<number>(0);
     const perPageOptions: any = [
@@ -792,6 +819,11 @@ export default defineComponent({
     const selectedPerPage = ref<number>(20);
     const pagination: any = ref({
       rowsPerPage: 20,
+    });
+    const patternAssociationDialog = ref({
+      show: false,
+      data: [],
+      fieldName: ""
     });
 
     const selectedFields = ref([]);
@@ -987,12 +1019,20 @@ export default defineComponent({
     const setSchema = (streamResponse) => {
       const schemaMapping = new Set([]);
 
+      //here lets add the pattern associations to the streamResponse
+      streamResponse.settings.pattern_associations = streamResponse.pattern_associations;
       if (streamResponse?.settings) {
         // console.log("streamResponse:", streamResponse);
         previousSchemaVersion = JSON.parse(
           JSON.stringify(streamResponse.settings),
         );
       }
+      //after this we need to have a map of pattern_id and according to field as well
+      //so that we can easily access the apply_at value for a pattern if it is undefined or null
+      
+      previousSchemaVersion.pattern_associations && previousSchemaVersion.pattern_associations.forEach((pattern: PatternAssociation) => {
+        patternIdToApplyAtMap.set(pattern.field + pattern.pattern_id, pattern);
+      });
       if (!streamResponse.schema?.length) {
         streamResponse.schema = [];
         if (streamResponse.settings.defined_schema_fields?.length)
@@ -1019,6 +1059,10 @@ export default defineComponent({
             });
           },
         );
+      }
+      if(streamResponse.pattern_associations){
+        patternAssociations.value = groupPatternAssociationsByField(streamResponse.pattern_associations);
+        // Now you can quickly access patterns by field
       }
 
       if (
@@ -1117,6 +1161,7 @@ export default defineComponent({
     };
 
     const onSubmit = async () => {
+      patternAssociations.value = ungroupPatternAssociations(patternAssociations.value);
       let settings = {
         partition_keys: [],
         index_fields: [],
@@ -1124,6 +1169,7 @@ export default defineComponent({
         bloom_filter_fields: [],
         defined_schema_fields: [...indexData.value.defined_schema_fields],
         extended_retention_days: [...indexData.value.extended_retention_days],
+        pattern_associations: [...patternAssociations.value],
       };
       if (showDataRetention.value && dataRetentionDays.value < 1) {
         q.notify({
@@ -1257,7 +1303,7 @@ export default defineComponent({
         )
         .then(async (res) => {
           if (
-            store.state.logs.logs.data.stream.selectedStream.includes(
+            store.state.logs?.logs?.data?.stream?.selectedStream?.includes(
               indexData.value.name,
             )
           ) {
@@ -1416,6 +1462,12 @@ export default defineComponent({
       {
         name: "index_type",
         label: t("logStream.indexType"),
+        align: "left",
+        sortable: false,
+      },
+      {
+        name: "patterns",
+        label: t("logStream.regexPatterns"),
         align: "left",
         sortable: false,
       },
@@ -1636,6 +1688,71 @@ export default defineComponent({
       onSubmit();
     };
 
+    const  groupPatternAssociationsByField = (associations: PatternAssociation[]): Record<string, PatternAssociation[]> => {
+        return associations.reduce((acc, item) => {
+          if (!acc[item.field]) {
+            acc[item.field] = [];
+          }
+          acc[item.field].push(item);
+          return acc;
+        }, {} as Record<string, PatternAssociation[]>);
+      }
+      const ungroupPatternAssociations = (grouped: Record<string, PatternAssociation[]>): PatternAssociation[] => {
+          return Object.values(grouped).flat();
+        };
+
+    const openPatternAssociationDialog = (field: string) => {
+      patternAssociationDialog.value.show = true;
+      patternAssociationDialog.value.data = patternAssociations.value[field] || [];
+      patternAssociationDialog.value.fieldName = field;
+    }
+    //this is used to add a new pattern to the field
+    //completely new pattern not an update
+    const handleAddPattern = (pattern: PatternAssociation) => {
+      formDirtyFlag.value = true;
+      if(patternAssociations.value[pattern.field]){
+        patternAssociations.value[pattern.field].push(pattern);
+      }
+      else{
+        patternAssociations.value[pattern.field] = [pattern];
+      }
+      patternAssociationDialog.value.data = patternAssociations.value[pattern.field];
+    }
+
+    //this is used to remove a pattern from the field
+    const handleRemovePattern = (patternId: string, fieldName: string) => {
+      formDirtyFlag.value = true;
+      let filteredData = patternAssociations.value[fieldName] && patternAssociations.value[fieldName].filter((pattern: PatternAssociation) => {
+        return pattern.pattern_id !== patternId;
+      });
+      patternAssociations.value[fieldName] = [...filteredData];
+      patternAssociationDialog.value.data = [...filteredData];
+    }
+
+    //this is used to update an already applied pattern in the field
+    //for suppose user wants to update policy or apply_at for a pattern
+    const handleUpdateAppliedPattern = (pattern: PatternAssociation, fieldName: string, patternId: string, attribute: string) => {
+      patternAssociations.value[pattern.field] && patternAssociations.value[fieldName].forEach((p: PatternAssociation) => {
+        if(p.pattern_id === pattern.pattern_id && p.pattern_name === pattern.pattern_name){
+          if(attribute === "policy"){
+            p.policy = pattern.policy;
+          }
+          else if(attribute === "apply_at"){
+            if(pattern.apply_at != undefined && pattern.apply_at != null){
+              p.apply_at = pattern.apply_at;
+            }
+            else{
+              p.apply_at = patternIdToApplyAtMap.get(fieldName + patternId)?.apply_at;
+            }
+          }
+        }
+      });
+      if(patternAssociations.value[fieldName]){
+        patternAssociationDialog.value.data = [...patternAssociations.value[fieldName]];
+      }
+    }
+
+
     return {
       t,
       q,
@@ -1705,6 +1822,12 @@ export default defineComponent({
       deleteDates,
       IsdeleteBtnVisible,
       showStoreOriginalDataToggle,
+      patternAssociations,
+      patternAssociationDialog,
+      openPatternAssociationDialog,
+      handleAddPattern,
+      handleRemovePattern,
+      handleUpdateAppliedPattern
     };
   },
   created() {
@@ -1939,9 +2062,9 @@ export default defineComponent({
 
   .q-table {
     td:nth-child(2) {
-      min-width: 20rem;
-      width: 20rem;
-      max-width: 20rem;
+      min-width: 15rem;
+      width: 15rem;
+      max-width: 15rem;
       overflow: auto;
       scrollbar-width: thin;
       scrollbar-color: #999 #f0f0f0;
@@ -1954,6 +2077,13 @@ export default defineComponent({
   th:first-child,
   td:first-child {
     padding-left: 8px !important;
+  }
+
+  th:nth-child(5),
+  td:nth-child(5){
+    min-width: 15rem;
+    width: 15rem;
+    max-width: 15rem;
   }
 }
 .dark-theme-table tr:hover td:nth-child(2) {
