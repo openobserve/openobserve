@@ -283,19 +283,21 @@ async fn handle_alert_triggers(
         );
         final_end_time = skipped_timestamps_end_timestamp.1;
         let skipped_timestamps = skipped_timestamps_end_timestamp.0;
-
         // Skip Alerts: Say for some reason, this alert trigger (period: 10mins, frequency 5mins)
         // which was supposed to run at 10am is now processed after a delay of 5 mins (may be alert
         // manager was stuck or something). In that case, only use the period strictly to evaluate
         // the alert. If the delay is within the max considerable delay, consider the delay with
         // period, otherwise strictly use the period only. Also, since we are skipping this alert
         // (9:50am to 10am timerange), we need to report this event to the `triggers` usage stream.
-        for timestamp in skipped_timestamps {
-            let start_time = timestamp
+        if !skipped_timestamps.is_empty() {
+            let skipped_first_timestamp = skipped_timestamps.first().unwrap();
+            let skipped_last_timestamp = skipped_timestamps.last().unwrap();
+            let start_time = skipped_first_timestamp
                 - Duration::try_minutes(alert.trigger_condition.period)
                     .unwrap()
                     .num_microseconds()
                     .unwrap();
+            let skipped_alerts_count = skipped_timestamps.len();
             // If delay is greater than the alert frequency, skip them and report the event
             // to the `triggers` usage stream.
             publish_triggers_usage(TriggerData {
@@ -308,7 +310,7 @@ async fn handle_alert_triggers(
                 is_silenced: trigger.is_silenced,
                 status: TriggerDataStatus::Skipped,
                 start_time,
-                end_time: timestamp,
+                end_time: *skipped_last_timestamp,
                 retries: trigger.retries,
                 delay_in_secs: Some(delay),
                 error: None,
@@ -319,6 +321,7 @@ async fn handle_alert_triggers(
                 query_took: None,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 time_in_queue_ms: Some(time_in_queue),
+                skipped_alerts_count: Some(skipped_alerts_count as i64),
             })
             .await;
         }
@@ -363,6 +366,7 @@ async fn handle_alert_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(time_in_queue),
+        skipped_alerts_count: None,
     };
 
     let evaluation_took = Instant::now();
@@ -742,6 +746,7 @@ async fn handle_report_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
+        skipped_alerts_count: None,
     };
 
     if trigger.retries >= max_retries {
@@ -903,6 +908,7 @@ async fn handle_derived_stream_triggers(
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
+            skipped_alerts_count: None,
         };
 
         log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {}", err_msg);
@@ -986,6 +992,7 @@ async fn handle_derived_stream_triggers(
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
+            skipped_alerts_count: None,
         };
         log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {}", err_msg);
         new_trigger_data.reset();
@@ -1139,6 +1146,7 @@ async fn handle_derived_stream_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(time_in_queue),
+        skipped_alerts_count: None,
     };
 
     // evaluate trigger and configure trigger next run time
