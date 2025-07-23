@@ -37,6 +37,10 @@ version-resolver:
       - '🧹 Updates'
   default: patch
 template: |
+    ##📦 Download Binaries
+    You can download the binaries from:
+    - https://openobserve.ai/downloads
+
     $CHANGES
 
     ## 🐳 Docker Images
