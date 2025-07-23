@@ -24,11 +24,12 @@ use ::config::{
     utils::{json, rand::get_rand_element},
 };
 use actix_web::{
-    FromRequest, HttpMessage, HttpRequest, HttpResponse,
+    FromRequest, HttpRequest, HttpResponse,
     http::{Error, Method, header},
     route, web,
 };
 use hashbrown::HashMap;
+use reqwest::header::HeaderMap;
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
@@ -50,7 +51,7 @@ struct URLDetails {
 pub async fn config(
     req: HttpRequest,
     payload: web::Payload,
-    client: web::Data<awc::Client>,
+    client: web::Data<reqwest::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
     dispatch(req, payload, client).await
 }
@@ -65,7 +66,7 @@ pub async fn config(
 pub async fn config_paths(
     req: HttpRequest,
     payload: web::Payload,
-    client: web::Data<awc::Client>,
+    client: web::Data<reqwest::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
     dispatch(req, payload, client).await
 }
@@ -81,7 +82,7 @@ pub async fn config_paths(
 pub async fn api(
     req: HttpRequest,
     payload: web::Payload,
-    client: web::Data<awc::Client>,
+    client: web::Data<reqwest::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
     dispatch(req, payload, client).await
 }
@@ -96,7 +97,7 @@ pub async fn api(
 pub async fn aws(
     req: HttpRequest,
     payload: web::Payload,
-    client: web::Data<awc::Client>,
+    client: web::Data<reqwest::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
     dispatch(req, payload, client).await
 }
@@ -111,7 +112,7 @@ pub async fn aws(
 pub async fn gcp(
     req: HttpRequest,
     payload: web::Payload,
-    client: web::Data<awc::Client>,
+    client: web::Data<reqwest::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
     dispatch(req, payload, client).await
 }
@@ -124,7 +125,7 @@ pub async fn gcp(
 pub async fn rum(
     req: HttpRequest,
     payload: web::Payload,
-    client: web::Data<awc::Client>,
+    client: web::Data<reqwest::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
     dispatch(req, payload, client).await
 }
@@ -132,7 +133,7 @@ pub async fn rum(
 async fn dispatch(
     req: HttpRequest,
     payload: web::Payload,
-    client: web::Data<awc::Client>,
+    client: web::Data<reqwest::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -242,15 +243,25 @@ async fn get_url(path: &str) -> URLDetails {
 async fn default_proxy(
     req: HttpRequest,
     payload: web::Payload,
-    client: web::Data<awc::Client>,
+    client: web::Data<reqwest::Client>,
     new_url: URLDetails,
     start: std::time::Instant,
 ) -> actix_web::Result<HttpResponse, Error> {
     let p = new_url.path.find("?").unwrap_or(new_url.path.len());
     let query_str = &new_url.path[..p];
     // send query
-    let req = create_proxy_request(client, req, &new_url).await?;
-    let mut resp = match req.send_stream(payload).await {
+    let mut req = create_proxy_request(client, req, &new_url).await?;
+    let body = match payload.to_bytes().await {
+        Ok(body) => body,
+        Err(e) => {
+            log::error!("Failed to read request body: {e:?}");
+            return Ok(e.error_response());
+        }
+    };
+    if !body.is_empty() {
+        req = req.body(body);
+    }
+    let resp = match req.send().await {
         Ok(resp) => resp,
         Err(e) => {
             log::error!(
@@ -267,12 +278,14 @@ async fn default_proxy(
     };
 
     // handle response
-    let mut new_resp = HttpResponse::build(resp.status());
+    let status_code = actix_web::http::StatusCode::from_u16(resp.status().as_u16())
+        .unwrap_or(actix_web::http::StatusCode::INTERNAL_SERVER_ERROR);
+    let mut new_resp = HttpResponse::build(status_code);
 
     // copy headers
     for (key, value) in resp.headers() {
         if !key.eq("content-encoding") {
-            new_resp.insert_header((key.clone(), value.clone()));
+            new_resp.insert_header((key.clone().as_str(), value.clone().as_bytes()));
         }
     }
 
@@ -287,13 +300,9 @@ async fn default_proxy(
                 header::CONNECTION,
                 header::HeaderValue::from_static("keep-alive"),
             ))
-            .streaming(resp.take_payload())
+            .streaming(resp.bytes_stream())
     } else {
-        let body = match resp
-            .body()
-            .limit(get_config().limit.req_payload_limit)
-            .await
-        {
+        let body = match read_limited_body(resp, get_config().limit.req_payload_limit).await {
             Ok(b) => b,
             Err(e) => {
                 log::error!(
@@ -324,7 +333,7 @@ enum ProxyPayload {
 async fn proxy_querier_by_body(
     req: HttpRequest,
     payload: web::Payload,
-    client: web::Data<awc::Client>,
+    client: web::Data<reqwest::Client>,
     mut new_url: URLDetails,
     start: std::time::Instant,
 ) -> actix_web::Result<HttpResponse, Error> {
@@ -447,12 +456,12 @@ async fn proxy_querier_by_body(
     let req = create_proxy_request(client, req, &new_url).await?;
     let resp = match payload {
         ProxyPayload::None => req.send().await,
-        ProxyPayload::PromQLQuery(payload) => req.send_form(&payload).await,
-        ProxyPayload::SearchRequest(payload) => req.send_json(&payload).await,
-        ProxyPayload::SearchPartitionRequest(payload) => req.send_json(&payload).await,
-        ProxyPayload::ValuesRequest(payload) => req.send_json(&payload).await,
+        ProxyPayload::PromQLQuery(payload) => req.form(&payload).send().await,
+        ProxyPayload::SearchRequest(payload) => req.json(&payload).send().await,
+        ProxyPayload::SearchPartitionRequest(payload) => req.json(&payload).send().await,
+        ProxyPayload::ValuesRequest(payload) => req.json(&payload).send().await,
     };
-    let mut resp = match resp {
+    let resp = match resp {
         Ok(resp) => resp,
         Err(e) => {
             log::error!(
@@ -469,12 +478,14 @@ async fn proxy_querier_by_body(
     };
 
     // handle response
-    let mut new_resp = HttpResponse::build(resp.status());
+    let status_code = actix_web::http::StatusCode::from_u16(resp.status().as_u16())
+        .unwrap_or(actix_web::http::StatusCode::INTERNAL_SERVER_ERROR);
+    let mut new_resp = HttpResponse::build(status_code);
 
     // copy headers
     for (key, value) in resp.headers() {
         if !key.eq("content-encoding") {
-            new_resp.insert_header((key.clone(), value.clone()));
+            new_resp.insert_header((key.clone().as_str(), value.clone().as_bytes()));
         }
     }
 
@@ -489,13 +500,9 @@ async fn proxy_querier_by_body(
                 header::CONNECTION,
                 header::HeaderValue::from_static("keep-alive"),
             ))
-            .streaming(resp.take_payload())
+            .streaming(resp.bytes_stream())
     } else {
-        let body = match resp
-            .body()
-            .limit(get_config().limit.req_payload_limit)
-            .await
-        {
+        let body = match read_limited_body(resp, get_config().limit.req_payload_limit).await {
             Ok(b) => b,
             Err(e) => {
                 log::error!(
@@ -515,11 +522,25 @@ async fn proxy_querier_by_body(
     Ok(http_response)
 }
 
+async fn read_limited_body(
+    mut resp: reqwest::Response,
+    limit: usize,
+) -> Result<bytes::Bytes, String> {
+    let mut body = Vec::new();
+    while let Some(chunk) = resp.chunk().await.map_err(|e| e.to_string())? {
+        if body.len() + chunk.len() > limit {
+            return Err(format!("Response body exceeded limit of {limit} bytes"));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(bytes::Bytes::from(body))
+}
+
 async fn create_proxy_request(
-    client: web::Data<awc::Client>,
+    client: web::Data<reqwest::Client>,
     req: HttpRequest,
     new_url: &URLDetails,
-) -> actix_web::Result<awc::ClientRequest, Error> {
+) -> actix_web::Result<reqwest::RequestBuilder, Error> {
     // get cookies
     let cookies = req
         .head()
@@ -533,36 +554,43 @@ async fn create_proxy_request(
             }
         })
         .collect::<Vec<_>>();
+    // convert actix method to reqwest method
+    let method = reqwest::Method::from_bytes(req.method().as_str().as_bytes()).map_err(|e| {
+        Error::from(actix_http::error::PayloadError::Io(std::io::Error::other(
+            e,
+        )))
+    })?;
     // create request
     let mut req = if new_url.full_url.starts_with("https://") {
         create_http_client()
             .unwrap()
-            .request_from(req.full_url().to_string(), req.head())
-            .address(new_url.node_addr.parse().unwrap())
+            .request(method, req.full_url())
     } else {
-        client.request_from(&new_url.full_url, req.head())
+        client.request(method, &new_url.full_url)
     };
     // set cookies
     if !cookies.is_empty() {
-        req.headers_mut().insert(
-            actix_web::http::header::COOKIE,
-            actix_http::header::HeaderValue::from_str(&cookies.join("; ")).unwrap(),
+        let mut header_map = HeaderMap::new();
+        header_map.insert(
+            reqwest::header::COOKIE,
+            reqwest::header::HeaderValue::from_str(&cookies.join("; ")).unwrap(),
         );
+        req = req.headers(header_map);
     }
     Ok(req)
 }
 
-pub fn create_http_client() -> Result<awc::Client, anyhow::Error> {
+pub fn create_http_client() -> Result<reqwest::Client, anyhow::Error> {
     let cfg = get_config();
-    let mut client_builder = awc::Client::builder()
-        .connector(awc::Connector::new().limit(cfg.route.max_connections))
+    let mut client_builder = reqwest::Client::builder()
+        .pool_max_idle_per_host(cfg.route.max_connections)
         .timeout(std::time::Duration::from_secs(cfg.route.timeout))
-        .disable_redirects();
+        .redirect(reqwest::redirect::Policy::none());
     if cfg.http.tls_enabled {
         let tls_config = crate::service::tls::client_tls_config()?;
-        client_builder = client_builder.connector(awc::Connector::new().rustls_0_23(tls_config));
+        client_builder = client_builder.use_preconfigured_tls(tls_config);
     }
-    Ok(client_builder.finish())
+    Ok(client_builder.build()?)
 }
 
 #[cfg(test)]
