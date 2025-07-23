@@ -735,7 +735,7 @@ fn handle_histogram(
     };
 
     let interval = if histogram_interval > 0 {
-        format!("{} seconds", histogram_interval)
+        format!("{} second", histogram_interval)
     } else {
         let attrs = caps
             .get(1)
