@@ -56,7 +56,12 @@ export class HomePage {
         await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
         await this.page.waitForTimeout(5000);
 
-        await this.page.getByRole('option', { name: orgName }).locator('div').nth(2).click();
+        // Search for the organization
+        await this.page.locator('[data-test="organization-search-input"]').fill(orgName);
+        await this.page.waitForTimeout(2000);
+
+        // Click the organization from search results
+        await this.page.locator('[data-test="organization-menu-item-label-item-label"]').first().click();
     }
 
     async homePageURLValidation(orgName) {
@@ -101,8 +106,8 @@ export class HomePage {
         // Click the dropdown to open the list of organizations
         await this.page.getByText('arrow_drop_down').click();
     
-        // Wait for the dropdown options to be present
-        const optionsSelector = '[data-test="navbar-organizations-select"] [role="option"]';
+        // Wait for the dropdown options to be present using the correct selector
+        const optionsSelector = '[data-test="organization-menu-item-label-item-label"]';
         try {
             await this.page.waitForSelector(optionsSelector, { state: 'visible', timeout: 60000 });
         } catch (error) {
@@ -114,8 +119,8 @@ export class HomePage {
         const optionsCount = await this.page.locator(optionsSelector).count();
         console.log(`Number of options visible: ${optionsCount}`);
     
-        // Check if the 'default' option is available and visible
-        const defaultOption = this.page.getByRole('option', { name: 'default' });
+        // Find and click the 'default' option using the correct locator
+        const defaultOption = this.page.locator(optionsSelector).filter({ hasText: 'default' }).first();
     
         // Wait for the 'default' option to be visible
         try {

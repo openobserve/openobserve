@@ -39,8 +39,12 @@ use infra::{
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
 
 use super::db::enrichment_table;
+#[cfg(feature = "enterprise")]
+use crate::service::db::re_pattern::process_association_changes;
 use crate::{
     common::meta::{
         authz::Authz,
@@ -69,7 +73,13 @@ pub async fn get_stream(
     if schema != Schema::empty() {
         let mut stats = stats::get_stream_stats(org_id, stream_name, stream_type);
         transform_stats(&mut stats, org_id, stream_name, stream_type).await;
-        Some(stream_res(stream_name, stream_type, schema, Some(stats)))
+        Some(stream_res(
+            org_id,
+            stream_name,
+            stream_type,
+            schema,
+            Some(stats),
+        ))
     } else {
         None
     }
@@ -120,6 +130,7 @@ pub async fn get_streams(
             && stream_loc.stream_type != StreamType::EnrichmentTables
         {
             indices_res.push(stream_res(
+                org_id,
                 stream_loc.stream_name.as_str(),
                 stream_loc.stream_type,
                 stream_loc.schema,
@@ -134,6 +145,7 @@ pub async fn get_streams(
             )
             .await;
             indices_res.push(stream_res(
+                org_id,
                 stream_loc.stream_name.as_str(),
                 stream_loc.stream_type,
                 stream_loc.schema,
@@ -144,7 +156,9 @@ pub async fn get_streams(
     indices_res
 }
 
+// org_id is only for pattern associations, which is ent only
 pub fn stream_res(
+    _org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     schema: Schema,
@@ -194,6 +208,16 @@ pub fn stream_res(
         stream_type,
     ));
 
+    #[cfg(not(feature = "enterprise"))]
+    let pattern_associations = vec![];
+    // because this fn cannot be async, we cannot await on initializing the pattern
+    // manager. So instead we do it in best-effort-way, where if it is already initialized,
+    // we get the patterns, otherwise report them as empty
+    #[cfg(feature = "enterprise")]
+    let pattern_associations = match PATTERN_MANAGER.get() {
+        Some(m) => m.get_associations(_org_id, stream_type, stream_name),
+        None => vec![],
+    };
     let is_derived = unwrap_stream_is_derived(&schema);
 
     Stream {
@@ -206,6 +230,7 @@ pub fn stream_res(
         stats,
         settings,
         metrics_meta,
+        pattern_associations,
         is_derived,
     }
 }
@@ -579,6 +604,28 @@ pub async fn update_stream_settings(
             if let Some(partition_time_level) = new_settings.partition_time_level {
                 settings.partition_time_level = Some(partition_time_level);
             }
+
+            #[cfg(feature = "enterprise")]
+            {
+                if let Err(e) = process_association_changes(
+                    org_id,
+                    stream_name,
+                    stream_type,
+                    new_settings.pattern_associations,
+                )
+                .await
+                {
+                    return Ok(
+                        HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                            http::StatusCode::INTERNAL_SERVER_ERROR,
+                            format!(
+                                "Internal server error while updating pattern associations {e}",
+                            ),
+                        )),
+                    );
+                }
+            }
+
             save_stream_settings(org_id, stream_name, stream_type, settings).await
         }
         None => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -691,6 +738,12 @@ pub async fn stream_delete_inner(
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        use super::db::re_pattern::remove_stream_associations_after_deletion;
+        remove_stream_associations_after_deletion(org_id, stream_name, stream_type).await?;
+    }
+
     // create delete for compactor
     if let Err(e) =
         db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
@@ -778,7 +831,13 @@ mod tests {
     fn test_stream_res() {
         let stats = StreamStats::default();
         let schema = Schema::new(vec![Field::new("f.c", DataType::Int32, false)]);
-        let res = stream_res("Test", StreamType::Logs, schema, Some(stats.clone()));
+        let res = stream_res(
+            "default",
+            "Test",
+            StreamType::Logs,
+            schema,
+            Some(stats.clone()),
+        );
         assert_eq!(res.stats, stats);
     }
 }

@@ -37,6 +37,7 @@ env:
   ZO_SMTP_ENABLED: true
   ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
   ZO_CREATE_ORG_THROUGH_INGESTION: true
+  ZO_UTF8_VIEW_ENABLED: false
 
 jobs:
   build_binary:
@@ -186,10 +187,6 @@ jobs:
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
 
-      # - name: Check OpenObserve logs
-      #   if: always()
-      #   run: cat o2.log
-
       - name: Sanitize Test Filename
         shell: bash
         run: |
@@ -216,6 +213,10 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
+
+      - name: Check OpenObserve logs
+        if: always()
+        run: cat o2.log
 
   generate_coverage_report:
     name: Generate Coverage Report

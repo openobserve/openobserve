@@ -38,6 +38,8 @@ pub mod ofga;
 pub mod org_users;
 pub mod organization;
 pub mod pipeline;
+#[cfg(feature = "enterprise")]
+pub mod re_pattern;
 pub mod saved_view;
 pub mod scheduler;
 pub mod schema;
