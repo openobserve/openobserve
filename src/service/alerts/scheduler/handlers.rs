@@ -953,6 +953,7 @@ async fn handle_derived_stream_triggers(
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
+            skipped_alerts_count: None,
         };
         log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {}", msg);
         new_trigger_data.reset();
