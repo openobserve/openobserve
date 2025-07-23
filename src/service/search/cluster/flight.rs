@@ -105,20 +105,23 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     .await?;
     let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
+    let file_id_list_records = file_id_list_vec.iter().map(|v| v.records).sum::<i64>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, files: {}, took: {} ms",
-                sql.time_range, file_id_list_num, file_id_list_took,
+                "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, files: {}, records: {}, took: {} ms",
+                sql.time_range, file_id_list_num, file_id_list_records, file_id_list_took,
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:leader get file id".to_string())
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
-                .desc(format!("get files {file_id_list_num} ids"))
+                .desc(format!(
+                    "get files {file_id_list_num} ids, records {file_id_list_records}"
+                ))
                 .build()
         )
     );
