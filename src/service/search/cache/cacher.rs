@@ -162,7 +162,7 @@ pub async fn check_cache(
             } else {
                 sql.time_range
             };
-        handle_histogram(origin_sql, q_time_range);
+        handle_histogram(origin_sql, q_time_range, interval);
         req.query.sql = origin_sql.clone();
         discard_interval = interval * 1000 * 1000; // in microseconds
     }
@@ -695,31 +695,40 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     Ok(true)
 }
 
-fn handle_histogram(origin_sql: &mut String, q_time_range: Option<(i64, i64)>) {
+fn handle_histogram(
+    origin_sql: &mut String,
+    q_time_range: Option<(i64, i64)>,
+    histogram_interval: i64,
+) {
     let caps = if let Some(caps) = RE_HISTOGRAM.captures(origin_sql.as_str()) {
         caps
     } else {
         return;
     };
-    let attrs = caps
-        .get(1)
-        .unwrap()
-        .as_str()
-        .split(',')
-        .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
-        .collect::<Vec<&str>>();
 
-    let interval = match attrs.get(1) {
-        Some(v) => match v.parse::<u16>() {
-            Ok(v) => generate_histogram_interval(q_time_range, v),
-            Err(_) => v.to_string(),
-        },
-        None => generate_histogram_interval(q_time_range, 0),
+    let interval = if histogram_interval > 0 {
+        format!("{histogram_interval} second")
+    } else {
+        let attrs = caps
+            .get(1)
+            .unwrap()
+            .as_str()
+            .split(',')
+            .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
+            .collect::<Vec<&str>>();
+
+        attrs
+            .get(1)
+            .map_or_else(
+                || generate_histogram_interval(q_time_range, 0),
+                |v| v.to_string(),
+            )
+            .to_string()
     };
 
     *origin_sql = origin_sql.replace(
         caps.get(0).unwrap().as_str(),
-        &format!("histogram(_timestamp,'{}')", interval),
+        &format!("histogram(_timestamp,'{interval}')"),
     );
 }
 
