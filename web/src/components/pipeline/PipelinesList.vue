@@ -93,10 +93,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tr
             :data-test="`pipeline-list-table-${props.row.pipeline_id}-row`"
             :props="props"
-            style="cursor: pointer"
+            style="cursor: pointer;"
             @click="triggerExpand(props)"
           >
-            <q-td auto-width>
+            <q-td class="q-table-checkbox-cell">
               <q-checkbox
                 v-model="props.selected"
                 color="secondary"
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop
               />
             </q-td>
-            <q-td v-if="activeTab == 'scheduled'" auto-width>
+            <q-td style="padding: 0px 8px !important;" v-if="activeTab == 'scheduled'">
               <q-btn
                 dense
                 flat
@@ -117,15 +117,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </q-td>
             <q-td v-for="col in filterColumns()" :key="col.name" :props="props">
-              <template v-if="col.name !== 'actions'">
+              <template v-if="col.name == 'name'">  
+                <div class="tw-flex tw-gap-2 tw-items-center">
+                    <img :src="getPipelineIcon(checkIsScheduled(props.row))" />
+                  {{ props.row[col.field] }}
+                </div>
+              </template>
+              <template v-else-if="col.name == 'stream_type'"> 
+                <span :class="`${props.row[col.field]}-col-chip`">
+                  {{ props.row[col.field] }}
+                </span>
+              </template>
+              <template v-else-if="col.name !== 'actions' && col.name != 'name' && col.name != 'stream_type'">
                 {{ props.row[col.field] }}
               </template>
               <template v-else>
                 <!-- Actions Buttons -->
+                 <div class="tw-flex tw-items-center">
                 <q-btn
                   :data-test="`pipeline-list-${props.row.name}-pause-start-alert`"
                   :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-                  class="q-ml-xs material-symbols-outlined"
                   padding="sm"
                   unelevated
                   size="sm"
@@ -140,8 +151,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
                   icon="edit"
-                  class="q-ml-xs"
-                  padding="sm"
                   unelevated
                   size="sm"
                   round
@@ -150,33 +159,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.stop="editPipeline(props.row)"
                 ></q-btn>
                 <q-btn
-                  :data-test="`pipeline-list-${props.row.name}-export-pipeline`"
-                  icon="download"
-                  class="q-ml-xs"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :title="t('pipeline.export')"
-                  @click.stop="exportPipeline(props.row)"
-                ></q-btn>
-                <q-btn
-                  :data-test="`pipeline-list-${props.row.name}-delete-pipeline`"
-                  :icon="outlinedDelete"
-                  class="q-ml-xs"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :title="t('pipeline.delete')"
-                  @click.stop="openDeleteDialog(props.row)"
-                ></q-btn>
-                <q-btn
                   :data-test="`pipeline-list-${props.row.name}-view-pipeline`"
                   :icon="outlinedVisibility"
-                  class="q-ml-xs"
                   padding="sm"
                   unelevated
                   size="sm"
@@ -188,6 +172,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <PipelineView :pipeline="props.row" />
                   </q-tooltip>
                 </q-btn>
+
+                <!-- these are the extra buttons  -->
+                <q-btn
+                  :icon="outlinedMoreVert"
+                  unelevated
+                  size="sm"
+                  round
+                  flat
+                  @click.stop="openMenu($event, props.row)"
+                  :data-test="`pipeline-list-${props.row.name}-more-options`"
+                >
+                  <q-menu>
+                    <q-list style="min-width: 100px">
+                      <!-- export pipeline -->
+                      <q-item
+                        :data-test="`pipeline-list-${props.row.name}-export-pipeline`"
+                        class="flex items-center"
+                        clickable
+                        v-close-popup
+                        @click.stop="exportPipeline(props.row)"
+                        >
+                        <q-item-section dense avatar>
+                          <q-icon
+                            size="16px"
+                            name="download"
+                          />
+                        </q-item-section>
+                        <q-item-section>Export</q-item-section>
+                      </q-item>
+                      <!-- delete pipeline -->
+                      <q-item
+                        :data-test="`pipeline-list-${props.row.name}-delete-pipeline`"
+                        class="flex items-center justify-center"
+                        clickable
+                        v-close-popup
+                        @click.stop="openDeleteDialog(props.row)"
+                      >
+                        <q-item-section dense avatar>
+                          <q-icon size="16px" :name="outlinedDelete" />
+                        </q-item-section>
+                        <q-item-section>{{
+                          t("pipeline.delete")
+                        }}</q-item-section>
+                      </q-item>
+                    </q-list>
+                  </q-menu>
+                </q-btn>
+                </div>
               </template>
             </q-td>
           </q-tr>
@@ -270,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:header="props">
             <q-tr :props="props">
               <!-- Adding this block to render the select-all checkbox -->
-              <q-th auto-width>
+              <q-th class="q-table-checkbox-cell-header">
                 <q-checkbox
                   v-model="props.selected"
                   size="sm"
@@ -339,6 +371,8 @@ import type { QTableColumn } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import {
   outlinedDelete,
+  outlinedDownload,
+  outlinedMoreVert,
   outlinedPause,
   outlinedPlayArrow,
   outlinedVisibility,
@@ -351,6 +385,7 @@ import PipelineView from "./PipelineView.vue";
 import ResumePipelineDialog from "../ResumePipelineDialog.vue";
 
 import { filter, update } from "lodash-es";
+import { getImageURL } from "@/utils/zincutils";
 
 interface Column {
   name: string;
@@ -545,7 +580,7 @@ const triggerExpand = (props: any) => {
 
 const getColumnsForActiveTab = (tab: any) => {
   let realTimeColumns = [
-    { name: "#", label: "#", field: "#", align: "left", style: "width: 67px;" },
+    { name: "#", label: "#", field: "#", align: "left", style: "width: 40px;" },
 
     {
       name: "name",
@@ -571,7 +606,7 @@ const getColumnsForActiveTab = (tab: any) => {
   ];
 
   let scheduledColumns = [
-    { name: "#", label: "#", field: "#", align: "left", style: "width: 67px;" },
+    { name: "#", label: "#", field: "#", align: "left", style: "width: 40px;" },
 
     {
       name: "name",
@@ -679,10 +714,11 @@ const getPipelines = async () => {
       if (pipeline.source.source_type === "realtime") {
         pipeline.stream_name = pipeline.source.stream_name;
         pipeline.stream_type = pipeline.source.stream_type;
-        pipeline.frequency = "--"
-        pipeline.period = "--"
-        pipeline.cron = "--"
-        pipeline.sql_query = "--"
+        //leave other fields blank for realtime pipelines
+        // pipeline.frequency = "--"
+        // pipeline.period = "--"
+        // pipeline.cron = "--"
+        // pipeline.sql_query = "--"
       } else {
         pipeline.stream_type = pipeline.source.stream_type;
         pipeline.frequency =
@@ -907,6 +943,17 @@ const handleCancelResumePipeline = () => {
   resumePipelineDialogMeta.value.show = false;
   return;
 }
+
+const checkIsScheduled = (pipeline: any) => {
+  return pipeline.source.source_type === "scheduled";
+}
+
+const getPipelineIcon = (isScheduled: boolean) => {
+  return isScheduled ? getImageURL('images/pipeline/scheduled_pipeline.svg') : getImageURL('images/pipeline/realtime_pipeline.svg');
+}
+const openMenu = (event: Event, row: any) => {
+  event.stopPropagation();
+};
 </script>
 <style lang="scss" scoped>
 .dark-mode {
@@ -959,5 +1006,35 @@ const handleCancelResumePipeline = () => {
   width: 100%;
   justify-content: space-between;
   align-items: center;
+}
+.logs-col-chip{
+  background-color: #EFF8FF;
+  width: 40px;
+  height: 24px;
+  padding: 4px 8px;
+  border: 1px solid #b2ddff;
+  border-radius: 4px;
+  text-transform: capitalize;
+  color: #175cd3;
+}
+.metrics-col-chip{
+  background-color: #FEF6EE;
+  width: 40px;
+  height: 24px;
+  padding: 4px 8px;
+  border: 1px solid #F9DBAF;
+  border-radius: 4px;
+  text-transform: capitalize;
+  color: #B93815;
+}
+.traces-col-chip{
+  background-color: #F8F9FC;
+  width: 40px;
+  height: 24px;
+  padding: 4px 8px;
+  border: 1px solid #D5D9EB;
+  border-radius: 4px;
+  text-transform: capitalize;
+  color: #363F72;
 }
 </style>

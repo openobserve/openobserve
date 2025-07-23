@@ -184,7 +184,21 @@
     padding: 0px 16px !important;
     height: 36px !important;
   };
-
+  //this is to remove the padding from the checkbox cell in the table 
+  //it is taking extra space in the table so we are removing it 
+  //we need to add it to the td and th of the checkbox cell
+  .q-table-checkbox-cell{
+    padding: 0px !important;
+    min-width: 35px !important;
+    max-width: 35px !important;
+    width: 35px !important;
+  }
+  .q-table-checkbox-cell-header{
+    padding: 0px !important;
+    min-width: 35px !important;
+    max-width: 35px !important;
+    width: 35px !important;
+  }
 
   th:last-child.actions-column,
   td:last-child.actions-column {
