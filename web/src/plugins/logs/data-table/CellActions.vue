@@ -36,23 +36,16 @@
         <NotEqualIcon></NotEqualIcon>
       </q-icon>
     </q-btn>
-    <q-btn
-      v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+    <!-- o2 ai context add button in the cell actions when user adds a interesting field to the table 
+     then we show some options there we need this  -->
+    <O2AIContextAddBtn
       class="q-ml-xs"
-      :ripple="false"
-      @click.prevent.stop="sendToAiChat(JSON.stringify(row[column.id]))"
-      data-test="menu-link-ai-item"
-      no-caps
-      :borderless="true"
-      flat
-      size="6px"
-      dense
-      style="border-radius: 100%; border: 1px solid #fff;"
-    >
-      <div class="row items-center no-wrap">
-        <img height="14px" width="14px" :src="getBtnLogo" class="header-icon ai-icon" />
-      </div>
-    </q-btn>
+      @send-to-ai-chat="sendToAiChat(JSON.stringify(row[column.id]))"
+      :style="'border: 1px solid #fff;'"
+      :size="'6px'"
+      :imageHeight="'16px'"
+      :imageWidth="'16px'"
+    />
   </div>
 </template>
 
@@ -62,7 +55,7 @@ import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { getImageURL } from "@/utils/zincutils";
-import config from "@/aws-exports";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 
 defineProps({
   column: {
@@ -96,9 +89,4 @@ const backgroundClass = computed(() =>
 const sendToAiChat = (value: any) => {
   emit("sendToAiChat", value);
 };
-const getBtnLogo = computed(() => {
-      return store.state.theme === 'dark'
-        ? getImageURL('images/common/ai_icon_dark.svg')
-        : getImageURL('images/common/ai_icon.svg')
-    })
 </script>

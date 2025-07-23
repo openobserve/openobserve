@@ -343,26 +343,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 {{ cell.renderValue() }}
-                <q-btn
-                v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column && config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                    :ripple="false"
-                    @click.stop="sendToAiChat(JSON.stringify(cell.row.original),true)"
-                    data-test="menu-link-ai-item"
-                    no-caps
-                    :borderless="true"
-                    flat
-                    size="xs"
-                    dense
-                    class="tw-absolute tw-right-[16px] tw-top-1/2 tw-transform tw--translate-y-1/2"
-                    :class="[
-                      'tw-invisible ai-btn'
-                    ]"
-                    style="border-radius: 100%;"
-                  >
-                    <div class="row items-center no-wrap">
-                      <img height="20px" width="20px"  :src="getBtnLogo" class="header-icon ai-icon" />
-                    </div>
-                  </q-btn>
+                // o2 ai context add button in the table
+                <O2AIContextAddBtn
+                    v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column" class="tw-absolute tw-right-[16px] tw-top-1/2 tw-transform tw-invisible tw--translate-y-1/2 ai-btn" 
+                    @send-to-ai-chat="sendToAiChat(JSON.stringify(cell.row.original),true)"
+                    />
               </td>
             </template>
           </tr>
@@ -390,7 +375,7 @@ import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import { debounce } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
-import config from "@/aws-exports";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 
 const props = defineProps({
   rows: {
@@ -820,11 +805,6 @@ const handleCellMouseLeave = () => {
 const viewTrace = (row: any) => {
   emits("view-trace", row);
 };
-const getBtnLogo = computed(() => {
-      return store.state.theme === 'dark'
-        ? getImageURL('images/common/ai_icon_dark.svg')
-        : getImageURL('images/common/ai_icon.svg')
-    })
 const sendToAiChat = (value: any,isEntireRow: boolean = false) => {
   if(isEntireRow){
     //here we will get the original value of the row
@@ -867,11 +847,9 @@ const filterRowBasedOnColumns = (row: any,columns: any) => {
 
 defineExpose({
   parentRef,
-  getBtnLogo,
   sendToAiChat,
-  store,
-  config
-});
+  store
+  });
 </script>
 <style scoped lang="scss">
 .resizer {

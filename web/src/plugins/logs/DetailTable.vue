@@ -51,23 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="table"
             :label="t('common.table')"
           />
-          <q-btn
-            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-            :ripple="false"
-            @click.prevent.stop="sendToAiChat(JSON.stringify(rowData))"
-            data-test="menu-link-ai-item"
-            no-caps
-            :borderless="true"
-            flat
-            size="6px"
-            class="tw-px-2 tw-py-2"
-            dense
-            style="border-radius: 100%;"
-          >
-            <div class="row items-center no-wrap">
-              <img :src="getBtnLogo" class="header-icon ai-icon" />
-            </div>
-          </q-btn>
+          <!-- o2 ai context add button in the detail table -->
+          <O2AIContextAddBtn 
+            class="tw-px-2 tw-py-2" 
+            @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
+             />
         </q-tabs>
       </div>
       <div
@@ -364,7 +352,7 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import JsonPreview from "./JsonPreview.vue";
-import config from "@/aws-exports";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 
 const defaultValue: any = () => {
   return {
@@ -374,7 +362,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { EqualIcon, NotEqualIcon, JsonPreview },
+  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn },
   emits: [
     "showPrevDetail",
     "showNextDetail",
@@ -502,11 +490,6 @@ export default defineComponent({
       emit("sendToAiChat", value);
       emit("closeTable");
     };
-    const getBtnLogo = computed(() => {
-      return store.state.theme === 'dark'
-        ? getImageURL('images/common/ai_icon_dark.svg')
-        : getImageURL('images/common/ai_icon.svg')
-    });
     const closeTable = () => {
       emit("closeTable");
     }
@@ -528,9 +511,7 @@ export default defineComponent({
       multiStreamFields,
       viewTrace,
       sendToAiChat,
-      getBtnLogo,
-      closeTable,
-      config
+      closeTable
     };
   },
   async created() {

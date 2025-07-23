@@ -208,23 +208,15 @@
             </q-tooltip>
           </q-icon>
         </template>
-        <template v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled" #right>
-          <q-btn
-            :ripple="false"
-            @click.prevent.stop="sendToAiChat(JSON.stringify(inputEvents))"
-            data-test="menu-link-ai-item"
-            no-caps
-            :borderless="true"
-            flat
-            size="6px"
-            class="tw-px-2 tw-mr-4 "
-            dense
-            style="border-radius: 100%;"
-          >
-            <div class="row items-center no-wrap">
-              <img height="16" width="16" :src="getBtnLogo" class="header-icon ai-icon" />
-            </div>
-          </q-btn>
+        <template #right>
+          <!-- o2 ai context add button in the test function -->
+          <O2AIContextAddBtn
+            @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
+            :size="'6px'"
+            :imageHeight="'16px'"
+            :imageWidth="'16px'"
+            :class="'tw-px-2 tw-mr-4'"
+           />
           </template>
       </FullViewContainer>
       <div
@@ -343,7 +335,7 @@ import { event, useQuasar } from "quasar";
 import { getConsumableRelativeTime } from "@/utils/date";
 import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
-import config from "@/aws-exports";
+import O2AIContextAddBtn from "../common/O2AIContextAddBtn.vue";
 
 const props = defineProps({
   vrlFunction: {
@@ -745,12 +737,6 @@ function highlightSpecificEvent() {
     console.log("Error in highlightSpecificEvent", e);
   }
 }
-const getBtnLogo = computed(() => {
-      return store.state.theme === 'dark'
-        ? getImageURL('images/common/ai_icon_dark.svg')
-        : getImageURL('images/common/ai_icon.svg')
-    });
-
 const sendToAiChat = (value: any) => {
   emit("sendToAiChat", value);
 };
@@ -758,8 +744,6 @@ const sendToAiChat = (value: any) => {
 defineExpose({
   testFunction,
   sendToAiChat,
-  getBtnLogo,
-  config,
   store
 });
 </script>
