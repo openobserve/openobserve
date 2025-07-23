@@ -37,7 +37,8 @@
       </q-icon>
     </q-btn>
     <q-btn
-    class="q-ml-xs"
+      v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+      class="q-ml-xs"
       :ripple="false"
       @click.prevent.stop="sendToAiChat(JSON.stringify(row[column.id]))"
       data-test="menu-link-ai-item"
@@ -61,6 +62,7 @@ import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { getImageURL } from "@/utils/zincutils";
+import config from "@/aws-exports";
 
 defineProps({
   column: {

@@ -208,7 +208,7 @@
             </q-tooltip>
           </q-icon>
         </template>
-        <template #right>
+        <template v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled" #right>
           <q-btn
             :ripple="false"
             @click.prevent.stop="sendToAiChat(JSON.stringify(inputEvents))"
@@ -343,6 +343,7 @@ import { event, useQuasar } from "quasar";
 import { getConsumableRelativeTime } from "@/utils/date";
 import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
+import config from "@/aws-exports";
 
 const props = defineProps({
   vrlFunction: {
@@ -757,7 +758,9 @@ const sendToAiChat = (value: any) => {
 defineExpose({
   testFunction,
   sendToAiChat,
-  getBtnLogo
+  getBtnLogo,
+  config,
+  store
 });
 </script>
 
