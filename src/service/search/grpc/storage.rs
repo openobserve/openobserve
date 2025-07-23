@@ -619,7 +619,7 @@ pub async fn filter_file_list_by_tantivy_index(
     let target_partitions = if cache_type == file_data::CacheType::None {
         cfg.limit.query_thread_num
     } else {
-        cfg.limit.cpu_num
+        cfg.limit.query_index_thread_num
     };
 
     let search_start = std::time::Instant::now();
@@ -654,6 +654,12 @@ pub async fn filter_file_list_by_tantivy_index(
         .map(|g| g.len())
         .max()
         .unwrap_or(0);
+
+    log::info!(
+        "[trace_id {}] search->tantivy: target_partitions: {target_partitions}, group_num: {group_num}, max_group_len: {max_group_len}",
+        query.trace_id,
+    );
+
     for _ in 0..max_group_len {
         if no_more_files {
             // delete the rest of the files

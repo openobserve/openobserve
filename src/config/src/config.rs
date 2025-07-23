@@ -1202,6 +1202,8 @@ pub struct Limit {
     pub usage_reporting_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
     pub query_thread_num: usize,
+    #[env_config(name = "ZO_QUERY_INDEX_THREAD_NUM", default = 0)]
+    pub query_index_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
@@ -2034,6 +2036,13 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             cfg.limit.query_thread_num = cpu_num * 2;
         } else {
             cfg.limit.query_thread_num = cpu_num * 4;
+        }
+    }
+    if cfg.limit.query_index_thread_num == 0 {
+        if cfg.common.local_mode {
+            cfg.limit.query_index_thread_num = cpu_num;
+        } else {
+            cfg.limit.query_index_thread_num = cpu_num * 2;
         }
     }
 
