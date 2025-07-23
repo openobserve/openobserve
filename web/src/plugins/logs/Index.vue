@@ -392,6 +392,7 @@ import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
+import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import useAiChat from "@/composables/useAiChat";
 
 export default defineComponent({
@@ -594,7 +595,8 @@ export default defineComponent({
     const expandedLogs = ref([]);
     const splitterModel = ref(10);
 
-    const { showErrorNotification } = useNotifications();
+    const { showErrorNotification, showAliasErrorForVisualization } =
+      useNotifications();
 
     provide("dashboardPanelDataPageKey", "logs");
     const visualizeChartData = ref({});
@@ -718,7 +720,10 @@ export default defineComponent({
           !type
         ) {
           searchObj.meta.pageType = "logs";
-          if(prev === "stream_explorer" && (type == undefined || type !== "stream_explorer")) {
+          if (
+            prev === "stream_explorer" &&
+            (type == undefined || type !== "stream_explorer")
+          ) {
             searchObj.meta.refreshHistogram = true;
           }
           loadLogsData();
@@ -1531,6 +1536,35 @@ export default defineComponent({
             ? `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"  FROM "${searchObj?.data?.stream?.selectedStream?.[0]}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`
             : "");
       }
+
+      // if query is empty, then do not proceed further
+      if (
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query
+      ) {
+        showErrorNotification(
+          "Query is empty, please write query to visualize",
+        );
+        return null;
+      }
+
+      // check if all fields has alias
+      const allFieldsHaveAlias = allSelectionFieldsHaveAlias(
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query,
+      );
+
+      if (!allFieldsHaveAlias) {
+        showAliasErrorForVisualization(
+          "All fields must have alias to visualize, please add alias to all fields",
+        );
+
+        // do not proceed further
+        return null;
+      }
+
       // If shouldUseHistogram === null, do not do anything (no query assignment)
       return shouldUseHistogram;
     };
@@ -1591,7 +1625,16 @@ export default defineComponent({
             // this will rerender/call resize method of already rendered chart to resize
             window.dispatchEvent(new Event("resize"));
           }
-        } catch (error) {}
+        } catch (err: any) {
+          // this will clear dummy trace id
+          cancelFieldExtraction();
+
+           // show error notification
+           showErrorNotification(
+            err.message ?? "Error in updating visualization",
+          );
+          return;
+        }
       },
     );
 
@@ -1671,7 +1714,19 @@ export default defineComponent({
         try {
           await updateVisualization();
         } catch (err: any) {
+          // this will clear dummy trace id
+          cancelFieldExtraction();
+
           // Extraction was cancelled, so do not proceed further
+          // if its abort, then do not show any error notification
+          if (err.name === "AbortError") {
+            return;
+          }
+
+          // show error notification
+          showErrorNotification(
+            err.message ?? "Error in updating visualization",
+          );
           return;
         }
 
