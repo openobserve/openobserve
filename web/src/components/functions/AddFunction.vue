@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="add-functions-section tw-pl-4 tw-py-0 tw-pr-0">
+  <div class="add-functions-section tw-pl-4 tw-py-1 tw-pr-0">
     <div class="add-function-actions tw-pb-2 tw-pt-1">
       <FunctionsToolbar
         v-model:name="formData.name"
