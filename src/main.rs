@@ -1127,12 +1127,6 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
             .await;
     }
 
-    #[cfg(feature = "profiling")]
-    if let Some(agent) = agent {
-        let agent_ready = agent.stop().unwrap();
-        agent_ready.shutdown();
-    }
-
     log::info!("server stopped");
 
     Ok(())
