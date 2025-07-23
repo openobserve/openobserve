@@ -544,11 +544,6 @@ pub async fn process_delta(
                     end_time,
                 },
             };
-            log::info!(
-                "[HTTP2_STREAM]: Processing deltas for trace_id: {}, hits: {:?}",
-                trace_id,
-                search_res.hits
-            );
             log::debug!(
                 "[HTTP2_STREAM]: Sending search response for trace_id: {}, delta: {:?}, hits len: {}, result_cache_ratio: {}",
                 trace_id,

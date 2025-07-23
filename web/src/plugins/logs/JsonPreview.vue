@@ -216,6 +216,24 @@
                 >
               </q-item-section>
             </q-item>
+            <q-item v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled" clickable v-close-popup>
+              <q-item-section>
+                <q-item-label
+                  data-test="redirect-to-regex-pattern-btn"
+                  @click.stop="createRegexPatternFromLogs(key,value[key])"
+                  v-close-popup
+                  ><q-btn
+                    title="Add field to table"
+                    size="6px"
+                    round
+                    class="q-mr-sm pointer"
+                  >
+                  <q-img height="14px" width="14px" :src="regexIcon" />
+                  </q-btn
+                  >{{t('regex_patterns.create_regex_pattern_field')}}</q-item-label
+                >
+              </q-item-section>
+            </q-item>
           </q-list>
         </q-btn-dropdown>
 
@@ -235,12 +253,80 @@
         </span>
       </div>
       }
+      <div
+        v-if="showMenu"
+        class="context-menu shadow-lg rounded-sm"
+        :style="{ position: 'fixed', top: `${menuY}px`, left: `${menuX}px`, zIndex: 9999 }"
+        :class="store.state.theme === 'dark' ? 'context-menu-dark' : 'context-menu-light'"
+      >
+        <div class="context-menu-item" @click="copySelectedText">
+          <q-icon name="content_copy" size="xs" class="q-mr-sm" />
+          Copy
+        </div>
+        <div class="context-menu-item" @click="handleCreateRegex">
+          <q-img 
+            :src="regexIconForContextMenu" 
+            class="q-mr-sm" 
+            style="width: 14px; height: 14px;"
+          />
+          Create regex pattern
+        </div>
+      </div>
+
     </div>
+    <q-dialog v-if="config.isEnterprise == 'true'" v-model="typeOfRegexPattern">
+      <q-card style="width: 700px; max-width: 80vw">
+        <q-card-section>
+          <div class="text-h6">What is the type of regex pattern you want to create?</div>
+        </q-card-section>
+
+        <q-card-section class="q-pt-none">
+          <div>
+            <q-input
+              type="text"
+              data-test="regex-pattern-type-input"
+              v-model="regexPatternType"
+              color="input-border"
+              label="Type of regex pattern (e.g. email, phone number, etc.)"
+              bg-color="input-bg"
+              class="showLabelOnTop"
+              stack-label
+              outlined
+              filled
+              dense
+            />
+          </div>
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn
+            data-test="search-scheduler-max-records-cancel-btn"
+            unelevated
+            no-caps
+            class="q-mr-sm text-bold"
+            :label="t('confirmDialog.cancel')"
+            v-close-popup
+          />
+          <q-btn
+            data-test="search-scheduler-max-records-submit-btn"
+            unelevated
+            no-caps
+            :label="t('confirmDialog.ok')"
+            color="secondary"
+            class="text-bold"
+            @click="confirmRegexPatternType"
+            v-close-popup
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
   </div>
+  
 </template>
 
 <script lang="ts">
-import { ref, onBeforeMount, computed, nextTick, onMounted, watch } from "vue";
+import { ref, onBeforeMount, computed, nextTick, onMounted, watch, onUnmounted } from "vue";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
@@ -299,11 +385,16 @@ export default {
 
     const filteredTracesStreamOptions = ref([]);
 
+    const router = useRouter();
+
     const tracesStreams = ref([]);
 
     const queryEditorRef = ref<any>();
 
     const isTracesStreamsLoading = ref(false);
+
+    const typeOfRegexPattern = ref(false);
+    const regexPatternType = ref('');
 
     const previewId = ref("");
     const schemaToBeSearch = ref({});
@@ -311,6 +402,11 @@ export default {
     const $q = useQuasar();
     const unflattendData: any = ref("");
     const loading = ref(false);
+
+    const showMenu = ref(false);
+    const menuX = ref(0);
+    const menuY = ref(0);
+    const selectedText = ref('');
 
     const tabs = [
       {
@@ -394,7 +490,59 @@ export default {
       previewId.value = getUUID();
     });
 
-    onMounted(async () => {});
+
+    onMounted(() => {
+      // Handler for closing menu on outside click
+      //because when user clicks on the log content with right click, the context menu is shown and when user clicks outside the log content, the context menu is closed
+      const handleOutsideClick = (e: MouseEvent) => {
+        if (!(e.target as HTMLElement).closest('.q-btn')) {
+          showMenu.value = false;
+        }
+      };
+      //this is used to show the context menu when user right clicks on the log content
+      // Handler for context menu using event delegation
+      const handleContextMenu = (e: MouseEvent) => {
+        // Only handle right clicks on the log content area
+        const target = e.target as HTMLElement;
+        if (target.closest('.log_json_content')) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          const selection = window.getSelection()?.toString().trim() || '';
+          selectedText.value = selection;
+
+          // Get window width
+          const windowWidth = window.innerWidth;
+          // Context menu width (from CSS) plus some padding
+          const menuWidth = 220;
+          // Calculate if menu would overflow
+          const wouldOverflow = e.clientX + menuWidth > windowWidth;
+
+          // Position menu to the left if it would overflow, otherwise to the right
+          menuX.value = wouldOverflow ? e.clientX - menuWidth - 5 : e.clientX + 15;
+          menuY.value = e.clientY + 15;
+
+          showMenu.value = true;
+        }
+      };
+
+      // Add event listeners
+      if(config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled){
+        window.addEventListener('click', handleOutsideClick);
+        window.addEventListener('contextmenu', handleContextMenu);
+      }
+
+      // Cleanup
+      //this is used to remove the event listeners when the component is unmounted 
+      //it is used to avoid memory leaks
+      onUnmounted(() => {
+        if(config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled){
+          window.removeEventListener('click', handleOutsideClick);
+          window.removeEventListener('contextmenu', handleContextMenu);
+        }
+      });
+    });
+
 
     const getOriginalData = async () => {
       setViewTraceBtn();
@@ -515,6 +663,78 @@ export default {
         ? getImageURL('images/common/ai_icon_dark.svg')
         : getImageURL('images/common/ai_icon.svg')
     })
+      const regexIcon = computed(()=>{
+        return getImageURL(store.state.theme == 'dark' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
+      })
+      const regexIconForContextMenu = computed(()=>{
+        return getImageURL(store.state.theme == 'dark' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
+      })
+
+    const createRegexPatternFromLogs = (key: string, value: string) => {
+      emit("closeTable");
+      const promptToBeAdded = `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`
+
+      router.push({
+        path: '/settings/regex_patterns',
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          from: 'logs'
+        },
+      })
+      store.state.organizationData.regexPatternPrompt = promptToBeAdded;
+      store.state.organizationData.regexPatternTestValue = value;
+      emit("sendToAiChat", promptToBeAdded);
+
+
+    }
+
+    const handleCreateRegex = () => {
+      showMenu.value = false;
+      typeOfRegexPattern.value = true;
+    };
+
+    const confirmRegexPatternType = () => {
+      typeOfRegexPattern.value = false;
+      emit("closeTable");
+      // inputMessage.value = `Create a regex pattern for ${store.state.organizationData.customRegexPatternFromLogs.key} field that contains the following value: "${store.state.organizationData.customRegexPatternFromLogs.value}" which should be a type of ${store.state.organizationData.customRegexPatternFromLogs.type} from the ${store.state.organizationData.customRegexPatternFromLogs.stream} stream`;
+
+      const PromptToBeAdded =  `Create a regex pattern for the following value: "${selectedText.value}" which should be a type of ${regexPatternType.value} from the ${searchObj.data.stream.selectedStream[0]} stream`
+
+      store.state.organizationData.regexPatternPrompt = PromptToBeAdded;
+      store.state.organizationData.regexPatternTestValue = selectedText.value;
+      router.push({
+        path: '/settings/regex_patterns',
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          from: 'logs'
+        },
+      })
+    emit("sendToAiChat", PromptToBeAdded);
+
+    }
+
+
+
+    const copySelectedText = () => {
+      if (selectedText.value) {
+        navigator.clipboard.writeText(selectedText.value).then(() => {
+          showMenu.value = false;
+          $q.notify({
+            message: 'Text copied to clipboard',
+            color: 'positive',
+            position: 'bottom',
+            timeout: 1500
+          });
+        }).catch(() => {
+          $q.notify({
+            message: 'Failed to copy text',
+            color: 'negative',
+            position: 'bottom',
+            timeout: 1500
+          });
+        });
+      }
+    };
 
     return {
       t,
@@ -546,7 +766,19 @@ export default {
       addOrRemoveLabel,
       sendToAiChat,
       getBtnLogo,
-      config
+      config,
+      regexIcon,
+      createRegexPatternFromLogs,
+      showMenu,
+      menuX,
+      menuY,
+      selectedText,
+      handleCreateRegex,
+      copySelectedText,
+      regexIconForContextMenu,
+      typeOfRegexPattern,
+      regexPatternType,
+      confirmRegexPatternType,
     };
   },
 };
@@ -625,6 +857,41 @@ export default {
     &.active {
       background: #5960b2;
       color: #ffffff !important;
+    }
+  }
+}
+
+.context-menu {
+  min-width: 200px;
+  padding: 4px 0;
+  font-size: 13px;
+
+  .context-menu-item {
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+}
+
+
+.context-menu-dark {
+  background-color: #1a1a1a;
+  border: 1px solid #4a5568;
+  .context-menu-item {
+    color: #e2e8f0;
+    &:hover {
+      background-color: #4a5568;
+    }
+  }
+}
+.context-menu-light {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  .context-menu-item {
+    &:hover {
+      background-color: #f3f4f6;
     }
   }
 }

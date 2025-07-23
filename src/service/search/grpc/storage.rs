@@ -591,12 +591,13 @@ pub async fn filter_file_list_by_tantivy_index(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
+                "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, index size: {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
                 query.trace_id,
                 query.org_id,
                 query.stream_type,
                 query.stream_name,
                 scan_stats.querier_files,
+                bytes_to_human_readable(scan_stats.compressed_size as f64),
                 scan_stats.querier_memory_cached_files,
                 scan_stats.querier_disk_cached_files,
                 (cached_ratio * 100.0) as usize,
