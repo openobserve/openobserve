@@ -343,11 +343,11 @@ impl Display for O2Operators {
 
 #[cfg(not(feature = "enterprise"))]
 pub async fn query_optimiser(
-    url: &str,
-    token: &str,
-    meta_token: &Option<String>,
-    duration: i64,
-    stream_name: &Option<String>,
+    _url: &str,
+    _token: &str,
+    _meta_token: &Option<String>,
+    _duration: i64,
+    _stream_name: &Option<String>,
 ) -> Result<(), Error> {
     println!("query_optimiser not supported");
     Ok(())
