@@ -908,7 +908,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw-flex tw-justify-between tw-items-start tw-gap-4 ">
               <div class="tw-w-full lg:tw-w-[300px] running-text">
                 Running for {{ convertMinutesToDisplayValue(triggerData.period) }} in the interval of every {{
-                triggerData.frequency_type == 'minutes' ? convertMinutesToDisplayValue(triggerData.frequency) : triggerData.cron 
+                triggerData.frequency_type == 'minutes' ? convertMinutesToDisplayValue(triggerData.frequency) : convertMinutesToDisplayValue(getCronIntervalInMinutes(triggerData.cron)) 
                    }}
               </div>
               <div>
@@ -1618,6 +1618,7 @@ import {
   isAboveMinRefreshInterval,
   getUUID,
   b64EncodeUnicode,
+  getCronIntervalInMinutes,
 } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";

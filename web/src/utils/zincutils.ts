@@ -1206,4 +1206,19 @@ export const getEndPoint = (ingestionURL: string) => {
       tls: url.protocol === "https:" ? "On" : "Off",
   }
   return endpoint;
-}
+};
+export const getCronIntervalInMinutes = (cronExpression: string): number => {
+  try {
+    const interval = cronParser.parseExpression(cronExpression);
+
+    const first = interval.next();
+    const second = interval.next();
+
+    const diffMs = second.getTime() - first.getTime();
+    const diffMinutes = diffMs / (1000 * 60);
+
+    return diffMinutes;
+  } catch (err) {
+    throw new Error('Invalid cron expression');
+  }
+};
