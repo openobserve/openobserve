@@ -2938,6 +2938,11 @@ mod tests {
     #[allow(deprecated)]
     fn mock_config() -> config::Config {
         config::Config {
+            enrichment_table: config::EnrichmentTable {
+                cache_dir: String::default(),
+                merge_threshold_mb: u64::default(),
+                merge_interval: u64::default(),
+            },
             auth: config::Auth {
                 root_user_email: String::default(),
                 root_user_password: String::default(),
@@ -3125,6 +3130,8 @@ mod tests {
                 utf8_view_enabled: bool::default(),
                 dashboard_show_symbol_enabled: bool::default(),
                 default_hec_stream: String::default(),
+                data_tmp_dir: String::default(),
+                align_partitions_for_index: bool::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
@@ -3446,9 +3453,9 @@ mod tests {
                 batch_retry_max_attempts: u32::default(),
                 batch_retry_initial_delay_ms: u64::default(),
                 batch_retry_max_delay_ms: u64::default(),
-                remove_file_after_max_retry: bool::default(),
-                max_retry_count: u32::default(),
-                max_retry_time_in_hours: u64::default(),
+                remove_file_after_max_retry: true,
+                max_retry_count: 3,
+                max_retry_time_in_hours: 1,
             },
             encryption: config::Encryption {
                 algorithm: String::default(),

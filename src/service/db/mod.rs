@@ -21,6 +21,7 @@ use {
     infra::errors::Error, o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 
+pub mod ai_prompts;
 pub mod alerts;
 pub mod compact;
 pub mod dashboards;
