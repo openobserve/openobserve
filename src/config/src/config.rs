@@ -117,20 +117,27 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 3] =
+    ["trace_id", "service_name", "operation_name"];
 pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = get_config()
-        .common
-        .feature_secondary_index_extra_fields
-        .split(',')
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        })
-        .collect::<Vec<_>>();
+    let mut fields = chain(
+        _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS
+            .iter()
+            .map(|s| s.to_string()),
+        get_config()
+            .common
+            .feature_secondary_index_extra_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
