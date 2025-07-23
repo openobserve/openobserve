@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 dashboardPanelData.layout.currentQueryIndex
                               ].fields.x[index].axisType
                             "
-                            :label="'Not Timestamp Field'"
+                            :label="'Mark this field as non-timestamp'"
                             dense
                           />
                         </div>
@@ -737,7 +737,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dashboardPanelData.layout.currentQueryIndex
                           ].fields.y[index].axisType
                         "
-                        :label="'Not Timestamp Field'"
+                        :label="'Mark this field as non-timestamp'"
                         dense
                       />
                     </div>
