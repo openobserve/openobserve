@@ -23,8 +23,7 @@ use crate::{
         cli::{Cli as dataCli, args as dataArgs},
         export, import,
     },
-    common::{infra::config::USERS, meta},
-    migration,
+    common::{infra::config::USERS, meta, migration},
     service::{compact, db, file_list, users},
 };
 
@@ -218,18 +217,16 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .required(true)
                     .help("snowflake id"),
             ]),
-            clap::Command::new("consistent-hash").about("consistent hash").args([
-                clap::Arg::new("file")
-                    .short('f')
-                    .long("file")
-                    .required(true)
-                    .num_args(1..)
-                    .help("file"),
+            Command::new("consistent-hash").about("consistent hash").args([
+                arg!("file", 'f', "file", "file", true).num_args(1..),
             ]),
-            clap::Command::new("upgrade-db")
+            Command::new("upgrade-db")
                 .about("upgrade db table schemas").args(dataArgs()),
         ])
-        .get_matches();
+}
+
+pub async fn cli() -> Result<bool, anyhow::Error> {
+    let mut app = create_cli_app().get_matches();
 
     if app.subcommand().is_none() {
         return Ok(false);
