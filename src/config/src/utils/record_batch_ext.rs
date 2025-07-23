@@ -19,7 +19,7 @@ use arrow::{
     array::{
         ArrayBuilder, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Float64Array,
         Float64Builder, Int64Array, Int64Builder, NullBuilder, RecordBatchOptions, StringArray,
-        StringBuilder, UInt64Array, UInt64Builder, make_builder, new_null_array,
+        StringBuilder, StringViewBuilder, UInt64Array, UInt64Builder, new_null_array,
     },
     record_batch::RecordBatch,
 };
@@ -237,6 +237,14 @@ pub fn convert_json_to_record_batch(
     }
 
     RecordBatch::try_new(schema.clone(), cols)
+}
+
+// TODO: remove it after upgrade arrow-rs to 56.0.0.
+fn make_builder(data_type: &DataType, records_len: usize) -> Box<dyn ArrayBuilder> {
+    match data_type {
+        DataType::Utf8View => Box::new(StringViewBuilder::with_capacity(records_len)),
+        _ => arrow::array::make_builder(data_type, records_len),
+    }
 }
 
 pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> RecordBatch {
