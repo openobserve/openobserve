@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <div
                           v-if="dashboardPanelData.data.type === 'table'"
-                          class="q-mt-sm"
+                          class="q-mt-sm q-mb-sm"
                         >
                           <q-checkbox
                             v-model="
@@ -729,7 +729,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div
                       v-if="dashboardPanelData.data.type === 'table'"
-                      class="q-mt-sm"
+                      class="q-mt-sm q-mb-sm"
                     >
                       <q-checkbox
                         v-model="
