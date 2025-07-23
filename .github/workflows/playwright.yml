@@ -114,6 +114,7 @@ jobs:
             "dashboards/dashboard-import.spec.js",
             "dashboards/dashboard-maps.spec.js",
             "dashboards/dashboard-multi-y-axis.spec.js",
+            "dashboards/maxquery.spec.js",
             "dashboards/dashboard-tabs-setting.spec.js",
             "dashboards/dashboard-transpose.spec.js",
             "dashboards/dashboard-variables-setting.spec.js",
@@ -147,7 +148,6 @@ jobs:
             "Logs/searchpartition.spec.js",
             "Pipelines/pipeline-core.spec.js",
             # "remotepipeline.spec.js",
-
           ]
 
     steps:
