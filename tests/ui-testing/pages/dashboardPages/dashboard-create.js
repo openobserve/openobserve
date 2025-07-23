@@ -18,12 +18,19 @@ export default class DashboardCreate {
     );
     this.applyQueryBtn = this.page.locator('[data-test="dashboard-apply"]');
     this.backBtn = this.page.locator('[data-test="dashboard-back-btn"]');
+    // Added locator for the Add Dashboard side-sheet dialog
+    this.dashboardDialog = this.page.locator(
+      '[data-test="dashboard-add-dialog"]'
+    );
   }
 
   //Create Dashboard
   async createDashboard(dashboardName) {
     await this.dashCreateBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.dashCreateBtn.click();
+
+    // Wait for the side-sheet dialog to fully appear before interacting with its contents
+    await this.dashboardDialog.waitFor({ state: "visible", timeout: 15000 });
 
     await this.dashName.waitFor({ state: "visible", timeout: 15000 });
     await this.dashName.click();

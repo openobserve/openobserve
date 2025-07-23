@@ -17,8 +17,14 @@ const getAuthToken = async () => {
   return `Basic ${basicAuthCredentials}`;
 };
 
-// page is passed here to access the page object (currently not used)
-export const ingestion = async (page, streamName = "e2e_automate") => {
+// Generic ingestion helper – you can pass any JavaScript object/array as `data`.
+// Existing tests continue to work because `data` defaults to the original
+// `logsdata` import when no third argument is provided.
+export const ingestion = async (
+  page,
+  streamName = "e2e_automate",
+  data = logsdata
+) => {
   if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
   }
@@ -36,7 +42,7 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
       {
         method: "POST",
         headers,
-        body: JSON.stringify(logsdata),
+        body: JSON.stringify(data),
       }
     );
 
