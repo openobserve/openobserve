@@ -31,7 +31,7 @@ use config::{
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
-    physical_plan::{ExecutionPlan, displayable, visit_execution_plan},
+    physical_plan::{ExecutionPlan, visit_execution_plan},
     prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
@@ -147,8 +147,16 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
-    if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
-        nodes.retain(|n| n.is_ingester() || n.name.eq(&LOCAL_NODE.name));
+    if req.local_mode.unwrap_or_default() {
+        if LOCAL_NODE.is_querier() {
+            nodes.retain(|n| n.name.eq(&LOCAL_NODE.name));
+        } else {
+            nodes = nodes
+                .into_iter()
+                .filter(|n| n.is_querier())
+                .take(1)
+                .collect();
+        }
     }
 
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
@@ -966,9 +974,9 @@ pub async fn get_file_id_lists(
 }
 
 pub fn print_plan(trace_id: &str, physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
-    let plan = displayable(physical_plan.as_ref())
-        .indent(false)
-        .to_string();
     log::info!("[trace_id {trace_id}] leader physical plan {stage} rewrite");
-    log::info!("[trace_id {trace_id}] \n{plan}");
+    log::info!(
+        "{}",
+        config::meta::plan::generate_plan_string(trace_id, physical_plan.as_ref())
+    );
 }

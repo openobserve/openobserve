@@ -5135,6 +5135,7 @@ dependencies = [
  "sha1",
  "sqlx",
  "svix-ksuid",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tokio-stream",

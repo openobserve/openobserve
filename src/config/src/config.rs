@@ -117,20 +117,27 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 3] =
+    ["trace_id", "service_name", "operation_name"];
 pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = get_config()
-        .common
-        .feature_secondary_index_extra_fields
-        .split(',')
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        })
-        .collect::<Vec<_>>();
+    let mut fields = chain(
+        _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS
+            .iter()
+            .map(|s| s.to_string()),
+        get_config()
+            .common
+            .feature_secondary_index_extra_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -430,6 +437,7 @@ pub struct Config {
     pub pipeline: Pipeline,
     pub health_check: HealthCheck,
     pub encryption: Encryption,
+    pub enrichment_table: EnrichmentTable,
 }
 
 #[derive(EnvConfig)]
@@ -713,6 +721,8 @@ pub struct Common {
     pub data_db_dir: String,
     #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
     pub data_cache_dir: String,
+    #[env_config(name = "ZO_DATA_TMP_DIR", default = "")] // ./data/openobserve/tmp/
+    pub data_tmp_dir: String,
     // TODO: should rename to column_all
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub column_all: String,
@@ -1942,6 +1952,28 @@ pub struct HealthCheck {
     pub failed_times: usize,
 }
 
+#[derive(EnvConfig)]
+pub struct EnrichmentTable {
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_CACHE_DIR",
+        default = "",
+        help = "Local cache directory for enrichment tables"
+    )]
+    pub cache_dir: String,
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_MERGE_THRESHOLD_MB",
+        default = 60,
+        help = "Threshold for merging small files before S3 upload (in MB)"
+    )]
+    pub merge_threshold_mb: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_MERGE_INTERVAL",
+        default = 600,
+        help = "Background sync interval in seconds"
+    )]
+    pub merge_interval: u64,
+}
+
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().expect("config init error");
@@ -2335,6 +2367,12 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.data_cache_dir.ends_with('/') {
         cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);
+    }
+    if cfg.common.data_tmp_dir.is_empty() {
+        cfg.common.data_tmp_dir = format!("{}tmp/", cfg.common.data_dir);
+    }
+    if !cfg.common.data_tmp_dir.ends_with('/') {
+        cfg.common.data_tmp_dir = format!("{}/", cfg.common.data_tmp_dir);
     }
     if cfg.common.mmdb_data_dir.is_empty() {
         cfg.common.mmdb_data_dir = format!("{}mmdb/", cfg.common.data_dir);
