@@ -2083,7 +2083,7 @@ export default defineComponent({
 .dark-mode{
   .alert-setup-container{
   background-color: #212121;
-  padding: 8px;
+  padding: 8px 16px;
   margin-left: 8px;
   border: 1px solid #343434;
   border-top: 0px !important;
@@ -2105,7 +2105,7 @@ export default defineComponent({
 .light-mode{
   .alert-setup-container{
     background-color: #ffffff;
-    padding: 8px;
+    padding: 8px 16px;
     margin-left: 8px;
     border: 1px solid #e6e6e6;
     border-top: 0px !important;

@@ -1627,7 +1627,7 @@ import searchService from "@/services/search";
 
 import AlertsContainer from "./AlertsContainer.vue";
 import useQuery from "@/composables/useQuery";
-import { pick } from "lodash-es";
+import { debounce, pick } from "lodash-es";
 import config from "@/aws-exports";
 import O2AIChat from "../O2AIChat.vue";
 
@@ -2129,10 +2129,10 @@ const filterFunctionOptions = (val: string, update: any) => {
   });
 };
 
-const onBlurQueryEditor = async () => {
+const onBlurQueryEditor = debounce(() => {
   queryEditorPlaceholderFlag.value = true;
   emits("validate-sql");
-};
+}, 10);
 
 const validateInputs = (notify: boolean = true) => {
   if (
@@ -2186,10 +2186,10 @@ const validateInputs = (notify: boolean = true) => {
   return true;
 };
 
-const onBlurFunctionEditor = async () => {
+const onBlurFunctionEditor = debounce(() => {
   functionEditorPlaceholderFlag.value = true;
   emits("validate-sql");
-};
+}, 10);
 
 const toggleExpandFunctionError = () => {
   isFunctionErrorExpanded.value = !isFunctionErrorExpanded.value;
