@@ -1,7 +1,6 @@
 <template>
     <div
-      class=""
-      :class="store.state.theme == 'dark' ? 'dark-mode-container' : 'light-mode-container'"
+      :class="store.state.theme === 'dark' ? 'dark-mode-container' : 'light-mode-container'"
     >
       <div class="tw-flex tw-justify-between">
         <div class="tw-flex tw-items-start tw-justify-between full-width ">

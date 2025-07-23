@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="expandState.thresholds" class= " tw-w-full row alert-setup-container " style=" margin-left: 8px;">
 
-      <div v-if="expandState.thresholds">
+      <div>
       <div class="col-12 flex justify-start items-center q-mt-xs">
                 <div
                   class="q-py-sm showLabelOnTop tw-font-semibold text-h7 q-pb-md flex items-center"
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-if="expandState.realTimeMode" class=" tw-w-full row alert-setup-container " style=" margin-left: 8px;">
 
-      <FilterGroup v-if="expandState.realTimeMode" :stream-fields="columns" :group="inputData" :depth="0" @add-condition="updateGroup" @add-group="updateGroup" @remove-group="removeConditionGroup" @input:update="(name, field) => emits('input:update', name, field)" />
+      <FilterGroup :stream-fields="columns" :group="inputData" :depth="0" @add-condition="updateGroup" @add-group="updateGroup" @remove-group="removeConditionGroup" @input:update="(name, field) => emits('input:update', name, field)" />
       </div>
   </div>
   </div>
