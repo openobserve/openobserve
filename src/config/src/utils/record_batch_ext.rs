@@ -19,7 +19,7 @@ use arrow::{
     array::{
         ArrayBuilder, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Float64Array,
         Float64Builder, Int64Array, Int64Builder, NullBuilder, RecordBatchOptions, StringArray,
-        StringBuilder, UInt64Array, UInt64Builder, make_builder, new_null_array,
+        StringBuilder, StringViewBuilder, UInt64Array, UInt64Builder, new_null_array,
     },
     record_batch::RecordBatch,
 };
@@ -88,6 +88,17 @@ pub fn convert_json_to_record_batch(
                 continue;
             };
             match data_type {
+                DataType::Utf8View => {
+                    let b = builder
+                        .as_any_mut()
+                        .downcast_mut::<StringViewBuilder>()
+                        .unwrap();
+                    if v.is_null() {
+                        b.append_null();
+                    } else {
+                        b.append_value(get_string_value(v));
+                    }
+                }
                 DataType::Utf8 => {
                     let b = builder
                         .as_any_mut()
@@ -179,6 +190,12 @@ pub fn convert_json_to_record_batch(
         builders.iter_mut().for_each(|(k, (data_type, b))| {
             if !record_keys.contains(k) {
                 match data_type {
+                    DataType::Utf8View => {
+                        b.as_any_mut()
+                            .downcast_mut::<StringViewBuilder>()
+                            .unwrap()
+                            .append_null();
+                    }
                     DataType::Utf8 => {
                         b.as_any_mut()
                             .downcast_mut::<StringBuilder>()
@@ -237,6 +254,14 @@ pub fn convert_json_to_record_batch(
     }
 
     RecordBatch::try_new(schema.clone(), cols)
+}
+
+// TODO: remove it after upgrade arrow-rs to 56.0.0.
+fn make_builder(data_type: &DataType, records_len: usize) -> Box<dyn ArrayBuilder> {
+    match data_type {
+        DataType::Utf8View => Box::new(StringViewBuilder::with_capacity(records_len)),
+        _ => arrow::array::make_builder(data_type, records_len),
+    }
 }
 
 pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> RecordBatch {
@@ -620,7 +645,7 @@ pub fn sort_record_batch_by_column(
 
 #[cfg(test)]
 mod test {
-    use arrow::util::pretty::pretty_format_batches;
+    use arrow::{array::{Array, StringViewArray}, util::pretty::pretty_format_batches};
     use arrow_schema::Field;
 
     use super::*;
@@ -1088,5 +1113,68 @@ mod test {
 | Bob   | 30  |
 +-------+-----+"
         );
+    }
+
+    // Test case for convert_json_to_record_batch that contains utf8view
+    #[tokio::test]
+    async fn test_convert_json_to_record_batch_with_utf8view() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8View, false),
+            Field::new("age", DataType::Int64, false),
+            Field::new("city", DataType::Utf8, true),
+        ]));
+
+        let data = vec![
+            Arc::new(serde_json::json!({
+                "name": "Alice",
+                "age": 25,
+                "city": "New York"
+            })),
+            Arc::new(serde_json::json!({
+                "name": "Bob",
+                "age": 30,
+                "city": "London"
+            })),
+            Arc::new(serde_json::json!({
+                "name": "Charlie",
+                "age": 35
+                // city is missing, should be null
+            })),
+        ];
+
+        let record_batch = convert_json_to_record_batch(&schema, &data).unwrap();
+
+        assert_eq!(record_batch.num_rows(), 3);
+        assert_eq!(record_batch.schema(), schema);
+        
+        // Test Utf8View column
+        let name_array = record_batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringViewArray>()
+            .unwrap();
+        assert_eq!(name_array.value(0), "Alice");
+        assert_eq!(name_array.value(1), "Bob");
+        assert_eq!(name_array.value(2), "Charlie");
+        
+        // Test Int64 column
+        let age_array = record_batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(age_array.value(0), 25);
+        assert_eq!(age_array.value(1), 30);
+        assert_eq!(age_array.value(2), 35);
+        
+        // Test Utf8 column with null values
+        let city_array = record_batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(city_array.value(0), "New York");
+        assert_eq!(city_array.value(1), "London");
+        assert!(city_array.is_null(2)); // Charlie's city should be null
     }
 }

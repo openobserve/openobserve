@@ -473,7 +473,8 @@
     "approxPartition": "Use Stream Stats for Partitioning",
     "indexSize": "Index Size",
     "extendedStartDate": "Start Date",
-    "extendedEndDate": "End Date"
+    "extendedEndDate": "End Date",
+    "regexPatterns": "Regex Patterns"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -1303,5 +1304,27 @@
     "applyFilter": "Apply Filters",
     "searchCluster": "Search Cluster",
     "searchRegion": "Search Region"
+  },
+  "regex_patterns": {
+    "header": "Regex Pattern",
+    "create_pattern": "Create Pattern",
+    "search": "Search Regex Pattern",
+    "no_data": "No Patterns in the Library",
+    "name": "Name",
+    "pattern": "Pattern",
+    "created_at": "Created At",
+    "updated_at": "Updated At",
+    "actions": "Actions",
+    "edit": "Edit",
+    "delete": "Delete",
+    "create_regex_pattern": "Create New Regex Pattern",
+    "create_close":"Create and Close",
+    "cancel":"Cancel",
+    "edit_regex_pattern": "Edit Regex Pattern",
+    "update_close": "Update and Close",
+    "description": "Description",
+    "create_regex_pattern_field": "Redact / Drop using Regex",
+    "import": "Import",
+    "import_title": "Import Regex Pattern"
   }
 }

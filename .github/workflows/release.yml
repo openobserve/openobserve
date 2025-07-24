@@ -199,10 +199,17 @@ jobs:
             aws s3 cp "$file" "s3://${BUCKET}/releases/openobserve/${GITHUB_REF_NAME}/$(basename "$file")"
           done
 
+      - name: Generate release body with Download Url
+        id: generate-body
+        run: |
+          echo "📦 Download Binaries from https://openobserve.ai/downloads" > release_body.md
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          cat release_body.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+  
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           name: "Release ${{ github.ref_name }}"
           generate_release_notes: true
-          files: |
-            **/openobserve-*
+          body: ${{ steps.generate-body.outputs.body }}

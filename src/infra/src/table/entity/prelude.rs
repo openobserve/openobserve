@@ -6,6 +6,7 @@ pub use super::{
     destinations::Entity as Destinations, distinct_value_fields::Entity as DistinctValueFields,
     enrichment_tables::Entity as EnrichmentTables, folders::Entity as Folders,
     org_users::Entity as OrgUsers, organizations::Entity as Organizations,
+    re_pattern_stream_map::Entity as RePatternStreamMap, re_patterns::Entity as RePatterns,
     report_dashboards::Entity as ReportDashboards, reports::Entity as Reports,
     search_job_partitions::Entity as SearchJobPartitions,
     search_job_results::Entity as SearchJobResults, search_jobs::Entity as SearchJobs,

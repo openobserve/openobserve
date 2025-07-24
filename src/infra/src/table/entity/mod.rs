@@ -13,6 +13,8 @@ pub mod folders;
 pub mod org_users;
 pub mod organizations;
 pub mod rate_limit_rules;
+pub mod re_pattern_stream_map;
+pub mod re_patterns;
 pub mod report_dashboards;
 pub mod reports;
 pub mod search_job_partitions;
