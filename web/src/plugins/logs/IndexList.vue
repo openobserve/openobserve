@@ -98,7 +98,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #body-cell-name="props">
           <q-tr
             :props="props"
-            v-if="props.row.label"
+            v-if="
+              props.row.label &&
+              (showOnlyInterestingFields
+                ? searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+                    props.row.group
+                  ]
+                : true)
+            "
             @click="
               searchObj.data.stream.expandGroupRows[props.row.group] =
                 !searchObj.data.stream.expandGroupRows[props.row.group]
@@ -113,9 +120,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               {{ props.row.name }} ({{
-                searchObj.data.stream.expandGroupRowsFieldCount[
-                  props.row.group
-                ]
+                showOnlyInterestingFields
+                  ? searchObj.data.stream
+                      .interestingExpandedGroupRowsFieldCount[props.row.group]
+                  : searchObj.data.stream.expandGroupRowsFieldCount[
+                      props.row.group
+                    ]
               }})
               <q-icon
                 v-if="
@@ -137,7 +147,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :props="props"
             v-else-if="
               !showOnlyInterestingFields ||
-              (showOnlyInterestingFields && props.row.isInterestingField)
+              (showOnlyInterestingFields &&
+                props.row.isInterestingField &&
+                searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+                  props.row.group
+                ])
             "
             v-show="searchObj.data.stream.expandGroupRows[props.row.group]"
           >
@@ -490,18 +504,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-expansion-item>
             </q-td>
           </q-tr>
-          <q-tr
-            v-if="
-              showOnlyInterestingFields &&
-              !searchObj.data.stream.interestingFieldList.length
-            "
-          >
-            <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
-              <div class="text-subtitle2 text-weight-bold">
-                No interesting fields found
-              </div>
-            </q-td>
-          </q-tr>
         </template>
         <template #top-right>
           <q-input
@@ -585,6 +587,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-btn-toggle>
           </div>
+          <div
+            style="border: 1px solid #c4c4c4; border-radius: 5px"
+            class="q-pr-xs q-ml-xs tw-right"
+          >
+            <q-toggle
+              data-test="logs-search-bar-sql-mode-toggle-btn"
+              v-model="showOnlyInterestingFields"
+              size="30px"
+            >
+              <q-icon name="info" size="1.1rem" />
+              <q-tooltip>
+                {{ t("search.showOnlyInterestingFields") }}
+              </q-tooltip>
+            </q-toggle>
+          </div>
           <div class="q-ml-xs text-right col" v-if="scope.pagesNumber > 1">
             <q-tooltip
               data-test="logs-page-fields-list-pagination-tooltip"
@@ -657,9 +674,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="scope.lastPage"
             />
           </div>
-
-          <q-toggle v-model="showOnlyInterestingFields" />
-
           <div
             class="q-ml-xs text-right"
             :class="scope.pagesNumber > 1 ? 'col-1' : 'col'"
@@ -826,7 +840,6 @@ export default defineComponent({
     });
 
     const checkSelectedFields = computed(() => {
-      console.log("checkSelectedFields", searchObj.data.stream.selectedFields);
       return (
         searchObj.data.stream.selectedFields &&
         searchObj.data.stream.selectedFields.length > 0
@@ -1246,9 +1259,24 @@ export default defineComponent({
         const index = searchObj.data.stream.interestingFieldList.indexOf(
           field.name,
         );
+
         if (index > -1) {
           // only splice array when item is found
           searchObj.data.stream.interestingFieldList.splice(index, 1); // 2nd parameter means remove one item only
+
+          searchObj.data.stream.selectedInterestingStreamFields =
+            searchObj.data.stream.selectedInterestingStreamFields.filter(
+              (item: any) => item.name !== field.name,
+            );
+
+          if (field.group) {
+            searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+              field.group
+            ] =
+              searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+                field.group
+              ] - 1;
+          }
 
           field.isInterestingField = !isInterestingField;
           fieldIndex = streamSchemaFieldsIndexMapping.value[field.name];
@@ -1285,6 +1313,7 @@ export default defineComponent({
         );
         if (index == -1 && field.name != "*") {
           searchObj.data.stream.interestingFieldList.push(field.name);
+
           const localInterestingFields: any = useLocalInterestingFields();
           field.isInterestingField = !isInterestingField;
           fieldIndex = streamSchemaFieldsIndexMapping.value[field.name];
@@ -1325,10 +1354,37 @@ export default defineComponent({
             }
           }
           useLocalInterestingFields(localStreamFields);
+          addInterestingFieldToSelectedStreamFields(field);
         }
       }
 
       emit("setInterestingFieldInSQLQuery", field, isInterestingField);
+    };
+
+    const addInterestingFieldToSelectedStreamFields = (field: any) => {
+      let expandKeys = Object.keys(searchObj.data.stream.expandGroupRows);
+
+      let index = 0;
+      for (const key of expandKeys) {
+        index =
+          index +
+          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[key] +
+          1;
+        if (key === field.group) break;
+      }
+
+      searchObj.data.stream.selectedInterestingStreamFields.splice(
+        index,
+        0,
+        field,
+      );
+
+      searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+        field.group
+      ] =
+        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+          field.group
+        ] + 1;
     };
 
     const pagination = ref({
@@ -1662,10 +1718,6 @@ export default defineComponent({
           searchObj.data.stream.expandGroupRows,
         ).reverse();
 
-        const expandGroupRows = showOnlyInterestingFields.value
-          ? searchObj.data.stream.interestingExpandedGroupRows
-          : searchObj.data.stream.expandGroupRows;
-
         const expandGroupRowsFieldCount = showOnlyInterestingFields.value
           ? searchObj.data.stream.interestingExpandedGroupRowsFieldCount
           : searchObj.data.stream.expandGroupRowsFieldCount;
@@ -1678,23 +1730,20 @@ export default defineComponent({
             : searchObj.data.stream.selectedStreamFields,
         );
         let count = 0;
-        // console.log(searchObj.data.stream.selectedStreamFields)
-        // console.log(searchObj.data.stream.expandGroupRows)
-        // console.log(searchObj.data.stream.expandGroupRowsFieldCount)
         for (let key of expandKeys) {
           if (
-            expandGroupRows[key] == false &&
+            searchObj.data.stream.expandGroupRows[key] == false &&
             selectedStreamFields != undefined &&
             selectedStreamFields?.length > 0
           ) {
             startIndex =
               selectedStreamFields.length - expandGroupRowsFieldCount[key];
             if (startIndex > 0) {
-              // console.log("startIndex", startIndex)
-              // console.log("count", count)
-              // console.log("selectedStreamFields", selectedStreamFields.length)
-              // console.log(searchObj.data.stream.expandGroupRowsFieldCount[key])
-              // console.log("========")
+              // console.log("startIndex", startIndex);
+              // console.log("count", count);
+              // console.log("selectedStreamFields", selectedStreamFields.length);
+              // console.log(searchObj.data.stream.expandGroupRowsFieldCount[key]);
+              // console.log("========");
               selectedStreamFields.splice(
                 startIndex - count,
                 expandGroupRowsFieldCount[key],
@@ -1705,7 +1754,7 @@ export default defineComponent({
           }
           count++;
         }
-        // console.log(JSON.parse(JSON.stringify(selectedStreamFields)))
+        // console.log(JSON.parse(JSON.stringify(selectedStreamFields)));
         return selectedStreamFields;
       }),
       formatLargeNumber,
