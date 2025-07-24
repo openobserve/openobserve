@@ -385,7 +385,6 @@ import { cloneDeep, debounce } from "lodash-es";
 import {
   buildSqlQuery,
   getFieldsFromQuery,
-  shouldUseHistogramQuery,
 } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
@@ -585,6 +584,7 @@ export default defineComponent({
       clearSearchObj,
       setCommunicationMethod,
       cancelQuery,
+      buildSearch,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -1419,83 +1419,6 @@ export default defineComponent({
         }
       },
     );
-
-    const setFieldsAndConditions = async () => {
-      let logsQuery = searchObj.data.query ?? "";
-
-      // if sql mode is off, then need to make query
-      if (searchObj.meta.sqlMode == false) {
-        logsQuery = buildSqlQuery(
-          searchObj.data.stream.selectedStream[0],
-          searchObj.meta.quickMode
-            ? searchObj.data.stream.interestingFieldList
-            : [],
-          logsQuery,
-        );
-      }
-
-      const { fields, filters, streamName } = await getFieldsFromQuery(
-        logsQuery ?? "",
-        store.state.zoConfig.timestamp_column ?? "_timestamp",
-      );
-
-      // if fields length is 0, then add default fields
-      if (fields.length == 0) {
-        const timeField = store.state.zoConfig.timestamp_column ?? "_timestamp";
-        // Add histogram(_timestamp) and count(_timestamp) to the fields array
-        fields.push(
-          {
-            column: timeField,
-            alias: "x_axis_1",
-            aggregationFunction: "histogram",
-          },
-          {
-            column: timeField,
-            alias: "y_axis_1",
-            aggregationFunction: "count",
-          },
-        );
-      }
-
-      // set stream type and stream name
-      if (streamName && streamName != "undefined") {
-        dashboardPanelData.data.queries[0].fields.stream_type =
-          searchObj.data.stream.streamType ?? "logs";
-        dashboardPanelData.data.queries[0].fields.stream = streamName;
-      }
-
-      // set fields
-      fields.forEach((field) => {
-        field.alias = field.alias ?? field.column;
-        field.label = generateLabelFromName(field.column);
-
-        // if fields doesnt have aggregation functions, then add it in the x axis fields
-        if (
-          field.aggregationFunction === null ||
-          field.aggregationFunction == "histogram"
-        ) {
-          dashboardPanelData.data.queries[0].fields.x.push(field);
-        } else {
-          dashboardPanelData.data.queries[0].fields.y.push(field);
-        }
-      });
-
-      // if x axis fields length is 2, then add 2nd x axis field to breakdown fields
-      if (dashboardPanelData.data.queries[0].fields.x.length == 2) {
-        dashboardPanelData.data.queries[0].fields.breakdown.push(
-          dashboardPanelData.data.queries[0].fields.x[1],
-        );
-        // remove 2nd x axis field from x axis fields
-        dashboardPanelData.data.queries[0].fields.x.splice(1, 1);
-      }
-      // if x axis fields length is greater than 2, then select chart type as table
-      else if (dashboardPanelData.data.queries[0].fields.x.length > 2) {
-        dashboardPanelData.data.type = "table";
-      }
-
-      // set filters
-      dashboardPanelData.data.queries[0].fields.filter = filters;
-    };
     const closeSearchHistoryfn = () => {
       router.back();
       showSearchHistory.value = false;
@@ -1509,67 +1432,6 @@ export default defineComponent({
     const searchResponseForVisualization = ref({});
 
     let fieldsExtractionPromise = new Promise((resolve) => resolve(true));
-
-    const copyLogsQueryToDashboardPanel = async () => {
-      // Check should use histogram query
-      // If true, then set histogram query
-      // If false, set logs page query
-      // If null, do not do anything
-      const shouldUseHistogram = await shouldUseHistogramQuery(
-        searchObj.data.query,
-      );
-
-      if (shouldUseHistogram === true) {
-        // set histogram query
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query =
-          searchObj?.data?.histogramQuery?.query?.sql ??
-          (searchObj?.data?.stream?.selectedStream?.[0]
-            ? `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"  FROM "${searchObj?.data?.stream?.selectedStream?.[0]}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`
-            : "");
-      } else if (shouldUseHistogram === false) {
-        // set same query
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query =
-          searchObj?.data?.query ??
-          (searchObj?.data?.stream?.selectedStream?.[0]
-            ? `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"  FROM "${searchObj?.data?.stream?.selectedStream?.[0]}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`
-            : "");
-      }
-
-      // if query is empty, then do not proceed further
-      if (
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query
-      ) {
-        showErrorNotification(
-          "Query is empty, please write query to visualize",
-        );
-        return null;
-      }
-
-      // check if all fields has alias
-      const allFieldsHaveAlias = allSelectionFieldsHaveAlias(
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query,
-      );
-
-      if (!allFieldsHaveAlias) {
-        showAliasErrorForVisualization(
-          "All fields must have alias to visualize, please add alias to all fields",
-        );
-
-        // do not proceed further
-        return null;
-      }
-
-      // If shouldUseHistogram === null, do not do anything (no query assignment)
-      return shouldUseHistogram;
-    };
 
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
@@ -1792,6 +1654,23 @@ export default defineComponent({
       };
 
       try {
+
+        let logsPageQuery = searchObj.data.query;
+        
+        // return if query is emptry and stream is not selected 
+        if(logsPageQuery === "" && searchObj.data.stream.selectedStream.length === 0){ 
+          showErrorNotification("Query is empty, please write query to visualize");
+          variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+          return null;
+        }
+
+        // handle sql mode
+        if(!searchObj.data.sqlMode){
+          const queryBuild= buildSearch();
+          logsPageQuery = queryBuild.query.sql;
+        }
+
+
         /* ------------------------------------------------------------- */
         /* 1) Fetch schema for the user query                            */
         /* ------------------------------------------------------------- */
@@ -1821,8 +1700,8 @@ export default defineComponent({
             query: {
               query: {
                 sql: store.state.zoConfig.sql_base64_enabled
-                  ? b64EncodeUnicode(searchObj.data.query)
-                  : searchObj.data.query,
+                  ? b64EncodeUnicode(logsPageQuery)
+                  : logsPageQuery,
                 query_fn: null,
                 start_time: startISOTimestamp,
                 end_time: endISOTimestamp,
@@ -1857,12 +1736,12 @@ export default defineComponent({
         const histogramFallbackQuery =
           searchObj?.data?.histogramQuery?.query?.sql ??
           (searchObj?.data?.stream?.selectedStream?.[0]
-            ? `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"  FROM "${searchObj?.data?.stream?.selectedStream?.[0]}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`
+            ? `SELECT histogram(_timestamp) as "zo_sql_key", count(_timestamp) as "zo_sql_num"  FROM "${searchObj?.data?.stream?.selectedStream?.[0]}"  GROUP BY zo_sql_key ORDER BY zo_sql_key ASC`
             : "");
 
         const finalQuery = shouldUseHistogram
           ? histogramFallbackQuery
-          : searchObj.data.query;
+          : logsPageQuery;
 
         if (!finalQuery) {
           showErrorNotification("Query is empty, please write query to visualize");
@@ -2114,7 +1993,6 @@ export default defineComponent({
       sendToAiChat,
       processInterestingFiledInSQLQuery,
       removeFieldByName,
-      setFieldsAndConditions,
       dashboardPanelData,
       searchResponseForVisualization,
     };

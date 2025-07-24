@@ -774,33 +774,3 @@ export const convertQueryIntoSingleLine = async (query: any) => {
     return query;
   }
 };
-
-function hasAggregation(columns: any) {
-  if (columns) {
-    for (const column of columns) {
-      if (column.expr && column.expr.type === "aggr_func") {
-        return true; // Found aggregation function or non-null groupby property
-      }
-    }
-  }
-  return false; // No aggregation function or non-null groupby property found
-}
-
-export const shouldUseHistogramQuery = async (query: any) => {
-  try {
-    // If query is empty, use histogram query
-    if (!query) return true;
-
-    await importSqlParser();
-    const ast: any = parser.astify(query);
-
-    // If able to parse and has aggregation, use same query (original)
-    if (hasAggregation(ast.columns)) return false;
-
-    // If able to parse and no aggregation, use histogram query
-    return true;
-  } catch (error) {
-    // If not able to parse, do not do anything (return null)
-    return null;
-  }
-};
