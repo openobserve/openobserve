@@ -135,7 +135,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tr>
           <q-tr
             :props="props"
-            v-else
+            v-else-if="
+              !showOnlyInterestingFields ||
+              (showOnlyInterestingFields && props.row.isInterestingField)
+            "
             v-show="searchObj.data.stream.expandGroupRows[props.row.group]"
           >
             <q-td
@@ -487,6 +490,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-expansion-item>
             </q-td>
           </q-tr>
+          <q-tr
+            v-if="
+              showOnlyInterestingFields &&
+              !searchObj.data.stream.interestingFieldList.length
+            "
+          >
+            <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
+              <div class="text-subtitle2 text-weight-bold">
+                No interesting fields found
+              </div>
+            </q-td>
+          </q-tr>
         </template>
         <template #top-right>
           <q-input
@@ -586,6 +601,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : searchObj.data.stream.selectedStreamFields.length
               }}
             </q-tooltip>
+
             <q-btn
               data-test="logs-page-fields-list-pagination-firstpage-button"
               v-if="scope.pagesNumber > 2"
@@ -641,6 +657,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="scope.lastPage"
             />
           </div>
+
+          <q-toggle v-model="showOnlyInterestingFields" />
+
           <div
             class="q-ml-xs text-right"
             :class="scope.pagesNumber > 1 ? 'col-1' : 'col'"
@@ -751,6 +770,7 @@ export default defineComponent({
       extractValueQuery,
       fnParsedSQL,
       fnUnparsedSQL,
+      streamSchemaFieldsIndexMapping,
     } = useLogs();
 
     const {
@@ -763,6 +783,8 @@ export default defineComponent({
 
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
     const openedFilterFields = ref<string[]>([]);
+
+    const showOnlyInterestingFields = ref(false);
 
     const userDefinedSchemaBtnGroupOption = [
       {
@@ -1211,17 +1233,15 @@ export default defineComponent({
     //   handleQueryData();
     // };
 
-    let selectedFieldsName: any = [];
     let fieldIndex: any = -1;
     const addToInterestingFieldList = (
       field: any,
       isInterestingField: boolean,
     ) => {
-      if (selectedFieldsName.length == 0) {
-        selectedFieldsName = searchObj.data.stream.selectedStreamFields.map(
-          (item: any) => item.name,
-        );
+      if (!Object.keys(streamSchemaFieldsIndexMapping.value).length) {
+        return;
       }
+
       if (isInterestingField) {
         const index = searchObj.data.stream.interestingFieldList.indexOf(
           field.name,
@@ -1231,7 +1251,7 @@ export default defineComponent({
           searchObj.data.stream.interestingFieldList.splice(index, 1); // 2nd parameter means remove one item only
 
           field.isInterestingField = !isInterestingField;
-          fieldIndex = selectedFieldsName.indexOf(field.name);
+          fieldIndex = streamSchemaFieldsIndexMapping.value[field.name];
           if (fieldIndex > -1) {
             searchObj.data.stream.selectedStreamFields[
               fieldIndex
@@ -1267,7 +1287,7 @@ export default defineComponent({
           searchObj.data.stream.interestingFieldList.push(field.name);
           const localInterestingFields: any = useLocalInterestingFields();
           field.isInterestingField = !isInterestingField;
-          fieldIndex = selectedFieldsName.indexOf(field.name);
+          fieldIndex = streamSchemaFieldsIndexMapping.value[field.name];
           if (fieldIndex > -1) {
             searchObj.data.stream.selectedStreamFields[
               fieldIndex
@@ -1318,7 +1338,7 @@ export default defineComponent({
 
     const toggleSchema = async () => {
       searchObj.loadingStream = true;
-      selectedFieldsName = [];
+      streamSchemaFieldsIndexMapping.value = {};
       setTimeout(async () => {
         await extractFields();
         searchObj.loadingStream = false;
@@ -1642,10 +1662,20 @@ export default defineComponent({
           searchObj.data.stream.expandGroupRows,
         ).reverse();
 
+        const expandGroupRows = showOnlyInterestingFields.value
+          ? searchObj.data.stream.interestingExpandedGroupRows
+          : searchObj.data.stream.expandGroupRows;
+
+        const expandGroupRowsFieldCount = showOnlyInterestingFields.value
+          ? searchObj.data.stream.interestingExpandedGroupRowsFieldCount
+          : searchObj.data.stream.expandGroupRowsFieldCount;
+
         let startIndex = 0;
         // Iterate over the keys in reverse order
         let selectedStreamFields = cloneDeep(
-          searchObj.data.stream.selectedStreamFields,
+          showOnlyInterestingFields.value
+            ? searchObj.data.stream.selectedInterestingStreamFields
+            : searchObj.data.stream.selectedStreamFields,
         );
         let count = 0;
         // console.log(searchObj.data.stream.selectedStreamFields)
@@ -1653,13 +1683,12 @@ export default defineComponent({
         // console.log(searchObj.data.stream.expandGroupRowsFieldCount)
         for (let key of expandKeys) {
           if (
-            searchObj.data.stream.expandGroupRows[key] == false &&
+            expandGroupRows[key] == false &&
             selectedStreamFields != undefined &&
             selectedStreamFields?.length > 0
           ) {
             startIndex =
-              selectedStreamFields.length -
-              searchObj.data.stream.expandGroupRowsFieldCount[key];
+              selectedStreamFields.length - expandGroupRowsFieldCount[key];
             if (startIndex > 0) {
               // console.log("startIndex", startIndex)
               // console.log("count", count)
@@ -1668,11 +1697,11 @@ export default defineComponent({
               // console.log("========")
               selectedStreamFields.splice(
                 startIndex - count,
-                searchObj.data.stream.expandGroupRowsFieldCount[key],
+                expandGroupRowsFieldCount[key],
               );
             }
           } else {
-            count += searchObj.data.stream.expandGroupRowsFieldCount[key];
+            count += expandGroupRowsFieldCount[key];
           }
           count++;
         }
@@ -1687,6 +1716,7 @@ export default defineComponent({
       selectedStream,
       checkSelectedFields,
       resetSelectedFileds,
+      showOnlyInterestingFields,
     };
   },
 });
