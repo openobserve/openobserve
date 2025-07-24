@@ -168,7 +168,7 @@ pub struct AxisItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub having_conditions: Option<Vec<HavingConditions>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub axis_type: Option<bool>,
+    pub treat_as_non_timestamp: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
