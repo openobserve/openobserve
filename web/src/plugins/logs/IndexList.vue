@@ -588,6 +588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn-toggle>
           </div>
           <div
+            v-if="searchObj.meta.quickMode"
             style="border: 1px solid #c4c4c4; border-radius: 5px"
             class="q-pr-xs q-ml-xs tw-right"
           >
@@ -698,6 +699,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </div>
         </template>
+        <template #no-data>
+          <div
+            v-if="searchObj.meta.quickMode"
+            style="border: 1px solid #c4c4c4; border-radius: 5px"
+            class="q-pr-xs q-ml-xs tw-right"
+          >
+            <q-toggle
+              data-test="logs-search-bar-sql-mode-toggle-btn"
+              v-model="showOnlyInterestingFields"
+              size="30px"
+            >
+              <q-icon name="info" size="1.1rem" />
+              <q-tooltip>
+                {{ t("search.showOnlyInterestingFields") }}
+              </q-tooltip>
+            </q-toggle>
+          </div>
+          <div v-else class="text-center">
+            <q-icon name="info" size="1.1rem" />
+            <q-tooltip>
+              {{ t("search.noFieldFound") }}
+            </q-tooltip>
+          </div>
+        </template>
       </q-table>
     </div>
   </div>
@@ -797,7 +822,7 @@ export default defineComponent({
 
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
 
-    const showOnlyInterestingFields = ref(false);
+    const showOnlyInterestingFields = ref(true);
 
     const userDefinedSchemaBtnGroupOption = [
       {
@@ -856,6 +881,20 @@ export default defineComponent({
       },
       {
         deep: true,
+      },
+    );
+
+    watch(
+      () => searchObj.meta.quickMode,
+      (isActive) => {
+        if (
+          searchObj.data.stream.selectedInterestingStreamFields.length &&
+          isActive
+        ) {
+          showOnlyInterestingFields.value = true;
+        } else {
+          showOnlyInterestingFields.value = false;
+        }
       },
     );
 
@@ -1300,6 +1339,11 @@ export default defineComponent({
               }
             }
           }
+
+          // If no interesting fields are selected, show all fields
+          if (!searchObj.data.stream.interestingFieldList.length)
+            showOnlyInterestingFields.value = false;
+
           useLocalInterestingFields(localStreamFields);
         }
       } else {
@@ -1366,26 +1410,26 @@ export default defineComponent({
 
       let index = 0;
       for (const key of expandKeys) {
+        if (expandKeys.indexOf(key) > 1) index += 1;
+        if (key === field.group) break;
         index =
           index +
-          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[key] +
-          1;
-        if (key === field.group) break;
+          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[key];
       }
 
       // Add the field to the beginning of the array, add all after timestamp column if timestamp column is present
       if (field.name === store.state.zoConfig?.timestamp_column) {
         searchObj.data.stream.selectedInterestingStreamFields.splice(
-          index -
-            searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-              field.group
-            ],
+          index,
           0,
           field,
         );
       } else {
         searchObj.data.stream.selectedInterestingStreamFields.splice(
-          index,
+          index +
+            searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+              field.group
+            ],
           0,
           field,
         );
