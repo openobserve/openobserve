@@ -3153,6 +3153,7 @@ mod tests {
                 mem_dump_thread_num: usize::default(),
                 usage_reporting_thread_num: usize::default(),
                 query_thread_num: usize::default(),
+                query_index_thread_num: usize::default(),
                 query_timeout: u64::default(),
                 query_ingester_timeout: u64::default(),
                 query_default_limit: i64::default(),
