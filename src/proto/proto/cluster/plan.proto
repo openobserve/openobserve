@@ -44,6 +44,7 @@ message SearchInfo {
     int64                      start_time = 4;
     int64                        end_time = 5;
     int64                         timeout = 6;
+    int64              histogram_interval = 7;
 }
 
 message IndexInfo {

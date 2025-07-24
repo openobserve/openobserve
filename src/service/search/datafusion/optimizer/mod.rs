@@ -123,7 +123,11 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     rules.push(Arc::new(EliminateOuterJoin::new()));
 
     // *********** custom rules ***********
-    rules.push(Arc::new(RewriteHistogram::new(start_time, end_time)));
+    rules.push(Arc::new(RewriteHistogram::new(
+        start_time,
+        end_time,
+        sql.histogram_interval.unwrap_or_default(),
+    )));
     if let Some(limit) = limit {
         rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));
     };

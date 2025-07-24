@@ -760,7 +760,7 @@ const useLogs = () => {
           histogram:
             "select histogram(" +
             store.state.zoConfig.timestamp_column +
-            ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from \"[INDEX_NAME]\" [WHERE_CLAUSE] GROUP BY zo_sql_key ORDER BY zo_sql_key",
+            ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from \"[INDEX_NAME]\" [WHERE_CLAUSE] GROUP BY zo_sql_key ORDER BY zo_sql_key DESC",
         },
       };
 
@@ -876,11 +876,6 @@ const useLogs = () => {
           searchObj.meta.resultGrid.chartInterval = "1 day";
           searchObj.meta.resultGrid.chartKeyFormat = "YYYY-MM-DD";
         }
-
-        req.aggs.histogram = req.aggs.histogram.replaceAll(
-          "[INTERVAL]",
-          searchObj.meta.resultGrid.chartInterval,
-        );
       } else {
         notificationMsg.value = "Invalid date format";
         return false;
@@ -1232,12 +1227,15 @@ const useLogs = () => {
 
           partitionQueryReq["streaming_output"] = true;
 
+          searchObj.data.queryResults.histogram_interval = 0;
+
           await searchService
             .partition({
               org_identifier: searchObj.organizationIdentifier,
               query: partitionQueryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
+              searchType: "ui",
             })
             .then(async (res: any) => {
               searchObj.data.queryResults.partitionDetail = {
@@ -1615,6 +1613,14 @@ const useLogs = () => {
     return Math.ceil(partitionTotal / searchObj.meta.resultGrid.rowsPerPage);
   }
 
+  const replaceHistogramInterval = async (queryReq: any) => {
+    if(searchObj.data.queryResults.histogram_interval) {
+      queryReq.query.sql = await changeHistogramInterval(queryReq.query.sql, 0);
+    } else {
+      queryReq.query.sql = queryReq.query.sql.replaceAll("[INTERVAL]", searchObj.meta.resultGrid.chartInterval);
+    }
+  }
+
   const getQueryData = async (isPagination = false) => {
     try {
       //remove any data that has been cached 
@@ -1755,6 +1761,8 @@ const useLogs = () => {
         searchObj.data.customDownloadQueryObj = JSON.parse(
           JSON.stringify(queryReq),
         );
+
+        await replaceHistogramInterval(searchObj.data.histogramQuery);
 
         // get the current page detail and set it into query request
         queryReq.query.start_time =
@@ -2135,7 +2143,9 @@ const useLogs = () => {
       if (!intervalMs) {
         throw new Error("Invalid interval");
       }
-      searchObj.data.histogramInterval = intervalMs;
+
+      searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval ? searchObj.data.queryResults.histogram_interval * 1000000 : intervalMs;
+
       const date = new Date();
       const startTimeDate = new Date(
         searchObj.data.customDownloadQueryObj.query.start_time / 1000,
@@ -2449,14 +2459,10 @@ const useLogs = () => {
 
       const isAggregation = searchObj.meta.sqlMode && parsedSQL != undefined && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
 
-      if(isAggregation && !queryReq.query?.streaming_output && searchObj.data.queryResults.histogram_interval) {
-        const interval = searchObj.data.queryResults.histogram_interval ? searchObj.data.queryResults.histogram_interval + ' seconds' : null;
-        let query = await changeHistogramInterval(queryReq.query.sql, interval);
-        if(query) {
-          queryReq.query.sql = query;
-        }
+      if(searchObj.data.queryResults.histogram_interval) {
+        queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
       }
-
+        
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
       const decideSearch = searchObj.meta.jobId
@@ -2811,7 +2817,21 @@ const useLogs = () => {
       }
 
       const dismiss = () => {};
+
       try {
+        // Set histogram interval
+        if(searchObj.data.queryResults.histogram_interval) {
+          searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
+          queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
+        }
+
+
+        if(!searchObj.data.histogramInterval) {
+          console.error("Error processing histogram data:", "histogramInterval is not set");
+          searchObj.loadingHistogram = false;
+          return;
+        }
+
         const { traceparent, traceId } = generateTraceContext();
         addTraceId(traceId);
         queryReq.query.size = -1;
@@ -5546,6 +5566,13 @@ const useLogs = () => {
         time,
         "UTC",
       );
+
+      if(!searchObj.data.histogramInterval) {
+        console.error("Error processing histogram data:", "histogramInterval is not set");
+        searchObj.loadingHistogram = false;
+        return;
+      }
+
       for (
         let currentTime: any = currentTimeToBePassed.timestamp / 1000;
         currentTime < endDateTime;
@@ -5610,6 +5637,9 @@ const useLogs = () => {
     searchObj.data.queryResults.took += response.content.results.took;
     searchObj.data.queryResults.result_cache_ratio +=
       response.content.results.result_cache_ratio;
+
+    searchObj.data.queryResults.histogram_interval = response.content.results.histogram_interval;
+    if(searchObj.data.queryResults.histogram_interval) searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
   }
 
   const handlePageCountStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
@@ -6055,6 +6085,8 @@ const useLogs = () => {
     const _shouldShowHistogram = shouldShowHistogram(parsedSQL);
 
     searchObj.data.queryResults.aggs = [];
+    searchObj.data.queryResults.histogram_interval = 0;
+
     if (_shouldShowHistogram) {
       searchObj.meta.refreshHistogram = false;
       if (searchObj.data.queryResults.hits?.length > 0) {
@@ -6066,6 +6098,9 @@ const useLogs = () => {
         await generateHistogramSkeleton();
 
         histogramResults = [];
+
+        searchObj.data.histogramQuery.query.sql = await changeHistogramInterval(searchObj.data.histogramQuery.query.sql, 0);
+
 
         const payload = buildWebSocketPayload(
           searchObj.data.histogramQuery,

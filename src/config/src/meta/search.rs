@@ -137,6 +137,8 @@ pub struct Query {
     pub streaming_output: bool,
     #[serde(default)]
     pub streaming_id: Option<String>,
+    #[serde(default)]
+    pub histogram_interval: i64,
 }
 
 fn default_size() -> i64 {
@@ -160,6 +162,7 @@ impl Default for Query {
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
+            histogram_interval: 0,
         }
     }
 }
@@ -502,6 +505,8 @@ pub struct SearchPartitionRequest {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub streaming_output: bool,
+    #[serde(default)]
+    pub search_type: Option<SearchEventType>,
 }
 
 impl SearchPartitionRequest {
@@ -534,6 +539,7 @@ impl From<&Request> for SearchPartitionRequest {
             clusters: req.clusters.clone(),
             query_fn: req.query.query_fn.clone(),
             streaming_output: req.query.streaming_output,
+            search_type: req.search_type,
         }
     }
 }
@@ -612,6 +618,7 @@ impl SearchHistoryRequest {
                 skip_wal: false,
                 streaming_output: false,
                 streaming_id: None,
+                histogram_interval: 0,
             },
             encoding: RequestEncoding::Empty,
             regions: Vec::new(),
@@ -813,6 +820,7 @@ impl From<Query> for cluster_rpc::SearchQuery {
             query_fn: query.query_fn.unwrap_or_default(),
             action_id: query.action_id.unwrap_or_default(),
             skip_wal: query.skip_wal,
+            histogram_interval: query.histogram_interval,
         }
     }
 }
@@ -1156,6 +1164,7 @@ impl MultiStreamRequest {
                     skip_wal: self.skip_wal,
                     streaming_output: false,
                     streaming_id: None,
+                    histogram_interval: 0,
                 },
                 regions: self.regions.clone(),
                 clusters: self.clusters.clone(),

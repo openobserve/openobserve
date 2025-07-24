@@ -86,18 +86,19 @@ message ScanStatsResponse {
 
 // Search request query
 message SearchQuery {
-    string              sql = 1;
-    bool         quick_mode = 3;
-    int32              from = 4;
-    int32              size = 5;
-    int64        start_time = 6;
-    int64          end_time = 7;
-    bool   track_total_hits = 9;
-    string      query_type = 10;
-    bool        uses_zo_fn = 12;
-    string        query_fn = 13;
-    bool          skip_wal = 14;
-    string       action_id = 15;
+    string                sql = 1;
+    bool           quick_mode = 3;
+    int32                from = 4;
+    int32                size = 5;
+    int64          start_time = 6;
+    int64            end_time = 7;
+    bool     track_total_hits = 9;
+    string        query_type = 10;
+    bool          uses_zo_fn = 12;
+    string          query_fn = 13;
+    bool            skip_wal = 14;
+    string         action_id = 15;
+    int64 histogram_interval = 16;
 }
 
 
