@@ -121,12 +121,7 @@ export function validatePipeline(pipeline: Pipeline, context?: ValidationContext
           streamName = node.data.stream_name.value;
         }
 
-        if (streamName) {
-          // Check if stream exists
-          if (!context.streamList.includes(streamName)) {
-            result.errors.push(`Input stream "${streamName}" in node ${node.id} does not exist in the stream list`);
-          }
-          
+        if (streamName) {          
           // Only show error if this is a new stream name (different from original)
           const originalNode = context.originalPipeline?.nodes?.find((n: any) => n.id === node.id);
           const originalStreamName = typeof originalNode?.data?.stream_name === 'string' 
