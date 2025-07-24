@@ -31,7 +31,7 @@ test.describe.configure({ mode: "parallel" });
 
 // Refactored test cases using Page Object Model
 
-test.describe("dashboard filter testcases", () => {
+test.describe("HTML chart dashboard", () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     await page.waitForTimeout(1000);
@@ -62,8 +62,6 @@ test.describe("dashboard filter testcases", () => {
     // Add a panel to the dashboard
     await pm.dashboardCreate.addPanel();
 
-    await pm.dashboardPanelActions.addPanelName(panelName);
-
     await pm.chartTypeSelector.selectChartType("html");
 
     await page
@@ -85,7 +83,6 @@ test.describe("dashboard filter testcases", () => {
     // Add the panel name and save the panel
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
-    // Save the dashboard panel
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
@@ -121,8 +118,6 @@ test.describe("dashboard filter testcases", () => {
     // Add a panel to the dashboard
     await pm.dashboardCreate.addPanel();
 
-    await pm.dashboardPanelActions.addPanelName(panelName);
-
     await pm.chartTypeSelector.selectChartType("html");
 
     await pm.dashboardTimeRefresh.setRelative("15", "m");
@@ -148,6 +143,7 @@ test.describe("dashboard filter testcases", () => {
     ).toBeVisible();
 
     // Save the dashboard panel
+    await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
 
     // Delete the dashboard
