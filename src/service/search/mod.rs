@@ -924,18 +924,23 @@ pub async fn search_partition(
     }
     // Only for UI search, we need to generate histogram interval
     else if req.search_type.eq(&Some(SearchEventType::UI)) {
-        let time_range = (req.start_time, req.end_time);
-        let interval = generate_histogram_interval(Some(time_range));
-        match convert_histogram_interval_to_seconds(interval) {
-            Ok(v) => {
-                // convert seconds to microseconds
-                min_step = v * 1_000_000
-            }
-            Err(e) => {
-                log::error!(
-                    "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {:?}",
-                    e
-                );
+        if let Some(hist_int) = sql.histogram_interval {
+            // convert seconds to microseconds
+            min_step = hist_int * 1_000_000;
+        } else {
+            let time_range = (req.start_time, req.end_time);
+            let interval = generate_histogram_interval(Some(time_range), 0);
+            match convert_histogram_interval_to_seconds(&interval) {
+                Ok(v) => {
+                    // convert seconds to microseconds
+                    min_step = v * 1_000_000
+                }
+                Err(e) => {
+                    log::error!(
+                        "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {:?}",
+                        e
+                    );
+                }
             }
         }
     }
