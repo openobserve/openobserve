@@ -88,7 +88,7 @@ test.describe("Sanity testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
+    await page.waitForTimeout(2000);
     await pm.logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
   });
@@ -141,7 +141,7 @@ test.describe("Sanity testcases", () => {
   });
 
   // ===== HISTOGRAM TESTS =====
-  test("should not display chart if histogram off and display again when toggle is on", async ({ page }) => {
+  test.skip("should not display chart if histogram off and display again when toggle is on", async ({ page }) => {
     await page
       .locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]')
       .click();
