@@ -141,6 +141,7 @@ jobs:
             "Streams/streamname.spec.js",
             "Streams/streaming.spec.js",
             "Logs/unflattened.spec.js",
+            "Logs/logsqueries.matchall.spec.js",
             "GeneralTests/usersOrg.spec.js",
             "Logs/websocket.spec.js",
             "Pipelines/pipeline-dynamic.spec.js",
