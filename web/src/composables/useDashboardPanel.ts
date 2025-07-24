@@ -3217,8 +3217,88 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   // For visualization, we need to set the custom query fields
-  const setCustomQueryFields = async (abortSignal?: AbortSignal) => {
+  const setCustomQueryFields = async (
+    extractedFieldsParam?: {
+      group_by: string[];
+      projections: string[];
+      timeseries_field: string | null;
+    },
+    abortSignal?: AbortSignal,
+  ) => {
     resetFields();
+
+    // Helper function to process extracted fields and populate axes
+    const processExtractedFields = (extractedFields: {
+      group_by: string[];
+      projections: string[];
+      timeseries_field: string | null;
+    }) => {
+      // remove all fields from custom query fields
+      dashboardPanelData.meta.stream.customQueryFields = [];
+
+      // add all fields to custom query fields
+      extractedFields.projections.forEach((field: any) => {
+        dashboardPanelData.meta.stream.customQueryFields.push({
+          name: field,
+          type: "",
+        });
+      });
+
+      // remove group by and timeseries field from projections, while using it on y axis
+      const yAxisFields = extractedFields.projections.filter(
+        (field) =>
+          !extractedFields.group_by.includes(field) &&
+          field !== extractedFields.timeseries_field,
+      );
+
+      if (
+        extractedFields.timeseries_field &&
+        extractedFields.group_by.length <= 2
+      ) {
+        // select line chart as default
+        dashboardPanelData.data.type = "line";
+
+        // add timestamp as x axis
+        addXAxisItem({ name: extractedFields.timeseries_field });
+        // here upto 1 group by will be available, add group by as breakdown
+        extractedFields.group_by.forEach((field: any) => {
+          // if field is not timeseries field, then add it as breakdown
+          if (field !== extractedFields.timeseries_field) {
+            addBreakDownAxisItem({ name: field });
+          }
+        });
+        // add all y axis fields
+        yAxisFields.forEach((field: any) => {
+          addYAxisItem({ name: field });
+        });
+      } else {
+        // select table chart as default
+        dashboardPanelData.data.type = "table";
+
+        // add timestamp as x axis if available
+        if (extractedFields.timeseries_field) {
+          addXAxisItem({ name: extractedFields.timeseries_field });
+        }
+
+        // add all group by fields as x axis
+        extractedFields.group_by.forEach((field: any) => {
+          if (field !== extractedFields.timeseries_field) {
+            addXAxisItem({ name: field });
+          }
+        });
+
+        // add all y axis fields
+        yAxisFields.forEach((field: any) => {
+          addYAxisItem({ name: field });
+        });
+      }
+    };
+
+    // If extractedFieldsParam is provided, use it directly to avoid duplicate API call
+    if (extractedFieldsParam) {
+      processExtractedFields(extractedFieldsParam);
+      return;
+    }
 
     const timestamps = dashboardPanelData.meta.dateTime;
     let startISOTimestamp: any;
@@ -3269,7 +3349,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             : {}),
         },
         page_type: "dashboards",
-        is_streaming: isStreamingEnabled(store.state)
+        is_streaming: isStreamingEnabled(store.state),
       },
       "dashboards",
     );
@@ -3285,65 +3365,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       timeseries_field: string | null;
     } = searchRes.data;
 
-    // remove all fields from custom query fields
-    dashboardPanelData.meta.stream.customQueryFields = [];
-
-    // add all fields to custom query fields
-    extractedFields.projections.forEach((field: any) => {
-      dashboardPanelData.meta.stream.customQueryFields.push({
-        name: field,
-        type: "",
-      });
-    });
-
-    // remove group by and timeseries field from projections, while using it on y axis
-    const yAxisFields = extractedFields.projections.filter(
-      (field) =>
-        !extractedFields.group_by.includes(field) &&
-        field !== extractedFields.timeseries_field,
-    );
-
-    if (
-      extractedFields.timeseries_field &&
-      extractedFields.group_by.length <= 2
-    ) {
-      // select line chart as default
-      dashboardPanelData.data.type = "line";
-
-      // add timestamp as x axis
-      addXAxisItem({ name: extractedFields.timeseries_field });
-      // here upto 1 group by will be available, add group by as breakdown
-      extractedFields.group_by.forEach((field: any) => {
-        // if field is not timeseries field, then add it as breakdown
-        if (field !== extractedFields.timeseries_field) {
-          addBreakDownAxisItem({ name: field });
-        }
-      });
-      // add all y axis fields
-      yAxisFields.forEach((field: any) => {
-        addYAxisItem({ name: field });
-      });
-    } else {
-      // select table chart as default
-      dashboardPanelData.data.type = "table";
-
-      // add timestamp as x axis if available
-      if (extractedFields.timeseries_field) {
-        addXAxisItem({ name: extractedFields.timeseries_field });
-      }
-
-      // add all group by fields as x axis
-      extractedFields.group_by.forEach((field: any) => {
-        if (field !== extractedFields.timeseries_field) {
-          addXAxisItem({ name: field });
-        }
-      });
-
-      // add all y axis fields
-      yAxisFields.forEach((field: any) => {
-        addYAxisItem({ name: field });
-      });
-    }
+    // Use the helper function to process the extracted fields
+    processExtractedFields(extractedFields);
   };
 
   return {

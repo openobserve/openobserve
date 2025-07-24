@@ -372,6 +372,7 @@ import {
   verifyOrganizationStatus,
   useLocalInterestingFields,
   deepCopy,
+  b64EncodeUnicode,
 } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
@@ -394,6 +395,7 @@ import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import useAiChat from "@/composables/useAiChat";
+import queryService from "@/services/search";
 
 export default defineComponent({
   name: "PageSearch",
@@ -1582,17 +1584,15 @@ export default defineComponent({
               dashboardPanelData.layout.currentQueryIndex
             ].customQuery = true;
 
-            const shouldUseHistogram = await copyLogsQueryToDashboardPanel();
+            // reset old rendered chart
+            visualizeChartData.value = {};
+
+            const shouldUseHistogram = await extractVisualizationFields();
 
             // if not able to parse query, do not do anything
             if (shouldUseHistogram === null) {
               return;
             }
-
-            // reset old rendered chart
-            visualizeChartData.value = {};
-
-            await extractVisualizationFields();
 
             // set logs page data to searchResponseForVisualization
             if (shouldUseHistogram === true) {
@@ -1650,14 +1650,15 @@ export default defineComponent({
             dashboardPanelData.layout.currentQueryIndex
           ].customQuery = true;
 
-          const shouldUseHistogram = await copyLogsQueryToDashboardPanel();
+          // reset old rendered chart
+          visualizeChartData.value = {};
+
+          const shouldUseHistogram = await extractVisualizationFields();
 
           // if not able to parse query, do not do anything
           if (shouldUseHistogram === null) {
             return;
           }
-
-          await extractVisualizationFields();
 
           // emit resize event
           // this will rerender/call resize method of already rendered chart to resize
@@ -1780,16 +1781,131 @@ export default defineComponent({
         fieldsExtractionAbortController.value.abort();
       }
 
-      // Create a fresh AbortController for this extraction cycle
+      // Create a fresh AbortController for this cycle
       fieldsExtractionAbortController.value = new AbortController();
       const signal = fieldsExtractionAbortController.value.signal;
 
-      // Start extraction with abort support
-      fieldsExtractionPromise = setCustomQueryFields(signal);
+      const checkAbort = () => {
+        if (signal.aborted) {
+          throw new DOMException("Aborted", "AbortError");
+        }
+      };
 
       try {
+        /* ------------------------------------------------------------- */
+        /* 1) Fetch schema for the user query                            */
+        /* ------------------------------------------------------------- */
+        const timestamps = dashboardPanelData.meta.dateTime;
+        let startISOTimestamp: number | undefined;
+        let endISOTimestamp: number | undefined;
+
+        if (
+          timestamps?.start_time &&
+          timestamps?.end_time &&
+          timestamps.start_time != "Invalid Date" &&
+          timestamps.end_time != "Invalid Date"
+        ) {
+          startISOTimestamp = new Date(
+            timestamps.start_time.toISOString(),
+          ).getTime();
+          endISOTimestamp = new Date(
+            timestamps.end_time.toISOString(),
+          ).getTime();
+        }
+
+        checkAbort();
+
+        const schemaRes = await queryService.result_schema(
+          {
+            org_identifier: store.state.selectedOrganization.identifier,
+            query: {
+              query: {
+                sql: store.state.zoConfig.sql_base64_enabled
+                  ? b64EncodeUnicode(searchObj.data.query)
+                  : searchObj.data.query,
+                query_fn: null,
+                start_time: startISOTimestamp,
+                end_time: endISOTimestamp,
+                size: -1,
+                histogram_interval: undefined,
+                streaming_output: false,
+                streaming_id: null,
+              },
+              ...(store.state.zoConfig.sql_base64_enabled
+                ? { encoding: "base64" }
+                : {}),
+            },
+            page_type: "dashboards",
+            is_streaming: isStreamingEnabled(store.state),
+          },
+          "dashboards",
+        );
+
+        checkAbort();
+
+        const extractedFields = schemaRes.data as {
+          group_by: string[];
+          projections: string[];
+          timeseries_field: string | null;
+        };
+
+        /* Decide whether to use histogram query */
+        const shouldUseHistogram = !(
+          extractedFields?.group_by && extractedFields.group_by.length
+        );
+
+        const histogramFallbackQuery =
+          searchObj?.data?.histogramQuery?.query?.sql ??
+          (searchObj?.data?.stream?.selectedStream?.[0]
+            ? `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"  FROM "${searchObj?.data?.stream?.selectedStream?.[0]}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`
+            : "");
+
+        const finalQuery = shouldUseHistogram
+          ? histogramFallbackQuery
+          : searchObj.data.query;
+
+        if (!finalQuery) {
+          showErrorNotification("Query is empty, please write query to visualize");
+          variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+          return null;
+        }
+
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].query = finalQuery;
+
+        const allFieldsHaveAlias = allSelectionFieldsHaveAlias(finalQuery);
+        if (!allFieldsHaveAlias) {
+          showAliasErrorForVisualization(
+            "All fields must have alias to visualize, please add alias to all fields",
+          );
+          variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+          return null;
+        }
+
+        /* Populate fields & axes */
+        // For histogram queries, we need to modify the extractedFields to match the actual query structure
+        let fieldsForVisualization = extractedFields;
+        if (shouldUseHistogram) {
+          // For histogram query, override the extracted fields to match the histogram structure
+          fieldsForVisualization = {
+            group_by: ["zo_sql_key"], // histogram field is grouped by zo_sql_key
+            projections: ["zo_sql_key", "zo_sql_num"], // histogram returns zo_sql_key and zo_sql_num
+            timeseries_field: "zo_sql_key", // zo_sql_key is the time field in histogram
+          };
+        }
+
+        fieldsExtractionPromise = setCustomQueryFields(fieldsForVisualization, signal);
+
         await fieldsExtractionPromise;
-      } catch (err: any) {
+
+        visualizeChartData.value = JSON.parse(
+          JSON.stringify(dashboardPanelData.data),
+        );
+
+        return shouldUseHistogram;
+      } catch (err) {
+        variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
         throw err;
       }
     };
