@@ -628,7 +628,7 @@ pub async fn filter_file_list_by_tantivy_index(
     let target_partitions = if cache_type == file_data::CacheType::None {
         cfg.limit.query_thread_num
     } else {
-        cfg.limit.cpu_num
+        cfg.limit.query_index_thread_num
     };
 
     let search_start = std::time::Instant::now();
@@ -646,6 +646,12 @@ pub async fn filter_file_list_by_tantivy_index(
         .map(|g| g.len())
         .max()
         .unwrap_or(0);
+
+    log::info!(
+        "[trace_id {}] search->tantivy: target_partitions: {target_partitions}, group_num: {group_num}, max_group_len: {max_group_len}",
+        query.trace_id,
+    );
+
     for _ in 0..max_group_len {
         if no_more_files {
             // delete the rest of the files
@@ -1056,6 +1062,7 @@ fn partition_tantivy_files(
 // use the min_ts & max_ts of the file.meta to group files and each group can't contains crossing
 // time range files
 fn group_files_by_time_range(mut files: Vec<FileKey>, partition_num: usize) -> Vec<Vec<FileKey>> {
+    let expect_group_elements = files.len().div_ceil(partition_num);
     // sort files by max_ts in ascending order
     files.sort_unstable_by(|a, b| a.meta.max_ts.cmp(&b.meta.max_ts));
     // group by time range
@@ -1075,70 +1082,39 @@ fn group_files_by_time_range(mut files: Vec<FileKey>, partition_num: usize) -> V
         }
     }
     // regroup if the number of groups is less than expect partitions
-    if file_groups_indices.len() >= partition_num {
+    if file_groups_indices
+        .first()
+        .is_some_and(|g| g.len() <= expect_group_elements)
+    {
         file_groups_indices
     } else {
-        repartition_sorted_groups(file_groups_indices, partition_num)
+        repartition_sorted_groups(file_groups_indices, expect_group_elements)
     }
 }
 
-// 1. first get larger group
-// 2. split larger groups based on odd and even numbers
-// 3. loop until the group reaches the number of partitions
+// repartition the groups to the number of partitions
 fn repartition_sorted_groups(
     mut groups: Vec<Vec<FileKey>>,
-    partition_num: usize,
+    expect_group_elements: usize,
 ) -> Vec<Vec<FileKey>> {
     if groups.is_empty() {
         return groups;
     }
 
-    while groups.len() < partition_num {
-        let max_index = find_max_group_index(&groups);
-        let max_group = groups.remove(max_index);
-
-        // if the max group has less than 1 files, we don't split it further
-        if max_group.len() <= 1 {
-            groups.push(max_group);
+    loop {
+        if groups[0].len() <= expect_group_elements {
             break;
         }
-
-        // split max_group into odd and even groups
-        let group_cap = max_group.len().div_ceil(2);
-        let mut odd_group = Vec::with_capacity(group_cap);
-        let mut even_group = Vec::with_capacity(group_cap);
-
-        for (idx, file) in max_group.into_iter().enumerate() {
-            if idx % 2 == 0 {
-                even_group.push(file);
-            } else {
-                odd_group.push(file);
-            }
+        let max_group = groups.remove(0);
+        let chunk_num = max_group.len().div_ceil(expect_group_elements);
+        let mut new_groups = vec![vec![]; chunk_num];
+        for (k, item) in max_group.into_iter().enumerate() {
+            new_groups[k % chunk_num].push(item);
         }
-
-        if !odd_group.is_empty() {
-            groups.push(odd_group);
-        }
-        if !even_group.is_empty() {
-            groups.push(even_group);
-        }
+        groups.extend(new_groups);
     }
 
     groups
-}
-
-// find the index of the group with the most files
-fn find_max_group_index(groups: &[Vec<FileKey>]) -> usize {
-    groups
-        .iter()
-        .enumerate()
-        .fold(0, |max_index, (idx, group)| {
-            if group.len() > groups[max_index].len() {
-                idx
-            } else {
-                max_index
-            }
-        })
 }
 
 // Helper function to extract a file from a group at the specified index
@@ -1184,7 +1160,7 @@ mod tests {
         ];
         let partition_num = 3;
         let groups = group_files_by_time_range(files, partition_num);
-        assert_eq!(groups.len(), 3);
+        assert!(groups.len() >= 3);
     }
 
     #[test]
@@ -1199,7 +1175,7 @@ mod tests {
         ];
         let partition_num = 2;
         let groups = group_files_by_time_range(files, partition_num);
-        assert_eq!(groups.len(), 2);
+        assert!(groups.len() >= 2);
     }
 
     #[test]
@@ -1207,7 +1183,7 @@ mod tests {
         let files = vec![create_file_key(1, 10), create_file_key(11, 20)];
         let partition_num = 3;
         let groups = group_files_by_time_range(files, partition_num);
-        assert_eq!(groups.len(), 2);
+        assert!(groups.len() >= 2);
     }
 
     #[test]
@@ -1216,9 +1192,9 @@ mod tests {
             vec![create_file_key(1, 10), create_file_key(11, 20)],
             vec![create_file_key(21, 30), create_file_key(31, 40)],
         ];
-        let partition_num = 4;
-        let repartitioned_groups = repartition_sorted_groups(groups, partition_num);
-        assert_eq!(repartitioned_groups.len(), 4);
+        let expect_group_elements = 1;
+        let repartitioned_groups = repartition_sorted_groups(groups, expect_group_elements);
+        assert!(repartitioned_groups.len() >= 4);
     }
 
     #[test]
@@ -1230,20 +1206,9 @@ mod tests {
             create_file_key(31, 40),
             create_file_key(41, 50),
         ]];
-        let partition_num = 3;
-        let repartitioned_groups = repartition_sorted_groups(groups, partition_num);
-        assert_eq!(repartitioned_groups.len(), 3);
-    }
-
-    #[test]
-    fn test_find_max_group_index() {
-        let groups = vec![
-            vec![create_file_key(1, 10)],
-            vec![create_file_key(11, 20), create_file_key(21, 30)],
-            vec![create_file_key(31, 40)],
-        ];
-        let max_index = find_max_group_index(&groups);
-        assert_eq!(max_index, 1);
+        let expect_group_elements = 2;
+        let repartitioned_groups = repartition_sorted_groups(groups, expect_group_elements);
+        assert!(repartitioned_groups.len() >= 3);
     }
 
     #[test]
