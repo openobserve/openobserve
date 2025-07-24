@@ -443,18 +443,21 @@ const activeTab = ref("all");
 const filteredPipelines: any = ref([]);
 const columns: any = ref([]);
 
-const tabs = reactive([
+const tabs = computed(() => [
   {
     label: "All",
     value: "all",
+    logo: (store.state.theme === 'dark' || activeTab.value === 'all') ? getImageURL("images/pipeline/all_pipelines_dark.svg") : getImageURL("images/pipeline/all_pipelines_light.svg"),
   },
   {
     label: "Scheduled",
     value: "scheduled",
+    logo: (store.state.theme === 'dark' || activeTab.value === 'scheduled') ? getImageURL("images/pipeline/scheduled_pipeline_dark.svg") : getImageURL("images/pipeline/scheduled_pipeline_light.svg"),
   },
   {
     label: "Real-Time",
     value: "realtime",
+    logo: (store.state.theme === 'dark' || activeTab.value === 'realtime') ? getImageURL("images/pipeline/realtime_pipeline_dark.svg") : getImageURL("images/pipeline/realtime_pipeline_light.svg"),
   },
 ]);
 
