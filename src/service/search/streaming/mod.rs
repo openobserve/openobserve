@@ -207,12 +207,8 @@ pub async fn process_search_stream_request(
             .unwrap_or_default();
 
         log::info!(
-            "[HTTP2_STREAM trace_id {trace_id}] found cache responses len:{}, with hits: {},
-        cache_start_time: {:#?}, cache_end_time: {:#?}",
+            "[HTTP2_STREAM trace_id {trace_id}] found cache responses len:{}, cache_start_time: {c_start_time}, cache_end_time: {c_end_time}",
             cached_resp.len(),
-            cached_hits,
-            c_start_time,
-            c_end_time
         );
 
         // handle cache responses and deltas
