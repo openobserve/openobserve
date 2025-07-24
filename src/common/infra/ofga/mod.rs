@@ -147,7 +147,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let v0_0_16 = version_compare::Version::from("0.0.16").unwrap();
         let v0_0_17 = version_compare::Version::from("0.0.17").unwrap();
         let v0_0_18 = version_compare::Version::from("0.0.18").unwrap();
-        let v0_0_19 = version_compare::Version::from("0.0.19").unwrap();
+        let v0_0_20 = version_compare::Version::from("0.0.20").unwrap();
         if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
             need_pipeline_migration = true;
         }
@@ -171,7 +171,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             log::info!("[OFGA:Local] AI chat permissions migration needed");
             need_ai_chat_permissions_migration = true;
         }
-        if meta_version > v0_0_19 && existing_model_version < v0_0_19 {
+        if meta_version > v0_0_20 && existing_model_version < v0_0_20 {
             log::info!("[OFGA:Local] Re patterns migration needed");
             need_re_pattern_migration = true;
         }
