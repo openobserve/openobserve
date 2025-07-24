@@ -169,9 +169,20 @@ async fn handle_alert_triggers(
             Ok(Some((_, alert))) => alert,
             Ok(None) => {
                 log::error!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] Alert not found for module_key: {}",
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Alert not found for module_key: {}, deleting this trigger job",
                     trigger.module_key
                 );
+                if let Err(e) = db::scheduler::delete(
+                    &trigger.org,
+                    db::scheduler::TriggerModule::Alert,
+                    &trigger.module_key,
+                )
+                .await
+                {
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error deleting trigger job: {e}"
+                    );
+                }
                 return Err(anyhow::anyhow!("Alert not found"));
             }
             Err(e) => {
@@ -183,9 +194,19 @@ async fn handle_alert_triggers(
         }
     } else {
         log::error!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] Alert id is not a valid ksuid: {}",
+            "[SCHEDULER trace_id {scheduler_trace_id}] Alert id is not a valid ksuid: {}, deleting this trigger job",
             trigger.module_key
         );
+        // Module key is not a valid ksuid, delete the trigger job
+        if let Err(e) = db::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::Alert,
+            &trigger.module_key,
+        )
+        .await
+        {
+            log::error!("[SCHEDULER trace_id {scheduler_trace_id}] Error deleting trigger job: {e}")
+        }
         return Err(anyhow::anyhow!(
             "Alert id is not a valid ksuid: {}",
             trigger.module_key
