@@ -32,7 +32,7 @@ const FOOTER_CACHE_VERSION: u32 = 1;
 const FOOTER_VERSION_LEN: usize = 4;
 const FOOTER_OFFSET_LEN: usize = 8;
 
-pub(crate) struct FooterCache {
+pub struct FooterCache {
     data: RwLock<HashMap<PathBuf, HashMap<Range<usize>, OwnedBytes>>>,
 }
 

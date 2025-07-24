@@ -962,12 +962,6 @@ pub struct Common {
     )]
     pub inverted_index_search_format: String,
     #[env_config(
-        name = "ZO_INVERTED_INDEX_TANTIVY_MODE",
-        default = "",
-        help = "Tantivy search mode, puffin or mmap, default is puffin."
-    )]
-    pub inverted_index_tantivy_mode: String,
-    #[env_config(
         name = "ZO_INVERTED_INDEX_CAMEL_CASE_TOKENIZER_DISABLED",
         default = false,
         help = "Disable camel case tokenizer for inverted index."
@@ -2608,17 +2602,6 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
-
-    // check disk cache with tantivy mode
-    cfg.common.inverted_index_tantivy_mode = cfg.common.inverted_index_tantivy_mode.to_lowercase();
-    if cfg.common.inverted_index_tantivy_mode.is_empty() {
-        cfg.common.inverted_index_tantivy_mode = "puffin".to_string();
-    }
-    if !cfg.disk_cache.enabled && cfg.common.inverted_index_tantivy_mode == "mmap" {
-        return Err(anyhow::anyhow!(
-            "Inverted index tantivy mode can not be set to mmap when disk cache is disabled."
-        ));
-    }
 
     Ok(())
 }
