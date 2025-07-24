@@ -1100,6 +1100,9 @@ fn repartition_sorted_groups(
         return groups;
     }
 
+    let total_files = groups.iter().map(|g| g.len()).sum::<usize>();
+    let avg_files = total_files.div_ceil(partition_num);
+
     while groups.len() < partition_num {
         let max_index = find_max_group_index(&groups);
         let max_group = groups.remove(max_index);
@@ -1110,25 +1113,18 @@ fn repartition_sorted_groups(
             break;
         }
 
-        // split max_group into odd and even groups
-        let group_cap = max_group.len().div_ceil(2);
-        let mut odd_group = Vec::with_capacity(group_cap);
-        let mut even_group = Vec::with_capacity(group_cap);
+        let group_size = max_group.len().div_ceil(avg_files);
+
+        let mut new_groups = Vec::with_capacity(group_size);
+        for _ in 0..group_size {
+            new_groups.push(Vec::with_capacity(avg_files));
+        }
 
         for (idx, file) in max_group.into_iter().enumerate() {
-            if idx % 2 == 0 {
-                even_group.push(file);
-            } else {
-                odd_group.push(file);
-            }
+            new_groups[idx % group_size].push(file);
         }
 
-        if !odd_group.is_empty() {
-            groups.push(odd_group);
-        }
-        if !even_group.is_empty() {
-            groups.push(even_group);
-        }
+        groups.extend(new_groups);
     }
 
     groups
