@@ -228,4 +228,159 @@ mod tests {
             assert!(data.get("version").unwrap() == "1.0.1");
         }
     }
+
+    #[test]
+    fn test_geo_info_data_creation_and_properties() {
+        // Test GeoInfoData struct creation and property access
+        let geo_info = GeoInfoData {
+            city: Some("New York"),
+            country: Some("United States"),
+            country_iso_code: Some("US"),
+            location: None,
+        };
+
+        assert_eq!(geo_info.city, Some("New York"));
+        assert_eq!(geo_info.country, Some("United States"));
+        assert_eq!(geo_info.country_iso_code, Some("US"));
+        assert!(geo_info.location.is_none());
+    }
+
+    #[test]
+    fn test_initialize_ua_parser() {
+        // Test that initialize_ua_parser returns a valid UserAgentParser
+        let parser = initialize_ua_parser();
+
+        // Test that the parser can parse a basic user agent
+        let user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
+        let parsed = parser.parse(user_agent);
+
+        // Verify that parsing doesn't panic and returns some result
+        assert!(!parsed.user_agent.family.is_empty());
+    }
+
+    #[test]
+    fn test_ua_parser_global_static() {
+        // Test that the global UA_PARSER static is properly initialized
+        // Access it to trigger lazy initialization
+        let _parser = &*UA_PARSER;
+
+        // Test that it can parse a user agent
+        let user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
+        let parsed = (*UA_PARSER).parse(user_agent);
+
+        assert!(!parsed.user_agent.family.is_empty());
+    }
+
+    #[test]
+    fn test_filter_api_keys_edge_cases() {
+        // Test edge cases for filter_api_keys function
+        let test_cases = [
+            // Empty HashMap
+            (HashMap::new(), 0),
+            // Only invalid keys
+            (
+                vec![("invalid_key".to_string(), "value".to_string())]
+                    .into_iter()
+                    .collect(),
+                0,
+            ),
+            // Mixed valid and invalid keys
+            (
+                vec![
+                    ("oo-api-key".to_string(), "secret".to_string()),
+                    ("oo-valid-key".to_string(), "value".to_string()),
+                    ("o2-api-key".to_string(), "secret2".to_string()),
+                    ("o2-valid-key".to_string(), "value2".to_string()),
+                    ("batch_time".to_string(), "123456".to_string()),
+                    ("other-key".to_string(), "other-value".to_string()),
+                ]
+                .into_iter()
+                .collect(),
+                3,
+            ),
+        ];
+
+        for (mut input, expected_len) in test_cases {
+            RumExtraData::filter_api_keys(&mut input);
+            assert_eq!(input.len(), expected_len);
+
+            // Verify no API keys remain
+            assert!(!input.contains_key("oo-api-key"));
+            assert!(!input.contains_key("o2-api-key"));
+        }
+    }
+
+    #[test]
+    fn test_filter_api_keys_case_sensitivity() {
+        // Test case sensitivity of key filtering
+        let mut data = vec![
+            ("OO-API-KEY".to_string(), "value".to_string()),
+            ("O2-API-KEY".to_string(), "value".to_string()),
+            ("oo-api-key".to_string(), "value".to_string()),
+            ("o2-api-key".to_string(), "value".to_string()),
+            ("OO-VALID-KEY".to_string(), "value".to_string()),
+            ("O2-VALID-KEY".to_string(), "value".to_string()),
+        ]
+        .into_iter()
+        .collect();
+
+        RumExtraData::filter_api_keys(&mut data);
+
+        // Should only keep the valid keys (case-sensitive matching)
+        assert_eq!(data.len(), 0); // All keys are filtered out due to case sensitivity
+        assert!(!data.contains_key("oo-api-key"));
+        assert!(!data.contains_key("o2-api-key"));
+    }
+
+    #[test]
+    fn test_filter_tags_edge_cases() {
+        // Test edge cases for filter_tags function
+        let test_cases = [
+            // Empty HashMap
+            (HashMap::new(), 0),
+            // No tags present
+            (
+                vec![("other-key".to_string(), "other-value".to_string())]
+                    .into_iter()
+                    .collect(),
+                0,
+            ),
+        ];
+
+        for (input, expected_len) in test_cases {
+            let result = RumExtraData::filter_tags(&input);
+            assert_eq!(result.len(), expected_len);
+        }
+    }
+
+    #[test]
+    fn test_filter_tags_malformed_input() {
+        // Test malformed tag inputs
+        let test_cases = [
+            // Special characters in keys/values
+            (
+                "ootags=key-with-dash:value-with-dash,key_with_underscore:value_with_underscore",
+                2,
+            ),
+        ];
+
+        for (tags_str, expected_count) in test_cases {
+            let mut data = HashMap::new();
+            data.insert("ootags".to_string(), tags_str.to_string());
+
+            let result = RumExtraData::filter_tags(&data);
+            assert_eq!(result.len(), expected_count);
+        }
+    }
+
+    #[test]
+    fn test_filter_tags_no_tags_present() {
+        // Test when neither ootags nor o2tags are present
+        let mut data = HashMap::new();
+        data.insert("other-param".to_string(), "other-value".to_string());
+        data.insert("oo-param".to_string(), "oo-value".to_string());
+
+        let result = RumExtraData::filter_tags(&data);
+        assert!(result.is_empty());
+    }
 }
