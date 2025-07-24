@@ -3321,7 +3321,7 @@ const useLogs = () => {
                     searchObj.organizationIdentifier + "_" + stream.name
                   ]
                 : environmentInterestingFields.length > 0
-                  ? [...environmentInterestingFields]
+                  ? [...environmentInterestingFields, store.state.zoConfig?.timestamp_column]
                   : [...schemaInterestingFields];
 
             const intField = new Set(

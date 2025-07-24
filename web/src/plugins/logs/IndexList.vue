@@ -1362,6 +1362,11 @@ export default defineComponent({
     };
 
     const addInterestingFieldToSelectedStreamFields = (field: any) => {
+      const defaultFields = [
+        store.state.zoConfig?.timestamp_column,
+        store.state.zoConfig?.all_fields_name,
+      ];
+
       let expandKeys = Object.keys(searchObj.data.stream.expandGroupRows);
 
       let index = 0;
@@ -1373,11 +1378,23 @@ export default defineComponent({
         if (key === field.group) break;
       }
 
-      searchObj.data.stream.selectedInterestingStreamFields.splice(
-        index,
-        0,
-        field,
-      );
+      // Add the field to the beginning of the array, add all after timestamp column if timestamp column is present
+      if (field.name === store.state.zoConfig?.timestamp_column) {
+        searchObj.data.stream.selectedInterestingStreamFields.splice(
+          index -
+            searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+              field.group
+            ],
+          0,
+          field,
+        );
+      } else {
+        searchObj.data.stream.selectedInterestingStreamFields.splice(
+          index,
+          0,
+          field,
+        );
+      }
 
       searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
         field.group
