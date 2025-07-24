@@ -88,7 +88,7 @@ test.describe("Sanity testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    await page.waitForTimeout(2000);
+    const allsearch = page.waitForResponse("**/api/default/_search**");
     await pm.logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
   });

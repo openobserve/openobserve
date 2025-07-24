@@ -158,8 +158,4 @@ test.describe("CTE Logs Queries testcases", () => {
     await pageManager.logsPage.clickSearchBarRefreshButton();
     await pageManager.logsPage.expectLogTableColumnSourceVisible();
   });
-
- 
-
-
 }); 
