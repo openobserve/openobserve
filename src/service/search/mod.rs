@@ -929,7 +929,7 @@ pub async fn search_partition(
             min_step = hist_int * 1_000_000;
         } else {
             let time_range = (req.start_time, req.end_time);
-            let interval = generate_histogram_interval(Some(time_range), 0);
+            let interval = generate_histogram_interval(Some(time_range));
             match convert_histogram_interval_to_seconds(&interval) {
                 Ok(v) => {
                     // convert seconds to microseconds
