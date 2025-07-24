@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-model="
                               dashboardPanelData.data.queries[
                                 dashboardPanelData.layout.currentQueryIndex
-                              ].fields.x[index].axisType
+                              ].fields.x[index].treatAsNonTimestamp
                             "
                             :label="'Mark this field as non-timestamp'"
                             dense
@@ -735,7 +735,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model="
                           dashboardPanelData.data.queries[
                             dashboardPanelData.layout.currentQueryIndex
-                          ].fields.y[index].axisType
+                          ].fields.y[index].treatAsNonTimestamp
                         "
                         :label="'Mark this field as non-timestamp'"
                         dense
@@ -1166,8 +1166,8 @@ export default defineComponent({
       selectedStreamFieldsBasedOnUserDefinedSchema,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
 
-    // Initialize axisType for existing fields (only for table charts)
-    const initializeAxisTypes = () => {
+    // Initialize treatAsNonTimestamp for existing fields (only for table charts)
+    const initializeTreatAsNonTimestamp = () => {
       const currentQuery =
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -1176,36 +1176,37 @@ export default defineComponent({
       // Check if this is a new panel (no ID means it's new)
       const isNewPanel = !dashboardPanelData.data.id;
 
-      // Helper: set axisType for X/Y fields only
-      const setAxisTypeForField = (field: any) => {
-        // Always ensure axisType is set for existing panels
+      // Helper: set treatAsNonTimestamp for X/Y fields only
+      const setTreatAsNonTimestampForField = (field: any) => {
+        // Always ensure treatAsNonTimestamp is set for existing panels
         if (isNewPanel) {
           // For new panels: set based on field name
-          // For timestamp fields: axisType = false (unchecked)
-          // For non-timestamp fields: axisType = true (checked)
-          field.axisType = field.column === "_timestamp" ? false : true;
+          // For timestamp fields: treatAsNonTimestamp = false (unchecked)
+          // For non-timestamp fields: treatAsNonTimestamp = true (checked)
+          field.treatAsNonTimestamp =
+            field.column === "_timestamp" ? false : true;
         } else {
           // For existing panels: set all to false (unchecked) initially
-          field.axisType = false;
+          field.treatAsNonTimestamp = false;
         }
       };
 
       // Only X and Y axes for table charts
       if (currentQuery?.fields?.x) {
         currentQuery.fields.x.forEach((field: any) => {
-          setAxisTypeForField(field);
+          setTreatAsNonTimestampForField(field);
         });
       }
       if (currentQuery?.fields?.y) {
         currentQuery.fields.y.forEach((field: any) => {
-          setAxisTypeForField(field);
+          setTreatAsNonTimestampForField(field);
         });
       }
     };
 
     onMounted(() => {
       nextTick(() => {
-        initializeAxisTypes();
+        initializeTreatAsNonTimestamp();
       });
     });
 
@@ -1213,8 +1214,8 @@ export default defineComponent({
       () => dashboardPanelData.data.type,
       (newType: string, oldType: string) => {
         if (newType !== oldType) {
-          // Reset axis types when chart type changes
-          initializeAxisTypes();
+          // Reset treatAsNonTimestamp when chart type changes
+          initializeTreatAsNonTimestamp();
         }
       },
     );

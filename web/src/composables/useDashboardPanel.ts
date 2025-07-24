@@ -472,7 +472,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             : null,
         isDerived,
         havingConditions: [],
-        axisType: row.name === "_timestamp" ? false : true,
+        treatAsNonTimestamp: row.name === "_timestamp" ? false : true,
       });
     }
 
@@ -588,7 +588,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             : "count",
         isDerived,
         havingConditions: [],
-        axisType: row.name === "_timestamp" ? false : true,
+        treatAsNonTimestamp: row.name === "_timestamp" ? false : true,
       });
     }
     updateArrayAlias();

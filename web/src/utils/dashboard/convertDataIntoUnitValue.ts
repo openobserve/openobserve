@@ -278,29 +278,29 @@ export const isTimeSeries = (sample: any) => {
 
 // Check if the sample is timestamp (16 digit microseconds)
 /**
- * Checks if the sample is timestamp (16 digit microseconds) based on axisType object.
- * axisType: { value: true | false | null | undefined | "auto" }
- * - If axisType.value === true (not timestamp field): Return false
- * - If axisType.value === false (timestamp field): Check if all values are 16 digits, return true if they are
- * - If axisType.value === null or undefined (auto mode): Check if all values are 16 digits, return true if they are
+ * Checks if the sample is timestamp (16 digit microseconds) based on treatAsNonTimestamp object.
+ * treatAsNonTimestamp: { value: true | false | null | undefined | "auto" }
+ * - If treatAsNonTimestamp.value === true (not timestamp field): Return false
+ * - If treatAsNonTimestamp.value === false (timestamp field): Check if all values are 16 digits, return true if they are
+ * - If treatAsNonTimestamp.value === null or undefined (auto mode): Check if all values are 16 digits, return true if they are
  * - Otherwise: Return false
  */
-export const isTimeStamp = (sample: any, axisType: any) => {
+export const isTimeStamp = (sample: any, treatAsNonTimestamp: any) => {
   const microsecondsPattern = /^\d{16}$/;
 
-  // If axisType is true (not timestamp field), return false
-  if (axisType === true) {
+  // If treatAsNonTimestamp is true (not timestamp field), return false
+  if (treatAsNonTimestamp === true) {
     return false;
   }
 
-  // If axisType is false (timestamp field), check if all values are 16 digit numbers
-  if (axisType === false) {
+  // If treatAsNonTimestamp is false (timestamp field), check if all values are 16 digit numbers
+  if (treatAsNonTimestamp === false) {
     return sample.every((value: any) =>
       microsecondsPattern.test(value?.toString()),
     );
   }
-  // If axisType is null or undefined, check if all values are 16 digits
-  if (axisType === null || axisType === undefined) {
+  // If treatAsNonTimestamp is null or undefined, check if all values are 16 digits
+  if (treatAsNonTimestamp === null || treatAsNonTimestamp === undefined) {
     return sample.every((value: any) =>
       microsecondsPattern.test(value?.toString()),
     );

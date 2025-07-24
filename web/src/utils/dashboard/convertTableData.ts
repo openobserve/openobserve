@@ -94,7 +94,7 @@ export const convertTableData = (
       column: key,
       color: null,
       isDerived: false,
-      axisType: false,
+      treatAsNonTimestamp: false,
     }));
 
     // add responseKeys to columnData
@@ -111,7 +111,7 @@ export const convertTableData = (
           ?.slice(0, Math.min(20, tableRows.length))
           ?.map((it: any) => it[field.alias]);
         const isTimeSeriesData = isTimeSeries(sample);
-        const isTimeStampData = isTimeStamp(sample, field.axisType);
+        const isTimeStampData = isTimeStamp(sample, field.treatAsNonTimestamp);
 
         if (isTimeSeriesData || isTimeStampData) {
           histogramFields.push(field.alias);
@@ -128,7 +128,7 @@ export const convertTableData = (
           ?.slice(0, Math.min(20, tableRows.length))
           ?.map((it: any) => it[field.alias]);
         const isTimeSeriesData = isTimeSeries(sample);
-        const isTimeStampData = isTimeStamp(sample, field.axisType);
+        const isTimeStampData = isTimeStamp(sample, field.treatAsNonTimestamp);
 
         if (isTimeSeriesData || isTimeStampData) {
           histogramFields.push(field.alias);
