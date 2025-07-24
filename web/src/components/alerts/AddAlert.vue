@@ -80,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   subLabel="Set the stage for your alert."
                   icon="edit"
                   class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
+                  :iconClass="'tw-mt-[2px]'"
               />
               </div>
               <div v-if="expandState.alertSetup" class="tw-w-full row alert-setup-container">
@@ -293,7 +294,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model:is-expanded="expandState.advancedSetup"
                     label="Advanced Setup"
                     :icon="'add'"
-                    subLabel="Go deeper with custom options"
                    class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
                     />
             </div>

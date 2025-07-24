@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             subLabel="Set your alert rules and choose how you'd like to be notified."
             icon="tune"
             class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
+            :iconClass="'tw-mt-[2px]'"
             @update:is-expanded="()=>emits('update:expandState', expandState)"
           />
       </div>
@@ -869,6 +870,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label="Multi Window"
           subLabel="Set relative alerting system based on SQL query"
         class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
+        :iconClass="'tw-mt-[2px]'"
           :image="multiWindowImage"
           @update:is-expanded="()=>emits('update:expandState', expandState)"
         />  
@@ -1016,6 +1018,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :image="conditionsImage"
           subLabel="What should trigger the alert."
           class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
+          :iconClass="'tw-mt-[2px]'"
           @update:is-expanded="()=>emits('update:expandState', expandState)"
         />
     </div>

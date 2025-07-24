@@ -13,26 +13,28 @@
             v-if="!image"
             :name="icon"
             size="16px"
-            class="tw-mr-2 tw-mt-1   tw-rounded-full tw-px-1 tw-py-1  "
+            class="tw-mr-2   tw-rounded-full tw-px-1 tw-py-1  "
             :class="[
               store.state.theme === 'dark'
                 ? 'tw-text-gray-100 tw-bg-gray-600'
                 : 'light-mode-icon',
+                iconClass
             ]"
           />
           <img
             v-else
             :src="image"
-            class="tw-mr-2 tw-mt-1 tw-rounded-full tw-px-1 tw-py-1"
+            class="tw-mr-2 tw-rounded-full tw-px-1 tw-py-1"
             :class="[
               store.state.theme === 'dark'
                 ? 'tw-text-gray-100 tw-bg-gray-600'
                 : 'light-mode-icon',
+                iconClass
             ]"
           />
           <div class="tw-flex tw-flex-col tw-items-start tw-justify-start">
            <span> {{ label }}</span>
-            <div v-if="subLabel" class="tw-text-[13px]"
+            <div class="tw-text-[13px] tw-h-[20px]"
             :class="[
               store.state.theme === 'dark'
                 ? 'tw-text-[#c6c6c6]'
@@ -96,6 +98,10 @@
       default: "edit",
     },
     image:{
+      type: String,
+      default: "",
+    },
+    iconClass:{
       type: String,
       default: "",
     }
