@@ -56,7 +56,8 @@ import {
   arraysMatch,
   isWebSocketEnabled,
   isStreamingEnabled,
-  addSpacesToOperators
+  addSpacesToOperators,
+  deepCopy
 } from "@/utils/zincutils";
 import {
   convertDateToTimestamp,
@@ -200,6 +201,10 @@ const defaultObject = {
       filteredField: <any>[],
       missingStreamMultiStreamFilter: <any>[],
       pipelineQueryStream: <any>[],
+      interestingStreamFields: <{ [key: string]: string[] }>{},
+      selectedInterestingStreamFields: <string[]>[],
+      interestingExpandedGroupRows: <any>{},
+      interestingExpandedGroupRowsFieldCount: <any>{},
     },
     resultGrid: {
       currentDateTime: new Date(),
@@ -297,6 +302,8 @@ const searchAggData = reactive({
 });
 
 const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
+
+const streamSchemaFieldsIndexMapping = ref<{ [key: string]: number }>({});
 
 let histogramResults: any = [];
 let histogramMappedData: any = [];
@@ -3361,6 +3368,9 @@ const useLogs = () => {
         let userDefineSchemaSettings: any = [];
         const schemaMaps: any = [];
         const commonSchemaMaps: any = [];
+        const interestingSchemaMaps: any = [];
+        const interestingCommonSchemaMaps: any = [];
+
         let schemaFieldsIndex: number = -1;
         let commonSchemaFieldsIndex: number = -1;
         let fieldObj: any = {};
@@ -3395,9 +3405,13 @@ const useLogs = () => {
           ),
         };
 
+        searchObj.data.stream.interestingExpandedGroupRows = deepCopy(searchObj.data.stream.expandGroupRows);
+        searchObj.data.stream.interestingExpandedGroupRowsFieldCount = deepCopy(searchObj.data.stream.expandGroupRowsFieldCount);
+
         searchObj.data.datetime.queryRangeRestrictionMsg = "";
         searchObj.data.datetime.queryRangeRestrictionInHour = -1;
         for (const stream of searchObj.data.streamResults.list) {
+          searchObj.data.stream.interestingStreamFields[stream.name] = [];
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
             if (searchObj.data.stream.selectedStream.length > 1) {
               schemaMaps.push({
@@ -3411,6 +3425,8 @@ const useLogs = () => {
                 streams: [stream.name],
                 isInterestingField: false,
               });
+
+              interestingSchemaMaps.push(schemaMaps[schemaMaps.length - 1]);
 
               schemaFields.push("dummylabel");
               // searchObj.data.stream.expandGroupRowsFieldCount[stream.name] = searchObj.data.stream.expandGroupRowsFieldCount[stream.name] + 1;
@@ -3502,14 +3518,13 @@ const useLogs = () => {
                   ? [...environmentInterestingFields]
                   : [...schemaInterestingFields];
 
-            searchObj.data.stream.interestingFieldList.push(
-              ...streamInterestingFieldsLocal,
+            const intField = new Set(
+              [searchObj.data.stream.interestingFieldList, ...streamInterestingFieldsLocal],
             );
 
-            const intField = new Set(
-              searchObj.data.stream.interestingFieldList,
-            );
-            searchObj.data.stream.interestingFieldList = [...intField];
+            searchObj.data.stream.interestingFieldList = Array.from(intField);
+
+            searchObj.data.stream.interestingStreamFields[stream.name] = Array.from(new Set(streamInterestingFieldsLocal));
 
             // create a schema field mapping based on field name to avoid iteration over object.
             // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
@@ -3567,6 +3582,13 @@ const useLogs = () => {
                     }
 
                     commonSchemaMaps.push(fieldObj);
+
+                    if(fieldObj.isInterestingField) {
+                      interestingCommonSchemaMaps.push(fieldObj);
+                      searchObj.data.stream.interestingExpandedGroupRows["common"] =
+                        searchObj.data.stream.interestingExpandedGroupRows["common"] + 1;
+                    }
+
                     commonSchemaFields.push(field);
                     searchObj.data.stream.expandGroupRowsFieldCount["common"] =
                       searchObj.data.stream.expandGroupRowsFieldCount[
@@ -3576,6 +3598,11 @@ const useLogs = () => {
                     //remove the element from the index
                     schemaFields.splice(schemaFieldsIndex, 1);
                     schemaMaps.splice(schemaFieldsIndex, 1);
+
+                    const index = interestingSchemaMaps.indexOf((item: any) => item.name == field);
+                    if(index > -1) {
+                      interestingSchemaMaps.splice(index, 1);
+                    }
                   } else if (commonSchemaFieldsIndex > -1) {
                     commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
                       stream.name,
@@ -3586,6 +3613,11 @@ const useLogs = () => {
                     //   ] + 1;
                   } else {
                     schemaMaps.push(fieldObj);
+                    if(fieldObj.isInterestingField) {
+                      interestingSchemaMaps.push(fieldObj);
+                      searchObj.data.stream.interestingExpandedGroupRows[stream.name] =
+                        searchObj.data.stream.interestingExpandedGroupRows[stream.name] + 1;
+                    }
                     schemaFields.push(field);
                     searchObj.data.stream.expandGroupRowsFieldCount[
                       stream.name
@@ -3623,9 +3655,21 @@ const useLogs = () => {
                       searchObj.data.stream.expandGroupRowsFieldCount[
                         schemaMaps[schemaFieldsIndex].streams[0]
                       ] - 1;
+
+                    searchObj.data.stream.interestingExpandedGroupRows[
+                      schemaMaps[schemaFieldsIndex].streams[0]
+                    ] =
+                      searchObj.data.stream.interestingExpandedGroupRows[
+                        schemaMaps[schemaFieldsIndex].streams[0]
+                      ] - 1;
                   }
 
                   commonSchemaMaps.push(fieldObj);
+                  if(fieldObj.isInterestingField) {
+                    interestingCommonSchemaMaps.push(fieldObj);
+                    searchObj.data.stream.interestingExpandedGroupRows["common"] =
+                      searchObj.data.stream.interestingExpandedGroupRows["common"] + 1;
+                  }
                   commonSchemaFields.push(field);
                   searchObj.data.stream.expandGroupRowsFieldCount["common"] =
                     searchObj.data.stream.expandGroupRowsFieldCount["common"] +
@@ -3634,6 +3678,10 @@ const useLogs = () => {
                   //remove the element from the index
                   schemaFields.splice(schemaFieldsIndex, 1);
                   schemaMaps.splice(schemaFieldsIndex, 1);
+                  const index = interestingSchemaMaps.indexOf((item: any) => item.name == field);
+                    if(index > -1) {
+                      interestingSchemaMaps.splice(index, 1);
+                    }
                 } else if (commonSchemaFieldsIndex > -1) {
                   commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
                     stream.name,
@@ -3643,6 +3691,11 @@ const useLogs = () => {
                   //   1;
                 } else {
                   schemaMaps.push(fieldObj);
+                  if(fieldObj.isInterestingField) {
+                    interestingSchemaMaps.push(fieldObj);
+                    searchObj.data.stream.interestingExpandedGroupRows[stream.name] =
+                      searchObj.data.stream.interestingExpandedGroupRows[stream.name] + 1;
+                  }
                   schemaFields.push(field);
                   searchObj.data.stream.expandGroupRowsFieldCount[stream.name] =
                     searchObj.data.stream.expandGroupRowsFieldCount[
@@ -3667,6 +3720,8 @@ const useLogs = () => {
                 streams: [stream.name],
                 isInterestingField: false,
               });
+
+              interestingCommonSchemaMaps.unshift(commonSchemaMaps[0]);
 
               commonSchemaFields.unshift("dummylabel");
               // searchObj.data.stream.expandGroupRowsFieldCount["common"] = searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
@@ -3741,6 +3796,9 @@ const useLogs = () => {
                     streams: [],
                   };
                   schemaMaps.push(fieldObj);
+                  if(fieldObj.isInterestingField) {
+                    interestingSchemaMaps.push(fieldObj);
+                  }
                   schemaFields.push(key);
                 }
               }
@@ -3755,11 +3813,21 @@ const useLogs = () => {
           ...commonSchemaMaps,
           ...schemaMaps,
         ];
+
+        searchObj.data.stream.selectedInterestingStreamFields = [
+          ...interestingCommonSchemaMaps,
+          ...interestingSchemaMaps,
+        ];
+
         if (
           searchObj.data.stream.selectedStreamFields != undefined &&
           searchObj.data.stream.selectedStreamFields.length
         )
           updateFieldKeywords(searchObj.data.stream.selectedStreamFields);
+
+        createFieldIndexMapping();
+
+        console.log(searchObj.data.stream.selectedInterestingStreamFields, interestingSchemaMaps, interestingCommonSchemaMaps);
       }
       searchObjDebug["extractFieldsEndTime"] = performance.now();
     } catch (e: any) {
@@ -3767,6 +3835,16 @@ const useLogs = () => {
       console.log("Error while extracting fields.", e);
       notificationMsg.value = "Error while extracting stream fields.";
     }
+  }
+
+  const createFieldIndexMapping = async () => {
+    new Promise((resolve) => {
+      streamSchemaFieldsIndexMapping.value = {};
+      for (let i = 0; i < searchObj.data.stream.selectedStreamFields.length; i++) {
+        streamSchemaFieldsIndexMapping.value[searchObj.data.stream.selectedStreamFields[i].name] = i;
+      }
+      resolve(true);
+    });
   }
 
   const updateGridColumns = () => {
