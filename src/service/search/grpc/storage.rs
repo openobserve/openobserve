@@ -656,8 +656,9 @@ pub async fn filter_file_list_by_tantivy_index(
         .unwrap_or(0);
 
     log::info!(
-        "[trace_id {}] search->tantivy: target_partitions: {target_partitions}, group_num: {group_num}, max_group_len: {max_group_len}",
+        "[trace_id {}] search->tantivy: target_partitions: {target_partitions}, group_num: {group_num}, max_group_len: {max_group_len}, group_distribution: {:?}",
         query.trace_id,
+        index_parquet_files.iter().map(|g| g.len()).collect_vec()
     );
 
     for _ in 0..max_group_len {
@@ -1048,17 +1049,36 @@ fn group_files_by_time_range(mut files: Vec<FileKey>, partition_num: usize) -> V
     // group by time range
     let mut file_groups_indices: Vec<Vec<FileKey>> = vec![];
     for file in files {
-        let file_group_to_insert = file_groups_indices.iter_mut().find(|group| {
-            file.meta.min_ts
-                > group
-                    .last()
-                    .expect("groups should be nonempty at construction")
-                    .meta
-                    .max_ts
-        });
-        match file_group_to_insert {
-            Some(group) => group.push(file),
-            None => file_groups_indices.push(vec![file]),
+        // Find all groups that can accommodate this file (no time range crossing)
+        let available_group_indices: Vec<usize> = file_groups_indices
+            .iter()
+            .enumerate()
+            .filter(|(_, group)| {
+                file.meta.min_ts
+                    > group
+                        .last()
+                        .expect("groups should be nonempty at construction")
+                        .meta
+                        .max_ts
+            })
+            .map(|(idx, _)| idx)
+            .collect();
+
+        match available_group_indices.as_slice() {
+            [] => {
+                // No existing group can accommodate this file, create a new group
+                file_groups_indices.push(vec![file]);
+            }
+            group_indices => {
+                // Find the group with the least number of files
+                let min_group_idx = group_indices
+                    .iter()
+                    .min_by_key(|&&idx| file_groups_indices[idx].len())
+                    .unwrap();
+
+                // Add the file to the group with the least files
+                file_groups_indices[*min_group_idx].push(file);
+            }
         }
     }
     // regroup if the number of groups is less than expect partitions
