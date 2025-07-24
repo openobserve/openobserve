@@ -472,7 +472,7 @@ const removeVariable = (variable: any) => {
     );
 };
 
-const validateSqlQuery = () => {
+const validateSqlQuery = async () => {
   validatingSqlQuery.value = true;
   if (streamRoute.value.query_condition.type == "promql") {
     isValidSqlQuery.value = true;
@@ -521,10 +521,11 @@ const validateSqlQuery = () => {
             message: `${message}`,
             timeout: 3000,
           });
+          resolve("");
+        } else {
+          isValidSqlQuery.value = true;
           reject("");
-        } else isValidSqlQuery.value = true;
-
-        resolve("");
+        }
       });
   });
 };
