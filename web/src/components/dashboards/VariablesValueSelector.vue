@@ -1207,14 +1207,6 @@ export default defineComponent({
           return;
         }
 
-        if (currentlyExecutingPromises[name] === null) {
-          variableLog(
-            name,
-            `Promise already cancelled, skipping load for variable ${name}`,
-          );
-          currentlyExecutingPromises[name] = reject;
-        }
-
         // For search operations, use comprehensive cancellation
         if (searchText) {
           cancelAllVariableOperations(name);
@@ -1743,39 +1735,45 @@ export default defineComponent({
             variableObject.name,
             `Old Varilables Data: ${JSON.stringify(oldVariablesData)}`,
           );
-
-          
-            variableLog(
-              variableObject.name,
-              `finalizePartialVariableLoading: loading child variables: ${childVariables}, ${JSON.stringify(childVariableObjects)}`,
-            );
-            const results = await Promise.all(
-              childVariableObjects.map((childVariable: any) => {
-                // Only load children if the parent value actually changed 
-                // OR child is waiting for the load
-                if(childVariable.isVariableLoadingPending || oldVariablesData[name] !== variableObject.value) {
-                  
-                  variableLog(
-                    variableObject.name,
-                    `finalizePartialVariableLoading: Loading child variable ${childVariable.name} as parent value changed`,
-                  )
-                  
-                  return loadSingleVariableDataByName(childVariable, isInitialLoad);
-                } else {
-                  
-                  variableLog(
-                    variableObject.name,
-                    `finalizePartialVariableLoading: Skipping child variable ${childVariable.name} loading as parent value did not change`,
-                  );
-                
-                }
-              }),
-            );
-
-            variableLog(
-              variableObject.name,
-              `finalizePartialVariableLoading: child variables results: ${JSON.stringify(results)}`,
-            );
+          for (const childVariable of childVariableObjects) {
+            // Only apply guard for REST API mode
+            if (
+              !isStreamingEnabled(store.state) &&
+              !isWebSocketEnabled(store.state)
+            ) {
+              if (isInitialLoad) {
+                variableLog(
+                  variableObject.name,
+                  `finalizePartialVariableLoading: Initial load, always loading child variable ${childVariable.name}`,
+                );
+                await loadSingleVariableDataByName(childVariable, true);
+                continue;
+              }
+              if (
+                (childVariable.isVariableLoadingPending ||
+                  oldVariablesData[name] !== variableObject.value) &&
+                !childVariable.isLoading &&
+                !childVariable.isVariableLoadingPending
+              ) {
+                variableLog(
+                  variableObject.name,
+                  `finalizePartialVariableLoading: [REST] Loading child variable ${childVariable.name} as parent value changed`,
+                );
+                await loadSingleVariableDataByName(childVariable, false);
+              } else {
+                variableLog(
+                  variableObject.name,
+                  `finalizePartialVariableLoading: [REST] Skipping child variable ${childVariable.name} loading as parent value did not change or child is already loading/pending`,
+                );
+              }
+            } else {
+              variableLog(
+                variableObject.name,
+                `finalizePartialVariableLoading: [Streaming/WebSocket] Loading child variable ${childVariable.name}`,
+              );
+              await loadSingleVariableDataByName(childVariable, isInitialLoad);
+            }
+          }
         }
       } catch (error) {
         // console.error(`Error finalizing partial variable loading for ${variableObject.name}:`, error);
