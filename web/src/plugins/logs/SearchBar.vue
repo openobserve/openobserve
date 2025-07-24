@@ -3231,6 +3231,7 @@ export default defineComponent({
         confirmLogsVisualizeModeChangeDialog.value = true;
       } else {
         searchObj.meta.logsVisualizeToggle = value;
+        updateUrlQueryParams();
       }
     };
 
@@ -3255,6 +3256,7 @@ export default defineComponent({
 
       // reset old dashboardPanelData
       resetDashboardPanelData();
+      updateUrlQueryParams();
 
       // assign, old dashboardPanelData meta object
       dashboardPanelData.meta = dashboardPanelDataMetaObj;
