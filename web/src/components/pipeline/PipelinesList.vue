@@ -598,6 +598,7 @@ const getColumnsForActiveTab = (tab: any) => {
       label: t("alerts.stream_name"),
       align: "left",
       sortable: true,
+      style: "width: 80px;",
     },
     {
       name: "stream_type",
@@ -605,6 +606,7 @@ const getColumnsForActiveTab = (tab: any) => {
       label: t("alerts.streamType"),
       align: "left",
       sortable: true,
+      style: "width: 80px;",
     },
   ];
 
@@ -624,6 +626,7 @@ const getColumnsForActiveTab = (tab: any) => {
       label: "Stream Type",
       align: "left",
       sortable: true,
+      style: "width: 80px;",
     },
     {
       name: "frequency",
@@ -631,6 +634,7 @@ const getColumnsForActiveTab = (tab: any) => {
       label: "Frequency",
       align: "left",
       sortable: true,
+      style: "width: 80px;",
     },
     {
       name: "period",
@@ -638,6 +642,7 @@ const getColumnsForActiveTab = (tab: any) => {
       label: "Period",
       align: "left",
       sortable: true,
+      style: "width: 80px;",
     },
     {
       name: "cron",
@@ -645,6 +650,7 @@ const getColumnsForActiveTab = (tab: any) => {
       label: "Cron",
       align: "left",
       sortable: false,
+      style: "width: 80px;",
     },
   ];
 
