@@ -472,7 +472,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             : null,
         isDerived,
         havingConditions: [],
-        treatAsNonTimestamp: row.name === "_timestamp" ? false : true,
+        treatAsNonTimestamp:
+          row.name === store.state.zoConfig.timestamp_column ? false : true,
       });
     }
 
@@ -588,7 +589,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             : "count",
         isDerived,
         havingConditions: [],
-        treatAsNonTimestamp: row.name === "_timestamp" ? false : true,
+        treatAsNonTimestamp:
+          row.name === store.state.zoConfig.timestamp_column ? false : true,
       });
     }
     updateArrayAlias();
@@ -721,7 +723,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         column: row.name,
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
-        havingConditions: [], 
+        havingConditions: [],
       };
     }
   };
@@ -761,7 +763,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         color: getNewColorValue(),
         aggregationFunction: null, // You can set the appropriate aggregation function here
         isDerived,
-        havingConditions: [], 
+        havingConditions: [],
       };
     }
   };

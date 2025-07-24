@@ -1113,6 +1113,7 @@ import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoCompl
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -1145,6 +1146,7 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
+    const store = useStore();
     const {
       dashboardPanelData,
       addXAxisItem,
@@ -1184,7 +1186,9 @@ export default defineComponent({
           // For timestamp fields: treatAsNonTimestamp = false (unchecked)
           // For non-timestamp fields: treatAsNonTimestamp = true (checked)
           field.treatAsNonTimestamp =
-            field.column === "_timestamp" ? false : true;
+            field.column === store.state.zoConfig.timestamp_column
+              ? false
+              : true;
         } else {
           // For existing panels: set all to false (unchecked) initially
           field.treatAsNonTimestamp = false;
