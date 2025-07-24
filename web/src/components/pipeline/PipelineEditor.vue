@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex justify-between items-center q-pb-sm">
+  <div class="flex justify-between items-center q-py-sm">
     <div class="flex items-center">
       <div
         data-test="add-pipeline-back-btn"
