@@ -405,6 +405,7 @@ pub async fn cache_files(
     // check how many files already cached
     let mut cached_files = HashSet::with_capacity(files.len());
     let (mut cache_hits, mut cache_misses) = (0, 0);
+    let start = std::time::Instant::now();
     for (file, _, max_ts) in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
@@ -445,10 +446,17 @@ pub async fn cache_files(
         }
     }
 
+    let check_cache_took = start.elapsed().as_millis() as usize;
+    if check_cache_took > 1000 {
+        log::warn!(
+            "[trace_id {trace_id}] search->storage: check file cache took: {check_cache_took} ms",
+        );
+    }
+
     let files_num = files.len() as i64;
     if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
         // all files are cached
-        return Ok((file_data::CacheType::None, cache_hits, cache_misses));
+        return Ok((file_data::CacheType::Disk, cache_hits, cache_misses));
     }
 
     // check cache size
@@ -482,6 +490,7 @@ pub async fn cache_files(
         .collect_vec();
     let file_type = file_type.to_string();
     tokio::spawn(async move {
+        let start = std::time::Instant::now();
         let files_num = files.len();
         for (file, size, ts) in files {
             if let Err(e) =
@@ -492,12 +501,9 @@ pub async fn cache_files(
                 );
             }
         }
+        let download_took = start.elapsed().as_millis() as usize;
         log::info!(
-            "[trace_id {}] search->storage: successfully enqueued {} files of {} for background download into {:?}",
-            trace_id,
-            files_num,
-            file_type,
-            cache_type,
+            "[trace_id {trace_id}] search->storage: successfully enqueued {files_num} files of {file_type} for background download into {cache_type:?} took: {download_took} ms",
         );
     });
 
@@ -576,12 +582,13 @@ pub async fn filter_file_list_by_tantivy_index(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
+                "[trace_id {}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, index size: {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
                 query.trace_id,
                 query.org_id,
                 query.stream_type,
                 query.stream_name,
                 scan_stats.querier_files,
+                bytes_to_human_readable(scan_stats.compressed_size as f64),
                 scan_stats.querier_memory_cached_files,
                 scan_stats.querier_disk_cached_files,
                 (cached_ratio * 100.0) as usize,
@@ -612,7 +619,7 @@ pub async fn filter_file_list_by_tantivy_index(
     let target_partitions = if cache_type == file_data::CacheType::None {
         cfg.limit.query_thread_num
     } else {
-        cfg.limit.cpu_num
+        cfg.limit.query_index_thread_num
     };
 
     let search_start = std::time::Instant::now();
@@ -647,6 +654,12 @@ pub async fn filter_file_list_by_tantivy_index(
         .map(|g| g.len())
         .max()
         .unwrap_or(0);
+
+    log::info!(
+        "[trace_id {}] search->tantivy: target_partitions: {target_partitions}, group_num: {group_num}, max_group_len: {max_group_len}",
+        query.trace_id,
+    );
+
     for _ in 0..max_group_len {
         if no_more_files {
             // delete the rest of the files
@@ -1030,6 +1043,7 @@ async fn search_tantivy_index(
 // use the min_ts & max_ts of the file.meta to group files and each group can't contains crossing
 // time range files
 fn group_files_by_time_range(mut files: Vec<FileKey>, partition_num: usize) -> Vec<Vec<FileKey>> {
+    let expect_group_elements = files.len().div_ceil(partition_num);
     // sort files by max_ts in ascending order
     files.sort_unstable_by(|a, b| a.meta.max_ts.cmp(&b.meta.max_ts));
     // group by time range
@@ -1049,70 +1063,39 @@ fn group_files_by_time_range(mut files: Vec<FileKey>, partition_num: usize) -> V
         }
     }
     // regroup if the number of groups is less than expect partitions
-    if file_groups_indices.len() >= partition_num {
+    if file_groups_indices
+        .first()
+        .is_some_and(|g| g.len() <= expect_group_elements)
+    {
         file_groups_indices
     } else {
-        repartition_sorted_groups(file_groups_indices, partition_num)
+        repartition_sorted_groups(file_groups_indices, expect_group_elements)
     }
 }
 
-// 1. first get larger group
-// 2. split larger groups based on odd and even numbers
-// 3. loop until the group reaches the number of partitions
+// repartition the groups to the number of partitions
 fn repartition_sorted_groups(
     mut groups: Vec<Vec<FileKey>>,
-    partition_num: usize,
+    expect_group_elements: usize,
 ) -> Vec<Vec<FileKey>> {
     if groups.is_empty() {
         return groups;
     }
 
-    while groups.len() < partition_num {
-        let max_index = find_max_group_index(&groups);
-        let max_group = groups.remove(max_index);
-
-        // if the max group has less than 1 files, we don't split it further
-        if max_group.len() <= 1 {
-            groups.push(max_group);
+    loop {
+        if groups[0].len() <= expect_group_elements {
             break;
         }
-
-        // split max_group into odd and even groups
-        let group_cap = max_group.len().div_ceil(2);
-        let mut odd_group = Vec::with_capacity(group_cap);
-        let mut even_group = Vec::with_capacity(group_cap);
-
-        for (idx, file) in max_group.into_iter().enumerate() {
-            if idx % 2 == 0 {
-                even_group.push(file);
-            } else {
-                odd_group.push(file);
-            }
+        let max_group = groups.remove(0);
+        let chunk_num = max_group.len().div_ceil(expect_group_elements);
+        let mut new_groups = vec![vec![]; chunk_num];
+        for (k, item) in max_group.into_iter().enumerate() {
+            new_groups[k % chunk_num].push(item);
         }
-
-        if !odd_group.is_empty() {
-            groups.push(odd_group);
-        }
-        if !even_group.is_empty() {
-            groups.push(even_group);
-        }
+        groups.extend(new_groups);
     }
 
     groups
-}
-
-// find the index of the group with the most files
-fn find_max_group_index(groups: &[Vec<FileKey>]) -> usize {
-    groups
-        .iter()
-        .enumerate()
-        .fold(0, |max_index, (idx, group)| {
-            if group.len() > groups[max_index].len() {
-                idx
-            } else {
-                max_index
-            }
-        })
 }
 
 #[cfg(test)]
@@ -1176,8 +1159,8 @@ mod tests {
             vec![create_file_key(1, 10), create_file_key(11, 20)],
             vec![create_file_key(21, 30), create_file_key(31, 40)],
         ];
-        let partition_num = 4;
-        let repartitioned_groups = repartition_sorted_groups(groups, partition_num);
+        let expect_group_elements = 1;
+        let repartitioned_groups = repartition_sorted_groups(groups, expect_group_elements);
         assert_eq!(repartitioned_groups.len(), 4);
     }
 
@@ -1190,19 +1173,8 @@ mod tests {
             create_file_key(31, 40),
             create_file_key(41, 50),
         ]];
-        let partition_num = 3;
-        let repartitioned_groups = repartition_sorted_groups(groups, partition_num);
+        let expect_group_elements = 2;
+        let repartitioned_groups = repartition_sorted_groups(groups, expect_group_elements);
         assert_eq!(repartitioned_groups.len(), 3);
-    }
-
-    #[test]
-    fn test_find_max_group_index() {
-        let groups = vec![
-            vec![create_file_key(1, 10)],
-            vec![create_file_key(11, 20), create_file_key(21, 30)],
-            vec![create_file_key(31, 40)],
-        ];
-        let max_index = find_max_group_index(&groups);
-        assert_eq!(max_index, 1);
     }
 }

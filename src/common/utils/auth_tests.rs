@@ -3039,6 +3039,7 @@ mod tests {
                 data_stream_dir: String::default(),
                 data_db_dir: String::default(),
                 data_cache_dir: String::default(),
+                data_tmp_dir: String::default(),
                 column_all: String::default(),
                 parquet_compression: String::default(),
                 timestamp_compression_disabled: bool::default(),
@@ -3145,6 +3146,7 @@ mod tests {
                 aggregation_topk_enabled: bool::default(),
                 utf8_view_enabled: bool::default(),
                 search_inspector_enabled: bool::default(),
+                align_partitions_for_index: bool::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
@@ -3173,6 +3175,7 @@ mod tests {
                 mem_dump_thread_num: usize::default(),
                 usage_reporting_thread_num: usize::default(),
                 query_thread_num: usize::default(),
+                query_index_thread_num: usize::default(),
                 query_timeout: u64::default(),
                 query_ingester_timeout: u64::default(),
                 query_default_limit: i64::default(),
@@ -3454,6 +3457,9 @@ mod tests {
                 batch_size_bytes: usize::default(),
                 batch_timeout_ms: u64::default(),
                 use_shared_http_client: bool::default(),
+                max_retry_count: u32::default(),
+                max_retry_time_in_hours: u64::default(),
+                remove_file_after_max_retry: bool::default(),
             },
             encryption: config::Encryption {
                 algorithm: String::default(),

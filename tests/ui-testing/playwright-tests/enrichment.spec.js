@@ -318,6 +318,11 @@ abc, err = get_enrichment_table_record("${fileName}", {
     // Explore the uploaded table
     await page.getByRole("button", { name: "Explore" }).click();
 
+    await page.waitForTimeout(2000);
+    await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
+      force: true,
+    });
+    await page.waitForTimeout(2000);
     const showingText = page.getByText('Showing 1 to 2 out of 2');
   await expect(showingText).toBeVisible()
 

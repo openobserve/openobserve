@@ -33,7 +33,7 @@ use config::{
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
-    physical_plan::{ExecutionPlan, displayable, visit_execution_plan},
+    physical_plan::{ExecutionPlan, visit_execution_plan},
     prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
@@ -112,20 +112,24 @@ pub async fn search(
     .await?;
     let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
+    let file_id_list_records = file_id_list_vec.iter().map(|v| v.records).sum::<i64>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, files: {}, took: {} ms",
-                sql.time_range, file_id_list_num, file_id_list_took,
+                "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, files: {}, records: {}, took: {} ms",
+                sql.time_range, file_id_list_num, file_id_list_records, file_id_list_took,
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:leader get file id".to_string())
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
-                .desc(format!("get files {} ids", file_id_list_num))
+                .desc(format!(
+                    "get files {} ids, records {}",
+                    file_id_list_num, file_id_list_records
+                ))
                 .build()
         )
     );
@@ -419,7 +423,7 @@ pub async fn run_datafusion(
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
-        print_plan(&physical_plan, "before");
+        print_plan(&trace_id, &physical_plan, "before");
     }
 
     // 7. rewrite physical plan
@@ -570,7 +574,7 @@ pub async fn run_datafusion(
     }
 
     if cfg.common.print_key_sql {
-        print_plan(&physical_plan, "after");
+        print_plan(&trace_id, &physical_plan, "after");
     }
 
     // run datafusion
@@ -1193,12 +1197,10 @@ pub async fn get_inverted_index_file_list(
     ))
 }
 
-pub fn print_plan(physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
-    let plan = displayable(physical_plan.as_ref())
-        .indent(false)
-        .to_string();
-    println!("+---------------------------+----------+");
-    println!("leader physical plan {stage} rewrite");
-    println!("+---------------------------+----------+");
-    println!("{}", plan);
+pub fn print_plan(trace_id: &str, physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
+    log::info!("[trace_id {trace_id}] leader physical plan {stage} rewrite");
+    log::info!(
+        "{}",
+        config::meta::plan::generate_plan_string(trace_id, physical_plan.as_ref())
+    );
 }
