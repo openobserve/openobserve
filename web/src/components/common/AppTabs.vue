@@ -33,7 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ]"
         @click="changeTab(tab)"
       >
-        {{ tab.label }}
+      <div class="tw-flex tw-items-center">
+        <img v-if="tab.logo" :src="tab.logo" class="tab-logo tw-mr-2" />
+        <span>{{ tab.label }}</span>
+      </div>
       </div>
     </div>
   </div>
@@ -49,6 +52,7 @@ interface Tab {
   disabled?: boolean;
   title?: string;
   hide?: boolean;
+  logo?: string;
 }
 
 const emit = defineEmits(["update:activeTab"]);
