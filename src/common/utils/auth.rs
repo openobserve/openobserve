@@ -613,6 +613,9 @@ impl FromRequest for AuthExtractor {
         // if let Some(auth_header) = req.headers().get("Authorization") {
         if !auth_str.is_empty() {
             if (method.eq("POST") && url_len > 1 && path_columns[1].starts_with("_search"))
+                || (method.eq("POST")
+                    && url_len > 1
+                    && path_columns[1].starts_with("result_schema"))
                 || (method.eq("POST") && url_len > 1 && path.ends_with("actions/upload"))
                 || path.contains("/prometheus/api/v1/query")
                 || path.contains("/resources")

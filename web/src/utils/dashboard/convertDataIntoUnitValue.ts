@@ -497,36 +497,61 @@ const validateChartFieldsConfiguration = (
   errors: string[],
   xAxisLabel: string = "X-Axis",
   yAxisLabel: string = "Y-Axis",
+  pageKey: string = "dashboard",
 ) => {
   switch (chartType) {
     case "donut":
     case "pie": {
       if (fields?.y?.length > 1 || fields?.y?.length === 0) {
-        errors.push("Add one value field for donut and pie charts");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : "Add one value field for donut and pie charts";
+        errors.push(errorMsg);
       }
 
       if (fields?.x?.length > 1 || fields?.x?.length === 0) {
-        errors.push("Add one label field for donut and pie charts");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract label field from the query."
+            : "Add one label field for donut and pie charts";
+        errors.push(errorMsg);
       }
       break;
     }
     case "metric": {
       if (fields?.y?.length > 1 || fields?.y?.length === 0) {
-        errors.push("Add one value field for metric charts");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : "Add one value field for metric charts";
+        errors.push(errorMsg);
       }
 
       if (fields?.x?.length) {
-        errors.push(`${xAxisLabel} field is not allowed for Metric chart`);
+        const errorMsg =
+          pageKey === "logs"
+            ? "Grouping field is not allowed for Metric chart"
+            : `${xAxisLabel} field is not allowed for Metric chart`;
+        errors.push(errorMsg);
       }
       break;
     }
     case "gauge": {
       if (fields?.y?.length !== 1) {
-        errors.push("Add one value field for gauge chart");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : "Add one value field for gauge chart";
+        errors.push(errorMsg);
       }
       // gauge can have zero or one label
       if (fields?.x?.length !== 1 && fields?.x?.length !== 0) {
-        errors.push("Add one label field for gauge chart");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract grouping field from the query."
+            : "Add one label field for gauge chart";
+        errors.push(errorMsg);
       }
       break;
     }
@@ -536,86 +561,148 @@ const validateChartFieldsConfiguration = (
     case "scatter":
     case "bar": {
       if (fields?.y?.length < 1) {
-        errors.push(`Add at least one field for the ${yAxisLabel}`);
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : `Add at least one field for the ${yAxisLabel}`;
+        errors.push(errorMsg);
       }
 
       if (fields?.x?.length > 1 || fields?.x?.length === 0) {
-        errors.push(`Add one fields for the ${xAxisLabel}`);
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract grouping field from the query."
+            : `Add one fields for the ${xAxisLabel}`;
+        errors.push(errorMsg);
       }
       break;
     }
     case "table": {
       if (fields?.y?.length === 0 && fields?.x?.length === 0) {
-        errors.push(`Add at least one field on ${xAxisLabel} or ${yAxisLabel}`);
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract fields from the query."
+            : `Add at least one field on ${xAxisLabel} or ${yAxisLabel}`;
+        errors.push(errorMsg);
       }
       break;
     }
     case "heatmap": {
       if (fields?.y?.length === 0) {
-        errors.push(`Add at least one field for the ${yAxisLabel}`);
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract grouping field from the query."
+            : `Add at least one field for the ${yAxisLabel}`;
+        errors.push(errorMsg);
       }
 
       if (fields?.x?.length === 0) {
-        errors.push(`Add one field for the ${xAxisLabel}`);
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract second level grouping field from the query."
+            : `Add one field for the ${xAxisLabel}`;
+        errors.push(errorMsg);
       }
 
       if (fields?.z?.length === 0) {
-        errors.push("Add one field for the Z-Axis");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : "Add one field for the Z-Axis";
+        errors.push(errorMsg);
       }
       break;
     }
     case "stacked":
     case "h-stacked": {
       if (fields?.y?.length === 0) {
-        errors.push(`Add at least one field for the ${yAxisLabel}`);
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : `Add at least one field for the ${yAxisLabel}`;
+        errors.push(errorMsg);
       }
       if (fields?.x?.length !== 1 || fields?.breakdown?.length !== 1) {
-        errors.push(
-          `Add exactly one field on the ${xAxisLabel} and breakdown for stacked and h-stacked charts`,
-        );
+        const breakdownErrMsg =
+          pageKey === "logs"
+            ? "Unable to extract grouping field from the query."
+            : `Add exactly one field on the ${xAxisLabel} and breakdown for stacked and h-stacked charts`;
+        errors.push(breakdownErrMsg);
       }
       break;
     }
     case "area-stacked": {
       if (fields?.y?.length > 1 || fields?.y?.length === 0) {
-        errors.push(
-          `Add exactly one field on ${yAxisLabel} for area-stacked charts`,
-        );
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : `Add exactly one field on ${yAxisLabel} for area-stacked charts`;
+        errors.push(errorMsg);
       }
       if (fields?.x?.length !== 1 || fields?.breakdown?.length !== 1) {
-        errors.push(
-          `Add exactly one field on the ${xAxisLabel} and breakdown for area-stacked charts`,
-        );
+        const breakdownErrMsg =
+          pageKey === "logs"
+            ? "Unable to extract grouping field from the query."
+            : `Add exactly one field on the ${xAxisLabel} and breakdown for area-stacked charts`;
+        errors.push(breakdownErrMsg);
       }
       break;
     }
     case "geomap": {
       if (fields?.latitude == null) {
-        errors.push("Add one field for the latitude");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract latitude field from the query."
+            : "Add one field for the latitude";
+        errors.push(errorMsg);
       }
       if (fields?.longitude == null) {
-        errors.push("Add one field for the longitude");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract longitude field from the query."
+            : "Add one field for the longitude";
+        errors.push(errorMsg);
       }
       break;
     }
     case "sankey": {
       if (fields?.source == null) {
-        errors.push("Add one field for the source");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract source field from the query."
+            : "Add one field for the source";
+        errors.push(errorMsg);
       }
       if (fields?.target == null) {
-        errors.push("Add one field for the target");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract target field from the query."
+            : "Add one field for the target";
+        errors.push(errorMsg);
       }
       if (fields?.value == null) {
-        errors.push("Add one field for the value");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : "Add one field for the value";
+        errors.push(errorMsg);
       }
       break;
     }
     case "maps": {
       if (fields?.name == null) {
-        errors.push("Add one field for the name");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract name field from the query."
+            : "Add one field for the name";
+        errors.push(errorMsg);
       }
       if (fields?.value_for_maps == null) {
-        errors.push("Add one field for the value");
+        const errorMsg =
+          pageKey === "logs"
+            ? "Unable to extract value field from the query."
+            : "Add one field for the value";
+        errors.push(errorMsg);
       }
       break;
     }
@@ -646,6 +733,7 @@ export const validateSQLPanelFields = (
   currentYLabel: string,
   errors: string[],
   isFieldsValidationRequired: boolean = true,
+  pageKey?: string,
 ) => {
   if (isFieldsValidationRequired) {
     // Validate fields configuration based on chart type
@@ -655,6 +743,7 @@ export const validateSQLPanelFields = (
       errors,
       currentXLabel,
       currentYLabel,
+      pageKey,
     );
   }
 };
@@ -838,6 +927,7 @@ export const validatePanel = (
   errors: string[] = [],
   isFieldsValidationRequired: boolean = true,
   allStreamFields: any[] = [],
+  pageKey: string = "dashboard",
 ) => {
   // Get current query index
   const currentQueryIndex = panelData?.layout?.currentQueryIndex || 0;
@@ -912,6 +1002,7 @@ export const validatePanel = (
       currentYLabel,
       errors,
       isFieldsValidationRequired,
+      pageKey,
     );
 
     // Validate fields against streams if field validation is required

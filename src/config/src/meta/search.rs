@@ -1215,6 +1215,13 @@ pub struct HashFileResponse {
     pub files: HashMap<String, HashMap<String, String>>,
 }
 
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct ResultSchemaResponse {
+    pub projections: Vec<String>,
+    pub group_by: Vec<String>,
+    pub timeseries_field: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -56,6 +56,8 @@ export interface WebSocketSearchResponse {
       from?: number;
       aggs?: any;
       result_cache_ratio?: number;
+      order_by?: string;
+      histogram_interval?: number;
     };
     streaming_aggs?: boolean;
     total?: number;

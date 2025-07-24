@@ -15,4 +15,5 @@
 
 pub mod deduplication;
 pub mod deduplication_exec;
+pub mod projections;
 pub mod tantivy_count_exec;
