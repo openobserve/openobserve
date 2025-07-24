@@ -3518,7 +3518,7 @@ const useLogs = () => {
                   : [...schemaInterestingFields];
 
             const intField = new Set(
-              [searchObj.data.stream.interestingFieldList, ...streamInterestingFieldsLocal],
+              [...searchObj.data.stream.interestingFieldList, ...streamInterestingFieldsLocal],
             );
 
             searchObj.data.stream.interestingFieldList = Array.from(intField);
@@ -3584,8 +3584,8 @@ const useLogs = () => {
 
                     if(fieldObj.isInterestingField) {
                       interestingCommonSchemaMaps.push(fieldObj);
-                      searchObj.data.stream.interestingExpandedGroupRows["common"] =
-                        searchObj.data.stream.interestingExpandedGroupRows["common"] + 1;
+                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
+                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
                     }
 
                     commonSchemaFields.push(field);
@@ -3597,8 +3597,7 @@ const useLogs = () => {
                     //remove the element from the index
                     schemaFields.splice(schemaFieldsIndex, 1);
                     schemaMaps.splice(schemaFieldsIndex, 1);
-
-                    const index = interestingSchemaMaps.indexOf((item: any) => item.name == field);
+                    const index = interestingSchemaMaps.findIndex((item: any) => item.name == field);
                     if(index > -1) {
                       interestingSchemaMaps.splice(index, 1);
                     }
@@ -3614,8 +3613,8 @@ const useLogs = () => {
                     schemaMaps.push(fieldObj);
                     if(fieldObj.isInterestingField) {
                       interestingSchemaMaps.push(fieldObj);
-                      searchObj.data.stream.interestingExpandedGroupRows[stream.name] =
-                        searchObj.data.stream.interestingExpandedGroupRows[stream.name] + 1;
+                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
+                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
                     }
                     schemaFields.push(field);
                     searchObj.data.stream.expandGroupRowsFieldCount[
@@ -3655,19 +3654,23 @@ const useLogs = () => {
                         schemaMaps[schemaFieldsIndex].streams[0]
                       ] - 1;
 
-                    searchObj.data.stream.interestingExpandedGroupRows[
-                      schemaMaps[schemaFieldsIndex].streams[0]
-                    ] =
-                      searchObj.data.stream.interestingExpandedGroupRows[
+
+                    if(fieldObj.isInterestingField) {
+                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
                         schemaMaps[schemaFieldsIndex].streams[0]
-                      ] - 1;
+                      ] =
+                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+                          schemaMaps[schemaFieldsIndex].streams[0]
+                        ] - 1;
+                    }
                   }
 
                   commonSchemaMaps.push(fieldObj);
+
                   if(fieldObj.isInterestingField) {
                     interestingCommonSchemaMaps.push(fieldObj);
-                    searchObj.data.stream.interestingExpandedGroupRows["common"] =
-                      searchObj.data.stream.interestingExpandedGroupRows["common"] + 1;
+                    searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
+                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
                   }
                   commonSchemaFields.push(field);
                   searchObj.data.stream.expandGroupRowsFieldCount["common"] =
@@ -3677,10 +3680,10 @@ const useLogs = () => {
                   //remove the element from the index
                   schemaFields.splice(schemaFieldsIndex, 1);
                   schemaMaps.splice(schemaFieldsIndex, 1);
-                  const index = interestingSchemaMaps.indexOf((item: any) => item.name == field);
-                    if(index > -1) {
-                      interestingSchemaMaps.splice(index, 1);
-                    }
+                  const index = interestingSchemaMaps.findIndex((item: any) => item.name == field);
+                  if(index > -1) {                      
+                    interestingSchemaMaps.splice(index, 1);
+                  }
                 } else if (commonSchemaFieldsIndex > -1) {
                   commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
                     stream.name,
@@ -3690,10 +3693,11 @@ const useLogs = () => {
                   //   1;
                 } else {
                   schemaMaps.push(fieldObj);
+
                   if(fieldObj.isInterestingField) {
                     interestingSchemaMaps.push(fieldObj);
-                    searchObj.data.stream.interestingExpandedGroupRows[stream.name] =
-                      searchObj.data.stream.interestingExpandedGroupRows[stream.name] + 1;
+                    searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
+                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
                   }
                   schemaFields.push(field);
                   searchObj.data.stream.expandGroupRowsFieldCount[stream.name] =
@@ -3795,6 +3799,7 @@ const useLogs = () => {
                     streams: [],
                   };
                   schemaMaps.push(fieldObj);
+
                   if(fieldObj.isInterestingField) {
                     interestingSchemaMaps.push(fieldObj);
                   }
@@ -3825,8 +3830,6 @@ const useLogs = () => {
           updateFieldKeywords(searchObj.data.stream.selectedStreamFields);
 
         createFieldIndexMapping();
-
-        console.log(searchObj.data.stream.selectedInterestingStreamFields, interestingSchemaMaps, interestingCommonSchemaMaps);
       }
       searchObjDebug["extractFieldsEndTime"] = performance.now();
     } catch (e: any) {
