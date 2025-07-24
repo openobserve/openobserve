@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://openobserve.ai"><img src="https://openobserve.ai/img/logo/logo_horizontal.svg" alt="OpenObserve"></a>
+  <a href="https://openobserve.ai"><img src="https://openobserve.ai/img/logo/o2-logo-readme.svg" alt="OpenObserve"></a>
 </p>
 <p align="center">
     <em>🚀 10x easier, 🚀 140x lower storage cost, 🚀 high performance, 🚀 petabyte scale - Elasticsearch/Splunk/Datadog alternative for 🚀 (logs, metrics, traces).</em>
