@@ -45,6 +45,7 @@ import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitVal
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import { useAnnotations } from "./useAnnotations";
 import useHttpStreamingSearch from "../useStreamingSearch";
+import { requiresApiCall } from "@/utils/panelConfigComparator";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -1644,11 +1645,28 @@ export const usePanelDataLoader = (
 
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
-    () => [panelSchema?.value, selectedTimeObj?.value, forceLoad?.value],
+    () => [selectedTimeObj?.value, forceLoad?.value],
     async () => {
       log("PanelSchema/Time Wather: called");
       loadData(); // Loading the data
     },
+  );
+
+  watch(
+    () => [panelSchema?.value],
+    async (newVal, oldVal) => {
+      const [newSchema] = newVal;
+      const [oldSchema] = oldVal;
+
+      const needsApiCall = requiresApiCall(oldSchema, newSchema);
+
+      if (!needsApiCall) {
+        return;
+      }
+
+      loadData();
+    },
+    { deep: true },
   );
 
   /**

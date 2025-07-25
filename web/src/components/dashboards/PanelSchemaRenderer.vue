@@ -616,6 +616,49 @@ export default defineComponent({
       tableRendererRef.value = null;
       parser = null;
     });
+    // Watch for panel schema changes to re-convert panel data
+    watch(
+      panelSchema,
+      async () => {
+        // Re-convert panel data when schema changes (for non-whitelisted config changes)
+        if (
+          !errorDetail?.value?.message &&
+          validatePanelData?.value?.length === 0 &&
+          data.value?.length
+        ) {
+          try {
+            panelData.value = await convertPanelData(
+              panelSchema.value,
+              data.value,
+              store,
+              chartPanelRef,
+              hoveredSeriesState,
+              resultMetaData,
+              metadata.value,
+              chartPanelStyle.value,
+              annotations,
+              loading.value,
+            );
+
+            limitNumberOfSeriesWarningMessage.value =
+              panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
+
+            errorDetail.value = {
+              message: "",
+              code: "",
+            };
+          } catch (error: any) {
+            console.error("error", error);
+            errorDetail.value = {
+              message: error?.message,
+              code: error?.code || "",
+            };
+          }
+        }
+      },
+      { deep: true },
+    );
+
     watch(
       [data, store?.state],
       async () => {

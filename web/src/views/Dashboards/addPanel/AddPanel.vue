@@ -510,13 +510,14 @@ import VariablesValueSelector from "../../../components/dashboards/VariablesValu
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import { useLoading } from "@/composables/useLoading";
-import { isEqual } from "lodash-es";
+import { debounce, isEqual } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
+import { requiresApiCall } from "@/utils/panelConfigComparator";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -899,11 +900,19 @@ export default defineComponent({
 
       const normalizedCurrent = normalizeVariables(variablesData);
       const normalizedRefreshed = normalizeVariables(updatedVariablesData);
+      const variablesChanged = !isEqual(normalizedCurrent, normalizedRefreshed);
 
-      return (
-        !isEqual(chartData.value, dashboardPanelData.data) ||
-        !isEqual(normalizedCurrent, normalizedRefreshed)
-      );
+      const configChanged = !isEqual(chartData.value, dashboardPanelData.data);
+      let needsApiCall = false;
+
+      if (configChanged) {
+        needsApiCall = requiresApiCall(
+          chartData.value,
+          dashboardPanelData.data,
+        );
+      }
+
+      return needsApiCall || variablesChanged;
     });
 
     watch(isOutDated, () => {
@@ -1561,6 +1570,25 @@ export default defineComponent({
       return { width: `${contentWidth}px` };
     });
 
+    const debouncedUpdateChartConfig = debounce((newVal, oldVal) => {
+      if (!isEqual(chartData.value, newVal)) {
+        const needsApiCall = requiresApiCall(chartData.value, newVal);
+
+        if (!needsApiCall) {
+          chartData.value = JSON.parse(JSON.stringify(newVal));
+          console.log(
+            "Config-only changes detected, updating chartData without API call",
+            chartData.value,
+          );
+
+          window.dispatchEvent(new Event("resize"));
+        }
+      }
+    }, 1000);
+
+    watch(() => dashboardPanelData.data, debouncedUpdateChartConfig, {
+      deep: true,
+    });
     // [START] ai chat
 
     // [START] O2 AI Context Handler
