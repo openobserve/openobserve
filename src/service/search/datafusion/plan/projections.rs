@@ -576,5 +576,35 @@ mod tests {
         assert_eq!(extractor.timestamp_alias, Some("tts".to_string()));
         assert_eq!(extractor.group_by, hashset!["tts", "k"]);
         assert_eq!(extractor.projections, hashset!["h", "k", "c", "tts"]);
+
+        let sql = r#"WITH pulled_jobs_logs AS (
+                SELECT 
+                    _timestamp AS "log_time",
+                    k8s_node_name AS "node_name",
+                    CAST(array_element(regexp_match(log, 'Pulled ([0-9]+) jobs'), 1) AS INTEGER) AS "pulled_jobs"
+                FROM default
+                WHERE CAST(array_element(regexp_match(log, 'Pulled ([0-9]+) jobs'), 1) AS INTEGER) > 3
+                )
+                SELECT
+                histogram(log_time) AS "time_bucket",
+                COUNT(log_time) AS "logs_count",
+                node_name AS "node_name",
+                pulled_jobs AS "pulled_jobs"
+                FROM pulled_jobs_logs
+                GROUP BY time_bucket, node_name, pulled_jobs
+                ORDER BY time_bucket ASC"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.timeseries, Some("time_bucket".to_string()));
+        assert_eq!(extractor.ts_hist_alias, Some("time_bucket".to_string()));
+        assert_eq!(extractor.timestamp_alias, Some("log_time".to_string()));
+        assert_eq!(
+            extractor.group_by,
+            hashset!["time_bucket", "node_name", "pulled_jobs"]
+        );
+        assert_eq!(
+            extractor.projections,
+            hashset!["time_bucket", "logs_count", "node_name", "pulled_jobs"]
+        );
     }
 }
