@@ -1982,7 +1982,86 @@ const useLogs = () => {
             searchObj.meta.sqlMode == false &&
             searchObj.meta.refreshHistogram == true)
         ) {
-          await processHttpHistogramResults(queryReq);
+          searchObj.meta.refreshHistogram = false;
+          if (searchObj.data.queryResults.hits.length > 0) {
+            if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == true) {
+              searchObj.data.histogram = {
+                xData: [],
+                yData: [],
+                chartParams: {
+                  title: getHistogramTitle(),
+                  unparsed_x_data: [],
+                  timezone: "",
+                },
+                errorCode: 0,
+                errorMsg: "Histogram is not available for multi-stream SQL mode search.",
+                errorDetail: "",
+              };
+
+              // get page count for multi stream sql mode search
+              setTimeout(async () => {
+                getPageCount(queryReq);
+              }, 0);
+              searchObj.meta.histogramDirtyFlag = false;
+            } else {
+              if(searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false) {
+                searchObj.data.histogramQuery.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query);
+              }
+              searchObjDebug["histogramStartTime"] = performance.now();
+              searchObj.data.histogram.errorMsg = "";
+              searchObj.data.histogram.errorCode = 0;
+              searchObj.data.histogram.errorDetail = "";
+              searchObj.loadingHistogram = true;
+
+              const parsedSQL: any = fnParsedSQL();
+              searchObj.data.queryResults.aggs = [];
+
+              const partitions = JSON.parse(
+                JSON.stringify(
+                  searchObj.data.queryResults.partitionDetail.partitions,
+                ),
+              );
+
+              // is _timestamp orderby ASC then reverse the partition array
+              if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
+                partitions.reverse();
+              }
+
+              await generateHistogramSkeleton();
+              for (const partition of partitions) {
+                searchObj.data.histogramQuery.query.start_time = partition[0];
+                searchObj.data.histogramQuery.query.end_time = partition[1];
+                //to improve the cancel query UI experience we add additional check here and further we need to remove it
+                if (searchObj.data.isOperationCancelled) {
+                  searchObj.loadingHistogram = false;
+                  searchObj.data.isOperationCancelled = false;
+
+                  if (!searchObj.data.histogram?.xData?.length) {
+                    notificationMsg.value = "Search query was cancelled";
+                    searchObj.data.histogram.errorMsg =
+                      "Search query was cancelled";
+                    searchObj.data.histogram.errorDetail =
+                      "Search query was cancelled";
+                  }
+
+                  showCancelSearchNotification();
+                  break;
+                }
+                await getHistogramQueryData(searchObj.data.histogramQuery);
+                if (partitions.length > 1) {
+                  setTimeout(async () => {
+                    await generateHistogramData();
+                    if(!queryReq.query?.streaming_output)  refreshPartitionPagination(true);
+                  }, 100);
+                }
+              }
+              searchObj.loadingHistogram = false;
+            }
+          }
+          if (searchObj.data.stream.selectedStream.length == 1 || (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false)) {
+            await generateHistogramData();
+          }
+          if(!queryReq.query?.streaming_output) refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
           resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
