@@ -175,7 +175,7 @@ export default defineComponent({
         );
 
         callOrgMember.then((res: { data: any }) => {
-          if (res.data.error_members != null) {
+          if (res?.data?.error_members != null) {
             const message = `Error while updating organization member`;
 
             this.$q.notify({
