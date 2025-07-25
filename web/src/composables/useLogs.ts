@@ -201,7 +201,6 @@ const defaultObject = {
       filteredField: <any>[],
       missingStreamMultiStreamFilter: <any>[],
       pipelineQueryStream: <any>[],
-      interestingStreamFields: <{ [key: string]: string[] }>{},
       selectedInterestingStreamFields: <string[]>[],
       interestingExpandedGroupRows: <any>{},
       interestingExpandedGroupRowsFieldCount: <any>{},
@@ -3411,7 +3410,6 @@ const useLogs = () => {
         searchObj.data.datetime.queryRangeRestrictionMsg = "";
         searchObj.data.datetime.queryRangeRestrictionInHour = -1;
         for (const stream of searchObj.data.streamResults.list) {
-          searchObj.data.stream.interestingStreamFields[stream.name] = [];
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
             if (searchObj.data.stream.selectedStream.length > 1) {
               schemaMaps.push({
@@ -3515,16 +3513,15 @@ const useLogs = () => {
                     searchObj.organizationIdentifier + "_" + stream.name
                   ]
                 : environmentInterestingFields.length > 0
-                  ? [...environmentInterestingFields, store.state.zoConfig?.timestamp_column]
+                  ? [...environmentInterestingFields]
                   : [...schemaInterestingFields];
 
+            // Add timestamp column to the interesting field list if it is not present in the interesting field list
             const intField = new Set(
-              [...searchObj.data.stream.interestingFieldList, ...streamInterestingFieldsLocal],
+              [...searchObj.data.stream.interestingFieldList, ...streamInterestingFieldsLocal, store.state.zoConfig?.timestamp_column],
             );
 
             searchObj.data.stream.interestingFieldList = Array.from(intField);
-
-            searchObj.data.stream.interestingStreamFields[stream.name] = Array.from(new Set(streamInterestingFieldsLocal));
 
             // create a schema field mapping based on field name to avoid iteration over object.
             // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
