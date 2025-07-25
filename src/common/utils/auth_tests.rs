@@ -3125,6 +3125,8 @@ mod tests {
                 utf8_view_enabled: bool::default(),
                 dashboard_show_symbol_enabled: bool::default(),
                 default_hec_stream: String::default(),
+                data_tmp_dir: String::default(),
+                align_partitions_for_index: bool::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
@@ -3453,6 +3455,11 @@ mod tests {
             encryption: config::Encryption {
                 algorithm: String::default(),
                 master_key: String::default(),
+            },
+            enrichment_table: config::EnrichmentTable {
+                cache_dir: String::default(),
+                merge_threshold_mb: u64::default(),
+                merge_interval: u64::default(),
             },
         }
     }
