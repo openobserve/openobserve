@@ -3389,7 +3389,10 @@ const useLogs = () => {
                     if(fieldObj.isInterestingField) {
                       interestingCommonSchemaMaps.push(fieldObj);
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
-                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
+                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
+
+                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] =
+                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] - 1;
                     }
 
                     commonSchemaFields.push(field);
