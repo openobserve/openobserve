@@ -191,7 +191,7 @@ export default defineComponent({
             });
           }
 
-          this.$emit("updated", res.data);
+          this.$emit("updated", res?.data);
           this.updateUserForm.resetValidation();
           dismiss();
         });

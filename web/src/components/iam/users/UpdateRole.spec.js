@@ -464,4 +464,128 @@ describe("UpdateRole Component", () => {
       expect(notifyMock).toHaveBeenCalled();
     });
   });
+
+  describe("Form Input Validation", () => {
+    it("validates required role field", async () => {
+      wrapper.vm.orgMemberData.role = "";
+      await wrapper.vm.$nextTick();
+
+      // Mock validation method
+      wrapper.vm.updateUserForm = {
+        validate: vi.fn().mockResolvedValue(false),
+        resetValidation: vi.fn()
+      };
+
+      const roleSelect = wrapper.findComponent({ name: 'QSelect' });
+      expect(roleSelect.exists()).toBe(true);
+      
+      await wrapper.vm.onSubmit();
+      await wrapper.vm.$nextTick();
+      
+      // For Quasar components, we should verify the validation was called
+      expect(wrapper.vm.updateUserForm.validate).toHaveBeenCalled();
+    });
+
+    it("prevents submission with empty role", async () => {
+      wrapper.vm.orgMemberData.role = "";
+      wrapper.vm.updateUserForm = {
+        validate: vi.fn().mockResolvedValue(false),
+        resetValidation: vi.fn()
+      };
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+
+      expect(organizationsService.update_member_role).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Component Reactivity", () => {
+    it("updates form data when modelValue changes", async () => {
+      const newData = {
+        org_member_id: "789",
+        role: "admin",
+        first_name: "Jane",
+        email: "jane@example.com"
+      };
+
+      // We need to trigger the created hook again
+      wrapper = mount(UpdateRole, {
+        global: {
+          plugins: [i18n],
+          provide: {
+            store: mockStore,
+          },
+          stubs: {
+            QCard: false,
+            QCardSection: false,
+            QSeparator: false,
+            QForm: false,
+            QInput: false,
+            QSelect: false,
+            QBtn: false,
+          }
+        },
+        props: {
+          modelValue: newData
+        }
+      });
+
+      expect(wrapper.vm.orgMemberData).toEqual(newData);
+    });
+
+    it("maintains role options after component update", async () => {
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.roleOptions).toContain("admin");
+      expect(wrapper.vm.roleOptions.length).toBe(1);
+    });
+  });
+
+  describe("Close Button Functionality", () => {
+    it("has close button in header", () => {
+      const closeButton = wrapper.findComponent({ name: 'QBtn', props: { icon: 'cancel' } });
+      expect(closeButton.exists()).toBe(true);
+    });
+
+    it("has cancel button in form", () => {
+      const cancelButton = wrapper.findComponent({ name: 'QBtn', props: { 'text-color': 'light-text' } });
+      expect(cancelButton.exists()).toBe(true);
+    });
+  });
+
+  describe("Form Layout and Styling", () => {
+    it("has proper card structure", () => {
+      const card = wrapper.findComponent({ name: 'QCard' });
+      expect(card.exists()).toBe(true);
+      expect(card.classes()).toContain('full-height');
+    });
+
+    it("has form section with proper spacing", () => {
+      const formSection = wrapper.findComponent({ name: 'QCardSection' });
+      expect(formSection.exists()).toBe(true);
+      expect(formSection.classes()).toContain('q-px-md');
+      expect(formSection.classes()).toContain('q-py-md');
+    });
+
+    it("has separator between header and form", () => {
+      const separator = wrapper.findComponent({ name: 'QSeparator' });
+      expect(separator.exists()).toBe(true);
+    });
+  });
+
+  describe("Input Field Properties", () => {
+    it("has read-only name input with correct attributes", () => {
+      const nameInput = wrapper.findComponent({ name: 'QInput', props: { label: 'user.name' } });
+      expect(nameInput.exists()).toBe(true);
+      expect(nameInput.props('readonly')).toBe(true);
+      expect(nameInput.props('dense')).toBe(true);
+    });
+
+    it("has role select with correct attributes", () => {
+      const roleSelect = wrapper.findComponent({ name: 'QSelect' });
+      expect(roleSelect.exists()).toBe(true);
+      expect(roleSelect.props('dense')).toBe(true);
+      expect(roleSelect.props('outlined')).toBe(true);
+    });
+  });
 });
