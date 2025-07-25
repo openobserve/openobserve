@@ -321,4 +321,263 @@ describe("MemberInvitation Component", () => {
       expect(wrapper.vm.selectedRole).toBe('member');
     });
   });
+
+  describe("Error Handling", () => {
+    it("handles API error during invitation", async () => {
+      const emailInput = wrapper.find('.q-input input');
+      await emailInput.setValue("test@example.com");
+      
+      const error = new Error("Network error");
+      vi.mocked(organizationsService.add_members).mockRejectedValue(error);
+
+      await wrapper.find('.q-btn').trigger('click');
+      await flushPromises();
+
+      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "negative",
+          message: error.message,
+          timeout: 5000
+        })
+      );
+    });
+
+    it("handles empty response from getRoles", async () => {
+      vi.mocked(usersService.getRoles).mockResolvedValue({ data: [] });
+      
+      const newWrapper = mount(MemberInvitation, {
+        props: { currentrole: "admin" },
+        global: {
+          plugins: [[Quasar, { platform }], i18n],
+          provide: { store, platform }
+        }
+      });
+      
+      await flushPromises();
+      expect(newWrapper.vm.options).toEqual([]);
+      newWrapper.unmount();
+    });
+  });
+
+  describe("Email Input Handling", () => {
+    it("handles mixed separators in email list", async () => {
+      const emailInput = wrapper.find('.q-input input');
+      await emailInput.setValue("test1@example.com, test2@example.com; test3@example.com,test4@example.com");
+      
+      vi.mocked(organizationsService.add_members).mockResolvedValue({
+        data: { data: {}, message: "Success" }
+      });
+
+      await wrapper.find('.q-btn').trigger('click');
+      await flushPromises();
+
+      expect(organizationsService.add_members).toHaveBeenCalledWith(
+        {
+          invites: [
+            "test1@example.com",
+            "test2@example.com",
+            "test3@example.com",
+            "test4@example.com"
+          ],
+          role: "admin"
+        },
+        "test-org"
+      );
+    });
+
+    it("trims whitespace from emails", async () => {
+      const emailInput = wrapper.find('.q-input input');
+      await emailInput.setValue("  test1@example.com ,  test2@example.com  ");
+      
+      vi.mocked(organizationsService.add_members).mockResolvedValue({
+        data: { data: {}, message: "Success" }
+      });
+
+      await wrapper.find('.q-btn').trigger('click');
+      await flushPromises();
+
+      expect(organizationsService.add_members).toHaveBeenCalledWith(
+        {
+          invites: ["test1@example.com", "test2@example.com"],
+          role: "admin"
+        },
+        "test-org"
+      );
+    });
+
+    it("converts emails to lowercase", async () => {
+      const emailInput = wrapper.find('.q-input input');
+      await emailInput.setValue("TEST@EXAMPLE.COM, Test@Example.com");
+      
+      vi.mocked(organizationsService.add_members).mockResolvedValue({
+        data: { data: {}, message: "Success" }
+      });
+
+      await wrapper.find('.q-btn').trigger('click');
+      await flushPromises();
+
+      expect(organizationsService.add_members).toHaveBeenCalledWith(
+        {
+          invites: ["test@example.com", "test@example.com"],
+          role: "admin"
+        },
+        "test-org"
+      );
+    });
+  });
+
+  describe("Component Initialization", () => {
+    it("initializes with default role as admin", () => {
+      expect(wrapper.vm.selectedRole).toBe("admin");
+    });
+
+    it("fetches roles on mount", async () => {
+      expect(usersService.getRoles).toHaveBeenCalledWith("test-org");
+    });
+
+    it("sets current user role from props", () => {
+      expect(wrapper.vm.currentUserRole).toBe("admin");
+    });
+
+    it("initializes with empty email input", () => {
+      expect(wrapper.vm.userEmail).toBe("");
+    });
+  });
+
+  describe("Notification Behavior", () => {
+    it("shows loading notification during invitation process", async () => {
+      const emailInput = wrapper.find('.q-input input');
+      await emailInput.setValue("test@example.com");
+      
+      vi.mocked(organizationsService.add_members).mockImplementation(() => 
+        new Promise(resolve => setTimeout(() => resolve({ data: { data: {}, message: "Success" } }), 100))
+      );
+
+      await wrapper.find('.q-btn').trigger('click');
+      
+      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          spinner: true,
+          message: "Please wait...",
+          timeout: 2000
+        })
+      );
+    });
+
+    it("dismisses loading notification after successful invitation", async () => {
+      const emailInput = wrapper.find('.q-input input');
+      await emailInput.setValue("test@example.com");
+      
+      const dismissMock = vi.fn();
+      wrapper.vm.$q.notify = vi.fn().mockReturnValue(dismissMock);
+
+      vi.mocked(organizationsService.add_members).mockResolvedValue({
+        data: { data: {}, message: "Success" }
+      });
+
+      await wrapper.find('.q-btn').trigger('click');
+      await flushPromises();
+
+      expect(dismissMock).toHaveBeenCalled();
+    });
+  });
+
+  describe("Role Selection Validation", () => {
+    it("updates selected role when valid option is chosen", async () => {
+      const select = wrapper.findComponent('.q-select');
+      await select.vm.$emit('update:modelValue', 'member');
+      await nextTick();
+      
+      expect(wrapper.vm.selectedRole).toBe('member');
+      expect(select.props('modelValue')).toBe('member');
+    });
+
+    it("maintains default role when options are empty", async () => {
+      vi.mocked(usersService.getRoles).mockResolvedValue({ data: [] });
+      
+      const newWrapper = mount(MemberInvitation, {
+        props: { currentrole: "admin" },
+        global: {
+          plugins: [[Quasar, { platform }], i18n],
+          provide: { store, platform }
+        }
+      });
+      
+      await flushPromises();
+      expect(newWrapper.vm.selectedRole).toBe('admin');
+      newWrapper.unmount();
+    });
+
+    it("updates options when getRoles returns new data", async () => {
+      const newRoles = [
+        { label: "Super Admin", value: "super_admin" },
+        { label: "Basic User", value: "basic" }
+      ];
+      
+      vi.mocked(usersService.getRoles).mockResolvedValue({ data: newRoles });
+      
+      const newWrapper = mount(MemberInvitation, {
+        props: { currentrole: "admin" },
+        global: {
+          plugins: [[Quasar, { platform }], i18n],
+          provide: { store, platform }
+        }
+      });
+      
+      await flushPromises();
+      expect(newWrapper.vm.options).toEqual(newRoles);
+      newWrapper.unmount();
+    });
+  });
+
+
+  describe("Component Visibility", () => {
+    const roles = ["member", "viewer", "custom", "unknown"];
+    
+    roles.forEach(role => {
+      it(`does not show invitation form for ${role} role`, () => {
+        const newWrapper = mount(MemberInvitation, {
+          props: { currentrole: role },
+          global: {
+            plugins: [[Quasar, { platform }], i18n],
+            provide: { store, platform }
+          }
+        });
+        
+        expect(newWrapper.find('.invite-user').exists()).toBe(false);
+        newWrapper.unmount();
+      });
+    });
+
+    it("shows invitation form for root user", () => {
+      const newWrapper = mount(MemberInvitation, {
+        props: { currentrole: "root" },
+        global: {
+          plugins: [[Quasar, { platform }], i18n],
+          provide: { store, platform }
+        }
+      });
+      
+      expect(newWrapper.find('.invite-user').exists()).toBe(true);
+      newWrapper.unmount();
+    });
+  });
+
+  describe("Input Reset Behavior", () => {
+    it("resets email input after successful invitation", async () => {
+      const emailInput = wrapper.find('.q-input input');
+      await emailInput.setValue("test@example.com");
+      
+      vi.mocked(organizationsService.add_members).mockResolvedValue({
+        data: { data: {}, message: "Success" }
+      });
+
+      await wrapper.find('.q-btn').trigger('click');
+      await flushPromises();
+
+      expect(wrapper.vm.userEmail).toBe("");
+      expect(emailInput.element.value).toBe("");
+    });
+  });
+
 });
