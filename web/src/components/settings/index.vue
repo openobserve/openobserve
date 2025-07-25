@@ -158,6 +158,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('settings.organizationManagement')"
             content-class="tab_content"
           />
+          <q-route-tab
+            v-if="config.isEnterprise == 'true'"
+            data-test="regex-patterns-tab"
+            name="regex_patterns"
+            :to="{
+              name: 'regexPatterns',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            content-class="tab_content"
+          >
+          <div class="tw-flex tw-items-center tw-w-full">
+            <img :src="regexIcon" alt="regex" style="width: 24px; height: 24px;" />
+            <span class="tw-text-sm tw-font-medium tw-ml-2"
+            :class="store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns'   ? 'tw-text-white' : 'tw-text-black'"
+            >{{ t('regex_patterns.header') }}</span>
+          </div>
+        </q-route-tab>
         </q-tabs>
 
         </div>
@@ -199,6 +218,7 @@ import {
   onActivated,
   onUpdated,
   watch,
+  computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -207,7 +227,7 @@ import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-
+import { getImageURL } from "@/utils/zincutils";
 export default defineComponent({
   name: "AppSettings",
   setup() {
@@ -280,6 +300,9 @@ export default defineComponent({
         showManagementTabs.value = true;
       }
     }
+    const regexIcon = computed(()=>{
+      return getImageURL(store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
+    })
 
     return {
       t,
@@ -291,7 +314,9 @@ export default defineComponent({
       outlinedSettings,
       isMetaOrg,
       showManagementTabs,
-      controlManagementTabs
+      controlManagementTabs,
+      regexIcon
+      
     };
   },
 });

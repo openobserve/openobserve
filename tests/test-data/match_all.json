@@ -1,0 +1,34 @@
+[  
+  {
+    "level": "info",
+    "msg": "test",
+    "log": "level=info msg=\"test\""
+  },
+  {
+    "count": 15,
+    "field": "value=test",
+    "log": "field=\"value=test\" count=15"
+  },
+  {
+    "func": "param1=\"a=b\", param2>5",
+    "value": 80,
+    "log": "func(param1=\"a=b\", param2>5) value=80"
+  },
+  {
+    "status": 404,
+    "url": "/api/v1/resource?path=test",
+    "time": 1200,
+    "log": "status!=200 url=/api/v1/resource?path=test time=1200"
+  },
+  {
+    "level": "debug",
+    "count": 50,
+    "size": 1024,
+    "log": "level!=debug count<=50 size>=1024"
+  },
+  {
+    "level": "info",
+    "msg": "stopping collector runner...",
+    "log": "level=info msg=\"stopping collector runner...\""
+  }
+] 

@@ -38,6 +38,10 @@ export const applyQueryButton = async function (page) {
 export async function deleteDashboard(page, dashboardName) {
   console.log(`Deleting dashboard with name: ${dashboardName}`);
 
+  // Wait for page to be fully loaded
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(5000);
+
   // const dashboardRow = page.locator(`//tr[.//td[text()="${dashboardName}"]]`);
   // await expect(dashboardRow).toBeVisible(); // Ensure the row is visible
   const dashboardRow = page

@@ -24,7 +24,8 @@ use actix_web::{
 };
 use arrow_schema::Schema;
 use config::{
-    Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
+    Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
+    SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, get_instance_id,
     meta::{
@@ -92,6 +93,7 @@ struct ConfigResponse<'a> {
     build_date: String,
     build_type: String,
     default_fts_keys: Vec<String>,
+    default_secondary_index_fields: Vec<String>,
     default_quick_mode_fields: Vec<String>,
     telemetry_enabled: bool,
     default_functions: Vec<ZoFunction<'a>>,
@@ -285,6 +287,10 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         build_type: build_type.to_string(),
         telemetry_enabled: cfg.common.telemetry_enabled,
         default_fts_keys: SQL_FULL_TEXT_SEARCH_FIELDS
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+        default_secondary_index_fields: SQL_SECONDARY_INDEX_SEARCH_FIELDS
             .iter()
             .map(|s| s.to_string())
             .collect(),

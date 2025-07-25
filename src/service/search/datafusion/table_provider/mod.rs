@@ -68,6 +68,7 @@ use crate::service::search::index::IndexCondition;
 
 pub mod catalog;
 pub mod empty_table;
+pub mod enrich_table;
 mod helpers;
 pub mod memtable;
 mod parquet_reader;

@@ -19,7 +19,7 @@ use arrow_schema::Field;
 use config::{
     meta::{
         promql::Metadata,
-        stream::{StreamSettings, StreamStats, StreamType},
+        stream::{PatternAssociation, StreamSettings, StreamStats, StreamType},
     },
     utils::json,
 };
@@ -41,6 +41,8 @@ pub struct Stream {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics_meta: Option<Metadata>,
     pub total_fields: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub pattern_associations: Vec<PatternAssociation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_derived: Option<bool>,
 }
@@ -155,6 +157,7 @@ mod tests {
             settings: StreamSettings::default(),
             metrics_meta: None,
             total_fields: 1,
+            pattern_associations: vec![],
             is_derived: None,
         };
 
@@ -235,6 +238,7 @@ mod tests {
             settings: StreamSettings::default(),
             metrics_meta: None,
             total_fields: 1,
+            pattern_associations: vec![],
             is_derived: None,
         };
 

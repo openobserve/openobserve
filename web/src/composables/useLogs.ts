@@ -55,7 +55,8 @@ import {
   generateTraceContext,
   arraysMatch,
   isWebSocketEnabled,
-  isStreamingEnabled
+  isStreamingEnabled,
+  addSpacesToOperators
 } from "@/utils/zincutils";
 import {
   convertDateToTimestamp,
@@ -819,7 +820,7 @@ const useLogs = () => {
           histogram:
             "select histogram(" +
             store.state.zoConfig.timestamp_column +
-            ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from \"[INDEX_NAME]\" [WHERE_CLAUSE] GROUP BY zo_sql_key ORDER BY zo_sql_key",
+            ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from \"[INDEX_NAME]\" [WHERE_CLAUSE] GROUP BY zo_sql_key ORDER BY zo_sql_key DESC",
         },
       };
 
@@ -1011,16 +1012,8 @@ const useLogs = () => {
           .filter((line: string) => !line.trim().startsWith("--"))
           .join("\n");
         if (whereClause.trim() != "") {
-          whereClause = whereClause
-            .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
-            .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
-            .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
-
-          whereClause = whereClause
-            .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-            .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-            .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
-            .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
+          // Use efficient state-based approach to avoid regex backtracking
+          whereClause = addSpacesToOperators(whereClause);
 
           //remove everything after -- in where clause
           const parsedSQL = whereClause.split(" ");

@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use config::{
-    meta::{cluster::NodeInfo, inverted_index::IndexOptimizeMode},
+    meta::{cluster::NodeInfo, inverted_index::IndexOptimizeMode, sql::TableReferenceExt},
     utils::json,
 };
 use datafusion::common::TableReference;
@@ -70,9 +70,10 @@ impl RemoteScanNodes {
         let query_identifier = QueryIdentifier {
             trace_id: self.req.trace_id.clone(),
             org_id: self.req.org_id.clone(),
-            stream_type: self.req.stream_type.to_string(),
+            stream_type: table_name.get_stream_type(self.req.stream_type).to_string(),
             partition: 0,           // set in FlightSearchRequest
             job_id: "".to_string(), // set in FlightSearchRequest
+            enrich_mode: false,
         };
 
         let search_infos = SearchInfos {

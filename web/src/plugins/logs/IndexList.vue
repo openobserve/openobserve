@@ -686,6 +686,7 @@ import {
   isWebSocketEnabled,
   isStreamingEnabled,
   b64EncodeStandard,
+  addSpacesToOperators,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
 import {
@@ -958,16 +959,7 @@ export default defineComponent({
           query_context = `SELECT *${queryFunctions} FROM "[INDEX_NAME]" [WHERE_CLAUSE]`;
 
           if (whereClause.trim() != "") {
-            whereClause = whereClause
-              .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
-              .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
-              .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
-
-            whereClause = whereClause
-              .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-              .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-              .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
-              .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
+            whereClause = addSpacesToOperators(whereClause);
 
             const parsedSQL = whereClause.split(" ");
             searchObj.data.stream.selectedStreamFields.forEach((field: any) => {

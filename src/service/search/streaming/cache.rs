@@ -131,9 +131,9 @@ pub async fn handle_cache_responses_and_deltas(
 ) -> Result<(), infra::errors::Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
-    let cache_order_by = if req.search_type.expect("search_type is required")
-        == SearchEventType::Dashboards
-        || req.query.size == -1
+    let search_type = req.search_type.expect("search_type is required");
+    let cache_order_by = if search_type == SearchEventType::Dashboards
+        || (req.query.size == -1 && search_type != SearchEventType::UI)
     {
         &OrderBy::Desc
     } else {

@@ -1197,6 +1197,7 @@ import config from "../../../aws-exports";
 
 import useAiChat from "@/composables/useAiChat";
 import { onBeforeUnmount } from "vue";
+import { debounce } from "lodash-es";
 
 
 const QueryEditor = defineAsyncComponent(
@@ -1793,9 +1794,10 @@ const filterFunctionOptions = (val: string, update: any) => {
   });
 };
 
-const onBlurQueryEditor = () => {
+const onBlurQueryEditor = debounce(() => {
   queryEditorPlaceholderFlag.value = true;
-};
+  emits("validate-sql");
+}, 10);
 
 const validateInputs = (notify: boolean = true) => {
   validateFrequency();
