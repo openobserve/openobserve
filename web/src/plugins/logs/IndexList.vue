@@ -187,7 +187,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="float-right">
                     <q-icon
                       :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                      v-if="searchObj.meta.quickMode"
+                      v-if="
+                        searchObj.meta.quickMode &&
+                        props.row.name !== store.state.zoConfig.timestamp_column
+                      "
                       :name="
                         props.row.isInterestingField ? 'info' : 'info_outline'
                       "
@@ -246,7 +249,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <q-icon
                     :data-test="`log-search-index-list-interesting-${props.row.name}-field-btn`"
-                    v-if="searchObj.meta.quickMode"
+                    v-if="
+                      searchObj.meta.quickMode &&
+                      props.row.name !== store.state.zoConfig.timestamp_column
+                    "
                     :name="
                       props.row.isInterestingField ? 'info' : 'info_outline'
                     "
@@ -822,7 +828,7 @@ export default defineComponent({
     const traceIdMapper = ref<{ [key: string]: string[] }>({});
     const openedFilterFields = ref<string[]>([]);
 
-    const showOnlyInterestingFields = ref(true);
+    const showOnlyInterestingFields = ref(false);
 
     const userDefinedSchemaBtnGroupOption = [
       {
