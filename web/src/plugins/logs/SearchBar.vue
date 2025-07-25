@@ -1722,11 +1722,15 @@ export default defineComponent({
                 localFields = localInterestingFields.value;
               }
               for (const stream of searchObj.data.stream.selectedStreamFields) {
+                // If the field is not the timestamp column, add it to the interesting field list
+                // As timestamp column is default interesting field, we don't need to add it to the local storage
                 if (
                   stream.name == col &&
-                  !searchObj.data.stream.interestingFieldList.includes(col)
+                  !searchObj.data.stream.interestingFieldList.includes(col) &&
+                  col !== store.state.zoConfig?.timestamp_column
                 ) {
                   searchObj.data.stream.interestingFieldList.push(col);
+
                   localFields[
                     searchObj.organizationIdentifier +
                       "_" +
@@ -1737,6 +1741,11 @@ export default defineComponent({
               useLocalInterestingFields(localFields);
             }
           }
+
+          // Add timestamp column to the interesting field list, as it is default interesting field
+          searchObj.data.stream.interestingFieldList.unshift(
+            store.state.zoConfig?.timestamp_column,
+          );
 
           for (const item of searchObj.data.stream.selectedStreamFields) {
             if (
