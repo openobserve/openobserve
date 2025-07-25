@@ -898,6 +898,7 @@ export default defineComponent({
       verifyOrganizationStatus,
       isEnterprise,
       isCurrentUserInternal,
+      _getRoles,
       // showAddUserBtn,
     };
   },
