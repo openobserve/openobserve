@@ -55,13 +55,16 @@ fn get_col_name(expr: &Expr) -> String {
 }
 
 #[inline]
-fn is_ts_hist_udf(e: &Expr) -> bool {
+fn is_ts_hist_udf(e: &Expr, ts_alias: &Option<String>) -> bool {
     // currently histogram errors with anything other than _timestamp, as aliasing does not work,
     // even with CTEs, so we can safely hardcode _timestamp here for now
     match e {
         Expr::ScalarFunction(f) => {
-            f.name() == "histogram"
-                && f.args.first().map(get_col_name) == Some("_timestamp".to_string())
+            let ts = match ts_alias {
+                Some(v) => v.to_string(),
+                None => "_timestamp".to_string(),
+            };
+            f.name() == "histogram" && f.args.first().map(get_col_name) == Some(ts)
         }
         _ => false,
     }
@@ -101,7 +104,9 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                             // without an alias, or using it in group by clause. In such case,
                             // it shows up as a scalar udf in projection exprs, so we need to handle
                             // and set the ts_hist_alias correctly
-                            if is_ts_hist_udf(expr) && self.ts_hist_alias.is_none() {
+                            if is_ts_hist_udf(expr, &self.timestamp_alias)
+                                && self.ts_hist_alias.is_none()
+                            {
                                 self.ts_hist_alias = Some(get_col_name(expr))
                             }
                         }
@@ -127,7 +132,9 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                                 self.timestamp_alias = Some(alias.name.clone());
                             }
 
-                            if self.ts_hist_alias.is_none() && is_ts_hist_udf(&alias.expr) {
+                            if self.ts_hist_alias.is_none()
+                                && is_ts_hist_udf(&alias.expr, &self.timestamp_alias)
+                            {
                                 self.ts_hist_alias = Some(alias.name.clone());
                             }
 
@@ -152,17 +159,18 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                     // aggregates, and if it is, set the alias to its name
                     // because no alias is allowed at group by level, we can be certain
                     // ts col is _timestamp, and is not aliased with some other name
+                    let ts = match self.timestamp_alias.as_ref() {
+                        Some(v) => v.as_str(),
+                        None => "_tiemstamp",
+                    };
                     match expr {
                         Expr::Column(col) => {
-                            if col.name() == "_timestamp" {
+                            if col.name() == ts {
                                 self.timestamp_alias = Some(col.name.clone())
                             }
                         }
-                        Expr::ScalarFunction(f) => {
-                            if f.name() == "histogram"
-                                && f.args.first().map(get_col_name)
-                                    == Some("_timestamp".to_string())
-                            {
+                        Expr::ScalarFunction(_) => {
+                            if is_ts_hist_udf(expr, &self.timestamp_alias) {
                                 self.ts_hist_alias = Some(get_col_name(expr));
                             }
                         }
