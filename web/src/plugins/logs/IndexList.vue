@@ -753,7 +753,6 @@ import {
   isWebSocketEnabled,
   isStreamingEnabled,
   b64EncodeStandard,
-  addSpacesToOperators,
   deepCopy,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
