@@ -995,7 +995,7 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
         let org_id = key_parts[1].to_string();
         let destination_name = key_parts[2].to_string();
         let batch_key = key_parts[3].to_string();
-        let stream_type = key_parts[4].to_string();
+        //let stream_type = key_parts[4].to_string();
 
         let remote_stream = config::meta::stream::RemoteStreamParams {
             org_id: org_id.clone().into(),
