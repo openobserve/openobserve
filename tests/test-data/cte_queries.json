@@ -1,0 +1,164 @@
+[
+  {
+    "kubernetes_container_name": "api-server",
+    "kubernetes_pod_name": "api-pod-1",
+    "message": "Starting org service initialization",
+    "level": "info",
+    "log": "level=info msg=\"Starting org service initialization\"",
+    "metadata": {
+      "region": "us-west-1",
+      "datacenter": "dc-1",
+      "host": "host-123"
+    },
+    "metrics": {
+      "cpu_usage": 45.2,
+      "memory_mb": 256,
+      "response_time_ms": 120
+    },
+    "tags": ["production", "api", "initialization"]
+  },
+  {
+    "kubernetes_container_name": "frontend",
+    "kubernetes_pod_name": "web-pod-1",
+    "message": "User authentication successful",
+    "level": "info",
+    "log": "level=info msg=\"User authentication successful\"",
+    "metadata": {
+      "region": "us-west-1",
+      "datacenter": "dc-1",
+      "host": "host-456"
+    },
+    "metrics": {
+      "cpu_usage": 32.1,
+      "memory_mb": 512,
+      "response_time_ms": 80
+    },
+    "tags": ["production", "frontend", "auth"]
+  },
+  {
+    "kubernetes_container_name": "api-server",
+    "kubernetes_pod_name": "api-pod-1",
+    "message": "Organization data sync completed",
+    "level": "info",
+    "log": "level=info msg=\"Organization data sync completed\"",
+    "metadata": {
+      "region": "us-west-2",
+      "datacenter": "dc-2",
+      "host": "host-789"
+    },
+    "metrics": {
+      "cpu_usage": 78.5,
+      "memory_mb": 1024,
+      "response_time_ms": 450
+    },
+    "tags": ["production", "api", "sync"]
+  },
+  {
+    "kubernetes_container_name": "database",
+    "kubernetes_pod_name": "db-pod-1",
+    "message": "Database backup started",
+    "level": "info",
+    "log": "level=info msg=\"Database backup started\"",
+    "metadata": {
+      "region": "us-east-1",
+      "datacenter": "dc-3",
+      "host": "host-101"
+    },
+    "metrics": {
+      "cpu_usage": 92.3,
+      "memory_mb": 4096,
+      "response_time_ms": 200
+    },
+    "tags": ["production", "database", "backup"]
+  },
+  {
+    "kubernetes_container_name": "api-server",
+    "kubernetes_pod_name": "api-pod-2",
+    "message": "High CPU usage detected",
+    "level": "warn",
+    "log": "level=warn msg=\"High CPU usage detected\"",
+    "metadata": {
+      "region": "us-west-1",
+      "datacenter": "dc-1",
+      "host": "host-123"
+    },
+    "metrics": {
+      "cpu_usage": 95.8,
+      "memory_mb": 1024,
+      "response_time_ms": 850
+    },
+    "tags": ["production", "api", "performance"]
+  },
+  {
+    "kubernetes_container_name": "frontend",
+    "kubernetes_pod_name": "web-pod-2",
+    "message": "Cache invalidation triggered",
+    "level": "info",
+    "log": "level=info msg=\"Cache invalidation triggered\"",
+    "metadata": {
+      "region": "us-east-1",
+      "datacenter": "dc-3",
+      "host": "host-456"
+    },
+    "metrics": {
+      "cpu_usage": 45.6,
+      "memory_mb": 512,
+      "response_time_ms": 95
+    },
+    "tags": ["production", "frontend", "cache"]
+  },
+  {
+    "kubernetes_container_name": "database",
+    "kubernetes_pod_name": "db-pod-1",
+    "message": "Slow query detected",
+    "level": "error",
+    "log": "level=error msg=\"Slow query detected\"",
+    "metadata": {
+      "region": "us-east-1",
+      "datacenter": "dc-3",
+      "host": "host-101"
+    },
+    "metrics": {
+      "cpu_usage": 88.9,
+      "memory_mb": 4096,
+      "response_time_ms": 5000
+    },
+    "tags": ["production", "database", "performance"]
+  },
+  {
+    "kubernetes_container_name": "api-server",
+    "kubernetes_pod_name": "api-pod-1",
+    "message": "Rate limiting applied",
+    "level": "warn",
+    "log": "level=warn msg=\"Rate limiting applied\"",
+    "metadata": {
+      "region": "us-west-2",
+      "datacenter": "dc-2",
+      "host": "host-789"
+    },
+    "metrics": {
+      "cpu_usage": 67.4,
+      "memory_mb": 768,
+      "response_time_ms": 320
+    },
+    "tags": ["production", "api", "throttling"]
+  },
+  {
+    "kubernetes_container_name": "api-server",
+    "kubernetes_pod_name": "api-pod-3",
+    "message": "Request timeout: Database connection timeout after 30s",
+    "level": "error",
+    "log": "level=error msg=\"Request timeout: Database connection timeout after 30s\"",
+    "metadata": {
+      "region": "us-west-1",
+      "datacenter": "dc-1",
+      "host": "host-234"
+    },
+    "metrics": {
+      "cpu_usage": 55.7,
+      "memory_mb": 1024,
+      "response_time_ms": 30000
+    },
+    "tags": ["production", "api", "error", "timeout"]
+  }
+] 
