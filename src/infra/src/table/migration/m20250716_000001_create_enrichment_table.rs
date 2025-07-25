@@ -81,6 +81,7 @@ fn create_enrichment_tables_statement() -> TableCreateStatement {
 
 fn create_enrichment_tables_index_statement() -> IndexCreateStatement {
     Index::create()
+        .if_not_exists()
         .name(ENRICHMENT_TABLES_ORG_NAME_IDX)
         .table(EnrichmentTables::Table)
         .col(EnrichmentTables::Org)
@@ -90,6 +91,7 @@ fn create_enrichment_tables_index_statement() -> IndexCreateStatement {
 
 fn create_enrichment_tables_index_statement_created_at() -> IndexCreateStatement {
     Index::create()
+        .if_not_exists()
         .name(ENRICHMENT_TABLES_CREATED_AT_IDX)
         .table(EnrichmentTables::Table)
         .col(EnrichmentTables::CreatedAt)
@@ -125,6 +127,16 @@ mod tests {
                 "created_at" bigint NOT NULL
             )"#
         );
+
+        collapsed_eq!(
+            &create_enrichment_tables_index_statement().to_string(PostgresQueryBuilder),
+            r#"CREATE INDEX IF NOT EXISTS "enrichment_table_org_name_idx" ON "enrichment_tables" ("org", "name")"#
+        );
+
+        collapsed_eq!(
+            &create_enrichment_tables_index_statement_created_at().to_string(PostgresQueryBuilder),
+            r#"CREATE INDEX IF NOT EXISTS "enrichment_table_created_at_idx" ON "enrichment_tables" ("created_at")"#
+        );
     }
 
     #[test]
@@ -139,6 +151,16 @@ mod tests {
                 `created_at` bigint UNSIGNED NOT NULL
             )"#
         );
+
+        collapsed_eq!(
+            &create_enrichment_tables_index_statement().to_string(MysqlQueryBuilder),
+            r#"CREATE INDEX `enrichment_table_org_name_idx` ON `enrichment_tables` (`org`, `name`)"#
+        );
+
+        collapsed_eq!(
+            &create_enrichment_tables_index_statement_created_at().to_string(MysqlQueryBuilder),
+            r#"CREATE INDEX `enrichment_table_created_at_idx` ON `enrichment_tables` (`created_at`)"#
+        );
     }
 
     #[test]
@@ -152,6 +174,16 @@ mod tests {
                 "data" blob(1) NOT NULL,
                 "created_at" bigint NOT NULL
             )"#
+        );
+
+        collapsed_eq!(
+            &create_enrichment_tables_index_statement().to_string(SqliteQueryBuilder),
+            r#"CREATE INDEX IF NOT EXISTS "enrichment_table_org_name_idx" ON "enrichment_tables" ("org", "name")"#
+        );
+
+        collapsed_eq!(
+            &create_enrichment_tables_index_statement_created_at().to_string(SqliteQueryBuilder),
+            r#"CREATE INDEX IF NOT EXISTS "enrichment_table_created_at_idx" ON "enrichment_tables" ("created_at")"#
         );
     }
 }
