@@ -332,28 +332,23 @@ describe("Condition Component", () => {
     });
 
     it("returns all columns when search value is empty", () => {
-      const mockUpdate = vi.fn();
-      const expectedColumns = [
+      const options = [
         { label: "timestamp", value: "timestamp", type: "datetime" },
         { label: "message", value: "message", type: "string" }
       ];
       
-      let capturedColumns;
+      let filteredOptions;
       const update = (callback) => {
         callback();
-        capturedColumns = wrapper.vm.filteredColumns;
       };
       
-      wrapper.vm.filterColumns(expectedColumns, "", update);
-      expect(mockUpdate).not.toHaveBeenCalled(); // Because we're using our custom update
+      filteredOptions = wrapper.vm.filterColumns(options, "", update);
       
-      // Verify that all expected columns are present in the result
-      expectedColumns.forEach(expectedColumn => {
-        expect(capturedColumns).toContainEqual(expectedColumn);
-      });
-
+      expect(filteredOptions).toEqual(expect.arrayContaining(options));
+      expect(filteredOptions.length).toBe(options.length);
+      
       // Verify that all columns in result match the expected format
-      capturedColumns.forEach(column => {
+      filteredOptions.forEach(column => {
         expect(column).toMatchObject({
           label: expect.any(String),
           value: expect.any(String),
