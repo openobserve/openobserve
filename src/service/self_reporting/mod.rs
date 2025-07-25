@@ -40,12 +40,11 @@ use tokio::sync::oneshot;
 pub mod cloud_events;
 mod ingestion;
 mod queues;
-#[cfg(feature = "cloud")]
+#[cfg(any(feature = "cloud", feature = "marketplace"))]
 pub mod search;
 
 pub async fn run() {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
+    if !should_report_usage() {
         return;
     }
 
@@ -73,7 +72,7 @@ pub async fn run() {
         return;
     }
 
-    log::debug!("[SELF-REPORTING] successfully initialized reporting queues");
+    log::info!("[SELF-REPORTING] successfully initialized reporting queues");
 }
 
 pub async fn report_request_usage_stats(
@@ -95,7 +94,7 @@ pub async fn report_request_usage_stats(
             .inc_by((stats.size * SIZE_IN_MB) as u64);
     }
 
-    if !get_config().common.usage_enabled {
+    if !should_report_usage() {
         return;
     }
 
@@ -192,8 +191,7 @@ pub async fn report_request_usage_stats(
 }
 
 async fn publish_usage(usages: Vec<UsageData>) {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
+    if !should_report_usage() {
         return;
     }
 
@@ -210,8 +208,7 @@ async fn publish_usage(usages: Vec<UsageData>) {
 }
 
 pub async fn publish_triggers_usage(trigger: TriggerData) {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
+    if !should_report_usage() {
         return;
     }
 
@@ -231,8 +228,7 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
 }
 
 pub async fn publish_error(error_data: ErrorData) {
-    let cfg = get_config();
-    if !cfg.common.usage_enabled {
+    if !should_report_usage() {
         return;
     }
 
@@ -256,9 +252,7 @@ pub async fn flush() {
     #[cfg(feature = "enterprise")]
     flush_audit().await;
 
-    let cfg = get_config();
-    // only ingester and querier nodes report usage
-    if !cfg.common.usage_enabled || (!LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier()) {
+    if !should_report_usage() {
         return;
     }
 
@@ -322,6 +316,16 @@ async fn publish_audit(
         .map_err(|e| anyhow::anyhow!(e.to_string()))
 }
 
+/// `marketplace` feature flag must report usage
+/// or enabled by env for other feature flags
+/// &
+/// Only ingester or querier nodes report usage
+#[inline]
+fn should_report_usage() -> bool {
+    (cfg!(feature = "marketplace") || get_config().common.usage_enabled)
+        && (LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier())
+}
+
 #[inline]
 pub fn http_report_metrics(
     start: std::time::Instant,
@@ -354,4 +358,15 @@ pub fn http_report_metrics(
             search_group,
         ])
         .inc();
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn get_feature() {
+        println!("res: {}", should_report_usage());
+    }
 }
