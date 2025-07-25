@@ -1378,6 +1378,8 @@ impl VisitorMut for IndexOptimizeModeVisitor {
         ) {
             self.is_simple_count = false;
             self.is_simple_histogram = false;
+            self.simple_topn = None;
+            self.simple_distinct = None;
             return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
