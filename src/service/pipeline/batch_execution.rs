@@ -35,6 +35,8 @@ use futures::future::try_join_all;
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
 use once_cell::sync::Lazy;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
+use tokio::sync::Mutex;
+use tokio::time::{Duration, Instant};
 
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
@@ -43,6 +45,51 @@ use crate::{
         self_reporting::publish_error,
     },
 };
+
+// Global batch buffer for accumulating remote stream records
+#[derive(Debug)]
+struct BatchBuffer {
+    records: Vec<json::Value>,
+    total_bytes: usize,
+    last_write: Instant,
+}
+
+impl BatchBuffer {
+    fn new() -> Self {
+        Self {
+            records: Vec::new(),
+            total_bytes: 0,
+            last_write: Instant::now(),
+        }
+    }
+
+    fn add_records(&mut self, new_records: Vec<json::Value>) {
+        for record in new_records {
+            self.total_bytes += record.to_string().len();
+            self.records.push(record);
+        }
+    }
+
+    fn should_flush(&self) -> bool {
+        const MAX_BATCH_SIZE: usize = 50; // Flush after 50 records
+        const MAX_BATCH_BYTES: usize = 32 * 1024; // Or 32KB
+        const MAX_BATCH_TIME_MS: u64 = 5000; // Or 5 seconds
+
+        self.records.len() >= MAX_BATCH_SIZE 
+            || self.total_bytes >= MAX_BATCH_BYTES
+            || self.last_write.elapsed() >= Duration::from_millis(MAX_BATCH_TIME_MS)
+    }
+
+    fn take_records(&mut self) -> Vec<json::Value> {
+        self.last_write = Instant::now();
+        self.total_bytes = 0;
+        std::mem::take(&mut self.records)
+    }
+}
+
+static BATCH_BUFFERS: Lazy<Mutex<HashMap<String, BatchBuffer>>> = Lazy::new(|| {
+    Mutex::new(HashMap::new())
+});
 
 static DYNAMIC_STREAM_NAME_PATTERN: Lazy<regex::Regex> =
     Lazy::new(|| regex::Regex::new(r"\{([^}]+)\}").unwrap());
@@ -815,23 +862,47 @@ async fn process_node(
                 count += 1;
             }
 
+            log::debug!("[Pipeline]: RemoteStream node processed {} records", records.len());
             if !records.is_empty() {
-                let mut remote_stream = remote_stream.clone();
-                remote_stream.org_id = org_id.into();
-                let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream).await?;
-                if let Err(e) = writer.write_wal(records).await {
-                    let err_msg = format!(
-                        "DestinationNode error persisting data to be ingested externally: {}",
-                        e
-                    );
-                    if let Err(send_err) = error_sender
-                        .send((node.id.to_string(), node.node_type(), err_msg))
-                        .await
-                    {
-                        log::error!(
-                            "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                // Create buffer key for this pipeline
+                let buffer_key = format!("{}:{}", pipeline_id, remote_stream.org_id);
+                
+                // Add records to the accumulating buffer and check if we should flush
+                let mut buffers = BATCH_BUFFERS.lock().await;
+                let buffer = buffers.entry(buffer_key.clone()).or_insert_with(BatchBuffer::new);
+                
+                let initial_record_count = buffer.records.len();
+                buffer.add_records(records);
+                
+                log::debug!("[Pipeline]: Added {} records to buffer, total: {} records, {} bytes", 
+                    buffer.records.len() - initial_record_count, buffer.records.len(), buffer.total_bytes);
+                
+                // Check if buffer should be flushed to WAL
+                if buffer.should_flush() {
+                    let records_to_write = buffer.take_records();
+                    drop(buffers); // Release the lock before async operations
+                    
+                    log::debug!("[Pipeline]: Flushing buffer - writing {} records to WAL", records_to_write.len());
+                    
+                    let mut remote_stream = remote_stream.clone();
+                    remote_stream.org_id = org_id.into();
+                    let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream).await?;
+                    if let Err(e) = writer.write_wal(records_to_write).await {
+                        let err_msg = format!(
+                            "DestinationNode error persisting data to be ingested externally: {}",
+                            e
                         );
+                        if let Err(send_err) = error_sender
+                            .send((node.id.to_string(), node.node_type(), err_msg))
+                            .await
+                        {
+                            log::error!(
+                                "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                            );
+                        }
                     }
+                } else {
+                    log::debug!("[Pipeline]: Buffer not ready for flush, continuing to accumulate");
                 }
             }
 

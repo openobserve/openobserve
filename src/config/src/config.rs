@@ -1879,6 +1879,12 @@ pub struct Pipeline {
     )]
     pub remove_file_after_max_retry: bool,
     #[env_config(
+        name = "ZO_PIPELINE_FILE_PROCESSING_TIMEOUT_SECS",
+        default = 300,
+        help = "Timeout in seconds for file processing before considering it stuck (default 5 minutes)"
+    )]
+    pub file_processing_timeout_secs: Option<u64>,
+    #[env_config(
         name = "ZO_PIPELINE_MAX_RETRY_COUNT",
         default = 10,
         help = "pipeline exporter client max retry count"
