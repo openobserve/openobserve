@@ -81,7 +81,6 @@ pub(crate) mod search_stream;
 pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
-pub(crate) mod tantivy;
 pub(crate) mod utils;
 
 /// The result of search in cluster

@@ -60,7 +60,7 @@ use tokio::{
 use super::worker::{MergeBatch, MergeSender};
 use crate::{
     common::infra::cluster::get_node_by_uuid,
-    job::files::parquet::{create_tantivy_index, generate_index_on_compactor},
+    job::files::parquet::generate_index_on_compactor,
     service::{
         db, file_list,
         schema::generate_schema_for_defined_schema_fields,
@@ -68,6 +68,7 @@ use crate::{
             DATAFUSION_RUNTIME,
             datafusion::exec::{self, MergeParquetResult},
         },
+        tantivy::create_tantivy_index,
     },
 };
 

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    collections::HashSet,
     io,
     ops::Range,
     path::{Path, PathBuf},
@@ -27,7 +28,7 @@ use tantivy::{
     directory::{Directory, FileHandle, OwnedBytes, error::OpenReadError},
 };
 
-use crate::service::search::tantivy::{
+use crate::service::tantivy::{
     puffin::{BlobMetadata, reader::PuffinBytesReader},
     puffin_directory::{
         EMPTY_PUFFIN_DIRECTORY, EMPTY_PUFFIN_SEG_ID, get_file_from_empty_puffin_dir_with_ext,
@@ -211,11 +212,14 @@ impl Directory for PuffinDirReader {
 pub async fn warm_up_terms(
     searcher: &tantivy::Searcher,
     terms_grouped_by_field: &HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>>,
-    need_all_term_fields: Vec<tantivy::schema::Field>,
+    need_all_term_fields: HashSet<tantivy::schema::Field>,
+    need_fast_field: Option<String>,
 ) -> anyhow::Result<()> {
     let mut warm_up_fields_futures = Vec::new();
     let mut warm_up_fields_term_futures = Vec::new();
     let mut warm_up_terms_futures = Vec::new();
+    let mut warm_up_fast_fields_futures = Vec::new();
+    let mut warmed_segments = HashSet::new();
     for (field, terms) in terms_grouped_by_field {
         for segment_reader in searcher.segment_readers() {
             let inv_idx = segment_reader.inverted_index(*field)?;
@@ -242,6 +246,21 @@ pub async fn warm_up_terms(
         }
     }
 
+    // warm up fast fields if needed
+    if let Some(field_name) = need_fast_field {
+        for segment_reader in searcher.segment_readers() {
+            // only warm up fast fields once per segment
+            let field_name = field_name.clone();
+            let segment_id = segment_reader.segment_id();
+            if !warmed_segments.contains(&segment_id) {
+                let fast_field_reader = segment_reader.fast_fields();
+                warm_up_fast_fields_futures
+                    .push(async move { warm_up_fastfield(fast_field_reader, field_name).await });
+                warmed_segments.insert(segment_id);
+            }
+        }
+    }
+
     if !warm_up_fields_futures.is_empty() {
         try_join_all(warm_up_fields_futures).await?;
     }
@@ -251,5 +270,25 @@ pub async fn warm_up_terms(
     if !warm_up_terms_futures.is_empty() {
         try_join_all(warm_up_terms_futures).await?;
     }
+    if !warm_up_fast_fields_futures.is_empty() {
+        try_join_all(warm_up_fast_fields_futures).await?;
+    }
+    Ok(())
+}
+
+// warm up the fast field, only support _timestamp field
+async fn warm_up_fastfield(
+    fast_field_reader: &tantivy::fastfield::FastFieldReaders,
+    field_name: String,
+) -> anyhow::Result<()> {
+    let columns = fast_field_reader
+        .list_dynamic_column_handles(field_name.as_str())
+        .await?;
+    futures::future::try_join_all(
+        columns
+            .into_iter()
+            .map(|col| async move { col.file_slice().read_bytes_async().await }),
+    )
+    .await?;
     Ok(())
 }
