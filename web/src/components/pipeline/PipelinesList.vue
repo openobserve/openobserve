@@ -123,12 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ props.row[col.field] }}
                 </div>
               </template>
-              <template v-else-if="col.name == 'stream_type'"> 
-                <span :class="`${props.row[col.field]}-col-chip`">
-                  {{ props.row[col.field] }}
-                </span>
-              </template>
-              <template v-else-if="col.name !== 'actions' && col.name != 'name' && col.name != 'stream_type'">
+              <template v-else-if="col.name !== 'actions' && col.name != 'name'">
                 {{ props.row[col.field] }}
               </template>
               <template v-else>
@@ -1015,35 +1010,5 @@ const openMenu = (event: Event, row: any) => {
   width: 100%;
   justify-content: space-between;
   align-items: center;
-}
-.logs-col-chip{
-  background-color: #EFF8FF;
-  width: 40px;
-  height: 24px;
-  padding: 4px 8px;
-  border: 1px solid #b2ddff;
-  border-radius: 4px;
-  text-transform: capitalize;
-  color: #175cd3;
-}
-.metrics-col-chip{
-  background-color: #FEF6EE;
-  width: 40px;
-  height: 24px;
-  padding: 4px 8px;
-  border: 1px solid #F9DBAF;
-  border-radius: 4px;
-  text-transform: capitalize;
-  color: #B93815;
-}
-.traces-col-chip{
-  background-color: #F8F9FC;
-  width: 40px;
-  height: 24px;
-  padding: 4px 8px;
-  border: 1px solid #D5D9EB;
-  border-radius: 4px;
-  text-transform: capitalize;
-  color: #363F72;
 }
 </style>
