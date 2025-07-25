@@ -83,8 +83,6 @@ import useSearchWebSocket from "./useSearchWebSocket";
 import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
 import { changeHistogramInterval } from "@/utils/query/sqlUtils";
-import { type ActivationState, PageType } from "@/ts/interfaces/logs";
-import logs from "@/stores/logs";
 
 const defaultObject = {
   organizationIdentifier: "",
