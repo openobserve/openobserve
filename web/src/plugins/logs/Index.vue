@@ -1597,6 +1597,10 @@ export default defineComponent({
           // this will clear dummy trace id
           cancelFieldExtraction();
 
+          if(err.name === "AbortError"){
+            return;
+          }
+
            // show error notification
            showErrorNotification(
             err.message ?? "Error in updating visualization",
