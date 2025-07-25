@@ -526,6 +526,7 @@ pub struct SearchPartitionRequest {
     pub streaming_output: bool,
     #[serde(default)]
     pub histogram_interval: i64,
+    pub search_type: Option<SearchEventType>,
 }
 
 impl SearchPartitionRequest {
@@ -559,6 +560,7 @@ impl From<&Request> for SearchPartitionRequest {
             query_fn: req.query.query_fn.clone(),
             streaming_output: req.query.streaming_output,
             histogram_interval: req.query.histogram_interval,
+            search_type: req.search_type,
         }
     }
 }
@@ -1260,6 +1262,13 @@ pub struct HashFileRequest {
 #[derive(Debug, Default, Deserialize, Clone, Serialize)]
 pub struct HashFileResponse {
     pub files: HashMap<String, HashMap<String, String>>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct ResultSchemaResponse {
+    pub projections: Vec<String>,
+    pub group_by: Vec<String>,
+    pub timeseries_field: Option<String>,
 }
 
 #[cfg(test)]

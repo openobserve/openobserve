@@ -138,6 +138,7 @@ const defaultObject = {
       ? JSON.parse(useLocalWrapContent())
       : false,
     histogramDirtyFlag: false,
+    logsVisualizeDirtyFlag: false,
     sqlMode: false,
     sqlModeManualTrigger: false,
     quickMode: false,
@@ -703,6 +704,10 @@ const useLogs = () => {
 
     if(store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.clusters?.length) {
       query["clusters"] = searchObj.meta.clusters.join(",");
+    }
+
+    if(searchObj.meta.logsVisualizeToggle) {
+      query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
     }
 
     return query;
@@ -1294,12 +1299,18 @@ const useLogs = () => {
 
           partitionQueryReq["streaming_output"] = true;
 
+          searchObj.data.queryResults.histogram_interval = null;
+
+          // for visualization, will require to set histogram interval to fill missing values
+          searchObj.data.queryResults.visualization_histogram_interval = null;
+
           await searchService
             .partition({
               org_identifier: searchObj.organizationIdentifier,
               query: partitionQueryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
+              searchType: "ui",
             })
             .then(async (res: any) => {
               //this is called to get data into partitions array
@@ -1332,6 +1343,16 @@ const useLogs = () => {
                 partitionTotal: [],
                 paginations: [],
               };
+
+              searchObj.data.queryResults.histogram_interval = res.data.histogram_interval;
+
+              // check if histogram interval is undefined, then set current response as histogram response
+              // for visualization, will require to set histogram interval to fill missing values
+              // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+              // created new attribute visualization_histogram_interval to avoid this issue
+              if(!searchObj.data.queryResults.visualization_histogram_interval && res.data?.histogram_interval) {
+                searchObj.data.queryResults.visualization_histogram_interval = res.data?.histogram_interval;
+              }
 
               if (typeof partitionQueryReq.sql != "string") {
                 const partitionSize = 0;
@@ -2589,7 +2610,7 @@ const useLogs = () => {
 
       const isAggregation = searchObj.meta.sqlMode && parsedSQL != undefined && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
 
-      if(!queryReq.query?.streaming_output && searchObj.data.queryResults.histogram_interval) {
+      if(searchObj.data.queryResults.histogram_interval) {
         queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
       }
       
@@ -3092,7 +3113,14 @@ const useLogs = () => {
               }
             }
 
-            searchObj.data.queryResults.aggs.push(...res.data.hits);
+            const order_by = res?.data?.order_by ?? "desc"
+
+            if (order_by?.toLowerCase() === "desc") {
+              searchObj.data.queryResults.aggs.push(...res.data.hits);
+            } else {
+              searchObj.data.queryResults.aggs.unshift(...res.data.hits);
+            }
+
             searchObj.data.queryResults.scan_size += res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
             searchObj.data.queryResults.result_cache_ratio +=
@@ -3127,6 +3155,15 @@ const useLogs = () => {
               searchObj.data.queryResults.partitionDetail.paginations[
                 searchObj.data.resultGrid.currentPage - 1
               ][0].endTime;
+
+
+            // check if histogram interval is undefined, then set current response as histogram response
+            // for visualization, will require to set histogram interval to fill missing values
+            // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+            // created new attribute visualization_histogram_interval to avoid this issue
+            if(!searchObj.data.queryResults.visualization_histogram_interval && res.data?.histogram_interval) {
+              searchObj.data.queryResults.visualization_histogram_interval = res.data?.histogram_interval;
+            }
 
             // if (hasAggregationFlag) {
             //   searchObj.data.queryResults.total = res.data.total;
@@ -4335,6 +4372,19 @@ const useLogs = () => {
       searchObj.loading = false;
     }
   };
+
+  const loadVisualizeData = async () => {
+    try {
+      resetFunctions();
+      await getStreamList();
+      await getFunctions();
+      if (isActionsEnabled.value) await getActions();
+      await extractFields();
+    } catch (e: any) {
+      searchObj.loading = false;
+    }
+  };
+
   const loadJobData = async () => {
     try {
       resetFunctions();
@@ -4527,6 +4577,10 @@ const useLogs = () => {
 
     if(store.state.zoConfig?.super_cluster_enabled && queryParams.clusters) {
       searchObj.meta.clusters = queryParams.clusters.split(",");
+    }
+
+    if(queryParams.hasOwnProperty("logs_visualize_toggle") && queryParams.logs_visualize_toggle != "") {
+      searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
     }
 
     // TODO OK : Replace push with replace and test all scenarios
@@ -5773,7 +5827,13 @@ const useLogs = () => {
       }
     }
     
-    searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+    // if order by is desc, append new partition response at end
+    if (searchObj.data.queryResults.order_by?.toLowerCase() === "desc") {
+      searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+    } else {
+      // else append new partition response at start
+      searchObj.data.queryResults.aggs.unshift(...response.content.results.hits);
+    }
 
     (async () => {
       try {
@@ -5813,6 +5873,19 @@ const useLogs = () => {
     searchObj.data.queryResults.took += response.content.results.took;
     searchObj.data.queryResults.result_cache_ratio +=
       response.content.results.result_cache_ratio;
+    searchObj.data.queryResults.order_by = response?.content?.results?.order_by ?? "desc";
+
+    // check if histogram interval is undefined, then set current response as histogram response
+    // for visualization, will require to set histogram interval to fill missing values
+    // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+    // created new attribute visualization_histogram_interval to avoid this issue
+    if (
+      !searchObj.data.queryResults.visualization_histogram_interval &&
+      response.content?.results?.histogram_interval
+    ) {
+      searchObj.data.queryResults.visualization_histogram_interval  =
+        response.content?.results?.histogram_interval;
+    }
   }
 
   const handlePageCountStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
@@ -6760,7 +6833,8 @@ const useLogs = () => {
     clearSearchObj,
     setCommunicationMethod,
     hasAggregation,
-    };
+    loadVisualizeData,
+  };
 };
 
 export default useLogs;

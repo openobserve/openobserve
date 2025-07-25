@@ -2,6 +2,7 @@ export enum PageType {
   LOGS = "logs",
   STREAM_EXPLORER = "stream_explorer",
   TRACE_EXPLORER = "trace_explorer",
+  VISUALIZE = "visualize",
 }
 
 export interface ActivationState {
