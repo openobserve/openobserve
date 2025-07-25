@@ -39,6 +39,7 @@ use futures::StreamExt;
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
 use ingester::WAL_PARQUET_METADATA;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
     common::infra::wal,
@@ -436,24 +437,43 @@ pub async fn search_memtable(
 
     let mut tables = Vec::new();
     let start = std::time::Instant::now();
-    for (schema, record_batches) in batch_groups {
+    let latest_schema_fields = latest_schema.fields().len();
+    for (i, (schema, record_batches)) in batch_groups.into_iter().enumerate() {
         if record_batches.is_empty() {
             continue;
         }
 
-        // the field in latest_schema_map, but not in schema,
-        // so not in the diff_fields, result in Utf8View issue
-        // so we need to add it to the diff_fields
+        let adapt_start = std::time::Instant::now();
+        let batch_num = record_batches.len();
+        let batch_fields = schema.fields().len();
+
+        // if the field in latest_schema_map, but not in schema, and it is utf8view, we need to add
+        // as utf8 and add utf8view to diff_fields, because it will cause different dataType between
+        // batches
         let mut diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
-        let mut adapt_batches = Vec::with_capacity(record_batches.len());
-        for batch in record_batches {
-            adapt_batches.push(adapt_batch(latest_schema.clone(), batch, &mut diff_fields));
-        }
+        let (adapt_batches, new_diff_fields) = record_batches
+            .into_par_iter()
+            .map(|batch| adapt_batch(latest_schema.clone(), batch))
+            .collect::<(Vec<RecordBatch>, Vec<HashMap<String, DataType>>)>();
         let record_batches = adapt_batches;
+        for diff_field in new_diff_fields {
+            if !diff_field.is_empty() {
+                diff_fields.extend(diff_field);
+            }
+        }
+
+        log::info!(
+            "[trace_id {}] wal->mem->search: adapt batches for group {i}, schema fields {latest_schema_fields}, batch fields: {batch_fields}, diff_fields {}, batches {batch_num}, took {} ms",
+            query.trace_id,
+            diff_fields.len(),
+            adapt_start.elapsed().as_millis()
+        );
 
         tokio::task::coop::consume_budget().await;
 
         // merge small batches into big batches
+        let merge_start = std::time::Instant::now();
+        let batch_num = record_batches.len();
         let mut merge_groupes = Vec::new();
         let mut current_group = Vec::new();
         let group_limit = config::PARQUET_BATCH_SIZE;
@@ -471,7 +491,7 @@ pub async fn search_memtable(
             merge_groupes.push(current_group);
         }
         let record_batches = merge_groupes
-            .into_iter()
+            .into_par_iter()
             .map(|mut group| {
                 if group.len() == 1 {
                     group.remove(0)
@@ -480,6 +500,12 @@ pub async fn search_memtable(
                 }
             })
             .collect::<Vec<_>>();
+
+        log::info!(
+            "[trace_id {}] wal->mem->search: merge batches for group {i}, batches {batch_num}, took {} ms",
+            query.trace_id,
+            merge_start.elapsed().as_millis()
+        );
 
         tokio::task::coop::consume_budget().await;
 
@@ -658,16 +684,23 @@ async fn get_file_list(
 fn adapt_batch(
     latest_schema: Arc<Schema>,
     batch: RecordBatch,
-    diff_fields: &mut HashMap<String, DataType>,
-) -> RecordBatch {
-    let batch_schema = &*batch.schema();
-    let batch_cols = batch.columns().to_vec();
+) -> (RecordBatch, HashMap<String, DataType>) {
+    let mut diff_fields = HashMap::with_capacity(1);
+    let batch_schema = batch.schema();
+    let batch_fields = batch_schema
+        .fields()
+        .iter()
+        .enumerate()
+        .map(|(idx, f)| (f.name(), idx))
+        .collect::<HashMap<_, _>>();
+    let batch_cols = batch.columns();
 
     let mut cols: Vec<ArrayRef> = Vec::with_capacity(latest_schema.fields().len());
     let mut fields = Vec::with_capacity(latest_schema.fields().len());
     for field_latest in latest_schema.fields() {
-        if let Some((idx, field)) = batch_schema.column_with_name(field_latest.name()) {
-            cols.push(Arc::clone(&batch_cols[idx]));
+        if let Some(idx) = batch_fields.get(field_latest.name()) {
+            let field = batch_schema.field(*idx);
+            cols.push(Arc::clone(&batch_cols[*idx]));
             fields.push(field.clone());
         } else if *field_latest.data_type() == DataType::Utf8View {
             // in memtable, the schema should be utf8
@@ -684,5 +717,5 @@ fn adapt_batch(
         }
     }
     let schema = Arc::new(Schema::new(fields));
-    RecordBatch::try_new(schema, cols).unwrap()
+    (RecordBatch::try_new(schema, cols).unwrap(), diff_fields)
 }
