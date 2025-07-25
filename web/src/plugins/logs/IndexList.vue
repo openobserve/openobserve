@@ -1419,7 +1419,8 @@ export default defineComponent({
 
       let index = 0;
       for (const key of expandKeys) {
-        if (expandKeys.indexOf(key) > 1) index += 1;
+        if (Object.keys(expandKeys).length > 1) index += 1;
+
         if (key === field.group) break;
         index =
           index +
