@@ -201,6 +201,8 @@ pub trait Db: Sync + Send + 'static {
         need_watch: bool,
         start_dt: Option<i64>,
     ) -> Result<()>;
+    async fn get_id(&self, key: &str) -> Result<i64>;
+    async fn get_key_from_id(&self, id: i64) -> Result<String>;
     async fn get_for_update(
         &self,
         key: &str,

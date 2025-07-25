@@ -243,6 +243,48 @@ impl super::Db for SqliteDb {
         Ok(Bytes::from(value))
     }
 
+    async fn get_id(&self, key: &str) -> Result<i64> {
+        let (module, key1, key2) = super::parse_key(key);
+        let pool = CLIENT_RO.clone();
+        let query = format!(
+            "SELECT id FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}' ORDER BY start_dt DESC;"
+        );
+        let id: i64 = match sqlx::query_scalar(&query).fetch_one(&pool).await {
+            Ok(v) => v,
+            Err(e) => {
+                if let sqlx::Error::RowNotFound = e {
+                    return Err(Error::from(DbError::KeyNotExists(key.to_string())));
+                } else {
+                    return Err(Error::from(DbError::DBOperError(
+                        e.to_string(),
+                        key.to_string(),
+                    )));
+                }
+            }
+        };
+        Ok(id)
+    }
+
+    async fn get_key_from_id(&self, id: i64) -> Result<String> {
+        let pool = CLIENT_RO.clone();
+        let query = format!("SELECT module, key1, key2 FROM meta WHERE id = {id};");
+        let row: (String, String, String) = match sqlx::query_as(&query).fetch_one(&pool).await {
+            Ok(v) => v,
+            Err(e) => {
+                if let sqlx::Error::RowNotFound = e {
+                    return Err(Error::from(DbError::KeyNotExists(id.to_string())));
+                } else {
+                    return Err(Error::from(DbError::DBOperError(
+                        e.to_string(),
+                        id.to_string(),
+                    )));
+                }
+            }
+        };
+        let (module, key1, key2) = row;
+        Ok(super::build_key(&module, &key1, &key2, 0))
+    }
+
     async fn put(
         &self,
         key: &str,
