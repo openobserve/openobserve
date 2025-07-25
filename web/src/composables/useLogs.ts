@@ -1942,6 +1942,12 @@ const useLogs = () => {
                 errorMsg: "Histogram is not available for multi-stream SQL mode search.",
                 errorDetail: "",
               };
+
+              // get page count for multi stream sql mode search
+              setTimeout(async () => {
+                getPageCount(queryReq);
+              }, 0);
+              searchObj.meta.histogramDirtyFlag = false;
             } else {
               if(searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false) {
                 searchObj.data.histogramQuery.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query);
@@ -2038,8 +2044,7 @@ const useLogs = () => {
 
           }
           searchObj.meta.histogramDirtyFlag = false;
-        } 
-        else {
+        } else {
           let aggFlag = false;
           if (parsedSQL) {
             aggFlag = hasAggregation(parsedSQL?.columns);
