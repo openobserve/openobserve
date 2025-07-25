@@ -1468,6 +1468,8 @@ export default defineComponent({
               return;
             }
 
+            console.log("searchObj.data.queryResults", JSON.parse(JSON.stringify(searchObj.data.queryResults)));
+
             // set logs page data to searchResponseForVisualization
             if (shouldUseHistogram === true) {
               // replace hits with histogram query data
