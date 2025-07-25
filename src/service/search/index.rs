@@ -52,11 +52,14 @@ use super::{
     datafusion::udf::fuzzy_match_udf,
     utils::{is_field, is_value, split_conjunction, trim_quotes},
 };
-use crate::service::search::datafusion::udf::{
-    MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
-    STR_MATCH_UDF_NAME,
-    match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
-    str_match_udf,
+use crate::service::search::{
+    datafusion::udf::{
+        MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
+        STR_MATCH_UDF_NAME,
+        match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
+        str_match_udf,
+    },
+    utils::get_field_name,
 };
 
 pub fn get_index_condition_from_expr(
@@ -122,6 +125,7 @@ impl IndexCondition {
             .join(" AND ")
     }
 
+    // get the tantivy query for the index condition
     pub fn to_tantivy_query(
         &self,
         schema: Schema,
@@ -139,6 +143,7 @@ impl IndexCondition {
         Ok(Box::new(BooleanQuery::from(queries)))
     }
 
+    // get the fields use for search in tantivy
     pub fn get_tantivy_fields(&self) -> HashSet<String> {
         self.conditions
             .iter()
@@ -148,6 +153,7 @@ impl IndexCondition {
             })
     }
 
+    // get the fields use for search in datafusion(for add filter back logical)
     pub fn get_schema_fields(&self, fst_fields: &[String]) -> HashSet<String> {
         self.conditions
             .iter()
@@ -194,6 +200,36 @@ impl IndexCondition {
         self.conditions
             .iter()
             .all(|condition| condition.can_remove_filter())
+    }
+
+    // check if the index condition is a simple str match condition
+    // the simple str match condition is like str_match(field, 'value')
+    // use for check if the distinct query can be optimized
+    pub fn is_simple_str_match(&self, field: &str) -> bool {
+        if self.conditions.len() != 1 {
+            return false;
+        }
+        matches!(
+            &self.conditions[0],
+            Condition::StrMatch(f, ..) if f == field
+        )
+    }
+
+    // use for simple distinct optimization
+    pub fn get_str_match_condition(&self) -> Option<(String, bool)> {
+        match &self.conditions[0] {
+            Condition::StrMatch(_, value, case_sensitive) => {
+                Some((value.to_string(), *case_sensitive))
+            }
+            Condition::All() => None, // for the condition that query without filter
+            _ => unreachable!("get_str_match_condition only support one str_match condition"),
+        }
+    }
+
+    // use for check if the index condition is only
+    // for the condition that query without filter
+    pub fn is_condition_all(&self) -> bool {
+        self.conditions.len() == 1 && matches!(self.conditions[0], Condition::All())
     }
 
     // use for check if the index condition contains
@@ -248,6 +284,7 @@ pub enum Condition {
     MatchAll(String),
     // term, distance
     FuzzyMatchAll(String, u8),
+    All(),
     Or(Box<Condition>, Box<Condition>),
     And(Box<Condition>, Box<Condition>),
     Not(Box<Condition>),
@@ -261,9 +298,9 @@ impl Condition {
             Condition::NotEqual(field, value) => format!("{field}!={value}"),
             Condition::StrMatch(field, value, case_sensitive) => {
                 if *case_sensitive {
-                    format!("str_match({}, '{}')", field, value)
+                    format!("str_match({field}, '{value}')")
                 } else {
-                    format!("str_match_ignore_case({}, '{}')", field, value)
+                    format!("str_match_ignore_case({field}, '{value}')")
                 }
             }
             Condition::In(field, values, negated) => {
@@ -278,6 +315,7 @@ impl Condition {
             Condition::FuzzyMatchAll(value, distance) => {
                 format!("{INDEX_FIELD_NAME_FOR_ALL}:fuzzy({value}, {distance})")
             }
+            Condition::All() => "ALL".to_string(),
             Condition::Or(left, right) => format!("({} OR {})", left.to_query(), right.to_query()),
             Condition::And(left, right) => {
                 format!("({} AND {})", left.to_query(), right.to_query())
@@ -453,6 +491,11 @@ impl Condition {
                     let value = format!(".*{}.*", value.trim_matches('*'));
                     Box::new(RegexQuery::from_pattern(&value, default_field)?)
                 } else {
+                    if value.is_empty() {
+                        return Err(anyhow::anyhow!(
+                            "The value of match_all() function can't be empty"
+                        ));
+                    }
                     let mut tokens = o2_collect_tokens(value);
                     let last_prefix = if value.ends_with("*") {
                         tokens.pop()
@@ -499,6 +542,7 @@ impl Condition {
                 let term = Term::from_field_text(default_field, value);
                 Box::new(FuzzyTermQuery::new(term, *distance, false))
             }
+            Condition::All() => Box::new(AllQuery {}),
             Condition::Or(left, right) => {
                 let left_query = left.to_tantivy_query(schema, default_field)?;
                 let right_query = right.to_tantivy_query(schema, default_field)?;
@@ -546,7 +590,7 @@ impl Condition {
             Condition::In(field, _, negated) if *negated => {
                 fields.insert(field.clone());
             }
-            Condition::Equal(..) | Condition::In(..) => {}
+            Condition::All() | Condition::Equal(..) | Condition::In(..) => {}
         }
         fields
     }
@@ -565,6 +609,7 @@ impl Condition {
             Condition::MatchAll(_) | Condition::FuzzyMatchAll(..) => {
                 fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
             }
+            Condition::All() => {}
             Condition::Or(left, right) | Condition::And(left, right) => {
                 fields.extend(left.get_tantivy_fields());
                 fields.extend(right.get_tantivy_fields());
@@ -590,6 +635,7 @@ impl Condition {
             Condition::MatchAll(_) | Condition::FuzzyMatchAll(..) => {
                 fields.extend(fst_fields.iter().cloned());
             }
+            Condition::All() => {}
             Condition::Or(left, right) | Condition::And(left, right) => {
                 fields.extend(left.get_schema_fields(fst_fields));
                 fields.extend(right.get_schema_fields(fst_fields));
@@ -665,24 +711,23 @@ impl Condition {
             Condition::FuzzyMatchAll(value, distance) => {
                 let fuzzy_expr = Arc::new(fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
                 let term = if get_config().common.utf8_view_enabled {
-                    Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.clone()))))
+                    Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
                 } else {
-                    Arc::new(Literal::new(ScalarValue::Utf8(Some(value.clone()))))
+                    Arc::new(Literal::new(ScalarValue::Utf8(Some(value.to_string()))))
                 };
                 let distance = Arc::new(Literal::new(ScalarValue::Int64(Some(*distance as i64))));
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
                     Vec::with_capacity(fst_fields.len());
                 for field in fst_fields.iter() {
-                    let new_expr = Arc::new(ScalarFunctionExpr::new(
-                        fuzzy_expr.name(),
+                    let new_expr = Arc::new(ScalarFunctionExpr::try_new(
                         fuzzy_expr.clone(),
                         vec![
                             Arc::new(Column::new(field, schema.index_of(field).unwrap())),
                             term.clone(),
                             distance.clone(),
                         ],
-                        DataType::Boolean,
-                    ));
+                        schema,
+                    )?);
                     expr_list.push(new_expr);
                 }
                 if expr_list.is_empty() {
@@ -692,6 +737,7 @@ impl Condition {
                 }
                 Ok(disjunction(expr_list))
             }
+            Condition::All() => Ok(Arc::new(Literal::new(ScalarValue::Boolean(Some(true))))),
             Condition::Or(left, right) => {
                 let left = left.to_physical_expr(schema, fst_fields)?;
                 let right = right.to_physical_expr(schema, fst_fields)?;
@@ -718,6 +764,7 @@ impl Condition {
             Condition::Regex(..) => false,
             Condition::MatchAll(v) => is_alphanumeric(v),
             Condition::FuzzyMatchAll(..) => false,
+            Condition::All() => true,
             Condition::Or(left, right) => left.can_remove_filter() && right.can_remove_filter(),
             Condition::And(left, right) => left.can_remove_filter() && right.can_remove_filter(),
             Condition::Not(condition) => condition.can_remove_filter(),
@@ -732,7 +779,8 @@ impl Condition {
             | Condition::In(_, _, false)
             | Condition::Regex(..)
             | Condition::MatchAll(..)
-            | Condition::FuzzyMatchAll(..) => false,
+            | Condition::FuzzyMatchAll(..)
+            | Condition::All() => false,
             Condition::NotEqual(..) | Condition::Not(..) | Condition::In(_, _, true) => true,
             Condition::Or(left, right) | Condition::And(left, right) => {
                 left.is_negated_condition() || right.is_negated_condition()
@@ -815,15 +863,6 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
         _ => return false,
     }
     true
-}
-
-// Note: the expr should be Identifier or CompoundIdentifier
-fn get_field_name(expr: &Expr) -> String {
-    match expr {
-        Expr::Identifier(ident) => trim_quotes(ident.to_string().as_str()),
-        Expr::CompoundIdentifier(ident) => trim_quotes(ident[1].to_string().as_str()),
-        _ => unreachable!(),
-    }
 }
 
 fn get_value(expr: &Expr) -> String {
@@ -1010,6 +1049,14 @@ mod tests {
     }
 
     #[test]
+    fn test_condition_get_tantivy_fields_all() {
+        let condition = Condition::All();
+        let fields = condition.get_tantivy_fields();
+
+        assert_eq!(fields.len(), 0);
+    }
+
+    #[test]
     fn test_condition_get_tantivy_fields_or_simple() {
         let left = Condition::Equal("field1".to_string(), "value1".to_string());
         let right = Condition::Equal("field2".to_string(), "value2".to_string());
@@ -1087,13 +1134,15 @@ mod tests {
         let regex_cond = Condition::Regex("regex_field".to_string(), "pattern.*".to_string());
         let match_all_cond = Condition::MatchAll("search_term".to_string());
         let fuzzy_match_cond = Condition::FuzzyMatchAll("fuzzy_term".to_string(), 1);
+        let all_cond = Condition::All();
 
         // Create nested structure: ((equal OR in) AND (regex OR match_all)) OR (fuzzy_match_all AND
         // all)
         let left_or = Condition::Or(Box::new(equal_cond), Box::new(in_cond));
         let right_or = Condition::Or(Box::new(regex_cond), Box::new(match_all_cond));
         let left_and = Condition::And(Box::new(left_or), Box::new(right_or));
-        let condition = Condition::Or(Box::new(left_and), Box::new(fuzzy_match_cond));
+        let right_and = Condition::And(Box::new(fuzzy_match_cond), Box::new(all_cond));
+        let condition = Condition::Or(Box::new(left_and), Box::new(right_and));
 
         let fields = condition.get_tantivy_fields();
 
@@ -1171,6 +1220,16 @@ mod tests {
         let fields = index_condition.get_tantivy_fields();
 
         // Should deduplicate the field names
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+
+    // add some test for str_match
+    #[test]
+    fn test_str_match() {
+        let condition = Condition::StrMatch("field1".to_string(), "value1".to_string(), true);
+        let fields = condition.get_tantivy_fields();
+
         assert_eq!(fields.len(), 1);
         assert!(fields.contains("field1"));
     }

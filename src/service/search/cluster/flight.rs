@@ -407,7 +407,7 @@ pub async fn run_datafusion(
     sql: Arc<Sql>,
     nodes: Vec<Node>,
     partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
-    idx_file_list: Vec<FileKey>,
+    _idx_file_list: Vec<FileKey>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
@@ -473,7 +473,6 @@ pub async fn run_datafusion(
         req,
         nodes.into_arc_vec(),
         partitioned_file_lists,
-        idx_file_list,
         equal_keys,
         match_all_keys,
         sql.index_condition.clone(),
