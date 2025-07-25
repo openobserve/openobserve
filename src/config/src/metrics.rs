@@ -932,45 +932,6 @@ pub static PIPELINE_EXPORTED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static PIPELINE_STUCK_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "pipeline_stuck_files",
-            "Number of files stuck in processing state",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
-pub static PIPELINE_FILES_BY_STATUS: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "pipeline_files_by_status",
-            "Number of files by processing status",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["status"],
-    )
-    .expect("Metric created")
-});
-
-pub static PIPELINE_FILE_RESET_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "pipeline_file_reset_count",
-            "Number of times stuck files were reset",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["reason"],
-    )
-    .expect("Metric created")
-});
-
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -1216,15 +1177,6 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(PIPELINE_EXPORTED_BYTES.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(PIPELINE_STUCK_FILES.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(PIPELINE_FILES_BY_STATUS.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(PIPELINE_FILE_RESET_COUNT.clone()))
         .expect("Metric registered");
 }
 
