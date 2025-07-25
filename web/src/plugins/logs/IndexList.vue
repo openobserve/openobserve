@@ -537,12 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tr>
         </template>
         <template v-slot:pagination="scope">
-          <div
-            v-if="
-              store.state.zoConfig.user_defined_schemas_enabled &&
-              searchObj.meta.hasUserDefinedSchemas
-            "
-          >
+          <div v-if="showUserDefinedSchemaToggle">
             <q-btn-toggle
               no-caps
               v-model="searchObj.meta.useUserDefinedSchemas"
@@ -864,6 +859,13 @@ export default defineComponent({
       { label: t("search.logs"), value: "logs" },
       { label: t("search.enrichmentTables"), value: "enrichment_tables" },
     ];
+
+    const showUserDefinedSchemaToggle = computed(() => {
+      return (
+        store.state.zoConfig.user_defined_schemas_enabled &&
+        searchObj.meta.hasUserDefinedSchemas
+      );
+    });
 
     const streamList = computed(() => {
       return searchObj.data.stream.streamLists;
@@ -1833,6 +1835,7 @@ export default defineComponent({
       checkSelectedFields,
       resetSelectedFileds,
       showOnlyInterestingFields,
+      showUserDefinedSchemaToggle,
     };
   },
 });

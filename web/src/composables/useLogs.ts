@@ -3241,23 +3241,22 @@ const useLogs = () => {
               // searchObj.data.stream.expandGroupRowsFieldCount[stream.name] = searchObj.data.stream.expandGroupRowsFieldCount[stream.name] + 1;
             }
 
-            userDefineSchemaSettings =
-              stream.settings?.defined_schema_fields?.slice() || [];
             // check for schema exist in the object or not
             // if not pull the schema from server.
-            if (!stream.hasOwnProperty("schema")) {
-              searchObjDebug["extractFieldsWithAPI"] = " with API ";
-              const streamData: any = await loadStreamFields(stream.name);
-              const streamSchema: any = streamData.schema;
-              if (streamSchema == undefined) {
-                searchObj.loadingStream = false;
-                searchObj.data.errorMsg = t("search.noFieldFound");
-                throw new Error(searchObj.data.errorMsg);
-                return;
-              }
-              stream.settings = streamData.settings;
-              stream.schema = streamSchema;
+            const streamData = await loadStreamFields(stream.name);
+            if (streamData.schema === undefined) {
+              searchObj.loadingStream = false;
+              searchObj.data.errorMsg = t("search.noFieldFound");
+              throw new Error(searchObj.data.errorMsg);
+              return;
             }
+
+            stream.settings =  { ...streamData.settings };
+            stream.schema = [ ...streamData.schema ];
+
+            userDefineSchemaSettings =
+              stream.settings?.defined_schema_fields?.slice() || [];
+              
             if (
               (stream.settings.max_query_range > 0 || store.state.zoConfig.max_query_range > 0) &&
               (searchObj.data.datetime.queryRangeRestrictionInHour >
