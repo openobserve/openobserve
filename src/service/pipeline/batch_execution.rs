@@ -34,9 +34,13 @@ use futures::future::try_join_all;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
 use once_cell::sync::Lazy;
-use tokio::sync::mpsc::{Receiver, Sender, channel};
-use tokio::sync::Mutex;
-use tokio::time::{Duration, Instant};
+use tokio::{
+    sync::{
+        Mutex,
+        mpsc::{Receiver, Sender, channel},
+    },
+    time::{Duration, Instant},
+};
 
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
@@ -75,7 +79,7 @@ impl BatchBuffer {
         const MAX_BATCH_BYTES: usize = 32 * 1024; // Or 32KB
         const MAX_BATCH_TIME_MS: u64 = 5000; // Or 5 seconds
 
-        self.records.len() >= MAX_BATCH_SIZE 
+        self.records.len() >= MAX_BATCH_SIZE
             || self.total_bytes >= MAX_BATCH_BYTES
             || self.last_write.elapsed() >= Duration::from_millis(MAX_BATCH_TIME_MS)
     }
@@ -87,9 +91,8 @@ impl BatchBuffer {
     }
 }
 
-static BATCH_BUFFERS: Lazy<Mutex<HashMap<String, BatchBuffer>>> = Lazy::new(|| {
-    Mutex::new(HashMap::new())
-});
+static BATCH_BUFFERS: Lazy<Mutex<HashMap<String, BatchBuffer>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 static DYNAMIC_STREAM_NAME_PATTERN: Lazy<regex::Regex> =
     Lazy::new(|| regex::Regex::new(r"\{([^}]+)\}").unwrap());
@@ -862,11 +865,14 @@ async fn process_node(
                 count += 1;
             }
 
-            log::debug!("[Pipeline]: RemoteStream node processed {} records", records.len());
+            log::debug!(
+                "[Pipeline]: RemoteStream node processed {} records",
+                records.len()
+            );
             if !records.is_empty() {
                 // Group records by batch_key for routing to different remote streams
                 let mut records_by_batch_key: HashMap<String, Vec<json::Value>> = HashMap::new();
-                
+
                 for record in records {
                     // Extract batch_key from record, fallback to "default" if not present
                     let batch_key = record
@@ -874,42 +880,64 @@ async fn process_node(
                         .and_then(|v| v.as_str())
                         .unwrap_or("default")
                         .to_string();
-                    
+
                     records_by_batch_key
                         .entry(batch_key)
                         .or_insert_with(Vec::new)
                         .push(record);
                 }
-                
-                log::debug!("[Pipeline]: Grouped records into {} batch keys", records_by_batch_key.len());
-                
+
+                log::debug!(
+                    "[Pipeline]: Grouped records into {} batch keys",
+                    records_by_batch_key.len()
+                );
+
                 // Process each batch_key group separately
                 for (batch_key, batch_records) in records_by_batch_key {
                     // Create buffer key that includes batch_key for routing
-                    let buffer_key = format!("{}:{}:{}:{}:{}", pipeline_id, remote_stream.org_id, remote_stream.destination_name, batch_key, "remote");
-                    
+                    let buffer_key = format!(
+                        "{}:{}:{}:{}:{}",
+                        pipeline_id,
+                        remote_stream.org_id,
+                        remote_stream.destination_name,
+                        batch_key,
+                        "remote"
+                    );
+
                     // Add records to the accumulating buffer and check if we should flush
                     let mut buffers = BATCH_BUFFERS.lock().await;
-                    let buffer = buffers.entry(buffer_key.clone()).or_insert_with(BatchBuffer::new);
-                    
+                    let buffer = buffers
+                        .entry(buffer_key.clone())
+                        .or_insert_with(BatchBuffer::new);
+
                     let initial_record_count = buffer.records.len();
                     buffer.add_records(batch_records);
-                    
-                    log::debug!("[Pipeline]: Added {} records to buffer for batch_key '{}', total: {} records, {} bytes", 
-                        buffer.records.len() - initial_record_count, batch_key, buffer.records.len(), buffer.total_bytes);
-                    
+
+                    log::debug!(
+                        "[Pipeline]: Added {} records to buffer for batch_key '{}', total: {} records, {} bytes",
+                        buffer.records.len() - initial_record_count,
+                        batch_key,
+                        buffer.records.len(),
+                        buffer.total_bytes
+                    );
+
                     // Check if buffer should be flushed to WAL
                     if buffer.should_flush() {
                         let records_to_write = buffer.take_records();
                         drop(buffers); // Release the lock before async operations
-                        
-                        log::debug!("[Pipeline]: Flushing buffer for batch_key '{}' - writing {} records to WAL", batch_key, records_to_write.len());
-                        
+
+                        log::debug!(
+                            "[Pipeline]: Flushing buffer for batch_key '{}' - writing {} records to WAL",
+                            batch_key,
+                            records_to_write.len()
+                        );
+
                         // Create remote stream configuration with batch_key routing
                         let mut remote_stream_for_batch = remote_stream.clone();
                         remote_stream_for_batch.org_id = org_id.clone().into();
-                        
-                        let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
+
+                        let writer =
+                            get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
                         if let Err(e) = writer.write_wal(records_to_write).await {
                             let err_msg = format!(
                                 "DestinationNode error persisting data for batch_key '{}' to be ingested externally: {}",
@@ -925,7 +953,10 @@ async fn process_node(
                             }
                         }
                     } else {
-                        log::debug!("[Pipeline]: Buffer for batch_key '{}' not ready for flush, continuing to accumulate", batch_key);
+                        log::debug!(
+                            "[Pipeline]: Buffer for batch_key '{}' not ready for flush, continuing to accumulate",
+                            batch_key
+                        );
                     }
                 }
             }
@@ -948,6 +979,57 @@ async fn process_node(
     }
 
     // all cloned senders dropped when function goes out of scope -> close the channel
+
+    Ok(())
+}
+
+pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
+    let mut buffers = BATCH_BUFFERS.lock().await;
+
+    for (batch_key, buffer) in buffers.iter_mut() {
+        // let buffer_key = format!("{}:{}:{}:{}:{}", pipeline_id, remote_stream.org_id,
+        // remote_stream.destination_name, batch_key, "remote");
+        let key = batch_key.clone();
+        let key_parts = key.split(":").collect::<Vec<&str>>();
+        let pipeline_id = key_parts[0].to_string();
+        let org_id = key_parts[1].to_string();
+        let destination_name = key_parts[2].to_string();
+        let batch_key = key_parts[3].to_string();
+        let stream_type = key_parts[4].to_string();
+
+        let remote_stream = config::meta::stream::RemoteStreamParams {
+            org_id: org_id.clone().into(),
+            destination_name: destination_name.into(),
+        };
+
+        let mut remote_stream_for_batch = remote_stream.clone();
+        remote_stream_for_batch.org_id = org_id.clone().into();
+
+        if buffer.should_flush() {
+            let records_to_write = buffer.take_records();
+           
+
+            log::debug!(
+                "[Pipeline]: Flushing buffer for batch_key '{}' - writing {} records to WAL",
+                batch_key,
+                records_to_write.len()
+            );
+
+            // Create remote stream configuration with batch_key routing
+            let mut remote_stream_for_batch = remote_stream.clone();
+            remote_stream_for_batch.org_id = org_id.clone().into();
+
+            let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
+            if let Err(e) = writer.write_wal(records_to_write).await {
+                let err_msg = format!(
+                    "DestinationNode error persisting data for batch_key '{}' to be ingested externally: {}",
+                    batch_key, e
+                );
+                log::error!("{err_msg}");
+            }
+        }
+    }
+    drop(buffers); // Release the lock before async operations
 
     Ok(())
 }
