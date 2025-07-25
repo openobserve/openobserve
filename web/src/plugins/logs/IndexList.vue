@@ -586,9 +586,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-tooltip>
                 </div>
               </template>
+              <template
+                v-slot:interesting_fields_slot
+                v-if="searchObj.meta.quickMode"
+              >
+                <div data-test="logs-interesting-fields-btn">
+                  <q-icon name="info" />
+                  <q-icon name="schema"></q-icon>
+                  <q-tooltip
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                    class="text-body2"
+                  >
+                    <span class="text-bold" color="white">{{
+                      t("search.showOnlyInterestingFields")
+                    }}</span>
+                  </q-tooltip>
+                </div>
+              </template>
             </q-btn-toggle>
           </div>
-          <div
+          <div v-else-if="searchObj.meta.quickMode">
+            <q-btn-toggle
+              no-caps
+              v-model="showOnlyInterestingFields"
+              data-test="logs-page-field-list-user-defined-schema-toggle"
+              class="schema-field-toggle q-mr-xs"
+              toggle-color="primary"
+              bordered
+              size="8px"
+              color="white"
+              text-color="primary"
+              :options="selectedFieldsBtnGroupOption"
+            >
+              <template v-slot:all_fields_slot>
+                <div data-test="logs-all-fields-btn">
+                  <q-icon name="schema"></q-icon>
+                  <q-tooltip
+                    data-test="logs-page-fields-list-all-fields-warning-tooltip"
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                    class="text-body2"
+                  >
+                    <span class="text-bold" color="white">{{
+                      t("search.allFieldsLabel")
+                    }}</span>
+                    <q-separator color="white" class="q-mt-xs q-mb-xs" />
+                    {{ t("search.allFieldsWarningMsg") }}
+                  </q-tooltip>
+                </div>
+              </template>
+              <template
+                v-slot:interesting_fields_slot
+                v-if="searchObj.meta.quickMode"
+              >
+                <div data-test="logs-interesting-fields-btn">
+                  <q-icon name="info" />
+                  <q-icon name="schema"></q-icon>
+                  <q-tooltip
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                    class="text-body2"
+                  >
+                    <span class="text-bold" color="white">{{
+                      t("search.showOnlyInterestingFields")
+                    }}</span>
+                  </q-tooltip>
+                </div>
+              </template>
+            </q-btn-toggle>
+          </div>
+          <!-- <div
             v-if="searchObj.meta.quickMode"
             style="border: 1px solid #c4c4c4; border-radius: 5px"
             class="q-pr-xs q-ml-xs tw-right"
@@ -603,7 +674,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("search.showOnlyInterestingFields") }}
               </q-tooltip>
             </q-toggle>
-          </div>
+          </div> -->
           <div class="q-ml-xs text-right col" v-if="scope.pagesNumber > 1">
             <q-tooltip
               data-test="logs-page-fields-list-pagination-tooltip"
@@ -825,7 +896,7 @@ export default defineComponent({
 
     const showOnlyInterestingFields = ref(false);
 
-    const userDefinedSchemaBtnGroupOption = [
+    const userDefinedSchemaBtnGroupOption = ref([
       {
         label: "",
         value: "user_defined_schema",
@@ -836,7 +907,21 @@ export default defineComponent({
         value: "all_fields",
         slot: "all_fields_slot",
       },
+    ]);
+
+    const selectedFieldsBtnGroupOption = [
+      {
+        label: "",
+        value: false,
+        slot: "all_fields_slot",
+      },
+      {
+        label: "",
+        value: true,
+        slot: "interesting_fields_slot",
+      },
     ];
+
     const streamOptions: any = ref([]);
     const fieldValues: Ref<{
       [key: string | number]: {
@@ -900,6 +985,19 @@ export default defineComponent({
           showOnlyInterestingFields.value = true;
         } else {
           showOnlyInterestingFields.value = false;
+        }
+
+        if (isActive) {
+          userDefinedSchemaBtnGroupOption.value.push({
+            label: "",
+            value: "interesting_fields",
+            slot: "interesting_fields_slot",
+          });
+        } else {
+          userDefinedSchemaBtnGroupOption.value =
+            userDefinedSchemaBtnGroupOption.value.filter(
+              (option) => option.value !== "interesting_fields",
+            );
         }
       },
     );
@@ -1462,12 +1560,33 @@ export default defineComponent({
     });
 
     const toggleSchema = async () => {
+      const isInterestingFields =
+        searchObj.meta.useUserDefinedSchemas === "interesting_fields";
+
+      if (isInterestingFields) {
+        showOnlyInterestingFields.value = true;
+        return;
+      } else {
+        showOnlyInterestingFields.value = false;
+      }
+
       searchObj.loadingStream = true;
       streamSchemaFieldsIndexMapping.value = {};
+
+      // Selected streams has usd
       setTimeout(async () => {
         await extractFields();
         searchObj.loadingStream = false;
       }, 0);
+    };
+
+    const hasUserDefinedSchemas = () => {
+      return searchObj.data.stream.selectedStream.some((stream: any) => {
+        store.state.zoConfig.user_defined_schemas_enabled &&
+          searchObj.meta.useUserDefinedSchemas == "user_defined_schema" &&
+          stream.settings.hasOwnProperty("defined_schema_fields") &&
+          (stream.settings?.defined_schema_fields?.slice() || []) > 0;
+      });
     };
 
     const sortedStreamFields = () => {
@@ -1780,6 +1899,7 @@ export default defineComponent({
       addToInterestingFieldList,
       extractFields,
       userDefinedSchemaBtnGroupOption,
+      selectedFieldsBtnGroupOption,
       pagination,
       toggleSchema,
       streamFieldsRows: computed(() => {
