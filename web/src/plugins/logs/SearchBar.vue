@@ -3226,6 +3226,7 @@ export default defineComponent({
       } else {
       }
       searchObj.meta.logsVisualizeToggle = value;
+      updateUrlQueryParams();
 
       // dispatch resize event
       window.dispatchEvent(new Event("resize"));

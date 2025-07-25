@@ -645,6 +645,10 @@ const useLogs = () => {
       query["clusters"] = searchObj.meta.clusters.join(",");
     }
 
+    if(searchObj.meta.logsVisualizeToggle) {
+      query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
+    }
+
     return query;
   };
 
@@ -4396,6 +4400,10 @@ const useLogs = () => {
 
     if(store.state.zoConfig?.super_cluster_enabled && queryParams.clusters) {
       searchObj.meta.clusters = queryParams.clusters.split(",");
+    }
+
+    if(queryParams.hasOwnProperty("logs_visualize_toggle") && queryParams.logs_visualize_toggle != "") {
+      searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
     }
 
     // TODO OK : Replace push with replace and test all scenarios

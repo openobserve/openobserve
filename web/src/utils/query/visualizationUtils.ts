@@ -1,15 +1,38 @@
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql.js";
 
+/**
+ * Check if a column expression is a simple field reference (just a column name)
+ * without any functions or complex expressions.
+ */
+function isSimpleField(column: any): boolean {
+  // If column has an 'expr' property, check its type
+  if (column?.expr) {
+    // Simple column reference will have type 'column_ref'
+    return column?.expr?.type === 'column_ref';
+  }
+  
+  // Direct column reference (sometimes the structure is different)
+  return column?.type === 'column_ref';
+}
 
 /**
- * Check if every column expression in the SELECT list has a non-empty alias.
+ * Check if complex expressions (with functions/aggregations) have aliases.
+ * Simple field references are allowed to not have aliases.
  */
 function columnsHaveAlias(columns: any[] | undefined): boolean {
-  return (
-    Array.isArray(columns) &&
-    columns.length > 0 &&
-    columns.every((c) => typeof c.as === "string" && c.as.trim().length > 0)
-  );
+  if (!Array.isArray(columns) || columns?.length === 0) {
+    return false;
+  }
+
+  return columns?.every((c) => {
+    // If it's a simple field, we don't require an alias
+    if (isSimpleField(c)) {
+      return true;
+    }
+    
+    // For complex expressions (functions, aggregations, etc.), require an alias
+    return typeof c?.as === "string" && c?.as?.trim()?.length > 0;
+  });
 }
 
 /**
@@ -28,26 +51,26 @@ export function allSelectionFieldsHaveAlias(sql: string): boolean {
 
   let ast: any;
   try {
-    ast = parser.astify(sql);
+    ast = parser?.astify(sql);
   } catch {
     return false; // invalid SQL – treat as failure
   }
 
   // Parser returns an array when multiple statements are supplied; we only
   // inspect the first one.
-  let node: any = Array.isArray(ast) ? ast[0] : ast;
+  let node: any = Array.isArray(ast) ? ast?.[0] : ast;
 
-  if (!node || node.type !== "select") return false;
+  if (!node || node?.type !== "select") return false;
 
   // Walk through the primary SELECT and any chained UNION SELECTs via _next.
   while (node) {
-    if (!columnsHaveAlias(node.columns)) return false;
+    if (!columnsHaveAlias(node?.columns)) return false;
 
     // If this SELECT is followed by a UNION / UNION ALL etc., continue; the
     // parser places the next SELECT in `_next`.
-    if (node.set_op && node._next) {
+    if (node?.set_op && node?._next) {
       node = node._next;
-      if (!node || node.type !== "select") return false;
+      if (!node || node?.type !== "select") return false;
     } else {
       break; // no more UNION parts → exit loop
     }

@@ -826,11 +826,11 @@ export default defineComponent({
       if(Object.hasOwn(router.currentRoute.value?.query, "logs_visualize_toggle")) {
         searchObj.meta.logsVisualizeToggle = router.currentRoute.value.query.logs_visualize_toggle;
       }
-
+      
       await setupLogsTab();
-
       if (!isLogsTab()) {
         await importSqlParser();
+        handleVisualizeTab();
       }
     }
 
