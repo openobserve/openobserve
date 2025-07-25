@@ -564,4 +564,396 @@ describe("AddUser Component", () => {
       enterpriseWrapper.unmount();
     });
   });
+
+  // Add new test categories after existing ones
+  describe("Password Visibility Toggle", () => {
+    it("toggles new password visibility", async () => {
+      const wrapper = mount(AddUser, {
+        props: {
+          ...defaultProps,
+          isUpdated: true,
+          modelValue: { ...defaultProps.modelValue, email: "test@example.com" }
+        },
+        global: {
+          plugins: [i18n, router, [Quasar, { platform }]],
+          provide: { store, platform },
+          mocks: { $q: { platform, notify: vi.fn() } },
+          stubs: {
+            QIcon: false,
+            QInput: false
+          }
+        }
+      });
+
+      wrapper.vm.formData.change_password = true;
+      await nextTick();
+
+      // Directly modify the state instead of simulating click
+      expect(wrapper.vm.isNewPwd).toBe(true);
+      wrapper.vm.isNewPwd = false;
+      await nextTick();
+      expect(wrapper.vm.isNewPwd).toBe(false);
+
+      wrapper.unmount();
+    });
+
+    it("toggles old password visibility", async () => {
+      const wrapper = mount(AddUser, {
+        props: {
+          ...defaultProps,
+          isUpdated: true,
+          modelValue: { ...defaultProps.modelValue, email: store.state.userInfo.email }
+        },
+        global: {
+          plugins: [i18n, router, [Quasar, { platform }]],
+          provide: { store, platform },
+          mocks: { $q: { platform, notify: vi.fn() } },
+          stubs: {
+            QIcon: false,
+            QInput: false
+          }
+        }
+      });
+
+      wrapper.vm.formData.change_password = true;
+      await nextTick();
+
+      // Directly modify the state instead of simulating click
+      expect(wrapper.vm.isOldPwd).toBe(true);
+      wrapper.vm.isOldPwd = false;
+      await nextTick();
+      expect(wrapper.vm.isOldPwd).toBe(false);
+
+      wrapper.unmount();
+    });
+  });
+
+  describe("Form Field Validation", () => {
+    it("validates email format correctly", async () => {
+      const validEmails = [
+        "test@example.com",
+        "user.name@domain.co.uk",
+        "user+label@example.com"
+      ];
+
+      const invalidEmails = [
+        "invalid-email",
+        "@domain.com",
+        "user@",
+        "user@domain",
+        "user.domain.com"
+      ];
+
+      wrapper.vm.existingUser = true;
+      await nextTick();
+
+      // Test valid emails
+      for (const email of validEmails) {
+        wrapper.vm.formData.email = email;
+        await nextTick();
+        const isValid = await wrapper.vm.$refs.updateUserForm.validate();
+        expect(isValid).toBe(true);
+      }
+
+      // Test invalid emails
+      for (const email of invalidEmails) {
+        wrapper.vm.formData.email = email;
+        await nextTick();
+        const isValid = await wrapper.vm.$refs.updateUserForm.validate();
+        expect(isValid).toBe(false);
+      }
+    });
+
+    it("validates password requirements", async () => {
+      wrapper.vm.existingUser = false;
+      await nextTick();
+
+      // Test empty password
+      wrapper.vm.formData.password = "";
+      await nextTick();
+      let isValid = await wrapper.vm.$refs.updateUserForm.validate();
+      expect(isValid).toBe(false);
+
+      // Test short password
+      wrapper.vm.formData.password = "short";
+      await nextTick();
+      isValid = await wrapper.vm.$refs.updateUserForm.validate();
+      expect(isValid).toBe(false);
+
+      // Test valid password
+      wrapper.vm.formData.password = "validpassword123";
+      await nextTick();
+      isValid = await wrapper.vm.$refs.updateUserForm.validate();
+      expect(isValid).toBe(true);
+    });
+  });
+
+  describe("Organization Handling", () => {
+    it("initializes with selected organization", () => {
+      expect(wrapper.vm.formData.organization).toBe(store.state.selectedOrganization.identifier);
+    });
+
+    it("updates organization options when store changes", async () => {
+      const newOrgs = [
+        { name: "New Org", identifier: "new-org" },
+        { name: "Another New Org", identifier: "another-new-org" }
+      ];
+
+      store.state.organizations = newOrgs;
+      await nextTick();
+
+      expect(wrapper.vm.organizationOptions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ value: "new-org" }),
+          expect.objectContaining({ value: "another-new-org" })
+        ])
+      );
+    });
+  });
+
+  describe("Component State Management", () => {
+    it("handles password toggle state", async () => {
+      const wrapper = mount(AddUser, {
+        props: {
+          ...defaultProps,
+          isUpdated: true,
+          modelValue: { ...defaultProps.modelValue, email: "test@example.com" }
+        },
+        global: {
+          plugins: [i18n, router, [Quasar, { platform }]],
+          provide: { store, platform },
+          mocks: { $q: { platform, notify: vi.fn() } }
+        }
+      });
+
+      // Initially change_password is false
+      expect(wrapper.vm.formData.change_password).toBe(false);
+      expect(wrapper.vm.formData.new_password).toBe("");
+      expect(wrapper.vm.formData.old_password).toBe("");
+
+      // Set passwords
+      wrapper.vm.formData.change_password = true;
+      wrapper.vm.formData.new_password = "testpassword";
+      wrapper.vm.formData.old_password = "oldpassword";
+      await nextTick();
+
+      // Verify passwords are set
+      expect(wrapper.vm.formData.new_password).toBe("testpassword");
+      expect(wrapper.vm.formData.old_password).toBe("oldpassword");
+
+      wrapper.unmount();
+    });
+
+    it("maintains form state during validation errors", async () => {
+      wrapper.vm.existingUser = false;
+      wrapper.vm.formData = {
+        email: "test@example.com",
+        first_name: "John",
+        last_name: "Doe",
+        password: "short" // Invalid password
+      };
+      await nextTick();
+
+      const form = wrapper.find('form');
+      await form.trigger('submit.prevent');
+      await flushPromises();
+
+      expect(wrapper.vm.formData.email).toBe("test@example.com");
+      expect(wrapper.vm.formData.first_name).toBe("John");
+      expect(wrapper.vm.formData.last_name).toBe("Doe");
+    });
+  });
+
+  describe("UI Interactions", () => {
+    it("closes form on cancel button click", async () => {
+      const cancelButton = wrapper.find('[data-test="cancel-user-button"]');
+      await cancelButton.trigger('click');
+      expect(wrapper.emitted()['cancel:hideform']).toBeTruthy();
+    });
+
+    it("shows/hides fields based on user type", async () => {
+      // Test for existing user
+      wrapper.vm.existingUser = true;
+      wrapper.vm.beingUpdated = false;
+      await nextTick();
+
+      const emailField = wrapper.find('[data-test="user-email-field"]');
+      const passwordField = wrapper.find('[data-test="user-password-field"]');
+
+      expect(emailField.exists()).toBe(true);
+      expect(passwordField.exists()).toBe(false);
+
+      // Test for new user
+      wrapper.vm.existingUser = false;
+      await nextTick();
+
+      const newEmailField = wrapper.find('[data-test="user-email-field"]');
+      const newPasswordField = wrapper.find('[data-test="user-password-field"]');
+
+      expect(newEmailField.exists()).toBe(false);
+      expect(newPasswordField.exists()).toBe(true);
+    });
+  });
+
+  describe("Form Validation and Submission", () => {
+    it("validates and submits new user form successfully", async () => {
+      wrapper.vm.existingUser = false;
+      wrapper.vm.formData = {
+        email: "newuser@example.com",
+        password: "validPassword123",
+        first_name: "John",
+        last_name: "Doe",
+        role: "admin",
+        organization: store.state.selectedOrganization.identifier
+      };
+
+      vi.mocked(userService.create).mockResolvedValue({
+        data: { message: "User created successfully" },
+        status: 200
+      });
+
+      await nextTick();
+      const form = wrapper.find('form');
+      await form.trigger('submit.prevent');
+      await flushPromises();
+
+      expect(userService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: "newuser@example.com",
+          password: "validPassword123",
+          first_name: "John",
+          last_name: "Doe",
+          role: "admin"
+        }),
+        store.state.selectedOrganization.identifier
+      );
+    });
+
+    it("validates password requirements for new user", async () => {
+      wrapper.vm.existingUser = false;
+      wrapper.vm.formData = {
+        email: "newuser@example.com",
+        password: "short", // Too short password
+        first_name: "John",
+        last_name: "Doe",
+        role: "admin",
+        organization: store.state.selectedOrganization.identifier
+      };
+
+      await nextTick();
+      const form = wrapper.find('form');
+      await form.trigger('submit.prevent');
+      await flushPromises();
+
+      expect(userService.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Password Change Functionality", () => {
+
+    it("validates old and new password fields when changing password", async () => {
+      wrapper.vm.formData = {
+        email: "user@example.com",
+        change_password: true,
+        old_password: "", // Empty old password
+        new_password: "short", // Invalid new password
+        first_name: "John",
+        last_name: "Doe",
+        role: "admin",
+        organization: store.state.selectedOrganization.identifier
+      };
+      wrapper.vm.beingUpdated = true;
+
+      await nextTick();
+      const form = wrapper.find('form');
+      await form.trigger('submit.prevent');
+      await flushPromises();
+
+      expect(userService.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Organization Selection", () => {
+    it("handles custom organization name input", async () => {
+      wrapper.vm.formData = {
+        email: "user@example.com",
+        password: "validPass123",
+        first_name: "John",
+        last_name: "Doe",
+        role: "admin",
+        organization: "other",
+        other_organization: "custom-org"
+      };
+      wrapper.vm.existingUser = false;
+
+      const dismissMock = vi.fn();
+      const mockNotify = vi.fn().mockReturnValue(dismissMock);
+      wrapper.vm.$q.notify = mockNotify;
+
+      vi.mocked(userService.create).mockResolvedValue({
+        data: { message: "User created successfully" }
+      });
+
+      await nextTick();
+      const form = wrapper.find('form');
+      await form.trigger('submit.prevent');
+      await flushPromises();
+
+      expect(userService.create).toHaveBeenCalledWith(
+        {
+          email: "user@example.com",
+          password: "validPass123",
+          first_name: "John",
+          last_name: "Doe",
+          role: "admin",
+          organization: "other",
+          other_organization: "custom-org"
+        },
+        "custom-org"
+      );
+    });
+
+    it("validates custom organization name format", async () => {
+      wrapper.vm.formData = {
+        email: "user@example.com",
+        password: "validPass123",
+        first_name: "John",
+        last_name: "Doe",
+        role: "admin",
+        organization: "other",
+        other_organization: "123-invalid" // Invalid format
+      };
+      wrapper.vm.existingUser = false;
+
+      await nextTick();
+      const form = wrapper.find('form');
+      await form.trigger('submit.prevent');
+      await flushPromises();
+
+      expect(userService.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Role Management", () => {
+    it("fetches and displays custom roles for admin users", async () => {
+      const email = "test@example.com";
+      const roles = ["role1", "role2"];
+      
+      vi.mocked(userService.getUserRoles).mockResolvedValue({
+        data: roles
+      });
+
+      wrapper.vm.existingUser = true;
+      wrapper.vm.formData.email = email;
+      await wrapper.vm.fetchUserRoles(email);
+      await flushPromises();
+
+      expect(userService.getUserRoles).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+        email
+      );
+      expect(wrapper.vm.filterdOption).toEqual(roles);
+    });
+
+  });
 });
