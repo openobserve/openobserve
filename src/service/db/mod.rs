@@ -58,6 +58,18 @@ pub(crate) async fn get(key: &str) -> Result<Bytes> {
 }
 
 #[inline]
+pub(crate) async fn get_id(key: &str) -> Result<i64> {
+    let db = infra_db::get_db().await;
+    db.get_id(key).await
+}
+
+#[inline]
+pub(crate) async fn get_key_from_id(id: i64) -> Result<String> {
+    let db = infra_db::get_db().await;
+    db.get_key_from_id(id).await
+}
+
+#[inline]
 pub(crate) async fn put(
     key: &str,
     value: Bytes,
