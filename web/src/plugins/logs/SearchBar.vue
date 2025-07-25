@@ -3220,6 +3220,9 @@ export default defineComponent({
       ) {
         // cancel all the visualize queries
         cancelVisualizeQueries();
+        if(searchObj.meta.logsVisualizeDirtyFlag) {
+          getQueryData();
+        }
       } else {
       }
       searchObj.meta.logsVisualizeToggle = value;

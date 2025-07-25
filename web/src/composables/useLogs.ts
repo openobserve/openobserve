@@ -135,6 +135,7 @@ const defaultObject = {
       ? JSON.parse(useLocalWrapContent())
       : false,
     histogramDirtyFlag: false,
+    logsVisualizeDirtyFlag: false,
     sqlMode: false,
     sqlModeManualTrigger: false,
     quickMode: false,
@@ -4182,6 +4183,19 @@ const useLogs = () => {
       searchObj.loading = false;
     }
   };
+
+  const loadVisualizeData = async () => {
+    try {
+      resetFunctions();
+      await getStreamList();
+      await getFunctions();
+      if (isActionsEnabled.value) await getActions();
+      await extractFields();
+    } catch (e: any) {
+      searchObj.loading = false;
+    }
+  };
+
   const loadJobData = async () => {
     try {
       resetFunctions();
@@ -6573,7 +6587,8 @@ const useLogs = () => {
     sendCancelSearchMessage,
     isDistinctQuery,
     isWithQuery,
-    getStream
+    getStream,
+    loadVisualizeData,
   };
 };
 
