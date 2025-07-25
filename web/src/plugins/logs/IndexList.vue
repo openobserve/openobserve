@@ -1386,10 +1386,13 @@ export default defineComponent({
                   ] = [];
                 }
 
+                // If the field is not in the local stream fields and is not the timestamp column, add it to the local stream fields
+                // As timestamp column is default interesting field, we don't need to add it to the local stream fields
                 if (
                   localStreamFields[
                     searchObj.organizationIdentifier + "_" + selectedStream
-                  ].indexOf(field.name) == -1
+                  ].indexOf(field.name) == -1 &&
+                  field.name !== store.state.zoConfig?.timestamp_column
                 ) {
                   localStreamFields[
                     searchObj.organizationIdentifier + "_" + selectedStream
