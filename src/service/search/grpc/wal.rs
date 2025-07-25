@@ -694,8 +694,7 @@ fn adapt_batch(
         .enumerate()
         .map(|(idx, f)| (f.name(), idx))
         .collect::<HashMap<_, _>>();
-
-    let batch_cols = batch.columns().to_vec();
+    let batch_cols = batch.columns();
 
     let mut cols: Vec<ArrayRef> = Vec::with_capacity(latest_schema.fields().len());
     let mut fields = Vec::with_capacity(latest_schema.fields().len());
