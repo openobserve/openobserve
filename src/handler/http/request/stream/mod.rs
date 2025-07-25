@@ -24,6 +24,7 @@ use config::{
     utils::schema::format_stream_name,
 };
 use hashbrown::HashMap;
+use infra::errors::{DbError, Error as InfraError};
 
 use crate::{
     common::{
@@ -628,7 +629,7 @@ async fn delete_stream_data_by_time_range(
     );
 
     // Create a job to delete the data by the time range
-    match crate::service::db::compact::retention::delete_stream(
+    let key = match crate::service::db::compact::retention::delete_stream(
         &org_id,
         stream_type,
         &stream_name,
@@ -636,7 +637,7 @@ async fn delete_stream_data_by_time_range(
     )
     .await
     {
-        Ok(_) => {}
+        Ok(key) => key,
         Err(e) => {
             log::error!(
                 "delete_by_stream {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end} error: {e}"
@@ -648,8 +649,81 @@ async fn delete_stream_data_by_time_range(
         }
     };
 
-    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-        http::StatusCode::OK,
-        "data deletion job created",
-    )))
+    // Get the id from the key
+    let id = match crate::service::db::compact::retention::get_id(&key).await {
+        Ok(id) => id,
+        Err(e) => {
+            log::error!("get_id {key} error: {e}");
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST,
+                e.to_string(),
+            )));
+        }
+    };
+
+    let res = serde_json::json!({ "id": id });
+    Ok(HttpResponse::Ok().json(res))
+}
+
+/// StreamDeleteDataByTimeRangeJobStatus
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"get"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Streams",
+    operation_id = "StreamDeleteDataByTimeRange",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("type" = String, Query, description = "Stream type"),
+        ("start_ts" = String, Query, description = "Start unix timestamp in microseconds"),
+        ("end_ts" = String, Query, description = "End unix timestamp in microseconds"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/streams/{stream_name}/data_by_time_range/{id}")]
+async fn get_delete_stream_data_status(
+    path: web::Path<(String, String, String)>,
+    _req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (_org_id, _stream_name, id_str) = path.into_inner();
+
+    // Parse the id from the URL
+    let id: i64 = match id_str.parse() {
+        Ok(id) => id,
+        Err(_) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST,
+                "Invalid job ID",
+            )));
+        }
+    };
+
+    // Get the key from the ID
+    match crate::service::db::compact::retention::get_key_from_id(id).await {
+        Ok(_) => {
+            // Job still exists, return pending status
+            let res = serde_json::json!({ "id": id, "status": "pending" });
+            Ok(HttpResponse::Ok().json(res))
+        }
+        Err(e) => {
+            if let Some(infra_error) = e.downcast_ref::<InfraError>()
+                && let InfraError::DbError(DbError::KeyNotExists(_)) = infra_error
+            {
+                let res = serde_json::json!({ "id": id, "status": "completed" });
+                return Ok(HttpResponse::Ok().json(res));
+            }
+            log::error!("get_key_from_id {id} error: {e}");
+            Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST,
+                e.to_string(),
+            )))
+        }
+    }
 }
