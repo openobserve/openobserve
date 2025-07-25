@@ -3238,6 +3238,9 @@ export default defineComponent({
       ) {
         // cancel all the visualize queries
         cancelVisualizeQueries();
+        if(searchObj.meta.logsVisualizeDirtyFlag) {
+          getQueryData();
+        }
       } else {
         // cancel all the logs queries
         cancelQuery();

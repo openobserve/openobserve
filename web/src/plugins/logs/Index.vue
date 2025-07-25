@@ -585,6 +585,7 @@ export default defineComponent({
       setCommunicationMethod,
       cancelQuery,
       buildSearch,
+      loadVisualizeData,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -837,7 +838,12 @@ export default defineComponent({
 
     // Main method for handling before mount logic
     async function handleBeforeMount() {
+      if(Object.hasOwn(router.currentRoute.value?.query, "logs_visualize_toggle")) {
+        searchObj.meta.logsVisualizeToggle = router.currentRoute.value.query.logs_visualize_toggle;
+      }
+
       if (!isLogsTab()) {
+        await setupLogsTab();
         handleVisualizeTab();
       }else{
         await setupLogsTab();
@@ -900,7 +906,13 @@ export default defineComponent({
             await getRegionInfo();
           }
 
-          loadLogsData();
+          if(isLogsTab()) {
+            loadLogsData();
+          } else {
+            loadVisualizeData();
+            searchObj.meta.logsVisualizeDirtyFlag = true;
+            searchObj.loading = false;
+          }
 
           store.dispatch("logs/setIsInitialized", true);
         } else {

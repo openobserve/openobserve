@@ -83,6 +83,8 @@ import useSearchWebSocket from "./useSearchWebSocket";
 import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
 import { changeHistogramInterval } from "@/utils/query/sqlUtils";
+import { type ActivationState, PageType } from "@/ts/interfaces/logs";
+import logs from "@/stores/logs";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -138,6 +140,7 @@ const defaultObject = {
       ? JSON.parse(useLocalWrapContent())
       : false,
     histogramDirtyFlag: false,
+    logsVisualizeDirtyFlag: false,
     sqlMode: false,
     sqlModeManualTrigger: false,
     quickMode: false,
@@ -4371,6 +4374,19 @@ const useLogs = () => {
       searchObj.loading = false;
     }
   };
+
+  const loadVisualizeData = async () => {
+    try {
+      resetFunctions();
+      await getStreamList();
+      await getFunctions();
+      if (isActionsEnabled.value) await getActions();
+      await extractFields();
+    } catch (e: any) {
+      searchObj.loading = false;
+    }
+  };
+
   const loadJobData = async () => {
     try {
       resetFunctions();
@@ -6819,7 +6835,8 @@ const useLogs = () => {
     clearSearchObj,
     setCommunicationMethod,
     hasAggregation,
-    };
+    loadVisualizeData,
+  };
 };
 
 export default useLogs;
