@@ -402,6 +402,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(organization::es::org_data_stream_create)
         .service(organization::es::org_pipeline)
         .service(organization::es::org_pipeline_create)
+        .service(audit::download::log_download_activity)
         .service(stream::schema)
         .service(stream::settings)
         .service(stream::update_settings)

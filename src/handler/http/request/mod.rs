@@ -16,6 +16,7 @@
 pub mod actions;
 #[cfg(feature = "enterprise")]
 pub mod ai;
+pub mod audit;
 pub mod alerts;
 pub mod authz;
 #[cfg(feature = "cloud")]
