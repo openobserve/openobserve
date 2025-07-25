@@ -3243,6 +3243,7 @@ export default defineComponent({
         cancelQuery();
       }
       searchObj.meta.logsVisualizeToggle = value;
+      updateUrlQueryParams();
 
       // dispatch resize event
       window.dispatchEvent(new Event("resize"));
