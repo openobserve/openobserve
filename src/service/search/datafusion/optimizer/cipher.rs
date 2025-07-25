@@ -120,8 +120,8 @@ fn is_rewritable_cipher_call(expr: &Expr) -> bool {
         };
 
         // check one side is const string
-        let right_is_literal = matches!(right.as_ref(), Expr::Literal(ScalarValue::Utf8(_)));
-        let left_is_literal = matches!(left.as_ref(), Expr::Literal(ScalarValue::Utf8(_)));
+        let right_is_literal = matches!(right.as_ref(), Expr::Literal(ScalarValue::Utf8(_), _));
+        let left_is_literal = matches!(left.as_ref(), Expr::Literal(ScalarValue::Utf8(_), _));
 
         (left_is_cipher && right_is_literal) || (left_is_literal && right_is_cipher)
     } else {
@@ -305,11 +305,11 @@ impl TreeNodeRewriter for CipherKeyRewrite {
         // rewrite and add '.' as the default path
         let path = match args.get(2) {
             Some(v) => v.clone(),
-            None => Expr::Literal(ScalarValue::Utf8(Some(".".to_string()))),
+            None => Expr::Literal(ScalarValue::Utf8(Some(".".to_string())), None),
         };
 
         let new_key_name = match key_name {
-            Expr::Literal(ScalarValue::Utf8(Some(s))) => {
+            Expr::Literal(ScalarValue::Utf8(Some(s)), _) => {
                 let org_prefix = format!("{}:", self.org);
                 // because datafusion applies optimizer rules multiple times,
                 // we have to check if we have appended the prefix already.
@@ -320,7 +320,7 @@ impl TreeNodeRewriter for CipherKeyRewrite {
                 }
                 // construct new key name containing the org name
                 let new_key_name = format!("{}:{}", self.org, s);
-                Expr::Literal(ScalarValue::Utf8(Some(new_key_name)))
+                Expr::Literal(ScalarValue::Utf8(Some(new_key_name)), None)
             }
             _ => return Ok(Transformed::no(expr)),
         };

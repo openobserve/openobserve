@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use arrow_schema::{Field, Fields};
+use arrow_schema::{Field, FieldRef, Fields};
 use datafusion::{
     arrow::{
         array::{
@@ -28,7 +28,7 @@ use datafusion::{
     error::{DataFusionError, Result},
     functions::regex::regexpmatch::regexp_match,
     logical_expr::{
-        ReturnInfo, ReturnTypeArgs, ScalarFunctionArgs, ScalarFunctionImplementation, ScalarUDF,
+        ReturnFieldArgs, ScalarFunctionArgs, ScalarFunctionImplementation, ScalarUDF,
         ScalarUDFImpl, Signature, TypeSignature::Exact, Volatility,
     },
     physical_plan::ColumnarValue,
@@ -264,8 +264,8 @@ impl ScalarUDFImpl for RegxpMatchToFields {
         unreachable!() // since return_type_from_args is implemented
     }
 
-    fn return_type_from_args(&self, args: ReturnTypeArgs) -> Result<ReturnInfo> {
-        if args.arg_types.len() != 2 {
+    fn return_field_from_args(&self, args: ReturnFieldArgs) -> Result<FieldRef> {
+        if args.arg_fields.len() != 2 {
             return Err(DataFusionError::Execution(
                 "regexp_match_to_fields function requires 2 arguments, haystack & pattern, of strings".to_string()
             ));
@@ -275,16 +275,17 @@ impl ScalarUDFImpl for RegxpMatchToFields {
             _ => {
                 return Err(DataFusionError::Execution(format!(
                     "The second argument for regexp_match_to_fields needs to be a string, but got {}",
-                    args.arg_types[1]
+                    args.arg_fields[1]
                 )));
             }
         };
-        let ret_type = &args.arg_types[0];
-        let fields = regex_pattern_to_fields(&regexp_pattern, ret_type)?;
-        Ok(ReturnInfo::new(
+        let ret_type = &args.arg_fields[0];
+        let fields = regex_pattern_to_fields(&regexp_pattern, ret_type.data_type())?;
+        Ok(Arc::new(Field::new(
+            "regexp_match_to_fields",
             DataType::Struct(Fields::from_iter(fields)),
             false,
-        ))
+        )))
     }
 
     fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {

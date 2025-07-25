@@ -135,7 +135,7 @@ impl ExecutionPlan for DeduplicationExec {
     }
 
     fn statistics(&self) -> Result<Statistics> {
-        self.input.statistics()
+        self.input.partition_statistics(None)
     }
 
     // if don't have this, the optimizer will not merge the SortExec

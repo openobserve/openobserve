@@ -571,12 +571,11 @@ impl Condition {
                 } else {
                     Arc::new(str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone())
                 };
-                let udf_expr = Arc::new(ScalarFunctionExpr::new(
-                    udf.name(),
+                let udf_expr = Arc::new(ScalarFunctionExpr::try_new(
                     udf.clone(),
                     vec![left, right],
-                    DataType::Boolean,
-                ));
+                    schema,
+                )?);
                 Ok(udf_expr)
             }
             Condition::In(name, values) => {
@@ -634,16 +633,15 @@ impl Condition {
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
                     Vec::with_capacity(fst_fields.len());
                 for field in fst_fields.iter() {
-                    let new_expr = Arc::new(ScalarFunctionExpr::new(
-                        fuzzy_expr.name(),
+                    let new_expr = Arc::new(ScalarFunctionExpr::try_new(
                         fuzzy_expr.clone(),
                         vec![
                             Arc::new(Column::new(field, schema.index_of(field).unwrap())),
                             term.clone(),
                             distance.clone(),
                         ],
-                        DataType::Boolean,
-                    ));
+                        schema,
+                    )?);
                     expr_list.push(new_expr);
                 }
                 if expr_list.is_empty() {

@@ -1022,7 +1022,6 @@ export default defineComponent({
       //here lets add the pattern associations to the streamResponse
       streamResponse.settings.pattern_associations = streamResponse.pattern_associations;
       if (streamResponse?.settings) {
-        // console.log("streamResponse:", streamResponse);
         previousSchemaVersion = JSON.parse(
           JSON.stringify(streamResponse.settings),
         );

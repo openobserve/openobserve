@@ -1005,7 +1005,7 @@ const savePipelineJson = async (json: string) => {
         usedStreamsList = usedStreamsListResponse.value.filter((stream: any) => stream.stream_type == parsedPipeline.source.stream_type).map((stream: any) => stream.stream_name);
       }
       catch(error){
-        console.log(error,'error')
+        console.log(error, 'error')
       }
     }
 

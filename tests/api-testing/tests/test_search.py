@@ -920,7 +920,7 @@ def test_e2e_percentile(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
         "query": {
-            "sql": "SELECT _timestamp as \"x_axis_1\", approx_percentile_cont(arrow_cast(took,'Int64'), 0.99) as \"y_axis_1\"  FROM \"stream_pytest_data\" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+            "sql": "SELECT _timestamp as \"x_axis_1\", approx_percentile_cont(0.99) WITHIN GROUP (ORDER BY arrow_cast(took,'Int64')) as \"y_axis_1\"  FROM \"stream_pytest_data\" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
             "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,
@@ -946,7 +946,7 @@ def test_e2e_float(create_session, base_url):
     one_min_ago = int((now - timedelta(minutes=1)).timestamp() * 1000000)
     json_data = {
         "query": {
-            "sql": "SELECT _timestamp AS \"x_axis_1\", approx_percentile_cont(arrow_cast(took,'Float64'), 0.99) AS \"y_axis_1\"  FROM \"stream_pytest_data\" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+            "sql": "SELECT _timestamp AS \"x_axis_1\", approx_percentile_cont(0.99) WITHIN GROUP (ORDER BY arrow_cast(took,'Int64')) AS \"y_axis_1\"  FROM \"stream_pytest_data\" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
             "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,
