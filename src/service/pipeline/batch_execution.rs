@@ -864,45 +864,69 @@ async fn process_node(
 
             log::debug!("[Pipeline]: RemoteStream node processed {} records", records.len());
             if !records.is_empty() {
-                // Create buffer key for this pipeline
-                let buffer_key = format!("{}:{}", pipeline_id, remote_stream.org_id);
+                // Group records by batch_key for routing to different remote streams
+                let mut records_by_batch_key: HashMap<String, Vec<json::Value>> = HashMap::new();
                 
-                // Add records to the accumulating buffer and check if we should flush
-                let mut buffers = BATCH_BUFFERS.lock().await;
-                let buffer = buffers.entry(buffer_key.clone()).or_insert_with(BatchBuffer::new);
-                
-                let initial_record_count = buffer.records.len();
-                buffer.add_records(records);
-                
-                log::debug!("[Pipeline]: Added {} records to buffer, total: {} records, {} bytes", 
-                    buffer.records.len() - initial_record_count, buffer.records.len(), buffer.total_bytes);
-                
-                // Check if buffer should be flushed to WAL
-                if buffer.should_flush() {
-                    let records_to_write = buffer.take_records();
-                    drop(buffers); // Release the lock before async operations
+                for record in records {
+                    // Extract batch_key from record, fallback to "default" if not present
+                    let batch_key = record
+                        .get("batch_key")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("default")
+                        .to_string();
                     
-                    log::debug!("[Pipeline]: Flushing buffer - writing {} records to WAL", records_to_write.len());
+                    records_by_batch_key
+                        .entry(batch_key)
+                        .or_insert_with(Vec::new)
+                        .push(record);
+                }
+                
+                log::debug!("[Pipeline]: Grouped records into {} batch keys", records_by_batch_key.len());
+                
+                // Process each batch_key group separately
+                for (batch_key, batch_records) in records_by_batch_key {
+                    // Create buffer key that includes batch_key for routing
+                    let buffer_key = format!("{}:{}:{}:{}:{}", pipeline_id, remote_stream.org_id, remote_stream.destination_name, batch_key, "remote");
                     
-                    let mut remote_stream = remote_stream.clone();
-                    remote_stream.org_id = org_id.into();
-                    let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream).await?;
-                    if let Err(e) = writer.write_wal(records_to_write).await {
-                        let err_msg = format!(
-                            "DestinationNode error persisting data to be ingested externally: {}",
-                            e
-                        );
-                        if let Err(send_err) = error_sender
-                            .send((node.id.to_string(), node.node_type(), err_msg))
-                            .await
-                        {
-                            log::error!(
-                                "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                    // Add records to the accumulating buffer and check if we should flush
+                    let mut buffers = BATCH_BUFFERS.lock().await;
+                    let buffer = buffers.entry(buffer_key.clone()).or_insert_with(BatchBuffer::new);
+                    
+                    let initial_record_count = buffer.records.len();
+                    buffer.add_records(batch_records);
+                    
+                    log::debug!("[Pipeline]: Added {} records to buffer for batch_key '{}', total: {} records, {} bytes", 
+                        buffer.records.len() - initial_record_count, batch_key, buffer.records.len(), buffer.total_bytes);
+                    
+                    // Check if buffer should be flushed to WAL
+                    if buffer.should_flush() {
+                        let records_to_write = buffer.take_records();
+                        drop(buffers); // Release the lock before async operations
+                        
+                        log::debug!("[Pipeline]: Flushing buffer for batch_key '{}' - writing {} records to WAL", batch_key, records_to_write.len());
+                        
+                        // Create remote stream configuration with batch_key routing
+                        let mut remote_stream_for_batch = remote_stream.clone();
+                        remote_stream_for_batch.org_id = org_id.clone().into();
+                        
+                        let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
+                        if let Err(e) = writer.write_wal(records_to_write).await {
+                            let err_msg = format!(
+                                "DestinationNode error persisting data for batch_key '{}' to be ingested externally: {}",
+                                batch_key, e
                             );
+                            if let Err(send_err) = error_sender
+                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .await
+                            {
+                                log::error!(
+                                    "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                                );
+                            }
                         }
+                    } else {
+                        log::debug!("[Pipeline]: Buffer for batch_key '{}' not ready for flush, continuing to accumulate", batch_key);
                     }
-                } else {
-                    log::debug!("[Pipeline]: Buffer not ready for flush, continuing to accumulate");
                 }
             }
 
