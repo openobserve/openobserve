@@ -442,6 +442,7 @@ class="indexDetailsContainer" style="height: 100vh">
                           props.row.name == allFieldsName
                         )
                       "
+                      :disable="isEnvironmentSettings(props.row)"
                       v-model="props.row.index_type"
                       :options="streamIndexType"
                       :popup-content-style="{ textTransform: 'capitalize' }"
@@ -463,8 +464,14 @@ class="indexDetailsContainer" style="height: 100vh">
                       filled
                       dense
                       style="min-width: 300px; max-width: 300px"
-                      @update:model-value="markFormDirty(props.row.name, 'fts')"
-                    />
+                      @update:model-value="isEnvironmentSettings(props.row) == false ? markFormDirty(props.row.name, 'fts') : null"
+                    /> 
+                    <q-tooltip
+                      v-if="isEnvironmentSettings(props.row)"
+                      style="font-size: 14px; width: 250px;"
+                    >
+                      This is a predefined environment setting and cannot be changed.
+                    </q-tooltip>
                   </q-td>
                 </template>
 
@@ -778,6 +785,16 @@ export default defineComponent({
       { label: "All", value: 0 },
     ];
 
+    const isEnvironmentSettings = computed(() => {
+      return (row: any) => {
+        if (!row || !row.index_type) return false;
+        return (
+          row?.index_type?.includes("fullTextSearchKeyEnv") ||
+          row?.index_type?.includes("secondaryIndexKeyEnv")
+        );
+      };
+    });
+
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
@@ -844,6 +861,8 @@ export default defineComponent({
     const streamIndexType = [
       { label: "Full text search", value: "fullTextSearchKey" },
       { label: "Secondary index", value: "secondaryIndexKey" },
+      { label: "Full text search (Environment setting)", value: "fullTextSearchKeyEnv" },
+      { label: "Secondary index (Environment setting)", value: "secondaryIndexKeyEnv" },
       { label: "Bloom filter", value: "bloomFilterKey" },
       { label: "KeyValue partition", value: "keyPartition" },
       { label: "Prefix partition", value: "prefixPartition" },
@@ -926,20 +945,25 @@ export default defineComponent({
 
     const getFieldIndices = (property, settings) => {
       const fieldIndices = [];
-      if (
-        (settings.full_text_search_keys.length > 0 &&
-          settings.full_text_search_keys.includes(property.name)) ||
-        (settings.full_text_search_keys.length == 0 &&
-          store.state.zoConfig.default_fts_keys.includes(property.name))
+      if (settings.full_text_search_keys.length > 0 &&
+          settings.full_text_search_keys.includes(property.name)
       ) {
         fieldIndices.push("fullTextSearchKey");
       }
+
+      if(!settings?.full_text_search_keys.includes(property.name) && store.state.zoConfig.default_fts_keys.includes(property.name)) {
+        fieldIndices.push("fullTextSearchKeyEnv");
+      } 
 
       if (
         settings.index_fields.length > 0 &&
         settings.index_fields.includes(property.name)
       ) {
         fieldIndices.push("secondaryIndexKey");
+      }
+
+      if(!settings?.index_fields.includes(property.name) && store.state.zoConfig.default_secondary_index_fields.includes(property.name)) {
+        fieldIndices.push("secondaryIndexKeyEnv");
       }
 
       if (
@@ -1687,6 +1711,7 @@ export default defineComponent({
       redDaysList,
       deleteDates,
       IsdeleteBtnVisible,
+      isEnvironmentSettings,
     };
   },
   created() {
