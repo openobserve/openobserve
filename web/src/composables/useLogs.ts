@@ -3841,12 +3841,11 @@ const useLogs = () => {
   }
 
   const createFieldIndexMapping = async () => {
-    new Promise((resolve) => {
+    Promise.resolve().then(() => {
       streamSchemaFieldsIndexMapping.value = {};
       for (let i = 0; i < searchObj.data.stream.selectedStreamFields.length; i++) {
         streamSchemaFieldsIndexMapping.value[searchObj.data.stream.selectedStreamFields[i].name] = i;
       }
-      resolve(true);
     });
   }
 
