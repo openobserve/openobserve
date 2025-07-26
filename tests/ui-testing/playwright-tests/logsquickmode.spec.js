@@ -99,6 +99,8 @@ test.describe("Logs Quickmode testcases", () => {
     if (isSwitchedOff) {
       await toggleButton.click();
     }
+
+    await page.locator('[data-test="logs-all-fields-btn"]').click();
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
   test("should click on interesting fields icon and display query in editor", async ({

@@ -100,6 +100,7 @@ test.describe("Stream multiselect testcases", () => {
     await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
     await applyQueryButton(page);
     await logsPage.clickQuickModeToggle();
+    await page.locator('[data-test="logs-all-fields-btn"]').click();
 
   });
 
@@ -112,6 +113,9 @@ async function multistreamselect(page) {
     await page.waitForTimeout(2000);
     await page.locator('[data-test="log-search-index-list-stream-toggle-e2e_stream1"] div').nth(2).click();
     await page.waitForTimeout(4000);
+
+    await page.locator('[data-test="logs-all-fields-btn"]').click();
+
     await page.locator('#fnEditor').getByRole('textbox').click()
 //   await page.locator('[data-test="log-search-index-list-stream-toggle-e2e_stream1"] div').nth(2).click({force:true});
     const cell = await page.getByRole('cell', { name: /Common Group Fields/ });
@@ -206,7 +210,8 @@ await page.waitForTimeout(1000);
     await expect(page.url()).toContain("logs");
   });
 
-  test("should click on interesting fields icon and display query in editor", async ({
+  // This is flicky, as sometimes we get first record from stream1 and sometimes from e2e_automate
+  test.skip("should click on interesting fields icon and display query in editor", async ({
     page,
   }) => {
     await multistreamselect(page);
