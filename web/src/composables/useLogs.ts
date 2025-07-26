@@ -3664,8 +3664,10 @@ const useLogs = () => {
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
 
-                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] =
-                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] - 1;
+                      if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0) {
+                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] =
+                          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] - 1;
+                      }
                     }
 
                     commonSchemaFields.push(field);
@@ -3727,6 +3729,7 @@ const useLogs = () => {
                     fieldObj.streams.push(
                       ...schemaMaps[schemaFieldsIndex].streams,
                     );
+
                     searchObj.data.stream.expandGroupRowsFieldCount[
                       schemaMaps[schemaFieldsIndex].streams[0]
                     ] =
@@ -3736,12 +3739,14 @@ const useLogs = () => {
 
 
                     if(fieldObj.isInterestingField) {
-                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-                        schemaMaps[schemaFieldsIndex].streams[0]
-                      ] =
+                      if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0) {
                         searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
                           schemaMaps[schemaFieldsIndex].streams[0]
-                        ] - 1;
+                        ] =
+                          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+                            schemaMaps[schemaFieldsIndex].streams[0]
+                          ] - 1;
+                      }
                     }
                   }
 
