@@ -3160,6 +3160,17 @@ const useLogs = () => {
     fieldValues.value = {};
   };
 
+  const hasInterestingFieldsInLocal = function(streamName: string) {
+    const localInterestingFields: any = useLocalInterestingFields();
+    return localInterestingFields.value != null &&
+    localInterestingFields.value[
+      searchObj.organizationIdentifier + "_" + streamName
+    ] !== undefined &&
+    localInterestingFields.value[
+      searchObj.organizationIdentifier + "_" + streamName
+    ].length > 0;
+  };
+
   async function extractFields() {
     try {
       searchObjDebug["extractFieldsStartTime"] = performance.now();
@@ -3311,14 +3322,25 @@ const useLogs = () => {
                 searchObj.data.stream.selectedStream.length > 1;
             }
 
-            streamInterestingFieldsLocal =
-              localInterestingFields.value != null &&
-              localInterestingFields.value[
+            // remove timestamp field from the local interesting fields and update the local interesting fields. As timestamp field is default interesting field, we don't need to add it to the local storage
+            if(hasInterestingFieldsInLocal(stream.name)) {
+             const hasTimestampField = localInterestingFields.value[
                 searchObj.organizationIdentifier + "_" + stream.name
-              ] !== undefined &&
-              localInterestingFields.value[
-                searchObj.organizationIdentifier + "_" + stream.name
-              ].length > 0
+              ].some((field: any) => field === store.state.zoConfig?.timestamp_column);
+
+              // remove timestamp field from the local interesting fields and update the local interesting fields
+              if(hasTimestampField) {
+                localInterestingFields.value[
+                  searchObj.organizationIdentifier + "_" + stream.name
+                ] = localInterestingFields.value[
+                  searchObj.organizationIdentifier + "_" + stream.name
+                ].filter((field: any) => field !== store.state.zoConfig?.timestamp_column);
+              }
+
+              useLocalInterestingFields(localInterestingFields.value);
+            }
+
+            streamInterestingFieldsLocal = hasInterestingFieldsInLocal(stream.name)
                 ? localInterestingFields.value[
                     searchObj.organizationIdentifier + "_" + stream.name
                   ]
