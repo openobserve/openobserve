@@ -3485,6 +3485,7 @@ const useLogs = () => {
                     commonSchemaMaps.push(fieldObj);
 
                     if(fieldObj.isInterestingField) {
+                      interestingCommonSchemaMaps.push(fieldObj);
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
 
@@ -3516,6 +3517,7 @@ const useLogs = () => {
                   } else {
                     schemaMaps.push(fieldObj);
                     if(fieldObj.isInterestingField) {
+                      interestingSchemaMaps.push(fieldObj);
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
                         searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
                     }
