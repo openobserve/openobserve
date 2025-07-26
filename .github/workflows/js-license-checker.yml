@@ -15,6 +15,14 @@ jobs:
     steps:
       - name: Checkout latest code
         uses: actions/checkout@v4
+
+      - name: Check if UI code has changes and skip if none
+        run: |
+          if ! git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^web/"; then
+            echo "UI code hasn't changed, skipping license check"
+            exit 0
+          fi
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
