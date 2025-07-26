@@ -172,7 +172,7 @@
     "downloadCSV": "CSV",
     "downloadJSON": "JSON",
     "fileType": "File Type",
-    "showOnlyInterestingFields": "Show Only Interesting-Fields"
+    "showOnlyInterestingFields": "Interesting Fields"
   },
   "menu": {
     "home": "Home",
