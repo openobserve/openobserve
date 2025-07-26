@@ -279,7 +279,7 @@ test.describe("Logs Quickmode testcases", () => {
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
         .locator(
-          'text=SELECT kubernetes_pod_id FROM "e2e_automate"'
+          'text=SELECT _timestamp,kubernetes_pod_id FROM "e2e_automate"'
         )
     ).toBeVisible();
   });
