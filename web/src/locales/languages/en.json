@@ -166,7 +166,7 @@
     "transformType": "Transform Type",
     "saveActionDisabled": "Saving Action is currently unavailable",
     "moreActions": "More Actions",
-    "showOnlyInterestingFields": "Show Only Interesting-Fields"
+    "showOnlyInterestingFields": "Interesting Fields"
   },
   "menu": {
     "home": "Home",
