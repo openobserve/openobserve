@@ -81,3 +81,56 @@ where
         writeln!(writer)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_custom_time_format_utc() {
+        let timer = CustomTimeFormat;
+        let mut buffer = String::new();
+        let mut writer = tracing_subscriber::fmt::format::Writer::new(&mut buffer);
+
+        // Test that format_time doesn't panic and produces output
+        let result = timer.format_time(&mut writer);
+        assert!(result.is_ok());
+
+        assert!(!buffer.is_empty());
+        // Should contain RFC3339 format (contains 'T')
+        assert!(buffer.contains('T'));
+    }
+
+    #[test]
+    fn test_o2_formatter_new() {
+        let formatter = O2Formatter::new();
+        // Should not panic and create a valid formatter
+        // O2Formatter is a zero-sized type, so size is 0
+        assert_eq!(std::mem::size_of_val(&formatter), 0);
+    }
+
+    #[test]
+    fn test_o2_formatter_default() {
+        let formatter = O2Formatter::default();
+        let formatter_new = O2Formatter::new();
+
+        // Default should be equivalent to new()
+        assert_eq!(
+            std::mem::size_of_val(&formatter),
+            std::mem::size_of_val(&formatter_new)
+        );
+    }
+
+    #[test]
+    fn test_custom_time_format_writer() {
+        let timer = CustomTimeFormat;
+        let mut buffer = String::new();
+        let mut writer = tracing_subscriber::fmt::format::Writer::new(&mut buffer);
+
+        let result = timer.format_time(&mut writer);
+        assert!(result.is_ok());
+
+        // Buffer should contain some output
+        assert!(!buffer.is_empty());
+    }
+}
