@@ -619,6 +619,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="white"
               text-color="primary"
               :options="selectedFieldsBtnGroupOption"
+              @update:model-value="toggleInterestingFields"
             >
               <template v-slot:all_fields_slot>
                 <div data-test="logs-all-fields-btn">
@@ -752,30 +753,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-bold" color="white">{{
                 t("search.resetFields")
               }}</span>
-            </q-tooltip>
-          </div>
-        </template>
-        <template #no-data>
-          <div
-            v-if="searchObj.meta.quickMode"
-            style="border: 1px solid #c4c4c4; border-radius: 5px"
-            class="q-pr-xs q-ml-xs tw-right"
-          >
-            <q-toggle
-              data-test="logs-search-bar-sql-mode-toggle-btn"
-              v-model="showOnlyInterestingFields"
-              size="30px"
-            >
-              <q-icon name="info" size="1.1rem" />
-              <q-tooltip>
-                {{ t("search.showOnlyInterestingFields") }}
-              </q-tooltip>
-            </q-toggle>
-          </div>
-          <div v-else class="text-center">
-            <q-icon name="info" size="1.1rem" />
-            <q-tooltip>
-              {{ t("search.noFieldFound") }}
             </q-tooltip>
           </div>
         </template>
@@ -964,15 +941,6 @@ export default defineComponent({
     watch(
       () => searchObj.meta.quickMode,
       (isActive) => {
-        if (
-          searchObj.data.stream.selectedInterestingStreamFields.length &&
-          isActive
-        ) {
-          showOnlyInterestingFields.value = true;
-        } else {
-          showOnlyInterestingFields.value = false;
-        }
-
         if (isActive) {
           userDefinedSchemaBtnGroupOption.value.push({
             label: "",
@@ -980,6 +948,7 @@ export default defineComponent({
             slot: "interesting_fields_slot",
           });
           searchObj.meta.useUserDefinedSchemas = "interesting_fields";
+          showOnlyInterestingFields.value = true;
         } else {
           userDefinedSchemaBtnGroupOption.value =
             userDefinedSchemaBtnGroupOption.value.filter(
@@ -989,7 +958,19 @@ export default defineComponent({
           if (searchObj.meta.useUserDefinedSchemas === "interesting_fields") {
             searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
           }
+          showOnlyInterestingFields.value = false;
         }
+      },
+      {
+        immediate: true,
+      },
+    );
+
+    watch(
+      () => showUserDefinedSchemaToggle.value,
+      (isActive) => {
+        showOnlyInterestingFields.value =
+          searchObj.meta.useUserDefinedSchemas === "interesting_fields";
       },
       {
         immediate: true,
@@ -1556,11 +1537,14 @@ export default defineComponent({
 
       if (isInterestingFields) {
         showOnlyInterestingFields.value = true;
-        return;
       } else {
         showOnlyInterestingFields.value = false;
       }
 
+      await resetFields();
+    };
+
+    const resetFields = async () => {
       searchObj.loadingStream = true;
       streamSchemaFieldsIndexMapping.value = {};
 
@@ -1569,6 +1553,10 @@ export default defineComponent({
         await extractFields();
         searchObj.loadingStream = false;
       }, 0);
+    };
+
+    const toggleInterestingFields = () => {
+      resetFields();
     };
 
     const hasUserDefinedSchemas = () => {
@@ -1895,6 +1883,7 @@ export default defineComponent({
       selectedFieldsBtnGroupOption,
       pagination,
       toggleSchema,
+      toggleInterestingFields,
       streamFieldsRows: computed(() => {
         let expandKeys = Object.keys(
           searchObj.data.stream.expandGroupRows,
