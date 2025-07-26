@@ -936,15 +936,33 @@ export default defineComponent({
       },
     );
 
+    const resetFields = async () => {
+      searchObj.loadingStream = true;
+      streamSchemaFieldsIndexMapping.value = {};
+
+      // Selected streams has usd
+      setTimeout(async () => {
+        await extractFields();
+        searchObj.loadingStream = false;
+      }, 0);
+    };
+
     watch(
       () => searchObj.meta.quickMode,
       (isActive) => {
         if (isActive) {
-          userDefinedSchemaBtnGroupOption.value.push({
-            label: "",
-            value: "interesting_fields",
-            slot: "interesting_fields_slot",
-          });
+          // check if its present in the array dont add it again
+          if (
+            !userDefinedSchemaBtnGroupOption.value.some(
+              (option) => option.value === "interesting_fields",
+            )
+          ) {
+            userDefinedSchemaBtnGroupOption.value.push({
+              label: "",
+              value: "interesting_fields",
+              slot: "interesting_fields_slot",
+            });
+          }
           searchObj.meta.useUserDefinedSchemas = "interesting_fields";
           showOnlyInterestingFields.value = true;
         } else {
@@ -961,6 +979,14 @@ export default defineComponent({
       },
       {
         immediate: true,
+      },
+    );
+
+    watch(
+      () => searchObj.meta.quickMode,
+      () => {
+        // if quick mode is called, reset fields
+        resetFields();
       },
     );
 
@@ -1543,17 +1569,6 @@ export default defineComponent({
       }
 
       await resetFields();
-    };
-
-    const resetFields = async () => {
-      searchObj.loadingStream = true;
-      streamSchemaFieldsIndexMapping.value = {};
-
-      // Selected streams has usd
-      setTimeout(async () => {
-        await extractFields();
-        searchObj.loadingStream = false;
-      }, 0);
     };
 
     const toggleInterestingFields = () => {
