@@ -32,7 +32,14 @@ jobs:
             ref: ${{ github.event.pull_request.head.ref || github.ref }}
             fetch-depth: 0
             fetch-tags: true
-  
+
+        - name: Check if UI code has changes and skip if none
+          run: |
+            if ! git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^web/"; then
+              echo "UI code hasn't changed, skipping build"
+              exit 0
+            fi
+
         - name: Setup Rust Toolchain
           uses: dtolnay/rust-toolchain@master
           with:
@@ -111,7 +118,7 @@ jobs:
             sudo rm -rf /opt/ghc
             sudo rm -rf "/usr/local/share/boost"
             sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-  
+
         - name: Clone the current repo
           uses: actions/checkout@v4
           with:
@@ -119,7 +126,14 @@ jobs:
             ref: ${{ github.event.pull_request.head.ref || github.ref }}
             fetch-depth: 0
             fetch-tags: true
-  
+
+        - name: Check if UI code has changes and skip if none
+          run: |
+            if ! git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^web/"; then
+              echo "UI code hasn't changed, skipping build"
+              exit 0
+            fi
+
         - name: Setup Rust Toolchain
           uses: dtolnay/rust-toolchain@master
           with:
