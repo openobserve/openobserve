@@ -1413,12 +1413,18 @@ export default defineComponent({
             );
 
           if (field.group) {
-            searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-              field.group
-            ] =
+            if (
               searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
                 field.group
-              ] - 1;
+              ] > 0
+            ) {
+              searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+                field.group
+              ] =
+                searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+                  field.group
+                ] - 1;
+            }
           }
 
           field.isInterestingField = !isInterestingField;
