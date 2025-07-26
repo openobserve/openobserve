@@ -659,22 +659,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-btn-toggle>
           </div>
-          <!-- <div
-            v-if="searchObj.meta.quickMode"
-            style="border: 1px solid #c4c4c4; border-radius: 5px"
-            class="q-pr-xs q-ml-xs tw-right"
-          >
-            <q-toggle
-              data-test="logs-search-bar-sql-mode-toggle-btn"
-              v-model="showOnlyInterestingFields"
-              size="30px"
-            >
-              <q-icon name="info" size="1.1rem" />
-              <q-tooltip>
-                {{ t("search.showOnlyInterestingFields") }}
-              </q-tooltip>
-            </q-toggle>
-          </div> -->
           <div class="q-ml-xs text-right col" v-if="scope.pagesNumber > 1">
             <q-tooltip
               data-test="logs-page-fields-list-pagination-tooltip"
@@ -995,12 +979,20 @@ export default defineComponent({
             value: "interesting_fields",
             slot: "interesting_fields_slot",
           });
+          searchObj.meta.useUserDefinedSchemas = "interesting_fields";
         } else {
           userDefinedSchemaBtnGroupOption.value =
             userDefinedSchemaBtnGroupOption.value.filter(
               (option) => option.value !== "interesting_fields",
             );
+
+          if (searchObj.meta.useUserDefinedSchemas === "interesting_fields") {
+            searchObj.meta.useUserDefinedSchemas = "user_defined_schema";
+          }
         }
+      },
+      {
+        immediate: true,
       },
     );
 
