@@ -70,6 +70,8 @@ async function exploreStreamAndNavigateToPipeline(page, streamName) {
   // Search for the stream
   await page.getByPlaceholder('Search Stream').click();
   await page.getByPlaceholder('Search Stream').fill(streamName);
+
+  await page.waitForTimeout(1000);
   
   // Click on the 'Explore' button
   await page.getByRole('button', { name: 'Explore' }).first().click();
@@ -105,7 +107,8 @@ async function exploreStreamAndInteractWithLogDetails(page, streamName) {
   await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
   
   // Interact with the log detail key
-  await page.locator('[data-test="log-expand-detail-key-a-text"]').click();
+  // Commenting this, as a needs to be made interesting field in order to be in results. 
+  // await page.locator('[data-test="log-expand-detail-key-a-text"]').click();
   
   // Navigate to the pipeline menu
   await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
