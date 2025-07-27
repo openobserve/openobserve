@@ -131,6 +131,7 @@ test.describe("Join for logs", () => {
         await logsPage.selectIndexAndStreamJoin();
         await logsPage.enableSQLMode();
         await logsPage.clickQuickModeToggle();
+        await page.locator('[data-test="logs-all-fields-btn"]').click();
         await logsPage.selectRunQuery();
         await logsPage.clickInterestingFields();
         await logsPage.validateInterestingFields();
@@ -142,6 +143,7 @@ test.describe("Join for logs", () => {
         await logsPage.selectIndexAndStreamJoin();
         await logsPage.enableSQLMode();
         await logsPage.clickQuickModeToggle();
+        await page.locator('[data-test="logs-all-fields-btn"]').click();
         await logsPage.selectRunQuery();
         await logsPage.clickInterestingFields();
         await logsPage.validateInterestingFieldsQuery();
@@ -153,6 +155,7 @@ test.describe("Join for logs", () => {
         await logsPage.selectIndexAndStreamJoin();
         await logsPage.enableSQLMode();
         await logsPage.clickQuickModeToggle();
+        await page.locator('[data-test="logs-all-fields-btn"]').click();
         await logsPage.selectRunQuery();
         await logsPage.clickInterestingFields();
         await logsPage.addRemoveInteresting();

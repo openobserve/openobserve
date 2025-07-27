@@ -1272,16 +1272,16 @@ export default defineComponent({
           }
         } else {
           if (searchObj.data.stream.selectedStream.length > 1) {
-            if (parsedSQL && parsedSQL.from.length > 1) {
+            if (parsedSQL && parsedSQL?.from?.length > 1) {
               fieldPrefix = parsedSQL.from[0].as
                 ? `${parsedSQL.from[0].as}.`
                 : `${parsedSQL.from[0].table}.`;
             }
           }
           // Add the field in the query
-          if (parsedSQL.columns && parsedSQL.columns.length > 0) {
+          if (parsedSQL.columns && parsedSQL?.columns?.length > 0) {
             // Iterate and remove the * from the query
-            parsedSQL.columns = removeFieldByName(parsedSQL.columns, "*");
+            parsedSQL.columns = removeFieldByName(parsedSQL?.columns, "*");
           }
 
           // check is required for union query where both streams interesting fields goes into single array
@@ -1746,11 +1746,14 @@ export default defineComponent({
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
-        } else if (this.searchObj.data.stream.selectedStream.length > 1 && this.searchObj.meta.sqlMode == true) {
+        } else if (
+          this.searchObj.data.stream.selectedStream.length > 1 &&
+          this.searchObj.meta.sqlMode == true
+        ) {
           this.resetHistogramWithError(
             "Histogram is not available for multi stream search.",
           );
-        }  else if (
+        } else if (
           this.searchObj.meta.histogramDirtyFlag == true &&
           this.searchObj.meta.jobId == ""
         ) {

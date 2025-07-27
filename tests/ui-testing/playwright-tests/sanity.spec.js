@@ -119,6 +119,9 @@ test.describe("Sanity testcases", () => {
     if (isSwitchedOff) {
       await toggleButton.click();
     }
+
+    await page.locator('[data-test="logs-all-fields-btn"]').click();
+
     await page
       .locator('[data-cy="index-field-search-input"]')
       .fill("job");
