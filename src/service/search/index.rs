@@ -28,13 +28,15 @@ use datafusion::{
     physical_expr::ScalarFunctionExpr,
     physical_plan::{
         PhysicalExpr,
-        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal},
+        expressions::{BinaryExpr, Column, InListExpr, IsNotNullExpr, LikeExpr, Literal, NotExpr},
     },
     scalar::ScalarValue,
 };
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
-use sqlparser::ast::{BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments};
+use sqlparser::ast::{
+    BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, UnaryOperator,
+};
 use tantivy::{
     Term,
     query::{
@@ -102,21 +104,6 @@ impl Debug for IndexCondition {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.to_query())
     }
-}
-
-// single condition
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Condition {
-    // field, value
-    Equal(String, String),
-    // field, value, case_sensitive
-    StrMatch(String, String, bool),
-    In(String, Vec<String>),
-    Regex(String, String),
-    MatchAll(String),
-    FuzzyMatchAll(String, u8),
-    Or(Box<Condition>, Box<Condition>),
-    And(Box<Condition>, Box<Condition>),
 }
 
 impl IndexCondition {
@@ -204,6 +191,22 @@ impl IndexCondition {
     }
 }
 
+// single condition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Condition {
+    // field, value
+    Equal(String, String),
+    // field, value, case_sensitive
+    StrMatch(String, String, bool),
+    In(String, Vec<String>),
+    Regex(String, String),
+    MatchAll(String),
+    FuzzyMatchAll(String, u8),
+    Or(Box<Condition>, Box<Condition>),
+    And(Box<Condition>, Box<Condition>),
+    Not(Box<Condition>),
+}
+
 impl Condition {
     // this only use for display the query
     pub fn to_query(&self) -> String {
@@ -227,6 +230,7 @@ impl Condition {
             Condition::And(left, right) => {
                 format!("({} AND {})", left.to_query(), right.to_query())
             }
+            Condition::Not(condition) => format!("NOT({})", condition.to_query()),
         }
     }
 
@@ -324,6 +328,10 @@ impl Condition {
                 Box::new(Condition::from_expr(right)),
             ),
             Expr::Nested(expr) => Condition::from_expr(expr),
+            Expr::UnaryOp {
+                op: UnaryOperator::Not,
+                expr,
+            } => Condition::Not(Box::new(Condition::from_expr(expr))),
             _ => unreachable!(),
         }
     }
@@ -388,16 +396,16 @@ impl Condition {
                         )])));
                     }
                     if !terms.is_empty() {
-                        Ok(if terms.len() > 1 {
+                        if terms.len() > 1 {
                             Box::new(BooleanQuery::intersection(terms))
                         } else {
                             terms.remove(0)
-                        })
+                        }
                     } else {
-                        Err(anyhow::anyhow!(
+                        return Err(anyhow::anyhow!(
                             "The value of match_all() function can't be empty"
-                        ))
-                    }?
+                        ));
+                    }
                 }
             }
             Condition::FuzzyMatchAll(value, distance) => {
@@ -424,25 +432,43 @@ impl Condition {
                 let right_query = right.to_tantivy_query(schema, default_field)?;
                 Box::new(BooleanQuery::intersection(vec![left_query, right_query]))
             }
+            Condition::Not(condition) => {
+                let query = condition.to_tantivy_query(schema, default_field)?;
+                Box::new(BooleanQuery::new(vec![
+                    (Occur::MustNot, query),
+                    (Occur::Must, Box::new(AllQuery {})),
+                ]))
+            }
         })
     }
 
-    pub fn need_all_term_fields(&self) -> Vec<String> {
+    pub fn need_all_term_fields(&self) -> HashSet<String> {
+        let mut fields = HashSet::new();
         match self {
-            Condition::StrMatch(field, ..) => vec![field.clone()],
-            Condition::Regex(field, _) => vec![field.clone()],
+            Condition::StrMatch(field, ..) => {
+                fields.insert(field.clone());
+            }
+            Condition::Regex(field, _) => {
+                fields.insert(field.clone());
+            }
             Condition::MatchAll(value) => {
-                if (value.len() > 1 && (value.starts_with("*") || value.ends_with("*")))
-                    || (value.len() > 3 && value.starts_with("re:"))
-                {
-                    vec![INDEX_FIELD_NAME_FOR_ALL.to_string()]
-                } else {
-                    vec![]
+                if value.len() > 1 && (value.starts_with("*") || value.ends_with("*")) {
+                    fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
                 }
             }
-            Condition::FuzzyMatchAll(..) => vec![INDEX_FIELD_NAME_FOR_ALL.to_string()],
-            _ => vec![],
+            Condition::FuzzyMatchAll(..) => {
+                fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
+            }
+            Condition::Or(left, right) | Condition::And(left, right) => {
+                fields.extend(left.need_all_term_fields());
+                fields.extend(right.need_all_term_fields());
+            }
+            Condition::Not(condition) => {
+                fields.extend(condition.get_tantivy_fields());
+            }
+            Condition::Equal(..) | Condition::In(..) => {}
         }
+        fields
     }
 
     pub fn get_tantivy_fields(&self) -> HashSet<String> {
@@ -469,6 +495,9 @@ impl Condition {
             Condition::Or(left, right) | Condition::And(left, right) => {
                 fields.extend(left.get_tantivy_fields());
                 fields.extend(right.get_tantivy_fields());
+            }
+            Condition::Not(condition) => {
+                fields.extend(condition.get_tantivy_fields());
             }
         }
         fields
@@ -498,6 +527,9 @@ impl Condition {
             Condition::Or(left, right) | Condition::And(left, right) => {
                 fields.extend(left.get_schema_fields(fst_fields));
                 fields.extend(right.get_schema_fields(fst_fields));
+            }
+            Condition::Not(condition) => {
+                fields.extend(condition.get_schema_fields(fst_fields));
             }
         }
         fields
@@ -563,13 +595,7 @@ impl Condition {
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
                     Vec::with_capacity(fst_fields.len());
                 for field in fst_fields.iter() {
-                    let new_expr = Arc::new(LikeExpr::new(
-                        false,
-                        true,
-                        Arc::new(Column::new(field, schema.index_of(field).unwrap())),
-                        term.clone(),
-                    ));
-                    expr_list.push(new_expr);
+                    expr_list.push(create_like_expr_with_not_null(field, term.clone(), schema));
                 }
                 if expr_list.is_empty() {
                     return Err(anyhow::anyhow!(
@@ -618,6 +644,10 @@ impl Condition {
                 let right = right.to_physical_expr(schema, fst_fields)?;
                 Ok(Arc::new(BinaryExpr::new(left, Operator::And, right)))
             }
+            Condition::Not(condition) => {
+                let expr = condition.to_physical_expr(schema, fst_fields)?;
+                Ok(Arc::new(NotExpr::new(expr)))
+            }
         }
     }
 
@@ -631,6 +661,7 @@ impl Condition {
             Condition::FuzzyMatchAll(..) => false,
             Condition::Or(left, right) => left.can_remove_filter() && right.can_remove_filter(),
             Condition::And(left, right) => left.can_remove_filter() && right.can_remove_filter(),
+            Condition::Not(condition) => condition.can_remove_filter(),
         }
     }
 }
@@ -684,42 +715,29 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
         }
         Expr::Function(func) => {
             let fn_name = func.name.to_string().to_lowercase();
-            if fn_name == MATCH_ALL_UDF_NAME {
-                if let FunctionArguments::List(list) = &func.args {
-                    if list.args.len() != 1 {
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
-            } else if fn_name == FUZZY_MATCH_ALL_UDF_NAME {
-                if let FunctionArguments::List(list) = &func.args {
-                    if list.args.len() != 2 {
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
-            } else if fn_name == STR_MATCH_UDF_NAME
-                || fn_name == STR_MATCH_UDF_IGNORE_CASE_NAME
-                || fn_name == MATCH_FIELD_UDF_NAME
-                || fn_name == MATCH_FIELD_IGNORE_CASE_UDF_NAME
-            {
-                if let FunctionArguments::List(list) = &func.args {
-                    if list.args.len() != 2 {
-                        return false;
-                    }
-                    if !index_fields.contains(&get_arg_name(&list.args[0])) {
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
-            } else {
+            let FunctionArguments::List(list) = &func.args else {
                 return false;
-            }
+            };
+
+            return match fn_name.as_str() {
+                MATCH_ALL_UDF_NAME => list.args.len() == 1,
+                FUZZY_MATCH_ALL_UDF_NAME => list.args.len() == 2,
+                STR_MATCH_UDF_NAME
+                | STR_MATCH_UDF_IGNORE_CASE_NAME
+                | MATCH_FIELD_UDF_NAME
+                | MATCH_FIELD_IGNORE_CASE_UDF_NAME => {
+                    list.args.len() == 2 && index_fields.contains(&get_arg_name(&list.args[0]))
+                }
+                _ => false,
+            };
         }
         Expr::Nested(expr) => return is_expr_valid_for_index(expr, index_fields),
+        Expr::UnaryOp {
+            op: UnaryOperator::Not,
+            expr,
+        } => {
+            return is_expr_valid_for_index(expr, index_fields);
+        }
         _ => return false,
     }
     true
@@ -741,6 +759,7 @@ fn get_value(expr: &Expr) -> String {
     }
 }
 
+// combine all exprs with OR operator
 fn disjunction(exprs: Vec<Arc<dyn PhysicalExpr>>) -> Arc<dyn PhysicalExpr> {
     if exprs.len() == 1 {
         exprs[0].clone()
@@ -754,6 +773,7 @@ fn disjunction(exprs: Vec<Arc<dyn PhysicalExpr>>) -> Arc<dyn PhysicalExpr> {
     }
 }
 
+// combine all exprs with AND operator
 fn conjunction(exprs: Vec<Arc<dyn PhysicalExpr>>) -> Arc<dyn PhysicalExpr> {
     if exprs.len() == 1 {
         exprs[0].clone()
@@ -793,6 +813,19 @@ pub(crate) fn get_arg_name(args: &FunctionArg) -> String {
             _ => unimplemented!("str_match not support filed type: {:?}", arg),
         },
     }
+}
+
+fn create_like_expr_with_not_null(
+    field: &str,
+    term: Arc<dyn PhysicalExpr>,
+    schema: &arrow_schema::Schema,
+) -> Arc<dyn PhysicalExpr> {
+    let column = Arc::new(Column::new(field, schema.index_of(field).unwrap()));
+    Arc::new(BinaryExpr::new(
+        Arc::new(IsNotNullExpr::new(column.clone())),
+        Operator::And,
+        Arc::new(LikeExpr::new(false, true, column, term.clone())),
+    ))
 }
 
 fn is_alphanumeric(s: &str) -> bool {
