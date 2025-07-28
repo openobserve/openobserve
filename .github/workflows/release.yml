@@ -170,6 +170,10 @@ jobs:
     name: Release artifacts
     needs: [build]
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -177,12 +181,14 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::325553860333:role/github-actions-s3-uploader
+          role-session-name: GithubActionsSession
+          aws-region: us-east-2
+
       - name: Upload to S3
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ vars.AWS_S3_REGION }}
-          BUCKET: ${{ vars.AWS_S3_BUCKET_NAME }}
         run: |
           if ! command -v aws &> /dev/null; then
             echo "AWS CLI not found. Installing..."
