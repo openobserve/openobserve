@@ -993,7 +993,10 @@ export default defineComponent({
     );
 
     watch(
-      () => showUserDefinedSchemaToggle.value,
+      () => [
+        showUserDefinedSchemaToggle.value,
+        searchObj.meta.useUserDefinedSchemas,
+      ],
       (isActive) => {
         showOnlyInterestingFields.value =
           searchObj.meta.useUserDefinedSchemas === "interesting_fields";
