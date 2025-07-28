@@ -1504,11 +1504,17 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.data.type,
       async () => {
+        const currentQuery =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].query;
 
-        // validate panel data
-        isValid(true, true)          
-        
-        // await nextTick();
+        // check if query is assigned and not empty
+        // this prevents hard refresh early validation before query is assigned
+        if (currentQuery && currentQuery.trim() !== "") {
+          isValid(true, true);
+        }
+
         visualizeChartData.value = JSON.parse(
           JSON.stringify(dashboardPanelData.data),
         );
@@ -1537,10 +1543,12 @@ export default defineComponent({
               )
             : cloneDeep(searchObj.data.datetime);
 
-        dashboardPanelData.meta.dateTime = {
-          start_time: new Date(dateTime.startTime),
-          end_time: new Date(dateTime.endTime),
-        };
+        if (searchObj.meta.logsVisualizeToggle === "visualize") {
+          dashboardPanelData.meta.dateTime = {
+            start_time: new Date(dateTime.startTime),
+            end_time: new Date(dateTime.endTime),
+          };
+        }
       },
       { deep: true },
     );
@@ -1567,8 +1575,15 @@ export default defineComponent({
           return;
         }
 
-        if (!isValid(true, true)) {
-          // return;
+        const currentQuery =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].query;        
+
+        // check if query is assigned and not empty
+        // this prevents hard refresh early validation before query is assigned
+        if (currentQuery && currentQuery.trim() !== "") {
+          isValid(true, true);
         }
 
         // reset searchResponseForVisualization

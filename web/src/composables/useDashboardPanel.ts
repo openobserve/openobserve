@@ -3159,6 +3159,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     (newVal, oldVal) => {
+
+      // if pageKey is logs, then return
+      // because custom query fields will be extracted from the query using the result schema api
+      if (pageKey == "logs") {
+        return;
+      }
+
       // Check if customQuery mode has changed
       const customQueryChanged = newVal[1] !== oldVal[1];
 
