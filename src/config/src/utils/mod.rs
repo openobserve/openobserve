@@ -21,6 +21,7 @@ pub mod enrichment_local_cache;
 pub mod file;
 pub mod flatten;
 pub mod hash;
+pub mod histogram;
 pub mod inverted_index;
 pub mod json;
 pub mod md5;

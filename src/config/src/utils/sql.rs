@@ -1035,7 +1035,7 @@ mod tests {
             r#"SELECT * FROM "olympics" WHERE _timestamp >= 1716854400000 AND _timestamp <= 1716940800000"#,
             r#"SELECT * FROM "olympics" WHERE _timestamp >= 1716854400000 AND _timestamp <= 1716940800000"#,
         ];
-        for (i, query) in queries.iter().enumerate() {
+        for query in queries.iter() {
             let is_eligible = is_eligible_for_histogram(query).unwrap();
             assert_eq!(is_eligible, true);
         }
@@ -1050,7 +1050,7 @@ mod tests {
             r#"SELECT DISTINCT * FROM "olympics""#,
             r#"SELECT * FROM "olympics" LIMIT 100"#,
         ];
-        for (i, query) in queries.iter().enumerate() {
+        for query in queries.iter() {
             let is_eligible = is_eligible_for_histogram(query).unwrap();
             assert_eq!(is_eligible, false);
         }

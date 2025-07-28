@@ -236,21 +236,27 @@ pub async fn search(
     }
     req.use_cache = Some(use_cache);
 
+    // get stream name
+    let stream_names = match resolve_stream_names(&req.query.sql) {
+        Ok(v) => v.clone(),
+        Err(e) => {
+            return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
+        }
+    };
+
     // Handle histogram data for UI
     if is_ui_histogram {
-        // Check if query is eligible for histogram
-        let is_eligible =
-            config::utils::sql::is_eligible_for_histogram(&req.query.sql).unwrap_or(false);
-        if !is_eligible {
-            return Ok(MetaHttpResponse::bad_request(
-                "Histogram unavailable for SUBQUERY, CTE, DISTINCT and LIMIT queries.",
-            ));
+        // Convert the original query to a histogram query
+        match config::utils::histogram::convert_to_histogram_query(&req.query.sql, &stream_names) {
+            Ok(histogram_query) => {
+                req.query.sql = histogram_query;
+                // Reset to allow auto-interval
+                req.query.histogram_interval = 0;
+            }
+            Err(e) => {
+                return Ok(MetaHttpResponse::bad_request(e));
+            }
         }
-        // TODO: Modify the original query to a histogram query
-        // e.g.:
-        // original_query: SELECT * FROM "olympics"
-        // histogram_query: SELECT histogram(_timestamp) AS "zo_sql_key", COUNT(*) AS "zo_sql_num"
-        // FROM "olympics" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC
     }
 
     // set search event type
@@ -266,14 +272,6 @@ pub async fn search(
             .as_ref()
             .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
     }
-
-    // get stream name
-    let stream_names = match resolve_stream_names(&req.query.sql) {
-        Ok(v) => v.clone(),
-        Err(e) => {
-            return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
-        }
-    };
 
     // get stream settings
     for stream_name in stream_names {
