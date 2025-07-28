@@ -162,7 +162,7 @@ test.describe("Logs Queries testcases", () => {
     await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
     await page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox').click();
-    await page.keyboard.type("match_all_raw_ignore_case('provide_credentials')");
+    await page.keyboard.type("match_all('provide_credentials')");
     await page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content').waitFor({ state: "visible" });
     await page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
     await page.locator('[data-test="logs-search-bar-reset-filters-btn"]').click({ force: true });
