@@ -33,7 +33,7 @@ use config::{
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
-    physical_plan::{ExecutionPlan, displayable, visit_execution_plan},
+    physical_plan::visit_execution_plan,
     prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
@@ -428,7 +428,11 @@ pub async fn run_datafusion(
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
-        print_plan(&physical_plan, "before");
+        log::info!("[trace_id {trace_id}] leader physical plan before rewrite");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+        );
     }
 
     // 7. rewrite physical plan
@@ -513,7 +517,11 @@ pub async fn run_datafusion(
     }
 
     if cfg.common.print_key_sql {
-        print_plan(&physical_plan, "after");
+        log::info!("[trace_id {trace_id}] leader physical plan after rewrite");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+        );
     }
 
     // run datafusion
@@ -1130,14 +1138,4 @@ pub async fn get_inverted_index_file_list(
         resp.scan_size,
         start.elapsed().as_millis() as usize,
     ))
-}
-
-pub fn print_plan(physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
-    let plan = displayable(physical_plan.as_ref())
-        .indent(false)
-        .to_string();
-    println!("+---------------------------+----------+");
-    println!("leader physical plan {stage} rewrite");
-    println!("+---------------------------+----------+");
-    println!("{}", plan);
 }
