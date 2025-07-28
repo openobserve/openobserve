@@ -576,7 +576,7 @@ export default defineComponent({
           [panelSchema?.value?.id]: false,
         };
       }
-      
+
       // Clear all refs to prevent memory leaks
       chartPanelRef.value = null;
       drilldownPopUpRef.value = null;
@@ -584,6 +584,58 @@ export default defineComponent({
       tableRendererRef.value = null;
       parser = null;
     });
+    const convertPanelDataCommon = async () => {
+      if (
+        !errorDetail?.value?.message &&
+        validatePanelData?.value?.length === 0
+      ) {
+        try {
+          panelData.value = await convertPanelData(
+            panelSchema.value,
+            data.value,
+            store,
+            chartPanelRef,
+            hoveredSeriesState,
+            resultMetaData,
+            metadata.value,
+            chartPanelStyle.value,
+            annotations,
+            loading.value,
+          );
+
+          limitNumberOfSeriesWarningMessage.value =
+            panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
+
+          errorDetail.value = {
+            message: "",
+            code: "",
+          };
+        } catch (error: any) {
+          console.error("error", error);
+          errorDetail.value = {
+            message: error?.message,
+            code: error?.code || "",
+          };
+        }
+      } else {
+        // if no data is available, then show the default data
+        // if there is an error config in the panel schema, then show the default data on error
+        // if no default data on error is set, then show the custom error message
+        if (
+          panelSchema.value?.error_config?.custom_error_handeling &&
+          panelSchema.value?.error_config?.default_data_on_error
+        ) {
+          data.value = JSON.parse(
+            panelSchema.value?.error_config?.default_data_on_error,
+          );
+          errorDetail.value = {
+            message: "",
+            code: "",
+          };
+        }
+      }
+    };
+
     // Watch for panel schema changes to re-convert panel data
     watch(
       panelSchema,
@@ -594,34 +646,7 @@ export default defineComponent({
           validatePanelData?.value?.length === 0 &&
           data.value?.length
         ) {
-          try {
-            panelData.value = await convertPanelData(
-              panelSchema.value,
-              data.value,
-              store,
-              chartPanelRef,
-              hoveredSeriesState,
-              resultMetaData,
-              metadata.value,
-              chartPanelStyle.value,
-              annotations,
-              loading.value,
-            );
-
-            limitNumberOfSeriesWarningMessage.value =
-              panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
-
-            errorDetail.value = {
-              message: "",
-              code: "",
-            };
-          } catch (error: any) {
-            console.error("error", error);
-            errorDetail.value = {
-              message: error?.message,
-              code: error?.code || "",
-            };
-          }
+          await convertPanelDataCommon();
         }
       },
       { deep: true },
@@ -659,58 +684,8 @@ export default defineComponent({
             code: "",
           };
 
-        // panelData.value = convertPanelData(panelSchema.value, data.value, store);
-        if (
-          !errorDetail?.value?.message &&
-          validatePanelData?.value?.length === 0
-        ) {
-          try {
-            // passing chartpanelref to get width and height of DOM element
-            panelData.value = await convertPanelData(
-              panelSchema.value,
-              data.value,
-              store,
-              chartPanelRef,
-              hoveredSeriesState,
-              resultMetaData,
-              metadata.value,
-              chartPanelStyle.value,
-              annotations,
-              loading.value,
-            );
-
-            limitNumberOfSeriesWarningMessage.value =
-              panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
-
-            errorDetail.value = {
-              message: "",
-              code: "",
-            };
-          } catch (error: any) {
-            console.error("error", error);
-
-            errorDetail.value = {
-              message: error?.message,
-              code: error?.code || "",
-            };
-          }
-        } else {
-          // if no data is available, then show the default data
-          // if there is an error config in the panel schema, then show the default data on error
-          // if no default data on error is set, then show the custom error message
-          if (
-            panelSchema.value?.error_config?.custom_error_handeling &&
-            panelSchema.value?.error_config?.default_data_on_error
-          ) {
-            data.value = JSON.parse(
-              panelSchema.value?.error_config?.default_data_on_error,
-            );
-            errorDetail.value = {
-              message: "",
-              code: "",
-            };
-          }
-        }
+        // Use the common function to convert panel data
+        await convertPanelDataCommon();
       },
       { deep: true },
     );
