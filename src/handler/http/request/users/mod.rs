@@ -46,7 +46,7 @@ use crate::{
                 UserOrgRole, UserRequest, UserRoleRequest, get_roles,
             },
         },
-        utils::auth::{UserEmail, generate_presigned_url},
+        utils::auth::{UserEmail, generate_presigned_url, is_valid_email},
     },
     service::users,
 };
@@ -141,9 +141,11 @@ pub async fn save(
     user.email = user.email.trim().to_lowercase();
 
     let bad_req_msg = if user.password.len() < 8 {
-        Some("Password must be at least 8 characters long".to_string())
+        Some("Password must be at least 8 characters long")
     } else if user.role.base_role == UserRole::Root {
-        Some("Not allowed".to_string())
+        Some("Not allowed")
+    } else if !is_valid_email(user.email.as_str()) {
+        Some("Invalid Email address")
     } else {
         None
     };
@@ -151,7 +153,7 @@ pub async fn save(
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
-                msg,
+                msg.to_string(),
             )),
         );
     }

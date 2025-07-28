@@ -54,6 +54,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_ratelimit_migration = false;
     let mut need_service_accounts_migration = false;
     let mut need_ai_chat_permissions_migration = false;
+    let mut need_re_pattern_permission_migration = false;
+
     let mut existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
             Ok(Some(model)) => Some(model),
@@ -146,6 +148,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let v0_0_16 = version_compare::Version::from("0.0.16").unwrap();
         let v0_0_17 = version_compare::Version::from("0.0.17").unwrap();
         let v0_0_18 = version_compare::Version::from("0.0.18").unwrap();
+        let v0_0_20 = version_compare::Version::from("0.0.20").unwrap();
+
         if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
             need_pipeline_migration = true;
         }
@@ -168,6 +172,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         if meta_version > v0_0_17 && existing_model_version < v0_0_18 {
             log::info!("[OFGA:Local] AI chat permissions migration needed");
             need_ai_chat_permissions_migration = true;
+        }
+        if existing_model_version < v0_0_20 {
+            log::info!("[OFGA:Local] re_patterns permissions migration needed");
+            need_re_pattern_permission_migration = true;
         }
     }
 
@@ -278,6 +286,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                     if need_ai_chat_permissions_migration {
                         get_ownership_all_org_tuple(org_name, "ai", &mut tuples);
+                    }
+                    if need_re_pattern_permission_migration {
+                        get_ownership_all_org_tuple(org_name, "re_patterns", &mut tuples);
                     }
                 }
                 if need_alert_folders_migration {

@@ -610,7 +610,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(cloud::billings::unsubscribe)
         .service(cloud::billings::create_billing_portal_session)
         .service(cloud::org_usage::get_org_usage)
-        .service(cloud::marketing::handle_new_attrition_event)
+        .service(cloud::marketing::handle_new_attribution_event)
         .service(organization::org::all_organizations)
         .service(organization::org::extend_trial_period);
 

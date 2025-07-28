@@ -1,4 +1,3 @@
-
 name: Build PR Docker Image on Fork
 
 on:
@@ -6,137 +5,137 @@ on:
     types: [ok-to-test-command]
 
 env:
-    AWS_REGION: us-east-1
+  AWS_REGION: us-east-1
 
 jobs:
-    build_pr_image_on_fork:
-      name: build_pr_image_on_fork
-      permissions:
-        id-token: write
-        contents: read
-        pull-requests: write
-        checks: write
-      if: |
-        github.event_name == 'repository_dispatch' &&
-        github.event.client_payload.slash_command.args.named.sha != '' &&
-        contains(
-          github.event.client_payload.pull_request.head.sha,
-          github.event.client_payload.slash_command.args.named.sha
-        )
-      runs-on: ${{ github.event.client_payload.pull_request.head.repo.fork == true && 'ubuntu-2204-8-cores' || 'ubicloud-standard-8' }}
-      steps:
-        - name: Remove unused tools
-          run: |
-            sudo rm -rf /usr/share/dotnet
-            sudo rm -rf /opt/ghc
-            sudo rm -rf "/usr/local/share/boost"
-            sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-  
-        - name: Clone the current repo
-          # uses: actions/checkout@v3
-          # with:
-          #   ref: 'refs/pull/${{ github.event.client_payload.pull_request.number }}/merge'
-          uses: actions/checkout@v4
-          with:
-            ref: 'refs/pull/${{ github.event.client_payload.pull_request.number }}/merge'
-            # repository: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
-            # ref: ${{ github.event.client_payload.pull_request.head.sha }}
-            # fetch-depth: 0
-            # fetch-tags: true
+  build_pr_image_on_fork:
+    name: build_pr_image_on_fork
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+      checks: write
+    if: |
+      github.event_name == 'repository_dispatch' &&
+      github.event.client_payload.slash_command.args.named.sha != '' &&
+      contains(
+        github.event.client_payload.pull_request.head.sha,
+        github.event.client_payload.slash_command.args.named.sha
+      )
+    runs-on: ${{ github.event.client_payload.pull_request.head.repo.fork == true && 'ubuntu-2204-8-cores' || 'ubicloud-standard-8' }}
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
-        - name: Set GIT_TAG env
-          run: |
-            git fetch -f --tags
-            echo "GIT_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)" >> $GITHUB_ENV
-            echo "GIT_HASH=${{github.event.client_payload.slash_command.args.named.sha}}" >> $GITHUB_ENV
-      
-        - name: Setup Rust Toolchain
-          uses: dtolnay/rust-toolchain@master
-          with:
-            toolchain: nightly-2025-03-02
-            
-        - uses: Swatinem/rust-cache@v2
-          with:
-            cache-on-failure: true
-        - name: Install Protoc
-          uses: arduino/setup-protoc@v3
-          with:
-            version: "21.12"
-        - uses: actions/setup-node@v4
-          with:
-            node-version: 22
-        
-        - name: Build frontend code
-          run: cd web && npm install && npm run build
-        
-        - name: Print rustc cfg
-          run: rustc -C target-cpu=native --print cfg
-          
-        - name: Build and run binary
-          run: |
-            cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu
-            mkdir -p bin
-            mv target/x86_64-unknown-linux-gnu/release/openobserve bin/openobserve
-     
-        - name: Configure AWS Credentials
-          uses: aws-actions/configure-aws-credentials@v4
-          with:
-            aws-region: ${{ env.AWS_REGION }}
-            role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
-            role-session-name: GithubActionsSession
-  
-        - name: Login to Amazon ECR
-          id: login-ecr
-          uses: aws-actions/amazon-ecr-login@v2          
-          with:
-            registry-type: public
-  
-        - name: Set up QEMU
-          uses: docker/setup-qemu-action@v3
-         
-        - name: Set up Docker Buildx
-          uses: docker/setup-buildx-action@v3
+      - name: Clone the current repo
+        # uses: actions/checkout@v3
+        # with:
+        #   ref: 'refs/pull/${{ github.event.client_payload.pull_request.number }}/merge'
+        uses: actions/checkout@v4
+        with:
+          ref: "refs/pull/${{ github.event.client_payload.pull_request.number }}/merge"
+          # repository: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
+          # ref: ${{ github.event.client_payload.pull_request.head.sha }}
+          # fetch-depth: 0
+          # fetch-tags: true
 
-        - name: Build and push
-          uses: docker/build-push-action@v6
-          with:
-            file: deploy/build/Dockerfile.pr.amd64
-            context: .
-            tags: |
-              public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
-            push: true
-            cache-from: type=gha
-            cache-to: type=gha,mode=max
-        # - uses: actions/github-script@v7
-        #   id: update-check-run
-        #   if: ${{ always() }}
-        #   env:
-        #     number: ${{ github.event.client_payload.pull_request.number }}
-        #     job: ${{ github.job }}
-        #     # Conveniently, job.status maps to https://developer.github.com/v3/checks/runs/#update-a-check-run
-        #     conclusion: ${{ job.status }} 
-        #   with:
-        #     github-token: ${{ secrets.GITHUB_TOKEN }}
-        #     script: |
-        #       const { data: pull } = await github.rest.pulls.get({
-        #         ...context.repo,
-        #         pull_number: process.env.number
-        #       });
-        #       const ref = pull.head.sha;
-    
-        #       const { data: checks } = await github.rest.checks.listForRef({
-        #         ...context.repo,
-        #         ref
-        #       });
-        #       console.log(checks)
+      - name: Set GIT_TAG env
+        run: |
+          git fetch -f --tags
+          echo "GIT_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)" >> $GITHUB_ENV
+          echo "GIT_HASH=${{github.event.client_payload.slash_command.args.named.sha}}" >> $GITHUB_ENV
 
-        #       const check = checks.check_runs.filter(c => c.name === process.env.job);
-    
-        #       const { data: result } = await github.rest.checks.update({
-        #         ...context.repo,
-        #         check_run_id: check[0].id,
-        #         status: 'completed',
-        #         conclusion: process.env.conclusion
-        #       });
-    
-        #       return result;
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-05-20
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "21.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build frontend code
+        run: cd web && npm install && npm run build
+
+      - name: Print rustc cfg
+        run: rustc -C target-cpu=native --print cfg
+
+      - name: Build and run binary
+        run: |
+          cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu
+          mkdir -p bin
+          mv target/x86_64-unknown-linux-gnu/release/openobserve bin/openobserve
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
+          role-session-name: GithubActionsSession
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          file: deploy/build/Dockerfile.pr.amd64
+          context: .
+          tags: |
+            public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # - uses: actions/github-script@v7
+      #   id: update-check-run
+      #   if: ${{ always() }}
+      #   env:
+      #     number: ${{ github.event.client_payload.pull_request.number }}
+      #     job: ${{ github.job }}
+      #     # Conveniently, job.status maps to https://developer.github.com/v3/checks/runs/#update-a-check-run
+      #     conclusion: ${{ job.status }}
+      #   with:
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     script: |
+      #       const { data: pull } = await github.rest.pulls.get({
+      #         ...context.repo,
+      #         pull_number: process.env.number
+      #       });
+      #       const ref = pull.head.sha;
+
+      #       const { data: checks } = await github.rest.checks.listForRef({
+      #         ...context.repo,
+      #         ref
+      #       });
+      #       console.log(checks)
+
+      #       const check = checks.check_runs.filter(c => c.name === process.env.job);
+
+      #       const { data: result } = await github.rest.checks.update({
+      #         ...context.repo,
+      #         check_run_id: check[0].id,
+      #         status: 'completed',
+      #         conclusion: process.env.conclusion
+      #       });
+
+      #       return result;

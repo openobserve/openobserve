@@ -70,149 +70,152 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
             <!-- alerts setup  section -->
             <div
-              class="flex tw-mt-2 justify-start items-center q-col-gutter-md flex-wrap "
+              class="flex tw-mt-1 justify-start items-center flex-wrap "
             >
-            <div class=" tw-w-full row alert-setup-container">
-              <AlertsContainer 
-                name="query"
-                v-model:is-expanded="expandState.alertSetup"
-                label="Alert Setup"
-                subLabel="Set the stage for your alert."
-                icon="edit"
-                class="tw-mt-1 tw-w-full col-12"
-            />
-             <div v-show="expandState.alertSetup" class="tw-w-full ">
-
-              <div
-                class="alert-name-input o2-input flex justify-between items-center tw-gap-10 tw-pb-3"
-                style="padding-top: 12px;"
-                data-test="add-alert-name-input-container"
-              >
-                <q-input
-                  data-test="add-alert-name-input row"
-                  v-model="formData.name"
-                  :label="t('alerts.name') + ' *'"
-                  color="input-border"
-                    class="showLabelOnTop col"
-                    :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-                  stack-label
-                  outlined
-                  filled
-                  dense
-                  hide-bottom-space
-                  v-bind:readonly="beingUpdated"
-                  v-bind:disable="beingUpdated"
-                  :rules="[
-                    (val: any) =>
-                      !!val
-                        ? isValidResourceName(val) ||
-                          `Characters like :, ?, /, #, and spaces are not allowed.`
-                        : t('common.nameRequired'),
-                  ]"
-                  tabindex="0"
-                />
-                <div class="col" style="height: 62px;">
-                  <SelectFolderDropDown
-                    :disableDropdown="beingUpdated"
-                    :type="'alerts'"
-                    :style="'height: 30px'"
-                    @folder-selected="updateActiveFolderId"
-                    :activeFolderId="activeFolderId"
-                    :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-                />
-                </div>
-               
+              <div class="tw-w-full tw-ml-2   ">
+                <AlertsContainer 
+                  name="query"
+                  v-model:is-expanded="expandState.alertSetup"
+                  label="Alert Setup"
+                  subLabel="Set the stage for your alert."
+                  icon="edit"
+                  class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
+                  :iconClass="'tw-mt-[2px]'"
+              />
               </div>
-             </div>
+              <div v-if="expandState.alertSetup" class="tw-w-full row alert-setup-container">
+    
+              <div class="tw-w-full ">
 
-             <div
-                class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-3"
-                style="padding-top: 0px"
-                v-show="expandState.alertSetup"
-                data-test="add-alert-stream-type-select-container"
-              >
                 <div
-                  data-test="add-alert-stream-type-select"
-                  class="alert-stream-type o2-input tw-w-full col "
-                  style="padding-top: 0"
-
+                  class="alert-name-input o2-input flex justify-between items-center tw-gap-10 tw-pb-3"
+                  style="padding-top: 12px;"
+                  data-test="add-alert-name-input-container"
                 >
-                  <q-select
-                    data-test="add-alert-stream-type-select-dropdown"
-                    v-model="formData.stream_type"
-                    :options="streamTypes"
-                    :label="t('alerts.streamType') + ' *'"
-                    :popup-content-style="{ textTransform: 'lowercase' }"
+                  <q-input
+                    data-test="add-alert-name-input row"
+                    v-model="formData.name"
+                    :label="t('alerts.name') + ' *'"
                     color="input-border"
-                    class="q-py-sm showLabelOnTop no-case col"
-                    :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+                      class="showLabelOnTop col"
+                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                     stack-label
                     outlined
                     filled
                     dense
+                    hide-bottom-space
                     v-bind:readonly="beingUpdated"
                     v-bind:disable="beingUpdated"
-                    @update:model-value="updateStreams()"
-                    :rules="[(val: any) => !!val || 'Field is required!']"
+                    :rules="[
+                      (val: any) =>
+                        !!val
+                          ? isValidResourceName(val) ||
+                            `Characters like :, ?, /, #, and spaces are not allowed.`
+                          : t('common.nameRequired'),
+                    ]"
+                    tabindex="0"
                   />
-                </div>
-                <div
-                  data-test="add-alert-stream-select"
-                  class="o2-input col"
-                  style="padding-top: 0"
-                >
-                  <q-select
-                    data-test="add-alert-stream-name-select-dropdown"
-                    v-model="formData.stream_name"
-                    :options="filteredStreams"
-                    :label="t('alerts.stream_name') + ' *'"
-                    :loading="isFetchingStreams"
-                    color="input-border"
-                    class="q-py-sm showLabelOnTop no-case col"
-                    :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
-                    filled
-                    stack-label
-                    dense
-                    use-input
-                    hide-selected
-                    fill-input
-                    :input-debounce="400"
-                    v-bind:readonly="beingUpdated"
-                    v-bind:disable="beingUpdated"
-                    @filter="filterStreams"
-                    @update:model-value="
-                      updateStreamFields(formData.stream_name)
-                    "
-                    behavior="menu"
-                    :rules="[(val: any) => !!val || 'Field is required!']"
+                  <div class="col" style="height: 62px;">
+                    <SelectFolderDropDown
+                      :disableDropdown="beingUpdated"
+                      :type="'alerts'"
+                      :style="'height: 30px'"
+                      @folder-selected="updateActiveFolderId"
+                      :activeFolderId="activeFolderId"
+                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
                   />
+                  </div>
+                
                 </div>
               </div>
-              <div   v-if="expandState.alertSetup" class="tw-flex tw-items-center tw-gap-5">
-              <q-radio
-                data-test="add-alert-scheduled-alert-radio"
-                v-bind:readonly="beingUpdated"
-                v-bind:disable="beingUpdated"
-                v-model="formData.is_real_time"
-                :checked="formData.is_real_time"
-                val="false"
-                dense
-                :label="t('alerts.scheduled')"
-                class="q-ml-none"
-              />
-              <q-radio
-                data-test="add-alert-realtime-alert-radio"
-                v-bind:readonly="beingUpdated"
-                v-bind:disable="beingUpdated"
-                v-model="formData.is_real_time"
-                :checked="!formData.is_real_time"
-                val="true"
-                dense
-                :label="t('alerts.realTime')"
-                class="q-ml-none"
-              />
-            </div>
-            </div>
+
+              <div
+                  class="flex tw-w-full items-center justify-between row tw-gap-10 tw-pb-3"
+                  style="padding-top: 0px"
+                  data-test="add-alert-stream-type-select-container"
+                >
+                  <div
+                    data-test="add-alert-stream-type-select"
+                    class="alert-stream-type o2-input tw-w-full col "
+                    style="padding-top: 0"
+
+                  >
+                    <q-select
+                      data-test="add-alert-stream-type-select-dropdown"
+                      v-model="formData.stream_type"
+                      :options="streamTypes"
+                      :label="t('alerts.streamType') + ' *'"
+                      :popup-content-style="{ textTransform: 'lowercase' }"
+                      color="input-border"
+                      class="q-py-sm showLabelOnTop no-case col"
+                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+                      stack-label
+                      outlined
+                      filled
+                      dense
+                      v-bind:readonly="beingUpdated"
+                      v-bind:disable="beingUpdated"
+                      @update:model-value="updateStreams()"
+                      :rules="[(val: any) => !!val || 'Field is required!']"
+                    />
+                  </div>
+                  <div
+                    data-test="add-alert-stream-select"
+                    class="o2-input col"
+                    style="padding-top: 0"
+                  >
+                    <q-select
+                      data-test="add-alert-stream-name-select-dropdown"
+                      v-model="formData.stream_name"
+                      :options="filteredStreams"
+                      :label="t('alerts.stream_name') + ' *'"
+                      :loading="isFetchingStreams"
+                      color="input-border"
+                      class="q-py-sm showLabelOnTop no-case col"
+                      :class="store.state.theme === 'dark' ? 'input-box-bg-dark' : 'input-box-bg-light'"
+                      filled
+                      stack-label
+                      dense
+                      use-input
+                      hide-selected
+                      fill-input
+                      :input-debounce="400"
+                      v-bind:readonly="beingUpdated"
+                      v-bind:disable="beingUpdated"
+                      @filter="filterStreams"
+                      @update:model-value="
+                        updateStreamFields(formData.stream_name)
+                      "
+                      behavior="menu"
+                      :rules="[(val: any) => !!val || 'Field is required!']"
+                    />
+                  </div>
+                </div>
+                <div class="tw-flex tw-items-center tw-gap-5">
+                <q-radio
+                  data-test="add-alert-scheduled-alert-radio"
+                  v-bind:readonly="beingUpdated"
+                  v-bind:disable="beingUpdated"
+                  v-model="formData.is_real_time"
+                  :checked="formData.is_real_time"
+                  val="false"
+                  dense
+                  :label="t('alerts.scheduled')"
+                  class="q-ml-none"
+                />
+                <q-radio
+                  data-test="add-alert-realtime-alert-radio"
+                  v-bind:readonly="beingUpdated"
+                  v-bind:disable="beingUpdated"
+                  v-model="formData.is_real_time"
+                  :checked="!formData.is_real_time"
+                  val="true"
+                  dense
+                  :label="t('alerts.realTime')"
+                  class="q-ml-none"
+                />
+              </div>
+              </div>
             </div>
             
 
@@ -281,22 +284,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
   
-              <!-- this section needs to be moved to the scheduled and relatime alert components -->
-
             <!-- additional setup starts here -->
             <div
-              class="flex tw-mt-2 justify-start items-center q-pb-sm q-col-gutter-md flex-wrap "
+              class="flex tw-mt-1 justify-start items-center q-pb-sm flex-wrap "
             >
-            <div class=" tw-w-full row alert-setup-container" >
+              <div class="tw-w-full tw-ml-2   ">
+                <AlertsContainer 
+                    name="advanced"
+                    v-model:is-expanded="expandState.advancedSetup"
+                    label="Advanced Setup"
+                    :icon="'add'"
+                   class="tw-mt-1 tw-w-full col-12 tw-px-2 tw-py-2 "
+                    />
+            </div>
+            <div v-if="expandState.advancedSetup" class=" tw-w-full row alert-setup-container" >
 
-              <AlertsContainer 
-                name="advanced"
-                v-model:is-expanded="expandState.advancedSetup"
-                label="Advanced Setup"
-                :icon="'add'"
-                subLabel="Go deeper with custom options"
-                class="tw-mt-1 tw-w-full col-12"
-            />
             <div class="tw-w-full row" >
               <div v-if="expandState.advancedSetup" class="tw-mt-2 tw-w-full">
               <variables-input
@@ -381,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
         <div
-          style="width: 420px; height: 300px; position: sticky; top: 0 "
+          style="width: 420px; height: 320px; position: sticky; top: 0 "
           class=" col-2"
         >
           <preview-alert
@@ -598,7 +600,7 @@ export default defineComponent({
       advancedSetup: true,
       realTimeMode: true,
       thresholds: true,
-      multiWindowSelection: true,
+      multiWindowSelection: false,
     });
     var triggerOperators: any = ref([
 
@@ -2078,10 +2080,12 @@ export default defineComponent({
 .dark-mode{
   .alert-setup-container{
   background-color: #212121;
-  padding: 16px 16px 16px 16px;
-  margin-left: 24px;
-  border-radius: 4px;
+  padding: 8px 16px;
+  margin-left: 8px;
   border: 1px solid #343434;
+  border-top: 0px !important;
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px ;
 }
 .q-text-area-input > div > div  { 
   background-color:rgb(30, 31, 31) !important;
@@ -2098,10 +2102,12 @@ export default defineComponent({
 .light-mode{
   .alert-setup-container{
     background-color: #ffffff;
-    padding: 16px 16px 16px 16px;
-    margin-left: 24px;
-    border-radius: 4px;
+    padding: 8px 16px;
+    margin-left: 8px;
     border: 1px solid #e6e6e6;
+    border-top: 0px !important;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px ;
   }
   .custom-input-label{
     color: #5C5C5C;

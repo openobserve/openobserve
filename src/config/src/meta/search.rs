@@ -64,16 +64,13 @@ pub struct Request {
     pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
     #[serde(default)]
     pub timeout: i64,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub search_type: Option<SearchEventType>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default = "default_use_cache")]
     pub use_cache: bool,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub local_mode: Option<bool>,
 }
 
@@ -93,8 +90,8 @@ pub enum RequestEncoding {
 impl From<&str> for RequestEncoding {
     fn from(s: &str) -> Self {
         match s.to_lowercase().as_str() {
-            "base64" => RequestEncoding::Base64,
-            _ => RequestEncoding::Empty,
+            "base64" => Self::Base64,
+            _ => Self::Empty,
         }
     }
 }
@@ -102,8 +99,8 @@ impl From<&str> for RequestEncoding {
 impl std::fmt::Display for RequestEncoding {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            RequestEncoding::Base64 => write!(f, "base64"),
-            RequestEncoding::Empty => write!(f, ""),
+            Self::Base64 => write!(f, "base64"),
+            Self::Empty => write!(f, ""),
         }
     }
 }
@@ -174,22 +171,17 @@ impl Request {
     pub fn decode(&mut self) -> Result<(), std::io::Error> {
         match self.encoding {
             RequestEncoding::Base64 => {
-                self.query.sql = match base64::decode_url(&self.query.sql) {
-                    Ok(v) => {
-                        match crate::utils::query_select_utils::replace_o2_custom_patterns(&v) {
-                            Ok(sql) => sql,
-                            Err(e) => {
-                                log::error!(
-                                    "Error replacing o2 custom patterns , returning original sql: {e}"
-                                );
-                                v
-                            }
+                let decoded = base64::decode_url(&self.query.sql)?;
+                self.query.sql =
+                    match crate::utils::query_select_utils::replace_o2_custom_patterns(&decoded) {
+                        Ok(sql) => sql,
+                        Err(e) => {
+                            log::error!(
+                                "Error replacing o2 custom patterns , returning original sql: {e}"
+                            );
+                            decoded
                         }
-                    }
-                    Err(e) => {
-                        return Err(e);
-                    }
-                };
+                    };
             }
             RequestEncoding::Empty => {}
         }
@@ -204,8 +196,7 @@ pub struct Response {
     pub took: usize,
     #[serde(default)]
     pub took_detail: ResponseTook,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub columns: Vec<String>,
     #[schema(value_type = Vec<Object>)]
     pub hits: Vec<json::Value>,
@@ -213,25 +204,21 @@ pub struct Response {
     pub from: i64,
     pub size: i64,
     pub cached_ratio: usize,
-    #[serde(default)]
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, default)]
     pub scan_files: usize,
     pub scan_size: usize,
     pub idx_scan_size: usize,
     pub scan_records: usize,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(skip_serializing_if = "String::is_empty", default)]
     pub response_type: String,
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub trace_id: String,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub function_error: Vec<String>,
     #[serde(default)]
     pub is_partial: bool,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub histogram_interval: Option<i64>, // seconds, for histogram
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_start_time: Option<i64>,
@@ -326,7 +313,7 @@ impl Iterator for ResponseChunkIterator {
         }
 
         // Create the next chunk of hits
-        let mut current_chunk: Vec<crate::utils::json::Value> = Vec::new();
+        let mut current_chunk: Vec<crate::utils::json::Value> = Vec::with_capacity(self.chunk_size);
         let mut current_chunk_size: usize = 0;
 
         // Keep adding hits until we reach the target chunk size
@@ -572,8 +559,7 @@ pub struct SearchPartitionResponse {
     pub records: usize,
     pub original_size: usize,
     pub compressed_size: usize,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub histogram_interval: Option<i64>, // seconds, for histogram
     pub max_query_range: i64, // hours, for histogram
     pub partitions: Vec<[i64; 2]>,
@@ -690,65 +676,65 @@ impl TryFrom<json::Value> for SearchHistoryHitResponse {
         Ok(SearchHistoryHitResponse {
             org_id: value
                 .get("org_id")
-                .and_then(|v| v.as_str())
-                .ok_or("org_id missing".to_string())?
+                .and_then(json::Value::as_str)
+                .ok_or("org_id missing")?
                 .to_string(),
             stream_type: value
                 .get("stream_type")
-                .and_then(|v| v.as_str())
-                .ok_or("stream_type missing".to_string())?
+                .and_then(json::Value::as_str)
+                .ok_or("stream_type missing")?
                 .to_string(),
             stream_name: value
                 .get("stream_name")
-                .and_then(|v| v.as_str())
-                .ok_or("stream_name missing".to_string())?
+                .and_then(json::Value::as_str)
+                .ok_or("stream_name missing")?
                 .to_string(),
             min_ts: value
                 .get("min_ts")
-                .and_then(|v| v.as_i64())
-                .ok_or("min_ts missing".to_string())?,
+                .and_then(json::Value::as_i64)
+                .ok_or("min_ts missing")?,
             max_ts: value
                 .get("max_ts")
-                .and_then(|v| v.as_i64())
-                .ok_or("max_ts missing".to_string())?,
+                .and_then(json::Value::as_i64)
+                .ok_or("max_ts missing")?,
             request_body: value
                 .get("request_body")
-                .and_then(|v| v.as_str())
-                .ok_or("request_body".to_string())?
+                .and_then(json::Value::as_str)
+                .ok_or("request_body missing")?
                 .to_string(),
             size: value
                 .get("size")
-                .and_then(|v| v.as_f64())
-                .ok_or("size missing".to_string())?,
+                .and_then(json::Value::as_f64)
+                .ok_or("size missing")?,
             num_records: value
                 .get("num_records")
-                .and_then(|v| v.as_i64())
-                .ok_or("num_records missing".to_string())?,
+                .and_then(json::Value::as_i64)
+                .ok_or("num_records missing")?,
             response_time: value
                 .get("response_time")
-                .and_then(|v| v.as_f64())
-                .ok_or("response_time missing".to_string())?,
+                .and_then(json::Value::as_f64)
+                .ok_or("response_time missing")?,
             cached_ratio: value
                 .get("cached_ratio")
-                .and_then(|v| v.as_i64())
-                .ok_or("cached_ratio missing".to_string())?,
+                .and_then(json::Value::as_i64)
+                .ok_or("cached_ratio missing")?,
             trace_id: value
                 .get("trace_id")
-                .and_then(|v| v.as_str())
-                .ok_or("trace_id missing".to_string())?
+                .and_then(json::Value::as_str)
+                .ok_or("trace_id missing")?
                 .to_string(),
             function: value
                 .get("function")
-                .and_then(|v| v.as_str())
+                .and_then(json::Value::as_str)
                 .map(|v| v.to_string()),
-            _timestamp: value.get("_timestamp").and_then(|v| v.as_i64()),
+            _timestamp: value.get("_timestamp").and_then(json::Value::as_i64),
             unit: value
                 .get("unit")
-                .and_then(|v| v.as_str())
+                .and_then(json::Value::as_str)
                 .map(|v| v.to_string()),
             event: value
                 .get("event")
-                .and_then(|v| v.as_str())
+                .and_then(json::Value::as_str)
                 .map(|v| v.to_string()),
         })
     }
@@ -837,9 +823,9 @@ impl ScanStats {
 impl From<Query> for cluster_rpc::SearchQuery {
     fn from(query: Query) -> Self {
         cluster_rpc::SearchQuery {
-            sql: query.sql.clone(),
+            sql: query.sql,
             quick_mode: query.quick_mode,
-            query_type: query.query_type.clone(),
+            query_type: query.query_type,
             from: query.from as i32,
             size: query.size as i32,
             start_time: query.start_time,
@@ -933,15 +919,15 @@ impl<'de> Deserialize<'de> for SearchEventType {
 impl std::fmt::Display for SearchEventType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            SearchEventType::UI => write!(f, "ui"),
-            SearchEventType::Dashboards => write!(f, "dashboards"),
-            SearchEventType::Reports => write!(f, "reports"),
-            SearchEventType::Alerts => write!(f, "alerts"),
-            SearchEventType::Values => write!(f, "_values"),
-            SearchEventType::Other => write!(f, "other"),
-            SearchEventType::RUM => write!(f, "rum"),
-            SearchEventType::DerivedStream => write!(f, "derived_stream"),
-            SearchEventType::SearchJob => write!(f, "search_job"),
+            Self::UI => write!(f, "ui"),
+            Self::Dashboards => write!(f, "dashboards"),
+            Self::Reports => write!(f, "reports"),
+            Self::Alerts => write!(f, "alerts"),
+            Self::Values => write!(f, "_values"),
+            Self::Other => write!(f, "other"),
+            Self::RUM => write!(f, "rum"),
+            Self::DerivedStream => write!(f, "derived_stream"),
+            Self::SearchJob => write!(f, "search_job"),
         }
     }
 }
@@ -949,17 +935,16 @@ impl std::fmt::Display for SearchEventType {
 impl TryFrom<&str> for SearchEventType {
     type Error = String;
     fn try_from(s: &str) -> std::result::Result<Self, Self::Error> {
-        let s = s.to_lowercase();
-        match s.as_str() {
-            "ui" => Ok(SearchEventType::UI),
-            "dashboards" => Ok(SearchEventType::Dashboards),
-            "reports" => Ok(SearchEventType::Reports),
-            "alerts" => Ok(SearchEventType::Alerts),
-            "values" | "_values" => Ok(SearchEventType::Values),
-            "other" => Ok(SearchEventType::Other),
-            "rum" => Ok(SearchEventType::RUM),
-            "derived_stream" | "derivedstream" => Ok(SearchEventType::DerivedStream),
-            "search_job" | "searchjob" => Ok(SearchEventType::SearchJob),
+        match s.to_lowercase().as_str() {
+            "ui" => Ok(Self::UI),
+            "dashboards" => Ok(Self::Dashboards),
+            "reports" => Ok(Self::Reports),
+            "alerts" => Ok(Self::Alerts),
+            "values" | "_values" => Ok(Self::Values),
+            "other" => Ok(Self::Other),
+            "rum" => Ok(Self::RUM),
+            "derived_stream" | "derivedstream" => Ok(Self::DerivedStream),
+            "search_job" | "searchjob" => Ok(Self::SearchJob),
             _ => Err(format!(
                 "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`"
             )),
@@ -978,29 +963,19 @@ pub struct ValuesEventContext {
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct SearchEventContext {
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub alert_key: Option<String>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub derived_stream_key: Option<String>,
-    #[serde(default)]
-    #[serde(rename = "report_id")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "report_id")]
     pub report_key: Option<String>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dashboard_id: Option<String>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dashboard_name: Option<String>,
-    #[serde(default)]
-    #[serde(rename = "folder_id")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "folder_id")]
     pub dashboard_folder_id: Option<String>,
-    #[serde(default)]
-    #[serde(rename = "folder_name")]
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "folder_name")]
     pub dashboard_folder_name: Option<String>,
 }
 
@@ -1326,6 +1301,853 @@ mod tests {
         req.decode().unwrap();
         assert_eq!(req.query.sql, "select * from test");
     }
+
+    #[test]
+    fn test_request_encoding_from_str() {
+        assert_eq!(RequestEncoding::from("base64"), RequestEncoding::Base64);
+        assert_eq!(RequestEncoding::from("BASE64"), RequestEncoding::Base64);
+        assert_eq!(RequestEncoding::from(""), RequestEncoding::Empty);
+        assert_eq!(RequestEncoding::from("unknown"), RequestEncoding::Empty);
+    }
+
+    #[test]
+    fn test_request_encoding_display() {
+        assert_eq!(RequestEncoding::Base64.to_string(), "base64");
+        assert_eq!(RequestEncoding::Empty.to_string(), "");
+    }
+
+    #[test]
+    fn test_query_default() {
+        let query = Query::default();
+        assert_eq!(query.sql, "");
+        assert_eq!(query.from, 0);
+        assert_eq!(query.size, 10);
+        assert_eq!(query.start_time, 0);
+        assert_eq!(query.end_time, 0);
+        assert!(!query.quick_mode);
+        assert_eq!(query.query_type, "");
+        assert!(!query.track_total_hits);
+        assert!(!query.uses_zo_fn);
+        assert!(query.query_fn.is_none());
+        assert!(query.action_id.is_none());
+        assert!(!query.skip_wal);
+        assert!(!query.streaming_output);
+        assert!(query.streaming_id.is_none());
+        assert_eq!(query.histogram_interval, 0);
+    }
+
+    #[test]
+    fn test_response_new() {
+        let response = Response::new(5, 20);
+        assert_eq!(response.from, 5);
+        assert_eq!(response.size, 20);
+        assert_eq!(response.total, 0);
+        assert_eq!(response.took, 0);
+        assert!(response.hits.is_empty());
+        assert!(response.columns.is_empty());
+    }
+
+    #[test]
+    fn test_response_pagination() {
+        let mut response = Response::new(0, 10);
+        response.hits = vec![
+            json::json!({"id": 1}),
+            json::json!({"id": 2}),
+            json::json!({"id": 3}),
+            json::json!({"id": 4}),
+            json::json!({"id": 5}),
+        ];
+        response.total = 5;
+
+        // Test normal pagination
+        response.pagination(1, 2);
+        assert_eq!(response.from, 1);
+        assert_eq!(response.size, 2);
+        assert_eq!(response.hits.len(), 2);
+        assert_eq!(response.hits[0]["id"], 2);
+        assert_eq!(response.hits[1]["id"], 3);
+
+        // Test pagination beyond total
+        response.pagination(10, 5);
+        assert_eq!(response.from, 10);
+        assert_eq!(response.size, 5);
+        assert!(response.hits.is_empty());
+        assert_eq!(response.total, 0);
+    }
+
+    #[test]
+    fn test_response_setters() {
+        let mut response = Response::new(0, 10);
+
+        response.set_took(100);
+        assert_eq!(response.took, 100);
+        assert_eq!(response.took_detail.total, 100);
+
+        response.set_cache_took(20);
+        assert_eq!(response.took_detail.cache_took, 20);
+
+        response.set_wait_in_queue(30);
+        assert_eq!(response.took_detail.wait_in_queue, 30);
+
+        response.set_search_took(100, 10, 5);
+        assert_eq!(response.took_detail.search_took, 85);
+        assert_eq!(response.took_detail.file_list_took, 10);
+        assert_eq!(response.took_detail.idx_took, 5);
+
+        response.set_total(50);
+        assert_eq!(response.total, 50);
+
+        response.set_scan_files(25);
+        assert_eq!(response.scan_files, 25);
+
+        response.set_cached_ratio(75);
+        assert_eq!(response.cached_ratio, 75);
+
+        response.set_scan_size(1024);
+        assert_eq!(response.scan_size, 1024);
+
+        response.set_idx_scan_size(512);
+        assert_eq!(response.idx_scan_size, 512);
+
+        response.set_scan_records(1000);
+        assert_eq!(response.scan_records, 1000);
+
+        response.set_trace_id("trace123".to_string());
+        assert_eq!(response.trace_id, "trace123");
+
+        response.set_partial(true, "Partial data warning".to_string());
+        assert!(response.is_partial);
+        assert_eq!(response.function_error.len(), 1);
+        assert_eq!(response.function_error[0], "Partial data warning");
+
+        response.set_partial(false, "Another warning".to_string());
+        assert!(!response.is_partial);
+        assert_eq!(response.function_error.len(), 2);
+
+        response.set_histogram_interval(Some(3600));
+        assert_eq!(response.histogram_interval, Some(3600));
+
+        response.set_work_group(Some("workgroup1".to_string()));
+        assert_eq!(response.work_group, Some("workgroup1".to_string()));
+
+        response.set_order_by(Some(OrderBy::Asc));
+        assert_eq!(response.order_by, Some(OrderBy::Asc));
+
+        response.set_result_cache_ratio(90);
+        assert_eq!(response.result_cache_ratio, 90);
+    }
+
+    #[test]
+    fn test_response_took_add() {
+        let mut took1 = ResponseTook {
+            total: 100,
+            cache_took: 10,
+            file_list_took: 20,
+            wait_in_queue: 5,
+            idx_took: 15,
+            search_took: 50,
+        };
+
+        let took2 = ResponseTook {
+            total: 200,
+            cache_took: 15,
+            file_list_took: 25,
+            wait_in_queue: 10,
+            idx_took: 20,
+            search_took: 130,
+        };
+
+        took1.add(&took2);
+        assert_eq!(took1.cache_took, 25);
+        assert_eq!(took1.file_list_took, 45);
+        assert_eq!(took1.wait_in_queue, 15);
+        assert_eq!(took1.idx_took, 35);
+        assert_eq!(took1.search_took, 180);
+    }
+
+    #[test]
+    fn test_search_partition_request_decode() {
+        let mut req = SearchPartitionRequest {
+            sql: "c2VsZWN0ICogZnJvbSB0ZXN0".to_string(),
+            start_time: 0,
+            end_time: 1000,
+            encoding: RequestEncoding::Base64,
+            regions: vec!["region1".to_string()],
+            clusters: vec!["cluster1".to_string()],
+            query_fn: Some("fn1".to_string()),
+            streaming_output: false,
+            histogram_interval: 0,
+        };
+
+        req.decode().unwrap();
+        assert_eq!(req.sql, "select * from test");
+        assert_eq!(req.encoding, RequestEncoding::Empty);
+    }
+
+    #[test]
+    fn test_search_partition_request_from_request() {
+        let request = Request {
+            query: Query {
+                sql: "SELECT * FROM test".to_string(),
+                start_time: 100,
+                end_time: 200,
+                query_fn: Some("test_fn".to_string()),
+                streaming_output: true,
+                histogram_interval: 3600,
+                ..Default::default()
+            },
+            encoding: RequestEncoding::Base64,
+            regions: vec!["region1".to_string()],
+            clusters: vec!["cluster1".to_string()],
+            ..Default::default()
+        };
+
+        let partition_req: SearchPartitionRequest = (&request).into();
+        assert_eq!(partition_req.sql, "SELECT * FROM test");
+        assert_eq!(partition_req.start_time, 100);
+        assert_eq!(partition_req.end_time, 200);
+        assert_eq!(partition_req.encoding, RequestEncoding::Base64);
+        assert_eq!(partition_req.regions, vec!["region1".to_string()]);
+        assert_eq!(partition_req.clusters, vec!["cluster1".to_string()]);
+        assert_eq!(partition_req.query_fn, Some("test_fn".to_string()));
+        assert!(partition_req.streaming_output);
+        assert_eq!(partition_req.histogram_interval, 3600);
+    }
+
+    #[test]
+    fn test_search_history_request_validate() {
+        let valid_req = SearchHistoryRequest {
+            start_time: 100,
+            end_time: 200,
+            ..Default::default()
+        };
+        assert!(valid_req.validate().unwrap());
+
+        let invalid_req = SearchHistoryRequest {
+            start_time: 200,
+            end_time: 100,
+            ..Default::default()
+        };
+        assert!(invalid_req.validate().is_err());
+    }
+
+    #[test]
+    fn test_search_history_request_to_query_req() {
+        let req = SearchHistoryRequest {
+            org_id: Some("org1".to_string()),
+            stream_type: Some("logs".to_string()),
+            start_time: 100,
+            end_time: 200,
+            size: 50,
+            ..Default::default()
+        };
+
+        let query_req = req.to_query_req("usage").unwrap();
+        assert_eq!(query_req.query.start_time, 100);
+        assert_eq!(query_req.query.end_time, 200);
+        assert_eq!(query_req.query.size, 50);
+        assert!(query_req.query.sql.contains("org_id = 'org1'"));
+        assert!(query_req.query.sql.contains("stream_type = 'logs'"));
+    }
+
+    #[test]
+    fn test_search_history_hit_response_try_from() {
+        let json_value = json::json!({
+            "org_id": "org1",
+            "stream_type": "logs",
+            "stream_name": "test_stream",
+            "min_ts": 100,
+            "max_ts": 200,
+            "request_body": "SELECT * FROM test",
+            "size": 1024.5,
+            "num_records": 1000,
+            "response_time": 50.0,
+            "cached_ratio": 75,
+            "trace_id": "trace123",
+            "function": "test_fn",
+            "_timestamp": 150,
+            "unit": "bytes",
+            "event": "search"
+        });
+
+        let response: SearchHistoryHitResponse = json_value.try_into().unwrap();
+        assert_eq!(response.org_id, "org1");
+        assert_eq!(response.stream_type, "logs");
+        assert_eq!(response.stream_name, "test_stream");
+        assert_eq!(response.min_ts, 100);
+        assert_eq!(response.max_ts, 200);
+        assert_eq!(response.request_body, "SELECT * FROM test");
+        assert_eq!(response.size, 1024.5);
+        assert_eq!(response.num_records, 1000);
+        assert_eq!(response.response_time, 50.0);
+        assert_eq!(response.cached_ratio, 75);
+        assert_eq!(response.trace_id, "trace123");
+        assert_eq!(response.function, Some("test_fn".to_string()));
+        assert_eq!(response._timestamp, Some(150));
+        assert_eq!(response.unit, Some("bytes".to_string()));
+        assert_eq!(response.event, Some("search".to_string()));
+    }
+
+    #[test]
+    fn test_scan_stats_new() {
+        let stats = ScanStats::new();
+        assert_eq!(stats.files, 0);
+        assert_eq!(stats.records, 0);
+        assert_eq!(stats.original_size, 0);
+        assert_eq!(stats.compressed_size, 0);
+    }
+
+    #[test]
+    fn test_scan_stats_add() {
+        let mut stats1 = ScanStats {
+            files: 10,
+            records: 100,
+            original_size: 1024,
+            compressed_size: 512,
+            querier_files: 5,
+            querier_memory_cached_files: 3,
+            querier_disk_cached_files: 2,
+            idx_scan_size: 256,
+            idx_took: 50,
+            file_list_took: 30,
+            aggs_cache_ratio: 80,
+        };
+
+        let stats2 = ScanStats {
+            files: 20,
+            records: 200,
+            original_size: 2048,
+            compressed_size: 1024,
+            querier_files: 10,
+            querier_memory_cached_files: 6,
+            querier_disk_cached_files: 4,
+            idx_scan_size: 512,
+            idx_took: 60,
+            file_list_took: 40,
+            aggs_cache_ratio: 90,
+        };
+
+        stats1.add(&stats2);
+        assert_eq!(stats1.files, 30);
+        assert_eq!(stats1.records, 300);
+        assert_eq!(stats1.original_size, 3072);
+        assert_eq!(stats1.compressed_size, 1536);
+        assert_eq!(stats1.querier_files, 15);
+        assert_eq!(stats1.querier_memory_cached_files, 9);
+        assert_eq!(stats1.querier_disk_cached_files, 6);
+        assert_eq!(stats1.idx_scan_size, 768);
+        assert_eq!(stats1.idx_took, 60); // max
+        assert_eq!(stats1.file_list_took, 40); // max
+        assert_eq!(stats1.aggs_cache_ratio, 80); // min
+    }
+
+    #[test]
+    fn test_scan_stats_format_to_mb() {
+        let mut stats = ScanStats {
+            original_size: 1048576,  // 1MB in bytes
+            compressed_size: 524288, // 0.5MB in bytes
+            idx_scan_size: 2097152,  // 2MB in bytes
+            ..Default::default()
+        };
+
+        stats.format_to_mb();
+        assert_eq!(stats.original_size, 1);
+        assert_eq!(stats.compressed_size, 0);
+        assert_eq!(stats.idx_scan_size, 2);
+    }
+
+    #[test]
+    fn test_search_event_type_try_from() {
+        type SET = SearchEventType; // Saving line too long
+        assert_eq!(SET::try_from("ui").unwrap(), SET::UI);
+        assert_eq!(SET::try_from("dashboards").unwrap(), SET::Dashboards);
+        assert_eq!(SET::try_from("reports").unwrap(), SET::Reports);
+        assert_eq!(SET::try_from("alerts").unwrap(), SET::Alerts);
+        assert_eq!(SET::try_from("values").unwrap(), SET::Values);
+        assert_eq!(SET::try_from("_values").unwrap(), SET::Values);
+        assert_eq!(SET::try_from("other").unwrap(), SET::Other);
+        assert_eq!(SET::try_from("rum").unwrap(), SET::RUM);
+        assert_eq!(SET::try_from("derived_stream").unwrap(), SET::DerivedStream);
+        assert_eq!(SET::try_from("derivedstream").unwrap(), SET::DerivedStream);
+        assert_eq!(SET::try_from("search_job").unwrap(), SET::SearchJob);
+        assert_eq!(SET::try_from("searchjob").unwrap(), SET::SearchJob);
+        assert!(SearchEventType::try_from("invalid").is_err());
+    }
+
+    #[test]
+    fn test_search_event_type_display() {
+        assert_eq!(SearchEventType::UI.to_string(), "ui");
+        assert_eq!(SearchEventType::Dashboards.to_string(), "dashboards");
+        assert_eq!(SearchEventType::Reports.to_string(), "reports");
+        assert_eq!(SearchEventType::Alerts.to_string(), "alerts");
+        assert_eq!(SearchEventType::Values.to_string(), "_values");
+        assert_eq!(SearchEventType::Other.to_string(), "other");
+        assert_eq!(SearchEventType::RUM.to_string(), "rum");
+        assert_eq!(SearchEventType::DerivedStream.to_string(), "derived_stream");
+        assert_eq!(SearchEventType::SearchJob.to_string(), "search_job");
+    }
+
+    #[test]
+    fn test_search_event_context_builder_methods() {
+        let alert_ctx = SearchEventContext::with_alert(Some("alert123".to_string()));
+        assert_eq!(alert_ctx.alert_key, Some("alert123".to_string()));
+
+        let derived_ctx = SearchEventContext::with_derived_stream(Some("stream123".to_string()));
+        assert_eq!(
+            derived_ctx.derived_stream_key,
+            Some("stream123".to_string())
+        );
+
+        let report_ctx = SearchEventContext::with_report(Some("report123".to_string()));
+        assert_eq!(report_ctx.report_key, Some("report123".to_string()));
+
+        let dashboard_ctx = SearchEventContext::with_dashboard(
+            Some("dashboard123".to_string()),
+            Some("Dashboard Name".to_string()),
+            Some("folder123".to_string()),
+            Some("Folder Name".to_string()),
+        );
+        assert_eq!(dashboard_ctx.dashboard_id, Some("dashboard123".to_string()));
+        assert_eq!(
+            dashboard_ctx.dashboard_name,
+            Some("Dashboard Name".to_string())
+        );
+        assert_eq!(
+            dashboard_ctx.dashboard_folder_id,
+            Some("folder123".to_string())
+        );
+        assert_eq!(
+            dashboard_ctx.dashboard_folder_name,
+            Some("Folder Name".to_string())
+        );
+    }
+
+    #[test]
+    fn test_search_event_context_enrich_for_dashboard() {
+        let mut ctx = SearchEventContext::default();
+        ctx.enrich_for_dashboard(
+            "New Dashboard".to_string(),
+            "New Folder".to_string(),
+            "new_folder_id".to_string(),
+        );
+        assert_eq!(ctx.dashboard_name, Some("New Dashboard".to_string()));
+        assert_eq!(ctx.dashboard_folder_name, Some("New Folder".to_string()));
+        assert_eq!(ctx.dashboard_folder_id, Some("new_folder_id".to_string()));
+    }
+
+    #[test]
+    fn test_query_to_cluster_rpc() {
+        let query = Query {
+            sql: "SELECT * FROM test".to_string(),
+            quick_mode: true,
+            query_type: "test".to_string(),
+            from: 10,
+            size: 20,
+            start_time: 100,
+            end_time: 200,
+            track_total_hits: true,
+            uses_zo_fn: true,
+            query_fn: Some("test_fn".to_string()),
+            action_id: Some("action123".to_string()),
+            skip_wal: true,
+            histogram_interval: 3600,
+            ..Default::default()
+        };
+
+        let cluster_query: cluster_rpc::SearchQuery = query.into();
+        assert_eq!(cluster_query.sql, "SELECT * FROM test");
+        assert!(cluster_query.quick_mode);
+        assert_eq!(cluster_query.query_type, "test");
+        assert_eq!(cluster_query.from, 10);
+        assert_eq!(cluster_query.size, 20);
+        assert_eq!(cluster_query.start_time, 100);
+        assert_eq!(cluster_query.end_time, 200);
+        assert!(cluster_query.track_total_hits);
+        assert!(cluster_query.uses_zo_fn);
+        assert_eq!(cluster_query.query_fn, "test_fn");
+        assert_eq!(cluster_query.action_id, "action123");
+        assert!(cluster_query.skip_wal);
+        assert_eq!(cluster_query.histogram_interval, 3600);
+    }
+
+    #[test]
+    fn test_scan_stats_conversions() {
+        let stats = ScanStats {
+            files: 10,
+            records: 100,
+            original_size: 1024,
+            compressed_size: 512,
+            querier_files: 5,
+            querier_memory_cached_files: 3,
+            querier_disk_cached_files: 2,
+            idx_scan_size: 256,
+            idx_took: 50,
+            file_list_took: 30,
+            aggs_cache_ratio: 80,
+        };
+
+        // Test conversion to cluster_rpc::ScanStats
+        let cluster_stats: cluster_rpc::ScanStats = (&stats).into();
+        assert_eq!(cluster_stats.files, 10);
+        assert_eq!(cluster_stats.records, 100);
+        assert_eq!(cluster_stats.original_size, 1024);
+        assert_eq!(cluster_stats.compressed_size, 512);
+        assert_eq!(cluster_stats.querier_files, 5);
+        assert_eq!(cluster_stats.querier_memory_cached_files, 3);
+        assert_eq!(cluster_stats.querier_disk_cached_files, 2);
+        assert_eq!(cluster_stats.idx_scan_size, 256);
+        assert_eq!(cluster_stats.idx_took, 50);
+        assert_eq!(cluster_stats.file_list_took, 30);
+        assert_eq!(cluster_stats.aggs_cache_ratio, 80);
+
+        // Test conversion from cluster_rpc::ScanStats
+        let converted_stats: ScanStats = (&cluster_stats).into();
+        assert_eq!(converted_stats.files, 10);
+        assert_eq!(converted_stats.records, 100);
+        assert_eq!(converted_stats.original_size, 1024);
+        assert_eq!(converted_stats.compressed_size, 512);
+        assert_eq!(converted_stats.querier_files, 5);
+        assert_eq!(converted_stats.querier_memory_cached_files, 3);
+        assert_eq!(converted_stats.querier_disk_cached_files, 2);
+        assert_eq!(converted_stats.idx_scan_size, 256);
+        assert_eq!(converted_stats.idx_took, 50);
+        assert_eq!(converted_stats.file_list_took, 30);
+        assert_eq!(converted_stats.aggs_cache_ratio, 80);
+    }
+
+    #[test]
+    fn test_response_chunk_iterator() {
+        let mut response = Response::new(0, 10);
+        response.hits = vec![
+            json::json!({"id": 1, "data": "small"}),
+            json::json!({"id": 2, "data": "small"}),
+            json::json!({"id": 3, "data": "small"}),
+        ];
+        response.total = 3;
+
+        let iterator = ResponseChunkIterator::new(response, Some(100)); // Small chunk size
+        let chunks: Vec<ResponseChunk> = iterator.collect();
+
+        // Should have metadata chunk + hits chunks
+        assert!(!chunks.is_empty());
+
+        // First chunk should be metadata
+        if let ResponseChunk::Metadata { response } = &chunks[0] {
+            assert!(response.hits.is_empty());
+            assert_eq!(response.total, 3);
+        } else {
+            panic!("First chunk should be metadata");
+        }
+    }
+
+    #[test]
+    fn test_stream_response_chunks_iterator() {
+        let chunks = StreamResponseChunks {
+            chunks_iter: None,
+            single_chunk: Some(Ok(BytesImpl::from("test data"))),
+        };
+
+        let items: Vec<Result<BytesImpl, std::io::Error>> = chunks.collect();
+        assert_eq!(items.len(), 1);
+        assert!(items[0].is_ok());
+    }
+
+    #[test]
+    fn test_multi_stream_request_to_query_req() {
+        let request = MultiStreamRequest {
+            sql: vec![
+                SqlQuery {
+                    sql: "SELECT * FROM table1".to_string(),
+                    start_time: Some(100),
+                    end_time: Some(200),
+                    query_fn: Some("fn1".to_string()),
+                    is_old_format: false,
+                },
+                SqlQuery {
+                    sql: "SELECT * FROM table2".to_string(),
+                    start_time: None,
+                    end_time: None,
+                    query_fn: None,
+                    is_old_format: true,
+                },
+            ],
+            encoding: RequestEncoding::Base64,
+            timeout: 30,
+            from: 5,
+            size: 25,
+            start_time: 50,
+            end_time: 250,
+            sort_by: Some("timestamp".to_string()),
+            quick_mode: true,
+            query_type: "test".to_string(),
+            track_total_hits: true,
+            uses_zo_fn: true,
+            query_fn: Some("global_fn".to_string()),
+            skip_wal: true,
+            regions: vec!["region1".to_string()],
+            clusters: vec!["cluster1".to_string()],
+            search_type: Some(SearchEventType::UI),
+            search_event_context: Some(SearchEventContext::default()),
+            index_type: "parquet".to_string(),
+            per_query_response: true,
+        };
+
+        let query_reqs = request.to_query_req();
+        assert_eq!(query_reqs.len(), 2);
+
+        // Check first query
+        let first_req = &query_reqs[0];
+        assert_eq!(first_req.query.sql, "SELECT * FROM table1");
+        assert_eq!(first_req.query.start_time, 100);
+        assert_eq!(first_req.query.end_time, 200);
+        assert_eq!(first_req.query.from, 5);
+        assert_eq!(first_req.query.size, 25);
+        assert!(first_req.query.quick_mode);
+        assert_eq!(first_req.query.query_type, "test");
+        assert!(first_req.query.track_total_hits);
+        assert!(first_req.query.uses_zo_fn);
+        assert!(first_req.query.skip_wal);
+        assert_eq!(first_req.encoding, RequestEncoding::Base64);
+        assert_eq!(first_req.timeout, 30);
+        assert_eq!(first_req.regions, vec!["region1".to_string()]);
+        assert_eq!(first_req.clusters, vec!["cluster1".to_string()]);
+        assert_eq!(first_req.search_type, Some(SearchEventType::UI));
+
+        // Check second query
+        let second_req = &query_reqs[1];
+        assert_eq!(second_req.query.sql, "SELECT * FROM table2");
+        assert_eq!(second_req.query.start_time, 50); // Uses global start_time
+        assert_eq!(second_req.query.end_time, 250); // Uses global end_time
+    }
+
+    #[test]
+    fn test_time_offset() {
+        let time_offset = TimeOffset {
+            start_time: 100,
+            end_time: 200,
+        };
+        assert_eq!(time_offset.start_time, 100);
+        assert_eq!(time_offset.end_time, 200);
+    }
+
+    #[test]
+    fn test_storage_type() {
+        assert_eq!(StorageType::Memory, StorageType::Memory);
+        assert_eq!(StorageType::Wal, StorageType::Wal);
+        assert_ne!(StorageType::Memory, StorageType::Wal);
+    }
+
+    #[test]
+    fn test_session() {
+        let session = Session {
+            id: "session123".to_string(),
+            storage_type: StorageType::Memory,
+            work_group: Some("workgroup1".to_string()),
+            target_partitions: 4,
+        };
+        assert_eq!(session.id, "session123");
+        assert_eq!(session.storage_type, StorageType::Memory);
+        assert_eq!(session.work_group, Some("workgroup1".to_string()));
+        assert_eq!(session.target_partitions, 4);
+    }
+
+    #[test]
+    fn test_values_event_context() {
+        let ctx = ValuesEventContext {
+            top_k: Some(10),
+            no_count: true,
+            field: "test_field".to_string(),
+        };
+        assert_eq!(ctx.top_k, Some(10));
+        assert!(ctx.no_count);
+        assert_eq!(ctx.field, "test_field");
+    }
+
+    #[test]
+    fn test_values_request() {
+        let request = ValuesRequest {
+            fields: vec!["field1".to_string(), "field2".to_string()],
+            size: Some(100),
+            no_count: true,
+            regions: vec!["region1".to_string()],
+            clusters: vec!["cluster1".to_string()],
+            vrl_fn: Some("vrl_fn".to_string()),
+            start_time: Some(100),
+            end_time: Some(200),
+            filter: Some("filter_expr".to_string()),
+            timeout: Some(30),
+            use_cache: true,
+            stream_name: "test_stream".to_string(),
+            stream_type: StreamType::Logs,
+            sql: "SELECT * FROM test".to_string(),
+        };
+
+        assert_eq!(request.fields.len(), 2);
+        assert_eq!(request.size, Some(100));
+        assert!(request.no_count);
+        assert_eq!(request.regions.len(), 1);
+        assert_eq!(request.clusters.len(), 1);
+        assert_eq!(request.vrl_fn, Some("vrl_fn".to_string()));
+        assert_eq!(request.start_time, Some(100));
+        assert_eq!(request.end_time, Some(200));
+        assert_eq!(request.filter, Some("filter_expr".to_string()));
+        assert_eq!(request.timeout, Some(30));
+        assert!(request.use_cache);
+        assert_eq!(request.stream_name, "test_stream");
+        assert_eq!(request.stream_type, StreamType::Logs);
+        assert_eq!(request.sql, "SELECT * FROM test");
+    }
+
+    #[test]
+    fn test_hash_file_request_response() {
+        let request = HashFileRequest {
+            files: vec!["file1.txt".to_string(), "file2.txt".to_string()],
+        };
+        assert_eq!(request.files.len(), 2);
+
+        let mut response = HashFileResponse::default();
+        response.files.insert(
+            "file1.txt".to_string(),
+            [("hash".to_string(), "abc123".to_string())]
+                .into_iter()
+                .collect(),
+        );
+        assert_eq!(response.files.len(), 1);
+        assert!(response.files.contains_key("file1.txt"));
+    }
+
+    #[test]
+    fn test_pagination_query() {
+        let query = PaginationQuery {
+            from: Some(10),
+            size: Some(20),
+        };
+        assert_eq!(query.from, Some(10));
+        assert_eq!(query.size, Some(20));
+    }
+
+    #[test]
+    fn test_sql_query() {
+        let query = SqlQuery {
+            sql: "SELECT * FROM test".to_string(),
+            start_time: Some(100),
+            end_time: Some(200),
+            query_fn: Some("test_fn".to_string()),
+            is_old_format: false,
+        };
+        assert_eq!(query.sql, "SELECT * FROM test");
+        assert_eq!(query.start_time, Some(100));
+        assert_eq!(query.end_time, Some(200));
+        assert_eq!(query.query_fn, Some("test_fn".to_string()));
+        assert!(!query.is_old_format);
+    }
+
+    #[test]
+    fn test_multi_search_partition_request() {
+        let request = MultiSearchPartitionRequest {
+            sql: vec![
+                "SELECT * FROM table1".to_string(),
+                "SELECT * FROM table2".to_string(),
+            ],
+            start_time: 100,
+            end_time: 200,
+            encoding: RequestEncoding::Base64,
+            regions: vec!["region1".to_string()],
+            clusters: vec!["cluster1".to_string()],
+            query_fn: Some("test_fn".to_string()),
+            streaming_output: true,
+            histogram_interval: 3600,
+        };
+        assert_eq!(request.sql.len(), 2);
+        assert_eq!(request.start_time, 100);
+        assert_eq!(request.end_time, 200);
+        assert_eq!(request.encoding, RequestEncoding::Base64);
+        assert_eq!(request.regions.len(), 1);
+        assert_eq!(request.clusters.len(), 1);
+        assert_eq!(request.query_fn, Some("test_fn".to_string()));
+        assert!(request.streaming_output);
+        assert_eq!(request.histogram_interval, 3600);
+    }
+
+    #[test]
+    fn test_multi_search_partition_response() {
+        let mut response = MultiSearchPartitionResponse::default();
+        let partition_response = SearchPartitionResponse {
+            trace_id: "trace123".to_string(),
+            file_num: 10,
+            records: 100,
+            original_size: 1024,
+            compressed_size: 512,
+            histogram_interval: Some(3600),
+            max_query_range: 24,
+            partitions: vec![[100, 200]],
+            order_by: OrderBy::Asc,
+            limit: 1000,
+            streaming_output: true,
+            streaming_aggs: false,
+            streaming_id: Some("stream123".to_string()),
+        };
+
+        response
+            .success
+            .insert("query1".to_string(), partition_response);
+        response
+            .error
+            .insert("query2".to_string(), "Error message".to_string());
+
+        assert_eq!(response.success.len(), 1);
+        assert_eq!(response.error.len(), 1);
+        assert!(response.success.contains_key("query1"));
+        assert!(response.error.contains_key("query2"));
+    }
+
+    #[test]
+    fn test_query_status_response() {
+        let response = QueryStatusResponse {
+            status: vec![QueryStatus {
+                trace_id: "trace123".to_string(),
+                status: "running".to_string(),
+                created_at: 100,
+                started_at: 110,
+                work_group: "workgroup1".to_string(),
+                user_id: Some("user123".to_string()),
+                org_id: Some("org123".to_string()),
+                stream_type: Some("logs".to_string()),
+                query: Some(QueryInfo {
+                    sql: "SELECT * FROM test".to_string(),
+                    start_time: 100,
+                    end_time: 200,
+                }),
+                scan_stats: Some(ScanStats::new()),
+                search_type: Some(SearchEventType::UI),
+            }],
+        };
+        assert_eq!(response.status.len(), 1);
+        assert_eq!(response.status[0].trace_id, "trace123");
+        assert_eq!(response.status[0].status, "running");
+    }
+
+    #[test]
+    fn test_cancel_query_response() {
+        let response = CancelQueryResponse {
+            trace_id: "trace123".to_string(),
+            is_success: true,
+        };
+        assert_eq!(response.trace_id, "trace123");
+        assert!(response.is_success);
+    }
+
+    #[test]
+    fn test_query_info() {
+        let info = QueryInfo {
+            sql: "SELECT * FROM test".to_string(),
+            start_time: 100,
+            end_time: 200,
+        };
+        assert_eq!(info.sql, "SELECT * FROM test");
+        assert_eq!(info.start_time, 100);
+        assert_eq!(info.end_time, 200);
+    }
 }
 
 mod search_history_utils {
@@ -1377,29 +2199,19 @@ mod search_history_utils {
         pub fn build(self, search_stream_name: &str) -> String {
             let mut query = format!("SELECT * FROM {search_stream_name} WHERE event='Search'");
 
-            if let Some(org_id) = self.org_id
-                && !org_id.is_empty()
-            {
+            if let Some(org_id) = self.org_id.filter(|s| !s.is_empty()) {
                 query.push_str(&format!(" AND org_id = '{org_id}'"));
             }
-            if let Some(stream_type) = self.stream_type
-                && !stream_type.is_empty()
-            {
+            if let Some(stream_type) = self.stream_type.filter(|s| !s.is_empty()) {
                 query.push_str(&format!(" AND stream_type = '{stream_type}'"));
             }
-            if let Some(stream_name) = self.stream_name
-                && !stream_name.is_empty()
-            {
+            if let Some(stream_name) = self.stream_name.filter(|s| !s.is_empty()) {
                 query.push_str(&format!(" AND stream_name = '{stream_name}'"));
             }
-            if let Some(user_email) = self.user_email
-                && !user_email.is_empty()
-            {
+            if let Some(user_email) = self.user_email.filter(|s| !s.is_empty()) {
                 query.push_str(&format!(" AND user_email = '{user_email}'"));
             }
-            if let Some(trace_id) = self.trace_id
-                && !trace_id.is_empty()
-            {
+            if let Some(trace_id) = self.trace_id.filter(|s| !s.is_empty()) {
                 query.push_str(&format!(" AND trace_id = '{trace_id}'"));
             }
 
