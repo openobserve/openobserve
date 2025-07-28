@@ -1527,7 +1527,7 @@ export default defineComponent({
                 if (
                   localStreamFields[
                     searchObj.organizationIdentifier + "_" + selectedStream
-                  ].indexOf(field.name) == -1 &&
+                  ]?.indexOf(field.name) == -1 &&
                   field.name !== store.state.zoConfig?.timestamp_column &&
                   !defaultInterestingFields.has(field.name)
                 ) {
