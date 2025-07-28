@@ -45,7 +45,7 @@ import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitVal
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import { useAnnotations } from "./useAnnotations";
 import useHttpStreamingSearch from "../useStreamingSearch";
-import { requiresApiCall } from "@/utils/panelConfigComparator";
+import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -1658,7 +1658,10 @@ export const usePanelDataLoader = (
       const [newSchema] = newVal;
       const [oldSchema] = oldVal;
 
-      const needsApiCall = requiresApiCall(oldSchema, newSchema);
+      const needsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+        oldSchema,
+        newSchema,
+      );
 
       if (!needsApiCall) {
         return;

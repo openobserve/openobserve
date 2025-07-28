@@ -48,7 +48,10 @@ const getChangedKeys = (oldObj: any, newObj: any): string[] => {
 /**
  * Checks if the changes between old and new config require an API call
  */
-export const requiresApiCall = (oldConfig: any, newConfig: any): boolean => {
+export const checkIfConfigChangeRequiredApiCallOrNot = (
+  oldConfig: any,
+  newConfig: any,
+): boolean => {
   const changedKeys = getChangedKeys(oldConfig, newConfig);
   const needsApiCall = changedKeys.some((key) =>
     Array.from(API_REQUIRING_CHANGES).some((apiKey) => key.startsWith(apiKey)),

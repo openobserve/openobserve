@@ -517,7 +517,7 @@ import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
-import { requiresApiCall } from "@/utils/panelConfigComparator";
+import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -906,7 +906,7 @@ export default defineComponent({
       let needsApiCall = false;
 
       if (configChanged) {
-        needsApiCall = requiresApiCall(
+        needsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
           chartData.value,
           dashboardPanelData.data,
         );
@@ -1572,7 +1572,10 @@ export default defineComponent({
 
     const debouncedUpdateChartConfig = debounce((newVal, oldVal) => {
       if (!isEqual(chartData.value, newVal)) {
-        const needsApiCall = requiresApiCall(chartData.value, newVal);
+        const needsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+          chartData.value,
+          newVal,
+        );
 
         if (!needsApiCall) {
           chartData.value = JSON.parse(JSON.stringify(newVal));
