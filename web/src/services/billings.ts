@@ -64,7 +64,7 @@ const billings = {
     );
   },
   submit_new_user_info: async ( org_identifier: string, payload: any,) => {
-    return http().post(`/api/${org_identifier}/billings/new_user_attrition`, payload);
+    return http().post(`/api/${org_identifier}/billings/new_user_attribution`, payload);
   }
 };
 
