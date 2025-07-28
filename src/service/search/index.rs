@@ -792,7 +792,7 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
             let Expr::Function(func) = expr.as_ref() else {
                 return false;
             };
-            if func.name.to_string().to_lowercase() == MATCH_ALL_UDF_NAME {
+            if func.name.to_string().to_lowercase() != MATCH_ALL_UDF_NAME {
                 return false;
             }
             matches!(&func.args, FunctionArguments::List(list) if list.args.len() == 1)
