@@ -228,14 +228,6 @@ mod tests {
 
         let physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
-        // use datafusion::physical_plan::displayable;
-        // println!(
-        //     "{}",
-        //     displayable(physical_plan.as_ref())
-        //         .indent(false)
-        //         .to_string()
-        // );
-
         let expected = vec![
             "AggregateExec: mode=Final, gby=[], aggr=[count(*)]",
             "  CoalescePartitionsExec",
@@ -302,14 +294,6 @@ mod tests {
 
         let physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
-        // use datafusion::physical_plan::displayable;
-        // println!(
-        //     "{}",
-        //     displayable(physical_plan.as_ref())
-        //         .indent(false)
-        //         .to_string()
-        // );
-
         let expected = vec![
             "CoalesceBatchesExec: target_batch_size=8192",
             "  HashJoinExec: mode=Partitioned, join_type=Inner, on=[(id@0, id@0)], projection=[id@1]",
@@ -375,14 +359,6 @@ mod tests {
         // println!("{}", plan.to_string());
 
         let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-
-        // use datafusion::physical_plan::displayable;
-        // println!(
-        //     "{}",
-        //     displayable(physical_plan.as_ref())
-        //         .indent(false)
-        //         .to_string()
-        // );
 
         let expected = vec![
             "CoalesceBatchesExec: target_batch_size=8192",
