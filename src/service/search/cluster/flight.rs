@@ -833,14 +833,22 @@ pub(crate) async fn partition_file_by_hash(
     for fk in file_id_list {
         let node_name =
             infra_cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group)
-                .await
-                .expect("there is no querier node in consistent hash ring");
-        let idx = match node_idx.get(&node_name) {
-            Some(idx) => *idx,
+                .await;
+        let idx = match node_name {
+            Some(node_name) => match node_idx.get(&node_name) {
+                Some(idx) => *idx,
+                None => {
+                    log::warn!(
+                        "partition_file_by_hash: {} not found in node_idx",
+                        node_name
+                    );
+                    0
+                }
+            },
             None => {
-                log::error!(
-                    "partition_file_by_hash: {} not found in node_idx",
-                    node_name
+                log::warn!(
+                    "partition_file_by_hash: {} can't get a node from consistent hashing",
+                    fk.id
                 );
                 0
             }
