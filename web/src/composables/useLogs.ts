@@ -3383,7 +3383,7 @@ const useLogs = () => {
                 ? [...localInterestingFields.value?.[
                     searchObj.organizationIdentifier + "_" + stream.name
                   ], ...filteredEnvironmentInterestingFields]
-                : [...Array.from(environmentInterestingFields)]
+                : [...filteredEnvironmentInterestingFields]
 
             
 
