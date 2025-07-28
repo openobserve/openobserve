@@ -91,6 +91,7 @@ pub async fn query_optimiser(
             match result {
                 Ok(table_columns) => {
                     println!("Analysis by table:");
+                    let mut recos: HashMap<String, Vec<OptimiserRecommendation>> = HashMap::new();
                     for (table_name, columns) in &table_columns {
                         if let Some(stream_settings) = stream_map.get(table_name) {
                             println!("--------------------------------------------------------");
@@ -115,6 +116,13 @@ pub async fn query_optimiser(
                                         "col {} , is secondary index hence use str_match",
                                         col.column_name
                                     );
+                                    recos.entry(table_name.clone()).or_insert(Vec::new()).push(OptimiserRecommendation {
+                                        stream_name: table_name.clone(),
+                                        column_name: col.column_name.clone(),
+                                        recommendation: "Use str_match".to_string(),
+                                        reason: "Column is a secondary index and not using str_match   - {}: used operators={:?}, occurrences={}".to_string(),
+                                        r_type: OptimiserRecommendationType::QueryOptimisation,
+                                    });
                                     println!(
                                         "  - {}: used operators={:?}, occurrences={}",
                                         col.column_name, col.operators, col.occurrences
@@ -132,6 +140,13 @@ pub async fn query_optimiser(
                                         "  - {}: operators={:?}, occurrences={}",
                                         col.column_name, col.operators, col.occurrences
                                     );
+                                    recos.entry(table_name.clone()).or_insert(Vec::new()).push(OptimiserRecommendation {
+                                        stream_name: table_name.clone(),
+                                        column_name: col.column_name.clone(),
+                                        recommendation: "Use match_all".to_string(),
+                                        reason: format!("Column is a full text search key and not using match_all   - {}: used operators={:?}, occurrences={}", col.column_name, col.operators, col.occurrences),
+                                        r_type: OptimiserRecommendationType::QueryOptimisation,
+                                    });
                                 } else {
                                     for (operator, occurrences) in &col.operator_occurrences {
                                         if *operator == O2Operators::Eq.to_string()
@@ -142,6 +157,13 @@ pub async fn query_optimiser(
                                                 "Enable secondary index for col {} , occurrences {} of total {}",
                                                 col.column_name, occurrences, col.occurrences
                                             );
+                                            recos.entry(table_name.clone()).or_insert(Vec::new()).push(OptimiserRecommendation {
+                                                stream_name: table_name.clone(),
+                                                column_name: col.column_name.clone(),
+                                                recommendation: format!("Enable secondary index for col {}", col.column_name),
+                                                reason: format!("{}: used operators={:?}, occurrences={} of total {}", col.column_name, operator, occurrences, col.occurrences),
+                                                r_type: OptimiserRecommendationType::StreamSettings,
+                                            });
                                         } else if *operator == O2Operators::Like.to_string()
                                             || *operator == O2Operators::RegexMatch.to_string()
                                         {
@@ -149,11 +171,29 @@ pub async fn query_optimiser(
                                                 "Enable full text search for col {} , occurrences {} of total {}",
                                                 col.column_name, occurrences, col.occurrences
                                             );
+                                            recos.entry(table_name.clone()).or_insert(Vec::new()).push(OptimiserRecommendation {
+                                                stream_name: table_name.clone(),
+                                                column_name: col.column_name.clone(),
+                                                recommendation: "Use full text search".to_string(),
+                                                reason: format!("{}: used operators={:?}, occurrences={} of total {}", col.column_name, operator, occurrences, col.occurrences),
+                                                r_type: OptimiserRecommendationType::StreamSettings,
+                                            });
                                         }
                                     }
                                 }
                             }
                         }
+                    }
+                    for (stream_name, recommendations) in recos {
+                        println!("--------------------------------------------------------");
+                        println!("********** {stream_name} **********");
+                        for recommendation in recommendations {
+                            println!(
+                                "Recommendation: {} - {} - {}",
+                                recommendation.r_type , recommendation.recommendation, recommendation.reason
+                            );
+                        }
+                        println!("--------------------------------------------------------");
                     }
                 }
                 Err(e) => {
@@ -347,4 +387,28 @@ pub async fn query_optimiser(
 ) -> Result<(), Error> {
     println!("query_optimiser not supported");
     Ok(())
+}
+
+#[derive(Debug, Clone)]
+struct OptimiserRecommendation {
+    pub stream_name: String,
+    pub column_name: String,
+    pub recommendation: String,
+    pub reason: String,
+    pub r_type: OptimiserRecommendationType,
+}
+
+#[derive(Debug, Clone)]
+pub enum OptimiserRecommendationType {
+    QueryOptimisation,
+    StreamSettings,
+}
+
+impl std::fmt::Display for OptimiserRecommendationType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            OptimiserRecommendationType::QueryOptimisation => write!(f, "QueryOptimisation"),
+            OptimiserRecommendationType::StreamSettings => write!(f, "StreamSettings"),
+        }
+    }
 }
