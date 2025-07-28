@@ -81,7 +81,7 @@ pub mod remote {
 
         crate::service::db::file_list::set(&account, &remote_key, Some(file_meta), false).await?;
 
-        log::debug!("Uploaded enrichment table {} to remote", table_name);
+        log::debug!("Uploaded enrichment table {table_name} to remote");
         Ok(())
     }
 
@@ -128,10 +128,7 @@ pub mod remote {
 
         upload_to_remote(org_id, table_name, file_meta, &data, min_ts).await?;
 
-        log::debug!(
-            "Merged and uploaded enrichment table {} to remote",
-            table_name
-        );
+        log::debug!("Merged and uploaded enrichment table {table_name} to remote",);
 
         // Delete the data from the db
         database::delete(org_id, table_name).await?;
@@ -203,16 +200,11 @@ pub mod remote {
             for (org_id, table_name) in org_table_pairs {
                 match merge_and_upload_to_remote(&org_id, &table_name).await {
                     Ok(_) => {
-                        log::debug!(
-                            "Merged and uploaded enrichment table {} to remote",
-                            table_name
-                        );
+                        log::debug!("Merged and uploaded enrichment table {table_name} to remote",);
                     }
                     Err(e) => {
                         log::error!(
-                            "Failed to merge and upload enrichment table {}: {}",
-                            table_name,
-                            e
+                            "Failed to merge and upload enrichment table {table_name}: {e}",
                         );
                     }
                 }
@@ -264,7 +256,7 @@ pub mod local {
             .await
             .map_err(|e| anyhow!("Failed to write metadata file: {}", e))?;
 
-        log::debug!("Stored enrichment table {} to local storage", key);
+        log::debug!("Stored enrichment table {key} to local storage");
         Ok(())
     }
 
@@ -326,7 +318,7 @@ pub mod local {
             .await
             .map_err(|e| anyhow!("Failed to write metadata file: {}", e))?;
 
-        log::debug!("Deleted enrichment table {} from local storage", key);
+        log::debug!("Deleted enrichment table {key} from local storage");
         Ok(())
     }
 
@@ -412,7 +404,7 @@ pub mod database {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to save enrichment data: {}", e))?;
 
-        log::debug!("Stored enrichment table {} to database", table_name);
+        log::debug!("Stored enrichment table {table_name} to database");
         Ok(())
     }
 
@@ -422,11 +414,7 @@ pub mod database {
         {
             Ok(data) => Ok(data.0),
             Err(e) => {
-                log::error!(
-                    "Failed to retrieve enrichment table {} from database: {}",
-                    table_name,
-                    e
-                );
+                log::error!("Failed to retrieve enrichment table {table_name} from database: {e}",);
                 Err(anyhow::anyhow!(
                     "Failed to retrieve enrichment table {}: {}",
                     table_name,
@@ -444,10 +432,7 @@ pub mod database {
                 anyhow::anyhow!("Failed to delete enrichment table {}: {e}", table_name)
             })?;
 
-        log::debug!(
-            "Deleted enrichment table {} from database storage",
-            table_name
-        );
+        log::debug!("Deleted enrichment table {table_name} from database storage",);
         Ok(())
     }
 

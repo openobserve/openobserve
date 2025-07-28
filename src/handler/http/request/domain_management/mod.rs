@@ -60,7 +60,7 @@ pub async fn get_domain_management_config(path: web::Path<String>) -> Result<Htt
     match domain_management::get_domain_management_config().await {
         Ok(response) => Ok(MetaHttpResponse::json(response)),
         Err(e) => {
-            log::error!("Error getting domain management config: {}", e);
+            log::error!("Error getting domain management config: {e}");
             match e {
                 infra::errors::Error::Message(ref msg) if msg.contains("not found") => {
                     Ok(MetaHttpResponse::not_found(e))
@@ -104,7 +104,7 @@ pub async fn set_domain_management_config(
     match domain_management::set_domain_management_config(request).await {
         Ok(response) => Ok(MetaHttpResponse::json(response)),
         Err(e) => {
-            log::error!("Error setting domain management config: {}", e);
+            log::error!("Error setting domain management config: {e}");
             match e {
                 infra::errors::Error::Message(_) => Ok(MetaHttpResponse::bad_request(e)),
                 _ => Ok(MetaHttpResponse::internal_error(e)),

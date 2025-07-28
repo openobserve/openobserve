@@ -46,7 +46,7 @@ pub async fn delete(org_id: &str, table_name: &str) -> Result<()> {
         .await
         .map_err(|e| anyhow!("Failed to write metadata file: {}", e))?;
 
-    log::debug!("Deleted enrichment table {} from local storage", key);
+    log::debug!("Deleted enrichment table {key} from local storage");
     Ok(())
 }
 
