@@ -42,9 +42,9 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request, get_work_group,
+                get_is_ui_histogram_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
             },
             stream::get_settings_max_query_range,
         },
@@ -155,6 +155,7 @@ async fn can_use_distinct_stream(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
     ),
     request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
         "query": {
@@ -222,6 +223,7 @@ pub async fn search(
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let is_ui_histogram = get_is_ui_histogram_from_request(&query);
 
     let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
@@ -233,6 +235,15 @@ pub async fn search(
         return Ok(MetaHttpResponse::bad_request(e));
     }
     req.use_cache = Some(use_cache);
+
+    // Handle histogram data for UI
+    if is_ui_histogram {
+        // TODO: Modify the original query to a histogram query
+        // e.g.:
+        // original_query: SELECT * FROM "olympics"
+        // histogram_query: SELECT histogram(_timestamp) AS "zo_sql_key", COUNT(*) AS "zo_sql_num"
+        // FROM "olympics" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC
+    }
 
     // set search event type
     if req.search_type.is_none() {

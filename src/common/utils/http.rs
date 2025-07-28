@@ -95,6 +95,14 @@ pub(crate) fn get_use_cache_from_request(query: &Query<HashMap<String, String>>)
 }
 
 #[inline(always)]
+pub(crate) fn get_is_ui_histogram_from_request(query: &Query<HashMap<String, String>>) -> bool {
+    let Some(v) = query.get("is_ui_histogram") else {
+        return false;
+    };
+    v.to_lowercase().as_str().parse::<bool>().unwrap_or(false)
+}
+
+#[inline(always)]
 pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
     match query.get("folder") {
         Some(s) => s.to_string(),
