@@ -838,7 +838,7 @@ pub(crate) async fn partition_file_by_hash(
         let idx = match node_idx.get(&node_name) {
             Some(idx) => *idx,
             None => {
-                log::error!(
+                log::warn!(
                     "partition_file_by_hash: {} not found in node_idx",
                     node_name
                 );
