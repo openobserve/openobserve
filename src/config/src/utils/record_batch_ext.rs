@@ -645,7 +645,10 @@ pub fn sort_record_batch_by_column(
 
 #[cfg(test)]
 mod test {
-    use arrow::{array::{Array, StringViewArray}, util::pretty::pretty_format_batches};
+    use arrow::{
+        array::{Array, StringViewArray},
+        util::pretty::pretty_format_batches,
+    };
     use arrow_schema::Field;
 
     use super::*;
@@ -1146,7 +1149,7 @@ mod test {
 
         assert_eq!(record_batch.num_rows(), 3);
         assert_eq!(record_batch.schema(), schema);
-        
+
         // Test Utf8View column
         let name_array = record_batch
             .column(0)
@@ -1156,7 +1159,7 @@ mod test {
         assert_eq!(name_array.value(0), "Alice");
         assert_eq!(name_array.value(1), "Bob");
         assert_eq!(name_array.value(2), "Charlie");
-        
+
         // Test Int64 column
         let age_array = record_batch
             .column(1)
@@ -1166,7 +1169,7 @@ mod test {
         assert_eq!(age_array.value(0), 25);
         assert_eq!(age_array.value(1), 30);
         assert_eq!(age_array.value(2), 35);
-        
+
         // Test Utf8 column with null values
         let city_array = record_batch
             .column(2)

@@ -549,8 +549,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 &get_dex_config().client_id,
                 true,
                 true,
-            )
-            .await;
+            );
             let id_token;
             match token_ver {
                 Ok(res) => {

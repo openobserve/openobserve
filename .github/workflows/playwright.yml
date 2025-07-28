@@ -59,7 +59,7 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-03-02
+          toolchain: nightly-2025-05-20
           targets: x86_64-unknown-linux-gnu
       - uses: Swatinem/rust-cache@v2
         with:
@@ -141,6 +141,7 @@ jobs:
             "Streams/streamname.spec.js",
             "Streams/streaming.spec.js",
             "Logs/unflattened.spec.js",
+            "Logs/logsqueries.cte.spec.js",
             "Logs/logsqueries.matchall.spec.js",
             "GeneralTests/usersOrg.spec.js",
             "Logs/websocket.spec.js",
