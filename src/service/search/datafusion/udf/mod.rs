@@ -55,15 +55,7 @@ pub(crate) const REGEX_NOT_MATCH_UDF_NAME: &str = "re_not_match";
 /// The name of the regex_matches UDF given to DataFusion.
 pub(crate) const REGEX_MATCHES_UDF_NAME: &str = "re_matches";
 
-pub(crate) const DEFAULT_FUNCTIONS: [ZoFunction; 13] = [
-    ZoFunction {
-        name: "match_all_raw",
-        text: "match_all_raw('v')",
-    },
-    ZoFunction {
-        name: "match_all_raw_ignore_case",
-        text: "match_all_raw_ignore_case('v')",
-    },
+pub(crate) const DEFAULT_FUNCTIONS: [ZoFunction; 11] = [
     ZoFunction {
         name: "match_all",
         text: "match_all('v')",

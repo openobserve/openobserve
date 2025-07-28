@@ -59,7 +59,7 @@ use super::datafusion::udf::cipher_udf::{
 };
 use super::{
     datafusion::udf::match_all_udf::{
-        FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
+        FUZZY_MATCH_ALL_UDF_NAME, 
         MATCH_ALL_UDF_NAME,
     },
     index::{IndexCondition, get_index_condition_from_expr},
@@ -1095,8 +1095,6 @@ impl VisitorMut for MatchVisitor {
         if let Expr::Function(func) = expr {
             let name = func.name.to_string().to_lowercase();
             if name == MATCH_ALL_UDF_NAME
-                || name == MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME
-                || name == MATCH_ALL_RAW_UDF_NAME
                 || name == FUZZY_MATCH_ALL_UDF_NAME
             {
                 if let FunctionArguments::List(list) = &func.args {

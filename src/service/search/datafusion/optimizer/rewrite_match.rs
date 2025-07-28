@@ -30,10 +30,7 @@ use datafusion::{
 
 use crate::service::search::datafusion::udf::{
     fuzzy_match_udf,
-    match_all_udf::{
-        FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
-        MATCH_ALL_UDF_NAME,
-    },
+    match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
 };
 
 /// Optimization rule that rewrite match_all() to str_match()
@@ -95,8 +92,6 @@ fn is_match_all(expr: &Expr) -> bool {
     match expr {
         Expr::ScalarFunction(ScalarFunction { func, .. }) => {
             func.name().to_lowercase() == MATCH_ALL_UDF_NAME
-                || func.name() == MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME
-                || func.name() == MATCH_ALL_RAW_UDF_NAME
                 || func.name() == FUZZY_MATCH_ALL_UDF_NAME
         }
         _ => false,
@@ -333,9 +328,7 @@ mod tests {
         let ctx = SessionContext::new_with_state(state);
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.register_udf(match_all_udf::MATCH_ALL_RAW_UDF.clone());
         ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
-        ctx.register_udf(match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
         ctx.register_udf(match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
 
         for item in sqls {
