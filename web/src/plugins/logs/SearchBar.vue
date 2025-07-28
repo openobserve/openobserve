@@ -1903,8 +1903,11 @@ export default defineComponent({
       }
 
       if (parsedSQL?._next) {
-        columnNames = getColumnNames(parsedSQL._next);
+        columnNames = [
+          ...new Set([...columnNames, ...getColumnNames(parsedSQL._next)]),
+        ];
       }
+
       return columnNames;
     };
 
