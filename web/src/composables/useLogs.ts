@@ -3368,6 +3368,8 @@ const useLogs = () => {
                   "_" +
                   stream.name
               ] = Array.from(deselectedFields).filter((field: any) => environmentInterestingFields.has(field));
+
+              useLocalInterestingFields(localInterestingFields.value);
             }
 
             const filteredDeselectedFields =
