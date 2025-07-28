@@ -58,19 +58,29 @@ use crate::service::search::{
     utils::get_field_name,
 };
 
+// this function will split the expression into two parts
+// the first part is the index condition (can use index)
+// the second part is the other expression (can not use index)
+// For example, if the expr is "match_all('bar') AND a = 1 AND b like '%foo%'",
+// and the a is secondary index field.
+// the firist part is "match_all('bar') AND a = 1" (convert to IndexCondition that use tantivy)
+// the second part is "b like '%foo%'" (use datafusion)
 pub fn get_index_condition_from_expr(
     index_fields: &HashSet<String>,
     expr: &Expr,
 ) -> (Option<IndexCondition>, Option<Expr>) {
     let mut other_expr = Vec::new();
+    // split the expression by AND operator
     let expr_list = split_conjunction(expr);
     let mut index_condition = IndexCondition::default();
     for e in expr_list {
+        // validate the expression if it can use index
         if !is_expr_valid_for_index(e, index_fields) {
             other_expr.push(e);
             continue;
         }
 
+        // convert the expression to Condition
         let multi_condition = Condition::from_expr(e);
         index_condition.add_condition(multi_condition);
     }
@@ -267,6 +277,8 @@ impl Condition {
         }
     }
 
+    /// this function will convert the expr to Condition
+    /// and the Expr is valid by [`is_expr_valid_for_index`]
     pub fn from_expr(expr: &Expr) -> Self {
         match expr {
             Expr::BinaryOp {
