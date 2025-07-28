@@ -39,6 +39,11 @@ pub(crate) fn get_stream_type_from_request(
 }
 
 #[inline(always)]
+pub(crate) fn get_ts_from_request(query: &Query<HashMap<String, String>>) -> Option<i64> {
+    query.get("ts").map(|s| s.parse::<i64>().unwrap_or(0))
+}
+
+#[inline(always)]
 pub(crate) fn get_fallback_order_by_col_from_request(
     query: &Query<HashMap<String, String>>,
 ) -> Option<String> {
