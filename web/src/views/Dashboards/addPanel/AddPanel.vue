@@ -1579,10 +1579,6 @@ export default defineComponent({
 
         if (!configNeedsApiCall) {
           chartData.value = JSON.parse(JSON.stringify(newVal));
-          console.log(
-            "Config-only changes detected, updating chartData without API call",
-            chartData.value,
-          );
 
           window.dispatchEvent(new Event("resize"));
         }
