@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod histogram;
+
 use std::{ops::ControlFlow, sync::Arc};
 
 use arrow_schema::FieldRef;
@@ -1706,13 +1708,13 @@ impl VisitorMut for ComplexQueryVisitor {
 }
 
 #[derive(Debug)]
-struct HistogramIntervalVisitor {
+pub struct HistogramIntervalVisitor {
     pub interval: Option<i64>,
     time_range: Option<(i64, i64)>,
 }
 
 impl HistogramIntervalVisitor {
-    fn new(time_range: Option<(i64, i64)>) -> Self {
+    pub fn new(time_range: Option<(i64, i64)>) -> Self {
         Self {
             interval: None,
             time_range,

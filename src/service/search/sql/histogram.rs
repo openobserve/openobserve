@@ -14,13 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use anyhow::Result;
+use config::utils::sql::is_eligible_for_histogram;
 use sqlparser::{
     ast::{SetExpr, Statement},
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
-
-use crate::utils::sql::is_eligible_for_histogram;
 
 /// Converts an original query to a histogram query
 /// Extracts WHERE clause and builds histogram query with provided stream name

@@ -247,7 +247,10 @@ pub async fn search(
     // Handle histogram data for UI
     if is_ui_histogram {
         // Convert the original query to a histogram query
-        match config::utils::histogram::convert_to_histogram_query(&req.query.sql, &stream_names) {
+        match crate::service::search::sql::histogram::convert_to_histogram_query(
+            &req.query.sql,
+            &stream_names,
+        ) {
             Ok(histogram_query) => {
                 req.query.sql = histogram_query;
             }
