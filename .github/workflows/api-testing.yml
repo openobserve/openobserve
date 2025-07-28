@@ -33,6 +33,13 @@ jobs:
       - name: Checkout git repo
         uses: actions/checkout@v4
 
+      - name: Check if API code has changes and skip if none
+        run: |
+          if [[ -n "${{ github.event.before }}" ]] && ! git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^src/"; then
+            echo "API code hasn't changed, skipping unit tests"
+            exit 0
+          fi
+
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
