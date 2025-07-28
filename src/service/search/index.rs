@@ -253,6 +253,8 @@ pub enum Condition {
     All(),
     Or(Box<Condition>, Box<Condition>),
     And(Box<Condition>, Box<Condition>),
+    // TODO: add Not operator in Condition
+    // Not(Box<Condition>),
 }
 
 impl Condition {
