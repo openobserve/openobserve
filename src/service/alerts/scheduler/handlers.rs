@@ -305,19 +305,21 @@ async fn handle_alert_triggers(
         );
         final_end_time = skipped_timestamps_end_timestamp.1;
         let skipped_timestamps = skipped_timestamps_end_timestamp.0;
-
         // Skip Alerts: Say for some reason, this alert trigger (period: 10mins, frequency 5mins)
         // which was supposed to run at 10am is now processed after a delay of 5 mins (may be alert
         // manager was stuck or something). In that case, only use the period strictly to evaluate
         // the alert. If the delay is within the max considerable delay, consider the delay with
         // period, otherwise strictly use the period only. Also, since we are skipping this alert
         // (9:50am to 10am timerange), we need to report this event to the `triggers` usage stream.
-        for timestamp in skipped_timestamps {
-            let start_time = timestamp
+        if !skipped_timestamps.is_empty() {
+            let skipped_first_timestamp = skipped_timestamps.first().unwrap();
+            let skipped_last_timestamp = skipped_timestamps.last().unwrap();
+            let start_time = skipped_first_timestamp
                 - Duration::try_minutes(alert.trigger_condition.period)
                     .unwrap()
                     .num_microseconds()
                     .unwrap();
+            let skipped_alerts_count = skipped_timestamps.len();
             // If delay is greater than the alert frequency, skip them and report the event
             // to the `triggers` usage stream.
             publish_triggers_usage(TriggerData {
@@ -330,7 +332,7 @@ async fn handle_alert_triggers(
                 is_silenced: trigger.is_silenced,
                 status: TriggerDataStatus::Skipped,
                 start_time,
-                end_time: timestamp,
+                end_time: *skipped_last_timestamp,
                 retries: trigger.retries,
                 delay_in_secs: Some(delay),
                 error: None,
@@ -341,6 +343,7 @@ async fn handle_alert_triggers(
                 query_took: None,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 time_in_queue_ms: Some(time_in_queue),
+                skipped_alerts_count: Some(skipped_alerts_count as i64),
             })
             .await;
         }
@@ -385,6 +388,7 @@ async fn handle_alert_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(time_in_queue),
+        skipped_alerts_count: None,
     };
 
     let evaluation_took = Instant::now();
@@ -773,6 +777,7 @@ async fn handle_report_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
+        skipped_alerts_count: None,
     };
 
     if trigger.retries >= max_retries {
@@ -917,6 +922,7 @@ async fn handle_derived_stream_triggers(
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
+            skipped_alerts_count: None,
         };
 
         log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
@@ -941,45 +947,6 @@ async fn handle_derived_stream_triggers(
             );
             return Ok(());
         }
-    }
-
-    if !pipeline.enabled {
-        // Pipeline not enabled, check again in 5 mins
-        let msg = format!(
-            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
-        );
-        new_trigger.next_run_at += Duration::try_minutes(5)
-            .unwrap()
-            .num_microseconds()
-            .unwrap();
-        let trigger_data_stream = TriggerData {
-            _timestamp: now_micros(),
-            org: new_trigger.org.clone(),
-            module: TriggerDataType::DerivedStream,
-            key: new_trigger.module_key.clone(),
-            next_run_at: new_trigger.next_run_at,
-            is_realtime: new_trigger.is_realtime,
-            is_silenced: new_trigger.is_silenced,
-            status: TriggerDataStatus::Failed,
-            start_time: 0,
-            end_time: 0,
-            retries: new_trigger.retries,
-            error: Some(msg.clone()),
-            success_response: None,
-            is_partial: None,
-            delay_in_secs: None,
-            evaluation_took_in_secs: None,
-            source_node: Some(LOCAL_NODE.name.clone()),
-            query_took: None,
-            scheduler_trace_id: Some(scheduler_trace_id.clone()),
-            time_in_queue_ms: Some(time_in_queue),
-        };
-        log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
-        new_trigger_data.reset();
-        new_trigger.data = new_trigger_data.to_json_string();
-        db::scheduler::update_trigger(new_trigger).await?;
-        publish_triggers_usage(trigger_data_stream).await;
-        return Ok(());
     }
 
     let Some(derived_stream) = pipeline.get_derived_stream() else {
@@ -1011,6 +978,7 @@ async fn handle_derived_stream_triggers(
             query_took: None,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             time_in_queue_ms: Some(time_in_queue),
+            skipped_alerts_count: None,
         };
         log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
         new_trigger_data.reset();
@@ -1112,6 +1080,46 @@ async fn handle_derived_stream_triggers(
         end = aligned_curr_time;
     }
 
+    if !pipeline.enabled {
+        // Pipeline not enabled, check again in 5 mins
+        let msg = format!(
+            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
+        );
+        new_trigger.next_run_at += Duration::try_minutes(5)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        let trigger_data_stream = TriggerData {
+            _timestamp: now_micros(),
+            org: new_trigger.org.clone(),
+            module: TriggerDataType::DerivedStream,
+            key: new_trigger.module_key.clone(),
+            next_run_at: new_trigger.next_run_at,
+            is_realtime: new_trigger.is_realtime,
+            is_silenced: new_trigger.is_silenced,
+            status: TriggerDataStatus::Skipped,
+            start_time: 0,
+            end_time: 0,
+            retries: new_trigger.retries,
+            error: Some(msg.clone()),
+            success_response: None,
+            is_partial: None,
+            delay_in_secs: None,
+            evaluation_took_in_secs: None,
+            source_node: Some(LOCAL_NODE.name.clone()),
+            query_took: None,
+            scheduler_trace_id: Some(scheduler_trace_id.clone()),
+            time_in_queue_ms: Some(time_in_queue),
+            skipped_alerts_count: None,
+        };
+        log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
+        // new_trigger_data.reset();
+        // new_trigger.data = new_trigger_data.to_json_string();
+        db::scheduler::update_trigger(new_trigger).await?;
+        publish_triggers_usage(trigger_data_stream).await;
+        return Ok(());
+    }
+
     // In case the scheduler background job (watch_timeout) updates the trigger retries
     // (not through this handler), we need to skip to the next run at but with the same
     // trigger start time. If we don't handle here, in that case, the `clean_complete`
@@ -1144,7 +1152,7 @@ async fn handle_derived_stream_triggers(
     );
 
     let mut trigger_data_stream = TriggerData {
-        _timestamp: Utc::now().timestamp_micros(),
+        _timestamp: now_micros(),
         org: new_trigger.org.clone(),
         module: TriggerDataType::DerivedStream,
         key: new_trigger.module_key.to_lowercase(),
@@ -1168,6 +1176,7 @@ async fn handle_derived_stream_triggers(
         query_took: None,
         scheduler_trace_id: Some(scheduler_trace_id.clone()),
         time_in_queue_ms: Some(time_in_queue),
+        skipped_alerts_count: None,
     };
 
     // evaluate trigger and configure trigger next run time
@@ -1280,9 +1289,19 @@ async fn handle_derived_stream_triggers(
                         // need to get the metadata from the destination node with the same
                         // stream_params since this is a scheduled
                         // pipeline, only the destination node can be of stream node.
-                        let request_metadata = pipeline
+                        let mut request_metadata = pipeline
                             .get_metadata_by_stream_params(&dest_stream)
-                            .map(|meta| cluster_rpc::IngestRequestMetadata { data: meta });
+                            .map(|meta| {
+                                let mut meta = meta;
+                                meta.insert("is_derived".to_string(), "true".to_string());
+                                cluster_rpc::IngestRequestMetadata { data: meta }
+                            });
+                        if request_metadata.is_none() {
+                            let mut metadata = HashMap::new();
+                            metadata.insert("is_derived".to_string(), "true".to_string());
+                            request_metadata =
+                                Some(cluster_rpc::IngestRequestMetadata { data: metadata });
+                        }
                         let (org_id, stream_name, stream_type): (String, String, String) = {
                             (
                                 dest_stream.org_id.into(),
@@ -1291,6 +1310,7 @@ async fn handle_derived_stream_triggers(
                             )
                         };
                         let records_len = records.len();
+
                         let req = cluster_rpc::IngestionRequest {
                             org_id: org_id.clone(),
                             stream_name: stream_name.clone(),

@@ -18,7 +18,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-page class="q-pa-none">
-    <q-table
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
+      :class="store.state.theme =='dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+      style="position: sticky; top: 0; z-index: 1000 ;"
+      >
+          <div  class="q-table__title full-width" data-test="organizations-title-text">{{ t("organization.header") }}</div>
+          <div class="full-width tw-flex tw-justify-end">
+
+            <q-input
+              v-model="filterQuery"
+              filled
+              dense
+             class="col-6"
+              :placeholder="t('organization.search')"
+            >
+              <template #prepend>
+                <q-icon name="search" />
+              </template>
+            </q-input>
+          
+            <q-btn
+              class="q-ml-md text-bold no-border"
+              padding="sm lg"
+              color="secondary"
+              style="float: right; cursor: pointer !important"
+              no-caps
+              dense
+              :label="t(`organization.add`)"
+              @click="addOrganization"
+              data-test="Add Organization"
+            />
+            </div>
+        </div>
+    <div>
+      <q-table
       ref="qTable"
       :rows="organizations"
       :columns="columns"
@@ -27,6 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :filter="filterQuery"
       :filter-method="filterData"
       :loading="loading"
+      class="o2-quasar-table"
+      :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
     >
       <template #no-data><NoData /></template>
 
@@ -47,41 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template> -->
 
       <template #top="scope">
-        <div
-          class="full-width flex justify-between items-start"
-          style="margin-bottom: 2px; height: 44px"
-        >
-          <div class="q-table__title">{{ t("organization.header") }}</div>
-        </div>
-        <div class="full-width row q-mb-xs items-start">
-          <div class="col">
-            <q-input
-              v-model="filterQuery"
-              filled
-              dense
-              class="col-6 q-pr-sm"
-              style="width: 400px"
-              :placeholder="t('organization.search')"
-            >
-              <template #prepend>
-                <q-icon name="search" />
-              </template>
-            </q-input>
-          </div>
-          <div class="col-3">
-            <q-btn
-              class="q-ml-md q-mb-xs text-bold no-border float-right"
-              padding="sm lg"
-              color="secondary"
-              no-caps
-              dense
-              :label="t(`organization.add`)"
-              @click="addOrganization"
-              data-test="Add Organization"
-            />
-          </div>
-        </div>
-
         <QTablePagination
           :scope="scope"
           :pageTitle="t('organization.header')"
@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- @update:maxRecordToReturn="changeMaxRecordToReturn" -->
       </template>
     </q-table>
+    </div>
     <q-dialog
       v-model="showAddOrganizationDialog"
       position="right"
@@ -159,6 +160,7 @@ export default defineComponent({
         label: "#",
         field: "#",
         align: "left",
+        style: "width: 67px;",
       },
       {
         name: "name",
@@ -173,6 +175,7 @@ export default defineComponent({
         label: t("organization.identifier"),
         align: "left",
         sortable: true,
+        
       },
       {
         name: "type",
@@ -180,6 +183,7 @@ export default defineComponent({
         label: t("organization.type"),
         align: "left",
         sortable: true,
+        style: "width: 150px;",
       },
     ]);
 

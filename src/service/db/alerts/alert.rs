@@ -150,8 +150,9 @@ pub async fn create<C: TransactionTrait>(
     org_id: &str,
     folder_id: &str,
     alert: Alert,
+    overwrite: bool,
 ) -> Result<Alert, infra::errors::Error> {
-    let alert = table::create(conn, org_id, folder_id, alert, false).await?;
+    let alert = table::create(conn, org_id, folder_id, alert, overwrite).await?;
     let schedule_key = scheduler_key(alert.id);
 
     cluster::emit_put_event(org_id, &alert, Some(folder_id.to_string())).await?;

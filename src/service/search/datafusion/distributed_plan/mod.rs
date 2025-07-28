@@ -25,6 +25,7 @@ use datafusion::{
 
 pub mod codec;
 pub mod empty_exec;
+pub mod enrich_exec;
 pub mod node;
 pub mod remote_scan;
 pub mod rewrite;
@@ -59,6 +60,37 @@ impl<'n> TreeNodeVisitor<'n> for NewEmptyExecVisitor {
         } else {
             Ok(TreeNodeRecursion::Continue)
         }
+    }
+}
+
+pub struct NewEmptyExecCountVisitor {
+    count: usize,
+}
+
+impl NewEmptyExecCountVisitor {
+    pub fn new() -> Self {
+        Self { count: 0 }
+    }
+
+    pub fn get_count(&self) -> usize {
+        self.count
+    }
+}
+
+impl Default for NewEmptyExecCountVisitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for NewEmptyExecCountVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        if node.name() == "NewEmptyExec" {
+            self.count += 1;
+        }
+        Ok(TreeNodeRecursion::Continue)
     }
 }
 

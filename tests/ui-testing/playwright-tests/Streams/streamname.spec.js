@@ -1,5 +1,5 @@
 import { test, expect } from "../baseFixtures";
-import { StreamsPage } from '../../pages/streamsPages/streamsPage.js';
+import PageManager from '../../pages/page-manager.js';
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
 
 test.describe.configure({ mode: "parallel" });
@@ -18,11 +18,11 @@ async function login(page) {
 }
 
 test.describe("Stream name casing preservation tests", () => {
-  let streamsPage;
+  let pageManager;
 
   test.beforeEach(async ({ page }) => {
     await login(page);
-    streamsPage = new StreamsPage(page);
+    pageManager = new PageManager(page);
     await page.waitForTimeout(5000);
   });
 
@@ -52,12 +52,12 @@ test.describe("Stream name casing preservation tests", () => {
 
     // Validate streams in Stream Explorer
     for (const stream of streams) {
-      await streamsPage.navigateToStreamExplorer();
-      await streamsPage.searchStream(stream.name);
-      await streamsPage.verifyStreamNameVisibility(stream.name);
-      await streamsPage.exploreStream();
-      await streamsPage.verifyStreamExploration();
-      await streamsPage.goBack();
+      await pageManager.streamsPage.navigateToStreamExplorer();
+      await pageManager.streamsPage.searchStream(stream.name);
+      await pageManager.streamsPage.verifyStreamNameVisibility(stream.name);
+      await pageManager.streamsPage.exploreStream();
+      await pageManager.streamsPage.verifyStreamExploration();
+      await pageManager.streamsPage.goBack();
     }
   });
 }); 

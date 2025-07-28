@@ -227,6 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </div>
               <q-toggle
+                v-if="showStoreOriginalDataToggle"
                 data-test="log-stream-store-original-data-toggle-btn"
                 v-model="storeOriginalData"
                 :label="t('logStream.storeOriginalData')"
@@ -237,61 +238,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="q-mb-md">
               <div class="flex justify-between items-center full-width">
-              <div class="flex items-center">
-                <app-tabs
-                  v-if="isSchemaUDSEnabled"
-                  class="schema-fields-tabs"
-                  style="
-                    border: 1px solid #8a8a8a;
-                    border-radius: 4px;
-                    overflow: hidden;
-                  "
-                  data-test="schema-fields-tabs"
-                  :tabs="tabs"
-                  :active-tab="activeTab"
-                  @update:active-tab="updateActiveTab"
-                />
-                <div v-if="hasUserDefinedSchema" class="q-ml-sm">
-                  <q-icon name="info" class="q-mr-xs " size="16px" style="color: #F5A623; cursor: pointer;">
-                    <q-tooltip 
-                    style="font-size: 14px; width: 250px;"
+                <div class="flex items-center">
+                  <app-tabs
+                    v-if="isSchemaUDSEnabled"
+                    class="schema-fields-tabs"
+                    style="
+                      border: 1px solid #8a8a8a;
+                      border-radius: 4px;
+                      overflow: hidden;
+                    "
+                    data-test="schema-fields-tabs"
+                    :tabs="tabs"
+                    :active-tab="activeTab"
+                    @update:active-tab="updateActiveTab"
+                  />
+                  <div v-if="hasUserDefinedSchema" class="q-ml-sm">
+                    <q-icon
+                      name="info"
+                      class="q-mr-xs"
+                      size="16px"
+                      style="color: #f5a623; cursor: pointer"
                     >
-                    Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema.
-                    </q-tooltip>
-                  </q-icon>
+                      <q-tooltip style="font-size: 14px; width: 250px">
+                        Other fields show only the schema fields that existed
+                        before the stream was configured to use a user-defined
+                        schema.
+                      </q-tooltip>
+                    </q-icon>
+                  </div>
+                </div>
+
+                <div class="flex items-center tw-gap-4">
+                  <q-input
+                    data-test="schema-field-search-input"
+                    v-model="filterField"
+                    data-cy="schema-index-field-search-input"
+                    filled
+                    borderless
+                    dense
+                    debounce="1"
+                    :placeholder="t('search.searchField')"
+                  >
+                    <template #prepend>
+                      <q-icon name="search" />
+                    </template>
+                  </q-input>
+                  <q-btn
+                    v-if="isSchemaUDSEnabled"
+                    color="primary"
+                    data-test="schema-add-fields-title"
+                    @click="openDialog"
+                    class="q-my-sm text-bold no-border"
+                    padding="sm md"
+                    no-caps
+                    dense
+                    :disable="isDialogOpen"
+                  >
+                    Add Field(s)
+                  </q-btn>
                 </div>
               </div>
-
-              <div class="flex items-center tw-gap-4">
-                <q-input
-                  data-test="schema-field-search-input"
-                  v-model="filterField"
-                  data-cy="schema-index-field-search-input"
-                  filled
-                  borderless
-                  dense
-                  debounce="1"
-                  :placeholder="t('search.searchField')"
-                >
-                  <template #prepend>
-                    <q-icon name="search" />
-                  </template>
-                </q-input>
-                <q-btn
-                  v-if="isSchemaUDSEnabled"
-                  color="primary"
-                  data-test="schema-add-fields-title"
-                  @click="openDialog"
-                  class="q-my-sm text-bold no-border"
-                  padding="sm md"
-                  no-caps
-                  dense
-                  :disable="isDialogOpen"
-                >
-                  Add Field(s)
-                </q-btn>
-              </div>
-            </div>
             </div>
 
             <div class="q-mb-md" v-if="isDialogOpen">
@@ -461,9 +467,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       outlined
                       filled
                       dense
-                      style="min-width: 300px; max-width: 300px"
+                      style="min-width: 15rem; max-width: 15rem"
                       @update:model-value="markFormDirty(props.row.name, 'fts')"
                     />
+                  </q-td>
+                </template>
+                <!-- here we will render the number of regex patterns associated with the specific field -->
+                <template v-slot:body-cell-patterns="props">
+                  <q-td v-if="!(props.row.name == store.state.zoConfig.timestamp_column) && (props.row.type == 'Utf8' || props.row.type == 'utf8')" class="field-name text-left tw-text-[#5960B2] tw-cursor-pointer " style="padding-left: 12px !important;" @click="openPatternAssociationDialog(props.row.name)">
+                    {{ patternAssociations[props.row.name]?.length ? `View ${patternAssociations[props.row.name]?.length} Patterns` : 'Add Pattern' }}
+                    <span>
+                      <q-icon name="arrow_forward" size="xs" />
+                    </span>
+                  </q-td>
+                  <q-td v-else>
                   </q-td>
                 </template>
 
@@ -561,7 +578,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- floating footer for the table -->
 
           <div
-            :class="store.state.theme === 'dark' ? 'dark-theme-floating-buttons' : 'light-theme-floating-buttons'"
+            :class="
+              store.state.theme === 'dark'
+                ? 'dark-theme-floating-buttons'
+                : 'light-theme-floating-buttons'
+            "
             class="floating-buttons q-px-md q-py-xs"
           >
             <div
@@ -653,6 +674,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card v-else class="column q-pa-md full-height no-wrap">
     <h5>Wait while loading...</h5>
   </q-card>
+  <q-dialog v-model="patternAssociationDialog.show" position="right" full-height maximized>
+    <AssociatedRegexPatterns :data="patternAssociationDialog.data" :fieldName="patternAssociationDialog.fieldName" @closeDialog="patternAssociationDialog.show = false" @addPattern="handleAddPattern" @removePattern="handleRemovePattern" @updateSettings="onSubmit" @updateAppliedPattern="handleUpdateAppliedPattern" />
+  </q-dialog>
 
   <ConfirmDialog
     title="Delete Action"
@@ -708,6 +732,8 @@ import {
 
 import DateTime from "@/components/DateTime.vue";
 
+import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
+
 const defaultValue: any = () => {
   return {
     name: "",
@@ -733,8 +759,16 @@ export default defineComponent({
     AppTabs,
     QTablePagination,
     DateTime,
+    AssociatedRegexPatterns
   },
   setup({ modelValue }) {
+    type PatternAssociation = {
+      field: string;
+      pattern_name: string;
+      pattern_id: string;
+      policy: string;
+      apply_at: string;
+    };
     const { t } = useI18n();
     const store = useStore();
     const q = useQuasar();
@@ -757,11 +791,14 @@ export default defineComponent({
     const IsdeleteBtnVisible = ref(false);
     const redBtnRows = ref([]);
 
+    const patternIdToApplyAtMap = new Map();
+
     const newSchemaFields = ref([]);
     const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
     const isDialogOpen = ref(false);
+    const patternAssociations = ref([]);
     const redDaysList = ref([]);
     const resultTotal = ref<number>(0);
     const perPageOptions: any = [
@@ -783,6 +820,11 @@ export default defineComponent({
     const pagination: any = ref({
       rowsPerPage: 20,
     });
+    const patternAssociationDialog = ref({
+      show: false,
+      data: [],
+      fieldName: ""
+    });
 
     const selectedFields = ref([]);
 
@@ -796,11 +838,12 @@ export default defineComponent({
     //here we are setting the active tab based on the user defined schema
     //1. if there is UDS then it should be schemaFields
     //2. if there is no UDS then it should be allFields
-    const activeTab = ref(hasUserDefinedSchema.value ? "schemaFields" : "allFields");
-
+    const activeTab = ref(
+      hasUserDefinedSchema.value ? "schemaFields" : "allFields",
+    );
 
     const tabs = computed(() => [
-    {
+      {
         value: "schemaFields",
         label: `User Defined Schema (${indexData.value.defined_schema_fields.length})`,
         disabled: !hasUserDefinedSchema.value,
@@ -811,8 +854,7 @@ export default defineComponent({
         label: `${computedSchemaFieldsName.value} (${indexData.value.schema.length})`,
         disabled: false,
         hide: false,
-      }
-
+      },
     ]);
     const mainTabs = computed(() => [
       {
@@ -826,15 +868,15 @@ export default defineComponent({
         disabled: false,
       },
     ]);
-    //here we are making the schema field name dynamic based on the user defined schema 
-    //1. if there is UDS the it should be other fields 
+    //here we are making the schema field name dynamic based on the user defined schema
+    //1. if there is UDS the it should be other fields
     //2. if there is no UDS then it should be all fields
-    const computedSchemaFieldsName = computed(()=>{
-      if(!hasUserDefinedSchema.value){
-        return 'All Fields'
+    const computedSchemaFieldsName = computed(() => {
+      if (!hasUserDefinedSchema.value) {
+        return "All Fields";
       }
-      return 'Other Fields'
-    })
+      return "Other Fields";
+    });
 
     const streamIndexType = [
       { label: "Full text search", value: "fullTextSearchKey" },
@@ -857,13 +899,17 @@ export default defineComponent({
       storeOriginalData.value = false;
       approxPartition.value = false;
     });
-    //here we added a watcher to 
+
+    const showStoreOriginalDataToggle = computed(() => {
+      return modelValue.stream_type !== "traces";
+    });
+    //here we added a watcher to
     //1. if user defined schema is enabled then we need to show the schema fields tab and also need to make sure that it would be the active tab
     //2. if user defined schema is disabled then we need to show the all fields tab and also need to make sure that it would be the active tab
     watch(hasUserDefinedSchema, (newVal) => {
-      if(newVal){
+      if (newVal) {
         activeTab.value = "schemaFields";
-      }else{
+      } else {
         activeTab.value = "allFields";
       }
     });
@@ -973,12 +1019,20 @@ export default defineComponent({
     const setSchema = (streamResponse) => {
       const schemaMapping = new Set([]);
 
+      //here lets add the pattern associations to the streamResponse
+      streamResponse.settings.pattern_associations = streamResponse.pattern_associations;
       if (streamResponse?.settings) {
         // console.log("streamResponse:", streamResponse);
         previousSchemaVersion = JSON.parse(
           JSON.stringify(streamResponse.settings),
         );
       }
+      //after this we need to have a map of pattern_id and according to field as well
+      //so that we can easily access the apply_at value for a pattern if it is undefined or null
+      
+      previousSchemaVersion.pattern_associations && previousSchemaVersion.pattern_associations.forEach((pattern: PatternAssociation) => {
+        patternIdToApplyAtMap.set(pattern.field + pattern.pattern_id, pattern);
+      });
       if (!streamResponse.schema?.length) {
         streamResponse.schema = [];
         if (streamResponse.settings.defined_schema_fields?.length)
@@ -1005,6 +1059,10 @@ export default defineComponent({
             });
           },
         );
+      }
+      if(streamResponse.pattern_associations){
+        patternAssociations.value = groupPatternAssociationsByField(streamResponse.pattern_associations);
+        // Now you can quickly access patterns by field
       }
 
       if (
@@ -1103,6 +1161,7 @@ export default defineComponent({
     };
 
     const onSubmit = async () => {
+      patternAssociations.value = ungroupPatternAssociations(patternAssociations.value);
       let settings = {
         partition_keys: [],
         index_fields: [],
@@ -1110,6 +1169,7 @@ export default defineComponent({
         bloom_filter_fields: [],
         defined_schema_fields: [...indexData.value.defined_schema_fields],
         extended_retention_days: [...indexData.value.extended_retention_days],
+        pattern_associations: [...patternAssociations.value],
       };
       if (showDataRetention.value && dataRetentionDays.value < 1) {
         q.notify({
@@ -1242,10 +1302,14 @@ export default defineComponent({
           modifiedSettings,
         )
         .then(async (res) => {
-          if(store.state.logs.logs.data.stream.selectedStream.includes(indexData.value.name)) {
+          if (
+            store.state.logs?.logs?.data?.stream?.selectedStream?.includes(
+              indexData.value.name,
+            )
+          ) {
             store.dispatch("logs/setIsInitialized", false);
           }
-          
+
           await getStream(
             indexData.value.name,
             indexData.value.stream_type,
@@ -1398,6 +1462,12 @@ export default defineComponent({
       {
         name: "index_type",
         label: t("logStream.indexType"),
+        align: "left",
+        sortable: false,
+      },
+      {
+        name: "patterns",
+        label: t("logStream.regexPatterns"),
         align: "left",
         sortable: false,
       },
@@ -1618,6 +1688,71 @@ export default defineComponent({
       onSubmit();
     };
 
+    const  groupPatternAssociationsByField = (associations: PatternAssociation[]): Record<string, PatternAssociation[]> => {
+        return associations.reduce((acc, item) => {
+          if (!acc[item.field]) {
+            acc[item.field] = [];
+          }
+          acc[item.field].push(item);
+          return acc;
+        }, {} as Record<string, PatternAssociation[]>);
+      }
+      const ungroupPatternAssociations = (grouped: Record<string, PatternAssociation[]>): PatternAssociation[] => {
+          return Object.values(grouped).flat();
+        };
+
+    const openPatternAssociationDialog = (field: string) => {
+      patternAssociationDialog.value.show = true;
+      patternAssociationDialog.value.data = patternAssociations.value[field] || [];
+      patternAssociationDialog.value.fieldName = field;
+    }
+    //this is used to add a new pattern to the field
+    //completely new pattern not an update
+    const handleAddPattern = (pattern: PatternAssociation) => {
+      formDirtyFlag.value = true;
+      if(patternAssociations.value[pattern.field]){
+        patternAssociations.value[pattern.field].push(pattern);
+      }
+      else{
+        patternAssociations.value[pattern.field] = [pattern];
+      }
+      patternAssociationDialog.value.data = patternAssociations.value[pattern.field];
+    }
+
+    //this is used to remove a pattern from the field
+    const handleRemovePattern = (patternId: string, fieldName: string) => {
+      formDirtyFlag.value = true;
+      let filteredData = patternAssociations.value[fieldName] && patternAssociations.value[fieldName].filter((pattern: PatternAssociation) => {
+        return pattern.pattern_id !== patternId;
+      });
+      patternAssociations.value[fieldName] = [...filteredData];
+      patternAssociationDialog.value.data = [...filteredData];
+    }
+
+    //this is used to update an already applied pattern in the field
+    //for suppose user wants to update policy or apply_at for a pattern
+    const handleUpdateAppliedPattern = (pattern: PatternAssociation, fieldName: string, patternId: string, attribute: string) => {
+      patternAssociations.value[pattern.field] && patternAssociations.value[fieldName].forEach((p: PatternAssociation) => {
+        if(p.pattern_id === pattern.pattern_id && p.pattern_name === pattern.pattern_name){
+          if(attribute === "policy"){
+            p.policy = pattern.policy;
+          }
+          else if(attribute === "apply_at"){
+            if(pattern.apply_at != undefined && pattern.apply_at != null){
+              p.apply_at = pattern.apply_at;
+            }
+            else{
+              p.apply_at = patternIdToApplyAtMap.get(fieldName + patternId)?.apply_at;
+            }
+          }
+        }
+      });
+      if(patternAssociations.value[fieldName]){
+        patternAssociationDialog.value.data = [...patternAssociations.value[fieldName]];
+      }
+    }
+
+
     return {
       t,
       q,
@@ -1686,6 +1821,13 @@ export default defineComponent({
       redDaysList,
       deleteDates,
       IsdeleteBtnVisible,
+      showStoreOriginalDataToggle,
+      patternAssociations,
+      patternAssociationDialog,
+      openPatternAssociationDialog,
+      handleAddPattern,
+      handleRemovePattern,
+      handleUpdateAppliedPattern
     };
   },
   created() {
@@ -1920,9 +2062,9 @@ export default defineComponent({
 
   .q-table {
     td:nth-child(2) {
-      min-width: 20rem;
-      width: 20rem;
-      max-width: 20rem;
+      min-width: 15rem;
+      width: 15rem;
+      max-width: 15rem;
       overflow: auto;
       scrollbar-width: thin;
       scrollbar-color: #999 #f0f0f0;
@@ -1935,6 +2077,13 @@ export default defineComponent({
   th:first-child,
   td:first-child {
     padding-left: 8px !important;
+  }
+
+  th:nth-child(5),
+  td:nth-child(5){
+    min-width: 15rem;
+    width: 15rem;
+    max-width: 15rem;
   }
 }
 .dark-theme-table tr:hover td:nth-child(2) {

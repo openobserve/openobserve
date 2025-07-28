@@ -19,7 +19,8 @@ use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(default)]
 #[serde(rename_all = "snake_case")]
 pub struct Destination {
     pub id: Option<svix_ksuid::Ksuid>,
@@ -46,6 +47,14 @@ pub enum Module {
     },
 }
 
+impl Default for Module {
+    fn default() -> Self {
+        Module::Alert {
+            template: "".to_string(),
+            destination_type: DestinationType::Http(Endpoint::default()),
+        }
+    }
+}
 impl std::fmt::Display for Module {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -65,12 +74,20 @@ pub enum DestinationType {
     Sns(AwsSns),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+impl Default for DestinationType {
+    fn default() -> Self {
+        DestinationType::Http(Endpoint::default())
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct Email {
     pub recipients: Vec<String>,
 }
 
-#[derive(Serialize, Debug, PartialEq, Eq, Deserialize, Clone)]
+#[derive(Serialize, Debug, PartialEq, Eq, Deserialize, Clone, Default)]
+#[serde(default)]
 pub struct Endpoint {
     pub url: String,
     #[serde(default)]
@@ -85,7 +102,8 @@ pub struct Endpoint {
     pub output_format: Option<HTTPOutputFormat>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(default)]
 pub struct AwsSns {
     pub sns_topic_arn: String,
     pub aws_region: String,
@@ -121,7 +139,8 @@ impl fmt::Display for HTTPType {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(default)]
 #[serde(rename_all = "snake_case")]
 pub struct Template {
     pub id: Option<svix_ksuid::Ksuid>,
@@ -133,8 +152,9 @@ pub struct Template {
     pub body: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub enum TemplateType {
+    #[default]
     #[serde(rename = "http")]
     Http,
     #[serde(rename = "email")]

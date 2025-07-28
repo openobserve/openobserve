@@ -99,6 +99,29 @@ const useManagementRoutes = () => {
             routeGuard(to, from, next);
           },
         },
+        {
+          path: "domain_management",
+          name: "domainManagement",
+          component: () => import("@/components/settings/DomainManagement.vue"),
+          meta: {
+            keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "regex_patterns",
+          name: "regexPatterns",
+          component: () => import("@/components/settings/RegexPatternList.vue"),
+          meta: {
+            keepAlive: true,
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+          
+        },
       ],
     );
   }

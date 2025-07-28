@@ -212,11 +212,10 @@ const isValidName = computed(() => {
 
 const updateStreams = (resetStream = true) => {
   if (resetStream) formData.value.stream_name = "";
-console.log(formData.value.stream_type,"type in res");
   if (!formData.value.stream_type) return Promise.resolve();
 
   isFetchingStreams.value = true;
-  
+
   return getStreams(formData.value.stream_type, false)
     .then((res: any) => {
       indexOptions.value = res.list.map((data: any) => {
@@ -244,7 +243,7 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1
+      (column: any) => column.toLowerCase().indexOf(value) > -1,
     );
   });
   return filteredOptions;

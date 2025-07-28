@@ -84,7 +84,7 @@
     "vue": "^3.5.14",
     "vue-drag-resize": "^1.5.4",
     "vue-draggable-next": "^2.2.1",
-    "vue-i18n": "^11.1.2",
+    "vue-i18n": "^11.1.10",
     "vue-router": "^4.5.0",
     "vuex": "^4.1.0"
   },

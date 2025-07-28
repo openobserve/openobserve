@@ -43,7 +43,7 @@ use crate::service::{
         datafusion::{
             distributed_plan::{
                 NewEmptyExecVisitor,
-                codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
+                codec::get_physical_extension_codec,
                 empty_exec::NewEmptyExec,
                 node::{RemoteScanNode, SearchInfos},
                 remote_scan::RemoteScanExec,
@@ -94,9 +94,7 @@ pub async fn search(
     datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
-    let proto = ComposedPhysicalExtensionCodec {
-        codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
-    };
+    let proto = get_physical_extension_codec();
     let mut physical_plan = physical_plan_from_bytes_with_extension_codec(
         &flight_request.search_info.plan,
         &ctx,
@@ -166,8 +164,16 @@ pub async fn search(
     let mut nodes = get_online_querier_nodes(&trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
-    if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
-        nodes.retain(|n| n.is_ingester() || n.name.eq(&LOCAL_NODE.name));
+    if req.local_mode.unwrap_or_default() {
+        if LOCAL_NODE.is_querier() {
+            nodes.retain(|n| n.name.eq(&LOCAL_NODE.name));
+        } else {
+            nodes = nodes
+                .into_iter()
+                .filter(|n| n.is_querier())
+                .take(1)
+                .collect();
+        }
     }
 
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();

@@ -46,7 +46,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 5;
+pub const DB_SCHEMA_VERSION: u64 = 6;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -117,20 +117,27 @@ pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+const _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS: [&str; 3] =
+    ["trace_id", "service_name", "operation_name"];
 pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = get_config()
-        .common
-        .feature_secondary_index_extra_fields
-        .split(',')
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        })
-        .collect::<Vec<_>>();
+    let mut fields = chain(
+        _DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS
+            .iter()
+            .map(|s| s.to_string()),
+        get_config()
+            .common
+            .feature_secondary_index_extra_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -430,6 +437,7 @@ pub struct Config {
     pub pipeline: Pipeline,
     pub health_check: HealthCheck,
     pub encryption: Encryption,
+    pub enrichment_table: EnrichmentTable,
 }
 
 #[derive(EnvConfig)]
@@ -713,6 +721,8 @@ pub struct Common {
     pub data_db_dir: String,
     #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
     pub data_cache_dir: String,
+    #[env_config(name = "ZO_DATA_TMP_DIR", default = "")] // ./data/openobserve/tmp/
+    pub data_tmp_dir: String,
     // TODO: should rename to column_all
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub column_all: String,
@@ -1093,6 +1103,8 @@ pub struct Common {
     pub dashboard_placeholder: String,
     #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
     pub aggregation_cache_enabled: bool,
+    #[env_config(name = "ZO_AGGREGATION_TOPK_ENABLED", default = true)]
+    pub aggregation_topk_enabled: bool,
     #[env_config(name = "ZO_SEARCH_INSPECTOR_ENABLED", default = false)]
     pub search_inspector_enabled: bool,
     #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = true)]
@@ -1103,6 +1115,14 @@ pub struct Common {
         help = "Enable to show symbol in dashboard"
     )]
     pub dashboard_show_symbol_enabled: bool,
+    #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")]
+    pub default_hec_stream: String,
+    #[env_config(
+        name = "ZO_ALIGN_PARTITIONS_FOR_INDEX",
+        default = false,
+        help = "Enable to use large partition for index. This will apply for all streams"
+    )]
+    pub align_partitions_for_index: bool,
 }
 
 #[derive(EnvConfig)]
@@ -1179,6 +1199,8 @@ pub struct Limit {
     pub usage_reporting_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
     pub query_thread_num: usize,
+    #[env_config(name = "ZO_QUERY_INDEX_THREAD_NUM", default = 0)]
+    pub query_index_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
@@ -1568,8 +1590,6 @@ pub struct DiskCache {
     pub result_max_size: usize,
     #[env_config(name = "ZO_DISK_AGGREGATION_CACHE_MAX_SIZE", default = 0)]
     pub aggregation_max_size: usize,
-    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
-    pub aggregation_cache_enabled: bool,
     // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
@@ -1865,11 +1885,47 @@ pub struct Pipeline {
     )]
     pub batch_size_bytes: usize,
     #[env_config(
+        name = "ZO_PIPELINE_BATCH_RETRY_MAX_ATTEMPTS",
+        default = 3,
+        help = "Maximum number of retries for batch flush"
+    )]
+    pub batch_retry_max_attempts: u32,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_RETRY_INITIAL_DELAY_MS",
+        default = 1000, // 1 second
+        help = "Initial delay for batch flush retry (in milliseconds)"
+    )]
+    pub batch_retry_initial_delay_ms: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_RETRY_MAX_DELAY_MS",
+        default = 30000, // 30 seconds
+        help = "Maximum delay for batch flush retry (in milliseconds)"
+    )]
+    pub batch_retry_max_delay_ms: u64,
+    #[env_config(
         name = "ZO_PIPELINE_USE_SHARED_HTTP_CLIENT",
         default = false,
         help = "Use shared HTTP client instances for better connection pooling"
     )]
     pub use_shared_http_client: bool,
+    #[env_config(
+        name = "ZO_PIPELINE_REMOVE_FILE_AFTER_MAX_RETRY",
+        default = true,
+        help = "Remove wal file after max retry"
+    )]
+    pub remove_file_after_max_retry: bool,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_RETRY_COUNT",
+        default = 10,
+        help = "pipeline exporter client max retry count"
+    )]
+    pub max_retry_count: u32,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_RETRY_TIME_IN_HOURS",
+        default = 24,
+        help = "pipeline exporter client max retry time in hours"
+    )]
+    pub max_retry_time_in_hours: u64,
 }
 
 #[derive(EnvConfig)]
@@ -1896,6 +1952,28 @@ pub struct HealthCheck {
         help = "The node will be removed from consistent hash if health check failed exceed this times"
     )]
     pub failed_times: usize,
+}
+
+#[derive(EnvConfig)]
+pub struct EnrichmentTable {
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_CACHE_DIR",
+        default = "",
+        help = "Local cache directory for enrichment tables"
+    )]
+    pub cache_dir: String,
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_MERGE_THRESHOLD_MB",
+        default = 60,
+        help = "Threshold for merging small files before S3 upload (in MB)"
+    )]
+    pub merge_threshold_mb: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_MERGE_INTERVAL",
+        default = 600,
+        help = "Background sync interval in seconds"
+    )]
+    pub merge_interval: u64,
 }
 
 pub fn init() -> Config {
@@ -2015,6 +2093,13 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             cfg.limit.query_thread_num = cpu_num * 2;
         } else {
             cfg.limit.query_thread_num = cpu_num * 4;
+        }
+    }
+    if cfg.limit.query_index_thread_num == 0 {
+        if cfg.common.local_mode {
+            cfg.limit.query_index_thread_num = cpu_num;
+        } else {
+            cfg.limit.query_index_thread_num = cpu_num * 4;
         }
     }
 
@@ -2221,6 +2306,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.common.file_list_dump_debug_check =
         cfg.common.file_list_dump_dual_write && cfg.common.file_list_dump_debug_check;
 
+    if cfg.common.default_hec_stream.is_empty() {
+        cfg.common.default_hec_stream = "_hec".to_string();
+    }
+
     Ok(())
 }
 
@@ -2287,6 +2376,12 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if !cfg.common.data_cache_dir.ends_with('/') {
         cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);
+    }
+    if cfg.common.data_tmp_dir.is_empty() {
+        cfg.common.data_tmp_dir = format!("{}tmp/", cfg.common.data_dir);
+    }
+    if !cfg.common.data_tmp_dir.ends_with('/') {
+        cfg.common.data_tmp_dir = format!("{}/", cfg.common.data_tmp_dir);
     }
     if cfg.common.mmdb_data_dir.is_empty() {
         cfg.common.mmdb_data_dir = format!("{}mmdb/", cfg.common.data_dir);

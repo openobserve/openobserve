@@ -22,6 +22,8 @@ pub mod authz;
 pub mod cloud;
 pub mod clusters;
 pub mod dashboards;
+#[cfg(feature = "enterprise")]
+pub mod domain_management;
 pub mod enrichment_table;
 #[allow(deprecated)]
 pub mod folders;
@@ -34,6 +36,8 @@ pub mod organization;
 pub mod pipeline;
 pub mod promql;
 pub mod ratelimit;
+#[cfg(feature = "enterprise")]
+pub mod re_pattern;
 pub mod rum;
 #[cfg(feature = "enterprise")]
 pub mod script_server;

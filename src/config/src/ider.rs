@@ -15,15 +15,15 @@
 
 use std::{
     hint::spin_loop,
+    sync::LazyLock,
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use rand::Rng;
 use svix_ksuid::{Ksuid, KsuidLike};
 
-static IDER: Lazy<Mutex<SnowflakeIdGenerator>> = Lazy::new(|| {
+static IDER: LazyLock<Mutex<SnowflakeIdGenerator>> = LazyLock::new(|| {
     let machine_id = unsafe { super::cluster::LOCAL_NODE_ID };
     log::info!("init ider with machine_id: {machine_id}");
     Mutex::new(SnowflakeIdGenerator::new(machine_id))

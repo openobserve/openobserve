@@ -142,10 +142,11 @@ const stream = {
   delete: (
     org_identifier: string,
     stream_name: string,
-    stream_type: string
+    stream_type: string,
+    deleteAssociatedAlertsPipelines: boolean = true
   ) => {
     return http().delete(
-      `/api/${org_identifier}/streams/${stream_name}?type=${stream_type}`
+      `/api/${org_identifier}/streams/${stream_name}?type=${stream_type}&delete_all=${deleteAssociatedAlertsPipelines}`
     );
   },
 

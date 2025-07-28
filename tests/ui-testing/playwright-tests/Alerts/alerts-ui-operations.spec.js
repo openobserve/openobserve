@@ -1,10 +1,6 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
-import { AlertsPage } from '../../pages/alertsPages/alertsPage.js';
-import { AlertTemplatesPage } from '../../pages/alertsPages/alertTemplatesPage.js';
-import { AlertDestinationsPage } from '../../pages/alertsPages/alertDestinationsPage.js';
-import { CommonActions } from '../../pages/commonActions.js';
-import DashboardFolder from '../../pages/dashboardPages/dashboard-folder.js';
+import PageManager from '../../pages/page-manager.js';
 
 /**
  * Helper function for login
@@ -29,14 +25,10 @@ async function login(page) {
 
 test.describe("Alerts UI Operations", () => {
   // Shared test variables
-  let alertsPage;
-  let templatesPage;
-  let destinationsPage;
-  let commonActions;
+  let pageManager;
   let createdTemplateName;
   let createdDestinationName;
   let sharedRandomValue;
-  let dashboardFolders;
 
   /**
    * Setup for each test
@@ -48,15 +40,12 @@ test.describe("Alerts UI Operations", () => {
    */
   test.beforeEach(async ({ page }, testInfo) => {
     await login(page);
-    alertsPage = new AlertsPage(page);
-    templatesPage = new AlertTemplatesPage(page);
-    destinationsPage = new AlertDestinationsPage(page);
-    commonActions = new CommonActions(page);
+    pageManager = new PageManager(page);
     await page.waitForTimeout(5000);
 
     // Generate shared random value if not already generated
     if (!sharedRandomValue) {
-      sharedRandomValue = alertsPage.generateRandomString();
+      sharedRandomValue = pageManager.alertsPage.generateRandomString();
       console.log('Generated shared random value for this run:', sharedRandomValue);
     }
 
@@ -64,7 +53,7 @@ test.describe("Alerts UI Operations", () => {
     if (!test.info().title.includes('Scheduled Alert')) {
       // Ingest test data using common actions
       const streamName = 'auto_playwright_stream';
-      await commonActions.ingestTestData(streamName);
+      await pageManager.commonActions.ingestTestData(streamName);
     }
     
     // Navigate to alerts page
@@ -82,14 +71,14 @@ test.describe("Alerts UI Operations", () => {
   }, async ({ page }) => {
     // Create template with shared random value
     createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
-    await templatesPage.createTemplate(createdTemplateName);
-    await templatesPage.verifyCreatedTemplateExists(createdTemplateName);
+    await pageManager.alertTemplatesPage.createTemplate(createdTemplateName);
+    await pageManager.alertTemplatesPage.verifyCreatedTemplateExists(createdTemplateName);
     console.log('Created template:', createdTemplateName);
 
     // Create destination with shared random value
     createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
     const slackUrl = "DEMO";
-    await destinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
+    await pageManager.alertDestinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
     console.log('Created destination:', createdDestinationName);
   });
 
@@ -102,14 +91,14 @@ test.describe("Alerts UI Operations", () => {
   }, async ({ page }) => {
     // Ensure template exists
     createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
-    await templatesPage.ensureTemplateExists(createdTemplateName);
+    await pageManager.alertTemplatesPage.ensureTemplateExists(createdTemplateName);
 
     // Navigate to templates page
-    await templatesPage.navigateToTemplates();
+    await pageManager.alertTemplatesPage.navigateToTemplates();
     await page.waitForTimeout(2000);
 
     // Test template deletion
-    await templatesPage.deleteTemplateAndVerify(createdTemplateName);
+    await pageManager.alertTemplatesPage.deleteTemplateAndVerify(createdTemplateName);
   });
 
   /**
@@ -119,40 +108,39 @@ test.describe("Alerts UI Operations", () => {
   test('Create and Delete Scheduled Alert with SQL Query', {
     tag: ['@scheduledAlerts', '@all', '@alerts']
   }, async ({ page }) => {
-    dashboardFolders = new DashboardFolder(page);
     const streamName = 'auto_playwright_stream';
 
     // Ensure prerequisites exist
     createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
-    await templatesPage.ensureTemplateExists(createdTemplateName);
+    await pageManager.alertTemplatesPage.ensureTemplateExists(createdTemplateName);
     createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
     const slackUrl = "DEMO";
-    await destinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
+    await pageManager.alertDestinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
 
     // Navigate to alerts tab
-    await commonActions.navigateToAlerts();
+    await pageManager.commonActions.navigateToAlerts();
     await page.waitForTimeout(2000);
 
     // Ingest custom test data
-    await commonActions.ingestCustomTestData(streamName);
+    await pageManager.commonActions.ingestCustomTestData(streamName);
     await page.waitForTimeout(2000);
 
     // Create and verify scheduled alert
     const folderName = 'auto_' + sharedRandomValue;
-    await alertsPage.createFolder(folderName, 'Test Automation Folder');
-    await alertsPage.verifyFolderCreated(folderName);
+    await pageManager.alertsPage.createFolder(folderName, 'Test Automation Folder');
+    await pageManager.alertsPage.verifyFolderCreated(folderName);
     console.log('Successfully created folder:', folderName);
 
-    await alertsPage.navigateToFolder(folderName);
-    const alertName = await alertsPage.createScheduledAlertWithSQL(streamName, createdDestinationName, sharedRandomValue);
-    await alertsPage.verifyAlertCreated(alertName);
+    await pageManager.alertsPage.navigateToFolder(folderName);
+    const alertName = await pageManager.alertsPage.createScheduledAlertWithSQL(streamName, createdDestinationName, sharedRandomValue);
+    await pageManager.alertsPage.verifyAlertCreated(alertName);
     console.log('Successfully created scheduled alert:', alertName);
 
     // Clean up
-    await alertsPage.deleteAlertByRow(alertName);
-    await dashboardFolders.searchFolder(folderName);
+    await pageManager.alertsPage.deleteAlertByRow(alertName);
+    await pageManager.dashboardFolder.searchFolder(folderName);
     await expect(page.locator(`text=${folderName}`)).toBeVisible();
-    await dashboardFolders.deleteFolder(folderName);
+    await pageManager.dashboardFolder.deleteFolder(folderName);
   });
 
   /**
@@ -162,72 +150,65 @@ test.describe("Alerts UI Operations", () => {
   test('Alert Module UI Validations and Filters Check', {
     tag: ['@all', '@alerts', '@alertsUIValidations']
   }, async ({ page }) => {
-    // Initialize page objects
-    alertsPage = new AlertsPage(page);
-    templatesPage = new AlertTemplatesPage(page);
-    destinationsPage = new AlertDestinationsPage(page);
-    commonActions = new CommonActions(page);
-    dashboardFolders = new DashboardFolder(page);
-
     // Create template
     const templateName = 'auto_playwright_template_' + sharedRandomValue;
-    await templatesPage.createTemplate(templateName);
+    await pageManager.alertTemplatesPage.createTemplate(templateName);
     console.log('Created template:', templateName);
 
     // Create destination
     const destinationName = 'auto_playwright_destination_' + sharedRandomValue;
     const slackUrl = "DEMO";
-    await destinationsPage.ensureDestinationExists(destinationName, slackUrl, templateName);
+    await pageManager.alertDestinationsPage.ensureDestinationExists(destinationName, slackUrl, templateName);
     console.log('Created destination:', destinationName);
 
     // Navigate to alerts page
-    await commonActions.navigateToAlerts();
+    await pageManager.commonActions.navigateToAlerts();
 
     // Create folder
     const folderName = 'auto_' + sharedRandomValue;
-    await alertsPage.createFolder(folderName, 'Test Automation Folder');
+    await pageManager.alertsPage.createFolder(folderName, 'Test Automation Folder');
     console.log('Created folder:', folderName);
 
     // Get initial alert counts
-    await commonActions.navigateToHome();
-    const { scheduledAlertsCount, realTimeAlertsCount } = await alertsPage.verifyAlertCounts();
+    await pageManager.commonActions.navigateToHome();
+    const { scheduledAlertsCount, realTimeAlertsCount } = await pageManager.alertsPage.verifyAlertCounts();
     console.log('Initial Active Scheduled Alerts Count:', scheduledAlertsCount);
     console.log('Initial Active Real-time Alerts Count:', realTimeAlertsCount);
 
     // Navigate to alerts and verify ui validations
-    await commonActions.navigateToAlerts();
-    await alertsPage.navigateToFolder(folderName);
+    await pageManager.commonActions.navigateToAlerts();
+    await pageManager.alertsPage.navigateToFolder(folderName);
     console.log('Navigated to folder:', folderName);
 
     // Verify invalid alert name validation
-    await alertsPage.verifyInvalidAlertCreation();
+    await pageManager.alertsPage.verifyInvalidAlertCreation();
 
     // Verify field required validation
-    await alertsPage.verifyFieldRequiredValidation();
+    await pageManager.alertsPage.verifyFieldRequiredValidation();
 
     // Create a valid alert using existing function
     const streamName = 'auto_playwright_stream';
     const column = 'job';
     const value = 'test';
-    await commonActions.navigateToAlerts();
-    await alertsPage.navigateToFolder(folderName);
+    await pageManager.commonActions.navigateToAlerts();
+    await pageManager.alertsPage.navigateToFolder(folderName);
     await page.waitForTimeout(2000);
-    const alertName = await alertsPage.createAlert(streamName, column, value, destinationName, sharedRandomValue);
-    await alertsPage.verifyAlertCreated(alertName);
+    const alertName = await pageManager.alertsPage.createAlert(streamName, column, value, destinationName, sharedRandomValue);
+    await pageManager.alertsPage.verifyAlertCreated(alertName);
     console.log('Successfully created valid alert:', alertName);
     await page.waitForTimeout(2000); // Add delay after alert creation
 
     // Navigate back to home and verify alert count increased
-    await commonActions.navigateToHome();
-    const { realTimeAlertsCount: newRealTimeAlertsCount } = await alertsPage.verifyAlertCounts();
+    await pageManager.commonActions.navigateToHome();
+    const { realTimeAlertsCount: newRealTimeAlertsCount } = await pageManager.alertsPage.verifyAlertCounts();
     console.log('New Active Real-time Alerts Count:', newRealTimeAlertsCount);
     
     // Verify count increased by 1
-    await alertsPage.verifyAlertCountIncreased(realTimeAlertsCount, newRealTimeAlertsCount);
+    await pageManager.alertsPage.verifyAlertCountIncreased(realTimeAlertsCount, newRealTimeAlertsCount);
 
     // Navigate back to alerts and verify clone validation
-    await commonActions.navigateToAlerts();
-    await alertsPage.navigateToFolder(folderName);
+    await pageManager.commonActions.navigateToAlerts();
+    await pageManager.alertsPage.navigateToFolder(folderName);
     console.log('Navigated back to folder:', folderName);
     await page.waitForTimeout(2000);
 
@@ -236,32 +217,32 @@ test.describe("Alerts UI Operations", () => {
     console.log('Alert is visible before clone validation:', alertName);
 
     // Now verify clone validation
-    await alertsPage.verifyCloneAlertUIValidation(alertName);
+    await pageManager.alertsPage.verifyCloneAlertUIValidation(alertName);
 
     // Continue with rest of the test...
-    await alertsPage.verifyTabContents();
-    await alertsPage.verifyFolderSearch(folderName);
+    await pageManager.alertsPage.verifyTabContents();
+    await pageManager.alertsPage.verifyFolderSearch(folderName);
 
     // Move alerts to target folder
     const targetFolderName = 'testfoldermove';
-    await alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
-    await alertsPage.moveAllAlertsToFolder(targetFolderName);
+    await pageManager.alertsPage.ensureFolderExists(targetFolderName, 'Test Folder for Moving Alerts');
+    await pageManager.alertsPage.moveAllAlertsToFolder(targetFolderName);
 
-    await dashboardFolders.searchFolder(folderName);
+    await pageManager.dashboardFolder.searchFolder(folderName);
     await expect(page.locator(`text=${folderName}`)).toBeVisible();
-    await dashboardFolders.deleteFolder(folderName);
+    await pageManager.dashboardFolder.deleteFolder(folderName);
 
     // Verify alerts in target folder
     await page.waitForTimeout(2000);
-    await dashboardFolders.searchFolder(targetFolderName);
-    await alertsPage.navigateToFolder(targetFolderName);
+    await pageManager.dashboardFolder.searchFolder(targetFolderName);
+    await pageManager.alertsPage.navigateToFolder(targetFolderName);
     await page.waitForTimeout(2000);
 
     // Search and verify alert instance
-    await alertsPage.searchAlert(alertName);
-    await alertsPage.verifySearchResultsUIValidation(1);
+    await pageManager.alertsPage.searchAlert(alertName);
+    await pageManager.alertsPage.verifySearchResultsUIValidation(1);
 
     // Delete the alert
-    await alertsPage.deleteAlertByRow(alertName);
+    await pageManager.alertsPage.deleteAlertByRow(alertName);
   });
 }); 

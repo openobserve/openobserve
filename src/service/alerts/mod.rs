@@ -689,7 +689,7 @@ async fn build_sql(
     let where_sql = conditions
         .to_sql(&schema)
         .await
-        .map_err(|err| anyhow::anyhow!("Error building SQL on stream {}: {}", &stream_name, err))?;
+        .map_err(|err| anyhow::anyhow!("Error building SQL on stream {stream_name}: {err}"))?;
     if query_condition.aggregation.is_none() {
         return Ok(format!("SELECT * FROM \"{stream_name}\" WHERE {where_sql}"));
     }
@@ -702,9 +702,8 @@ async fn build_sql(
             Ok(field) => field.data_type(),
             Err(_) => {
                 return Err(anyhow::anyhow!(
-                    "Aggregation column {} not found on stream {}",
+                    "Aggregation column {} not found on stream {stream_name}",
                     &agg.having.column,
-                    &stream_name
                 ));
             }
         };
@@ -766,17 +765,17 @@ fn build_expr(
                 cond.value.to_string()
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{}\" {} '{}'", field_alias, "=", val),
-                Operator::NotEqualTo => format!("\"{}\" {} '{}'", field_alias, "!=", val),
-                Operator::GreaterThan => format!("\"{}\" {} '{}'", field_alias, ">", val),
+                Operator::EqualTo => format!("\"{field_alias}\" = '{val}'"),
+                Operator::NotEqualTo => format!("\"{field_alias}\" != '{val}'"),
+                Operator::GreaterThan => format!("\"{field_alias}\" > '{val}'"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{}\" {} '{}'", field_alias, ">=", val)
+                    format!("\"{field_alias}\" >= '{val}'")
                 }
-                Operator::LessThan => format!("\"{}\" {} '{}'", field_alias, "<", val),
-                Operator::LessThanEquals => format!("\"{}\" {} '{}'", field_alias, "<=", val),
-                Operator::Contains => format!("\"{}\" {} '%{}%'", field_alias, "LIKE", val),
+                Operator::LessThan => format!("\"{field_alias}\" < '{val}'"),
+                Operator::LessThanEquals => format!("\"{field_alias}\" <= '{val}'"),
+                Operator::Contains => format!("str_match(\"{field_alias}\", '%{val}%')"),
                 Operator::NotContains => {
-                    format!("\"{}\" {} '%{}%'", field_alias, "NOT LIKE", val)
+                    format!("\"{field_alias}\" NOT LIKE '%{val}%'")
                 }
             }
         }
@@ -790,30 +789,27 @@ fn build_expr(
                     .parse()
                     .map_err(|e| {
                         anyhow::anyhow!(
-                            "Column [{}] dataType is [{}] but value is [{}], err: {}",
+                            "Column [{}] dataType is [{field_type}] but value is [{}], err: {e}",
                             cond.column,
-                            field_type,
                             cond.value,
-                            e
                         )
                     })?
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{}\" {} {}", field_alias, "=", val),
-                Operator::NotEqualTo => format!("\"{}\" {} {}", field_alias, "!=", val),
-                Operator::GreaterThan => format!("\"{}\" {} {}", field_alias, ">", val),
+                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
+                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
+                Operator::GreaterThan => format!("\"{field_alias}\" > {val}"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{}\" {} {}", field_alias, ">=", val)
+                    format!("\"{field_alias}\" >= {val}")
                 }
-                Operator::LessThan => format!("\"{}\" {} {}", field_alias, "<", val),
+                Operator::LessThan => format!("\"{field_alias}\" < {val}"),
                 Operator::LessThanEquals => {
-                    format!("\"{}\" {} {}", field_alias, "<=", val)
+                    format!("\"{field_alias}\" <= {val}")
                 }
                 _ => {
                     return Err(anyhow::anyhow!(
-                        "Column {} has data_type [{}] and it does not supported operator [{:?}]",
+                        "Column {} has data_type [{field_type}] and it does not supported operator [{:?}]",
                         cond.column,
-                        field_type,
                         cond.operator
                     ));
                 }
@@ -829,30 +825,27 @@ fn build_expr(
                     .parse()
                     .map_err(|e| {
                         anyhow::anyhow!(
-                            "Column [{}] dataType is [{}] but value is [{}], err: {}",
+                            "Column [{}] dataType is [{field_type}] but value is [{}], err: {e}",
                             cond.column,
-                            field_type,
                             cond.value,
-                            e
                         )
                     })?
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{}\" {} {}", field_alias, "=", val),
-                Operator::NotEqualTo => format!("\"{}\" {} {}", field_alias, "!=", val),
-                Operator::GreaterThan => format!("\"{}\" {} {}", field_alias, ">", val),
+                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
+                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
+                Operator::GreaterThan => format!("\"{field_alias}\" > {val}"),
                 Operator::GreaterThanEquals => {
-                    format!("\"{}\" {} {}", field_alias, ">=", val)
+                    format!("\"{field_alias}\" >= {val}")
                 }
-                Operator::LessThan => format!("\"{}\" {} {}", field_alias, "<", val),
+                Operator::LessThan => format!("\"{field_alias}\" < {val}"),
                 Operator::LessThanEquals => {
-                    format!("\"{}\" {} {}", field_alias, "<=", val)
+                    format!("\"{field_alias}\" <= {val}")
                 }
                 _ => {
                     return Err(anyhow::anyhow!(
-                        "Column {} has data_type [{}] and it does not supported operator [{:?}]",
+                        "Column {} has data_type [{field_type}] and it does not supported operator [{:?}]",
                         cond.column,
-                        field_type,
                         cond.operator
                     ));
                 }
@@ -868,22 +861,19 @@ fn build_expr(
                     .parse()
                     .map_err(|e| {
                         anyhow::anyhow!(
-                            "Column [{}] dataType is [{}] but value is [{}], err: {}",
+                            "Column [{}] dataType is [{field_type}] but value is [{}], err: {e}",
                             cond.column,
-                            field_type,
                             cond.value,
-                            e
                         )
                     })?
             };
             match cond.operator {
-                Operator::EqualTo => format!("\"{}\" {} {}", field_alias, "=", val),
-                Operator::NotEqualTo => format!("\"{}\" {} {}", field_alias, "!=", val),
+                Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
+                Operator::NotEqualTo => format!("\"{field_alias}\" != {val}"),
                 _ => {
                     return Err(anyhow::anyhow!(
-                        "Column {} has data_type [{}] and it does not supported operator [{:?}]",
+                        "Column {} has data_type [{field_type}] and it does not supported operator [{:?}]",
                         cond.column,
-                        field_type,
                         cond.operator
                     ));
                 }
@@ -891,9 +881,8 @@ fn build_expr(
         }
         _ => {
             return Err(anyhow::anyhow!(
-                "Column {} has data_type [{}] and it does not supported by alert, if you think this is a bug please report it to us",
+                "Column {} has data_type [{field_type}] and it does not supported by alert, if you think this is a bug please report it to us",
                 cond.column,
-                field_type
             ));
         }
     };

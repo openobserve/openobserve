@@ -527,12 +527,17 @@ pub async fn values_http2_stream(
     // Get use_cache from query params
     values_req.use_cache = get_use_cache_from_request(&query);
 
+    let keyword = match query.get("keyword") {
+        None => "".to_string(),
+        Some(v) => v.trim().to_string(),
+    };
     // Build search requests per field and use only the first one
     let reqs = match build_search_request_per_field(
         &values_req,
         &org_id,
         stream_type,
         &values_req.stream_name,
+        &keyword,
     )
     .await
     {

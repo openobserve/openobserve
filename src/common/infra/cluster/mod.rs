@@ -326,7 +326,18 @@ async fn watch_node_list() -> Result<()> {
         match ev {
             Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let mut item_value: Node = json::from_slice(&ev.value.unwrap()).unwrap();
+                let mut item_value: Node = match json::from_slice(ev.value.as_ref().unwrap()) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let value_str = String::from_utf8_lossy(ev.value.as_ref().unwrap());
+                        log::error!(
+                            "[CLUSTER] watch_node_list: error parsing node: {}, payload: {}",
+                            e,
+                            value_str
+                        );
+                        continue;
+                    }
+                };
                 let (_broadcasted, exist) = match NODES.read().await.get(item_key) {
                     Some(v) => (v.broadcasted, item_value.is_same(v)),
                     None => (false, false),

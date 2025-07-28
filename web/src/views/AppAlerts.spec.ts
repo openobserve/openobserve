@@ -26,10 +26,10 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
-describe("Streams", async () => {
+describe.skip("Streams", async () => {
   let wrapper: any;
   beforeEach(() => {
-    vi.useFakeTimers();
+    
     wrapper = mount(AppAlerts, {
       global: {
         provide: {

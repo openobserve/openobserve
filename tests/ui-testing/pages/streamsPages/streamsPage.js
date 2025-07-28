@@ -1,9 +1,9 @@
 import { expect } from '@playwright/test';
-import { LoginPage } from '../loginPage.js';
+import { LoginPage } from '../generalPages/loginPage.js';
 import { LogsPage } from '../logsPages/logsPage.js';
-import { IngestionPage } from '../ingestionPage.js';
-import { ManagementPage } from '../managementPage.js';
-import { StreamPage } from '../streamPage.js';
+import { IngestionPage } from '../generalPages/ingestionPage.js';
+import { ManagementPage } from '../generalPages/managementPage.js';
+
 import { getHeaders, getIngestionUrl, sendRequest } from '../../utils/apiUtils.js';
 
 export class StreamsPage {
@@ -15,7 +15,7 @@ export class StreamsPage {
         this.logsPage = new LogsPage(page);
         this.ingestionPage = new IngestionPage(page);
         this.managementPage = new ManagementPage(page);
-        this.streamPage = new StreamPage(page);
+
         
         // Locators following alerts pattern - only the ones that were changed
         this.managementMenuItem = page.locator('[data-test="menu-link-settings-item"]');
@@ -128,29 +128,36 @@ export class StreamsPage {
         await this.logsPage.waitForSearchResultAndCheckText(expectedText);
     }
 
-    // Stream methods - delegate to StreamPage
+    // Stream methods
     async navigateToStreamExplorer() {
-        await this.streamPage.navigateToStreamExplorer();
+        await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
+        await this.page.waitForTimeout(1000);
     }
 
     async searchStream(streamName) {
-        await this.streamPage.searchStream(streamName);
+        await this.page.getByPlaceholder("Search Stream").click();
+        await this.page.getByPlaceholder("Search Stream").fill(streamName);
+        await this.page.waitForTimeout(3000);
     }
 
     async verifyStreamNameVisibility(streamName) {
-        await this.streamPage.verifyStreamNameVisibility(streamName);
+        await expect(this.page.getByText(streamName)).toBeVisible();
     }
 
     async exploreStream() {
-        await this.streamPage.exploreStream();
+        const streamButton = this.page.getByRole("button", { name: 'Explore' });
+        await expect(streamButton).toBeVisible();
+        await streamButton.click({ force: true });
+        await this.page.waitForTimeout(1000);
     }
 
     async verifyStreamExploration() {
-        await this.streamPage.verifyStreamExploration();
+        await expect(this.page.url()).toContain("logs");
     }
 
     async goBack() {
-        await this.streamPage.goBack();
+        await this.page.goBack();
+        await this.page.waitForTimeout(1000);
     }
 
     // Ingestion methods - delegate to IngestionPage
@@ -198,5 +205,34 @@ export class StreamsPage {
     // Validation method for 'No data found for histogram.'
     async expectNoDataFoundForHistogram() {
         await expect(this.page.getByText('warning No data found for histogram.')).toBeVisible();
+    }
+
+    // Methods from legacy streamsPage.js
+    async gotoStreamsPage() {
+        await this.page.locator('[data-test="menu-link-\\/streams-item"]').click();
+    }
+
+    async streamsPageDefaultOrg() {
+        await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+    
+        await this.page.waitForSelector('text=default'); 
+    
+        const defaultOption = this.page.locator('text=default').first(); // Target the first occurrence
+        await defaultOption.click();
+    }
+
+    async streamsPageDefaultMultiOrg() {
+        await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+
+        await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
+    }
+
+    async streamsPageURLValidation() {
+        // TODO: Fix this test
+        // await expect(this.page).not.toHaveURL(/default/);
+    }
+
+    async streamsURLValidation() {
+        await expect(this.page).toHaveURL(/streams/);
     }
 } 

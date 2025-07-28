@@ -190,6 +190,7 @@ pub async fn save(
     name: &str,
     mut alert: Alert,
     create: bool,
+    overwrite: bool,
 ) -> Result<(), AlertError> {
     // Currently all alerts are stored in the default folder so create the
     // default folder for the org if it doesn't exist yet.
@@ -197,7 +198,7 @@ pub async fn save(
         create_default_alerts_folder(org_id).await?;
     };
 
-    prepare_alert(org_id, stream_name, name, &mut alert, create).await?;
+    prepare_alert(org_id, stream_name, name, &mut alert, create, overwrite).await?;
 
     // save the alert
     // TODO: Get the folder id
@@ -239,6 +240,7 @@ async fn prepare_alert(
     name: &str,
     alert: &mut Alert,
     create: bool,
+    overwrite: bool,
 ) -> Result<(), AlertError> {
     if !name.is_empty() {
         alert.name = name.to_string();
@@ -261,7 +263,7 @@ async fn prepare_alert(
     if let Some(alert_id) = alert.id {
         match get_by_id_db(org_id, alert_id).await {
             Ok(old_alert) => {
-                if create {
+                if create && !overwrite {
                     return Err(AlertError::CreateAlreadyExists);
                 }
                 alert.owner = old_alert.owner;
@@ -459,6 +461,7 @@ pub async fn create<C: TransactionTrait>(
     org_id: &str,
     folder_id: &str,
     mut alert: Alert,
+    overwrite: bool,
 ) -> Result<Alert, AlertError> {
     if !table::folders::exists(org_id, folder_id, FolderType::Alerts).await? {
         if folder_id == DEFAULT_FOLDER {
@@ -470,9 +473,17 @@ pub async fn create<C: TransactionTrait>(
 
     let alert_name = alert.name.clone();
     let stream_name = alert.stream_name.clone();
-    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, true).await?;
+    prepare_alert(
+        org_id,
+        &stream_name,
+        &alert_name,
+        &mut alert,
+        true,
+        overwrite,
+    )
+    .await?;
 
-    let alert = db::alerts::alert::create(conn, org_id, folder_id, alert).await?;
+    let alert = db::alerts::alert::create(conn, org_id, folder_id, alert, overwrite).await?;
 
     set_ownership(
         org_id,
@@ -578,7 +589,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     let alert_name = alert.name.clone();
     let stream_name = alert.stream_name.clone();
 
-    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false).await?;
+    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false, false).await?;
 
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
     #[cfg(feature = "enterprise")]
@@ -1840,7 +1851,7 @@ mod tests {
         let alert_name = "abc/alert";
         let mut alert: Alert = Default::default();
         alert.name = alert_name.to_string();
-        let ret = save(org_id, stream_name, alert_name, alert, true).await;
+        let ret = save(org_id, stream_name, alert_name, alert, true, false).await;
         // alert name should not contain /
         assert!(ret.is_err());
     }

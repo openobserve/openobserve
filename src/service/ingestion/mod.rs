@@ -255,6 +255,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             query_took: None,
             scheduler_trace_id: None,
             time_in_queue_ms: None,
+            skipped_alerts_count: None,
         };
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
@@ -549,16 +550,15 @@ pub async fn get_uds_and_original_data_streams(
             stream.stream_name.to_string(),
             stream_settings.index_all_values,
         );
-        if let Some(fields) = &stream_settings.defined_schema_fields {
-            if !fields.is_empty() {
-                let mut fields: HashSet<_> = fields.iter().cloned().collect();
-                if !fields.contains(TIMESTAMP_COL_NAME) {
-                    fields.insert(TIMESTAMP_COL_NAME.to_string());
-                }
-                user_defined_schema_map.insert(stream.stream_name.to_string(), Some(fields));
-            } else {
-                user_defined_schema_map.insert(stream.stream_name.to_string(), None);
+
+        if !stream_settings.defined_schema_fields.is_empty() {
+            let mut fields = HashSet::<_>::from_iter(stream_settings.defined_schema_fields);
+            if !fields.contains(TIMESTAMP_COL_NAME) {
+                fields.insert(TIMESTAMP_COL_NAME.to_string());
             }
+            user_defined_schema_map.insert(stream.stream_name.to_string(), Some(fields));
+        } else {
+            user_defined_schema_map.insert(stream.stream_name.to_string(), None);
         }
     }
 }

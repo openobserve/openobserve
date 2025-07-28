@@ -276,12 +276,63 @@ export const isTimeSeries = (sample: any) => {
   });
 };
 
-//Check if the sample is timestamp
-export const isTimeStamp = (sample: any) => {
+// Check if the sample is timestamp (16 digit microseconds)
+/**
+ * Checks if the sample is timestamp (16 digit microseconds) based on treatAsNonTimestamp object.
+ * treatAsNonTimestamp: { value: true | false | null | undefined | "auto" }
+ * - If treatAsNonTimestamp.value === true (not timestamp field): Return false
+ * - If treatAsNonTimestamp.value === false (timestamp field): Check if all values are 16 digits, return true if they are
+ * - If treatAsNonTimestamp.value === null or undefined (auto mode): Check if all values are 16 digits, return true if they are
+ * - Otherwise: Return false
+ */
+export const isTimeStamp = (sample: any, treatAsNonTimestamp: any) => {
   const microsecondsPattern = /^\d{16}$/;
-  return sample.every((value: any) =>
-    microsecondsPattern.test(value?.toString()),
-  );
+
+  // If treatAsNonTimestamp is true (not timestamp field), return false
+  if (treatAsNonTimestamp === true) {
+    return false;
+  }
+
+  // If treatAsNonTimestamp is false (timestamp field), check if all values are 16 digit numbers
+  if (treatAsNonTimestamp === false) {
+    return sample.every((value: any) =>
+      microsecondsPattern.test(value?.toString()),
+    );
+  }
+  // If treatAsNonTimestamp is null or undefined, check if all values are 16 digits
+  if (treatAsNonTimestamp === null || treatAsNonTimestamp === undefined) {
+    return sample.every((value: any) =>
+      microsecondsPattern.test(value?.toString()),
+    );
+  }
+};
+
+/**
+ * Converts 16-digit microsecond timestamps to readable date format
+ * @param value - The value to convert (can be single value or array)
+ * @returns The converted value(s) in date format
+ */
+export const convert16DigitTimestamp = (value: any): any => {
+  // If value is an array, convert each element
+  if (Array.isArray(value)) {
+    return value.map((item: any) => convert16DigitTimestamp(item));
+  }
+
+  // If value is a string or number, convert it
+  if (typeof value === "string" || typeof value === "number") {
+    const strValue = value.toString();
+    const microsecondsPattern = /^\d{16}$/;
+
+    if (microsecondsPattern.test(strValue)) {
+      // Convert microseconds to milliseconds (divide by 1000)
+      const milliseconds = parseInt(strValue) / 1000;
+      const date = new Date(milliseconds);
+      return formatDate(date);
+    }
+  }
+
+  // Return original value if not a 16-digit timestamp
+  return value;
 };
 
 export function convertOffsetToSeconds(

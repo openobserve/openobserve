@@ -77,18 +77,19 @@ async fn schema(
             "stream not found",
         )));
     };
-    if let Some(uds_fields) = schema.settings.defined_schema_fields.as_ref() {
+    if !schema.settings.defined_schema_fields.is_empty() {
         let mut schema_fields = schema
             .schema
             .iter()
             .map(|f| (&f.name, f))
             .collect::<HashMap<_, _>>();
-        schema.uds_schema = Some(
-            uds_fields
-                .iter()
-                .filter_map(|f| schema_fields.remove(f).map(|f| f.to_owned()))
-                .collect::<Vec<_>>(),
-        );
+        schema.uds_schema = schema
+            .settings
+            .defined_schema_fields
+            .iter()
+            .filter_map(|f| schema_fields.remove(f))
+            .cloned()
+            .collect::<Vec<_>>();
     }
 
     // filter by keyword
@@ -317,6 +318,7 @@ async fn delete_fields(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
+        ("delete_all" = bool, Query, description = "Delete all related feature resources"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
@@ -334,7 +336,17 @@ async fn delete(
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    stream::delete_stream(&org_id, &stream_name, stream_type).await
+    let del_related_feature_resources = query
+        .get("delete_all")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
+    stream::delete_stream(
+        &org_id,
+        &stream_name,
+        stream_type,
+        del_related_feature_resources,
+    )
+    .await
 }
 
 /// ListStreams

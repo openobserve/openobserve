@@ -711,7 +711,7 @@ fn handle_histogram(
 ) {
     let caps = RE_HISTOGRAM.captures(origin_sql.as_str()).unwrap();
     let interval = if histogram_interval > 0 {
-        format!("{histogram_interval} seconds")
+        format!("{histogram_interval} second")
     } else {
         let attrs = caps
             .get(1)

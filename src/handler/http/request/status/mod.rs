@@ -24,7 +24,8 @@ use actix_web::{
 };
 use arrow_schema::Schema;
 use config::{
-    Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
+    Config, META_ORG_ID, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
+    SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config, get_instance_id,
     meta::{
@@ -92,6 +93,7 @@ struct ConfigResponse<'a> {
     build_date: String,
     build_type: String,
     default_fts_keys: Vec<String>,
+    default_secondary_index_fields: Vec<String>,
     default_quick_mode_fields: Vec<String>,
     telemetry_enabled: bool,
     default_functions: Vec<ZoFunction<'a>>,
@@ -285,6 +287,10 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         build_type: build_type.to_string(),
         telemetry_enabled: cfg.common.telemetry_enabled,
         default_fts_keys: SQL_FULL_TEXT_SEARCH_FIELDS
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+        default_secondary_index_fields: SQL_SECONDARY_INDEX_SEARCH_FIELDS
             .iter()
             .map(|s| s.to_string())
             .collect(),
@@ -557,6 +563,30 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     {
                         return Ok(HttpResponse::Unauthorized()
                             .json("Service accounts are not allowed to login".to_string()));
+                    }
+
+                    // Check if email is allowed by domain management system
+                    #[cfg(feature = "enterprise")]
+                    match o2_enterprise::enterprise::domain_management::is_email_allowed(
+                        &res.0.user_email,
+                    )
+                    .await
+                    {
+                        Ok(allowed) => {
+                            if !allowed {
+                                audit_message.response_meta.http_response_code = 403;
+                                audit_message._timestamp = now_micros();
+                                audit(audit_message).await;
+                                return Ok(
+                                    HttpResponse::Unauthorized().json("Unauthorized".to_string())
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Failed to check domain management: {}", e);
+                            // Fail open - allow access if domain management check fails
+                            // This prevents system lockouts due to configuration errors
+                        }
                     }
 
                     audit_message.user_email = res.0.user_email.clone();

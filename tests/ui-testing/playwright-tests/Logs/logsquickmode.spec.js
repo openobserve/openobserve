@@ -1,7 +1,7 @@
 import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import { LogsPage } from '../../pages/logsPages/logsPage.js';
+import PageManager from '../../pages/page-manager.js';
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -56,7 +56,7 @@ async function ingestion(page) {
 
 
 test.describe("Logs Quickmode testcases", () => {
-  let logsPage;
+  let pageManager;
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -76,7 +76,7 @@ test.describe("Logs Quickmode testcases", () => {
 
   test.beforeEach(async ({ page }) => {
     await login(page);
-    logsPage = new LogsPage(page);
+    pageManager = new PageManager(page);
     await page.waitForTimeout(1000);
     await ingestion(page);
     await page.waitForTimeout(2000);
@@ -85,12 +85,12 @@ test.describe("Logs Quickmode testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await logsPage.selectStream("e2e_automate");
+    await pageManager.logsPage.selectStream("e2e_automate");
  
     await applyQueryButton(page);
 
     // Enable quick mode toggle if it's not already enabled
-    const toggleButton = await logsPage.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
+    const toggleButton = await pageManager.logsPage.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
     // Evaluate the class attribute to determine if the toggle is in the off state
     const isSwitchedOff = await toggleButton.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
     if (isSwitchedOff) {
@@ -102,17 +102,17 @@ test.describe("Logs Quickmode testcases", () => {
   }, async ({
     page,
   }) => {
-    await logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickInterestingFieldButton("kubernetes_pod_id");
-    await logsPage.clickSQLModeToggle();
-    await logsPage.waitForTimeout(2000);
-    await logsPage.expectInterestingFieldInEditor("kubernetes_pod_id");
+    await pageManager.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.expectInterestingFieldInEditor("kubernetes_pod_id");
   });
   test("should display quick mode toggle button", {
     tag: ['@quickModeLogs', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.expectQuickModeToggleVisible();
+    await pageManager.logsPage.expectQuickModeToggleVisible();
   });
 
   test("should click on interesting fields icon in histogram mode and run query", {
@@ -120,25 +120,25 @@ test.describe("Logs Quickmode testcases", () => {
   }, async ({
     page,
   }) => {
-    await logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickInterestingFieldButton("kubernetes_pod_id");
-    await logsPage.clickSearchBarRefreshButton();
-    await logsPage.waitForTimeout(2000);
-    await logsPage.expectInterestingFieldInTable("kubernetes_pod_id");
+    await pageManager.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.expectInterestingFieldInTable("kubernetes_pod_id");
   });
 
   test("should display error on entering random text in histogram mode when quick mode is on", {
     tag: ['@errorHandlingHistogramModeLogs', '@histogram', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickQueryEditor();
-    await logsPage.typeInQueryEditor("oooo");
-    await logsPage.waitForTimeout(1000);
-    await logsPage.waitForSearchBarRefreshButton();
-    await logsPage.clickSearchBarRefreshButton();
-    await logsPage.waitForTimeout(2000);
-    await logsPage.expectErrorMessageVisible();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickQueryEditor();
+    await pageManager.logsPage.typeInQueryEditor("oooo");
+    await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.waitForSearchBarRefreshButton();
+    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.expectErrorMessageVisible();
   });
 
   test("should display selected interestesing field and order by - as default in editor", {
@@ -146,30 +146,30 @@ test.describe("Logs Quickmode testcases", () => {
   }, async ({
     page,
   }) => {
-    await logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickInterestingFieldButton("kubernetes_pod_id");
-    await logsPage.clickSQLModeToggle();
-    await logsPage.waitForQueryEditorTextbox();
-    await logsPage.expectQueryEditorVisible();
+    await pageManager.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.waitForQueryEditorTextbox();
+    await pageManager.logsPage.expectQueryEditorVisible();
   });
 
   test("should adding/removing interesting field removes it from editor and results too", {
     tag: ['@interestingFieldsCRUD', '@all', '@logs']
   }, async ({ page }) => {
-    await logsPage.fillIndexFieldSearchInput("kubernetes_container_name");
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickInterestingFieldButton("kubernetes_container_name");
-    await logsPage.fillIndexFieldSearchInput("level");
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickInterestingFieldButton("level");
-    await logsPage.clickSQLModeToggle();
-    await logsPage.clickSearchBarRefreshButton();
-    await logsPage.expectLogTableColumnSourceVisible();
-    await logsPage.clickInterestingFieldButton("level");
-    await logsPage.expectQueryEditorNotContainsText("level");
-    await logsPage.clickSearchBarRefreshButton();
-    await logsPage.expectLogTableColumnSourceNotHaveText("source");
+    await pageManager.logsPage.fillIndexFieldSearchInput("kubernetes_container_name");
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickInterestingFieldButton("kubernetes_container_name");
+    await pageManager.logsPage.fillIndexFieldSearchInput("level");
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickInterestingFieldButton("level");
+    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await pageManager.logsPage.expectLogTableColumnSourceVisible();
+    await pageManager.logsPage.clickInterestingFieldButton("level");
+    await pageManager.logsPage.expectQueryEditorNotContainsText("level");
+    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await pageManager.logsPage.expectLogTableColumnSourceNotHaveText("source");
   });
 
   test("should display order by in sql mode by default even after page reload", {
@@ -177,14 +177,14 @@ test.describe("Logs Quickmode testcases", () => {
   }, async ({
     page,
   }) => {
-    await logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickInterestingFieldButton("kubernetes_pod_id");
-    await logsPage.clickSQLModeToggle();
-    await logsPage.clickSearchBarRefreshButton();
-    await logsPage.page.reload();
-    await logsPage.waitForTimeout(2000);
-    await logsPage.expectQueryEditorContainsText('SELECT kubernetes_pod_id FROM "e2e_automate"');
+    await pageManager.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await pageManager.logsPage.page.reload();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.expectQueryEditorContainsText('SELECT kubernetes_pod_id FROM "e2e_automate"');
   });
 
   test("should display results without adding timestamp in quick mode", {
@@ -192,13 +192,13 @@ test.describe("Logs Quickmode testcases", () => {
   }, async ({
     page,
   }) => {
-    await logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickInterestingFieldButton("kubernetes_pod_id");
-    await logsPage.clickSQLModeToggle();
-    await logsPage.waitForTimeout(2000);
-    await logsPage.clickSearchBarRefreshButton();
-    await logsPage.waitForTimeout(2000);
-    await logsPage.expectExactTextVisible("source");
+    await pageManager.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    await pageManager.logsPage.clickSQLModeToggle();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.clickSearchBarRefreshButton();
+    await pageManager.logsPage.waitForTimeout(2000);
+    await pageManager.logsPage.expectExactTextVisible("source");
   });
 });

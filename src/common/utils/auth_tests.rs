@@ -46,7 +46,6 @@ mod tests {
     const GROUP_NAME: &str = "TEST_GROUP_NAME";
     const PIPELINE_ID: &str = "TEST_PIPELINE_ID";
     const SHORT_URL_ID: &str = "TEST_SHORT_URL_ID";
-    const WS_REQUEST_ID: &str = "TEST_WS_REQUEST_ID";
     const ACTION_KSUID: &str = "TEST_ACTION_KSUID";
     const CIPHER_KEY_ID: &str = "TEST_CIPHER_KEY_ID";
 
@@ -2985,6 +2984,10 @@ mod tests {
                 timeout: u64::default(),
                 max_connections: usize::default(),
             },
+            http_streaming: config::HttpStreaming {
+                streaming_response_chunk_size: usize::default(),
+                streaming_enabled: bool::default(),
+            },
             common: config::Common {
                 app_name: String::default(),
                 local_mode: bool::default(),
@@ -3115,11 +3118,13 @@ mod tests {
                 file_list_dump_min_hour: Default::default(),
                 file_list_dump_debug_check: Default::default(),
                 aggregation_cache_enabled: bool::default(),
+                aggregation_topk_enabled: bool::default(),
                 use_stream_settings_for_partitions_enabled: Default::default(),
                 dashboard_placeholder: Default::default(),
                 search_inspector_enabled: bool::default(),
                 utf8_view_enabled: bool::default(),
                 dashboard_show_symbol_enabled: bool::default(),
+                default_hec_stream: String::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
@@ -3148,6 +3153,7 @@ mod tests {
                 mem_dump_thread_num: usize::default(),
                 usage_reporting_thread_num: usize::default(),
                 query_thread_num: usize::default(),
+                query_index_thread_num: usize::default(),
                 query_timeout: u64::default(),
                 query_ingester_timeout: u64::default(),
                 query_default_limit: i64::default(),
@@ -3291,7 +3297,6 @@ mod tests {
                 multi_dir: String::default(),
                 aggregation_max_size: usize::default(),
                 delay_window_mins: i64::default(),
-                aggregation_cache_enabled: bool::default(),
             },
             log: config::Log {
                 level: String::default(),
@@ -3433,11 +3438,17 @@ mod tests {
                 remote_request_max_retry_time: u64::default(),
                 max_connections: usize::default(),
                 wal_size_limit: u64::default(),
+                use_shared_http_client: bool::default(),
                 batch_size: usize::default(),
                 batch_enabled: bool::default(),
                 batch_size_bytes: usize::default(),
                 batch_timeout_ms: u64::default(),
-                use_shared_http_client: bool::default(),
+                batch_retry_max_attempts: u32::default(),
+                batch_retry_initial_delay_ms: u64::default(),
+                batch_retry_max_delay_ms: u64::default(),
+                remove_file_after_max_retry: bool::default(),
+                max_retry_count: u32::default(),
+                max_retry_time_in_hours: u64::default(),
             },
             encryption: config::Encryption {
                 algorithm: String::default(),

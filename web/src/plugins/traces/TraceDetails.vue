@@ -1116,8 +1116,6 @@ export default defineComponent({
     });
 
     const startResize = (event: any) => {
-      console.log("called");
-
       initialX.value = event.clientX;
       initialWidth.value = leftWidth.value;
 

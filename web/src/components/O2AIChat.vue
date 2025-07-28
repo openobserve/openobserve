@@ -243,23 +243,9 @@ import { MarkedOptions } from 'marked';
 import { useQuasar } from 'quasar';
 import { useStore } from 'vuex';
 import useAiChat from '@/composables/useAiChat';
-
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { getImageURL } from '@/utils/zincutils';
-
-export interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-export interface ChatHistoryEntry {
-  id: number;
-  timestamp: string;
-  title: string;
-  messages: ChatMessage[];
-  provider: string;
-  model: string;
-}
+import { ChatMessage, ChatHistoryEntry } from '@/types/chat';
 
 // Add IndexedDB setup
 const DB_NAME = 'o2ChatDB';
@@ -738,13 +724,12 @@ export default defineComponent({
         }
 
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw response;
         }
 
         if (!response.body) {
           throw new Error('No response body');
         }
-
 
         const reader = response.body.getReader();
         await processStream(reader);
@@ -752,16 +737,25 @@ export default defineComponent({
         store.dispatch('setCurrentChatTimestamp', currentChatId.value);
         store.dispatch('setChatUpdated', true);
         
-        // Save is now handled after stream processing completes
-
-      } catch (error) {
-        console.error('Error sending message:', error);
-        if (chatMessages.value.length > 0 && chatMessages.value[chatMessages.value.length - 1].role === 'assistant') {
-          chatMessages.value[chatMessages.value.length - 1].content = 'Error: Unable to get response from the server';
+      } catch (error: any) {
+        // Remove the empty assistant message that was added before the error
+        //this will impact in the case of error showing empty message above the error message in the chat
+        if (chatMessages.value.length > 0 && chatMessages.value[chatMessages.value.length - 1].role === 'assistant' && !chatMessages.value[chatMessages.value.length - 1].content) {
+          chatMessages.value.pop();
+        }
+        let errorMessage = 'Error: Unable to get response from the server. Please try again later.';
+        //we need to handle the 403 error seperately and show the error message to the user
+        if (error.status === 403) {
+          chatMessages.value.push({
+            role: 'assistant',
+            content: 'Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.'
+          });
+        } else if (chatMessages.value.length > 0 && chatMessages.value[chatMessages.value.length - 1].role === 'assistant') {
+          chatMessages.value[chatMessages.value.length - 1].content = errorMessage;
         } else {
           chatMessages.value.push({
             role: 'assistant',
-            content: 'Error: Unable to get response from the server'
+            content: errorMessage
           });
         }
         await saveToHistory(); // Save after error

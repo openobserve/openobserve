@@ -359,7 +359,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .expect("Deferred jobs failed to init");
 
     if cfg.log.events_enabled {
-        tokio::task::spawn(async move { zo_logger::send_logs().await });
+        tokio::task::spawn(zo_logger::send_logs());
     }
     if cfg.common.telemetry_enabled {
         tokio::task::spawn(async move {
@@ -753,9 +753,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         .disable_signals()
         .run();
     let handle = server.handle();
-    tokio::task::spawn(async move {
-        graceful_shutdown(handle).await;
-    });
+    tokio::task::spawn(graceful_shutdown(handle));
     server.await?;
     Ok(())
 }
@@ -861,9 +859,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         .disable_signals()
         .run();
     let handle = server.handle();
-    tokio::task::spawn(async move {
-        graceful_shutdown(handle).await;
-    });
+    tokio::task::spawn(graceful_shutdown(handle));
     server.await?;
     Ok(())
 }
@@ -1104,9 +1100,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
         .disable_signals()
         .run();
     let handle = server.handle();
-    tokio::task::spawn(async move {
-        graceful_shutdown(handle).await;
-    });
+    tokio::task::spawn(graceful_shutdown(handle));
     server.await?;
 
     log::info!("HTTP server stopped");

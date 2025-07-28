@@ -50,20 +50,19 @@ use opentelemetry::trace::{Span, TraceId, Tracer};
 use parking_lot::Mutex;
 use prost::Message;
 use proto::cluster_rpc;
+use rand::prelude::SliceRandom;
 use tonic::{
     Streaming,
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
 };
 
-use super::{
-    codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
-    node::RemoteScanNode,
-};
+use super::node::RemoteScanNode;
 use crate::service::{
     grpc::get_cached_channel,
     search::{
         MetadataMap,
+        datafusion::distributed_plan::codec::get_physical_extension_codec,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
 };
@@ -77,6 +76,7 @@ pub struct RemoteScanExec {
     cache: PlanProperties,
     pub scan_stats: Arc<Mutex<ScanStats>>,
     pub partial_err: Arc<Mutex<String>>,
+    pub enrich_mode_node_idx: usize,
 }
 
 impl RemoteScanExec {
@@ -89,12 +89,21 @@ impl RemoteScanExec {
         let cache = Self::compute_properties(Arc::clone(&input.schema()), output_partitions);
 
         // serialize the input plan and set it as the plan for the remote scan node
-        let proto = ComposedPhysicalExtensionCodec {
-            codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
-        };
+        let proto = get_physical_extension_codec();
         let physical_plan_bytes =
             physical_plan_to_bytes_with_extension_codec(input.clone(), &proto)?;
         remote_scan_node.set_plan(physical_plan_bytes.to_vec());
+
+        // get the node ids for enrich mode
+        let mut node_ids = remote_scan_node
+            .nodes
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, n)| if n.is_querier() { Some(idx) } else { None })
+            .collect::<Vec<_>>();
+        // random shuffle the node ids
+        node_ids.shuffle(&mut rand::thread_rng());
+        let enrich_mode_node_idx = node_ids.pop().unwrap_or_default();
 
         Ok(RemoteScanExec {
             input,
@@ -103,6 +112,7 @@ impl RemoteScanExec {
             cache,
             scan_stats: Arc::new(Mutex::new(ScanStats::default())),
             partial_err: Arc::new(Mutex::new(String::new())),
+            enrich_mode_node_idx,
         })
     }
 
@@ -160,9 +170,15 @@ impl ExecutionPlan for RemoteScanExec {
 
     fn with_new_children(
         self: Arc<Self>,
-        _: Vec<Arc<dyn ExecutionPlan>>,
+        children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        Ok(self)
+        if children.is_empty() {
+            return Ok(self);
+        }
+        Ok(Arc::new(Self::new(
+            children[0].clone(),
+            self.remote_scan_node.clone(),
+        )?))
     }
 
     fn execute(
@@ -173,6 +189,7 @@ impl ExecutionPlan for RemoteScanExec {
         let fut = get_remote_batch(
             self.remote_scan_node.clone(),
             partition,
+            partition == self.enrich_mode_node_idx,
             self.input.schema().clone(),
             self.scan_stats.clone(),
             self.partial_err.clone(),
@@ -192,6 +209,7 @@ impl ExecutionPlan for RemoteScanExec {
 async fn get_remote_batch(
     remote_scan_node: RemoteScanNode,
     partition: usize,
+    enrich_mode: bool,
     schema: SchemaRef,
     scan_stats: Arc<Mutex<ScanStats>>,
     partial_err: Arc<Mutex<String>>,
@@ -221,7 +239,12 @@ async fn get_remote_batch(
     }
 
     // fast return for empty file list querier node
-    if !is_super && is_querier && !is_ingester && remote_scan_node.is_file_list_empty(partition) {
+    if !is_super
+        && is_querier
+        && !is_ingester
+        && !enrich_mode
+        && remote_scan_node.is_file_list_empty(partition)
+    {
         return Ok(get_empty_record_batch_stream(
             trace_id,
             schema,
@@ -237,6 +260,7 @@ async fn get_remote_batch(
     request.set_job_id(generate_random_string(7));
     request.set_partition(partition);
     request.search_info.timeout = timeout as i64;
+    request.query_identifier.enrich_mode = enrich_mode;
 
     log::info!(
         "[trace_id {}] flight->search: request node: {}, query_type: {}, is_super: {}, is_querier: {}, timeout: {}, files: {}",

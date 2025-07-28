@@ -28,10 +28,7 @@ use config::{
     metrics,
     utils::json,
 };
-use datafusion::{
-    common::tree_node::TreeNode,
-    physical_plan::{displayable, visit_execution_plan},
-};
+use datafusion::{common::tree_node::TreeNode, physical_plan::visit_execution_plan};
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
@@ -238,13 +235,11 @@ async fn run_datafusion(
     };
 
     if cfg.common.print_key_sql {
-        let plan = displayable(physical_plan.as_ref())
-            .indent(false)
-            .to_string();
-        println!("+---------------------------+----------+");
-        println!("leader physical plan before rewrite");
-        println!("+---------------------------+----------+");
-        println!("{plan}");
+        log::info!("[trace_id {trace_id}] leader physical plan before rewrite");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+        );
     }
 
     // 6. rewrite physical plan
@@ -312,15 +307,16 @@ async fn run_datafusion(
             .unwrap_or_default();
         let use_cache = use_cache && org_settings.aggregation_cache_enabled;
         let target_partitions = ctx.state().config().target_partitions();
-        let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) = o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::rewrite_aggregate_plan(
-            streaming_id,
-            start_time,
-            end_time,
-            use_cache,
-            target_partitions,
-            physical_plan,
-        )
-        .await?;
+        let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) =
+            o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_streaming_agg_plan(
+                streaming_id,
+                start_time,
+                end_time,
+                use_cache,
+                target_partitions,
+                physical_plan,
+            )
+            .await?;
         physical_plan = plan;
         // Check for aggs cache hit
         if is_complete_cache_hit {
@@ -337,14 +333,20 @@ async fn run_datafusion(
         }
     }
 
+    // rewrite physical plan for merge aggregation and get topk
+    let plan = o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_topk_agg_plan(
+        sql.limit,
+        physical_plan,
+    )
+    .await?;
+    physical_plan = plan;
+
     if cfg.common.print_key_sql {
-        let plan = displayable(physical_plan.as_ref())
-            .indent(false)
-            .to_string();
-        println!("+---------------------------+----------+");
-        println!("leader physical plan after rewrite");
-        println!("+---------------------------+----------+");
-        println!("{plan}");
+        log::info!("[trace_id {trace_id}] leader physical plan after rewrite");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+        );
     }
 
     let datafusion_start = std::time::Instant::now();

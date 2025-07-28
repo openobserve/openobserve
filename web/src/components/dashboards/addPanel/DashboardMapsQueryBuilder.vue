@@ -104,7 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields.name.label
                     "
-                    :rules="[(val: string) => !!val?.trim() || 'Required']"
                   />
                   <div
                     v-if="
@@ -276,7 +275,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         dashboardPanelData.layout.currentQueryIndex
                       ].fields.value_for_maps.label
                     "
-                    :rules="[(val: string) => !!val?.trim() || 'Required']"
                   />
                   <div style="width: 100%" class="tw-mb-2">
                     <span class="tw-block tw-mb-1 tw-font-bold">Having</span>

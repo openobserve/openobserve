@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::TimeZone;
+use clap::{Arg, ArgAction, Command};
 use config::utils::file::set_permission;
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
@@ -31,221 +32,113 @@ use crate::{
     service::{compact, db, file_list, users},
 };
 
-pub async fn cli() -> Result<bool, anyhow::Error> {
-    let app = clap::Command::new("openobserve")
+/// Not to be confused with [`clap::arg`] macro, this is a custom macro that
+/// is used to create an `Arg` struct with the given name, short, long, help,
+/// and required flags.
+macro_rules! arg {
+    ($name:expr, $short:expr, $long:expr, $help:expr $(, $required:expr)?) => {
+        clap::Arg::new($name).short($short).long($long).help($help)$(.required($required))?
+    };
+}
+
+fn create_cli_app() -> Command {
+    Command::new("openobserve")
         .version(config::VERSION)
         .about(clap::crate_description!())
         .subcommands(&[
-            clap::Command::new("reset")
+            Command::new("reset")
                 .about("reset openobserve data")
-                .arg(
-                    clap::Arg::new("component")
-                        .short('c')
-                        .long("component")
-                        .help(
-                            "reset data of the component: root, user, alert, dashboard, function, stream-stats",
-                        ),
-                ),
-            clap::Command::new("import")
+                .arg(arg!("component", 'c', "component", "reset data of the component: root, user, alert, dashboard, function, stream-stats", true)),
+            Command::new("import")
                 .about("import openobserve data").args(dataArgs()),
-            clap::Command::new("export")
+            Command::new("export")
                 .about("export openobserve data").args(dataArgs()),
-            clap::Command::new("view")
+            Command::new("view")
                 .about("view openobserve data")
-                .arg(
-                    clap::Arg::new("component")
-                        .short('c')
-                        .long("component")
-                        .help("view data of the component: version, user"),
-                ),
-            clap::Command::new("init-dir")
+                .arg(arg!("component", 'c', "component", "view data of the component: version, user")),
+            Command::new("init-dir")
                 .about("init openobserve data dir")
-                .arg(
-                    clap::Arg::new("path")
-                        .short('p')
-                        .long("path")
-                        .help("init this path as data root dir"),
-                ),
-            clap::Command::new("migrate-file-list")
+                .arg(arg!("path", 'p', "path", "init this path as data root dir")),
+            Command::new("migrate-file-list")
                 .about("migrate file-list")
                 .args([
-                    clap::Arg::new("prefix")
-                        .short('p')
-                        .long("prefix")
-                        .value_name("prefix")
-                        .required(false)
-                        .help("only migrate specified prefix, default is all"),
-                    clap::Arg::new("from")
-                        .short('f')
-                        .long("from")
-                        .value_name("from")
-                        .required(true)
-                        .help("migrate from: sled, sqlite, etcd, mysql, postgresql"),
-                    clap::Arg::new("to")
-                        .short('t')
-                        .long("to")
-                        .value_name("to")
-                        .required(true)
-                        .help("migrate to: sqlite, mysql, postgresql"),
+                    arg!("prefix", 'p', "prefix", "only migrate specified prefix, default is all"),
+                    arg!("from", 'f', "from", "migrate from: sled, sqlite, etcd, mysql, postgresql"),
+                    arg!("to", 't', "to", "migrate to: sqlite, mysql, postgresql"),
                 ]),
-            clap::Command::new("migrate-meta")
+            Command::new("migrate-meta")
                 .about("migrate meta")
                 .args([
-                    clap::Arg::new("from")
-                        .short('f')
-                        .long("from")
-                        .value_name("from")
-                        .required(true)
-                        .help("migrate from: sled, sqlite, etcd, mysql, postgresql"),
-                    clap::Arg::new("to")
-                        .short('t')
-                        .long("to")
-                        .value_name("to")
-                        .required(true)
-                        .help("migrate to: sqlite, etcd, mysql, postgresql"),
+                    arg!("from", 'f', "from", "migrate from: sled, sqlite, etcd, mysql, postgresql", true).value_name("from"),
+                    arg!("to", 't', "to", "migrate to: sqlite, etcd, mysql, postgresql", true).value_name("to"),
                 ]),
-            clap::Command::new("migrate-dashboards").about("migrate-dashboards"),
-            clap::Command::new("migrate-pipeline").about("migrate pipelines")
+            Command::new("migrate-dashboards").about("migrate-dashboards"),
+            Command::new("migrate-pipeline").about("migrate pipelines")
                 .arg(
-                    clap::Arg::new("drop-table")
-                        .long("drop-table")
-                        .required(false)
-                        .num_args(0)
-                        .help("Drop existing Pipeline table first before migrating")
+                    arg!("drop-table", 'd', "drop-table", "Drop existing Pipeline table first before migrating", false)
+                    .value_name("drop-table")
+                    .num_args(0)
                 ),
-            clap::Command::new("delete-parquet")
+            Command::new("delete-parquet")
                 .about("delete parquet files from s3 and file_list")
                 .args([
-                    clap::Arg::new("account")
-                        .short('a')
-                        .long("account")
-                        .required(false)
-                        .value_name("account")
-                        .help("the account name"),
-                    clap::Arg::new("file")
-                        .short('f')
-                        .long("file")
-                        .value_name("file")
-                        .help("the parquet file name"),
+                    arg!("account", 'a', "account", "the account name", false).value_name("account"),
+                    arg!("file", 'f', "file", "the parquet file name", true).value_name("file"),
                 ]),
-            clap::Command::new("migrate-schemas").about("migrate from single row to row per schema version"),
-            clap::Command::new("seaorm-rollback").about("rollback SeaORM migration steps")
+            Command::new("migrate-schemas").about("migrate from single row to row per schema version"),
+            Command::new("seaorm-rollback").about("rollback SeaORM migration steps")
                 .subcommand(
-                    clap::Command::new("all")
+                    Command::new("all")
                     .about("rollback all SeaORM migration steps")
                 )
                 .subcommand(
-                    clap::Command::new("last")
+                    Command::new("last")
                     .about("rollback last N SeaORM migration steps")
-                    .arg(clap::Arg::new("N").help("number of migration steps to rollback (default is 1)").value_parser(clap::value_parser!(u32)))
+                    .arg(
+                        Arg::new("N").help("number of migration steps to rollback (default is 1)").value_parser(clap::value_parser!(u32)))
                 ),
-            clap::Command::new("recover-file-list").about("recover file list from s3")
+            Command::new("recover-file-list").about("recover file list from s3")
                 .args([
-                    clap::Arg::new("account")
-                        .short('a')
-                        .long("account")
-                        .value_name("account")
-                        .required(true)
-                        .help("the account name"),
-                    clap::Arg::new("prefix")
-                        .short('p')
-                        .long("prefix")
-                        .value_name("prefix")
-                        .required(true)
-                        .help("only migrate specified prefix"),
-                    clap::Arg::new("insert")
-                        .short('i')
-                        .long("insert")
-                        .value_name("insert")
-                        .required(false)
-                        .action(clap::ArgAction::SetTrue)
-                        .help("insert file list into db"),
+                    arg!("account", 'a', "account", "the account name", true).value_name("account"),
+                    arg!("prefix", 'p', "prefix", "only migrate specified prefix", true).value_name("prefix"),
+                    arg!("insert", 'i', "insert", "insert file list into db", false).value_name("insert").action(ArgAction::SetTrue),
                 ]),
-            clap::Command::new("node").about("node command").subcommands([
-                clap::Command::new("offline").about("offline node"),
-                clap::Command::new("online").about("online node"),
-                clap::Command::new("flush").about("flush memtable to disk"),
-                clap::Command::new("list").about("list cached nodes").args([
-                    clap::Arg::new("metrics")
-                        .short('m')
-                        .long("metrics")
-                        .required(false)
-                        .action(clap::ArgAction::SetTrue)
-                        .help("show node metrics"),
+                Command::new("node").about("node command").subcommands([
+                Command::new("offline").about("offline node"),
+                Command::new("online").about("online node"),
+                Command::new("flush").about("flush memtable to disk"),
+                Command::new("list").about("list cached nodes").args([
+                    arg!("metrics", 'm', "metrics", "show node metrics", false).action(ArgAction::SetTrue),
                 ]),
-                clap::Command::new("metrics").about("show local node metrics"),
+                Command::new("metrics").about("show local node metrics"),
             ]),
-            clap::Command::new("sql").about("query data").args([
-                clap::Arg::new("org") 
-                    .long("org")
-                    .required(false)
-                    .default_value("default")
-                    .help("org name"),
-                clap::Arg::new("execute")
-                    .short('e')
-                    .long("execute")
-                    .required(true)
-                    .help("execute sql"),
-                clap::Arg::new("time")
-                    .short('t')
-                    .long("time")
-                    .required(false)
-                    .default_value("15m")
-                    .help("time range, e.g. 15m, 1h, 1d, 1w, 1y"),
-                clap::Arg::new("limit")
-                    .short('l')
-                    .long("limit")
-                    .required(false)
-                    .default_value("10")
-                    .help("limit the number of results"),
+            Command::new("sql").about("query data").args([
+                arg!("org", 'o', "org", "org name").default_value("default"),
+                arg!("execute", 'e', "execute", "execute sql", true),
+                arg!("time", 't', "time", "time range, e.g. 15m, 1h, 1d, 1w, 1y").default_value("15m"),
+                arg!("limit", 'l', "limit", "limit the number of results").default_value("10"),
             ]),
-            clap::Command::new("test").about("test command").subcommands([
-                clap::Command::new("file_list").about("test generate file list groups").args([
-                    clap::Arg::new("mode")
-                        .short('m')
-                        .long("mode")
-                        .required(true)
-                        .default_value("file_size")
-                        .help("mode: file_size, file_time, time_range"),
-                    clap::Arg::new("stream")
-                        .short('s')
-                        .long("stream")
-                        .required(true)
-                        .default_value("")
-                        .help("stream name, the format is org/logs/default"),
-                    clap::Arg::new("hour")
-                        .short('d')
-                        .long("date")
-                        .required(true)
-                        .default_value("")
-                        .help("date for testing, the format is 2025/01/01/00"),
-                    clap::Arg::new("group_size")
-                        .short('g')
-                        .long("group_size")
-                        .required(false)
-                        .default_value("5")
-                        .help("group size by gb, default is 5gb"),
+            Command::new("test").about("test command").subcommands([
+                Command::new("file_list").about("test generate file list groups").args([
+                    arg!("mode", 'm', "mode", "mode: file_size, file_time, time_range").default_value("file_size"),
+                    arg!("stream", 's', "stream", "stream name, the format is org/logs/default").default_value(""),
+                    arg!("hour", 'd', "hour", "date for testing, the format is 2025/01/01/00").default_value(""),
+                    arg!("group_size", 'g', "group_size", "group size by gb, default is 5gb").default_value("5"),
                 ]),
             ]),
-            clap::Command::new("parse-id").about("parse snowflake id to timestamp").args([
-                clap::Arg::new("id")
-                    .short('i')
-                    .long("id")
-                    .required(true)
-                    .help("snowflake id"),
+            Command::new("parse-id").about("parse snowflake id to timestamp").args([
+                arg!("id", 'i', "id", "snowflake id", true),
             ]),
-            clap::Command::new("consistent-hash").about("consistent hash").args([
-                clap::Arg::new("file")
-                    .short('f')
-                    .long("file")
-                    .required(true)
-                    .num_args(1..)
-                    .help("file"),
+            Command::new("consistent-hash").about("consistent hash").args([
+                arg!("file", 'f', "file", "file", true).num_args(1..),
             ]),
-            clap::Command::new("upgrade-db")
+            Command::new("upgrade-db")
                 .about("upgrade db table schemas").args(dataArgs()),
         ])
-        .get_matches();
+}
+
+pub async fn cli() -> Result<bool, anyhow::Error> {
+    let mut app = create_cli_app().get_matches();
 
     if app.subcommand().is_none() {
         return Ok(false);
@@ -254,24 +147,20 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     #[cfg(not(feature = "tokio-console"))]
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("INFO"));
 
-    let (name, command) = app.subcommand().unwrap();
+    let (name, mut command) = app.remove_subcommand().unwrap();
     if name == "init-dir" {
-        match command.get_one::<String>("path") {
-            Some(path) => {
-                set_permission(path, 0o777)?;
-                println!("init dir {path} successfully");
-            }
-            None => {
-                return Err(anyhow::anyhow!("please set data path"));
-            }
-        }
+        let path = command
+            .get_one::<String>("path")
+            .ok_or_else(|| anyhow::anyhow!("please set data path"))?;
+        set_permission(path, 0o777)?;
+        println!("init dir {path} successfully");
         return Ok(true);
     }
 
     // init infra, create data dir & tables
     let cfg = config::get_config();
     infra::init().await.expect("infra init failed");
-    match name {
+    match name.as_str() {
         "reset" => {
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
@@ -364,26 +253,14 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             }
         }
         "migrate-file-list" => {
-            let from = match command.get_one::<String>("from") {
-                Some(from) => from.to_string(),
-                None => "".to_string(),
-            };
-            let to = match command.get_one::<String>("to") {
-                Some(to) => to.to_string(),
-                None => "".to_string(),
-            };
+            let from = command.remove_one::<String>("from").unwrap_or_default();
+            let to = command.remove_one::<String>("to").unwrap_or_default();
             println!("Running migration file_list from {from} to {to}");
             migration::file_list::run(&from, &to).await?;
         }
         "migrate-meta" => {
-            let from = match command.get_one::<String>("from") {
-                Some(from) => from.to_string(),
-                None => "".to_string(),
-            };
-            let to = match command.get_one::<String>("to") {
-                Some(to) => to.to_string(),
-                None => "".to_string(),
-            };
+            let from = command.remove_one::<String>("from").unwrap_or_default();
+            let to = command.remove_one::<String>("to").unwrap_or_default();
             println!("Running migration metadata from {from} to {to}");
             migration::meta::run(&from, &to).await?
         }
@@ -397,10 +274,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             migration::pipeline_func::run(drop_table).await?;
         }
         "delete-parquet" => {
-            let account = command
-                .get_one::<String>("account")
-                .map(|s| s.to_string())
-                .unwrap_or_default();
+            let account = command.remove_one::<String>("account").unwrap_or_default();
             let file = command.get_one::<String>("file").unwrap();
             match file_list::delete_parquet_file(&account, file, true).await {
                 Ok(_) => {
@@ -543,4 +417,674 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
 
     println!("command {name} execute successfully");
     Ok(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use clap::Command;
+
+    use super::*;
+
+    // Helper function to create the CLI app for testing
+    fn create_test_app() -> Command {
+        create_cli_app()
+    }
+
+    #[test]
+    fn test_arg_macro() {
+        // Test that the arg! macro works correctly
+        let arg = arg!("test", 't', "test", "test argument");
+        assert_eq!(arg.get_id(), "test");
+        assert_eq!(arg.get_short(), Some('t'));
+        assert_eq!(arg.get_long(), Some("test"));
+        assert!(arg.get_help().is_some());
+        assert!(!arg.is_required_set());
+    }
+
+    #[test]
+    fn test_arg_macro_required() {
+        // Test that the arg! macro works with required flag
+        let arg = arg!("test", 't', "test", "test argument", true);
+        assert_eq!(arg.get_id(), "test");
+        assert_eq!(arg.get_short(), Some('t'));
+        assert_eq!(arg.get_long(), Some("test"));
+        assert!(arg.get_help().is_some());
+        assert!(arg.is_required_set());
+    }
+
+    #[test]
+    fn test_cli_app_creation() {
+        // Test that the CLI app can be created without errors
+        let app = create_test_app();
+        assert_eq!(app.get_name(), "openobserve");
+        assert!(app.get_subcommands().count() > 0);
+    }
+
+    #[test]
+    fn test_reset_command_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "reset", "--component", "user"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "reset");
+        assert_eq!(sub_matches.get_one::<String>("component").unwrap(), "user");
+    }
+
+    #[test]
+    fn test_reset_command_invalid_component() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "reset", "--component", "invalid"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "reset");
+        assert_eq!(
+            sub_matches.get_one::<String>("component").unwrap(),
+            "invalid"
+        );
+    }
+
+    #[test]
+    fn test_view_command_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "view", "--component", "version"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "view");
+        assert_eq!(
+            sub_matches.get_one::<String>("component").unwrap(),
+            "version"
+        );
+    }
+
+    #[test]
+    fn test_init_dir_command_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "init-dir", "--path", "/tmp/test"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "init-dir");
+        assert_eq!(sub_matches.get_one::<String>("path").unwrap(), "/tmp/test");
+    }
+
+    #[test]
+    fn test_migrate_file_list_command_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from([
+                "openobserve",
+                "migrate-file-list",
+                "--from",
+                "sqlite",
+                "--to",
+                "mysql",
+            ])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "migrate-file-list");
+        assert_eq!(sub_matches.get_one::<String>("from").unwrap(), "sqlite");
+        assert_eq!(sub_matches.get_one::<String>("to").unwrap(), "mysql");
+    }
+
+    #[test]
+    fn test_migrate_meta_command_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from([
+                "openobserve",
+                "migrate-meta",
+                "--from",
+                "sqlite",
+                "--to",
+                "mysql",
+            ])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "migrate-meta");
+        assert_eq!(sub_matches.get_one::<String>("from").unwrap(), "sqlite");
+        assert_eq!(sub_matches.get_one::<String>("to").unwrap(), "mysql");
+    }
+
+    #[test]
+    fn test_migrate_pipeline_command_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "migrate-pipeline"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "migrate-pipeline");
+        assert!(!sub_matches.get_flag("drop-table"));
+    }
+
+    #[test]
+    fn test_migrate_pipeline_with_drop_table() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "migrate-pipeline", "--drop-table"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "migrate-pipeline");
+        assert!(sub_matches.get_flag("drop-table"));
+    }
+
+    #[test]
+    fn test_delete_parquet_command_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "delete-parquet", "--file", "test.parquet"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "delete-parquet");
+        assert_eq!(
+            sub_matches.get_one::<String>("file").unwrap(),
+            "test.parquet"
+        );
+        assert_eq!(
+            sub_matches
+                .get_one::<String>("account")
+                .unwrap_or(&String::new()),
+            ""
+        );
+    }
+
+    #[test]
+    fn test_delete_parquet_with_account() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from([
+                "openobserve",
+                "delete-parquet",
+                "--account",
+                "test-account",
+                "--file",
+                "test.parquet",
+            ])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "delete-parquet");
+        assert_eq!(
+            sub_matches.get_one::<String>("account").unwrap(),
+            "test-account"
+        );
+        assert_eq!(
+            sub_matches.get_one::<String>("file").unwrap(),
+            "test.parquet"
+        );
+    }
+
+    #[test]
+    fn test_seaorm_rollback_all_command() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "seaorm-rollback", "all"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "seaorm-rollback");
+        let (sub_name, _) = sub_matches.subcommand().unwrap();
+        assert_eq!(sub_name, "all");
+    }
+
+    #[test]
+    fn test_seaorm_rollback_last_command() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "seaorm-rollback", "last", "5"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "seaorm-rollback");
+        let (sub_name, sub_sub_matches) = sub_matches.subcommand().unwrap();
+        assert_eq!(sub_name, "last");
+        assert_eq!(sub_sub_matches.get_one::<u32>("N").unwrap(), &5);
+    }
+
+    #[test]
+    fn test_seaorm_rollback_last_default() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "seaorm-rollback", "last"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "seaorm-rollback");
+        let (sub_name, sub_sub_matches) = sub_matches.subcommand().unwrap();
+        assert_eq!(sub_name, "last");
+        assert_eq!(sub_sub_matches.get_one::<u32>("N"), None);
+    }
+
+    #[test]
+    fn test_recover_file_list_command_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from([
+                "openobserve",
+                "recover-file-list",
+                "--account",
+                "test-account",
+                "--prefix",
+                "test-prefix",
+            ])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "recover-file-list");
+        assert_eq!(
+            sub_matches.get_one::<String>("account").unwrap(),
+            "test-account"
+        );
+        assert_eq!(
+            sub_matches.get_one::<String>("prefix").unwrap(),
+            "test-prefix"
+        );
+        assert!(!sub_matches.get_flag("insert"));
+    }
+
+    #[test]
+    fn test_recover_file_list_with_insert() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from([
+                "openobserve",
+                "recover-file-list",
+                "--account",
+                "test-account",
+                "--prefix",
+                "test-prefix",
+                "--insert",
+            ])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "recover-file-list");
+        assert_eq!(
+            sub_matches.get_one::<String>("account").unwrap(),
+            "test-account"
+        );
+        assert_eq!(
+            sub_matches.get_one::<String>("prefix").unwrap(),
+            "test-prefix"
+        );
+        assert!(sub_matches.get_flag("insert"));
+    }
+
+    #[test]
+    fn test_node_command_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "node", "offline"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "node");
+        let (sub_name, _) = sub_matches.subcommand().unwrap();
+        assert_eq!(sub_name, "offline");
+    }
+
+    #[test]
+    fn test_node_list_command() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "node", "list"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "node");
+        let (sub_name, sub_sub_matches) = sub_matches.subcommand().unwrap();
+        assert_eq!(sub_name, "list");
+        assert!(!sub_sub_matches.get_flag("metrics"));
+    }
+
+    #[test]
+    fn test_node_list_with_metrics() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "node", "list", "--metrics"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "node");
+        let (sub_name, sub_sub_matches) = sub_matches.subcommand().unwrap();
+        assert_eq!(sub_name, "list");
+        assert!(sub_sub_matches.get_flag("metrics"));
+    }
+
+    #[test]
+    fn test_sql_command_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from([
+                "openobserve",
+                "sql",
+                "--execute",
+                "SELECT * FROM logs",
+                "--org",
+                "test-org",
+                "--time",
+                "1h",
+                "--limit",
+                "50",
+            ])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "sql");
+        assert_eq!(sub_matches.get_one::<String>("org").unwrap(), "test-org");
+        assert_eq!(
+            sub_matches.get_one::<String>("execute").unwrap(),
+            "SELECT * FROM logs"
+        );
+        assert_eq!(sub_matches.get_one::<String>("time").unwrap(), "1h");
+        assert_eq!(sub_matches.get_one::<String>("limit").unwrap(), "50");
+    }
+
+    #[test]
+    fn test_sql_command_defaults() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "sql", "--execute", "SELECT * FROM logs"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "sql");
+        assert_eq!(sub_matches.get_one::<String>("org").unwrap(), "default");
+        assert_eq!(
+            sub_matches.get_one::<String>("execute").unwrap(),
+            "SELECT * FROM logs"
+        );
+        assert_eq!(sub_matches.get_one::<String>("time").unwrap(), "15m");
+        assert_eq!(sub_matches.get_one::<String>("limit").unwrap(), "10");
+    }
+
+    #[test]
+    fn test_test_file_list_command_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from([
+                "openobserve",
+                "test",
+                "file_list",
+                "--mode",
+                "file_size",
+                "--stream",
+                "org/logs/default",
+                "--hour",
+                "2025/01/01/00",
+                "--group_size",
+                "10",
+            ])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "test");
+        let (sub_name, sub_sub_matches) = sub_matches.subcommand().unwrap();
+        assert_eq!(sub_name, "file_list");
+        assert_eq!(
+            sub_sub_matches.get_one::<String>("mode").unwrap(),
+            "file_size"
+        );
+        assert_eq!(
+            sub_sub_matches.get_one::<String>("stream").unwrap(),
+            "org/logs/default"
+        );
+        assert_eq!(
+            sub_sub_matches.get_one::<String>("hour").unwrap(),
+            "2025/01/01/00"
+        );
+        assert_eq!(
+            sub_sub_matches.get_one::<String>("group_size").unwrap(),
+            "10"
+        );
+    }
+
+    #[test]
+    fn test_test_file_list_defaults() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from([
+                "openobserve",
+                "test",
+                "file_list",
+                "--mode",
+                "file_size",
+                "--stream",
+                "org/logs/default",
+                "--hour",
+                "2025/01/01/00",
+            ])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "test");
+        let (sub_name, sub_sub_matches) = sub_matches.subcommand().unwrap();
+        assert_eq!(sub_name, "file_list");
+        assert_eq!(
+            sub_sub_matches.get_one::<String>("mode").unwrap(),
+            "file_size"
+        );
+        assert_eq!(
+            sub_sub_matches.get_one::<String>("stream").unwrap(),
+            "org/logs/default"
+        );
+        assert_eq!(
+            sub_sub_matches.get_one::<String>("hour").unwrap(),
+            "2025/01/01/00"
+        );
+        assert_eq!(
+            sub_sub_matches.get_one::<String>("group_size").unwrap(),
+            "5"
+        );
+    }
+
+    #[test]
+    fn test_parse_id_command_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "parse-id", "--id", "123456789"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "parse-id");
+        assert_eq!(sub_matches.get_one::<String>("id").unwrap(), "123456789");
+    }
+
+    #[test]
+    fn test_consistent_hash_command_parsing() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from([
+                "openobserve",
+                "consistent-hash",
+                "--file",
+                "file1.txt",
+                "file2.txt",
+                "file3.txt",
+            ])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "consistent-hash");
+        let files: Vec<&String> = sub_matches.get_many::<String>("file").unwrap().collect();
+        assert_eq!(files, vec!["file1.txt", "file2.txt", "file3.txt"]);
+    }
+
+    #[test]
+    fn test_consistent_hash_single_file() {
+        let app = create_test_app();
+        let matches = app
+            .try_get_matches_from(["openobserve", "consistent-hash", "--file", "file1.txt"])
+            .unwrap();
+        let (name, sub_matches) = matches.subcommand().unwrap();
+        assert_eq!(name, "consistent-hash");
+        let files: Vec<&String> = sub_matches.get_many::<String>("file").unwrap().collect();
+        assert_eq!(files, vec!["file1.txt"]);
+    }
+
+    #[test]
+    fn test_no_subcommand() {
+        let app = create_test_app();
+        let matches = app.try_get_matches_from(["openobserve"]).unwrap();
+        assert!(matches.subcommand().is_none());
+    }
+
+    #[test]
+    fn test_invalid_subcommand() {
+        let app = create_test_app();
+        let result = app.try_get_matches_from(["openobserve", "invalid-command"]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_missing_required_argument() {
+        let app = create_test_app();
+        let result = app.try_get_matches_from(["openobserve", "migrate-meta"]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_limit_validation_logic() {
+        // Test the limit validation logic from the sql command
+        let test_cases = [
+            ("5", 5),
+            ("100", 100),
+            ("1000", 1000),
+            ("0", 10),    // Should default to 10
+            ("1001", 10), // Should default to 10
+            ("-5", 10),   // Should default to 10
+        ];
+
+        for (input, expected) in test_cases {
+            let mut limit = input.parse::<i64>().unwrap_or(10);
+            if !(1..=1000).contains(&limit) {
+                limit = 10;
+            }
+            assert_eq!(limit, expected, "Failed for input: {input}");
+        }
+    }
+
+    #[test]
+    fn test_path_validation() {
+        // Test path validation logic
+        let valid_paths = [
+            "/tmp/test",
+            "./relative/path",
+            "C:\\Windows\\Path",
+            "/home/user/documents",
+        ];
+
+        for path in valid_paths {
+            let path_obj = Path::new(path);
+            assert!(!path_obj.to_string_lossy().is_empty());
+        }
+    }
+
+    #[test]
+    fn test_component_validation() {
+        // Test valid reset components
+        let valid_reset_components = [
+            "root",
+            "user",
+            "alert",
+            "dashboard",
+            "function",
+            "stream-stats",
+        ];
+
+        for component in valid_reset_components {
+            assert!(!component.is_empty());
+            assert!(component.len() < 50); // Reasonable length check
+        }
+
+        for component in ["version", "user"] {
+            assert!(!component.is_empty());
+            assert!(component.len() < 50);
+        }
+    }
+
+    #[test]
+    fn test_migration_source_target_validation() {
+        // Test valid migration sources and targets
+        let valid_sources = ["sled", "sqlite", "etcd", "mysql", "postgresql"];
+        let valid_targets = ["sqlite", "mysql", "postgresql"];
+
+        for source in valid_sources {
+            assert!(!source.is_empty());
+            assert!(source.len() < 20);
+        }
+
+        for target in valid_targets {
+            assert!(!target.is_empty());
+            assert!(target.len() < 20);
+        }
+    }
+
+    #[test]
+    fn test_time_format_validation() {
+        // Test time format validation logic
+        let valid_time_formats = ["15m", "1h", "1d", "1w", "1y", "30s", "2h30m"];
+
+        for time_format in valid_time_formats {
+            assert!(!time_format.is_empty());
+            assert!(time_format.len() < 10);
+            // Basic format check: should contain at least one letter
+            assert!(time_format.chars().any(|c| c.is_alphabetic()));
+        }
+    }
+
+    #[test]
+    fn test_sql_query_validation() {
+        // Test SQL query validation logic
+        let valid_queries = [
+            "SELECT * FROM logs",
+            "SELECT count(*) FROM metrics",
+            "SELECT * FROM traces WHERE timestamp > now() - 1h",
+        ];
+
+        for query in valid_queries {
+            assert!(!query.is_empty());
+            assert!(query.len() < 1000); // Reasonable length
+            assert!(query.to_uppercase().contains("SELECT"));
+        }
+    }
+
+    #[test]
+    fn test_stream_format_validation() {
+        // Test stream format validation (org/logs/default)
+        let valid_streams = ["org/logs/default", "test/metrics/cpu", "prod/traces/api"];
+
+        for stream in valid_streams {
+            let parts: Vec<&str> = stream.split('/').collect();
+            assert_eq!(parts.len(), 3, "Stream should have 3 parts: {stream}");
+            assert!(!parts[0].is_empty(), "Org should not be empty: {stream}");
+            assert!(
+                !parts[1].is_empty(),
+                "Stream type should not be empty: {stream}"
+            );
+            assert!(
+                !parts[2].is_empty(),
+                "Stream name should not be empty: {stream}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_hour_format_validation() {
+        // Test hour format validation (2025/01/01/00)
+        let valid_hours = ["2025/01/01/00", "2024/12/31/23", "2023/06/15/12"];
+
+        for hour in valid_hours {
+            let parts: Vec<&str> = hour.split('/').collect();
+            assert_eq!(parts.len(), 4, "Hour should have 4 parts: {hour}");
+
+            // Year should be 4 digits
+            assert_eq!(parts[0].len(), 4, "Year should be 4 digits: {hour}");
+            assert!(
+                parts[0].parse::<i32>().is_ok(),
+                "Year should be numeric: {hour}"
+            );
+
+            // Month should be 1-2 digits
+            let month: i32 = parts[1].parse().unwrap();
+            assert!((1..=12).contains(&month), "Month should be 1-12: {hour}");
+
+            // Day should be 1-2 digits
+            let day: i32 = parts[2].parse().unwrap();
+            assert!((1..=31).contains(&day), "Day should be 1-31: {hour}");
+
+            // Hour should be 1-2 digits
+            let hour_val: i32 = parts[3].parse().unwrap();
+            assert!((0..=23).contains(&hour_val), "Hour should be 0-23: {hour}");
+        }
+    }
 }

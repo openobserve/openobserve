@@ -6,6 +6,7 @@
     <div class="tw-flex tw-justify-between">
       <div class="tw-flex tw-items-center">
         <q-icon
+          v-if="showExpandIcon"
           name="keyboard_arrow_up"
           @click.stop="expanded = !expanded"
           class="tw-mr-1 tw-cursor-pointer tw-transition-all"
@@ -18,7 +19,7 @@
           size="20px"
         />
         <div
-          @click="expanded = !expanded"
+          @click="showExpandIcon ? expanded = !expanded : null"
           class="tw-text-[14px] tw-font-bold"
           :class="[
             store.state.theme === 'dark'
@@ -33,11 +34,6 @@
       </div>
       <div>
         <slot name="right" />
-        <!-- <q-icon
-          name="fullscreen"
-          size="18px"
-          class="tw-mr-1 tw-cursor-pointer tw-transition-all tw-text-gray-500"
-        /> -->
       </div>
     </div>
     <slot v-if="expanded" />
@@ -67,6 +63,11 @@ const props = defineProps({
   labelClass: {
     type: String,
     default: "",
+  },
+  showExpandIcon: {
+    type: Boolean,
+    default: true,
+    required: false,
   },
 });
 

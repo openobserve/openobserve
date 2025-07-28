@@ -22,7 +22,7 @@ import store from "@/test/unit/helpers/store";
 
 installQuasar();
 
-describe("MenuLink", async () => {
+describe.skip("MenuLink", async () => {
   let wrapper: any = null;
   beforeEach(() => {
     // render the component

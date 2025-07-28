@@ -19,7 +19,7 @@ use arrow_schema::Field;
 use config::{
     meta::{
         promql::Metadata,
-        stream::{StreamSettings, StreamStats, StreamType},
+        stream::{PatternAssociation, StreamSettings, StreamStats, StreamType},
     },
     utils::json,
 };
@@ -35,12 +35,16 @@ pub struct Stream {
     pub stats: StreamStats,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub schema: Vec<StreamProperty>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub uds_schema: Option<Vec<StreamProperty>>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub uds_schema: Vec<StreamProperty>,
     pub settings: StreamSettings,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics_meta: Option<Metadata>,
     pub total_fields: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub pattern_associations: Vec<PatternAssociation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_derived: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -149,10 +153,12 @@ mod tests {
                 name: "field1".to_string(),
                 prop_type: "string".to_string(),
             }],
-            uds_schema: None,
+            uds_schema: vec![],
             settings: StreamSettings::default(),
             metrics_meta: None,
             total_fields: 1,
+            pattern_associations: vec![],
+            is_derived: None,
         };
 
         let list_stream = ListStream {
@@ -225,16 +231,18 @@ mod tests {
             stream_type: StreamType::Logs,
             stats: StreamStats::default(),
             schema: vec![],
-            uds_schema: Some(vec![StreamProperty {
+            uds_schema: vec![StreamProperty {
                 name: "uds_field".to_string(),
                 prop_type: "string".to_string(),
-            }]),
+            }],
             settings: StreamSettings::default(),
             metrics_meta: None,
             total_fields: 1,
+            pattern_associations: vec![],
+            is_derived: None,
         };
 
-        assert!(stream.uds_schema.is_some_and(|schema| schema.len() == 1));
+        assert!(stream.uds_schema.len() == 1);
     }
 
     #[test]

@@ -31,7 +31,7 @@ use config::{
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
-    physical_plan::{ExecutionPlan, displayable, visit_execution_plan},
+    physical_plan::{ExecutionPlan, visit_execution_plan},
     prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
@@ -53,7 +53,8 @@ use crate::{
             DATAFUSION_RUNTIME, SearchResult,
             datafusion::{
                 distributed_plan::{
-                    EmptyExecVisitor, remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter,
+                    EmptyExecVisitor, NewEmptyExecCountVisitor, remote_scan::RemoteScanExec,
+                    rewrite::RemoteScanRewriter,
                 },
                 exec::{prepare_datafusion_context, register_udf},
                 optimizer::{generate_analyzer_rules, generate_optimizer_rules},
@@ -104,20 +105,23 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     .await?;
     let file_id_list_vec = file_id_list.values().flatten().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
+    let file_id_list_records = file_id_list_vec.iter().map(|v| v.records).sum::<i64>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, files: {}, took: {} ms",
-                sql.time_range, file_id_list_num, file_id_list_took,
+                "[trace_id {trace_id}] flight->search: get file_list time_range: {:?}, files: {}, records: {}, took: {} ms",
+                sql.time_range, file_id_list_num, file_id_list_records, file_id_list_took,
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:leader get file id".to_string())
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
-                .desc(format!("get files {file_id_list_num} ids"))
+                .desc(format!(
+                    "get files {file_id_list_num} ids, records {file_id_list_records}"
+                ))
                 .build()
         )
     );
@@ -146,8 +150,16 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
-    if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
-        nodes.retain(|n| n.is_ingester() || n.name.eq(&LOCAL_NODE.name));
+    if req.local_mode.unwrap_or_default() {
+        if LOCAL_NODE.is_querier() {
+            nodes.retain(|n| n.name.eq(&LOCAL_NODE.name));
+        } else {
+            nodes = nodes
+                .into_iter()
+                .filter(|n| n.is_querier())
+                .take(1)
+                .collect();
+        }
     }
 
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
@@ -393,7 +405,7 @@ pub async fn run_datafusion(
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
-        print_plan(&physical_plan, "before");
+        print_plan(&trace_id, &physical_plan, "before");
     }
 
     // 7. rewrite physical plan
@@ -437,6 +449,8 @@ pub async fn run_datafusion(
     let org_id = req.org_id.clone();
 
     let context = tracing::Span::current().context();
+
+    // rewrite physical plan
     let mut rewrite = RemoteScanRewriter::new(
         req,
         nodes.into_arc_vec(),
@@ -448,6 +462,11 @@ pub async fn run_datafusion(
         false, // for super cluster
         context,
     );
+
+    // TODO: if there is only one table and single node, we can skip the remote scan rewrite
+    let mut empty_exec_count_visitor = NewEmptyExecCountVisitor::default();
+    physical_plan.visit(&mut empty_exec_count_visitor)?;
+    let _empty_exec_count = empty_exec_count_visitor.get_count();
     physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
 
     // add remote scan exec to top if physical plan is not changed
@@ -478,15 +497,16 @@ pub async fn run_datafusion(
             .unwrap_or_default();
         let use_cache = use_cache && org_settings.aggregation_cache_enabled;
         let target_partitions = ctx.state().config().target_partitions();
-        let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) = o2_enterprise::enterprise::search::datafusion::distributed_plan::rewrite::rewrite_aggregate_plan(
-            streaming_id,
-            start_time,
-            end_time,
-            use_cache,
-            target_partitions,
-            physical_plan,
-        )
-        .await?;
+        let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) =
+            o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_streaming_agg_plan(
+                streaming_id,
+                start_time,
+                end_time,
+                use_cache,
+                target_partitions,
+                physical_plan,
+            )
+            .await?;
         physical_plan = plan;
         // Check for aggs cache hit
         if is_complete_cache_hit {
@@ -507,6 +527,17 @@ pub async fn run_datafusion(
         }
     }
 
+    // rewrite physical plan for merge aggregation and get topk
+    #[cfg(feature = "enterprise")]
+    {
+        let plan = o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_topk_agg_plan(
+            sql.limit,
+            physical_plan,
+        )
+        .await?;
+        physical_plan = plan;
+    }
+
     if !skip_empty_exec_visitor {
         let mut visitor = EmptyExecVisitor::default();
         if physical_plan.visit(&mut visitor).is_err() {
@@ -523,7 +554,7 @@ pub async fn run_datafusion(
     }
 
     if cfg.common.print_key_sql {
-        print_plan(&physical_plan, "after");
+        print_plan(&trace_id, &physical_plan, "after");
     }
 
     // run datafusion
@@ -945,12 +976,10 @@ pub async fn get_file_id_lists(
     Ok(file_lists)
 }
 
-pub fn print_plan(physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
-    let plan = displayable(physical_plan.as_ref())
-        .indent(false)
-        .to_string();
-    println!("+---------------------------+----------+");
-    println!("leader physical plan {stage} rewrite");
-    println!("+---------------------------+----------+");
-    println!("{plan}");
+pub fn print_plan(trace_id: &str, physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
+    log::info!("[trace_id {trace_id}] leader physical plan {stage} rewrite");
+    log::info!(
+        "{}",
+        config::meta::plan::generate_plan_string(trace_id, physical_plan.as_ref())
+    );
 }

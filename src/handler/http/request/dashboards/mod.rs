@@ -102,7 +102,7 @@ pub async fn create_dashboard(
     user_email: UserEmail,
 ) -> impl Responder {
     let org_id = path.into_inner();
-    let folder = get_folder(req);
+    let folder = get_folder(req.query_string());
     let mut dashboard: config::meta::dashboards::Dashboard = match req_body.into_inner().try_into()
     {
         Ok(dashboard) => dashboard,
@@ -372,9 +372,17 @@ async fn move_dashboards(
     }
 }
 
-pub fn get_folder(req: HttpRequest) -> String {
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+pub fn get_folder(query_str: &str) -> String {
+    let query = web::Query::<HashMap<String, String>>::from_query(query_str).unwrap();
     crate::common::utils::http::get_folder(&query)
+}
+
+pub fn is_overwrite(query_str: &str) -> bool {
+    let query = web::Query::<HashMap<String, String>>::from_query(query_str).unwrap();
+    match query.get("overwrite") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    }
 }
 
 /// Tries to get the user ID from the request headers.

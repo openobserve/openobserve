@@ -131,13 +131,13 @@ impl Query for ContainsQuery {
 
 /// Automaton that matches terms containing a given keyword
 #[derive(Debug, Clone)]
-struct ContainsAutomaton {
+pub struct ContainsAutomaton {
     keyword: Vec<u8>,
     case_sensitive: bool,
 }
 
 impl ContainsAutomaton {
-    fn new(keyword: &str, case_sensitive: bool) -> Self {
+    pub fn new(keyword: &str, case_sensitive: bool) -> Self {
         ContainsAutomaton {
             keyword: keyword.as_bytes().to_vec(),
             case_sensitive,
@@ -199,7 +199,7 @@ impl Automaton for ContainsAutomaton {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum ContainsState {
+pub enum ContainsState {
     /// Still searching for the keyword
     Searching { pos: usize },
     /// Found the keyword

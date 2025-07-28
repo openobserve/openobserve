@@ -429,7 +429,9 @@ export class AlertsPage {
         await this.commonActions.scrollAndFindOption(destinationName, 'template');
         
         await this.page.waitForTimeout(1000); // Wait after selecting destination
-
+        //here we are expanding the multi window section as because it is not expanded by default
+        await this.page.getByText('Multi WindowSet relative alerting system based on SQL query').click();
+        await this.page.getByText('keyboard_arrow_down').click();
         // Add time range
         await this.page.locator('[data-test="multi-time-range-alerts-add-btn"]').click();
         await this.page.locator('[data-test="date-time-btn"]').click();
@@ -444,7 +446,8 @@ export class AlertsPage {
         await this.page.waitForTimeout(2000);
 
         // Close dialog
-        await this.page.locator('div').filter({ hasText: /^closeAdd Conditions$/ }).locator('i').click();
+        //this is modified according to the new dialog structure and new close icon
+        await this.page.locator('#q-portal--dialog--9').getByText('arrow_back_ios_new').click();
         await this.page.waitForTimeout(1000);
 
         // Submit alert

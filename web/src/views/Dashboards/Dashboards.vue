@@ -214,14 +214,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           @row-click="onRowClick"
           data-test="dashboard-table"
+          class="o2-quasar-table"
+          :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
         >
           <!-- if data not available show nodata component -->
           <template #no-data>
             <NoData />
           </template>
-          <!-- header selection which on click selects all the dashboards -->
-          <template #header-selection="scope">
-            <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
+          <!-- we need to handle custom header for the table -->
+           <!-- so we manually added check box and all the columns -->
+          <template v-slot:header="props">
+            <q-tr :props="props">
+              <!-- Adding this block to render the select-all checkbox -->
+              <q-th auto-width>
+                <q-checkbox
+                  v-model="props.selected"
+                  size="sm"
+                  color="secondary"
+                  @update:model-value="props.select"
+                />
+              </q-th>
+
+              <!-- Rendering the rest of the columns -->
+               <!-- here passing the classes and style to the columns -->
+              <q-th
+                v-for="col in props.cols"
+                :key="col.name"
+                :props="props"
+                :class="col.classes"
+                :style="col.style"
+              >
+                {{ col.label }}
+              </q-th>
+            </q-tr>
           </template>
           <!-- body selection which on click selects the dashboard -->
           <template #body-selection="scope">
@@ -247,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <!-- add delete icon in actions column -->
           <template #body-cell-actions="props">
-            <q-td :props="props">
+            <q-td  :props="props">
               <q-btn
                 v-if="props.row.actions == 'true'"
                 :icon="outlinedDriveFileMove"
@@ -505,6 +530,7 @@ export default defineComponent({
             label: "#",
             field: "#",
             align: "left",
+            style: "width: 67px",
           },
           {
             name: "name",
@@ -546,6 +572,7 @@ export default defineComponent({
             field: "actions",
             label: t("dashboard.actions"),
             align: "center",
+            classes: 'actions-column' //this is the class that we are adding to the actions column so that we can apply the styling to the actions column only
           },
         ];
 

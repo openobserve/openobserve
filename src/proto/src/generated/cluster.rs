@@ -2886,6 +2886,16 @@ pub struct NewEmptyExecNode {
     #[prost(message, optional, tag = "7")]
     pub full_schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AggregateTopkExecNode {
+    #[prost(string, tag = "1")]
+    pub sort_field: ::prost::alloc::string::String,
+    #[prost(bool, tag = "2")]
+    pub descending: bool,
+    #[prost(uint64, tag = "3")]
+    pub limit: u64,
+}
 /// Search request
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2914,6 +2924,9 @@ pub struct QueryIdentifier {
     /// the unique id for each remote scan
     #[prost(string, tag = "5")]
     pub job_id: ::prost::alloc::string::String,
+    /// need special logic for loading enrich table
+    #[prost(bool, tag = "6")]
+    pub enrich_mode: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2966,7 +2979,7 @@ pub struct SuperClusterInfo {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IdxOptimizeMode {
-    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2, 3")]
+    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2, 3, 4, 5")]
     pub mode: ::core::option::Option<idx_optimize_mode::Mode>,
 }
 /// Nested message and enum types in `IdxOptimizeMode`.
@@ -2980,6 +2993,10 @@ pub mod idx_optimize_mode {
         SimpleCount(super::SimpleCount),
         #[prost(message, tag = "3")]
         SimpleHistogram(super::SimpleHistogram),
+        #[prost(message, tag = "4")]
+        SimpleTopn(super::SimpleTopN),
+        #[prost(message, tag = "5")]
+        SimpleDistinct(super::SimpleDistinct),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -3002,6 +3019,26 @@ pub struct SimpleHistogram {
     pub bucket_width: u64,
     #[prost(uint32, tag = "3")]
     pub num_buckets: u32,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleTopN {
+    #[prost(string, tag = "1")]
+    pub field: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "2")]
+    pub limit: u32,
+    #[prost(bool, tag = "3")]
+    pub asc: bool,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleDistinct {
+    #[prost(string, tag = "1")]
+    pub field: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "2")]
+    pub limit: u32,
+    #[prost(bool, tag = "3")]
+    pub asc: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

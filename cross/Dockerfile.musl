@@ -1,0 +1,16 @@
+ARG CROSS_BASE_IMAGE
+FROM $CROSS_BASE_IMAGE
+
+ENV MARCH=${CROSS_CMAKE_SYSTEM_PROCESSOR}
+
+RUN apt-get update
+RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install -y --option=Dpkg::Options::=--force-confnew \
+    libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools libboost-all-dev cmake patch wget unzip
+
+RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
+RUN unzip protoc-21.12-linux-x86_64.zip -d protoc
+RUN cp protoc/bin/protoc /usr/local/bin/
+RUN cp -r protoc/include/google /usr/local/include/
+
+COPY --from=ent ./ /home/runner/work/o2-enterprise/o2-enterprise/o2-enterprise
+RUN ln -s /usr/include/boost/ /usr/local/x86_64-linux-musl/include/

@@ -17,17 +17,11 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
-
-import Index from "@/plugins/logs/Index.vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
-// import BarChart from "@/components/logBarChart.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-// @ts-ignore
-import { rest } from "msw";
-// import "plotly.js";
-import DetailTable from "@/plugins/logs/DetailTable.vue";
 import router from "@/test/unit/helpers/router";
+import DetailTable from "@/plugins/logs/DetailTable.vue";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -37,157 +31,201 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
-describe("Search Result", async () => {
+describe("SearchResult Component", () => {
   let wrapper: any;
+
   beforeEach(async () => {
-    vi.useFakeTimers();
-    wrapper = mount(Index, {
-      attachTo: "#app",
+    // Mock store state
+    store.state.zoConfig = {
+      sql_mode: false,
+      sql_mode_manual_trigger: false,
+      version: '1.0.0',
+      commit_hash: 'abc123',
+      build_date: '2024-01-01',
+      default_fts_keys: [],
+      show_stream_stats_doc_num: true,
+      data_retention_days: true,
+      extended_data_retention_days: 30,
+      user_defined_schemas_enabled: true,
+      super_cluster_enabled: true,
+      query_on_stream_selection: false,
+      default_functions: []
+    };
+
+    wrapper = mount(SearchResult, {
+      attachTo: document.body,
       global: {
-        provide: {
-          store: store,
-        },
+        provide: { store },
         plugins: [i18n, router],
         stubs: {
-          SearchBar: true,
-          IndexList: true,
-        },
+          DetailTable: true,
+          ChartRenderer: true,
+          SanitizedHtmlRenderer: true,
+          TenstackTable: true
+        }
       },
+      props: {
+        expandedLogs: []
+      }
     });
-    await flushPromises();
-    vi.advanceTimersByTime(500);
+
     await flushPromises();
   });
 
   afterEach(() => {
     wrapper.unmount();
-    vi.restoreAllMocks();
-    // vi.clearAllMocks();
+    vi.clearAllMocks();
   });
 
-  it("Should show the BarChart component when showHistogram is true and sqlMode is false", async () => {
-    expect(
-      wrapper.find('[data-test="logs-search-result-bar-chart"]').exists()
-    ).toBeTruthy();
+  describe('Component Rendering', () => {
+    it('should render the component', () => {
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it('should render pagination when showPagination is true', async () => {
+      wrapper.vm.searchObj.meta.resultGrid.showPagination = true;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="logs-search-result-pagination"]').exists()).toBe(true);
+    });
+
+    it('should render records per page selector when showPagination is true', async () => {
+      wrapper.vm.searchObj.meta.resultGrid.showPagination = true;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="logs-search-result-records-per-page"]').exists()).toBe(true);
+    });
+
+    it('should show histogram loader when loading', async () => {
+      wrapper.vm.searchObj.meta.showHistogram = true;
+      wrapper.vm.searchObj.loadingHistogram = true;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.histogramLoader).toBe(true);
+    });
+
+    it('should show no data message when histogram is empty', async () => {
+      wrapper.vm.searchObj.meta.showHistogram = true;
+      wrapper.vm.searchObj.loadingHistogram = false;
+      wrapper.vm.searchObj.loading = false;
+      wrapper.vm.plotChart = {};
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('h3').text()).toContain('No data found for histogram');
+    });
   });
 
-  // it("Should call the 'onChartUpdate' method when the 'updated:chart' event is emitted by the BarChart component", async () => {
-  //   await wrapper.findComponent(BarChart).vm.$emit("updated:chart", {
-  //     start: "2000-04-08 05:13:29",
-  //     end: "2000-07-06 18:53:45",
-  //   });
-  //   expect(
-  //     wrapper.findComponent(SearchResult).emitted()["update:datetime"]
-  //   ).toBeTruthy();
-  // });
-
-  //   it("Should render the q-virtual-scroll component with the correct props and call the 'onScroll' method when the 'virtual-scroll' event is emitted", () => {
-  //     expect(
-  //       wrapper.find('[data-test="logs-search-result-logs-table"]').html()
-  //     ).toMatchSnapshot();
-  //   });
-
-  describe("When user opens log details", () => {
-    let expandRowDetail: any, hits: any[], addSearchTerm: any;
+  describe('Pagination Navigation', () => {
     beforeEach(async () => {
-      expandRowDetail = vi.spyOn(
-        wrapper.findComponent(SearchResult).vm,
-        "expandRowDetail"
-      );
-      addSearchTerm = vi.spyOn(
-        wrapper.findComponent(SearchResult).vm,
-        "addSearchTerm"
-      );
-      hits = wrapper.vm.searchObj.data.queryResults.hits;
-      await wrapper
-        .find(
-          `[data-test="logs-search-result-detail-${wrapper.vm.searchObj.data.queryResults.hits[0]["_timestamp"]}"]`
-        )
-        .trigger("click");
-    });
-    it('Should call the "expandRowDetail" method when a row is clicked', async () => {
-      expect(expandRowDetail).toHaveBeenCalledTimes(1);
-      expect(wrapper.findComponent(DetailTable).text()).toContain(
-        hits[0]["_timestamp"]
-      );
+      wrapper.vm.searchObj.meta.resultGrid.showPagination = true;
+      wrapper.vm.searchObj.meta.resultGrid.rowsPerPage = 10;
+      wrapper.vm.searchObj.data.resultGrid.currentPage = 2;
+      await wrapper.vm.$nextTick();
     });
 
-    it('Should call "navigateRowDetail" on "showNextDetail" or "showPrevDetail" event from DetailTable', async () => {
-      await wrapper
-        .findComponent(DetailTable)
-        .find('[data-test="log-detail-next-detail-btn"]')
-        .trigger("click");
-      expect(wrapper.findComponent(DetailTable).text()).toContain(
-        hits[1]["_timestamp"]
-      );
-      expect(wrapper.findComponent(DetailTable).text()).not.toContain(
-        hits[0]["_timestamp"]
-      );
+    it('should navigate to previous page', async () => {
+      await wrapper.vm.getPageData('prev');
+      expect(wrapper.vm.searchObj.data.resultGrid.currentPage).toBe(1);
+      expect(wrapper.emitted()['update:scroll']).toBeTruthy();
     });
 
-    it('Should add or remove search terms on "add:searchterm" or "remove:searchterm" event from DetailTable', () => {
-      wrapper
-        .findComponent(DetailTable)
-        .vm.$emit("add:searchterm", "_timestamp");
-      expect(addSearchTerm).toHaveBeenCalledTimes(1);
-
-      wrapper
-        .findComponent(DetailTable)
-        .vm.$emit("remove:searchterm", "_timestamp");
-      expect(
-        wrapper.findComponent(SearchResult).emitted()["remove:searchTerm"]
-      ).toBeTruthy();
+    it('should navigate to next page', async () => {
+      wrapper.vm.searchObj.data.queryResults = { total: 30 };
+      await wrapper.vm.getPageData('next');
+      expect(wrapper.vm.searchObj.data.resultGrid.currentPage).toBe(3);
+      expect(wrapper.emitted()['update:scroll']).toBeTruthy();
     });
 
-    it('Should execute timeboxed search on "search:timeboxed" event from DetailTable component', async () => {
-      global.server.use(
-        rest.get(
-          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/k8s_json/_around`,
-          (req: any, res: any, ctx: any) => {
-            return res(
-              ctx.status(200),
-              ctx.json({
-                took: 10,
-                hits: [
-                  {
-                    _timestamp: 1680246906641572,
-                    kubernetes_annotations_kubernetes_io_psp: "eks.privileged",
-                    kubernetes_container_hash:
-                      "058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox@sha256:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589",
-                    kubernetes_container_image:
-                      "058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox:v0.0.3",
-                    kubernetes_container_name: "ziox",
-                    kubernetes_docker_id:
-                      "65917867b45dbe2cd429361796b5e7d42581124411bec968acfbd80ad0f163e2",
-                    kubernetes_host:
-                      "ip-10-2-15-197.us-east-2.compute.internal",
-                    kubernetes_labels_app: "ziox",
-                    kubernetes_labels_name: "ziox-querier",
-                    kubernetes_labels_pod_template_hash: "595748494c",
-                    kubernetes_labels_role: "querier",
-                    kubernetes_namespace_name: "ziox",
-                    kubernetes_pod_id: "ff96944f-ca8e-413f-a696-3236b1145482",
-                    kubernetes_pod_name: "ziox-querier-595748494c-vd9zw",
-                    log: '[2022-12-27T14:12:29Z INFO  zinc_enl::service::search::datafusion] search file: Bhargav_organization_29/logs/default/2022/12/27/05/7013381009471324160.parquet, need add columns: ["from"]',
-                    stream: "stderr",
-                  },
-                ],
-                total: 1,
-                from: 0,
-                size: 1,
-                scan_size: 110,
-              })
-            );
-          }
-        )
-      );
-      await wrapper
-        .findComponent(DetailTable)
-        .find('[data-test="logs-detail-table-search-around-btn"]')
-        .trigger("click");
-      expect(
-        wrapper.findComponent(SearchResult).emitted()["search:timeboxed"]
-      ).toBeTruthy();
+    it('should handle invalid page number input', async () => {
+      const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
+      wrapper.vm.searchObj.communicationMethod = 'http';
+      wrapper.vm.searchObj.data.queryResults = {
+        partitionDetail: { paginations: { length: 5 } }
+      };
+      wrapper.vm.pageNumberInput = 10;
+      
+      await wrapper.vm.getPageData('pageChange');
+      
+      expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'negative',
+        message: expect.stringContaining('Page number is out of range')
+      }));
+    });
+  });
+
+  describe('Table Functionality', () => {
+
+    it('should calculate table width correctly', () => {
+      window.innerWidth = 1000;
+      wrapper.vm.searchObj.config.splitterModel = 30;
+      
+      const width = wrapper.vm.getTableWidth;
+      expect(width).toBe(1000 - 56 - (1000 - 56) * 0.3 - 5);
+    });
+
+    it('should scroll table to top', async () => {
+      const scrollToSpy = vi.fn();
+      wrapper.vm.searchTableRef = {
+        parentRef: {
+          scrollTo: scrollToSpy
+        }
+      };
+      
+      await wrapper.vm.scrollTableToTop(0);
+      expect(scrollToSpy).toHaveBeenCalledWith({ top: 0 });
+    });
+  });
+
+  describe('Computed Properties', () => {
+    it('should compute toggleWrapFlag', () => {
+      wrapper.vm.searchObj.meta.toggleSourceWrap = true;
+      expect(wrapper.vm.toggleWrapFlag).toBe(true);
+    });
+
+    it('should compute findFTSFields', () => {
+      const fields = [{ name: 'field1' }];
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = fields;
+      expect(wrapper.vm.findFTSFields).toEqual(fields);
+    });
+
+    it('should compute updateTitle', () => {
+      const title = 'Test Title';
+      wrapper.vm.searchObj.data.histogram.chartParams.title = title;
+      expect(wrapper.vm.updateTitle).toBe(title);
+    });
+
+    it('should compute resetPlotChart', () => {
+      wrapper.vm.searchObj.meta.resetPlotChart = true;
+      expect(wrapper.vm.resetPlotChart).toBe(true);
+    });
+  });
+
+  describe('Watch Handlers', () => {
+
+    it('should handle findFTSFields changes', async () => {
+      const extractFTSFieldsSpy = vi.spyOn(wrapper.vm, 'extractFTSFields');
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: 'field1' }];
+      await wrapper.vm.$nextTick();
+      expect(extractFTSFieldsSpy).toHaveBeenCalled();
+    });
+
+    it('should handle updateTitle changes', async () => {
+      const title = 'New Title';
+      wrapper.vm.searchObj.data.histogram.chartParams.title = title;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.noOfRecordsTitle).toBe(title);
+    });
+
+    it('should handle resetPlotChart changes', async () => {
+      wrapper.vm.searchObj.meta.resetPlotChart = true;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.plotChart).toEqual({});
+      expect(wrapper.vm.searchObj.meta.resetPlotChart).toBe(false);
+    });
+  });
+
+  describe('Additional Error Handling', () => {
+
+    it('should handle function error', async () => {
+      wrapper.vm.searchObj.data.functionError = 'Function error';
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.searchObj.data.functionError).toBe('Function error');
     });
   });
 });

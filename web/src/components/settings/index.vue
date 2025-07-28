@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <q-page class="management-page">
-    <div class="head q-table__title q-mx-md q-my-sm">
+    <div class="head q-table__title q-mx-md q-py-sm">
       {{ t("settings.header") }}
     </div>
     <q-separator class="separator" />
@@ -131,6 +131,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             content-class="tab_content"
           />
           <q-route-tab
+            v-if="config.isEnterprise == 'true' && isMetaOrg"
+            data-test="domain-management-tab"
+            name="domain_management"
+            :to="{
+              name: 'domainManagement',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            icon="domain"
+            :label="t('settings.ssoDomainRestrictions')"
+            content-class="tab_content"
+          />
+          <q-route-tab
             v-if="config.isCloud == 'true' && isMetaOrg"
             data-test="organization-management-tab"
             name="organization_management"
@@ -144,6 +158,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('settings.organizationManagement')"
             content-class="tab_content"
           />
+          <q-route-tab
+            v-if="config.isEnterprise == 'true'"
+            data-test="regex-patterns-tab"
+            name="regex_patterns"
+            :to="{
+              name: 'regexPatterns',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            content-class="tab_content"
+          >
+          <div class="tw-flex tw-items-center tw-w-full">
+            <img :src="regexIcon" alt="regex" style="width: 24px; height: 24px;" />
+            <span class="tw-text-sm tw-font-medium tw-ml-2"
+            :class="store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns'   ? 'tw-text-white' : 'tw-text-black'"
+            >{{ t('regex_patterns.header') }}</span>
+          </div>
+        </q-route-tab>
         </q-tabs>
 
         </div>
@@ -151,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-slot:after>
         <div
-      style="position: absolute;  top: -5px; left: -16px; z-index: 90; "
+      style="position: absolute;  top: -5px; left: -16px; z-index: 1200; "
     >
       <!-- Place the content you want in the middle here -->
       <q-btn
@@ -185,6 +218,7 @@ import {
   onActivated,
   onUpdated,
   watch,
+  computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -193,7 +227,7 @@ import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-
+import { getImageURL } from "@/utils/zincutils";
 export default defineComponent({
   name: "AppSettings",
   setup() {
@@ -266,6 +300,9 @@ export default defineComponent({
         showManagementTabs.value = true;
       }
     }
+    const regexIcon = computed(()=>{
+      return getImageURL(store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
+    })
 
     return {
       t,
@@ -277,7 +314,9 @@ export default defineComponent({
       outlinedSettings,
       isMetaOrg,
       showManagementTabs,
-      controlManagementTabs
+      controlManagementTabs,
+      regexIcon
+      
     };
   },
 });

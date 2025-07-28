@@ -71,6 +71,7 @@ pub async fn check_for_schema(
     stream_schema_map: &mut HashMap<String, SchemaCache>,
     record_vals: Vec<&Map<String, Value>>,
     record_ts: i64,
+    is_derived: bool,
 ) -> Result<(SchemaEvolution, Option<Schema>)> {
     if !stream_schema_map.contains_key(stream_name) {
         let schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
@@ -120,7 +121,7 @@ pub async fn check_for_schema(
             let (defined_schema_fields, need_original, index_original_data, index_all_values) =
                 match stream_setting {
                     Some(s) => (
-                        s.defined_schema_fields.unwrap_or_default(),
+                        s.defined_schema_fields,
                         s.store_original_data,
                         s.index_original_data,
                         s.index_all_values,
@@ -166,6 +167,7 @@ pub async fn check_for_schema(
         &inferred_schema,
         record_ts,
         stream_schema_map,
+        is_derived,
     )
     .await?
     .unwrap_or(SchemaEvolution {
@@ -183,6 +185,7 @@ pub async fn check_for_schema(
             &inferred_schema,
             now_micros(),
             stream_schema_map,
+            is_derived,
         )
         .await?;
     }
@@ -220,6 +223,7 @@ pub async fn get_merged_schema(
 // 2. get schema from db for update,
 // 3. if db_schema is identical to inferred_schema, return (means another thread has updated schema)
 // 4. if db_schema is not identical to inferred_schema, merge schema and update db
+#[allow(clippy::too_many_arguments)]
 async fn handle_diff_schema(
     org_id: &str,
     stream_name: &str,
@@ -228,6 +232,7 @@ async fn handle_diff_schema(
     inferred_schema: &Schema,
     record_ts: i64,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
+    is_derived: bool,
 ) -> Result<Option<SchemaEvolution>> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -254,6 +259,9 @@ async fn handle_diff_schema(
     if is_new {
         let mut metadata = HashMap::with_capacity(1);
         metadata.insert("created_at".to_string(), record_ts.to_string());
+        if is_derived {
+            metadata.insert("is_derived".to_string(), "true".to_string());
+        }
         stream_schema_map.insert(
             stream_name.to_string(),
             SchemaCache::new(inferred_schema.clone().with_metadata(metadata)),
@@ -265,11 +273,18 @@ async fn handle_diff_schema(
     let mut ret: Option<_> = None;
     // retry x times for update schema
     while retries < cfg.limit.meta_transaction_retries {
+        let schema_for_merge = if is_derived {
+            let mut metadata = HashMap::with_capacity(1);
+            metadata.insert("is_derived".to_string(), "true".to_string());
+            &inferred_schema.clone().with_metadata(metadata)
+        } else {
+            inferred_schema
+        };
         match db::schema::merge(
             org_id,
             stream_name,
             stream_type,
-            inferred_schema,
+            schema_for_merge,
             Some(record_ts),
         )
         .await
@@ -324,10 +339,7 @@ async fn handle_diff_schema(
 
     // check defined_schema_fields
     let mut stream_setting = unwrap_stream_settings(&final_schema).unwrap_or_default();
-    let mut defined_schema_fields = stream_setting
-        .defined_schema_fields
-        .clone()
-        .unwrap_or_default();
+    let mut defined_schema_fields = stream_setting.defined_schema_fields.clone();
 
     // Automatically enable User-defined schema when
     // 1. allow_user_defined_schemas is enabled
@@ -390,7 +402,7 @@ async fn handle_diff_schema(
         }
 
         defined_schema_fields = uds_fields.into_iter().collect::<Vec<_>>();
-        stream_setting.defined_schema_fields = Some(defined_schema_fields.clone());
+        stream_setting.defined_schema_fields = defined_schema_fields.clone();
         final_schema.metadata.insert(
             "settings".to_string(),
             json::to_string(&stream_setting).unwrap(),
@@ -512,7 +524,7 @@ pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bo
 
     let stream_setting = unwrap_stream_settings(schema.schema());
     let defined_schema_fields = stream_setting
-        .and_then(|s| s.defined_schema_fields)
+        .map(|s| s.defined_schema_fields)
         .unwrap_or_default();
 
     for item in inferred_schema.fields.iter() {
@@ -619,6 +631,7 @@ mod tests {
             &mut map,
             vec![record.as_object().unwrap()],
             1234234234234,
+            false,
         )
         .await
         .unwrap();

@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, onUpdated, onActivated } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { getImageURL, maskText } from "../../../utils/zincutils";
+import { getImageURL, getIngestionURL, maskText } from "../../../utils/zincutils";
 import CopyContent from "../../CopyContent.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
@@ -156,13 +156,7 @@ openobserveRum.startSessionReplayRecording();`;
       rumToken.value = store.state.organizationData.rumToken.rum_token;
       let configData = defaultConfig;
 
-      let ingestionURL: string = store.state.API_ENDPOINT;
-      if (
-        Object.hasOwn(store.state.zoConfig, "ingestion_url") &&
-        store.state.zoConfig.ingestion_url !== ""
-      ) {
-        ingestionURL = store.state.zoConfig.ingestion_url;
-      }
+      const ingestionURL = getIngestionURL();
 
       configData = configData.replace(
         /<OPENOBSERVE_SITE>/g,

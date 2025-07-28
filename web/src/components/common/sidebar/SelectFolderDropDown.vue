@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- select new folder -->
       <q-select
         v-model="selectedFolder"
-        :label="t('dashboard.selectFolderLabel')"
+        :label="t('dashboard.selectFolderLabel') + ' *'"
         :options="store.state.organizationData.foldersByType[type]?.map((item: any)=> {return {label: item.name, value: item.folderId}})"
         :data-test="`${type}-index-dropdown-stream_type`"
         input-debounce="0"

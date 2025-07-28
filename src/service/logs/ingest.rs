@@ -35,6 +35,8 @@ use config::{
 };
 use flate2::read::GzDecoder;
 use infra::errors::{Error, Result};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
     common::v1::{AnyValue, KeyValue, any_value::Value},
@@ -65,12 +67,15 @@ pub async fn ingest(
     in_req: IngestionRequest<'_>,
     user_email: &str,
     extend_json: Option<&HashMap<String, serde_json::Value>>,
+    is_derived: bool,
 ) -> Result<IngestionResponse> {
     let start = std::time::Instant::now();
     let started_at: i64 = Utc::now().timestamp_micros();
     let cfg = config::get_config();
     let mut need_usage_report = true;
     let log_ingestion_errors = ingestion_log_enabled().await;
+    #[cfg(feature = "enterprise")]
+    let pattern_manager = get_pattern_manager().await?;
 
     // check stream
     let stream_name = if cfg.common.skip_formatting_stream_name {
@@ -89,6 +94,11 @@ pub async fn ingest(
         .timestamp_micros();
 
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
+    let mut derived_streams = HashSet::new();
+
+    if is_derived {
+        derived_streams.insert(stream_name.to_string());
+    }
 
     // Start retrieve associated pipeline and construct pipeline components
     let executable_pipeline = crate::service::ingestion::get_stream_executable_pipeline(
@@ -340,6 +350,10 @@ pub async fn ingest(
                     }
 
                     let destination_stream = stream_params.stream_name.to_string();
+                    if !derived_streams.contains(&destination_stream) {
+                        derived_streams.insert(destination_stream.clone());
+                    }
+
                     if !user_defined_schema_map.contains_key(&destination_stream) {
                         // a new dynamically created stream. need to check the two maps again
                         crate::service::ingestion::get_uds_and_original_data_streams(
@@ -467,6 +481,25 @@ pub async fn ingest(
     drop(original_options);
     drop(user_defined_schema_map);
 
+    #[cfg(feature = "enterprise")]
+    {
+        for (stream, data) in json_data_by_stream.iter_mut() {
+            match pattern_manager.process_at_ingestion(
+                org_id,
+                StreamType::Logs,
+                stream,
+                &mut data.0,
+            ) {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!(
+                        "error in processing records for patterns for stream {stream} : {e}"
+                    );
+                }
+            }
+        }
+    }
+
     let (metric_rpt_status_code, response_body) = {
         let mut status = IngestionStatus::Record(stream_status.status);
         let write_result = super::write_logs_by_stream(
@@ -478,6 +511,7 @@ pub async fn ingest(
             &mut status,
             json_data_by_stream,
             size_by_stream,
+            derived_streams,
         )
         .await;
         stream_status.status = match status {

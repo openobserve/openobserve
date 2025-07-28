@@ -42,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :filter="filter && filter.value"
       :filter-method="filter && filter.method"
       @virtual-scroll="onScroll"
-      class="full-height"
     >
       <template #no-data>
         <NoData class="q-mb-lg" />
@@ -52,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-th
             v-for="col in props.cols"
             :key="col.name"
+            :class="col.classes || ''"
             :props="props"
             :style="col.style"
           >
@@ -60,13 +60,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tr>
       </template>
        <template #top="scope">
+        <div class="tw-flex tw-items-center tw-justify-between tw-w-full q-py-xs  "> 
+          <span class="tw-font-bold tw-text-[14px] tw-w-full q-pa-none">
+          {{ rows.length }} {{ title }}
+        </span>
         <QTablePagination
           :scope="scope"
           :resultTotal="resultTotal"
           :perPageOptions="perPageOptions"
           position="top"
           @update:changeRecordPerPage="changePagination"
+          style="padding: 0px;"
         />
+        </div>
        </template>
       <template v-slot:body="props">
         <q-tr :props="props" :key="`m_${props.row.index}`">
@@ -124,7 +130,6 @@ import { ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { computed,watch  } from "vue";
 import NoData from "./shared/grid/NoData.vue";
-
 const props = defineProps({
   columns: {
     type: Array,
@@ -242,12 +247,6 @@ watch(
     top: 0;
     opacity: 1;
     z-index: 1;
-    background: #f5f5f5;
-  }
-
-  .q-table--dark .thead-sticky,
-  .q-table--dark .tfoot-sticky {
-    background: #565656 !important;
   }
 
   .q-table__bottom {

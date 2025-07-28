@@ -19,9 +19,9 @@ use tokio::time;
 use crate::service::{compact::stats::update_stats_from_file_list, db};
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    tokio::task::spawn(async move { update_node_memory_usage().await });
-    tokio::task::spawn(async move { file_list_update_stats().await });
-    tokio::task::spawn(async move { cache_stream_stats().await });
+    tokio::task::spawn(update_node_memory_usage());
+    tokio::task::spawn(file_list_update_stats());
+    tokio::task::spawn(cache_stream_stats());
     Ok(())
 }
 

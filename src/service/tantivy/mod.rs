@@ -19,7 +19,7 @@ pub mod puffin_directory;
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Context;
-use arrow::array::{Array, Int64Array, StringArray};
+use arrow::array::{Array, BooleanArray, Float64Array, Int64Array, StringArray, UInt64Array};
 use arrow_schema::{DataType, Schema};
 use bytes::Bytes;
 use config::{
@@ -148,12 +148,14 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         if field == TIMESTAMP_COL_NAME {
             continue;
         }
-        let index_opts = tantivy::schema::TextOptions::default().set_indexing_options(
-            tantivy::schema::TextFieldIndexing::default()
-                .set_index_option(tantivy::schema::IndexRecordOption::Basic)
-                .set_tokenizer("raw")
-                .set_fieldnorms(false),
-        );
+        let index_opts = tantivy::schema::TextOptions::default()
+            .set_indexing_options(
+                tantivy::schema::TextFieldIndexing::default()
+                    .set_index_option(tantivy::schema::IndexRecordOption::Basic)
+                    .set_tokenizer("raw")
+                    .set_fieldnorms(false),
+            )
+            .set_fast(None);
         tantivy_schema_builder.add_text_field(field, index_opts);
     }
     // add _timestamp field to tantivy schema
@@ -190,14 +192,52 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
             // process full text search fields
             let mut docs = vec![tantivy::doc!(); num_rows];
             for column_name in tantivy_fields.iter() {
+                // utf8, uint64, int64, float64, boolean
                 let column_data = match inverted_idx_batch.column_by_name(column_name) {
-                    Some(column_data) => match column_data.as_any().downcast_ref::<StringArray>() {
-                        Some(column_data) => column_data,
-                        None => {
+                    Some(data) => {
+                        if let Some(array) = data.as_any().downcast_ref::<StringArray>() {
+                            array
+                        } else if let Some(array) = data.as_any().downcast_ref::<Int64Array>() {
+                            // convert to string array
+                            &StringArray::from(
+                                array
+                                    .values()
+                                    .iter()
+                                    .map(|v| v.to_string())
+                                    .collect::<Vec<_>>(),
+                            )
+                        } else if let Some(array) = data.as_any().downcast_ref::<UInt64Array>() {
+                            // convert to string array
+                            &StringArray::from(
+                                array
+                                    .values()
+                                    .iter()
+                                    .map(|v| v.to_string())
+                                    .collect::<Vec<_>>(),
+                            )
+                        } else if let Some(array) = data.as_any().downcast_ref::<BooleanArray>() {
+                            // convert to string array
+                            &StringArray::from(
+                                array
+                                    .values()
+                                    .iter()
+                                    .map(|v| v.to_string())
+                                    .collect::<Vec<_>>(),
+                            )
+                        } else if let Some(array) = data.as_any().downcast_ref::<Float64Array>() {
+                            // convert to string array
+                            &StringArray::from(
+                                array
+                                    .values()
+                                    .iter()
+                                    .map(|v| v.to_string())
+                                    .collect::<Vec<_>>(),
+                            )
+                        } else {
                             // generate empty array to ensure the tantivy and parquet have same rows
                             &StringArray::from(vec![""; num_rows])
                         }
-                    },
+                    }
                     None => {
                         // generate empty array to ensure the tantivy and parquet have same rows
                         &StringArray::from(vec![""; num_rows])

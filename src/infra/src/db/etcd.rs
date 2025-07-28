@@ -52,7 +52,7 @@ pub async fn init() {
         return;
     }
     // enable keep alive for auth token
-    tokio::task::spawn(async move { keep_alive_connection().await });
+    tokio::task::spawn(keep_alive_connection());
 }
 
 pub struct Etcd {

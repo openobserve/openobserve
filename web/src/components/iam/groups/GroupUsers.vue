@@ -15,17 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="col q-pr-xs">
+  <div class="col">
     <div
       data-test="iam-users-selection-filters"
-      class="flex justify-start items-center bordered q-px-md q-py-sm"
+      class="flex justify-start bordered q-px-md q-py-sm"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-      :style="{
-        'box-shadow':
-          store.state.theme === 'dark'
-            ? 'rgb(45 45 45) 0px 4px 7px 0px'
-            : 'rgb(240 240 240) 0px 4px 7px 0px',
-      }"
       style="position: sticky; top: 0px; z-index: 2"
     >
       <div data-test="iam-users-selection-show-toggle" class="q-mr-md">
@@ -106,13 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
     </div>
-    <div data-test="iam-users-selection-table" class="q-px-md">
-      <div
-        data-test="iam-users-selection-table-title"
-        class="q-my-sm text-bold"
-      >
-        {{ rows.length }} Users
-      </div>
+    <div data-test="iam-users-selection-table">
       <template v-if="rows.length">
         <app-table
           :rows="rows"
@@ -124,6 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             value: userSearchKey,
             method: filterUsers,
           }"
+          :title="t('iam.users')"
+          class="o2-quasar-table"
         >
           <template v-slot:select="slotProps: any">
             <q-checkbox
@@ -228,6 +218,7 @@ const columns = computed(() => {
       sortable: false,
       slot: true,
       slotName: "select",
+      style: "width: 67px"
     },
     {
       name: "email",

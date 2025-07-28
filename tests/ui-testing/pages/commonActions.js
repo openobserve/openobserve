@@ -2,6 +2,16 @@ import { exec } from 'child_process';
 import { test } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+// Common Locator exports
+export var dateTimeButtonLocator='[data-test="date-time-btn"]';
+export var relative30SecondsButtonLocator='[data-test="date-time-relative-30-s-btn"]';
+export var absoluteTabLocator='[data-test="date-time-absolute-tab"]';
+export var Past30SecondsValue='Past 30 Seconds';
+export var startTimeValue='01:01:01';
+export var endTimeValue='02:02:02';
+export var startDateTimeValue='2024/10/01 01:01:01';
+export var endDateTimeValue='2024/10/01 02:02:02';
+
 export class CommonActions {
     constructor(page) {
         this.page = page;
@@ -127,5 +137,19 @@ export class CommonActions {
                 resolve();
             });
         });
+    }
+
+    /**
+     * Helper method to conditionally ingest test data based on test title
+     * Skips data ingestion for scheduled alert tests
+     * @param {string} testTitle - The title of the current test
+     * @param {string} streamName - The stream name for data ingestion
+     */
+    async skipDataIngestionForScheduledAlert(testTitle, streamName = 'auto_playwright_stream') {
+        // Skip data ingestion for scheduled alert test
+        if (!testTitle.includes('Scheduled Alert')) {
+            // Ingest test data using common actions
+            await this.ingestTestData(streamName);
+        }
     }
 } 

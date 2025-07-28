@@ -361,6 +361,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               size="xs"
                             />
                           </q-item-section>
+                          <q-item-section
+                            :data-test="`logs-search-bar-update-${props.row.view_name}-favorite-saved-view-btn`"
+                            side
+                            @click.stop="handleUpdateSavedView(props.row)"
+                          >
+                            <q-btn
+                              icon="edit"
+                              :title="t('common.edit')"
+                              class="logs-saved-view-icon"
+                              padding="xs"
+                              unelevated
+                              size="xs"
+                              round
+                              flat
+                            ></q-btn>
+                          </q-item-section>
+                          <q-item-section
+                            :data-test="`logs-search-bar-delete-${props.row.view_name}-favorite-saved-view-btn`"
+                            side
+                            @click.stop="handleDeleteSavedView(props.row)"
+                          >
+                            <q-btn
+                              icon="delete"
+                              :title="t('common.delete')"
+                              class="logs-saved-view-icon"
+                              padding="xs"
+                              unelevated
+                              size="xs"
+                              round
+                              flat
+                            ></q-btn>
+                          </q-item-section>
                         </q-item> </q-td
                     ></template>
                   </q-table>
@@ -1932,10 +1964,6 @@ export default defineComponent({
                   onStreamChange(searchObj.data.query);
                 }
               });
-              console.log(
-                "searchObj.data.streamResults.list",
-                JSON.parse(JSON.stringify(searchObj.data.streamResults.list)),
-              );
 
               if (streamFound == false) {
                 // searchObj.data.stream.selectedStream = { label: "", value: "" };
@@ -2285,7 +2313,7 @@ export default defineComponent({
     };
 
     const resetFunctionContent = () => {
-      fnEditorRef.value.setValue("");
+      fnEditorRef?.value?.setValue("");
       store.dispatch("setSavedFunctionDialog", false);
       isSavedFunctionAction.value = "create";
       savedFunctionName.value = "";
@@ -2662,7 +2690,7 @@ export default defineComponent({
                 searchObj.shouldIgnoreWatcher = false;
               } catch (e) {
                 searchObj.shouldIgnoreWatcher = false;
-                console.log(e);
+                console.log("Error while applying saved view", e);
               }
             }, 1000);
 
@@ -2714,7 +2742,7 @@ export default defineComponent({
             position: "bottom",
             timeout: 1000,
           });
-          console.log(err);
+          console.log("Error while applying saved view", err);
         });
     };
 
@@ -2764,6 +2792,19 @@ export default defineComponent({
             deleteViewID.value,
           )
           .then((res) => {
+            //remove it from localstorage as well
+            const localStoredSavedViews = JSON.parse(localStorage.getItem("savedViews") || "[]");
+            delete localStoredSavedViews[deleteViewID.value];
+            favoriteViews.value.forEach((item: any) => {
+              //remove it from favorite views list because we dont need to show it in the favorite views list
+              if (item == deleteViewID.value) {
+                favoriteViews.value.splice(favoriteViews.value.indexOf(item), 1);
+              }
+            });
+            //remove it from local saved views list because we dont need to show it in the local saved views list
+            localSavedViews.value = localSavedViews.value.filter((item: any) => item.view_id !== deleteViewID.value);
+            localStorage.setItem("savedViews", JSON.stringify(localStoredSavedViews));
+            //we are deleting the local storage item and also we are removing the item from the favoriteViews array
             if (res.status == 200) {
               $q.notify({
                 message: `View deleted successfully.`,
@@ -2788,7 +2829,7 @@ export default defineComponent({
               position: "bottom",
               timeout: 1000,
             });
-            console.log(err);
+            console.log("Error while deleting saved view", err);
           });
       } catch (e: any) {
         console.log("Error while getting saved views", e);
@@ -2884,7 +2925,7 @@ export default defineComponent({
               position: "bottom",
               timeout: 1000,
             });
-            console.log(err);
+            console.log("Error while creating saved view", err);
           });
       } catch (e: any) {
         isSavedViewAction.value = "create";
@@ -2958,7 +2999,7 @@ export default defineComponent({
               position: "bottom",
               timeout: 1000,
             });
-            console.log(err);
+            console.log("Error while updating saved view", err);
           });
       } catch (e: any) {
         isSavedViewAction.value = "create";
@@ -3157,7 +3198,6 @@ export default defineComponent({
               //     delete favoriteViewsList[key];
               //   }
               // }
-              console.log(favoriteViewsList);
               localSavedViews.value = favoriteViewsList;
             }
           }
@@ -3434,7 +3474,6 @@ export default defineComponent({
     };
 
     const selectTransform = (item: any, isSelected: boolean) => {
-      console.log("item", item);
       if (searchObj.data.transformType === "function") {
         populateFunctionImplementation(item, isSelected);
       }
@@ -3643,7 +3682,10 @@ export default defineComponent({
       customRangeIcon,
       createScheduledSearchIcon,
       listScheduledSearchIcon,
+      getColumnNames,
+      getSearchObj,
       toggleHistogram,
+      createSavedViews,
     };
   },
   computed: {
@@ -3814,7 +3856,7 @@ export default defineComponent({
       this.resetEditorLayout();
     },
     resetFunction(newVal) {
-      if (newVal == "" && store?.state?.savedViewFlag == false) {
+      if (newVal == "" && store && !store?.state?.savedViewFlag) {
         this.resetFunctionContent();
       }
     },
