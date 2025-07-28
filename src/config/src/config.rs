@@ -389,13 +389,12 @@ pub async fn get_sns_client() -> &'static aws_sdk_sns::Client {
 }
 
 pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
-    let blocked_streams = get_config()
+    get_config()
         .common
         .blocked_streams
         .split(',')
         .map(|x| x.to_string())
-        .collect();
-    blocked_streams
+        .collect()
 });
 
 #[derive(EnvConfig)]
@@ -725,6 +724,8 @@ pub struct Common {
     pub data_db_dir: String,
     #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
     pub data_cache_dir: String,
+    #[env_config(name = "ZO_DATA_TMP_DIR", default = "")] // ./data/openobserve/tmp/
+    pub data_tmp_dir: String,
     // TODO: should rename to column_all
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub column_all: String,
@@ -960,12 +961,6 @@ pub struct Common {
         help = "InvertedIndex search format, parquet(default), tantivy."
     )]
     pub inverted_index_search_format: String,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_TANTIVY_MODE",
-        default = "",
-        help = "Tantivy search mode, puffin or mmap, default is puffin."
-    )]
-    pub inverted_index_tantivy_mode: String,
     #[env_config(
         name = "ZO_INVERTED_INDEX_CAMEL_CASE_TOKENIZER_DISABLED",
         default = false,
@@ -2354,6 +2349,12 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.common.data_cache_dir.ends_with('/') {
         cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);
     }
+    if cfg.common.data_tmp_dir.is_empty() {
+        cfg.common.data_tmp_dir = format!("{}tmp/", cfg.common.data_dir);
+    }
+    if !cfg.common.data_tmp_dir.ends_with('/') {
+        cfg.common.data_tmp_dir = format!("{}/", cfg.common.data_tmp_dir);
+    }
     if cfg.common.mmdb_data_dir.is_empty() {
         cfg.common.mmdb_data_dir = format!("{}mmdb/", cfg.common.data_dir);
     }
@@ -2601,17 +2602,6 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
-
-    // check disk cache with tantivy mode
-    cfg.common.inverted_index_tantivy_mode = cfg.common.inverted_index_tantivy_mode.to_lowercase();
-    if cfg.common.inverted_index_tantivy_mode.is_empty() {
-        cfg.common.inverted_index_tantivy_mode = "puffin".to_string();
-    }
-    if !cfg.disk_cache.enabled && cfg.common.inverted_index_tantivy_mode == "mmap" {
-        return Err(anyhow::anyhow!(
-            "Inverted index tantivy mode can not be set to mmap when disk cache is disabled."
-        ));
-    }
 
     Ok(())
 }

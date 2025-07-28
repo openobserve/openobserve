@@ -67,6 +67,7 @@ strum.workspace = true
 svix-ksuid.workspace = true
 sysinfo.workspace = true
 tantivy.workspace = true
+tantivy-fst.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true

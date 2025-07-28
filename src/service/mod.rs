@@ -42,6 +42,7 @@ pub mod promql;
 pub mod ratelimit;
 pub mod schema;
 pub mod search;
+pub mod tantivy;
 pub mod websocket_events;
 
 #[cfg(feature = "enterprise")]

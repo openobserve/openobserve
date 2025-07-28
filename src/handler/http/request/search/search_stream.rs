@@ -524,7 +524,6 @@ pub async fn values_http2_stream(
 
     // Get query params
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     #[cfg(feature = "enterprise")]
     let body_bytes = String::from_utf8_lossy(&body).to_string();
@@ -561,12 +560,17 @@ pub async fn values_http2_stream(
     // Get use_cache from query params
     values_req.use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
 
+    let keyword = match query.get("keyword") {
+        None => "".to_string(),
+        Some(v) => v.trim().to_string(),
+    };
     // Build search requests per field and use only the first one
     let reqs = match build_search_request_per_field(
         &values_req,
         &org_id,
-        stream_type,
+        values_req.stream_type,
         &values_req.stream_name,
+        &keyword,
     )
     .await
     {

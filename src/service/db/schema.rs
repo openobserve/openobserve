@@ -463,8 +463,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 pub async fn cache() -> Result<(), anyhow::Error> {
     let db_key = "/schema/";
     let items = db::list(db_key).await?;
-    let mut schemas: HashMap<String, Vec<(i64, Bytes)>> = HashMap::with_capacity(items.len());
-    for (key, val) in items {
+    let items_num = items.len();
+    let mut schemas: HashMap<String, Vec<(i64, Bytes)>> = HashMap::with_capacity(items_num);
+
+    log::info!("Cache schema got {} items", items_num);
+    for (i, (key, val)) in items.into_iter().enumerate() {
         let key = key.strip_prefix(db_key).unwrap();
         let columns = key.split('/').take(4).collect::<Vec<_>>();
         assert_eq!(columns.len(), 4, "BUG");
@@ -472,9 +475,14 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let start_dt: i64 = columns[3].parse().unwrap();
         let entry = schemas.entry(item_key).or_insert(Vec::new());
         entry.push((start_dt, val));
+        if i % 1000 == 0 {
+            log::info!("Cache schema progress: {}/{}", i, items_num);
+        }
     }
+    log::info!("Stream schemas Cached {} schemas", items_num);
+    let keys_num = schemas.keys().len();
     let keys = schemas.keys().map(|k| k.to_string()).collect::<Vec<_>>();
-    for item_key in keys.iter() {
+    for (i, item_key) in keys.iter().enumerate() {
         let Some(mut schema_versions) = schemas.remove(item_key) else {
             continue;
         };
@@ -523,8 +531,11 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let mut w = STREAM_SCHEMAS.write().await;
         w.insert(item_key.to_string(), schema_versions);
         drop(w);
+        if i % 1000 == 0 {
+            log::info!("Stream schemas Cached progress: {}/{}", i, keys.len());
+        }
     }
-    log::info!("Stream schemas Cached");
+    log::info!("Stream schemas Cached {} streams", keys_num);
     Ok(())
 }
 

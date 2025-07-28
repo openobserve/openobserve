@@ -1031,9 +1031,7 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="common-auto-complete-option"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
     // await page.getByText("Error Loading Data").click();
-    await expect(
-      page.getByText("sql parser error: Expected:").first()
-    ).toBeVisible();
+    await expect(page.getByText('Schema error: No field named').first()).toBeVisible();
 
     await page
       .locator(

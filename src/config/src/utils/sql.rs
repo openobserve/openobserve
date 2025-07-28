@@ -28,7 +28,7 @@ use sqlparser::{
 
 use crate::TIMESTAMP_COL_NAME;
 
-pub const AGGREGATE_UDF_LIST: [&str; 16] = [
+pub const AGGREGATE_UDF_LIST: [&str; 15] = [
     "min",
     "max",
     "avg",
@@ -36,7 +36,6 @@ pub const AGGREGATE_UDF_LIST: [&str; 16] = [
     "count",
     "median",
     "array_agg",
-    "approx_percentile_cont",
     "percentile_cont",
     "summary_percentile",
     "first_value",
@@ -260,7 +259,7 @@ fn has_union(query: &Query) -> bool {
 
 fn has_subquery(stat: &Statement) -> bool {
     let mut visitor = SubqueryVisitor::new();
-    stat.visit(&mut visitor);
+    let _ = stat.visit(&mut visitor);
     visitor.is_subquery
 }
 
@@ -326,7 +325,7 @@ impl Visitor for SubqueryVisitor {
 
 fn has_timestamp(stat: &Statement) -> bool {
     let mut visitor = TimestampVisitor::new();
-    stat.visit(&mut visitor);
+    let _ = stat.visit(&mut visitor);
     visitor.timestamp_selected
 }
 
