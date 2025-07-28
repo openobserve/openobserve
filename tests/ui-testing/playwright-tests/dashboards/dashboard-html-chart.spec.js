@@ -27,6 +27,21 @@ const VARIABLE_HTML_SNIPPET = `<!DOCTYPE html>
   </body>
 </html>`;
 
+const XSS_HTML_SNIPPET = `<!DOCTYPE html>
+<html>
+  <body>
+    <h1 data-test>XSS Test</h1>
+    <script>alert("xss")</script>
+  </body>
+</html>`;
+
+const UNDEFINED_VARIABLE_HTML_SNIPPET = `<!DOCTYPE html>
+<html>
+  <body>
+    <p>$undefinedvar Not replaced</p>
+  </body>
+</html>`;
+
 test.describe.configure({ mode: "parallel" });
 
 // Refactored test cases using Page Object Model
@@ -149,5 +164,79 @@ test.describe("HTML chart dashboard", () => {
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
+  });
+
+  //The system does not allow malicious JavaScript to run inside an HTML chart.
+  //Only safe HTML (like headings or text) is displayed, preventing hackers from injecting harmful code.
+  test("Should sanitize <script> tags to prevent XSS in the HTML chart.", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+    const dashboardName =
+      "Dashboard_" + Math.random().toString(36).substr(2, 9);
+
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectChartType("html");
+
+    await page
+      .locator('[data-test="dashboard-html-editor"]')
+      .getByRole("textbox")
+      .locator("div")
+      .click();
+    await page
+      .locator('[data-test="dashboard-html-editor"]')
+      .getByRole("textbox")
+      .locator("div")
+      .fill(XSS_HTML_SNIPPET);
+
+    await expect(page.getByRole("heading", { name: "XSS Test" })).toBeVisible();
+    await expect(
+      page.locator('[data-test="html-renderer"] script')
+    ).toHaveCount(0);
+
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
+  });
+  test("Should keep undefined dashboard variable placeholder unchanged in HTML chart.", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+    const panelName =
+      pm.dashboardPanelActions.generateUniquePanelName("panel-test");
+    const dashboardName =
+      "Dashboard_" + Math.random().toString(36).substr(2, 9);
+
+    await pm.dashboardList.menuItem("dashboards-item");
+    await waitForDashboardPage(page);
+    await pm.dashboardCreate.createDashboard(dashboardName);
+    await pm.dashboardCreate.addPanel();
+    await pm.chartTypeSelector.selectChartType("html");
+
+    await page
+      .locator('[data-test="dashboard-html-editor"]')
+      .getByRole("textbox")
+      .locator("div")
+      .click();
+    await page
+      .locator('[data-test="dashboard-html-editor"]')
+      .getByRole("textbox")
+      .locator("div")
+      .fill(UNDEFINED_VARIABLE_HTML_SNIPPET);
+
+    await expect(
+      page.locator('[data-test="html-renderer"]').getByText("$undefinedvar")
+    ).toBeVisible();
+
+    await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.dashboardPanelActions.savePanel();
+    await pm.dashboardCreate.backToDashboardList();
+    await deleteDashboard(page, dashboardName);
   });
 });
