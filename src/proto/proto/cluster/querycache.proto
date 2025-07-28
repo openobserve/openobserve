@@ -49,6 +49,7 @@ message MultiQueryCacheResponse {
 
 message DeleteResultCacheRequest {
     string  path = 1; 
+    int64   ts = 2; 
 }
 
 message DeleteResultCacheResponse {
