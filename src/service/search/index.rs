@@ -28,7 +28,7 @@ use datafusion::{
     physical_expr::ScalarFunctionExpr,
     physical_plan::{
         PhysicalExpr,
-        expressions::{BinaryExpr, Column, InListExpr, LikeExpr, Literal, NotExpr},
+        expressions::{BinaryExpr, Column, InListExpr, IsNotNullExpr, LikeExpr, Literal, NotExpr},
     },
     scalar::ScalarValue,
 };
@@ -657,13 +657,7 @@ impl Condition {
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
                     Vec::with_capacity(fst_fields.len());
                 for field in fst_fields.iter() {
-                    let new_expr = Arc::new(LikeExpr::new(
-                        false,
-                        true,
-                        Arc::new(Column::new(field, schema.index_of(field).unwrap())),
-                        term.clone(),
-                    ));
-                    expr_list.push(new_expr);
+                    expr_list.push(create_like_expr_with_not_null(field, term.clone(), schema));
                 }
                 if expr_list.is_empty() {
                     return Err(anyhow::anyhow!(
@@ -868,6 +862,19 @@ pub(crate) fn get_arg_name(args: &FunctionArg) -> String {
             _ => unimplemented!("str_match not support filed type: {:?}", arg),
         },
     }
+}
+
+fn create_like_expr_with_not_null(
+    field: &str,
+    term: Arc<dyn PhysicalExpr>,
+    schema: &arrow_schema::Schema,
+) -> Arc<dyn PhysicalExpr> {
+    let column = Arc::new(Column::new(field, schema.index_of(field).unwrap()));
+    Arc::new(BinaryExpr::new(
+        Arc::new(IsNotNullExpr::new(column.clone())),
+        Operator::And,
+        Arc::new(LikeExpr::new(false, true, column, term.clone())),
+    ))
 }
 
 fn is_alphanumeric(s: &str) -> bool {
