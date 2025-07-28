@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod histogram;
+
 use std::{ops::ControlFlow, sync::Arc};
 
 use arrow_schema::FieldRef;
@@ -245,7 +247,12 @@ impl Sql {
         // 9. pick up histogram interval
         let mut histogram_interval_visitor =
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
-        let _ = statement.visit(&mut histogram_interval_visitor);
+        statement.visit(&mut histogram_interval_visitor);
+        let histogram_interval = if query.histogram_interval > 0 {
+            Some(query.histogram_interval)
+        } else {
+            histogram_interval_visitor.interval
+        };
 
         //********************Change the sql start*********************************//
         // 11. add _timestamp and _o2_id if need
@@ -347,7 +354,7 @@ impl Sql {
             time_range: Some((query.start_time, query.end_time)),
             group_by,
             order_by,
-            histogram_interval: histogram_interval_visitor.interval,
+            histogram_interval,
             sorted_by_time: need_sort_by_time,
             use_inverted_index,
             index_condition,
@@ -1701,13 +1708,13 @@ impl VisitorMut for ComplexQueryVisitor {
 }
 
 #[derive(Debug)]
-struct HistogramIntervalVisitor {
+pub struct HistogramIntervalVisitor {
     pub interval: Option<i64>,
     time_range: Option<(i64, i64)>,
 }
 
 impl HistogramIntervalVisitor {
-    fn new(time_range: Option<(i64, i64)>) -> Self {
+    pub fn new(time_range: Option<(i64, i64)>) -> Self {
         Self {
             interval: None,
             time_range,
