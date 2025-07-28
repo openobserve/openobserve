@@ -238,6 +238,14 @@ pub async fn search(
 
     // Handle histogram data for UI
     if is_ui_histogram {
+        // Check if query is eligible for histogram
+        let is_eligible =
+            config::utils::sql::is_eligible_for_histogram(&req.query.sql).unwrap_or(false);
+        if !is_eligible {
+            return Ok(MetaHttpResponse::bad_request(
+                "Histogram unavailable for SUBQUERY, CTE, DISTINCT and LIMIT queries.",
+            ));
+        }
         // TODO: Modify the original query to a histogram query
         // e.g.:
         // original_query: SELECT * FROM "olympics"

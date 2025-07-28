@@ -166,6 +166,20 @@ fn is_aggregate_expression(expr: &Expr) -> bool {
     }
 }
 
+pub fn is_eligible_for_histogram(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
+    // Histogram is not available for SUBQUERY, CTE, DISTINCT and LIMIT queries.
+    let ast = Parser::parse_sql(&GenericDialect {}, query)?;
+    for statement in ast.iter() {
+        if let Statement::Query(query) = statement {
+            if has_subquery(statement) || has_distinct(query) || has_limit(query) || has_cte(query)
+            {
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
+}
+
 // Check if has group_by
 fn has_group_by(query: &Query) -> bool {
     if let SetExpr::Select(ref select) = *query.body {
@@ -498,6 +512,10 @@ impl Visitor for WindowFunctionVisitor {
 fn has_cte(query: &Query) -> bool {
     // Check if query has WITH clause (CTEs)
     query.with.is_some()
+}
+
+fn has_limit(query: &Query) -> bool {
+    query.limit.is_some()
 }
 
 #[cfg(test)]
@@ -1008,6 +1026,33 @@ mod tests {
             let is_simple_aggregate = is_simple_aggregate_query(query).unwrap();
             println!("Query [{}] is_simple: {:?}", i, is_simple_aggregate);
             assert_eq!(is_simple_aggregate, false);
+        }
+    }
+
+    #[test]
+    fn check_is_eligible_for_histogram_for_queries_should_be_true() {
+        let queries = [
+            r#"SELECT * FROM "olympics" WHERE _timestamp >= 1716854400000 AND _timestamp <= 1716940800000"#,
+            r#"SELECT * FROM "olympics" WHERE _timestamp >= 1716854400000 AND _timestamp <= 1716940800000"#,
+        ];
+        for (i, query) in queries.iter().enumerate() {
+            let is_eligible = is_eligible_for_histogram(query).unwrap();
+            assert_eq!(is_eligible, true);
+        }
+    }
+
+    #[test]
+    fn check_is_eligible_for_histogram_for_queries_should_be_false() {
+        // Histogram is not available for SUBQUERY, CTE, DISTINCT and LIMIT queries.
+        let queries = [
+            r#"SELECT * FROM (SELECT * FROM "olympics")"#,
+            r#"WITH cte AS (SELECT * FROM "olympics") SELECT * FROM cte"#,
+            r#"SELECT DISTINCT * FROM "olympics""#,
+            r#"SELECT * FROM "olympics" LIMIT 100"#,
+        ];
+        for (i, query) in queries.iter().enumerate() {
+            let is_eligible = is_eligible_for_histogram(query).unwrap();
+            assert_eq!(is_eligible, false);
         }
     }
 }
