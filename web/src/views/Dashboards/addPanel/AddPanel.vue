@@ -903,16 +903,16 @@ export default defineComponent({
       const variablesChanged = !isEqual(normalizedCurrent, normalizedRefreshed);
 
       const configChanged = !isEqual(chartData.value, dashboardPanelData.data);
-      let needsApiCall = false;
+      let configNeedsApiCall = false;
 
       if (configChanged) {
-        needsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+        configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
           chartData.value,
           dashboardPanelData.data,
         );
       }
 
-      return needsApiCall || variablesChanged;
+      return configNeedsApiCall || variablesChanged;
     });
 
     watch(isOutDated, () => {
@@ -1572,12 +1572,12 @@ export default defineComponent({
 
     const debouncedUpdateChartConfig = debounce((newVal, oldVal) => {
       if (!isEqual(chartData.value, newVal)) {
-        const needsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+        const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
           chartData.value,
           newVal,
         );
 
-        if (!needsApiCall) {
+        if (!configNeedsApiCall) {
           chartData.value = JSON.parse(JSON.stringify(newVal));
           console.log(
             "Config-only changes detected, updating chartData without API call",

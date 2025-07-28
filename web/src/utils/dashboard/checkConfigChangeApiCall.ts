@@ -53,11 +53,11 @@ export const checkIfConfigChangeRequiredApiCallOrNot = (
   newConfig: any,
 ): boolean => {
   const changedKeys = getChangedKeys(oldConfig, newConfig);
-  const needsApiCall = changedKeys.some((key) =>
+  const configNeedsApiCall = changedKeys.some((key) =>
     Array.from(API_REQUIRING_CHANGES).some((apiKey) => key.startsWith(apiKey)),
   );
 
-  if (needsApiCall) {
+  if (configNeedsApiCall) {
     return true;
   }
 
