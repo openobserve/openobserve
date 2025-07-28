@@ -60,13 +60,14 @@ use crate::service::search::{
     utils::get_field_name,
 };
 
-// this function will split the expression into two parts
-// the first part is the index condition (can use index)
-// the second part is the other expression (can not use index)
-// For example, if the expr is "match_all('bar') AND a = 1 AND b like '%foo%'",
-// and the a is secondary index field.
-// the firist part is "match_all('bar') AND a = 1" (convert to IndexCondition that use tantivy)
-// the second part is "b like '%foo%'" (use datafusion)
+/// this function will split the expression into two parts
+/// the first part is the index condition (can use index)
+/// the second part is the other expression (can not use index)
+/// For example, if the expr is "match_all('bar') AND a = 1 AND b like '%foo%'",
+/// and the a is secondary index field.
+/// the firist part is "match_all('bar') AND a = 1" (convert to IndexCondition that use tantivy)
+/// the second part is "b like '%foo%'" (use datafusion)
+// TODO: support not for all operator in Condition
 pub fn get_index_condition_from_expr(
     index_fields: &HashSet<String>,
     expr: &Expr,
@@ -533,7 +534,12 @@ impl Condition {
                 }
             }
             Condition::FuzzyMatchAll(..) => vec![INDEX_FIELD_NAME_FOR_ALL.to_string()],
-            _ => vec![],
+            Condition::Or(left, right) | Condition::And(left, right) => {
+                let mut fields = left.need_all_term_fields();
+                fields.extend(right.need_all_term_fields());
+                fields
+            }
+            Condition::Equal(..) | Condition::In(..) | Condition::All() => vec![],
         }
     }
 
