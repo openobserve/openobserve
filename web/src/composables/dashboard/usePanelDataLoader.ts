@@ -1599,12 +1599,12 @@ export const usePanelDataLoader = (
       const [newSchema] = newVal;
       const [oldSchema] = oldVal;
 
-      const needsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+      const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
         oldSchema,
         newSchema,
       );
 
-      if (!needsApiCall) {
+      if (!configNeedsApiCall) {
         return;
       }
 
