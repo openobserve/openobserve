@@ -1684,8 +1684,11 @@ export default defineComponent({
       }
 
       if (parsedSQL?._next) {
-        columnNames = getColumnNames(parsedSQL._next);
+        columnNames = [
+          ...new Set([...columnNames, ...getColumnNames(parsedSQL._next)]),
+        ];
       }
+
       return columnNames;
     };
 
@@ -1710,6 +1713,11 @@ export default defineComponent({
           const columnNames = getColumnNames(parsedSQL);
 
           searchObj.data.stream.interestingFieldList = [];
+
+          const defaultInterestingFields = new Set(
+            store.state?.zoConfig?.default_quick_mode_fields || [],
+          );
+
           for (const col of columnNames) {
             if (
               !searchObj.data.stream.interestingFieldList.includes(col) &&
@@ -1729,13 +1737,21 @@ export default defineComponent({
                   !searchObj.data.stream.interestingFieldList.includes(col) &&
                   col !== store.state.zoConfig?.timestamp_column
                 ) {
+                  const interestingFieldsCopy = [
+                    ...searchObj.data.stream.interestingFieldList,
+                  ];
+
                   searchObj.data.stream.interestingFieldList.push(col);
+
+                  if (!defaultInterestingFields.has(col)) {
+                    interestingFieldsCopy.push(col);
+                  }
 
                   localFields[
                     searchObj.organizationIdentifier +
                       "_" +
                       searchObj.data.stream.selectedStream[0]
-                  ] = searchObj.data.stream.interestingFieldList;
+                  ] = interestingFieldsCopy;
                 }
               }
               useLocalInterestingFields(localFields);

@@ -991,7 +991,10 @@ export default defineComponent({
     );
 
     watch(
-      () => showUserDefinedSchemaToggle.value,
+      () => [
+        showUserDefinedSchemaToggle.value,
+        searchObj.meta.useUserDefinedSchemas,
+      ],
       (isActive) => {
         showOnlyInterestingFields.value =
           searchObj.meta.useUserDefinedSchemas === "interesting_fields";
@@ -1398,6 +1401,10 @@ export default defineComponent({
         return;
       }
 
+      const defaultInterestingFields = new Set(
+        store.state?.zoConfig?.default_quick_mode_fields || [],
+      );
+
       if (isInterestingField) {
         const index = searchObj.data.stream.interestingFieldList.indexOf(
           field.name,
@@ -1441,16 +1448,39 @@ export default defineComponent({
           if (localInterestingFields.value != null) {
             localStreamFields = localInterestingFields.value;
           }
+
           if (field.streams.length > 0) {
             let localFieldIndex = -1;
             for (const selectedStream of field.streams) {
-              localFieldIndex = localStreamFields[
+              localFieldIndex = localStreamFields?.[
                 searchObj.organizationIdentifier + "_" + selectedStream
-              ].indexOf(field.name);
+              ]?.indexOf(field.name);
               if (localFieldIndex > -1) {
                 localStreamFields[
                   searchObj.organizationIdentifier + "_" + selectedStream
                 ].splice(localFieldIndex, 1);
+              }
+
+              // If the field is in the default interesting fields, add it to the deselect list
+              const deselectField =
+                localStreamFields?.[
+                  "deselect" +
+                    "_" +
+                    searchObj.organizationIdentifier +
+                    "_" +
+                    selectedStream
+                ] || [];
+              if (
+                defaultInterestingFields.has(field.name) &&
+                !deselectField.includes(field.name)
+              ) {
+                localStreamFields[
+                  "deselect" +
+                    "_" +
+                    searchObj.organizationIdentifier +
+                    "_" +
+                    selectedStream
+                ] = [...deselectField, field.name];
               }
             }
           }
@@ -1500,12 +1530,43 @@ export default defineComponent({
                 if (
                   localStreamFields[
                     searchObj.organizationIdentifier + "_" + selectedStream
-                  ].indexOf(field.name) == -1 &&
-                  field.name !== store.state.zoConfig?.timestamp_column
+                  ]?.indexOf(field.name) == -1 &&
+                  field.name !== store.state.zoConfig?.timestamp_column &&
+                  !defaultInterestingFields.has(field.name)
                 ) {
                   localStreamFields[
                     searchObj.organizationIdentifier + "_" + selectedStream
                   ].push(field.name);
+                }
+
+                // If the field is in the deselect list, remove it from the local stream fields
+                const isFieldDeselected = new Set(
+                  localStreamFields?.[
+                    "deselect" +
+                      "_" +
+                      searchObj.organizationIdentifier +
+                      "_" +
+                      selectedStream
+                  ] || [],
+                ).has(field.name);
+
+                if (
+                  defaultInterestingFields.has(field.name) &&
+                  isFieldDeselected
+                ) {
+                  localStreamFields[
+                    "deselect" +
+                      "_" +
+                      searchObj.organizationIdentifier +
+                      "_" +
+                      selectedStream
+                  ] = localStreamFields[
+                    "deselect" +
+                      "_" +
+                      searchObj.organizationIdentifier +
+                      "_" +
+                      selectedStream
+                  ].filter((item: any) => item !== field.name);
                 }
               }
             }
