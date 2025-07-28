@@ -60,6 +60,11 @@ cp -r protoc/include/google C:/windows/system32/
 
 # macOS
 brew install protobuf
+
+# Set environment variable for protobuf include path (macOS)
+export PROTOC_INCLUDE=/opt/homebrew/include
+# Add this to your shell profile (~/.zshrc, ~/.bashrc, etc.) to make it permanent
+You could also set it in your .env file
 ```
 
 Build the binary:
