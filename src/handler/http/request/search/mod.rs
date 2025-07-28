@@ -250,8 +250,6 @@ pub async fn search(
         match config::utils::histogram::convert_to_histogram_query(&req.query.sql, &stream_names) {
             Ok(histogram_query) => {
                 req.query.sql = histogram_query;
-                // Reset to allow auto-interval
-                req.query.histogram_interval = 0;
             }
             Err(e) => {
                 return Ok(MetaHttpResponse::bad_request(e));
