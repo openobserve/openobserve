@@ -173,7 +173,7 @@ jobs:
     permissions:
       id-token: write
       contents: write
-      
+
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -189,6 +189,8 @@ jobs:
           aws-region: us-east-2
 
       - name: Upload to S3
+        env:
+          BUCKET: ${{ vars.AWS_S3_BUCKET_NAME }}
         run: |
           if ! command -v aws &> /dev/null; then
             echo "AWS CLI not found. Installing..."
