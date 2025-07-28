@@ -299,14 +299,10 @@ async fn get_stream_settings(
                             .into(),
                         stats: config::meta::stream::StreamStats::default(),
                         schema: vec![],
-                        uds_schema: vec![crate::common::meta::stream::StreamProperty {
-                            name: "uds_field".to_string(),
-                            prop_type: "string".to_string(),
-                        }],
+                        uds_schema: None,
                         settings,
                         metrics_meta: None,
                         total_fields: 1,
-                        is_derived: None,
                     }
                 })
                 .collect::<Vec<Stream>>();

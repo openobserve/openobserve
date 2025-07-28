@@ -217,16 +217,43 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .required(true)
                     .help("snowflake id"),
             ]),
-            Command::new("consistent-hash").about("consistent hash").args([
-                arg!("file", 'f', "file", "file", true).num_args(1..),
+            clap::Command::new("consistent-hash").about("consistent hash").args([
+                clap::Arg::new("file")
+                    .short('f')
+                    .long("file")
+                    .required(true)
+                    .num_args(1..)
+                    .help("file"),
             ]),
-            Command::new("upgrade-db")
-                .about("upgrade db table schemas").args(dataArgs()),
-        ])
-}
-
-pub async fn cli() -> Result<bool, anyhow::Error> {
-    let mut app = create_cli_app().get_matches();
+            clap::Command::new("query-optimiser").about("query optimiser").args([
+                clap::Arg::new("url")
+                    .short('u')
+                    .long("url")
+                    .required(true)
+                    .help("url"),
+                clap::Arg::new("token")
+                    .short('t')
+                    .long("token")
+                    .required(true)
+                    .help("token"),
+                clap::Arg::new("meta-token")
+                    .short('m')
+                    .long("meta-token")
+                    .required(false)
+                    .help("meta-token"),
+                clap::Arg::new("duration")
+                    .short('d')
+                    .long("duration")
+                    .required(true)
+                    .help("duration"),
+                clap::Arg::new("stream-name")
+                    .short('s')
+                    .long("stream-name")
+                    .required(false)
+                    .help("stream-name"),
+            ])
+        ])        
+        .get_matches();
 
     if app.subcommand().is_none() {
         return Ok(false);
@@ -495,8 +522,31 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let files = files.iter().map(|f| f.to_string()).collect::<Vec<_>>();
             super::http::consistent_hash(files).await?;
         }
-        "upgrade-db" => {
-            crate::migration::init_db().await?;
+        "query-optimiser" => {
+            let stream_name = command
+                .get_one::<String>("stream-name")
+                .map(|stream_name| stream_name.to_string());
+
+            let meta_token = command
+                .get_one::<String>("meta-token")
+                .map(|meta_token| meta_token.to_string());
+
+            let url = command.get_one::<String>("url").expect("url is required");
+            let token = command
+                .get_one::<String>("token")
+                .expect("token is required");
+
+            let duration = command.get_one::<String>("duration").unwrap();
+            let duration = duration.parse::<i64>().unwrap_or(12);
+
+            super::query_optimiser::query_optimiser(
+                url,
+                token,
+                &meta_token,
+                duration,
+                &stream_name,
+            )
+            .await?;
         }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));
