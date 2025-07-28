@@ -598,7 +598,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
                 log::info!("User added to the database");
             }
             Err(e) => {
-                log::error!("Error adding user to the database: {}", e);
+                log::error!("Error adding user to the database: {e}");
                 return is_new_user;
             }
         }
@@ -607,7 +607,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
     // Check if the user is part of any organization
     let org_users = list_org_users_by_user(user_email).await;
     if org_users.is_err() {
-        log::error!("Error fetching orgs for user: {}", user_email);
+        log::error!("Error fetching orgs for user: {user_email}");
     }
 
     let (org_name, role) = match org_users {
@@ -644,11 +644,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
                     .await;
                 }
                 Err(e) => {
-                    log::error!(
-                        "Error creating default org for user: {} error: {}",
-                        user_email,
-                        e
-                    );
+                    log::error!("Error creating default org for user: {user_email} error: {e}");
                 }
             };
             (org.name, "admin".to_string()) /* default to Admin when self signup */
@@ -662,7 +658,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
                     log::info!("User updated to the openfga");
                 }
                 Err(e) => {
-                    log::error!("Error updating user to the openfga: {}", e);
+                    log::error!("Error updating user to the openfga: {e}");
                 }
             }
         }

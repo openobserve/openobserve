@@ -480,7 +480,7 @@ pub async fn cleanup_enrichment_table_resources(
 
     // delete stream key
     if let Err(e) = db::enrichment_table::delete(org_id, stream_name).await {
-        log::error!("Error deleting enrichment table: {}", e);
+        log::error!("Error deleting enrichment table: {e}");
     }
 
     // delete stream stats cache

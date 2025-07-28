@@ -65,7 +65,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 if let Err(e) =
                     crate::service::enrichment::storage::database::delete(org_id, name).await
                 {
-                    log::error!("delete enrichment table db data error: {:?}", e);
+                    log::error!("delete enrichment table db data error: {e:?}");
                 }
             }
         }

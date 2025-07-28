@@ -30,7 +30,7 @@ pub fn get_open_fds() -> usize {
     match std::fs::read_dir("/proc/self/fd") {
         Ok(entries) => entries.count(),
         Err(e) => {
-            log::warn!("Failed to read open file descriptors: {}", e);
+            log::warn!("Failed to read open file descriptors: {e}");
             0
         }
     }

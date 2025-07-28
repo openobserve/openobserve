@@ -128,7 +128,7 @@ pub fn get_tcp_conn_resets() -> usize {
             0
         }
         Err(e) => {
-            log::warn!("Failed to read TCP connection resets: {}", e);
+            log::warn!("Failed to read TCP connection resets: {e}");
             0
         }
     }
