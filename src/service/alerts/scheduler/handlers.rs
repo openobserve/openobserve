@@ -205,7 +205,9 @@ async fn handle_alert_triggers(
         )
         .await
         {
-            log::error!("[SCHEDULER trace_id {scheduler_trace_id}] Error deleting trigger job: {e}")
+            log::error!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] Error deleting trigger job: {e}"
+            );
         }
         return Err(anyhow::anyhow!(
             "Alert id is not a valid ksuid: {}",
