@@ -3498,6 +3498,14 @@ const useLogs = () => {
 
         searchObj.data.datetime.queryRangeRestrictionMsg = "";
         searchObj.data.datetime.queryRangeRestrictionInHour = -1;
+
+        const interestingFieldsMapping = {
+          "common": [],
+          ...Object.fromEntries(
+            selectedStreamValues.sort().map((stream: any) => [stream, []]),
+          ),
+        }
+
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
             if (searchObj.data.stream.selectedStream.length > 1) {
@@ -3559,12 +3567,12 @@ const useLogs = () => {
               );
             }
 
-            let environmentInterestingFields = [];
+            let environmentInterestingFields = new Set();
             if (
               store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")
             ) {
               environmentInterestingFields =
-                store.state?.zoConfig?.default_quick_mode_fields;
+                 new Set(store.state?.zoConfig?.default_quick_mode_fields);
             }
 
             if (
@@ -3605,15 +3613,46 @@ const useLogs = () => {
               }
 
               useLocalInterestingFields(localInterestingFields.value);
+            }            
+
+            const deselectedFields = localInterestingFields.value?.[
+              "deselect" +
+                "_" +
+                searchObj.organizationIdentifier +
+                "_" +
+                stream.name
+            ];
+
+
+            // Check if all deselected fields are present in the environment interesting fields
+            if(deselectedFields && deselectedFields.length > 0) {
+              localInterestingFields.value[
+                "deselect" +
+                  "_" +
+                  searchObj.organizationIdentifier +
+                  "_" +
+                  stream.name
+              ] = Array.from(deselectedFields).filter((field: any) => environmentInterestingFields.has(field));
             }
 
+            const filteredDeselectedFields =
+              new Set(localInterestingFields.value?.[
+              "deselect" +
+                "_" +
+                searchObj.organizationIdentifier +
+                "_" +
+                stream.name
+            ] || []);
+
+            const filteredEnvironmentInterestingFields = Array.from(environmentInterestingFields).filter((field: any) => !filteredDeselectedFields.has(field));
+
             streamInterestingFieldsLocal = hasInterestingFieldsInLocal(stream.name)
-                ? localInterestingFields.value[
+                ? [...localInterestingFields.value?.[
                     searchObj.organizationIdentifier + "_" + stream.name
-                  ]
-                : environmentInterestingFields.length > 0
-                  ? [...environmentInterestingFields]
-                  : [...schemaInterestingFields];
+                  ], ...filteredEnvironmentInterestingFields]
+                : [...Array.from(environmentInterestingFields)]
+
+            
 
             // Add timestamp column to the interesting field list if it is not present in the interesting field list
             const intField = new Set(
@@ -3682,10 +3721,11 @@ const useLogs = () => {
 
                     if(fieldObj.isInterestingField) {
                       interestingCommonSchemaMaps.push(fieldObj);
+                      interestingFieldsMapping["common"].push(fieldObj.name);
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
 
-                      if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0) {
+                      if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0 && interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].includes(fieldObj.name)) {
                         searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] =
                           searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] - 1;
                       }
@@ -3716,6 +3756,7 @@ const useLogs = () => {
                     schemaMaps.push(fieldObj);
                     if(fieldObj.isInterestingField) {
                       interestingSchemaMaps.push(fieldObj);
+                      interestingFieldsMapping[stream.name].push(fieldObj.name);
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
                         searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
                     }
@@ -3760,7 +3801,7 @@ const useLogs = () => {
 
 
                     if(fieldObj.isInterestingField) {
-                      if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0) {
+                      if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0 && interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].includes(fieldObj.name)) {
                         searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
                           schemaMaps[schemaFieldsIndex].streams[0]
                         ] =
@@ -3775,6 +3816,7 @@ const useLogs = () => {
 
                   if(fieldObj.isInterestingField) {
                     interestingCommonSchemaMaps.push(fieldObj);
+                    interestingFieldsMapping["common"].push(fieldObj.name);
                     searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
                   }
@@ -3802,6 +3844,7 @@ const useLogs = () => {
 
                   if(fieldObj.isInterestingField) {
                     interestingSchemaMaps.push(fieldObj);
+                    interestingFieldsMapping[stream.name].push(fieldObj.name);
                     searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
                   }
@@ -3831,6 +3874,7 @@ const useLogs = () => {
               });
 
               interestingCommonSchemaMaps.unshift(commonSchemaMaps[0]);
+              interestingFieldsMapping["common"].unshift(commonSchemaMaps[0]);
 
               commonSchemaFields.unshift("dummylabel");
               // searchObj.data.stream.expandGroupRowsFieldCount["common"] = searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
@@ -3908,6 +3952,7 @@ const useLogs = () => {
 
                   if(fieldObj.isInterestingField) {
                     interestingSchemaMaps.push(fieldObj);
+                    interestingFieldsMapping[stream.name].push(fieldObj);
                   }
                   schemaFields.push(key);
                 }
@@ -3923,6 +3968,7 @@ const useLogs = () => {
           ...commonSchemaMaps,
           ...schemaMaps,
         ];
+        
 
         searchObj.data.stream.selectedInterestingStreamFields = [
           ...interestingCommonSchemaMaps,
