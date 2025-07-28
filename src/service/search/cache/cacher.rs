@@ -162,7 +162,7 @@ pub async fn check_cache(
             } else {
                 sql.time_range
             };
-        handle_histogram(origin_sql, q_time_range);
+        handle_histogram(origin_sql, q_time_range, interval);
         req.query.sql = origin_sql.clone();
         discard_interval = interval * 1000 * 1000; // in microseconds
     }
@@ -695,27 +695,44 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     Ok(true)
 }
 
-fn handle_histogram(origin_sql: &mut String, q_time_range: Option<(i64, i64)>) {
-    let caps = RE_HISTOGRAM.captures(origin_sql.as_str()).unwrap();
-    let attrs = caps
-        .get(1)
-        .unwrap()
-        .as_str()
-        .split(',')
-        .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
-        .collect::<Vec<&str>>();
-
-    let interval = match attrs.get(1) {
-        Some(v) => match v.parse::<u16>() {
-            Ok(v) => generate_histogram_interval(q_time_range, v),
-            Err(_) => v.to_string(),
-        },
-        None => generate_histogram_interval(q_time_range, 0),
+pub fn handle_histogram(
+    origin_sql: &mut String,
+    q_time_range: Option<(i64, i64)>,
+    histogram_interval: i64,
+) {
+    let caps = if let Some(caps) = RE_HISTOGRAM.captures(origin_sql.as_str()) {
+        caps
+    } else {
+        return;
     };
+
+    // 0th capture is the whole histogram(...) ,
+    // 1st capture is the comma-delimited list of args
+    // ideally there should be at least one arg, otherwise df with anyways complain,
+    // so we we return from here if capture[1] is None
+    let args = match caps.get(1) {
+        Some(v) => v
+            .as_str()
+            .split(',')
+            .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
+            .collect::<Vec<&str>>(),
+        None => return,
+    };
+
+    let interval = if histogram_interval > 0 {
+        format!("{histogram_interval} second")
+    } else {
+        args.get(1).map_or_else(
+            || generate_histogram_interval(q_time_range, 0),
+            |v| v.to_string(),
+        )
+    };
+
+    let field = args.get(0).unwrap_or(&"_timestamp");
 
     *origin_sql = origin_sql.replace(
         caps.get(0).unwrap().as_str(),
-        &format!("histogram(_timestamp,'{}')", interval),
+        &format!("histogram({field},'{interval}')"),
     );
 }
 

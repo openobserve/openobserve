@@ -8,6 +8,7 @@ use datafusion::{
 use hashbrown::HashSet;
 
 use crate::service::search::{
+    cache::cacher::handle_histogram,
     cluster::flight::{generate_context, register_table},
     request::Request,
     sql::Sql,
@@ -54,13 +55,16 @@ fn get_col_name(expr: &Expr) -> String {
 }
 
 #[inline]
-fn is_ts_hist_udf(e: &Expr) -> bool {
+fn is_ts_hist_udf(e: &Expr, ts_alias: &Option<String>) -> bool {
     // currently histogram errors with anything other than _timestamp, as aliasing does not work,
     // even with CTEs, so we can safely hardcode _timestamp here for now
     match e {
         Expr::ScalarFunction(f) => {
-            f.name() == "histogram"
-                && f.args.first().map(get_col_name) == Some("_timestamp".to_string())
+            let ts = match ts_alias {
+                Some(v) => v.to_string(),
+                None => "_timestamp".to_string(),
+            };
+            f.name() == "histogram" && f.args.first().map(get_col_name) == Some(ts)
         }
         _ => false,
     }
@@ -100,7 +104,9 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                             // without an alias, or using it in group by clause. In such case,
                             // it shows up as a scalar udf in projection exprs, so we need to handle
                             // and set the ts_hist_alias correctly
-                            if is_ts_hist_udf(expr) && self.ts_hist_alias.is_none() {
+                            if is_ts_hist_udf(expr, &self.timestamp_alias)
+                                && self.ts_hist_alias.is_none()
+                            {
                                 self.ts_hist_alias = Some(get_col_name(expr))
                             }
                         }
@@ -126,7 +132,9 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                                 self.timestamp_alias = Some(alias.name.clone());
                             }
 
-                            if self.ts_hist_alias.is_none() && is_ts_hist_udf(&alias.expr) {
+                            if self.ts_hist_alias.is_none()
+                                && is_ts_hist_udf(&alias.expr, &self.timestamp_alias)
+                            {
                                 self.ts_hist_alias = Some(alias.name.clone());
                             }
 
@@ -151,17 +159,18 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                     // aggregates, and if it is, set the alias to its name
                     // because no alias is allowed at group by level, we can be certain
                     // ts col is _timestamp, and is not aliased with some other name
+                    let ts = match self.timestamp_alias.as_ref() {
+                        Some(v) => v.as_str(),
+                        None => "_tiemstamp",
+                    };
                     match expr {
                         Expr::Column(col) => {
-                            if col.name() == "_timestamp" {
+                            if col.name() == ts {
                                 self.timestamp_alias = Some(col.name.clone())
                             }
                         }
-                        Expr::ScalarFunction(f) => {
-                            if f.name() == "histogram"
-                                && f.args.first().map(get_col_name)
-                                    == Some("_timestamp".to_string())
-                            {
+                        Expr::ScalarFunction(_) => {
+                            if is_ts_hist_udf(expr, &self.timestamp_alias) {
                                 self.ts_hist_alias = Some(get_col_name(expr));
                             }
                         }
@@ -176,10 +185,21 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
     }
 }
 
-pub async fn get_result_schema(sql: Sql) -> Result<ResultSchemaExtractor, anyhow::Error> {
+pub async fn get_result_schema(
+    mut sql: Sql,
+    is_streaming: bool,
+    use_cache: bool,
+) -> Result<ResultSchemaExtractor, anyhow::Error> {
     if sql.schemas.len() != 1 {
         return Ok(ResultSchemaExtractor::new());
     }
+
+    if !is_streaming && use_cache {
+        if let Some(interval) = sql.histogram_interval {
+            handle_histogram(&mut sql.sql, sql.time_range, interval);
+        }
+    }
+
     let sql_arc = Arc::new(sql.clone());
     let ctx = generate_context(&Request::default(), &sql_arc, 0).await?;
     register_table(&ctx, &sql_arc).await?;
@@ -193,14 +213,14 @@ pub async fn get_result_schema(sql: Sql) -> Result<ResultSchemaExtractor, anyhow
     // 1. we should give preference to histogram(_timestamp) when present
     // 2. then we should check if _timestamp is present
     // 3. if neither is in the projections, set it null (default)
-    if let Some(alias) = visitor.ts_hist_alias.as_ref()
-        && visitor.projections.contains(alias)
-    {
-        visitor.timeseries = Some(alias.clone());
-    } else if let Some(alias) = visitor.timestamp_alias.as_ref()
-        && visitor.projections.contains(alias)
-    {
-        visitor.timeseries = Some(alias.clone());
+    if let Some(alias) = visitor.ts_hist_alias.as_ref() {
+        if visitor.projections.contains(alias) {
+            visitor.timeseries = Some(alias.clone());
+        }
+    } else if let Some(alias) = visitor.timestamp_alias.as_ref() {
+        if visitor.projections.contains(alias) {
+            visitor.timeseries = Some(alias.clone());
+        }
     }
     Ok(visitor)
 }
@@ -237,9 +257,15 @@ mod tests {
     async fn get_sql(sql: &str) -> Sql {
         let schema = Schema::new(get_fields());
         infra::db_init().await.unwrap();
-        infra::schema::merge("parse_test", "default", StreamType::Logs, &schema, Some(1752660674351000))
-            .await
-            .unwrap();
+        infra::schema::merge(
+            "parse_test",
+            "default",
+            StreamType::Logs,
+            &schema,
+            Some(1752660674351000),
+        )
+        .await
+        .unwrap();
         let query = SearchQuery {
             sql: sql.to_string(),
             quick_mode: false,
@@ -253,7 +279,6 @@ mod tests {
             query_fn: "".to_string(),
             skip_wal: false,
             action_id: "".to_string(),
-            histogram_interval: 5,
         };
         Sql::new(&query, "parse_test", StreamType::Logs, None)
             .await
@@ -268,7 +293,7 @@ mod tests {
                     SELECT k8s_namespace_name, CAST(array_element(regexp_match(log, 'took: ([0-9]+) ms'), 1) AS INTEGER)
                     FROM FilteredLogs"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("_timestamp".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("_timestamp".to_string()));
@@ -285,7 +310,7 @@ mod tests {
         let sql = r#"select * FROM default 
         WHERE CAST(array_element(regexp_match(log, 'took: ([0-9]+) ms'), 1) AS INTEGER) > 500"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("_timestamp".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("_timestamp".to_string()));
@@ -311,7 +336,7 @@ mod tests {
     async fn test_basic_group_by() {
         let sql = r#"select histogram(_timestamp), k8s_namespace_name FROM "default" group by histogram(_timestamp),k8s_namespace_name"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(
             extractor.timeseries,
             Some("histogram(default._timestamp)".to_string())
@@ -332,7 +357,7 @@ mod tests {
 
         let sql = r#"select str_match(log,'test') from "default" group by str_match(log,'test')"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, None);
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, None);
@@ -354,7 +379,7 @@ mod tests {
             ORDER BY histogram(_timestamp) ASC"#;
 
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(
             extractor.timeseries,
             Some("histogram(default._timestamp)".to_string())
@@ -388,7 +413,7 @@ mod tests {
         k8s_namespace_name
         FROM "default" GROUP BY k8s_namespace_name,_timestamp"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("_timestamp".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("_timestamp".to_string()));
@@ -412,7 +437,7 @@ mod tests {
     async fn test_basic_alias() {
         let sql = r#"select k8s_namespace_name as namespace, _timestamp as ts FROM default"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("ts".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("ts".to_string()));
@@ -424,7 +449,7 @@ mod tests {
                     SELECT namespace as ns, _timestamp as tts
                     FROM FilteredLogs"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("tts".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("tts".to_string()));
@@ -437,7 +462,7 @@ mod tests {
         GROUP BY x_axis_1, x_axis_2 ORDER BY
         x_axis_1 ASC"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("x_axis_1".to_string()));
         assert_eq!(extractor.ts_hist_alias, Some("x_axis_1".to_string()));
         assert_eq!(extractor.timestamp_alias, None);
@@ -454,7 +479,7 @@ mod tests {
         FROM "default" t1 INNER JOIN "default" t2
         ON t1.k8s_namespace_name = t2.k8s_namespace_name"#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("_timestamp".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("_timestamp".to_string()));
@@ -492,7 +517,7 @@ mod tests {
             t1.k8s_pod_name
             "#;
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, None);
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, None);
@@ -524,7 +549,7 @@ mod tests {
                 GROUP BY d2.k8s_pod_name, d2.code"#;
 
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, None);
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, None);
@@ -543,11 +568,41 @@ mod tests {
         select h,c,k, ts as tts from test"#;
 
         let parsed = get_sql(sql).await;
-        let extractor = get_result_schema(parsed).await.unwrap();
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
         assert_eq!(extractor.timeseries, Some("h".to_string()));
         assert_eq!(extractor.ts_hist_alias, Some("h".to_string()));
         assert_eq!(extractor.timestamp_alias, Some("tts".to_string()));
         assert_eq!(extractor.group_by, hashset!["tts", "k"]);
         assert_eq!(extractor.projections, hashset!["h", "k", "c", "tts"]);
+
+        let sql = r#"WITH pulled_jobs_logs AS (
+                SELECT 
+                    _timestamp AS "log_time",
+                    k8s_node_name AS "node_name",
+                    CAST(array_element(regexp_match(log, 'Pulled ([0-9]+) jobs'), 1) AS INTEGER) AS "pulled_jobs"
+                FROM default
+                WHERE CAST(array_element(regexp_match(log, 'Pulled ([0-9]+) jobs'), 1) AS INTEGER) > 3
+                )
+                SELECT
+                histogram(log_time) AS "time_bucket",
+                COUNT(log_time) AS "logs_count",
+                node_name AS "node_name",
+                pulled_jobs AS "pulled_jobs"
+                FROM pulled_jobs_logs
+                GROUP BY time_bucket, node_name, pulled_jobs
+                ORDER BY time_bucket ASC"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.timeseries, Some("time_bucket".to_string()));
+        assert_eq!(extractor.ts_hist_alias, Some("time_bucket".to_string()));
+        assert_eq!(extractor.timestamp_alias, Some("log_time".to_string()));
+        assert_eq!(
+            extractor.group_by,
+            hashset!["time_bucket", "node_name", "pulled_jobs"]
+        );
+        assert_eq!(
+            extractor.projections,
+            hashset!["time_bucket", "logs_count", "node_name", "pulled_jobs"]
+        );
     }
 }

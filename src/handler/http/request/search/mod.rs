@@ -21,9 +21,7 @@ use chrono::Utc;
 use config::{
     DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        search::{
-            ResultSchemaResponse, SearchEventType, SearchHistoryHitResponse,
-        },
+        search::{ResultSchemaResponse, SearchEventType, SearchHistoryHitResponse},
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -1619,25 +1617,6 @@ pub async fn result_schema(
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
 
-    #[cfg(feature = "cloud")]
-    {
-        match is_org_in_free_trial_period(&org_id).await {
-            Ok(false) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    StatusCode::FORBIDDEN,
-                    format!("org {org_id} has expired its trial period"),
-                )));
-            }
-            Err(e) => {
-                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                    StatusCode::FORBIDDEN,
-                    e.to_string(),
-                )));
-            }
-            _ => {}
-        }
-    }
-
     let user_id = in_req
         .headers()
         .get("user_id")
@@ -1648,13 +1627,17 @@ pub async fn result_schema(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
+    let use_cache = get_use_cache_from_request(&query);
+    let is_streaming = {
+        match query.get("is_streaming") {
+            None => false,
+            Some(v) => v.to_lowercase().as_str().parse::<bool>().unwrap_or(false),
+        }
+    };
+
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
-
-    if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
-        req.query.sql = sql;
     };
 
     // set search event type
@@ -1766,18 +1749,18 @@ pub async fn result_schema(
             Err(e) => {
                 log::error!("Error parsing sql: {e}");
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    actix_web::http::StatusCode::BAD_REQUEST,
-                    e,
+                    actix_web::http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
                 )));
             }
         };
 
-    let res_schema = match get_result_schema(sql).await {
+    let res_schema = match get_result_schema(sql, is_streaming, use_cache).await {
         Ok(v) => v,
         Err(e) => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                actix_web::http::StatusCode::BAD_REQUEST,
-                e,
+                actix_web::http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
             )));
         }
     };
