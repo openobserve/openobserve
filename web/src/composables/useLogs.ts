@@ -3500,14 +3500,14 @@ const useLogs = () => {
         searchObj.data.datetime.queryRangeRestrictionMsg = "";
         searchObj.data.datetime.queryRangeRestrictionInHour = -1;
 
-        const interestingFieldsMapping = {
+        const interestingFieldsMapping: {[key: string]: string[]} = {
           "common": [],
           ...Object.fromEntries(
             selectedStreamValues.sort().map((stream: any) => [stream, []]),
           ),
         }
 
-        const interestingFieldsMap = {}
+        const interestingFieldsMap: {[key: string]: boolean} = {}
 
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
