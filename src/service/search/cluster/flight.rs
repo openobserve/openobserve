@@ -877,7 +877,7 @@ pub(crate) async fn partition_file_by_hash(
             Some(node_name) => match node_idx.get(&node_name) {
                 Some(idx) => *idx,
                 None => {
-                    log::warn!("partition_file_by_hash: {node_name} not found in node_idx",);
+                    log::warn!("partition_file_by_hash: {node_name} not found in node_idx");
                     0
                 }
             },
