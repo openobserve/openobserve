@@ -38,7 +38,7 @@ const alerts = {
     folder_id?: string,
     query?: string
   ) => {
-    let url = `/api/v2/${org_identifier}/alerts?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`;
+    let url = `/api/v2/${org_identifier}/alerts?sort_by=${sort_by}&desc=${desc}&name=${name}`;
     if(folder_id){
       url += `&folder=${folder_id}`;
     }

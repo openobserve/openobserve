@@ -28,7 +28,7 @@ use super::{
 use crate::{
     db::{
         self, IndexStatement,
-        mysql::{CLIENT, CLIENT_RO, create_index},
+        mysql::{CLIENT, CLIENT_DDL, CLIENT_RO, create_index},
     },
     errors::{DbError, Error, Result},
 };
@@ -51,7 +51,7 @@ impl Default for MySqlScheduler {
 impl super::Scheduler for MySqlScheduler {
     /// Creates the Scheduled Jobs table
     async fn create_table(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_DDL.clone();
         DB_QUERY_NUMS
             .with_label_values(&["create", "scheduled_jobs", ""])
             .inc();
@@ -759,7 +759,7 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs;"#,
 
 async fn add_data_column() -> Result<()> {
     log::info!("[MYSQL] Adding data column to scheduled_jobs table");
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     DB_QUERY_NUMS
         .with_label_values(&["alter", "scheduled_jobs", ""])
         .inc();

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component" id="searchBarComponent">
-    <div class="row q-my-xs">
+    <div class="row q-py-xs">
       <div class="float-right col flex items-center">
         <syntax-guide
           class="q-mr-sm"
@@ -346,8 +346,6 @@ export default defineComponent({
           page: "Search Logs",
         });
       }
-
-      if (value.valueType === "relative") emit("searchdata");
     };
 
     const updateQuery = () => {

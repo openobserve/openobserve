@@ -18,7 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="trace-details full-width" :style="backgroundStyle">
     <div
       class="row q-px-sm"
-      v-if="traceTree.length && !searchObj.data.traceDetails.loading"
+      v-if="
+        traceTree.length &&
+        !(
+          searchObj.data.traceDetails.isLoadingTraceDetails ||
+          searchObj.data.traceDetails.isLoadingTraceMeta
+        )
+      "
     >
       <div class="full-width flex items-center toolbar flex justify-between">
         <div class="flex items-center">
@@ -341,7 +347,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      v-else-if="searchObj.data.traceDetails.loading"
+      v-else-if="
+        searchObj.data.traceDetails.isLoadingTraceDetails ||
+        searchObj.data.traceDetails.isLoadingTraceMeta
+      "
       class="flex column items-center justify-center"
       :style="{ height: '100%' }"
     >
@@ -567,7 +576,8 @@ export default defineComponent({
         trace_end_time: 0,
       };
       searchObj.data.traceDetails.spanList = [];
-      searchObj.data.traceDetails.loading = true;
+      searchObj.data.traceDetails.isLoadingTraceDetails = false;
+      searchObj.data.traceDetails.isLoadingTraceMeta = false;
     };
 
     const setupTraceDetails = async () => {
@@ -626,40 +636,58 @@ export default defineComponent({
     });
 
     const getTraceMeta = () => {
-      searchObj.loading = true;
+      try {
+        searchObj.data.traceDetails.isLoadingTraceMeta = true;
 
-      let filter = (router.currentRoute.value.query.filter as string) || "";
+        let filter = (router.currentRoute.value.query.filter as string) || "";
 
-      if (filter?.length)
-        filter += ` and trace_id='${router.currentRoute.value.query.trace_id}'`;
-      else filter += `trace_id='${router.currentRoute.value.query.trace_id}'`;
+        if (filter?.length)
+          filter += ` and trace_id='${router.currentRoute.value.query.trace_id}'`;
+        else filter += `trace_id='${router.currentRoute.value.query.trace_id}'`;
 
-      searchService
-        .get_traces({
-          org_identifier: router.currentRoute.value.query
-            .org_identifier as string,
-          start_time: Number(router.currentRoute.value.query.from),
-          end_time: Number(router.currentRoute.value.query.to),
-          filter: filter || "",
-          size: 1,
-          from: 0,
-          stream_name: router.currentRoute.value.query.stream as string,
-        })
-        .then(async (res: any) => {
-          const trace = getTracesMetaData(res.data.hits)[0];
-          if (!trace) {
+        const streamName =
+          (router.currentRoute.value.query.stream as string) ||
+          searchObj.data.stream.selectedStream.value;
+
+        const orgIdentifier =
+          (router.currentRoute.value?.query?.org_identifier as string) ||
+          store.state.selectedOrganization?.identifier;
+
+        searchService
+          .get_traces({
+            org_identifier: orgIdentifier,
+            start_time: Number(router.currentRoute.value.query.from),
+            end_time: Number(router.currentRoute.value.query.to),
+            filter: filter || "",
+            size: 1,
+            from: 0,
+            stream_name: streamName,
+          })
+          .then(async (res: any) => {
+            const trace = getTracesMetaData(res.data.hits)[0];
+            if (!trace) {
+              showTraceDetailsError();
+              return;
+            }
+            searchObj.data.traceDetails.selectedTrace = trace;
+            getTraceDetails({
+              stream: streamName,
+              trace_id: trace.trace_id,
+              from: Number(router.currentRoute.value.query.from),
+              to: Number(router.currentRoute.value.query.to),
+            });
+          })
+          .catch(() => {
             showTraceDetailsError();
-            return;
-          }
-          searchObj.data.traceDetails.selectedTrace = trace;
-          getTraceDetails();
-        })
-        .catch(() => {
-          showTraceDetailsError();
-        })
-        .finally(() => {
-          searchObj.loading = false;
-        });
+          })
+          .finally(() => {
+            searchObj.data.traceDetails.isLoadingTraceMeta = false;
+          });
+      } catch (error) {
+        console.error("Error fetching trace meta:", error);
+        searchObj.data.traceDetails.isLoadingTraceMeta = false;
+        showTraceDetailsError();
+      }
     };
 
     const getDefaultRequest = () => {
@@ -679,14 +707,8 @@ export default defineComponent({
       const req = getDefaultRequest();
       req.query.from = 0;
       req.query.size = 2500;
-      req.query.start_time =
-        Math.ceil(
-          Number(searchObj.data.traceDetails.selectedTrace?.trace_start_time),
-        ) - 30000000;
-      req.query.end_time =
-        Math.ceil(
-          Number(searchObj.data.traceDetails.selectedTrace?.trace_end_time),
-        ) + 30000000;
+      req.query.start_time = trace.from;
+      req.query.end_time = trace.to;
 
       req.query.sql = b64EncodeUnicode(
         `SELECT * FROM ${trace.stream} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`,
@@ -695,33 +717,38 @@ export default defineComponent({
       return req;
     };
 
-    const getTraceDetails = async () => {
-      searchObj.data.traceDetails.loading = true;
-      searchObj.data.traceDetails.spanList = [];
-      const req = buildTraceSearchQuery(router.currentRoute.value.query);
+    const getTraceDetails = async (data: any) => {
+      try {
+        searchObj.data.traceDetails.isLoadingTraceDetails = true;
+        searchObj.data.traceDetails.spanList = [];
+        const req = buildTraceSearchQuery(data);
 
-      searchService
-        .search(
-          {
-            org_identifier: router.currentRoute.value.query
-              ?.org_identifier as string,
-            query: req,
-            page_type: "traces",
-          },
-          "ui",
-        )
-        .then((res: any) => {
-          if (!res.data?.hits?.length) {
-            showTraceDetailsError();
-            return;
-          }
-          searchObj.data.traceDetails.spanList = res.data?.hits || [];
-          console.log(res.data?.hits);
-          buildTracesTree();
-        })
-        .finally(() => {
-          searchObj.data.traceDetails.loading = false;
-        });
+        searchService
+          .search(
+            {
+              org_identifier: router.currentRoute.value.query
+                ?.org_identifier as string,
+              query: req,
+              page_type: "traces",
+            },
+            "ui",
+          )
+          .then((res: any) => {
+            if (!res.data?.hits?.length) {
+              showTraceDetailsError();
+              return;
+            }
+            searchObj.data.traceDetails.spanList = res.data?.hits || [];
+            buildTracesTree();
+          })
+          .finally(() => {
+            searchObj.data.traceDetails.isLoadingTraceDetails = false;
+          });
+      } catch (error) {
+        console.error("Error fetching trace details:", error);
+        searchObj.data.traceDetails.isLoadingTraceDetails = false;
+        showTraceDetailsError();
+      }
     };
 
     const getTracesMetaData = (traces: any[]) => {

@@ -567,13 +567,12 @@ pub fn calculate_deltas_v1(
 }
 
 pub async fn cache_results_to_disk(
-    trace_id: &str,
     file_path: &str,
     file_name: &str,
     data: String,
 ) -> std::io::Result<()> {
     let file = format!("results/{}/{}", file_path, file_name);
-    match disk::set(trace_id, &file, Bytes::from(data)).await {
+    match disk::set(&file, Bytes::from(data)).await {
         Ok(_) => (),
         Err(e) => {
             log::error!("Error caching results to disk: {:?}", e);
@@ -644,7 +643,7 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
     let mut remove_files: Vec<String> = vec![];
     for file in files {
-        match disk::remove("", file.strip_prefix(&prefix).unwrap()).await {
+        match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
             Err(e) => {
                 log::error!("Error deleting cache: {:?}", e);

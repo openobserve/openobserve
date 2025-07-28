@@ -41,8 +41,8 @@ pub struct PuffinDirReader {
 }
 
 impl PuffinDirReader {
-    pub async fn from_path(source: object_store::ObjectMeta) -> io::Result<Self> {
-        let mut source = PuffinBytesReader::new(source);
+    pub async fn from_path(account: String, source: object_store::ObjectMeta) -> io::Result<Self> {
+        let mut source = PuffinBytesReader::new(account, source);
         let Some(metadata) = source.get_metadata().await.map_err(|e| {
             io::Error::new(
                 io::ErrorKind::Other,

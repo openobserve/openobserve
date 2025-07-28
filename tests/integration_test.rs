@@ -42,7 +42,8 @@ mod tests {
                 router::*,
             },
         },
-        service::{alerts::scheduler::handlers::handle_triggers, search::SEARCH_SERVER},
+        migration,
+        service::{self, alerts::scheduler::handlers::handle_triggers, search::SEARCH_SERVER},
     };
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
@@ -128,6 +129,7 @@ mod tests {
         // init config
         config::init().await.unwrap();
         // init infra
+        migration::init_db().await.unwrap();
         infra::init().await.unwrap();
         // db migration steps, since it's separated out
         infra::table::migrate().await.unwrap();

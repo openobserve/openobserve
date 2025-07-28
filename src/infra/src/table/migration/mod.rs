@@ -46,7 +46,7 @@ mod m20250125_172300_delete_metas_templates;
 mod m20250213_000001_add_dashboard_updated_at;
 mod m20250217_115548_ratelimit_table;
 mod m20250320_000001_remove_alert_name_unique_constraint;
-
+mod m20250422_000001_add_alert_align_time;
 pub struct Migrator;
 
 #[async_trait::async_trait]
@@ -83,6 +83,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250213_000001_add_dashboard_updated_at::Migration),
             Box::new(m20250217_115548_ratelimit_table::Migration),
             Box::new(m20250320_000001_remove_alert_name_unique_constraint::Migration),
+            Box::new(m20250422_000001_add_alert_align_time::Migration),
         ]
     }
 }

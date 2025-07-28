@@ -64,6 +64,88 @@ test.describe("dashboard multi y axis testcases", () => {
 
     await dateTimeHelper.setRelativeTimeRange("6-w");
 
+    await dashboardPageActions.applyDashboardBtn();
+
+    await dashboardPageActions.waitForChartToRender();
+
+    await page
+      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
+      .click();
+
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", kubernetes_labels_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC',
+        })
+        .first()
+    ).toBeVisible();
+
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    await dashboardPageActions.addPanelName(randomDashboardName);
+
+    await dashboardPageActions.savePanel();
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+
+    await deleteDashboard(page, randomDashboardName);
+  });
+
+  test("should correctly display and update multiple Y-axes in edit panel.", async ({
+    page,
+  }) => {
+    const chartTypeSelector = new ChartTypeSelector(page);
+    const dashboardPage = new DashboardListPage(page);
+    const dashboardCreate = new DashboardCreate(page);
+    const dateTimeHelper = new DateTimeHelper(page);
+    const dashboardPageActions = new DashboardactionPage(page);
+
+    await dashboardPage.menuItem("dashboards-item");
+
+    await waitForDashboardPage(page);
+
+    await dashboardCreate.createDashboard(randomDashboardName);
+
+    await dashboardCreate.addPanel();
+
+    await chartTypeSelector.selectChartType("stacked");
+
+    await chartTypeSelector.selectStreamType("logs");
+
+    await chartTypeSelector.selectStream("e2e_automate");
+
+    await chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
+
+    await chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
+
+    await chartTypeSelector.searchAndAddField("kubernetes_labels_name", "b");
+
+    await dateTimeHelper.setRelativeTimeRange("6-w");
+
+    await dashboardPageActions.applyDashboardBtn();
+
+    await dashboardPageActions.waitForChartToRender();
+
+    await page
+      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
+      .click();
+
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", kubernetes_labels_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC',
+        })
+        .first()
+    ).toBeVisible();
+
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    await dashboardPageActions.addPanelName(randomDashboardName);
+
+    await dashboardPageActions.savePanel();
+
+    await dashboardPageActions.selectPanelAction(randomDashboardName, "Edit");
+
     await dashboardPageActions.waitForChartToRender();
 
     await page

@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:trigger="streamRoute.trigger_condition"
             v-model:sql="streamRoute.query_condition.sql"
             v-model:promql="streamRoute.query_condition.promql"
+            v-model:delay="streamRoute.delay"
             v-model:promql_condition="
               streamRoute.query_condition.promql_condition
             "
@@ -56,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:fullscreen="updateFullscreenMode"
             @update:stream_type="updateStreamType"
             @expandLog="toggleExpandLog"
+            @update:delay="updateDelay"
             class="q-mt-sm"
           />
         </div>
@@ -127,6 +129,7 @@ interface StreamRoute {
     cron: string;
     timezone: any;
   };
+  delay: number;
   context_attributes: any;
   description: string;
   enabled: boolean;
@@ -240,6 +243,7 @@ const getDefaultStreamRoute: any = () => {
       frequency: frequency <= 15 ? 15 : frequency,
       timezone: "UTC",
     },
+    delay: 0,
     context_attributes: [
       {
         key: "",
@@ -407,6 +411,7 @@ const saveQueryData = async () => {
       silence: 0,
       timezone: formData.trigger_condition.timezone,
     },
+    delay: formData.delay,
   };
 
   if (formData.trigger_condition.frequency_type === "cron") {
@@ -535,6 +540,10 @@ const updateQueryType = (val: string) => {
 
 const toggleExpandLog = (index: number) => {
   expandedLogs.value = [];
+};
+
+const updateDelay = (val: any) => {
+  streamRoute.value.delay = parseInt(val);
 };
 </script>
 

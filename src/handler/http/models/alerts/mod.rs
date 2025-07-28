@@ -17,7 +17,9 @@ pub mod requests;
 pub mod responses;
 
 use config::meta::{
-    alerts as meta_alerts, search as meta_search, stream as meta_stream, triggers::Trigger,
+    alerts::{self as meta_alerts, default_align_time},
+    search as meta_search, stream as meta_stream,
+    triggers::Trigger,
 };
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
@@ -126,6 +128,9 @@ pub struct TriggerCondition {
     #[serde(rename = "tolerance_in_secs")]
     #[serde(default)]
     pub tolerance_seconds: Option<i64>,
+
+    #[serde(default = "default_align_time")]
+    pub align_time: bool,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -315,6 +320,7 @@ impl From<meta_alerts::TriggerCondition> for TriggerCondition {
             silence_minutes: value.silence,
             timezone: value.timezone,
             tolerance_seconds: value.tolerance_in_secs,
+            align_time: value.align_time,
         }
     }
 }
@@ -479,6 +485,7 @@ impl From<Alert> for meta_alerts::alert::Alert {
 impl From<TriggerCondition> for meta_alerts::TriggerCondition {
     fn from(value: TriggerCondition) -> Self {
         Self {
+            align_time: value.align_time,
             period: value.period_minutes,
             operator: value.operator.into(),
             threshold: value.threshold_count,

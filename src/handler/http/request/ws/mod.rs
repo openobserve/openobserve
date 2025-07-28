@@ -24,8 +24,7 @@ use tokio::sync::RwLock;
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::extract_auth_expiry_and_user_id;
 use crate::{
-    handler::http::request::ws_v2::session::WsSession,
-    service::websocket_events::sessions_cache_utils,
+    handler::http::request::ws::session::WsSession, service::websocket_events::sessions_cache_utils,
 };
 
 #[get("{org_id}/ws/v2/{router_id}")]

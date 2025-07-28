@@ -397,6 +397,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
                       </span>
+                      <span
+                        class="text-red"
+                        v-else-if="
+                          typeof errorMessage === 'object' &&
+                          errorMessage.field == 'org_id'
+                        "
+                      >
+                        {{ errorMessage.message }}
+                        <div style="width: 300px">
+                          <q-select
+                            data-test="alert-import-org-id-input"
+                            v-model="userSelectedOrgId[index]"
+                            :options="organizationDataList"
+                            :label="'Organization Id'"
+                            :popup-content-style="{
+                              textTransform: 'lowercase',
+                            }"
+                            color="input-border"
+                            bg-color="input-bg"
+                            class="q-py-sm showLabelOnTop no-case"
+                            filled
+                            stack-label
+                            dense
+                            use-input
+                            hide-selected
+                            fill-input
+                            :input-debounce="400"
+                            @update:model-value="updateOrgId(userSelectedOrgId[index].value, index)"
+                            behavior="menu"
+                          >
+                          </q-select>
+                        </div>
+                      </span>
 
                       <span v-else>{{ errorMessage }}</span>
                     </div>
@@ -525,6 +558,17 @@ export default defineComponent({
     const activeFolderId = ref(router.currentRoute.value.query.folder || router.currentRoute.value.query?.folderId);
     const activeFolderAlerts = ref<any>([]);
     const isAlertImporting = ref(false);
+    const userSelectedOrgId = ref<any[]>([]);
+    const organizationDataList = computed(() => {
+        return store.state.organizations.map((org: any) => {
+          return {
+            label: org.identifier,
+            value: org.identifier,
+            disable: !org.identifier || org.identifier !== store.state.selectedOrganization.identifier
+          };
+        });
+      });
+
     const getFormattedDestinations: any = computed(() => {
       return props.destinations.map((destination: any) => {
         return destination.name;
@@ -768,7 +812,10 @@ export default defineComponent({
         input.org_id != store.state.selectedOrganization.identifier
       ) {
         alertErrors.push(
-          `Alert - ${index}: Organization Id is mandatory, should exist in organization list and should be equal to ${store.state.selectedOrganization.identifier}.`,
+          {
+            message: `Alert - ${index}: Organization Id is mandatory, should exist in organization list and should be equal to ${store.state.selectedOrganization.identifier}.`,
+            field: "org_id",
+          }
         );
       }
 
@@ -1174,6 +1221,10 @@ export default defineComponent({
         activeFolderAlerts.value = store.state.organizationData.allAlertsListByNames[folderId];
       
     }
+    const updateOrgId = (orgId: string, index: number) => {
+      jsonArrayOfObj.value[index].org_id = orgId;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    }
 
     return {
       t,
@@ -1222,6 +1273,9 @@ export default defineComponent({
       activeFolderAlerts,
       store,
       isAlertImporting,
+      organizationDataList,
+      userSelectedOrgId,
+      updateOrgId,
     };
   },
   components: {

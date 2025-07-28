@@ -29,11 +29,7 @@ use config::{
         stream::{FileKey, QueryPartitionStrategy, StreamType},
     },
     metrics,
-    utils::{
-        inverted_index::split_token,
-        json,
-        time::{BASE_TIME, now_micros},
-    },
+    utils::{inverted_index::split_token, json, time::now_micros},
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
@@ -54,23 +50,26 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::infra::cluster as infra_cluster,
-    service::search::{
-        DATAFUSION_RUNTIME, SearchResult,
-        datafusion::{
-            distributed_plan::{
-                EmptyExecVisitor,
-                remote_scan::RemoteScanExec,
-                rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+    service::{
+        db::enrichment_table,
+        search::{
+            DATAFUSION_RUNTIME, SearchResult,
+            datafusion::{
+                distributed_plan::{
+                    EmptyExecVisitor,
+                    remote_scan::RemoteScanExec,
+                    rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+                },
+                exec::{prepare_datafusion_context, register_udf},
+                optimizer::{generate_analyzer_rules, generate_optimizer_rules},
+                table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
             },
-            exec::{prepare_datafusion_context, register_udf},
-            optimizer::{generate_analyzer_rules, generate_optimizer_rules},
-            table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
+            generate_filter_from_equal_items,
+            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+            request::Request,
+            sql::Sql,
+            utils::{AsyncDefer, ScanStatsVisitor},
         },
-        generate_filter_from_equal_items,
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        request::Request,
-        sql::Sql,
-        utils::{AsyncDefer, ScanStatsVisitor},
     },
 };
 
@@ -107,6 +106,7 @@ pub async fn search(
 
     // 1. get file id list
     let file_id_list = get_file_id_lists(
+        trace_id,
         &sql.org_id,
         sql.stream_type,
         &sql.stream_names,
@@ -873,6 +873,7 @@ pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {
 
 #[tracing::instrument(name = "service:search:cluster:flight:get_file_id_lists", skip_all)]
 pub async fn get_file_id_lists(
+    trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     stream_names: &[TableReference],
@@ -886,14 +887,15 @@ pub async fn get_file_id_lists(
         // if stream is enrich, rewrite the time_range
         if let Some(schema) = stream.schema() {
             if schema == "enrich" || schema == "enrichment_tables" {
-                let start = BASE_TIME.timestamp_micros();
+                let start = enrichment_table::get_start_time(org_id, &name).await;
                 let end = now_micros();
                 time_range = Some((start, end));
             }
         }
         // get file list
         let file_id_list =
-            crate::service::file_list::query_ids(org_id, stream_type, &name, time_range).await?;
+            crate::service::file_list::query_ids(trace_id, org_id, stream_type, &name, time_range)
+                .await?;
         file_lists.insert(stream.clone(), file_id_list);
     }
     Ok(file_lists)

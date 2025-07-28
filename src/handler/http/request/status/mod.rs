@@ -28,7 +28,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, get_instance_id,
     meta::{cluster::NodeStatus, function::ZoFunction},
-    utils::{json, schema_ext::SchemaExt},
+    utils::{base64, json, schema_ext::SchemaExt},
 };
 use hashbrown::HashMap;
 use infra::{
@@ -46,10 +46,7 @@ use {
         validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
     },
     crate::service::self_reporting::audit,
-    config::{
-        ider,
-        utils::{base64, time::now_micros},
-    },
+    config::{ider, utils::time::now_micros},
     o2_dex::{
         config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
         service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
@@ -130,6 +127,7 @@ struct ConfigResponse<'a> {
     query_default_limit: i64,
     max_dashboard_series: usize,
     actions_enabled: bool,
+    histogram_enabled: bool,
 }
 
 #[derive(Serialize)]
@@ -321,6 +319,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
         actions_enabled,
+        histogram_enabled: cfg.limit.histogram_enabled,
     }))
 }
 
@@ -366,9 +365,6 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         "FILE_LIST",
         json::json!({"num":file_list_num,"max_id": file_list_max_id}),
     );
-
-    let tmpfs_mem_size = cache::tmpfs::stats().unwrap();
-    stats.insert("TMPFS", json::json!({ "mem_size": tmpfs_mem_size }));
 
     let last_file_list_offset = db::compact::file_list::get_offset().await.unwrap();
     stats.insert(
@@ -573,6 +569,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             })
             .unwrap();
             let cfg = get_config();
+            let tokens = base64::encode(&tokens);
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
@@ -652,6 +649,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
             })
             .unwrap();
             let conf = get_config();
+            let tokens = base64::encode(&tokens);
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
@@ -671,6 +669,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
         Err(_) => {
             let conf = get_config();
             let tokens = json::to_string(&AuthTokens::default()).unwrap();
+            let tokens = base64::encode(&tokens);
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
                 cookie::time::OffsetDateTime::now_utc()
@@ -699,6 +698,7 @@ fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
     conf: &Arc<Config>,
 ) -> Cookie<'a> {
     let tokens = json::to_string(token_struct).unwrap();
+    let tokens = base64::encode(&tokens);
     let mut auth_cookie = Cookie::new(cookie_name, tokens);
     auth_cookie.set_expires(
         cookie::time::OffsetDateTime::now_utc()
@@ -727,7 +727,9 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
     let user_email = get_user_email_from_auth_str(&auth_str).await;
 
     if let Some(cookie) = req.cookie("auth_tokens") {
-        let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
+        let val = config::utils::base64::decode_raw(cookie.value()).unwrap_or_default();
+        let auth_tokens: AuthTokens =
+            json::from_str(std::str::from_utf8(&val).unwrap_or_default()).unwrap_or_default();
         let access_token = auth_tokens.access_token;
 
         if access_token.starts_with("session") {

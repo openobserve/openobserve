@@ -62,7 +62,7 @@ pub(crate) async fn write_parquet_index_to_disk(
     stream_type: StreamType,
     stream_name: &str,
     file_name: &str,
-) -> Result<Vec<(String, FileMeta)>, anyhow::Error> {
+) -> Result<Vec<(String, String, FileMeta)>, anyhow::Error> {
     let start = std::time::Instant::now();
     let schema = if let Some(first_batch) = batches.first() {
         first_batch.schema()
@@ -127,9 +127,15 @@ pub(crate) async fn write_parquet_index_to_disk(
             &prefix,
         );
 
-        let store_file_name = new_idx_file_name.clone();
         let buf_size = buf_parquet.len();
-        match storage::put(&store_file_name, bytes::Bytes::from(buf_parquet)).await {
+        let account = storage::get_account(&new_idx_file_name).unwrap_or_default();
+        match storage::put(
+            &account,
+            &new_idx_file_name,
+            bytes::Bytes::from(buf_parquet),
+        )
+        .await
+        {
             Ok(_) => {
                 log::info!(
                     "[JOB:IDX] index file upload successfully: {}, size: {}, took: {} ms",
@@ -137,7 +143,7 @@ pub(crate) async fn write_parquet_index_to_disk(
                     buf_size,
                     start.elapsed().as_millis()
                 );
-                ret.push((new_idx_file_name, file_meta));
+                ret.push((account, new_idx_file_name, file_meta));
             }
             Err(err) => {
                 log::error!("[JOB] index file upload error: {:?}", err);

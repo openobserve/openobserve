@@ -24,6 +24,8 @@ use object_store::{
     PutOptions, PutPayload, PutResult, Result, path::Path,
 };
 
+use super::format_location;
+
 /// File system for local wal
 #[derive(Debug, Default)]
 pub struct FS {}
@@ -32,14 +34,6 @@ impl FS {
     /// Create new local wal storage.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    fn format_location(&self, location: &Path) -> Path {
-        let mut path = location.to_string();
-        if let Some(p) = path.find("/$$/") {
-            path = path[p + 4..].to_string();
-        }
-        path.into()
     }
 }
 
@@ -52,23 +46,23 @@ impl std::fmt::Display for FS {
 #[async_trait]
 impl ObjectStore for FS {
     async fn get(&self, location: &Path) -> Result<GetResult> {
-        let location = &self.format_location(location);
-        storage::LOCAL_WAL.get(location).await
+        let (_, location) = format_location(location);
+        storage::wal::get(&location).await
     }
 
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
-        let location = &self.format_location(location);
-        storage::LOCAL_WAL.get_opts(location, options).await
+        let (_, location) = format_location(location);
+        storage::wal::get_opts(&location, options).await
     }
 
     async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
-        let location = &self.format_location(location);
-        storage::LOCAL_WAL.get_range(location, range).await
+        let (_, location) = format_location(location);
+        storage::wal::get_range(&location, range).await
     }
 
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
-        let location = &self.format_location(location);
-        storage::LOCAL_WAL.head(location).await
+        let (_, location) = format_location(location);
+        storage::wal::head(&location).await
     }
 
     #[tracing::instrument(name = "datafusion::storage::local_wal::list", skip_all)]

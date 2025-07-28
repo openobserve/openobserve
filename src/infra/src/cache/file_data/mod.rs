@@ -26,8 +26,8 @@ use config::utils::time::get_ymdh_from_micros;
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 
+const DOWNLOAD_RETRY_TIMES: usize = 3;
 const INITIAL_CACHE_SIZE: usize = 128;
-pub const TRACE_ID_FOR_CACHE_LATEST_FILE: &str = "cache_latest_file";
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum CacheType {
@@ -177,37 +177,86 @@ pub async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn download(trace_id: &str, file: &str) -> Result<usize, anyhow::Error> {
+pub async fn download(
+    account: &str,
+    file: &str,
+    size: Option<usize>,
+) -> Result<usize, anyhow::Error> {
     let cfg = config::get_config();
     if cfg.memory_cache.enabled {
-        memory::download(trace_id, file).await
+        memory::download(account, file, size).await
     } else if cfg.disk_cache.enabled {
-        disk::download(trace_id, file).await
+        disk::download(account, file, size).await
     } else {
         Ok(0)
     }
 }
 
+async fn download_from_storage(
+    account: &str,
+    file: &str,
+    size: Option<usize>,
+) -> Result<(usize, bytes::Bytes), anyhow::Error> {
+    let mut data_len = 0;
+    let mut data_bytes = bytes::Bytes::new();
+    for i in 0..DOWNLOAD_RETRY_TIMES {
+        let data = crate::storage::get_bytes(account, file).await?;
+        if data.is_empty() {
+            return Err(anyhow::anyhow!("file {} data size is zero", file));
+        }
+        data_len = data.len();
+        data_bytes = data;
+        match size {
+            None => break,
+            Some(size) => {
+                if data_len == size {
+                    break;
+                } else {
+                    let msg = if i == DOWNLOAD_RETRY_TIMES - 1 {
+                        format!("after {} retries", DOWNLOAD_RETRY_TIMES)
+                    } else {
+                        "will retry".to_string()
+                    };
+                    log::warn!(
+                        "download file {} found size mismatch, expected: {}, actual: {}, {}",
+                        file,
+                        size,
+                        data_len,
+                        msg
+                    );
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
+            }
+        }
+    }
+    Ok((data_len, data_bytes))
+}
+
 /// set the data to the cache
 ///
 /// store the data to the memory cache or disk cache
-pub async fn set(trace_id: &str, key: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
+pub async fn set(key: &str, data: bytes::Bytes) -> Result<(), anyhow::Error> {
     let cfg = config::get_config();
     // set the data to the memory cache
     if cfg.memory_cache.enabled {
-        memory::set(trace_id, key, data).await
+        memory::set(key, data).await
     } else if cfg.disk_cache.enabled {
-        disk::set(trace_id, key, data).await
+        disk::set(key, data).await
     } else {
         Ok(())
     }
 }
 
-pub async fn get(file: &str, range: Option<Range<usize>>) -> object_store::Result<bytes::Bytes> {
-    get_opts(file, range, true).await
+pub async fn get(
+    account: &str,
+    file: &str,
+    range: Option<Range<usize>>,
+) -> object_store::Result<bytes::Bytes> {
+    get_opts(account, file, range, true).await
 }
 
 pub async fn get_opts(
+    account: &str,
     file: &str,
     range: Option<Range<usize>>,
     remote: bool,
@@ -228,8 +277,8 @@ pub async fn get_opts(
     // get from storage
     if remote {
         return match range {
-            Some(r) => crate::storage::get_range(file, r).await,
-            None => crate::storage::get(file).await,
+            Some(r) => crate::storage::get_range(account, file, r).await,
+            None => crate::storage::get_bytes(account, file).await,
         };
     }
 
@@ -239,11 +288,11 @@ pub async fn get_opts(
     })
 }
 
-pub async fn get_size(file: &str) -> object_store::Result<usize> {
-    get_size_opts(file, true).await
+pub async fn get_size(account: &str, file: &str) -> object_store::Result<usize> {
+    get_size_opts(account, file, true).await
 }
 
-pub async fn get_size_opts(file: &str, remote: bool) -> object_store::Result<usize> {
+pub async fn get_size_opts(account: &str, file: &str, remote: bool) -> object_store::Result<usize> {
     let cfg = config::get_config();
     // get from memory cache
     if cfg.memory_cache.enabled {
@@ -259,7 +308,7 @@ pub async fn get_size_opts(file: &str, remote: bool) -> object_store::Result<usi
     }
     // get from storage
     if remote {
-        let meta = crate::storage::head(file).await?;
+        let meta = crate::storage::head(account, file).await?;
         return Ok(meta.size);
     }
 

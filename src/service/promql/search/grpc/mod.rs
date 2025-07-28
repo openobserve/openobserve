@@ -28,7 +28,7 @@ use config::{
     utils::time::{now_micros, second_micros},
 };
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
-use infra::{cache::tmpfs, errors::Result};
+use infra::errors::Result;
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
@@ -114,7 +114,7 @@ pub async fn search(
     } else {
         // 1. get max records stream
         let start_time = std::time::Instant::now();
-        let file_list = match get_max_file_list(org_id, &query.query, start, end).await {
+        let file_list = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -234,14 +234,13 @@ pub async fn search_inner(
 
     // clear session
     search::datafusion::storage::file_list::clear(&trace_id);
-    // clear tmpfs
-    tmpfs::delete(&trace_id, true).unwrap();
 
     scan_stats.format_to_mb();
     Ok((value, result_type, scan_stats))
 }
 
 async fn get_max_file_list(
+    trace_id: &str,
     org_id: &str,
     query: &str,
     start: i64,
@@ -258,6 +257,7 @@ async fn get_max_file_list(
     let mut max_records = 0;
     for stream_name in metrics_name {
         let stream_file_list = crate::service::file_list::query(
+            trace_id,
             org_id,
             &stream_name,
             StreamType::Metrics,

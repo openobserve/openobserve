@@ -26,7 +26,7 @@ pub async fn exist_pending_delete(file: &str) -> bool {
     PENDING_DELETE_FILES.read().await.contains(file)
 }
 
-pub async fn add_pending_delete(org_id: &str, file: &str) -> Result<()> {
+pub async fn add_pending_delete(org_id: &str, account: &str, file: &str) -> Result<()> {
     // add to local db for persistence
     let ts = config::utils::time::now_micros();
     infra::file_list::LOCAL_CACHE
@@ -34,6 +34,7 @@ pub async fn add_pending_delete(org_id: &str, file: &str) -> Result<()> {
             org_id,
             ts,
             &[FileListDeleted {
+                account: account.to_string(),
                 file: file.to_string(),
                 index_file: false,
                 flattened: false,

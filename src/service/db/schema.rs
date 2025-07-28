@@ -134,7 +134,13 @@ pub async fn delete(
         // Enrichment table size is not deleted by schema delete
         // Since we are storing the current size of the table in bytes in the meta table,
         // when we delete enrichment table, we need to delete the size from the db as well.
-        let _ = super::enrichment_table::delete_table_size(org_id, stream_name).await;
+        if let Err(e) = super::enrichment_table::delete_table_size(org_id, stream_name).await {
+            log::error!("Failed to delete table size: {}", e);
+        }
+        if let Err(e) = super::enrichment_table::delete_meta_table_stats(org_id, stream_name).await
+        {
+            log::error!("Failed to delete meta table stats: {}", e);
+        }
     }
 
     // super cluster

@@ -18,7 +18,7 @@ use migration::Migrator;
 use sea_orm_migration::MigratorTrait;
 
 use crate::{
-    db::{ORM_CLIENT, SQLITE_STORE, connect_to_orm, sqlite::CLIENT_RW},
+    db::{ORM_CLIENT_DDL, SQLITE_STORE, connect_to_orm_ddl, sqlite::CLIENT_RW},
     dist_lock,
 };
 
@@ -48,7 +48,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
 pub async fn migrate() -> Result<(), anyhow::Error> {
     let locker = dist_lock::lock("/database/migration", 0).await?;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     // This is a hack to fix the failing alerts migration
     // For postgres, we need to run the migration that populates the alerts table first.
     // Otherwise, the `m20250109_092400_recreate_tables_with_ksuids` migration will fail.
@@ -62,7 +62,7 @@ pub async fn migrate() -> Result<(), anyhow::Error> {
 /// Get the index of the migration that populates the alerts table.
 /// This index is used as the first stage of the migration process.
 async fn get_alerts_populate_migration_index() -> Result<u32, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     let migrations = Migrator::get_pending_migrations(client).await?;
     let mut index: u32 = 0;
     for (i, migration) in migrations.iter().enumerate() {
@@ -80,7 +80,7 @@ async fn get_alerts_populate_migration_index() -> Result<u32, anyhow::Error> {
 }
 
 pub async fn down(steps: Option<u32>) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
     Migrator::down(client, steps).await?;
     Ok(())
 }

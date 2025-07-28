@@ -21,6 +21,7 @@ use std::{
     time::Duration,
 };
 
+pub use async_nats::Event as NatsEvent;
 use async_nats::{Client, ServerAddr, jetstream};
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -49,8 +50,22 @@ const SUPER_CLUSTER_PREFIX: &str = "super_cluster_kv_";
 
 static NATS_CLIENT: OnceCell<Client> = OnceCell::const_new();
 
-pub async fn get_nats_client() -> &'static Client {
-    NATS_CLIENT.get_or_init(connect).await
+/// Initialize a global NATS client with a mpsc channel sender for sending NATs events.
+pub async fn init_nats_client(nats_event_sender: mpsc::Sender<async_nats::Event>) -> Result<()> {
+    let client = connect(nats_event_sender).await;
+
+    NATS_CLIENT
+        .set(client)
+        .map_err(|e| Error::Message(format!("[NATS:init] failed to set global client: {}", e)))
+}
+
+pub async fn get_nats_client() -> Result<Client> {
+    NATS_CLIENT
+        .get()
+        .ok_or(Error::Message(
+            "[NATS:get_nats_client] NATs client not initialized".to_string(),
+        ))
+        .cloned()
 }
 
 async fn get_bucket_by_key<'a>(
@@ -58,7 +73,7 @@ async fn get_bucket_by_key<'a>(
     key: &'a str,
 ) -> Result<(jetstream::kv::Store, &'a str)> {
     let cfg = get_config();
-    let client = get_nats_client().await.clone();
+    let client = get_nats_client().await?;
     let jetstream = jetstream::new(client);
     let key = key.trim_start_matches('/');
     let bucket_name = key.split('/').next().unwrap();
@@ -147,7 +162,7 @@ impl super::Db for NatsDb {
     }
 
     async fn stats(&self) -> Result<super::Stats> {
-        let client = get_nats_client().await.clone();
+        let client = get_nats_client().await?;
         let jetstream = async_nats::jetstream::new(client);
         let mut keys_count = 0;
         let mut bytes_len = 0;
@@ -545,7 +560,7 @@ pub async fn create_table() -> Result<()> {
     Ok(())
 }
 
-pub async fn connect() -> async_nats::Client {
+pub async fn connect(nats_event_sender: mpsc::Sender<async_nats::Event>) -> async_nats::Client {
     let cfg = get_config();
     if cfg.common.print_key_config {
         log::info!("Nats init get_config(): {:?}", cfg.nats);
@@ -559,6 +574,17 @@ pub async fn connect() -> async_nats::Client {
     if !cfg.nats.user.is_empty() {
         opts = opts.user_and_password(cfg.nats.user.to_string(), cfg.nats.password.to_string());
     }
+    opts = opts.event_callback(move |event| {
+        let sender = nats_event_sender.clone();
+        async move {
+            if let Err(e) = sender.send(event).await {
+                log::error!(
+                    "NATs client event callback channel failed to send event: {}",
+                    e
+                );
+            }
+        }
+    });
     let addrs = cfg
         .nats
         .addr

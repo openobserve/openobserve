@@ -382,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
-                    data-test="dashboard-add-filter-geomap-data"
+                    data-test="dashboard-add-filter-data"
                   >
                     <div>+F</div>
                   </q-btn>
@@ -428,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-btn
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
-                    data-test="dashboard-add-filter-maps-data"
+                    data-test="dashboard-add-filter-data"
                   >
                     <div>+F</div>
                   </q-btn>
@@ -497,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     padding="sm"
                     @click="addFilteredItem(props.row.name)"
-                    data-test="dashboard-add-filter-sankey-data"
+                    data-test="dashboard-add-filter-data"
                   >
                     <div>+F</div>
                   </q-btn>

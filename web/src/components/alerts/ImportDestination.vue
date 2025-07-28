@@ -1007,9 +1007,10 @@ export default defineComponent({
 
       // Check if 'name' is required for both webhook and email
       if (!input.name || typeof input.name !== "string") {
-        destinationErrors.push(
-          `Destination - ${index} 'name' is required and should be a string`,
-        );
+        destinationErrors.push({
+          message: `Destination - ${index} 'name' is required and should be a string`,
+          field: "destination_name",
+        });
       }
 
       if (input.type === "action" && !isActionsEnabled.value) {

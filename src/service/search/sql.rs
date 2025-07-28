@@ -215,13 +215,7 @@ impl Sql {
             );
         } else {
             for (stream, schema) in total_schemas.iter() {
-                let columns = match columns.get(stream) {
-                    Some(columns) => columns.clone(),
-                    None => {
-                        used_schemas.insert(stream.clone(), schema.clone());
-                        continue;
-                    }
-                };
+                let columns = columns.get(stream).cloned().unwrap_or(Default::default());
                 let fields =
                     generate_schema_fields(columns, schema, match_visitor.match_items.is_some());
                 let schema = Schema::new(fields).with_metadata(schema.schema().metadata().clone());

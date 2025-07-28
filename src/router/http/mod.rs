@@ -28,11 +28,11 @@ use actix_web::{
     route, web,
 };
 use hashbrown::HashMap;
-pub use ws_v2::remove_querier_from_handler;
+pub use ws::remove_querier_from_handler;
 
 use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
 
-pub(crate) mod ws_v2;
+pub(crate) mod ws;
 
 struct URLDetails {
     is_error: bool,
@@ -400,17 +400,17 @@ async fn proxy_ws(
             let client_id = path_parts[path_parts.len() - 1].to_string();
 
             log::info!(
-                "[WS_V2_ROUTER] Handling WS v2 connection for client: {}, took: {} ms",
+                "[WS_ROUTER] Handling WS connection for client: {}, took: {} ms",
                 client_id,
                 start.elapsed().as_millis()
             );
 
             // Use the WebSocket v2 handler
-            let ws_handler = ws_v2::get_ws_handler().await;
+            let ws_handler = ws::get_ws_handler().await;
             match ws_handler.handle_connection(req, payload, client_id).await {
                 Ok(response) => Ok(response),
                 Err(e) => {
-                    log::error!("[WS_V2_ROUTER] failed: {}", e);
+                    log::error!("[WS_ROUTER] failed: {}", e);
                     Ok(HttpResponse::InternalServerError().body("WebSocket v2 error"))
                 }
             }

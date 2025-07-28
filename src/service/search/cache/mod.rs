@@ -669,7 +669,6 @@ pub async fn _write_results(
         let file_path_local = file_path.clone();
 
         match SearchService::cache::cacher::cache_results_to_disk(
-            &trace_id,
             &file_path_local,
             &file_name,
             res_cache,
@@ -821,12 +820,10 @@ pub async fn write_results_v2(
 
     let res_cache = json::to_string(&local_resp).unwrap();
     let query_key = file_path.replace('/', "_");
-    let trace_id = trace_id.to_string();
     tokio::spawn(async move {
         let file_path_local = file_path.clone();
 
         match SearchService::cache::cacher::cache_results_to_disk(
-            &trace_id,
             &file_path_local,
             &file_name,
             res_cache,

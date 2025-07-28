@@ -39,6 +39,7 @@ use infra::{
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
 
+use super::db::enrichment_table;
 use crate::{
     common::meta::{
         authz::Authz,
@@ -62,7 +63,7 @@ pub async fn get_stream(
 
     if schema != Schema::empty() {
         let mut stats = stats::get_stream_stats(org_id, stream_name, stream_type);
-        transform_stats(&mut stats);
+        transform_stats(&mut stats, org_id, stream_name, stream_type).await;
         Some(stream_res(stream_name, stream_type, schema, Some(stats)))
     } else {
         None
@@ -110,7 +111,9 @@ pub async fn get_streams(
             stream_loc.stream_name.as_str(),
             stream_loc.stream_type,
         );
-        if stats.eq(&StreamStats::default()) {
+        if stats.eq(&StreamStats::default())
+            && stream_loc.stream_type != StreamType::EnrichmentTables
+        {
             indices_res.push(stream_res(
                 stream_loc.stream_name.as_str(),
                 stream_loc.stream_type,
@@ -118,7 +121,13 @@ pub async fn get_streams(
                 None,
             ));
         } else {
-            transform_stats(&mut stats);
+            transform_stats(
+                &mut stats,
+                org_id,
+                stream_loc.stream_name.as_str(),
+                stream_loc.stream_type,
+            )
+            .await;
             indices_res.push(stream_res(
                 stream_loc.stream_name.as_str(),
                 stream_loc.stream_type,
@@ -668,10 +677,21 @@ pub async fn delete_stream(
     )))
 }
 
-fn transform_stats(stats: &mut StreamStats) {
+async fn transform_stats(
+    stats: &mut StreamStats,
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) {
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
     stats.index_size /= SIZE_IN_MB;
+    if stream_type == StreamType::EnrichmentTables {
+        if let Some(meta) = enrichment_table::get_meta_table_stats(org_id, stream_name).await {
+            stats.doc_time_min = meta.start_time;
+            stats.doc_time_max = meta.end_time;
+        }
+    }
 }
 
 pub fn stream_created(schema: &Schema) -> Option<i64> {

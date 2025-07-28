@@ -78,6 +78,8 @@ pub struct ScanStats {
 pub struct FileList {
     #[prost(message, repeated, tag = "1")]
     pub items: ::prost::alloc::vec::Vec<FileKey>,
+    #[prost(string, tag = "2")]
+    pub node_addr: ::prost::alloc::string::String,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]
@@ -92,6 +94,8 @@ pub struct FileKey {
     pub deleted: bool,
     #[prost(bytes = "vec", optional, tag = "4")]
     pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
+    #[prost(string, tag = "5")]
+    pub account: ::prost::alloc::string::String,
 }
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -101,6 +105,28 @@ pub struct IdxFileName {
     pub key: ::prost::alloc::string::String,
     #[prost(bytes = "vec", optional, tag = "2")]
     pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleFileList {
+    #[prost(string, repeated, tag = "1")]
+    pub files: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileContentResponse {
+    #[prost(message, repeated, tag = "1")]
+    pub entries: ::prost::alloc::vec::Vec<FileContent>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileContent {
+    /// The actual parquet file content
+    #[prost(bytes = "vec", tag = "1")]
+    pub content: ::prost::alloc::vec::Vec<u8>,
+    /// The name of the file
+    #[prost(string, tag = "2")]
+    pub filename: ::prost::alloc::string::String,
 }
 /// Generated client implementations.
 pub mod event_client {
@@ -209,6 +235,28 @@ pub mod event_client {
                 .insert(GrpcMethod::new("cluster.Event", "SendFileList"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn get_files(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SimpleFileList>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::FileContentResponse>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/cluster.Event/GetFiles");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Event", "GetFiles"));
+            self.inner.server_streaming(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -222,6 +270,16 @@ pub mod event_server {
             &self,
             request: tonic::Request<super::FileList>,
         ) -> std::result::Result<tonic::Response<super::EmptyResponse>, tonic::Status>;
+        /// Server streaming response type for the GetFiles method.
+        type GetFilesStream: tonic::codegen::tokio_stream::Stream<
+                Item = std::result::Result<super::FileContentResponse, tonic::Status>,
+            >
+            + Send
+            + 'static;
+        async fn get_files(
+            &self,
+            request: tonic::Request<super::SimpleFileList>,
+        ) -> std::result::Result<tonic::Response<Self::GetFilesStream>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct EventServer<T: Event> {
@@ -342,6 +400,53 @@ pub mod event_server {
                                 max_encoding_message_size,
                             );
                         let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Event/GetFiles" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetFilesSvc<T: Event>(pub Arc<T>);
+                    impl<
+                        T: Event,
+                    > tonic::server::ServerStreamingService<super::SimpleFileList>
+                    for GetFilesSvc<T> {
+                        type Response = super::FileContentResponse;
+                        type ResponseStream = T::GetFilesStream;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::SimpleFileList>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Event>::get_files(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetFilesSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)

@@ -75,7 +75,7 @@ export default defineComponent({
   name: "SearchResult",
   components: {
     ChartRenderer: defineAsyncComponent(
-      () => import("@/components/dashboards/panels/ChartRenderer.vue")
+      () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
     TraceBlock,
   },
@@ -92,7 +92,7 @@ export default defineComponent({
       this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
 
       const SFIndex = this.searchObj.data.stream.selectedFields.indexOf(
-        col.name
+        col.name,
       );
 
       this.searchObj.data.stream.selectedFields.splice(SFIndex, 1);
@@ -153,7 +153,7 @@ export default defineComponent({
         nextTick(() => {
           plotChart.value = convertTraceData(
             searchObj.data.histogram,
-            store.state.timezone
+            store.state.timezone,
           );
           // plotChart.value.forceReLayout();
         });
@@ -191,7 +191,7 @@ export default defineComponent({
       const newIndex = getRowIndex(
         isNext,
         isPrev,
-        Number(searchObj.meta.resultGrid.navigation.currentRowIndex)
+        Number(searchObj.meta.resultGrid.navigation.currentRowIndex),
       );
       searchObj.meta.resultGrid.navigation.currentRowIndex = newIndex;
     };

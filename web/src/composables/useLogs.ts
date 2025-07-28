@@ -1324,7 +1324,7 @@ const useLogs = () => {
 
               notificationMsg.value = searchObj.data.errorMsg;
 
-              if (err?.request?.status >= 429) {
+              if (err?.request?.status >= 429 || err?.request?.status == 400) {
                 notificationMsg.value = err?.response?.data?.message;
                 searchObj.data.errorMsg = err?.response?.data?.message || "";
                 searchObj.data.errorDetail = err?.response?.data?.error_detail;
@@ -1842,7 +1842,6 @@ const useLogs = () => {
             );
           }
           else{
-            console.log('here it is')
             resetHistogramWithError(
               "Histogram unavailable for CTEs, DISTINCT and LIMIT queries",
               -1
@@ -2098,7 +2097,6 @@ const useLogs = () => {
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
 
-      console.log(parser.astify(filteredQuery))
       return parser.astify(filteredQuery);
 
       // return convertPostgreToMySql(parser.astify(filteredQuery));
@@ -2231,7 +2229,7 @@ const useLogs = () => {
 
             notificationMsg.value = searchObj.data.countErrorMsg;
 
-            if (err?.request?.status >= 429) {
+            if (err?.request?.status >= 429 || err?.request?.status == 400) {
               notificationMsg.value = err?.response?.data?.message;
               searchObj.data.countErrorMsg += err?.response?.data?.message;
             }
@@ -2568,7 +2566,7 @@ const useLogs = () => {
 
           notificationMsg.value = searchObj.data.errorMsg;
 
-          if (err?.request?.status >= 429) {
+          if (err?.request?.status >= 429 || err?.request?.status == 400) {
             notificationMsg.value = err?.response?.data?.message || "";
             searchObj.data.errorMsg = err?.response?.data?.message || "";
             searchObj.data.errorDetail =
@@ -3894,7 +3892,7 @@ const useLogs = () => {
             searchObj.data.errorMsg = customMessage;
           }
 
-          if (err?.request?.status >= 429) {
+          if (err?.request?.status >= 429 || err?.request?.status == 400) {
             notificationMsg.value = err?.response?.data?.message;
             searchObj.data.errorMsg = err?.response?.data?.message;
           }
@@ -4600,12 +4598,9 @@ const useLogs = () => {
       if (parsedSQL?.with) {
         let withObj = parsedSQL.with;
         withObj.forEach((obj: any) => {
-          console.log("inside withobj", obj)
           // Map through each "from" array in the _next object, as it can contain multiple tables
           if (obj?.stmt?.from) {
-            console.log(obj.stmt.from, "obj.stmt.from")
             obj?.stmt?.from.forEach((stream: { table: string }) => {
-              console.log(stream.table , "stream");
               newSelectedStreams.push(stream.table);
             }
             );
@@ -5078,6 +5073,11 @@ const useLogs = () => {
           trace_id: queryReq.traceId,
           payload: {
             query: queryReq.queryReq.query,
+            // pass encodig if enabled,
+            // make sure that `encoding: null` is not being passed, that's why used object extraction logic
+            ...(store.state.zoConfig.sql_base64_enabled
+              ? { encoding: "base64" }
+              : {}),
           } as SearchRequestPayload,
           stream_type: searchObj.data.stream.streamType,
           search_type: "ui",
@@ -5115,12 +5115,13 @@ const useLogs = () => {
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse | WebSocketErrorResponse,
   ) => {
-    searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
+    if (response.type === "search_response") {
+      
+      searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
       ? searchPartitionMap[payload.traceId]
       : 0;
-    searchPartitionMap[payload.traceId]++;
+      searchPartitionMap[payload.traceId]++;
 
-    if (response.type === "search_response") {
       if (payload.type === "search") {
         handleLogsResponse(
           payload.queryReq,
@@ -5602,8 +5603,8 @@ const useLogs = () => {
       processHistogramRequest(payload.queryReq);
     }
 
-    if (payload.type === "search") searchObj.loading = false;
-    if (payload.type === "histogram" || payload.type === "pageCount")
+    if (payload.type === "search" && !response?.content?.should_client_retry) searchObj.loading = false;
+    if ((payload.type === "histogram" || payload.type === "pageCount") && !response?.content?.should_client_retry)
       searchObj.loadingHistogram = false;
 
     searchObj.data.isOperationCancelled = false;

@@ -65,7 +65,9 @@ pub async fn run(from: &str, to: &str) -> Result<(), anyhow::Error> {
                     .expect("load file_list failed");
                 let put_items = files
                     .into_iter()
-                    .map(|(file_key, file_meta)| FileKey::new(file_key, file_meta, false))
+                    .map(|(account, file_key, file_meta)| {
+                        FileKey::new(account, file_key, file_meta, false)
+                    })
                     .collect::<Vec<_>>();
                 dest.batch_add(&put_items)
                     .await

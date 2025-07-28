@@ -53,13 +53,19 @@ pub struct TriggerCondition {
     /// (seconds)
     #[serde(default)]
     pub tolerance_in_secs: Option<i64>,
+    #[serde(default = "default_align_time")]
+    pub align_time: bool,
+}
+
+pub fn default_align_time() -> bool {
+    true
 }
 
 impl TriggerCondition {
     // TODO: Currently, the frequency for alert is in seconds, but the
     // frequency for derived stream is in minutes. This needs to be fixed for alert.
     /// freq_in_secs is true if the frequency is in seconds, false if it is in minutes
-    pub fn get_next_trigger_time(
+    pub fn get_next_trigger_time_non_aligned(
         &self,
         freq_in_secs: bool,
         timezone_offset: i32,
@@ -176,7 +182,7 @@ impl TriggerCondition {
         apply_silence: bool,
     ) -> Result<i64, anyhow::Error> {
         let next_run_at =
-            self.get_next_trigger_time(freq_in_secs, timezone_offset, apply_silence)?;
+            self.get_next_trigger_time_non_aligned(freq_in_secs, timezone_offset, apply_silence)?;
         // Cron frequency is handled by the cron library, so we don't need to align it
         if self.frequency_type != FrequencyType::Cron {
             // `align_time` expects frequency in seconds, so convert if necessary
@@ -188,6 +194,19 @@ impl TriggerCondition {
             Ok(Self::align_time(next_run_at, timezone_offset, frequency))
         } else {
             Ok(next_run_at)
+        }
+    }
+
+    pub fn get_next_trigger_time(
+        &self,
+        freq_in_secs: bool,
+        timezone_offset: i32,
+        apply_silence: bool,
+    ) -> Result<i64, anyhow::Error> {
+        if self.align_time {
+            self.get_aligned_next_trigger_time(freq_in_secs, timezone_offset, apply_silence)
+        } else {
+            self.get_next_trigger_time_non_aligned(freq_in_secs, timezone_offset, apply_silence)
         }
     }
 }
@@ -444,14 +463,16 @@ mod test {
     }
 
     #[test]
-    fn test_get_next_trigger_time() {
+    fn test_get_next_trigger_time_non_aligned() {
         // Test case 1: Regular frequency (5 minutes)
         let condition = TriggerCondition {
             frequency: 300, // 5 minutes in seconds
             frequency_type: FrequencyType::Minutes,
             ..Default::default()
         };
-        let result = condition.get_next_trigger_time(true, 0, false).unwrap();
+        let result = condition
+            .get_next_trigger_time_non_aligned(true, 0, false)
+            .unwrap();
         let dt = DateTime::from_timestamp_micros(result).unwrap();
         let after_5_minutes = Utc::now() + Duration::minutes(5);
         assert_eq!(dt.minute(), after_5_minutes.minute());
@@ -463,7 +484,9 @@ mod test {
             cron: "0 */5 * * * *".to_string(), // Every 5 minutes
             ..Default::default()
         };
-        let result = condition.get_next_trigger_time(true, 0, false).unwrap();
+        let result = condition
+            .get_next_trigger_time_non_aligned(true, 0, false)
+            .unwrap();
         let dt = DateTime::from_timestamp_micros(result).unwrap();
         assert_eq!(dt.minute() % 5, 0);
         assert_eq!(dt.second(), 0);
@@ -474,7 +497,9 @@ mod test {
             silence: 10, // 10 minutes silence
             ..Default::default()
         };
-        let result = condition.get_next_trigger_time(true, 0, true).unwrap();
+        let result = condition
+            .get_next_trigger_time_non_aligned(true, 0, true)
+            .unwrap();
         let dt = DateTime::from_timestamp_micros(result).unwrap();
         // The next trigger should be after the silence period
         let now = Utc::now();
@@ -487,7 +512,9 @@ mod test {
             tolerance_in_secs: Some(60), // 1 minute tolerance
             ..Default::default()
         };
-        let result = condition.get_next_trigger_time(true, 0, false).unwrap();
+        let result = condition
+            .get_next_trigger_time_non_aligned(true, 0, false)
+            .unwrap();
         let dt = DateTime::from_timestamp_micros(result).unwrap();
         // The next trigger should be within the tolerance range
         let now = Utc::now();

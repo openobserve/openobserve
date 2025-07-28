@@ -14,14 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use config::{
-    ider,
-    meta::websocket::{SearchEventReq, ValuesEventReq},
+use config::meta::{
+    sql::OrderBy,
+    websocket::{SearchEventReq, ValuesEventReq},
 };
 use infra::errors;
 use serde::{Deserialize, Serialize};
 use tokio_tungstenite::tungstenite;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::handler::http::request::search::error_utils::map_error_to_http_response;
 
@@ -100,10 +99,8 @@ pub mod sessions_cache_utils {
     use futures::FutureExt;
     use tokio::sync::RwLock;
 
-    use super::search_registry_utils::SearchState;
     use crate::{
-        common::infra::config::{WS_SEARCH_REGISTRY, WS_SESSIONS},
-        handler::http::request::ws_v2::session::WsSession,
+        common::infra::config::WS_SESSIONS, handler::http::request::ws::session::WsSession,
     };
 
     pub async fn run_gc_ws_sessions() {
@@ -159,9 +156,6 @@ pub mod sessions_cache_utils {
 
         // close and remove expired sessions
         for session_id in expired {
-            // Clean up associated searches first
-            cleanup_searches_for_session(&session_id).await;
-
             // Close and remove session
             if let Some(session) = get_session(&session_id).await {
                 log::info!("[WS_GC] Closing expired session: {}", session_id);
@@ -187,45 +181,6 @@ pub mod sessions_cache_utils {
             "[WS_GC] Remaining active sessions: {}",
             len_sessions().await
         );
-    }
-
-    async fn cleanup_searches_for_session(session_id: &str) {
-        let r = WS_SEARCH_REGISTRY.read().await;
-        let searches_to_remove: Vec<String> = r
-            .iter()
-            .filter_map(|(key, state)| {
-                if state.get_req_id() == session_id {
-                    Some(key.clone())
-                } else {
-                    None
-                }
-            })
-            .collect();
-        drop(r);
-
-        for trace_id in searches_to_remove {
-            let mut w = WS_SEARCH_REGISTRY.write().await;
-            if let Some(state) = w.remove(&trace_id) {
-                match state {
-                    SearchState::Running { cancel_tx, req_id } => {
-                        let _ = cancel_tx.try_send(());
-                        log::info!(
-                            "[WS_GC] Cancelled running search: {} for session: {}",
-                            trace_id,
-                            req_id
-                        );
-                    }
-                    _ => {
-                        log::debug!(
-                            "[WS_GC] Removed search: {} for session: {}",
-                            trace_id,
-                            session_id
-                        );
-                    }
-                }
-            }
-            drop(w);
-        }
     }
 
     /// Insert a new session into the cache
@@ -263,69 +218,18 @@ pub mod sessions_cache_utils {
     /// Check if a session exists in the cache
     pub async fn contains_session(session_id: &str) -> bool {
         let r = WS_SESSIONS.read().await;
-        r.contains_key(session_id)
+        let res = r.contains_key(session_id);
+        drop(r);
+        res
     }
 
     /// Get the number of sessions in the cache
     pub async fn len_sessions() -> usize {
         let r = WS_SESSIONS.read().await;
-        r.len()
-    }
-}
-
-pub mod search_registry_utils {
-    use tokio::sync::mpsc;
-
-    use crate::common::infra::config::WS_SEARCH_REGISTRY;
-
-    #[derive(Debug)]
-    pub enum SearchState {
-        Running {
-            cancel_tx: mpsc::Sender<()>,
-            req_id: String,
-        },
-        Cancelled {
-            req_id: String,
-        },
-        Completed {
-            req_id: String,
-        },
-    }
-
-    impl SearchState {
-        pub fn get_req_id(&self) -> &str {
-            match self {
-                SearchState::Running { req_id, .. } => req_id,
-                SearchState::Cancelled { req_id } => req_id,
-                SearchState::Completed { req_id } => req_id,
-            }
-        }
-    }
-
-    // Add this function to check if a search is cancelled
-    pub async fn is_cancelled(trace_id: &str) -> Option<bool> {
-        let r = WS_SEARCH_REGISTRY.read().await;
-        let is_cancelled = r
-            .get(trace_id)
-            .map(|state| matches!(*state, SearchState::Cancelled { .. }));
+        let res = r.len();
         drop(r);
-        is_cancelled
+        res
     }
-}
-
-/// Setup tracing with a trace ID
-pub async fn setup_tracing_with_trace_id(trace_id: &str, span: tracing::Span) -> tracing::Span {
-    let mut headers: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    let traceparent = format!(
-        "00-{}-{}-01", /* 01 to indicate that the span is sampled i.e. needs to be
-                        * recorded/exported */
-        trace_id,
-        ider::generate_span_id()
-    );
-    headers.insert("traceparent".to_string(), traceparent);
-    let parent_ctx = opentelemetry::global::get_text_map_propagator(|prop| prop.extract(&headers));
-    span.set_parent(parent_ctx);
-    span
 }
 
 /// Represents the different types of WebSocket client messages that can be sent.
@@ -368,16 +272,15 @@ pub enum WsClientEvents {
 }
 
 impl WsClientEvents {
-    pub fn get_type(&self) -> String {
+    pub fn event_type(&self) -> &'static str {
         match self {
-            WsClientEvents::Search(_) => "search",
-            WsClientEvents::Values(_) => "values",
+            WsClientEvents::Search(req) => req.event_type(),
+            WsClientEvents::Values(req) => req.event_type(),
             #[cfg(feature = "enterprise")]
             WsClientEvents::Cancel { .. } => "cancel",
             WsClientEvents::Benchmark { .. } => "benchmark",
             WsClientEvents::TestAbnormalClose { .. } => "test_abnormal_close",
         }
-        .to_string()
     }
 
     pub fn to_json(&self) -> String {
@@ -457,6 +360,11 @@ pub enum WsServerEvents {
     End {
         trace_id: Option<String>,
     },
+    EventProgress {
+        trace_id: String,
+        percent: usize,
+        event_type: String,
+    },
     Ping(Vec<u8>),
     Pong(Vec<u8>),
 }
@@ -505,6 +413,7 @@ impl WsServerEvents {
             Self::CancelResponse { trace_id, .. } => trace_id.to_string(),
             Self::Error { trace_id, .. } => trace_id.clone().unwrap_or_default(),
             Self::End { trace_id } => trace_id.clone().unwrap_or_default(),
+            Self::EventProgress { trace_id, .. } => trace_id.to_string(),
             Self::Ping(_) => "".to_string(),
             Self::Pong(_) => "".to_string(),
         }
@@ -551,5 +460,31 @@ impl TryFrom<serde_json::Value> for WsServerEvents {
             Some("end") => serde_json::from_value(value).map_err(|e| e.to_string()),
             _ => Err("Unknown message type".to_string()),
         }
+    }
+}
+
+/// Calculate the progress percentage based on the search type and current partition
+pub fn calculate_progress_percentage(
+    partition_start_time: i64,
+    partition_end_time: i64,
+    req_start_time: i64,
+    req_end_time: i64,
+    partition_order_by: &OrderBy,
+) -> usize {
+    if req_end_time <= req_start_time {
+        return 0;
+    }
+
+    let percentage = if *partition_order_by == OrderBy::Desc {
+        // For dashboards/histograms partitions processed newest to oldest
+        (req_end_time - partition_start_time) as f32 / (req_end_time - req_start_time) as f32
+    } else {
+        // For regular searches partitions processed oldest to newest
+        (partition_end_time - req_start_time) as f32 / (req_end_time - req_start_time) as f32
+    };
+    if percentage < 0.5 {
+        ((percentage * 100.0).ceil() as usize).min(100)
+    } else {
+        ((percentage * 100.0).floor() as usize).min(100)
     }
 }

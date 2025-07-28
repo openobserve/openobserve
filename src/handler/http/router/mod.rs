@@ -552,7 +552,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(service_accounts::delete)
         .service(service_accounts::update)
         .service(service_accounts::get_api_token)
-        .service(ws_v2::websocket);
+        .service(ws::websocket);
 
     #[cfg(feature = "enterprise")]
     let service = service

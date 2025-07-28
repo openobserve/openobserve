@@ -30,7 +30,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                         == config::get_config().common.web_url
                 {
                     if let Some(zip_path) = &current_cluster_action.zip_file_path {
-                        if let Err(e) = infra::storage::del(&[zip_path]).await {
+                        if let Err(e) = infra::storage::del(vec![("", zip_path)]).await {
                             log::error!(
                                 "failed to delete the zip file from s3 bucket {}: {}",
                                 zip_path,
@@ -52,7 +52,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 if current_cluster_action.origin_cluster_url == config::get_config().common.web_url
                 {
                     if let Some(zip_path) = &current_cluster_action.zip_file_path {
-                        if let Err(e) = infra::storage::del(&[zip_path]).await {
+                        if let Err(e) = infra::storage::del(vec![("", zip_path)]).await {
                             log::error!(
                                 "failed to delete the zip file from s3 bucket {}: {}",
                                 zip_path,

@@ -359,6 +359,21 @@ pub static QUERY_PARQUET_CACHE_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static QUERY_PARQUET_CACHE_RATIO_NODE: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "query_parquet_cache_ratio_node",
+            "Querier parquet cache ratio for local node.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            0.01, 0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.0,
+        ])
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
 
 // query cache ratio for metrics
 pub static QUERY_METRICS_CACHE_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
@@ -482,18 +497,6 @@ pub static STORAGE_WRITE_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream_type"],
-    )
-    .expect("Metric created")
-});
-pub static STORAGE_READ_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "storage_read_requests",
-            "Storage read requests.".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
         &["organization", "stream_type", "storage_type"],
     )
     .expect("Metric created")
@@ -506,7 +509,19 @@ pub static STORAGE_WRITE_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream_type"],
+        &["organization", "stream_type", "storage_type"],
+    )
+    .expect("Metric created")
+});
+pub static STORAGE_READ_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "storage_read_requests",
+            "Storage read requests.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type", "method_type", "storage_type"],
     )
     .expect("Metric created")
 });
@@ -518,7 +533,7 @@ pub static STORAGE_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream_type", "storage_type"],
+        &["organization", "stream_type", "method_type", "storage_type"],
     )
     .expect("Metric created")
 });
@@ -855,6 +870,9 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(QUERY_PARQUET_CACHE_RATIO.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(QUERY_PARQUET_CACHE_RATIO_NODE.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(QUERY_METRICS_CACHE_RATIO.clone()))
         .expect("Metric registered");
 
@@ -998,14 +1016,6 @@ pub fn gather() -> String {
     TextEncoder::new()
         .encode(&registry.gather(), &mut buffer)
         .unwrap();
-
-    // process metrics
-    let mut process_metrics = vec![];
-    TextEncoder::new()
-        .encode(&prometheus::gather(), &mut process_metrics)
-        .unwrap();
-    buffer.extend_from_slice(&process_metrics);
-
     String::from_utf8(buffer).unwrap()
 }
 
