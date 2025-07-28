@@ -1,7 +1,7 @@
 FROM public.ecr.aws/docker/library/rust:bookworm
 
-RUN rustup toolchain install nightly-2025-03-02
-RUN rustup default nightly-2025-03-02
+RUN rustup toolchain install nightly-2025-05-20
+RUN rustup default nightly-2025-05-20
 RUN rustup target add aarch64-unknown-linux-gnu
 RUN rustup component add rustfmt clippy llvm-tools
 RUN cargo install --locked sccache
@@ -12,3 +12,4 @@ RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/pr
     && unzip protoc-21.12-linux-aarch_64.zip -d protoc \
     && cp protoc/bin/protoc /usr/local/bin/ \
     && cp -r protoc/include/google /usr/local/include/
+RUN apt-get update && apt-get install -y libboost-all-dev pkg-config cmake

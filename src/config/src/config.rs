@@ -408,7 +408,7 @@ pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
         .collect()
 });
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct Config {
     pub auth: Auth,
     pub http_streaming: HttpStreaming,
@@ -440,7 +440,7 @@ pub struct Config {
     pub enrichment_table: EnrichmentTable,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct HttpStreaming {
     #[env_config(
         name = "ZO_STREAMING_RESPONSE_CHUNK_SIZE_MB",
@@ -456,7 +456,7 @@ pub struct HttpStreaming {
     pub streaming_enabled: bool,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct ReportServer {
     #[env_config(name = "ZO_ENABLE_EMBEDDED_REPORT_SERVER", default = false)]
     pub enable_report_server: bool,
@@ -472,7 +472,7 @@ pub struct ReportServer {
     pub ipv6_enabled: bool,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct TokioConsole {
     #[env_config(name = "ZO_TOKIO_CONSOLE_SERVER_ADDR", default = "0.0.0.0")]
     pub tokio_console_server_addr: String,
@@ -482,7 +482,7 @@ pub struct TokioConsole {
     pub tokio_console_retention: u64,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct Chrome {
     #[env_config(name = "ZO_CHROME_ENABLED", default = false)]
     pub chrome_enabled: bool,
@@ -506,7 +506,7 @@ pub struct Chrome {
     pub chrome_window_height: u32,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct Smtp {
     #[env_config(name = "ZO_SMTP_ENABLED", default = false)]
     pub smtp_enabled: bool,
@@ -526,7 +526,7 @@ pub struct Smtp {
     pub smtp_encryption: String,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct Profiling {
     #[env_config(
         name = "ZO_PROF_PPROF_ENABLED",
@@ -566,7 +566,7 @@ pub struct Profiling {
     pub pyroscope_project_name: String,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct Auth {
     #[env_config(name = "ZO_ROOT_USER_EMAIL")]
     pub root_user_email: String,
@@ -586,7 +586,7 @@ pub struct Auth {
     pub action_server_token: String,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct Http {
     #[env_config(name = "ZO_HTTP_PORT", default = 5080)]
     pub port: u16,
@@ -610,7 +610,7 @@ pub struct Http {
     pub tls_root_certificates: String,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct Grpc {
     #[env_config(name = "ZO_GRPC_PORT", default = 5081)]
     pub port: u16,
@@ -642,7 +642,7 @@ pub struct Grpc {
     pub tls_key_path: String,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct TCP {
     #[env_config(name = "ZO_TCP_PORT", default = 5514)]
     pub tcp_port: u16,
@@ -658,7 +658,7 @@ pub struct TCP {
     pub tcp_tls_ca_cert_path: String,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct Route {
     #[env_config(name = "ZO_ROUTE_TIMEOUT", default = 600)]
     pub timeout: u64,
@@ -666,7 +666,7 @@ pub struct Route {
     pub max_connections: usize,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct Common {
     #[env_config(name = "ZO_APP_NAME", default = "openobserve")]
     pub app_name: String,
@@ -1125,7 +1125,7 @@ pub struct Common {
     pub align_partitions_for_index: bool,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct Limit {
     // no need set by environment
     pub cpu_num: usize,
@@ -1462,7 +1462,7 @@ pub struct Limit {
     pub histogram_enabled: bool,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
@@ -1521,7 +1521,7 @@ pub struct Compact {
     pub max_group_files: usize,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct CacheLatestFiles {
     #[env_config(name = "ZO_CACHE_LATEST_FILES_ENABLED", default = false)]
     pub enabled: bool,
@@ -1539,7 +1539,7 @@ pub struct CacheLatestFiles {
     pub download_node_size: i64,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct MemoryCache {
     #[env_config(name = "ZO_MEMORY_CACHE_ENABLED", default = true)]
     pub enabled: bool,
@@ -1572,7 +1572,7 @@ pub struct MemoryCache {
     pub datafusion_memory_pool: String,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct DiskCache {
     #[env_config(name = "ZO_DISK_CACHE_ENABLED", default = true)]
     pub enabled: bool,
@@ -1611,7 +1611,7 @@ pub struct DiskCache {
     pub delay_window_mins: i64,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct Log {
     #[env_config(name = "RUST_LOG", default = "info")]
     pub level: String,
@@ -1641,7 +1641,7 @@ pub struct Log {
     pub events_batch_size: usize,
 }
 
-#[derive(Debug, EnvConfig)]
+#[derive(Debug, EnvConfig, Default)]
 pub struct Etcd {
     #[env_config(name = "ZO_ETCD_ADDR", default = "localhost:2379")]
     pub addr: String,
@@ -1671,7 +1671,7 @@ pub struct Etcd {
     pub load_page_size: i64,
 }
 
-#[derive(Debug, EnvConfig)]
+#[derive(Debug, EnvConfig, Default)]
 pub struct Nats {
     #[env_config(name = "ZO_NATS_ADDR", default = "localhost:4222")]
     pub addr: String,
@@ -1774,7 +1774,7 @@ pub struct S3 {
     pub multi_part_upload_size: usize,
 }
 
-#[derive(Debug, EnvConfig)]
+#[derive(Debug, EnvConfig, Default)]
 pub struct Sns {
     #[env_config(name = "ZO_SNS_ENDPOINT", default = "")]
     pub endpoint: String,
@@ -1784,7 +1784,7 @@ pub struct Sns {
     pub operation_timeout: u64,
 }
 
-#[derive(Debug, EnvConfig)]
+#[derive(Debug, EnvConfig, Default)]
 pub struct Prometheus {
     #[env_config(name = "ZO_PROMETHEUS_HA_CLUSTER", default = "cluster")]
     pub ha_cluster_label: String,
@@ -1792,7 +1792,7 @@ pub struct Prometheus {
     pub ha_replica_label: String,
 }
 
-#[derive(Debug, EnvConfig)]
+#[derive(Debug, EnvConfig, Default)]
 pub struct RUM {
     #[env_config(name = "ZO_RUM_ENABLED", default = false)]
     pub enabled: bool,
@@ -1816,7 +1816,7 @@ pub struct RUM {
     pub insecure_http: bool,
 }
 
-#[derive(Debug, EnvConfig)]
+#[derive(Debug, EnvConfig, Default)]
 pub struct Pipeline {
     #[env_config(
         name = "ZO_PIPELINE_REMOTE_STREAM_WAL_DIR",
@@ -1928,7 +1928,7 @@ pub struct Pipeline {
     pub max_retry_time_in_hours: u64,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct Encryption {
     #[env_config(name = "ZO_MASTER_ENCRYPTION_ALGORITHM", default = "")]
     pub algorithm: String,
@@ -1936,7 +1936,7 @@ pub struct Encryption {
     pub master_key: String,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct HealthCheck {
     #[env_config(name = "ZO_HEALTH_CHECK_ENABLED", default = true)]
     pub enabled: bool,
@@ -1954,7 +1954,7 @@ pub struct HealthCheck {
     pub failed_times: usize,
 }
 
-#[derive(EnvConfig)]
+#[derive(EnvConfig, Default)]
 pub struct EnrichmentTable {
     #[env_config(
         name = "ZO_ENRICHMENT_TABLE_CACHE_DIR",

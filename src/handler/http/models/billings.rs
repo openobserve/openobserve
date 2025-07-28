@@ -93,7 +93,7 @@ impl From<cloud_billings::org_usage::OrgUsageQueryResult> for OrgUserData {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
-pub struct NewUserAttrition {
+pub struct NewUserAttribution {
     pub from: String,
     pub company: String,
 }
