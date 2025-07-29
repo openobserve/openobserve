@@ -78,6 +78,11 @@ export const convertPromQLData = async (
 ) => {
   // console.time("convertPromQLData");
 
+  // Set gridlines visibility based on config.show_gridlines (default: true)
+  const showGridlines =
+    panelSchema?.config?.show_gridlines !== undefined
+      ? panelSchema.config.show_gridlines
+      : true;
   await importMoment();
 
   // if no data than return it
@@ -356,7 +361,7 @@ export const convertPromQLData = async (
           : (panelSchema.config?.axis_border_show ?? false),
       },
       splitLine: {
-        show: true,
+        show: showGridlines,
         lineStyle: {
           opacity: 0.5,
         },
@@ -388,7 +393,7 @@ export const convertPromQLData = async (
           : (panelSchema.config?.axis_border_show ?? false),
       },
       splitLine: {
-        show: true,
+        show: showGridlines,
         lineStyle: {
           opacity: 0.5,
         },
@@ -421,6 +426,24 @@ export const convertPromQLData = async (
   let totalLength = 0;
   // for gauge chart, it contains grid array, single chart height and width, no. of charts per row and no. of columns
   let gridDataForGauge: any = {};
+
+  // Ensure gridlines visibility is set for all xAxis and yAxis (handles both array and object cases)
+  if (options.xAxis) {
+    (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
+      (axis) => {
+        // if (!axis.splitLine) axis.splitLine = {};
+        axis.splitLine.show = showGridlines;
+      },
+    );
+  }
+  if (options.yAxis) {
+    (Array.isArray(options.yAxis) ? options.yAxis : [options.yAxis]).forEach(
+      (axis) => {
+        // if (!axis.splitLine) axis.splitLine = {};
+        axis.splitLine.show = showGridlines;
+      },
+    );
+  }
 
   if (panelSchema.type === "gauge") {
     // calculate total length of all metrics
