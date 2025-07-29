@@ -2166,7 +2166,13 @@ export default defineComponent({
           this.resetHistogramWithError(
             "Histogram is not available for multi stream search.",
           );
-        } else if (
+        }else if(!this.searchObj.data.queryResults.is_histogram_eligible){
+          this.resetHistogramWithError(
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            -1,
+          );
+          this.searchObj.meta.histogramDirtyFlag = false;
+        }else if (
           this.searchObj.meta.histogramDirtyFlag == true &&
           this.searchObj.meta.jobId == ""
         ) {
@@ -2216,13 +2222,7 @@ export default defineComponent({
               this.searchObj.loadingHistogram = false;
             });
         }
-        else if(!this.searchObj.data.queryResults.is_histogram_eligible){
-          this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
-            -1,
-          );
-          this.searchObj.meta.histogramDirtyFlag = false;
-        }
+
       }
 
       this.updateUrlQueryParams();
