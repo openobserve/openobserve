@@ -257,7 +257,7 @@ pub async fn search(
                 converted_histogram_query = Some(req.query.sql.clone());
             }
             Err(e) => {
-                return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
+                return Ok(map_error_to_http_response(&(e), Some(trace_id)));
             }
         }
     }
