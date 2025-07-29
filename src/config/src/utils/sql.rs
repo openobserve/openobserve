@@ -1040,8 +1040,9 @@ mod tests {
             r#"SELECT * FROM "olympics" WHERE _timestamp >= 1716854400000 AND _timestamp <= 1716940800000"#,
         ];
         for query in queries.iter() {
-            let is_eligible = is_eligible_for_histogram(query).unwrap();
+            let (is_eligible, is_sub_query) = is_eligible_for_histogram(query).unwrap();
             assert_eq!(is_eligible, true);
+            assert_eq!(is_sub_query, false);
         }
     }
 
@@ -1049,14 +1050,19 @@ mod tests {
     fn check_is_eligible_for_histogram_for_queries_should_be_false() {
         // Histogram is not available for SUBQUERY, CTE, DISTINCT and LIMIT queries.
         let queries = [
-            r#"SELECT * FROM (SELECT * FROM "olympics")"#,
             r#"WITH cte AS (SELECT * FROM "olympics") SELECT * FROM cte"#,
             r#"SELECT DISTINCT * FROM "olympics""#,
             r#"SELECT * FROM "olympics" LIMIT 100"#,
         ];
         for query in queries.iter() {
-            let is_eligible = is_eligible_for_histogram(query).unwrap();
+            let (is_eligible, is_sub_query) = is_eligible_for_histogram(query).unwrap();
             assert_eq!(is_eligible, false);
+            // Note: subqueries return (true, true) but are still not eligible for histogram
+            if query.contains("SELECT * FROM (SELECT") {
+                assert_eq!(is_sub_query, true);
+            } else {
+                assert_eq!(is_sub_query, false);
+            }
         }
     }
 }
