@@ -1492,6 +1492,19 @@ export default defineComponent({
               }
             }
 
+            // set date time
+            const dateTime =
+              searchObj.data.datetime.type === "relative"
+                ? getConsumableRelativeTime(
+                  searchObj.data.datetime.relativeTimePeriod,
+                )
+                : cloneDeep(searchObj.data.datetime);
+
+            dashboardPanelData.meta.dateTime = {
+              start_time: new Date(dateTime.startTime),
+              end_time: new Date(dateTime.endTime),
+            };
+
             // run query
             visualizeChartData.value = JSON.parse(
               JSON.stringify(dashboardPanelData.data),
