@@ -54,18 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
-                :disabled="isVisualizeToggleDisabled"
                 no-caps
                 size="sm"
                 style="height: 32px"
               >
-                <q-tooltip>
-                  {{
-                    isVisualizeToggleDisabled
-                      ? t("search.visualizeDisabledForMultiStream")
-                      : t("search.visualize")
-                  }}
-                </q-tooltip>
                 <img
                   :src="visualizeIcon"
                   alt="Visualize"
@@ -3305,10 +3297,6 @@ export default defineComponent({
     const { dashboardPanelData, resetDashboardPanelData } =
       useDashboardPanelData(dashboardPanelDataPageKey);
 
-    const isVisualizeToggleDisabled = computed(() => {
-      return searchObj.data.stream.selectedStream.length > 1;
-    });
-
     // [START] cancel running queries
 
     const variablesAndPanelsDataLoadingState =
@@ -3626,7 +3614,6 @@ export default defineComponent({
       resetRegionFilter,
       validateFilterForMultiStream,
       cancelQuery,
-      isVisualizeToggleDisabled,
       onLogsVisualizeToggleUpdate,
       visualizeSearchRequestTraceIds,
       disable,
