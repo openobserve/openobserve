@@ -2150,7 +2150,7 @@ export default defineComponent({
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL) || !this.searchObj.data.queryResults.is_histogram_eligible) {
           this.resetHistogramWithError(
-            "Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries.",
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
@@ -2159,7 +2159,7 @@ export default defineComponent({
           (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL) || !this.searchObj.data.queryResults.is_histogram_eligible)
         ) {
           this.resetHistogramWithError(
-            "Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries.",
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;

@@ -1812,7 +1812,7 @@ const useLogs = () => {
           await processHttpHistogramResults(queryReq);
         } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
           resetHistogramWithError(
-            "Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries.",
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
             -1
           );
           searchObj.meta.histogramDirtyFlag = false;
@@ -1835,13 +1835,13 @@ const useLogs = () => {
           }
           if(isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible){
             resetHistogramWithError(
-              "Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries.",
+              "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
               -1
             );
           }
           else{
             resetHistogramWithError(
-              "Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries.",
+              "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
               -1
             );
 
@@ -6170,7 +6170,7 @@ const useLogs = () => {
         addTraceId(payload.traceId);
       }
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
-      resetHistogramWithError("Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries.", -1);
+      resetHistogramWithError("Histogram unavailable for CTEs, DISTINCT and LIMIT queries.", -1);
       searchObj.meta.histogramDirtyFlag = false;
     } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)) {
       if (shouldGetPageCount(queryReq, parsedSQL) && isFromZero) {
@@ -6182,14 +6182,14 @@ const useLogs = () => {
       }
       if(isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible){
         resetHistogramWithError(
-          "Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries..",
+          "Histogram unavailable for CTEs, DISTINCT and LIMIT queries..",
           -1
         );
         searchObj.meta.histogramDirtyFlag = false;
       }
       else{
         resetHistogramWithError(
-          "Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries.",
+          "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
           -1
         );
       }
