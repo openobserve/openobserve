@@ -1201,8 +1201,10 @@ const useLogs = () => {
                 partitionTotal: [],
                 paginations: [],
               };
-
+              //here we need to get the histogram interval for the histogram query that needs to be called
               searchObj.data.queryResults.histogram_interval = res.data?.histogram_interval;
+              //we get is_histogram_eligible flag to check from the BE so that if it is false then we dont need to make histogram call
+              searchObj.data.queryResults.is_histogram_eligible = res.data?.is_histogram_eligible;
 
               if (typeof partitionQueryReq.sql != "string") {
                 const partitionSize = 0;
@@ -1387,7 +1389,7 @@ const useLogs = () => {
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
             (!searchObj.meta.sqlMode ||
-              (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL) && !isDistinctQuery(parsedSQL) && !isWithQuery(parsedSQL)))) ||
+              (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL) && !isDistinctQuery(parsedSQL) && !isWithQuery(parsedSQL) && searchObj.data.queryResults.is_histogram_eligible))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
@@ -1856,11 +1858,11 @@ const useLogs = () => {
           if(!queryReq.query?.streaming_output) refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
           resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            "Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries.",
             -1
           );
           searchObj.meta.histogramDirtyFlag = false;
-        } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))) {
+        } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)) {
           let aggFlag = false;
           if (parsedSQL) {
             aggFlag = hasAggregation(parsedSQL?.columns);
@@ -1877,15 +1879,15 @@ const useLogs = () => {
               searchObjDebug["pagecountEndTime"] = performance.now();
             }, 0);
           }
-          if(isWithQuery(parsedSQL)){
+          if(isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible){
             resetHistogramWithError(
-              "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+              "Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries.",
               -1
             );
           }
           else{
             resetHistogramWithError(
-              "Histogram unavailable for CTEs, DISTINCT and LIMIT queries",
+              "Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries.",
               -1
             );
 
@@ -2380,7 +2382,7 @@ const useLogs = () => {
           delete queryReq.query.track_total_hits;
         }
 
-        if (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL)) {
+        if (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible) {
           delete queryReq.query.track_total_hits;
         }
       }
@@ -5074,7 +5076,7 @@ const useLogs = () => {
           delete queryReq.query.track_total_hits;
         }
 
-        if (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL)) {
+        if (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible) {
           delete queryReq.query.track_total_hits;
         }
       }
@@ -6044,9 +6046,9 @@ const useLogs = () => {
         addTraceId(payload.traceId);
       }
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
-      resetHistogramWithError("Histogram unavailable for CTEs, DISTINCT and LIMIT queries.", -1);
+      resetHistogramWithError("Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries.", -1);
       searchObj.meta.histogramDirtyFlag = false;
-    } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))) {
+    } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) )) {
       if (shouldGetPageCount(queryReq, parsedSQL) && isFromZero) {
         setTimeout(async () => {
           searchObjDebug["pagecountStartTime"] = performance.now();
@@ -6056,14 +6058,14 @@ const useLogs = () => {
       }
       if(isWithQuery(parsedSQL)){
         resetHistogramWithError(
-          "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+          "Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries..",
           -1
         );
         searchObj.meta.histogramDirtyFlag = false;
       }
       else{
         resetHistogramWithError(
-          "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+          "Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries.",
           -1
         );
       }
@@ -6094,7 +6096,7 @@ const useLogs = () => {
   function isNonAggregatedSQLMode(searchObj: any, parsedSQL: any) {
     return !(
       searchObj.meta.sqlMode &&
-      (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))
+      (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)
     );
   }
 
