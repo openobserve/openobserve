@@ -34,11 +34,11 @@ use futures::future::try_join_all;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
 use once_cell::sync::Lazy;
+use tokio::sync::mpsc::{Receiver, Sender, channel};
+
+#[cfg(feature = "enterprise")]
 use tokio::{
-    sync::{
-        Mutex,
-        mpsc::{Receiver, Sender, channel},
-    },
+    sync::Mutex,
     time::{Duration, Instant},
 };
 
@@ -51,6 +51,7 @@ use crate::{
 };
 
 // Global batch buffer for accumulating remote stream records
+#[cfg(feature = "enterprise")]
 #[derive(Debug)]
 struct BatchBuffer {
     records: Vec<json::Value>,
@@ -58,6 +59,7 @@ struct BatchBuffer {
     last_write: Instant,
 }
 
+#[cfg(feature = "enterprise")]
 impl BatchBuffer {
     fn new() -> Self {
         Self {
@@ -91,6 +93,7 @@ impl BatchBuffer {
     }
 }
 
+#[cfg(feature = "enterprise")]
 static BATCH_BUFFERS: Lazy<Mutex<HashMap<String, BatchBuffer>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 

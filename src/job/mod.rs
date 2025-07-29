@@ -36,6 +36,7 @@ pub(crate) mod files;
 mod flatten_compactor;
 pub mod metrics;
 mod mmdb_downloader;
+#[cfg(feature = "enterprise")]
 pub(crate) mod pipeline;
 mod promql;
 mod promql_self_consume;
@@ -221,6 +222,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { promql::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
     tokio::task::spawn(async move { file_downloader::run().await });
+    #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { pipeline::run().await });
 
     // load metrics disk cache
