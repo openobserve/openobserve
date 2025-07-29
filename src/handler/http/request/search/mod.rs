@@ -1679,8 +1679,10 @@ pub async fn result_schema(
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
-                return Ok(HttpResponse::BadRequest()
-                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )));
             }
         };
         for key in keys_used {
@@ -1688,14 +1690,15 @@ pub async fn result_schema(
             {
                 use o2_openfga::meta::mapping::OFGA_MODELS;
 
-                use crate::{
-                    common::utils::auth::{AuthExtractor, is_root_user},
-                    service::users::get_user,
+                use crate::common::{
+                    infra::config::USERS,
+                    meta,
+                    utils::auth::{AuthExtractor, is_root_user},
                 };
 
                 if !is_root_user(&user_id) {
-                    let user: config::meta::user::User =
-                        get_user(Some(&org_id), &user_id).await.unwrap();
+                    let user: meta::user::User =
+                        USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
 
                     if !crate::handler::http::auth::validator::check_permissions(
                         &user_id,
