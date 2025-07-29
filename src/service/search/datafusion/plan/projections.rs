@@ -87,6 +87,22 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                     // Then we process the cases where the timestamp field or
                     // histogram is present or aliased
                     match expr {
+                        Expr::Wildcard { .. } => {
+                            // for wildcard, this version of df gives * as name
+                            // so instead we remove the name, and set projections from input schema
+                            let name = get_col_name(expr);
+                            temp.remove(&name);
+                            temp.extend(
+                                proj.input
+                                    .schema()
+                                    .columns()
+                                    .into_iter()
+                                    .map(|c| c.name.clone()),
+                            );
+                            if self.timestamp_alias.is_none() && temp.contains("_timestamp") {
+                                self.timestamp_alias = Some("_timestamp".to_string());
+                            }
+                        }
                         Expr::Column(col) => {
                             // this can be the case when _timestamp field is not in group by or
                             // aliased, but is present, just as a
@@ -256,7 +272,7 @@ mod tests {
 
     async fn get_sql(sql: &str) -> Sql {
         let schema = Schema::new(get_fields());
-        infra::db_init().await.unwrap();
+        infra::init().await.unwrap();
         infra::schema::merge(
             "parse_test",
             "default",
@@ -279,6 +295,7 @@ mod tests {
             query_fn: "".to_string(),
             skip_wal: false,
             action_id: "".to_string(),
+            histogram_interval: 5,
         };
         Sql::new(&query, "parse_test", StreamType::Logs, None)
             .await
@@ -604,5 +621,23 @@ mod tests {
             extractor.projections,
             hashset!["time_bucket", "logs_count", "node_name", "pulled_jobs"]
         );
+
+        let sql = r#"WITH ErrorLogs AS (
+                SELECT 
+                    COALESCE(k8s_container_name, 'Unknown Container') AS container,
+                    COUNT(*) AS error_count
+                FROM "default"
+                GROUP BY container
+            )
+            SELECT * 
+            FROM ErrorLogs
+            WHERE error_count > 10"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.timeseries, None);
+        assert_eq!(extractor.ts_hist_alias, None);
+        assert_eq!(extractor.timestamp_alias, None);
+        assert_eq!(extractor.group_by, hashset!["container"]);
+        assert_eq!(extractor.projections, hashset!["container", "error_count"]);
     }
 }
