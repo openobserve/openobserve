@@ -622,14 +622,26 @@ async fn delete_stream_data_by_time_range(
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let time_range = body.into_inner();
 
-    let time_range_start = Utc
-        .timestamp_nanos(time_range.start * 1000)
-        .format("%Y-%m-%d")
-        .to_string();
-    let time_range_end = Utc
-        .timestamp_nanos(time_range.end * 1000)
-        .format("%Y-%m-%d")
-        .to_string();
+    // Convert the time range to RFC3339 format
+    // If this is a log stream, we use the hour part of the timestamp
+    // If the timestamp is 10:15:00, we use only the hour part
+    // If this is a non-log stream, we use only the day part of the timestamp
+    let time_range_start = {
+        let ts = Utc.timestamp_nanos(time_range.start * 1000);
+        if stream_type.eq(&StreamType::Logs) {
+            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
+        } else {
+            ts.format("%Y-%m-%d").to_string()
+        }
+    };
+    let time_range_end = {
+        let ts = Utc.timestamp_nanos(time_range.end * 1000);
+        if stream_type.eq(&StreamType::Logs) {
+            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
+        } else {
+            ts.format("%Y-%m-%d").to_string()
+        }
+    };
     if time_range_start >= time_range_end {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST,
