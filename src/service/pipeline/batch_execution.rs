@@ -883,7 +883,7 @@ async fn process_node(
 
                     records_by_batch_key
                         .entry(batch_key)
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(record);
                 }
 
@@ -983,6 +983,7 @@ async fn process_node(
     Ok(())
 }
 
+#[cfg(feature = "enterprise")]
 pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
     let mut buffers = BATCH_BUFFERS.lock().await;
 
@@ -995,7 +996,7 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
         let org_id = key_parts[1].to_string();
         let destination_name = key_parts[2].to_string();
         let batch_key = key_parts[3].to_string();
-        //let stream_type = key_parts[4].to_string();
+        // let stream_type = key_parts[4].to_string();
 
         let remote_stream = config::meta::stream::RemoteStreamParams {
             org_id: org_id.clone().into(),
@@ -1007,7 +1008,6 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
 
         if buffer.should_flush() {
             let records_to_write = buffer.take_records();
-           
 
             log::debug!(
                 "[Pipeline]: Flushing buffer for batch_key '{}' - writing {} records to WAL",

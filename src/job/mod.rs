@@ -36,12 +36,12 @@ pub(crate) mod files;
 mod flatten_compactor;
 pub mod metrics;
 mod mmdb_downloader;
+pub(crate) mod pipeline;
 mod promql;
 mod promql_self_consume;
 mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
-pub(crate) mod pipeline;
 
 pub use file_downloader::queue_background_download;
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;

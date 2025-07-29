@@ -156,7 +156,7 @@ where
 
     pub fn _read_entry(&mut self) -> Result<(Option<Vec<u8>>, u64)> {
         let total_start = std::time::Instant::now();
-        
+
         // Time checksum reading
         let checksum_start = std::time::Instant::now();
         let expected_checksum = match self.f.read_u32::<BigEndian>() {
@@ -164,7 +164,7 @@ where
             other => other.context(UnableToReadChecksumSnafu)?,
         };
         let checksum_read_duration = checksum_start.elapsed();
-        
+
         if expected_checksum == 0 {
             return Ok((None, 0));
         }
@@ -177,7 +177,7 @@ where
             .context(UnableToReadLengthSnafu)?
             .into();
         let length_read_duration = length_start.elapsed();
-        
+
         if expected_len == 0 {
             return Ok((Some(vec![]), 0));
         }
