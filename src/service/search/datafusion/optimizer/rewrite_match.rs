@@ -21,17 +21,16 @@ use datafusion::{
         tree_node::{Transformed, TreeNode, TreeNodeRewriter},
     },
     error::DataFusionError,
-    logical_expr::{Expr, Like, LogicalPlan, expr::ScalarFunction, utils::disjunction},
+    logical_expr::{
+        BinaryExpr, Expr, Like, LogicalPlan, Operator, expr::ScalarFunction, utils::disjunction,
+    },
     optimizer::{OptimizerConfig, OptimizerRule, optimizer::ApplyOrder, utils::NamePreserver},
     scalar::ScalarValue,
 };
 
 use crate::service::search::datafusion::udf::{
     fuzzy_match_udf,
-    match_all_udf::{
-        FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
-        MATCH_ALL_UDF_NAME,
-    },
+    match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
 };
 
 /// Optimization rule that rewrite match_all() to str_match()
@@ -93,8 +92,6 @@ fn is_match_all(expr: &Expr) -> bool {
     match expr {
         Expr::ScalarFunction(ScalarFunction { func, .. }) => {
             func.name().to_lowercase() == MATCH_ALL_UDF_NAME
-                || func.name() == MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME
-                || func.name() == MATCH_ALL_RAW_UDF_NAME
                 || func.name() == FUZZY_MATCH_ALL_UDF_NAME
         }
         _ => false,
@@ -120,10 +117,7 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
         match &expr {
             Expr::ScalarFunction(ScalarFunction { func, args }) => {
                 let name = func.name();
-                if name == MATCH_ALL_UDF_NAME
-                    || name == MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME
-                    || name == MATCH_ALL_RAW_UDF_NAME
-                {
+                if name == MATCH_ALL_UDF_NAME {
                     let Expr::Literal(ScalarValue::Utf8(Some(item))) = args[0].clone() else {
                         return Err(DataFusionError::Internal(format!(
                             "Unexpected argument type for match_all() keyword: {:?}",
@@ -142,14 +136,7 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                         Expr::Literal(ScalarValue::Utf8(Some(format!("%{item}%"))))
                     };
                     for field in self.fields.iter() {
-                        let new_expr = Expr::Like(Like {
-                            negated: false,
-                            expr: Box::new(Expr::Column(Column::new_unqualified(field))),
-                            pattern: Box::new(item.clone()),
-                            escape_char: None,
-                            case_insensitive: name != MATCH_ALL_RAW_UDF_NAME,
-                        });
-                        expr_list.push(new_expr);
+                        expr_list.push(create_like_expr_with_not_null(field, item.clone()));
                     }
                     if expr_list.is_empty() {
                         return Err(DataFusionError::Internal(
@@ -203,6 +190,22 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
     }
 }
 
+fn create_like_expr_with_not_null(field: &str, item: Expr) -> Expr {
+    Expr::BinaryExpr(BinaryExpr {
+        left: Box::new(Expr::IsNotNull(Box::new(Expr::Column(
+            Column::new_unqualified(field),
+        )))),
+        right: Box::new(Expr::Like(Like {
+            negated: false,
+            expr: Box::new(Expr::Column(Column::new_unqualified(field))),
+            pattern: Box::new(item),
+            escape_char: None,
+            case_insensitive: true,
+        })),
+        op: Operator::And,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -247,28 +250,6 @@ mod tests {
                     "+------------+",
                     "| 1          |",
                     "| 3          |",
-                    "+------------+",
-                ],
-            ),
-            (
-                "select _timestamp from t where match_all_raw_ignore_case('observe')",
-                vec![
-                    "+------------+",
-                    "| _timestamp |",
-                    "+------------+",
-                    "| 2          |",
-                    "| 3          |",
-                    "| 4          |",
-                    "+------------+",
-                ],
-            ),
-            (
-                "select _timestamp from t where match_all_raw_ignore_case('observe') and _timestamp = 2",
-                vec![
-                    "+------------+",
-                    "| _timestamp |",
-                    "+------------+",
-                    "| 2          |",
                     "+------------+",
                 ],
             ),
@@ -347,9 +328,7 @@ mod tests {
         let ctx = SessionContext::new_with_state(state);
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.register_udf(match_all_udf::MATCH_ALL_RAW_UDF.clone());
         ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
-        ctx.register_udf(match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
         ctx.register_udf(match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
 
         for item in sqls {

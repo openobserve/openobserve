@@ -59,7 +59,7 @@ use super::datafusion::udf::cipher_udf::{
 };
 use super::{
     datafusion::udf::match_all_udf::{
-        FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
+        FUZZY_MATCH_ALL_UDF_NAME, 
         MATCH_ALL_UDF_NAME,
     },
     index::{IndexCondition, get_index_condition_from_expr},
@@ -193,7 +193,6 @@ impl Sql {
         let need_sort_by_time = order_by.len() == 1
             && order_by[0].0 == TIMESTAMP_COL_NAME
             && order_by[0].1 == OrderBy::Desc;
-        let use_inverted_index = column_visitor.use_inverted_index;
 
         // check if need exact limit and offset
         if limit == -1 || limit == 0 {
@@ -283,7 +282,6 @@ impl Sql {
         if cfg.common.inverted_index_search_format.eq("tantivy")
             && stream_names.len() == 1
             && cfg.common.inverted_index_enabled
-            && use_inverted_index
         {
             let mut index_visitor = IndexVisitor::new(
                 &used_schemas,
@@ -295,6 +293,8 @@ impl Sql {
             can_optimize = index_visitor.can_optimize;
         }
         //********************Change the sql here*********************************//
+
+        let use_inverted_index = index_condition.is_some();
 
         // 13. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
@@ -1095,8 +1095,6 @@ impl VisitorMut for MatchVisitor {
         if let Expr::Function(func) = expr {
             let name = func.name.to_string().to_lowercase();
             if name == MATCH_ALL_UDF_NAME
-                || name == MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME
-                || name == MATCH_ALL_RAW_UDF_NAME
                 || name == FUZZY_MATCH_ALL_UDF_NAME
             {
                 if let FunctionArguments::List(list) = &func.args {

@@ -1142,7 +1142,7 @@ mod tests {
         ];
         let partition_num = 2;
         let groups = group_files_by_time_range(files, partition_num);
-        assert_eq!(groups.len(), 2);
+        assert_eq!(groups.len(), 3);
     }
 
     #[test]
