@@ -231,6 +231,8 @@ pub struct Response {
     pub work_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_by: Option<OrderBy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub converted_histogram_query: Option<String>,
 }
 
 /// Iterator for Streaming response of search `Response`
@@ -392,6 +394,7 @@ impl Response {
             result_cache_ratio: 0,
             work_group: None,
             order_by: None,
+            converted_histogram_query: None,
         }
     }
 
@@ -1222,6 +1225,13 @@ pub struct HashFileRequest {
 #[derive(Debug, Default, Deserialize, Clone, Serialize)]
 pub struct HashFileResponse {
     pub files: HashMap<String, HashMap<String, String>>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct ResultSchemaResponse {
+    pub projections: Vec<String>,
+    pub group_by: Vec<String>,
+    pub timeseries_field: Option<String>,
 }
 
 #[cfg(test)]

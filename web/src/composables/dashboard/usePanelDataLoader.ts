@@ -67,6 +67,8 @@ export const usePanelDataLoader = (
   dashboardId: any,
   folderId: any,
   reportId: any,
+  searchResponse: any,
+  is_ui_histogram: any,
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -476,6 +478,7 @@ export const usePanelDataLoader = (
                   traceparent,
                   dashboard_id: dashboardId?.value,
                   folder_id: folderId?.value,
+                  is_ui_histogram: is_ui_histogram.value,
                 },
                 searchType.value ?? "dashboards",
               ),
@@ -780,6 +783,7 @@ export const usePanelDataLoader = (
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,
         fallback_order_by_col: getFallbackOrderByCol(),
+        is_ui_histogram: is_ui_histogram.value,
       },
     });
   };
@@ -931,6 +935,7 @@ export const usePanelDataLoader = (
           dashboard_id: dashboardId?.value,
           folder_id: folderId?.value,
           fallback_order_by_col: getFallbackOrderByCol(),
+          is_ui_histogram: is_ui_histogram.value,
         },
       };
 
@@ -1275,6 +1280,7 @@ export const usePanelDataLoader = (
                           traceparent,
                           dashboard_id: dashboardId?.value,
                           folder_id: folderId?.value,
+                          is_ui_histogram: is_ui_histogram.value,
                         },
                         searchType.value ?? "dashboards",
                       ),
@@ -1397,6 +1403,21 @@ export const usePanelDataLoader = (
               );
 
               state.annotations = annotations;
+
+              if (searchResponse?.value?.hits?.length > 0) {
+                // Add empty objects to state.resultMetaData for the results of this query
+                state.data.push([]);
+                state.resultMetaData.push({});
+
+                const currentQueryIndex = state.data.length - 1;
+
+                state.data[currentQueryIndex] = searchResponse.value.hits;
+                state.resultMetaData[currentQueryIndex] = searchResponse.value;
+                // set loading to false
+                state.loading = false;
+
+                return;
+              }
 
               if (isStreamingEnabled()) {
                 await getDataThroughStreaming(

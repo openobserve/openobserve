@@ -385,6 +385,15 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
+    searchResponse: {
+      required: false,
+      type: Object,
+    },
+    is_ui_histogram: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -434,6 +443,8 @@ export default defineComponent({
       folderId,
       reportId,
       allowAnnotationsAdd,
+      searchResponse,
+      is_ui_histogram,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -457,6 +468,8 @@ export default defineComponent({
       dashboardId,
       folderId,
       reportId,
+      searchResponse,
+      is_ui_histogram,
     );
 
     const {
