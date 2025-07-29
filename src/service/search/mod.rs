@@ -1311,6 +1311,8 @@ pub async fn search_partition_multi(
         };
     }
     res.records = total_rec;
+    // Histogram is not eligible for multi-stream search
+    res.is_histogram_eligible = false;
     Ok(res)
 }
 
