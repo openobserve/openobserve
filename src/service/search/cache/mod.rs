@@ -431,7 +431,9 @@ pub async fn search(
         res.new_end_time = Some(req.query.end_time);
     }
 
-    res.is_histogram_eligible = is_eligible_for_histogram(&req.query.sql).ok();
+    res.is_histogram_eligible = is_eligible_for_histogram(&req.query.sql)
+        .ok()
+        .map(|(is_eligible, _)| is_eligible);
 
     // There are 3 types of partial responses:
     // 1. VRL error

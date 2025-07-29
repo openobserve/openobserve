@@ -775,7 +775,7 @@ pub async fn search_partition(
         (records + f.records, original_size + f.original_size)
     });
 
-    let is_histogram_eligible = is_eligible_for_histogram(&req.sql).unwrap_or(false);
+    let (is_histogram_eligible, _) = is_eligible_for_histogram(&req.sql).unwrap_or((false, false));
 
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),

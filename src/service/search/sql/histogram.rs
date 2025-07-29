@@ -27,7 +27,7 @@ pub fn convert_to_histogram_query(
     original_query: &str,
     stream_names: &[String],
 ) -> Result<String, Error> {
-    let is_eligible =
+    let (is_eligible, is_sub_query) =
         is_eligible_for_histogram(original_query).map_err(|e| Error::Message(e.to_string()))?;
     if !is_eligible {
         let error = Error::ErrorCode(ErrorCodes::SearchHistogramNotAvailable(
@@ -57,7 +57,8 @@ pub fn convert_to_histogram_query(
     );
 
     // Add WHERE clause if it exists
-    if !where_clause.is_empty() {
+    // skip where clause for sub query
+    if !where_clause.is_empty() && !is_sub_query {
         histogram_query.push_str(&format!(" WHERE {}", where_clause));
     }
 

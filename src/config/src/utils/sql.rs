@@ -166,17 +166,22 @@ fn is_aggregate_expression(expr: &Expr) -> bool {
     }
 }
 
-pub fn is_eligible_for_histogram(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
+// (is_eligible_for_histogram, is_sub_query)
+pub fn is_eligible_for_histogram(
+    query: &str,
+) -> Result<(bool, bool), sqlparser::parser::ParserError> {
     // Histogram is not available for SUBQUERY, CTE, DISTINCT and LIMIT queries.
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
         if let Statement::Query(query) = statement {
-            if has_distinct(query) || has_limit(query) || has_cte(query) {
-                return Ok(false);
+            if has_subquery(statement) {
+                return Ok((true, true));
+            } else if has_distinct(query) || has_limit(query) || has_cte(query) {
+                return Ok((false, false));
             }
         }
     }
-    Ok(true)
+    Ok((true, false))
 }
 
 // Check if has group_by
