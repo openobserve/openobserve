@@ -799,7 +799,22 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        let hist_int = sql.histogram_interval.unwrap_or(1);
+        let hist_int = if let Some(hist_int) = sql.histogram_interval {
+            hist_int
+        } else {
+            let interval = generate_histogram_interval(Some((req.start_time, req.end_time)), 0);
+            match convert_histogram_interval_to_seconds(&interval) {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "[trace_id {trace_id}] search_partition:
+        convert_histogram_interval_to_seconds error: {:?}",
+                        e
+                    );
+                    10
+                }
+            }
+        };
         // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
         if hist_int > 0 {
             min_step *= hist_int;
