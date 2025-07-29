@@ -185,9 +185,9 @@ const useSqlSuggestions = () => {
       insertText: (_keyword: string,path:string= 'path') => `spath('${_keyword}', '${path}')`,
     },
     {
-      label: (array: string[]= ['array']) => `to_array_string('${array}')`,
+      label: (array: string= 'array') => `to_array_string('${array}')`,
       kind: "Text",
-      insertText: (array: string[]= ['array']) => `to_array_string('${array}')`,
+      insertText: (array: string= 'array') => `to_array_string('${array}')`,
     },
     {
       label: () => `unnest`,
@@ -226,7 +226,7 @@ const useSqlSuggestions = () => {
       kind: "Text",
       insertText: (_keyword: string) => `min('${_keyword}')`,
     },
-    //histogram functoin
+    //histogram function
     {
       label: (_keyword: string,duration:string= 'duration') => `histogram('${_keyword}', '${duration}')`,
       kind: "Text",
