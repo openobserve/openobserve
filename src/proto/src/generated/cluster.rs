@@ -2306,6 +2306,8 @@ pub struct MultiQueryCacheResponse {
 pub struct DeleteResultCacheRequest {
     #[prost(string, tag = "1")]
     pub path: ::prost::alloc::string::String,
+    #[prost(int64, tag = "2")]
+    pub ts: i64,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

@@ -660,13 +660,28 @@ pub fn get_ts_col_order_by(
 }
 
 #[tracing::instrument]
-pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
+pub async fn delete_cache(path: &str, may_be_ts: Option<i64>) -> std::io::Result<bool> {
     let root_dir = disk::get_dir().await;
     let pattern = format!("{}/results/{}", root_dir, path);
     let prefix = format!("{}/", root_dir);
     let files = scan_files(&pattern, "json", None).unwrap_or_default();
     let mut remove_files: Vec<String> = vec![];
     for file in files {
+        // If timestamp is provided, check if we should delete this file
+        if let Some(delete_ts) = may_be_ts {
+            // Parse the start_time from filename:
+            // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
+            if let Some(file_name) = file.split('/').next_back() {
+                if let Some(start_time_str) = file_name.split('_').next() {
+                    if let Ok(start_time) = start_time_str.parse::<i64>() {
+                        // Only delete if start_time < delete_ts (keep cache from delete_ts onwards)
+                        if start_time > delete_ts {
+                            continue; // Skip this file, keep it
+                        }
+                    }
+                }
+            }
+        }
         match disk::remove("", file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
             Err(e) => {

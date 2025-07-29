@@ -204,6 +204,14 @@ impl super::Db for NatsDb {
         }
     }
 
+    async fn get_id(&self, _key: &str) -> Result<i64> {
+        unimplemented!()
+    }
+
+    async fn get_key_from_id(&self, _id: i64) -> Result<String> {
+        unimplemented!()
+    }
+
     async fn put(
         &self,
         key: &str,

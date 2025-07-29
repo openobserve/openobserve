@@ -21,11 +21,13 @@ use std::{
 use actix_web::{
     HttpRequest, HttpResponse, Responder, delete, get, http, http::StatusCode, post, put, web,
 };
+use chrono::{TimeZone, Utc};
 use config::{
-    meta::stream::{StreamSettings, StreamType, UpdateStreamSettings},
+    meta::stream::{StreamSettings, StreamType, TimeRange, UpdateStreamSettings},
     utils::schema::format_stream_name,
 };
 use hashbrown::HashMap;
+use infra::errors::{DbError, Error as InfraError};
 
 use crate::{
     common::{
@@ -34,7 +36,7 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             stream::{ListStream, StreamDeleteFields},
         },
-        utils::http::get_stream_type_from_request,
+        utils::http::{get_stream_type_from_request, get_ts_from_request},
     },
     service::stream,
 };
@@ -523,6 +525,7 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
+        ("ts" = Option<i64>, Query, description = "Timestamp in microseconds. If provided, must be > 0. Cache from this timestamp onwards will be retained, older cache will be deleted."),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
@@ -546,13 +549,25 @@ async fn delete_stream_cache(
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let may_be_ts = get_ts_from_request(&query);
+
+    // If ts parameter is present, it must be > 0
+    if let Some(ts) = may_be_ts {
+        if ts <= 0 {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                "Timestamp parameter must be greater than 0".to_string(),
+            )));
+        }
+    }
+
     let path = if stream_name.eq("_all") {
         org_id
     } else {
         format!("{}/{}/{}", org_id, stream_type, stream_name)
     };
 
-    match crate::service::search::cluster::cacher::delete_cached_results(path).await {
+    match crate::service::search::cluster::cacher::delete_cached_results(path, may_be_ts).await {
         true => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
             "cache deleted".to_string(),
@@ -561,5 +576,173 @@ async fn delete_stream_cache(
             http::StatusCode::BAD_REQUEST.into(),
             "Error deleting cache, please retry".to_string(),
         ))),
+    }
+}
+
+/// StreamDeleteDataByTimeRange
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"delete"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Streams",
+    operation_id = "StreamDeleteDataByTimeRange",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("type" = String, Query, description = "Stream type"),
+        ("start_ts" = String, Query, description = "Start unix timestamp in microseconds"),
+        ("end_ts" = String, Query, description = "End unix timestamp in microseconds"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[delete("/{org_id}/streams/{stream_name}/data_by_time_range")]
+async fn delete_stream_data_by_time_range(
+    path: web::Path<(String, String)>,
+    body: web::Json<TimeRange>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let cfg = config::get_config();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !cfg.common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let time_range = body.into_inner();
+
+    // Convert the time range to RFC3339 format
+    // If this is a log stream, we use the hour part of the timestamp
+    // If the timestamp is 10:15:00, we use only the hour part
+    // If this is a non-log stream, we use only the day part of the timestamp
+    let time_range_start = {
+        let ts = Utc.timestamp_nanos(time_range.start * 1000);
+        if stream_type.eq(&StreamType::Logs) {
+            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
+        } else {
+            ts.format("%Y-%m-%d").to_string()
+        }
+    };
+    let time_range_end = {
+        let ts = Utc.timestamp_nanos(time_range.end * 1000);
+        if stream_type.eq(&StreamType::Logs) {
+            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
+        } else {
+            ts.format("%Y-%m-%d").to_string()
+        }
+    };
+    if time_range_start >= time_range_end {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Invalid time range".to_string(),
+        )));
+    }
+
+    log::debug!(
+        "[COMPACTOR] delete_by_stream {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end}",
+    );
+
+    // Create a job to delete the data by the time range
+    let key = match crate::service::db::compact::retention::delete_stream(
+        &org_id,
+        stream_type,
+        &stream_name,
+        Some((time_range_start.as_str(), time_range_end.as_str())),
+    )
+    .await
+    {
+        Ok(key) => key,
+        Err(e) => {
+            log::error!(
+                "delete_by_stream {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end} error: {e}"
+            );
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )));
+        }
+    };
+
+    // Get the id from the key
+    let id = match crate::service::db::compact::retention::get_id(&key).await {
+        Ok(id) => id,
+        Err(e) => {
+            log::error!("get_id {key} error: {e}");
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )));
+        }
+    };
+
+    let res = serde_json::json!({ "id": id });
+    Ok(HttpResponse::Ok().json(res))
+}
+
+/// StreamDeleteDataByTimeRangeJobStatus
+///
+/// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"get"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Streams",
+    operation_id = "StreamDeleteDataByTimeRangeJobStatus",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("type" = String, Query, description = "Stream type"),
+        ("start_ts" = String, Query, description = "Start unix timestamp in microseconds"),
+        ("end_ts" = String, Query, description = "End unix timestamp in microseconds"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/streams/{stream_name}/data_by_time_range/{id}")]
+async fn get_delete_stream_data_status(
+    path: web::Path<(String, String, String)>,
+    _req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (_org_id, _stream_name, id_str) = path.into_inner();
+
+    // Parse the id from the URL
+    let id: i64 = match id_str.parse() {
+        Ok(id) => id,
+        Err(_) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                "Invalid job ID".to_string(),
+            )));
+        }
+    };
+
+    // Get the key from the ID
+    match crate::service::db::compact::retention::get_key_from_id(id).await {
+        Ok(_) => {
+            // Job still exists, return pending status
+            let res = serde_json::json!({ "id": id, "status": "pending" });
+            Ok(HttpResponse::Ok().json(res))
+        }
+        Err(e) => {
+            if let Some(infra_error) = e.downcast_ref::<InfraError>() {
+                if let InfraError::DbError(DbError::KeyNotExists(_)) = infra_error {
+                    let res = serde_json::json!({ "id": id, "status": "completed" });
+                    return Ok(HttpResponse::Ok().json(res));
+                }
+            }
+            log::error!("get_key_from_id {id} error: {e}");
+            Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )))
+        }
     }
 }
