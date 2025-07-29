@@ -255,7 +255,7 @@ pub async fn search(
                 req.query.sql = histogram_query;
             }
             Err(e) => {
-                return Ok(MetaHttpResponse::bad_request(e));
+                return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
             }
         }
     }
