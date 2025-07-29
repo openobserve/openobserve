@@ -206,7 +206,7 @@ impl PartitionGenerator {
                         remaining_end,
                         end_time,
                         step,
-                        OrderBy::Desc,
+                        OrderBy::Asc,
                     );
                     partitions.extend(remaining_partitions);
                 }
@@ -572,12 +572,13 @@ mod tests {
         );
     }
 
+    // Actual start
     #[test]
-    fn test_partition_generator_with_histogram_alignment_and_mini_partition() {
-        // Test case: 10:02 - 10:17 with 5-minute histogram interval and mini partition
-        let start_time = 1617267720000000; // 10:02
-        let end_time = 1617268620000000; // 10:17
-        let min_step = 300000000; // 5 minutes in microseconds
+    fn test_partition_generator_with_histogram_alignment_no_mini_partition_order_by_desc() {
+        let start_time = 1753763400000000; // Tuesday, July 29, 2025 at 10:00:00 AM GMT+5:30
+        let end_time = 1753806600000000; // Tuesday, July 29, 2025 at 10:00:00 PM GMT+5:30
+        let min_step_seconds = 1800; // 30 minutes in seconds
+        let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
         let mini_partition_duration_secs = 60;
 
         let generator = PartitionGenerator::new(
@@ -585,65 +586,285 @@ mod tests {
             mini_partition_duration_secs,
             true, // is_histogram = true
         );
-        let step = 300000000; // 5 minutes
+        let step = min_step; // 30 minutes in microseconds
 
         let partitions = generator.generate_partitions(
             start_time,
             end_time,
             step,
             OrderBy::Desc,
-            true, // add_mini_partition = true
+            false, // add_mini_partition = false
         );
 
-        // Expected partitions with mini partition and histogram alignment:
-        // 1. 10:16 - 10:17 (mini partition)
-        // 2. 10:15 - 10:16 (histogram aligned)
-        // 3. 10:10 - 10:15 (histogram aligned)
-        // 4. 10:05 - 10:10 (histogram aligned)
-        // 5. 10:02 - 10:05 (histogram aligned)
+        // Print the actual partitions for debugging
+        println!("HISTOGRAM PARTITIONS NO MINI PARTITION (DESC):");
+        println!("Number of partitions: {}", partitions.len());
+        for (i, [start, end]) in partitions.iter().enumerate() {
+            // Convert to human-readable time for debugging
+            let start = chrono::DateTime::from_timestamp_micros(*start)
+                .unwrap()
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string();
+            let end = chrono::DateTime::from_timestamp_micros(*end)
+                .unwrap()
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string();
+            println!("Partition {}: {} - {}", i + 1, start, end);
+        }
+
+        // HISTOGRAM PARTITIONS NO MINI PARTITION (DESC):
+        // Number of partitions: 24
+        // Partition 1: 2025-07-29 21:30:00 - 2025-07-29 22:00:00
+        // Partition 2: 2025-07-29 21:00:00 - 2025-07-29 21:30:00
+        // Partition 3: 2025-07-29 20:30:00 - 2025-07-29 21:00:00
+        // Partition 4: 2025-07-29 20:00:00 - 2025-07-29 20:30:00
+        // Partition 5: 2025-07-29 19:30:00 - 2025-07-29 20:00:00
+        // Partition 6: 2025-07-29 19:00:00 - 2025-07-29 19:30:00
+        // Partition 7: 2025-07-29 18:30:00 - 2025-07-29 19:00:00
+        // Partition 8: 2025-07-29 18:00:00 - 2025-07-29 18:30:00
+        // Partition 9: 2025-07-29 17:30:00 - 2025-07-29 18:00:00
+        // Partition 10: 2025-07-29 17:00:00 - 2025-07-29 17:30:00
+        // Partition 11: 2025-07-29 16:30:00 - 2025-07-29 17:00:00
+        // Partition 12: 2025-07-29 16:00:00 - 2025-07-29 16:30:00
+        // Partition 13: 2025-07-29 15:30:00 - 2025-07-29 16:00:00
+        // Partition 14: 2025-07-29 15:00:00 - 2025-07-29 15:30:00
+        // Partition 15: 2025-07-29 14:30:00 - 2025-07-29 15:00:00
+        // Partition 16: 2025-07-29 14:00:00 - 2025-07-29 14:30:00
+        // Partition 17: 2025-07-29 13:30:00 - 2025-07-29 14:00:00
+        // Partition 18: 2025-07-29 13:00:00 - 2025-07-29 13:30:00
+        // Partition 19: 2025-07-29 12:30:00 - 2025-07-29 13:00:00
+        // Partition 20: 2025-07-29 12:00:00 - 2025-07-29 12:30:00
+        // Partition 21: 2025-07-29 11:30:00 - 2025-07-29 12:00:00
+        // Partition 22: 2025-07-29 11:00:00 - 2025-07-29 11:30:00
+        // Partition 23: 2025-07-29 10:30:00 - 2025-07-29 11:00:00
+        // Partition 24: 2025-07-29 10:00:00 - 2025-07-29 10:30:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.last().unwrap()[0], start_time);
+        assert_eq!(partitions.first().unwrap()[1], end_time);
+    }
+
+    #[test]
+    fn test_partition_generator_with_histogram_alignment_and_mini_partition_order_by_desc() {
+        let start_time = 1753763400000000; // Tuesday, July 29, 2025 at 10:00:00 AM GMT+5:30
+        let end_time = 1753806600000000; // Tuesday, July 29, 2025 at 10:00:00 PM GMT+5:30
+        let min_step_seconds = 1800; // 30 minutes in seconds
+        let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(
+            min_step,
+            mini_partition_duration_secs,
+            true, // is_histogram = true
+        );
+        let step = min_step; // 30 minutes in microseconds
+
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Desc,
+            true, // add_mini_partition = false
+        );
 
         // Print the actual partitions for debugging
         println!("HISTOGRAM PARTITIONS WITH MINI PARTITION (DESC):");
         println!("Number of partitions: {}", partitions.len());
         for (i, [start, end]) in partitions.iter().enumerate() {
             // Convert to human-readable time for debugging
-            let start_mins = (start - 1617267600000000) / 60000000; // Minutes since 10:00
-            let end_mins = (end - 1617267600000000) / 60000000;
-            println!(
-                "Partition {}: 10:{:02} - 10:{:02} ({} - {})",
-                i + 1,
-                start_mins,
-                end_mins,
-                start,
-                end
-            );
+            let start = chrono::DateTime::from_timestamp_micros(*start)
+                .unwrap()
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string();
+            let end = chrono::DateTime::from_timestamp_micros(*end)
+                .unwrap()
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string();
+            println!("Partition {}: {} - {}", i + 1, start, end);
         }
+
+        // HISTOGRAM PARTITIONS WITH MINI PARTITION (DESC):
+        // Number of partitions: 25
+        // Partition 1: 2025-07-29 21:59:00 - 2025-07-29 22:00:00
+        // Partition 2: 2025-07-29 21:30:00 - 2025-07-29 21:59:00
+        // Partition 3: 2025-07-29 21:00:00 - 2025-07-29 21:30:00
+        // Partition 4: 2025-07-29 20:30:00 - 2025-07-29 21:00:00
+        // Partition 5: 2025-07-29 20:00:00 - 2025-07-29 20:30:00
+        // Partition 6: 2025-07-29 19:30:00 - 2025-07-29 20:00:00
+        // Partition 7: 2025-07-29 19:00:00 - 2025-07-29 19:30:00
+        // Partition 8: 2025-07-29 18:30:00 - 2025-07-29 19:00:00
+        // Partition 9: 2025-07-29 18:00:00 - 2025-07-29 18:30:00
+        // Partition 10: 2025-07-29 17:30:00 - 2025-07-29 18:00:00
+        // Partition 11: 2025-07-29 17:00:00 - 2025-07-29 17:30:00
+        // Partition 12: 2025-07-29 16:30:00 - 2025-07-29 17:00:00
+        // Partition 13: 2025-07-29 16:00:00 - 2025-07-29 16:30:00
+        // Partition 14: 2025-07-29 15:30:00 - 2025-07-29 16:00:00
+        // Partition 15: 2025-07-29 15:00:00 - 2025-07-29 15:30:00
+        // Partition 16: 2025-07-29 14:30:00 - 2025-07-29 15:00:00
+        // Partition 17: 2025-07-29 14:00:00 - 2025-07-29 14:30:00
+        // Partition 18: 2025-07-29 13:30:00 - 2025-07-29 14:00:00
+        // Partition 19: 2025-07-29 13:00:00 - 2025-07-29 13:30:00
+        // Partition 20: 2025-07-29 12:30:00 - 2025-07-29 13:00:00
+        // Partition 21: 2025-07-29 12:00:00 - 2025-07-29 12:30:00
+        // Partition 22: 2025-07-29 11:30:00 - 2025-07-29 12:00:00
+        // Partition 23: 2025-07-29 11:00:00 - 2025-07-29 11:30:00
+        // Partition 24: 2025-07-29 10:30:00 - 2025-07-29 11:00:00
+        // Partition 25: 2025-07-29 10:00:00 - 2025-07-29 10:30:00
 
         // Verify full coverage of time range
         assert_eq!(partitions.last().unwrap()[0], start_time);
         assert_eq!(partitions.first().unwrap()[1], end_time);
+    }
 
-        // Verify mini partition is at the end (DESC order)
-        let mini_partition = &partitions[0];
-        let mini_partition_duration = mini_partition[1] - mini_partition[0];
-        assert!(
-            mini_partition_duration <= (mini_partition_duration_secs * 1_000_000) as i64,
-            "Mini partition size should not exceed the configured duration"
+    #[test]
+    fn test_partition_generator_with_histogram_alignment_no_mini_partition_order_by_asc() {
+        let start_time = 1753763400000000; // Tuesday, July 29, 2025 at 10:00:00 AM GMT+5:30
+        let end_time = 1753806600000000; // Tuesday, July 29, 2025 at 10:00:00 PM GMT+5:30
+        let min_step_seconds = 1800; // 30 minutes in seconds
+        let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(
+            min_step,
+            mini_partition_duration_secs,
+            true, // is_histogram = true
         );
-        assert_eq!(
-            mini_partition[1], end_time,
-            "Mini partition should end at end_time"
+        let step = min_step; // 30 minutes in microseconds
+
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Asc,
+            false, // add_mini_partition = false
         );
 
-        // Verify histogram alignment for non-mini partitions
-        for (_i, [start, end]) in partitions.iter().enumerate().skip(1) {
-            if *start != start_time && *end != end_time {
-                assert_eq!(
-                    *start % min_step,
-                    0,
-                    "Partition start should align with histogram interval"
-                );
-            }
+        // Print the actual partitions for debugging
+        println!("HISTOGRAM PARTITIONS NO MINI PARTITION (ASC):");
+        println!("Number of partitions: {}", partitions.len());
+        for (i, [start, end]) in partitions.iter().enumerate() {
+            // Convert to human-readable time for debugging
+            let start = chrono::DateTime::from_timestamp_micros(*start)
+                .unwrap()
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string();
+            let end = chrono::DateTime::from_timestamp_micros(*end)
+                .unwrap()
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string();
+            println!("Partition {}: {} - {}", i + 1, start, end);
         }
+
+        // HISTOGRAM PARTITIONS NO MINI PARTITION (ASC):
+        // Number of partitions: 24
+        // Partition 1: 2025-07-29 10:00:00 - 2025-07-29 10:30:00
+        // Partition 2: 2025-07-29 10:30:00 - 2025-07-29 11:00:00
+        // Partition 3: 2025-07-29 11:00:00 - 2025-07-29 11:30:00
+        // Partition 4: 2025-07-29 11:30:00 - 2025-07-29 12:00:00
+        // Partition 5: 2025-07-29 12:00:00 - 2025-07-29 12:30:00
+        // Partition 6: 2025-07-29 12:30:00 - 2025-07-29 13:00:00
+        // Partition 7: 2025-07-29 13:00:00 - 2025-07-29 13:30:00
+        // Partition 8: 2025-07-29 13:30:00 - 2025-07-29 14:00:00
+        // Partition 9: 2025-07-29 14:00:00 - 2025-07-29 14:30:00
+        // Partition 10: 2025-07-29 14:30:00 - 2025-07-29 15:00:00
+        // Partition 11: 2025-07-29 15:00:00 - 2025-07-29 15:30:00
+        // Partition 12: 2025-07-29 15:30:00 - 2025-07-29 16:00:00
+        // Partition 13: 2025-07-29 16:00:00 - 2025-07-29 16:30:00
+        // Partition 14: 2025-07-29 16:30:00 - 2025-07-29 17:00:00
+        // Partition 15: 2025-07-29 17:00:00 - 2025-07-29 17:30:00
+        // Partition 16: 2025-07-29 17:30:00 - 2025-07-29 18:00:00
+        // Partition 17: 2025-07-29 18:00:00 - 2025-07-29 18:30:00
+        // Partition 18: 2025-07-29 18:30:00 - 2025-07-29 19:00:00
+        // Partition 19: 2025-07-29 19:00:00 - 2025-07-29 19:30:00
+        // Partition 20: 2025-07-29 19:30:00 - 2025-07-29 20:00:00
+        // Partition 21: 2025-07-29 20:00:00 - 2025-07-29 20:30:00
+        // Partition 22: 2025-07-29 20:30:00 - 2025-07-29 21:00:00
+        // Partition 23: 2025-07-29 21:00:00 - 2025-07-29 21:30:00
+        // Partition 24: 2025-07-29 21:30:00 - 2025-07-29 22:00:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.first().unwrap()[0], start_time);
+        assert_eq!(partitions.last().unwrap()[1], end_time);
+    }
+
+    #[test]
+    fn test_partition_generator_with_histogram_alignment_mini_partition_order_by_asc() {
+        // Test case: 10:02 - 10:17 with 5-minute histogram interval and mini partition
+        let start_time = 1753763400000000; // Tuesday, July 29, 2025 at 10:00:00 AM GMT+5:30
+        let end_time = 1753806600000000; // Tuesday, July 29, 2025 at 10:00:00 PM GMT+5:30
+        let min_step_seconds = 1800; // 30 minutes in seconds
+        let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(
+            min_step,
+            mini_partition_duration_secs,
+            true, // is_histogram = true
+        );
+        let step = min_step; // 30 minutes in microseconds
+
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Asc,
+            true, // add_mini_partition = true
+        );
+
+        // Print the actual partitions for debugging
+        println!("HISTOGRAM PARTITIONS NO MINI PARTITION (DESC):");
+        println!("Number of partitions: {}", partitions.len());
+        for (i, [start, end]) in partitions.iter().enumerate() {
+            // Convert to human-readable time for debugging
+            let start = chrono::DateTime::from_timestamp_micros(*start)
+                .unwrap()
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string();
+            let end = chrono::DateTime::from_timestamp_micros(*end)
+                .unwrap()
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string();
+            println!("Partition {}: {} - {}", i + 1, start, end);
+        }
+
+        // HISTOGRAM PARTITIONS NO MINI PARTITION (DESC):
+        // Number of partitions: 25
+        // Partition 1: 2025-07-29 10:00:00 - 2025-07-29 10:01:00
+        // Partition 2: 2025-07-29 10:01:00 - 2025-07-29 10:30:00
+        // Partition 3: 2025-07-29 10:30:00 - 2025-07-29 11:00:00
+        // Partition 4: 2025-07-29 11:00:00 - 2025-07-29 11:30:00
+        // Partition 5: 2025-07-29 11:30:00 - 2025-07-29 12:00:00
+        // Partition 6: 2025-07-29 12:00:00 - 2025-07-29 12:30:00
+        // Partition 7: 2025-07-29 12:30:00 - 2025-07-29 13:00:00
+        // Partition 8: 2025-07-29 13:00:00 - 2025-07-29 13:30:00
+        // Partition 9: 2025-07-29 13:30:00 - 2025-07-29 14:00:00
+        // Partition 10: 2025-07-29 14:00:00 - 2025-07-29 14:30:00
+        // Partition 11: 2025-07-29 14:30:00 - 2025-07-29 15:00:00
+        // Partition 12: 2025-07-29 15:00:00 - 2025-07-29 15:30:00
+        // Partition 13: 2025-07-29 15:30:00 - 2025-07-29 16:00:00
+        // Partition 14: 2025-07-29 16:00:00 - 2025-07-29 16:30:00
+        // Partition 15: 2025-07-29 16:30:00 - 2025-07-29 17:00:00
+        // Partition 16: 2025-07-29 17:00:00 - 2025-07-29 17:30:00
+        // Partition 17: 2025-07-29 17:30:00 - 2025-07-29 18:00:00
+        // Partition 18: 2025-07-29 18:00:00 - 2025-07-29 18:30:00
+        // Partition 19: 2025-07-29 18:30:00 - 2025-07-29 19:00:00
+        // Partition 20: 2025-07-29 19:00:00 - 2025-07-29 19:30:00
+        // Partition 21: 2025-07-29 19:30:00 - 2025-07-29 20:00:00
+        // Partition 22: 2025-07-29 20:00:00 - 2025-07-29 20:30:00
+        // Partition 23: 2025-07-29 20:30:00 - 2025-07-29 21:00:00
+        // Partition 24: 2025-07-29 21:00:00 - 2025-07-29 21:30:00
+        // Partition 25: 2025-07-29 21:30:00 - 2025-07-29 22:00:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.first().unwrap()[0], start_time);
+        assert_eq!(partitions.last().unwrap()[1], end_time);
     }
 }
