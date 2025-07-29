@@ -324,7 +324,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "version" => {
-                    println!("version: {}", db::version::get().await?);
+                    println!("version: {}", db::metas::version::get().await?);
                 }
                 "user" => {
                     db::user::cache().await?;

@@ -185,8 +185,16 @@ pub async fn search(
     let mut nodes = get_online_querier_nodes(&trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
-    if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
-        nodes.retain(|n| n.is_ingester() || n.name.eq(&LOCAL_NODE.name));
+    if req.local_mode.unwrap_or_default() {
+        if LOCAL_NODE.is_querier() {
+            nodes.retain(|n| n.name.eq(&LOCAL_NODE.name));
+        } else {
+            nodes = nodes
+                .into_iter()
+                .filter(|n| n.is_querier())
+                .take(1)
+                .collect();
+        }
     }
 
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
@@ -294,6 +302,7 @@ pub async fn search(
         start_time: req.time_range.as_ref().map(|x| x.0).unwrap_or(0),
         end_time: req.time_range.as_ref().map(|x| x.1).unwrap_or(0),
         timeout: req.timeout as u64,
+        histogram_interval: req.histogram_interval,
     };
 
     let context = tracing::Span::current().context();

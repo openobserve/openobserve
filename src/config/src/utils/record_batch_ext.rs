@@ -84,18 +84,9 @@ pub fn convert_json_to_record_batch(
         record_keys.clear();
         for (k, v) in record.as_object().unwrap() {
             record_keys.insert(k);
-            let res = builders.get_mut(k);
-            // where the value is null, the key maybe not exists in the schema
-            // so we skip it
-            if res.is_none() && v.is_null() {
+            let Some((data_type, builder)) = builders.get_mut(k) else {
                 continue;
-            }
-            let (data_type, builder) = res.ok_or_else(|| {
-                ArrowError::SchemaError(format!(
-                    "Cannot find key {} (value: {:?}) in schema {:?}",
-                    k, v, schema
-                ))
-            })?;
+            };
             match data_type {
                 DataType::Utf8 => {
                     let b = builder

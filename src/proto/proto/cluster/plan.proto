@@ -29,11 +29,12 @@ message FlightSearchRequest {
 }
 
 message QueryIdentifier {
-    string                       trace_id = 1; 
+    string                       trace_id = 1;
     string                         org_id = 2;
     string                    stream_type = 3;
     uint32                      partition = 4; // the partition number of the remote scan
     string                         job_id = 5; // the unique id for each remote scan 
+    bool                      enrich_mode = 6; // need special logic for loading enrich table
 }
 
 message SearchInfo {
@@ -43,12 +44,13 @@ message SearchInfo {
     int64                      start_time = 4;
     int64                        end_time = 5;
     int64                         timeout = 6;
+    int64              histogram_interval = 7;
 }
 
 message IndexInfo {
     bool                   use_inverted_index = 1;
-    string                    index_condition = 2; 
-    repeated KvItem                equal_keys = 3; 
+    string                    index_condition = 2;
+    repeated KvItem                equal_keys = 3;
     repeated string            match_all_keys = 4;
     IdxOptimizeMode       index_optimize_mode = 5;
 }
@@ -56,15 +58,18 @@ message IndexInfo {
 message SuperClusterInfo {
     bool                 is_super_cluster = 1;
     optional string               user_id = 2;
-    optional string            work_group = 3; 
+    optional string            work_group = 3;
     optional string     search_event_type = 4; // use for super cluster
     optional bool              local_mode = 5; // use for super cluster
 }
 
 message IdxOptimizeMode {
   oneof mode {
-    SimpleSelect simple_select = 1;
-    SimpleCount   simple_count = 2;
+    SimpleSelect    simple_select     = 1;
+    SimpleCount     simple_count      = 2;
+    SimpleHistogram simple_histogram  = 3;
+    SimpleTopN      simple_topn       = 4;
+    SimpleDistinct  simple_distinct   = 5;
   }
 }
 
@@ -74,6 +79,24 @@ message SimpleSelect {
 }
 
 message SimpleCount {}
+
+message SimpleHistogram {
+  int64 min_value = 1;
+  uint64 bucket_width = 2;
+  uint32 num_buckets = 3;
+}
+
+message SimpleTopN {
+  string field = 1;
+  uint32 limit = 2;
+  bool     asc = 3;
+}
+
+message SimpleDistinct {
+  string field = 1;
+  uint32 limit = 2;
+  bool     asc = 3;
+}
 
 message KvItem {
     string   key = 1;

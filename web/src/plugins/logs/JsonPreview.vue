@@ -203,7 +203,7 @@
                 >
               </q-item-section>
             </q-item>
-            <q-item  clickable v-close-popup>
+            <q-item v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled" clickable v-close-popup>
               <q-item-section>
                 <q-item-label
                   data-test="send-to-ai-chat-btn"
@@ -263,6 +263,7 @@ import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
 import { is, useQuasar } from "quasar";
 import { load } from "rudder-sdk-js";
+import config from "@/aws-exports";
 
 export default {
   name: "JsonPreview",
@@ -549,7 +550,8 @@ export default {
       getOriginalData,
       addOrRemoveLabel,
       sendToAiChat,
-      getBtnLogo
+      getBtnLogo,
+      config
     };
   },
 };

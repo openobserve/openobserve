@@ -33,7 +33,7 @@ use config::{
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
-    physical_plan::{ExecutionPlan, displayable, visit_execution_plan},
+    physical_plan::visit_execution_plan,
     prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
@@ -161,8 +161,16 @@ pub async fn search(
     let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
-    if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
-        nodes.retain(|n| n.is_ingester() || n.name.eq(&LOCAL_NODE.name));
+    if req.local_mode.unwrap_or_default() {
+        if LOCAL_NODE.is_querier() {
+            nodes.retain(|n| n.name.eq(&LOCAL_NODE.name));
+        } else {
+            nodes = nodes
+                .into_iter()
+                .filter(|n| n.is_querier())
+                .take(1)
+                .collect();
+        }
     }
 
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
@@ -420,7 +428,11 @@ pub async fn run_datafusion(
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
-        print_plan(&physical_plan, "before");
+        log::info!("[trace_id {trace_id}] leader physical plan before rewrite");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+        );
     }
 
     // 7. rewrite physical plan
@@ -505,7 +517,11 @@ pub async fn run_datafusion(
     }
 
     if cfg.common.print_key_sql {
-        print_plan(&physical_plan, "after");
+        log::info!("[trace_id {trace_id}] leader physical plan after rewrite");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+        );
     }
 
     // run datafusion
@@ -817,14 +833,22 @@ pub(crate) async fn partition_file_by_hash(
     for fk in file_id_list {
         let node_name =
             infra_cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group)
-                .await
-                .expect("there is no querier node in consistent hash ring");
-        let idx = match node_idx.get(&node_name) {
-            Some(idx) => *idx,
+                .await;
+        let idx = match node_name {
+            Some(node_name) => match node_idx.get(&node_name) {
+                Some(idx) => *idx,
+                None => {
+                    log::warn!(
+                        "partition_file_by_hash: {} not found in node_idx",
+                        node_name
+                    );
+                    0
+                }
+            },
             None => {
-                log::error!(
-                    "partition_file_by_hash: {} not found in node_idx",
-                    node_name
+                log::warn!(
+                    "partition_file_by_hash: {} can't get a node from consistent hashing",
+                    fk.id
                 );
                 0
             }
@@ -1122,14 +1146,4 @@ pub async fn get_inverted_index_file_list(
         resp.scan_size,
         start.elapsed().as_millis() as usize,
     ))
-}
-
-pub fn print_plan(physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
-    let plan = displayable(physical_plan.as_ref())
-        .indent(false)
-        .to_string();
-    println!("+---------------------------+----------+");
-    println!("leader physical plan {stage} rewrite");
-    println!("+---------------------------+----------+");
-    println!("{}", plan);
 }

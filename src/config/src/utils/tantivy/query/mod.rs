@@ -13,21 +13,4 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::service::db;
-
-pub async fn get() -> Result<String, anyhow::Error> {
-    let ret = db::get("/meta/kv/version").await?;
-    let version = std::str::from_utf8(&ret).unwrap();
-    Ok(version.to_string())
-}
-
-pub async fn set() -> Result<(), anyhow::Error> {
-    db::put(
-        "/meta/kv/version",
-        bytes::Bytes::from(config::VERSION),
-        db::NO_NEED_WATCH,
-        None,
-    )
-    .await?;
-    Ok(())
-}
+pub mod contains_query;

@@ -194,6 +194,7 @@ const useHttpStreaming = () => {
         if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
         if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
         if (meta?.fallback_order_by_col) url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
+        if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
       } else if(type === "values") {
         const fieldsString = meta?.fields.join(",");
         url = `/_values_stream`

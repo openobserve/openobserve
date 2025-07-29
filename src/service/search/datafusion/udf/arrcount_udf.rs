@@ -62,19 +62,14 @@ pub fn arr_count_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Colum
     let array = arr_field
         .iter()
         .map(|arr_field| {
-            match arr_field {
-                // in arrow, any value can be null.
-                // Here we decide to make our UDF to return 0 when the argument is null.
-                Some(arr_field) => {
-                    let arr_field: json::Value =
-                        json::from_str(arr_field).expect("Failed to deserialize arrzip field1");
-                    match arr_field {
-                        json::Value::Array(field) => Some(field.len() as u64),
-                        _ => Some(0),
-                    }
-                }
-                _ => Some(0),
-            }
+            arr_field
+                .and_then(|arr_field| {
+                    json::from_str::<json::Value>(arr_field)
+                        .ok()
+                        .and_then(|arr_field| arr_field.as_array().map(|arr| arr.len() as u64))
+                        .or(Some(0))
+                })
+                .or(Some(0))
         })
         .collect::<UInt64Array>();
 
@@ -164,5 +159,156 @@ mod tests {
             let data = df.collect().await.unwrap();
             assert_batches_eq!(item.1, &data);
         }
+
+        // Test invalid JSON input - should return 0 instead of panicking
+        let invalid_sqls = [(
+            "select arrcount(invalid_json) as ret from t",
+            vec!["+-----+", "| ret |", "+-----+", "| 0   |", "+-----+"],
+        )];
+
+        // Add invalid JSON column to schema
+        let schema_with_invalid = Arc::new(Schema::new(vec![Field::new(
+            "invalid_json",
+            DataType::Utf8,
+            false,
+        )]));
+
+        let batch_with_invalid = RecordBatch::try_new(
+            schema_with_invalid.clone(),
+            vec![Arc::new(StringArray::from(vec!["not json"]))],
+        )
+        .unwrap();
+
+        let ctx_invalid = SessionContext::new();
+        ctx_invalid.register_udf(ARR_COUNT_UDF.clone());
+        let provider_invalid =
+            MemTable::try_new(schema_with_invalid, vec![vec![batch_with_invalid]]).unwrap();
+        ctx_invalid
+            .register_table("t", Arc::new(provider_invalid))
+            .unwrap();
+
+        for item in invalid_sqls {
+            let df = ctx_invalid.sql(item.0).await.unwrap();
+            let data = df.collect().await.unwrap();
+            assert_batches_eq!(item.1, &data);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_arr_count_edge_cases() {
+        // Test cases that should return 0
+        let edge_cases = [
+            r#"[]"#,
+            r#"{"key": "value"}"#,
+            r#""just a string""#,
+            r#"42"#,
+            r#"true"#,
+            r#"null"#,
+        ];
+
+        for json_input in edge_cases {
+            let sql = format!("select arrcount(test_col) as ret from t");
+            let expected = vec!["+-----+", "| ret |", "+-----+", "| 0   |", "+-----+"];
+
+            let schema = Arc::new(Schema::new(vec![Field::new(
+                "test_col",
+                DataType::Utf8,
+                false,
+            )]));
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![Arc::new(StringArray::from(vec![json_input]))],
+            )
+            .unwrap();
+
+            let ctx = SessionContext::new();
+            ctx.register_udf(ARR_COUNT_UDF.clone());
+            let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+            ctx.register_table("t", Arc::new(provider)).unwrap();
+
+            let df = ctx.sql(&sql).await.unwrap();
+            let data = df.collect().await.unwrap();
+            assert_batches_eq!(expected, &data);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_arr_count_null_input() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "test_col",
+            DataType::Utf8,
+            true,
+        )]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(vec![None::<String>]))],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_COUNT_UDF.clone());
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let df = ctx
+            .sql("select arrcount(test_col) as ret from t")
+            .await
+            .unwrap();
+        let data = df.collect().await.unwrap();
+        assert_batches_eq!(
+            vec!["+-----+", "| ret |", "+-----+", "| 0   |", "+-----+"],
+            &data
+        );
+    }
+
+    #[tokio::test]
+    async fn test_arr_count_multiple_rows() {
+        let inputs = vec![
+            r#"["a", "b", "c"]"#,  // valid array - should return 3
+            r#"[]"#,               // empty array - should return 0
+            r#"not json"#,         // invalid JSON - should return 0
+            r#"["x", "y"]"#,       // valid array - should return 2
+            r#"{"key": "value"}"#, // object - should return 0
+        ];
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "test_col",
+            DataType::Utf8,
+            false,
+        )]));
+        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(StringArray::from(inputs))])
+            .unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_COUNT_UDF.clone());
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        let df = ctx
+            .sql("select arrcount(test_col) as ret from t")
+            .await
+            .unwrap();
+        let data = df.collect().await.unwrap();
+        assert_batches_eq!(
+            vec![
+                "+-----+", "| ret |", "+-----+", "| 3   |", "| 0   |", "| 0   |", "| 2   |",
+                "| 0   |", "+-----+",
+            ],
+            &data
+        );
+    }
+
+    #[tokio::test]
+    async fn test_arr_count_wrong_arguments() {
+        let ctx = SessionContext::new();
+        ctx.register_udf(ARR_COUNT_UDF.clone());
+
+        // Test with no arguments
+        let result = ctx.sql("select arrcount() as ret").await;
+        assert!(result.is_err());
+
+        // Test with multiple arguments
+        let result = ctx.sql("select arrcount('a', 'b') as ret").await;
+        assert!(result.is_err());
     }
 }

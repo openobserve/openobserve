@@ -13,5 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod puffin;
-pub mod puffin_directory;
+use datafusion::physical_plan::{ExecutionPlan, displayable};
+
+use crate::cluster::LOCAL_NODE;
+
+pub fn generate_plan_string(trace_id: &str, plan: &dyn ExecutionPlan) -> String {
+    let plan = displayable(plan).indent(false).to_string();
+    let mut plan = format!("[trace_id {trace_id}] \n{plan}");
+    if !LOCAL_NODE.is_single_node() {
+        plan = plan.replace("\n", "\\n");
+    }
+    plan
+}

@@ -34,6 +34,53 @@ use crate::{
 pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
 pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
 
+pub async fn get_enrichment_table_data(
+    org_id: &str,
+    name: &str,
+) -> Result<Vec<serde_json::Value>, anyhow::Error> {
+    let start_time = get_start_time(org_id, name).await;
+    let end_time = now_micros();
+
+    let query = config::meta::search::Query {
+        sql: format!("SELECT * FROM \"{name}\""),
+        start_time,
+        end_time,
+        size: -1, // -1 means no limit, enrichment table should not be limited
+        ..Default::default()
+    };
+
+    let req = config::meta::search::Request {
+        query,
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
+        clusters: vec![],
+        timeout: 0,
+        search_type: None,
+        search_event_context: None,
+        use_cache: None,
+        local_mode: Some(true),
+    };
+    log::debug!(
+        "get enrichment table {} data req start time: {}",
+        name,
+        start_time
+    );
+    // do search
+    match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
+        Ok(res) => {
+            if !res.hits.is_empty() {
+                Ok(res.hits)
+            } else {
+                Ok(vec![])
+            }
+        }
+        Err(err) => {
+            log::error!("get enrichment table data error: {:?}", err);
+            Ok(vec![])
+        }
+    }
+}
+
 pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
     let start_time = get_start_time(org_id, name).await;
     let end_time = now_micros();
@@ -78,7 +125,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
     }
 }
 
-fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
+pub fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
     match value {
         json::Value::Null => vrl::value::Value::Null,
         json::Value::Bool(b) => vrl::value::Value::Boolean(*b),
@@ -103,6 +150,57 @@ fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
     }
 }
 
+pub async fn save_enrichment_data_to_db(
+    org_id: &str,
+    name: &str,
+    data: &Vec<json::Value>,
+    created_at: i64,
+) -> Result<(), infra::errors::Error> {
+    let bin_data = serde_json::to_vec(&data).unwrap();
+    infra::table::enrichment_tables::add(org_id, name, bin_data, created_at).await
+}
+
+pub async fn get_enrichment_data_from_db(
+    org_id: &str,
+    name: &str,
+) -> Result<(Vec<json::Value>, i64, i64), infra::errors::Error> {
+    let mut vec = vec![];
+    let mut min_ts = 0;
+    let mut max_ts = 0;
+    // Each record is a json array
+    let records = infra::table::enrichment_tables::get_by_org_and_name(org_id, name).await?;
+    // Records are in descending order, we need to convert them to a json array
+    for record in records {
+        if min_ts == 0 || record.created_at < min_ts {
+            min_ts = record.created_at;
+        }
+        if max_ts == 0 || record.created_at > max_ts {
+            max_ts = record.created_at;
+        }
+        match serde_json::from_slice(&record.data) {
+            Ok(data) => match data {
+                json::Value::Array(arr) => {
+                    vec.extend(arr.iter().cloned());
+                }
+                _ => {
+                    log::error!("Invalid enrichment data: {data}");
+                }
+            },
+            Err(e) => {
+                log::error!("Failed to parse enrichment data: {e}");
+            }
+        }
+    }
+    Ok((vec, min_ts, max_ts))
+}
+
+pub async fn delete_enrichment_data_from_db(
+    org_id: &str,
+    name: &str,
+) -> Result<(), infra::errors::Error> {
+    infra::table::enrichment_tables::delete(org_id, name).await
+}
+
 /// Delete the size of the enrichment table in bytes
 pub async fn delete_table_size(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
     db_service::delete(
@@ -124,7 +222,7 @@ pub async fn get_table_size(org_id: &str, name: &str) -> f64 {
                 size.parse::<f64>().unwrap_or(0.0)
             }
             Err(e) => {
-                log::error!("get_table_size error: {:?}", e);
+                log::warn!("get_table_size error: {:?}", e);
                 stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables).storage_size
             }
         },
@@ -157,7 +255,7 @@ pub async fn get_meta_table_stats(
     {
         Ok(size) => size,
         Err(e) => {
-            log::error!("get_table_size error: {:?}", e);
+            log::warn!("get_table_size error: {:?}", e);
             return None;
         }
     };
@@ -234,9 +332,15 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org_id = keys[0];
                 let stream_name = keys[2];
 
-                let data = super::enrichment_table::get(org_id, stream_name)
+                let data = match super::super::enrichment::get_enrichment_table(org_id, stream_name)
                     .await
-                    .unwrap();
+                {
+                    Ok(data) => data,
+                    Err(e) => {
+                        log::error!("[ENRICHMENT::TABLE watch] get enrichment table error: {e}");
+                        vec![]
+                    }
+                };
                 log::debug!(
                     "enrichment table: {} cache data length: {}",
                     item_key,

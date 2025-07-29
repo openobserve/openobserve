@@ -17,6 +17,7 @@ pub mod arrow;
 pub mod async_file;
 pub mod base64;
 pub mod download_utils;
+pub mod enrichment_local_cache;
 pub mod file;
 pub mod flatten;
 pub mod hash;

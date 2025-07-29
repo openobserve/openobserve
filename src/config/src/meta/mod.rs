@@ -26,6 +26,7 @@ pub mod logger;
 pub mod meta_store;
 pub mod otlp;
 pub mod pipeline;
+pub mod plan;
 pub mod promql;
 pub mod ratelimit;
 pub mod search;

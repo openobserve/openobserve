@@ -607,8 +607,11 @@ async fn process_delta(
         trace_id
     );
 
-    // for dashboards & histograms
-    if req.search_type == SearchEventType::Dashboards || req.payload.query.size == -1 {
+    // for dashboards & histograms, expect for ui
+    let search_type = req.payload.search_type.expect("populate search_type");
+    if search_type == SearchEventType::Dashboards
+        || (req.payload.query.size == -1 && search_type != SearchEventType::UI)
+    {
         // sort partitions by timestamp in desc
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
     }
@@ -785,6 +788,7 @@ async fn get_partitions(
         // vrl is not required for _search_partition
         query_fn: Default::default(),
         streaming_output: true,
+        search_type: Some(req.search_type),
     };
 
     let res = SearchService::search_partition(
@@ -954,7 +958,11 @@ pub async fn do_partitioned_search(
     // unless the query is a dashboard or histogram
     let mut partition_order_by = req_order_by;
     // sort partitions in desc by _timestamp for dashboards & histograms
-    if req.search_type == SearchEventType::Dashboards || req.payload.query.size == -1 {
+    // expect if search_type is UI
+    let search_type = req.payload.search_type.expect("populate search_type");
+    if search_type == SearchEventType::Dashboards
+        || (req.payload.query.size == -1 && search_type != SearchEventType::UI)
+    {
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
         partition_order_by = &OrderBy::Desc;
     }
