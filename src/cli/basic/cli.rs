@@ -251,8 +251,20 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .long("stream-name")
                     .required(false)
                     .help("stream-name"),
+                clap::Arg::new("top-x")
+                    .short('x')
+                    .long("top-x")
+                    .required(false)
+                    .default_value("5")
+                    .help("top-x"),
+                clap::Arg::new("org-id")
+                    .short('o')
+                    .long("org-id")
+                    .required(false)
+                    .default_value("default")
+                    .help("org-id"),
             ])
-        ])        
+        ])
         .get_matches();
 
     if app.subcommand().is_none() {
@@ -538,6 +550,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
 
             let duration = command.get_one::<String>("duration").unwrap();
             let duration = duration.parse::<i64>().unwrap_or(12);
+            let top_x = command.get_one::<String>("top-x").unwrap();
+            let top_x = top_x.parse::<usize>().unwrap_or(5);
+            let org_id = command.get_one::<String>("org-id").unwrap();
 
             super::query_optimiser::query_optimiser(
                 url,
@@ -545,6 +560,8 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 &meta_token,
                 duration,
                 &stream_name,
+                top_x,
+                org_id,
             )
             .await?;
         }
