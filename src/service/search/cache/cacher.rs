@@ -669,8 +669,8 @@ pub async fn delete_cache(path: &str, may_be_ts: Option<i64>) -> std::io::Result
                 && let Some(start_time_str) = file_name.split('_').next()
                 && let Ok(start_time) = start_time_str.parse::<i64>()
             {
-                // Only delete if start_time > delete_ts (keep cache from delete_ts onwards)
-                if start_time <= delete_ts {
+                // Only delete if start_time < delete_ts (keep cache from delete_ts onwards)
+                if start_time > delete_ts {
                     continue; // Skip this file, keep it
                 }
             }
@@ -699,9 +699,9 @@ pub async fn delete_cache(path: &str, may_be_ts: Option<i64>) -> std::io::Result
                     && let Some(start_time_str) = file_name.split('_').next()
                     && let Ok(start_time) = start_time_str.parse::<i64>()
                 {
-                    // Only delete if start_time > delete_ts (keep cache from delete_ts
+                    // Only delete if start_time < delete_ts (keep cache from delete_ts
                     // onwards)
-                    if start_time <= delete_ts {
+                    if start_time > delete_ts {
                         continue; // Skip this file, keep it
                     }
                 }
