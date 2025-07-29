@@ -18,7 +18,7 @@ use infra::db::{ORM_CLIENT, ORM_CLIENT_DDL, connect_to_orm, connect_to_orm_ddl};
 use schema::migrate_resource_names;
 use version_compare::Version;
 
-use crate::service::db::version;
+use crate::service::db::metas::version;
 
 pub mod dashboards;
 pub mod file_list;
