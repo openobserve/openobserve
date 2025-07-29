@@ -2547,6 +2547,7 @@ dependencies = [
  "sysinfo",
  "tantivy",
  "tantivy-fst",
+ "tempfile",
  "tokio",
  "tokio-util",
  "tracing",
