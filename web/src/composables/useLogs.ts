@@ -4826,8 +4826,8 @@ const useLogs = () => {
     try {
       const parsedSQL = fnParsedSQL();
 
-      if (!Object.hasOwn(parsedSQL, "from") || parsedSQL?.from.length === 0) {
-        console.error("Failed to parse SQL query:", value);
+      if (!Object.hasOwn(parsedSQL, "from") || parsedSQL?.from == null || parsedSQL?.from?.length == 0) {
+        console.info("Failed to parse SQL query:", value);
         throw new Error("Invalid SQL syntax");
       }
 
@@ -5187,7 +5187,7 @@ const useLogs = () => {
 
       if(!queryReq) return;
       
-      if(!isPagination) {
+      if(!isPagination && searchObj.meta.refreshInterval === 0) {
         resetQueryData();
         histogramResults = [];
         searchObj.data.queryResults.hits = [];
