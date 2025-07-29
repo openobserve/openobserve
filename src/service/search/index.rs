@@ -28,7 +28,9 @@ use datafusion::{
     physical_expr::ScalarFunctionExpr,
     physical_plan::{
         PhysicalExpr,
-        expressions::{BinaryExpr, Column, InListExpr, IsNotNullExpr, LikeExpr, Literal, NotExpr},
+        expressions::{
+            BinaryExpr, CastExpr, Column, InListExpr, IsNotNullExpr, LikeExpr, Literal, NotExpr,
+        },
     },
     scalar::ScalarValue,
 };
@@ -628,22 +630,7 @@ impl Condition {
                 Ok(Arc::new(BinaryExpr::new(left, Operator::NotEq, right)))
             }
             Condition::StrMatch(name, value, case_sensitive) => {
-                let index = schema.index_of(name).unwrap();
-                let left = Arc::new(Column::new(name, index));
-                let field = schema.field(index);
-                let right = get_scalar_value(value, field.data_type())?;
-                let udf = if *case_sensitive {
-                    Arc::new(str_match_udf::STR_MATCH_UDF.clone())
-                } else {
-                    Arc::new(str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone())
-                };
-                let udf_expr = Arc::new(ScalarFunctionExpr::new(
-                    udf.name(),
-                    udf.clone(),
-                    vec![left, right],
-                    DataType::Boolean,
-                ));
-                Ok(udf_expr)
+                create_str_match_expr(schema, name, value, *case_sensitive)
             }
             Condition::In(name, values, negated) => {
                 let index = schema.index_of(name).unwrap();
@@ -896,6 +883,46 @@ fn create_like_expr_with_not_null(
         Operator::And,
         Arc::new(LikeExpr::new(false, true, column, term.clone())),
     ))
+}
+
+fn create_str_match_expr(
+    schema: &arrow_schema::Schema,
+    name: &str,
+    value: &str,
+    case_sensitive: bool,
+) -> Result<Arc<dyn PhysicalExpr>, anyhow::Error> {
+    let index = schema.index_of(name).unwrap();
+    let field = schema.field(index);
+    let col = Arc::new(Column::new(name, index));
+
+    // if the field is Utf8View, we need to cast it to Utf8 for str_match udf
+    let left: Arc<dyn PhysicalExpr> = if *field.data_type() == DataType::Utf8View {
+        Arc::new(CastExpr::new(col, DataType::Utf8, None))
+    } else {
+        col
+    };
+
+    // if the field is Utf8View, we need to cast it to Utf8 for str_match udf
+    let data_type = if *field.data_type() == DataType::Utf8View {
+        DataType::Utf8
+    } else {
+        field.data_type().clone()
+    };
+
+    let right = get_scalar_value(value, &data_type)?;
+    let udf = if case_sensitive {
+        Arc::new(str_match_udf::STR_MATCH_UDF.clone())
+    } else {
+        Arc::new(str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone())
+    };
+
+    let udf_expr = Arc::new(ScalarFunctionExpr::new(
+        udf.name(),
+        udf.clone(),
+        vec![left, right],
+        DataType::Boolean,
+    ));
+    Ok(udf_expr)
 }
 
 fn is_alphanumeric(s: &str) -> bool {
