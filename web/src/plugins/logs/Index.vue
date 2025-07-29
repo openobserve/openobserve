@@ -2148,18 +2148,18 @@ export default defineComponent({
       ) {
         this.searchObj.data.queryResults.aggs = [];
 
-        if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
+        if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL) || !this.searchObj.data.queryResults.is_histogram_eligible) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            "Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries.",
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
         } else if (
           this.searchObj.meta.sqlMode &&
-          (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
+          (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL) || !this.searchObj.data.queryResults.is_histogram_eligible)
         ) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            "Histogram unavailable for SUBQUERY, CTEs, DISTINCT and LIMIT queries.",
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
