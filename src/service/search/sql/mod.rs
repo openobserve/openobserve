@@ -24,9 +24,7 @@ use config::{
     meta::{
         inverted_index::IndexOptimizeMode,
         search::SearchEventType,
-        sql::{
-            MAX_LIMIT, OrderBy, Sql as MetaSql, TableReferenceExt, resolve_stream_names_with_type,
-        },
+        sql::{MAX_LIMIT, OrderBy, TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
@@ -75,7 +73,6 @@ use crate::service::search::{
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
-pub static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 
 pub static RE_HISTOGRAM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
@@ -2002,35 +1999,77 @@ pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Erro
     })
 }
 
-pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, Error> {
-    #[allow(deprecated)]
-    let meta = match meta {
-        Some(v) => v,
-        None => match MetaSql::new(sql) {
-            Ok(meta) => meta,
-            Err(_) => {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                    sql.to_string(),
-                )));
-            }
-        },
-    };
-    let Some(caps) = RE_WHERE.captures(sql) else {
-        return Ok(None);
-    };
-    let mut where_str = caps.get(1).unwrap().as_str().to_string();
-    if !meta.group_by.is_empty() {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" group ").unwrap()].to_string();
-    } else if meta.having {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" having ").unwrap()].to_string();
-    } else if !meta.order_by.is_empty() {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" order ").unwrap()].to_string();
-    } else if meta.limit > 0 || where_str.to_lowercase().ends_with(" limit 0") {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" limit ").unwrap()].to_string();
-    } else if meta.offset > 0 {
-        where_str = where_str[0..where_str.to_lowercase().rfind(" offset ").unwrap()].to_string();
+pub fn pickup_where(sql: &str) -> Result<Option<String>, Error> {
+    // disable subquery, join, union, except, intersect, etc.
+    let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+        .map_err(|e| Error::Message(e.to_string()))?
+        .pop()
+        .unwrap();
+    let mut visitor = PickupWhereVisitor::new();
+    let _ = statement.visit(&mut visitor);
+    if let Some(where_str) = visitor.where_str {
+        return Ok(Some(where_str));
     }
-    Ok(Some(where_str))
+    Ok(None)
+}
+
+struct PickupWhereVisitor {
+    where_str: Option<String>,
+}
+
+impl PickupWhereVisitor {
+    fn new() -> Self {
+        Self { where_str: None }
+    }
+}
+
+impl VisitorMut for PickupWhereVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        match query.body.as_ref() {
+            sqlparser::ast::SetExpr::Select(select) => {
+                if select.from.len() > 1
+                    || select.from.iter().any(|from| {
+                        !from.joins.is_empty()
+                            || matches!(
+                                from.relation,
+                                TableFactor::Derived { .. } | TableFactor::Function { .. }
+                            )
+                    })
+                {
+                    self.where_str = None;
+                    return ControlFlow::Break(());
+                }
+
+                if let Some(selection) = select.selection.as_ref() {
+                    self.where_str = Some(selection.to_string());
+                    return ControlFlow::Continue(());
+                } else {
+                    self.where_str = None;
+                    return ControlFlow::Break(());
+                }
+            }
+            sqlparser::ast::SetExpr::SetOperation { .. } => {
+                self.where_str = None;
+                return ControlFlow::Break(());
+            }
+            _ => {}
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        match expr {
+            // check if has subquery
+            Expr::Subquery(_) | Expr::Exists { .. } | Expr::InSubquery { .. } => {
+                self.where_str = None;
+                return ControlFlow::Break(());
+            }
+            _ => {}
+        }
+        ControlFlow::Continue(())
+    }
 }
 
 fn o2_id_is_needed(
@@ -3426,5 +3465,180 @@ mod tests {
             .pop()
             .unwrap();
         assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_pickup_where_normal_sql() {
+        // Test normal SQL with WHERE clause
+        let sql = "SELECT * FROM logs WHERE level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("level = 'error'".to_string()));
+
+        // Test normal SQL with complex WHERE clause
+        let sql = "SELECT * FROM logs WHERE level = 'error' AND timestamp > 1234567890";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("level = 'error' AND timestamp > 1234567890".to_string())
+        );
+
+        // Test normal SQL with OR condition
+        let sql = "SELECT * FROM logs WHERE level = 'error' OR level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("level = 'error' OR level = 'warn'".to_string())
+        );
+
+        // Test normal SQL with IN clause
+        let sql = "SELECT * FROM logs WHERE level IN ('error', 'warn', 'info')";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("level IN ('error', 'warn', 'info')".to_string())
+        );
+
+        // Test normal SQL with LIKE clause
+        let sql = "SELECT * FROM logs WHERE message LIKE '%error%'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("message LIKE '%error%'".to_string()));
+    }
+
+    #[test]
+    fn test_pickup_where_no_where_clause() {
+        // Test SQL without WHERE clause
+        let sql = "SELECT * FROM logs";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with only SELECT and FROM
+        let sql = "SELECT id, name FROM users";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_pickup_where_with_joins() {
+        // Test SQL with JOIN - should return None
+        let sql = "SELECT * FROM logs l JOIN users u ON l.user_id = u.id WHERE l.level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with multiple FROM tables - should return None
+        let sql = "SELECT * FROM logs, users WHERE logs.user_id = users.id";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with LEFT JOIN - should return None
+        let sql =
+            "SELECT * FROM logs l LEFT JOIN users u ON l.user_id = u.id WHERE l.level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with INNER JOIN - should return None
+        let sql =
+            "SELECT * FROM logs l INNER JOIN users u ON l.user_id = u.id WHERE l.level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_pickup_where_with_subqueries() {
+        // Test SQL with subquery in WHERE - should return None
+        let sql = "SELECT * FROM logs WHERE user_id IN (SELECT id FROM users WHERE active = true)";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with EXISTS subquery - should return None
+        let sql =
+            "SELECT * FROM logs WHERE EXISTS (SELECT 1 FROM users WHERE users.id = logs.user_id)";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with subquery in FROM - should return None
+        let sql = "SELECT * FROM (SELECT * FROM logs WHERE level = 'error') sub WHERE sub.timestamp > 1234567890";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_pickup_where_with_union() {
+        // Test SQL with UNION - should return None
+        let sql = "SELECT * FROM logs WHERE level = 'error' UNION SELECT * FROM logs WHERE level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with UNION ALL - should return None
+        let sql = "SELECT * FROM logs WHERE level = 'error' UNION ALL SELECT * FROM logs WHERE level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with INTERSECT - should return None
+        let sql = "SELECT * FROM logs WHERE level = 'error' INTERSECT SELECT * FROM logs WHERE level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with EXCEPT - should return None
+        let sql = "SELECT * FROM logs WHERE level = 'error' EXCEPT SELECT * FROM logs WHERE level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_pickup_where_complex_where_clauses() {
+        // Test complex WHERE with parentheses
+        let sql = "SELECT * FROM logs WHERE (level = 'error' OR level = 'warn') AND timestamp > 1234567890";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("(level = 'error' OR level = 'warn') AND timestamp > 1234567890".to_string())
+        );
+
+        // Test WHERE with function calls
+        let sql = "SELECT * FROM logs WHERE LENGTH(message) > 100 AND level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("LENGTH(message) > 100 AND level = 'error'".to_string())
+        );
+
+        // Test WHERE with BETWEEN
+        let sql = "SELECT * FROM logs WHERE timestamp BETWEEN 1234567890 AND 1234567999";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("timestamp BETWEEN 1234567890 AND 1234567999".to_string())
+        );
+
+        // Test WHERE with IS NULL
+        let sql = "SELECT * FROM logs WHERE user_id IS NULL AND level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("user_id IS NULL AND level = 'error'".to_string())
+        );
+
+        // Test WHERE with IS NOT NULL
+        let sql = "SELECT * FROM logs WHERE user_id IS NOT NULL";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("user_id IS NOT NULL".to_string()));
+    }
+
+    #[test]
+    fn test_pickup_where_edge_cases() {
+        // Test SQL with table alias but no joins
+        let sql = "SELECT * FROM logs l WHERE l.level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("l.level = 'error'".to_string()));
+
+        // Test SQL with quoted identifiers
+        let sql = "SELECT * FROM \"logs\" WHERE \"level\" = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("\"level\" = 'error'".to_string()));
+
+        // Test SQL with schema prefix
+        let sql = "SELECT * FROM public.logs WHERE level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("level = 'error'".to_string()));
     }
 }
