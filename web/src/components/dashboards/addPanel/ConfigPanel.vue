@@ -1271,6 +1271,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <div class="space"></div>
+
+      <q-toggle
+        v-model="dashboardPanelData.data.config.show_gridlines"
+        label="Show Gridlines"
+        data-test="dashboard-config-show-gridlines"
+      />
+
+      <div class="space"></div>
+
       <q-input
         v-if="
           [
@@ -1692,7 +1702,9 @@ export default defineComponent({
         const isNewPanel = !dashboardPanelData.data.id;
         // if new panel, use config env
         // else always false
-        dashboardPanelData.data.config.show_symbol = isNewPanel ? store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false : false;
+        dashboardPanelData.data.config.show_symbol = isNewPanel
+          ? (store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false)
+          : false;
       }
 
       // by default, set line interpolation as smooth
@@ -1712,6 +1724,10 @@ export default defineComponent({
 
       if (!dashboardPanelData?.data?.config?.trellis?.group_by_y_axis) {
         dashboardPanelData.data.config.trellis.group_by_y_axis = false;
+      }
+
+      if (!dashboardPanelData.data.config.show_gridlines) {
+        dashboardPanelData.data.config.show_gridlines = true;
       }
     });
 

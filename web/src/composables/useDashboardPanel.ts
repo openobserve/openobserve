@@ -57,6 +57,7 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
         num_of_columns: 1,
         group_by_y_axis: false,
       },
+      show_gridlines: true,
       show_legends: true,
       legends_position: null,
       unit: null,
