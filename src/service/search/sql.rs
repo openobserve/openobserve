@@ -2618,7 +2618,26 @@ mod tests {
         assert_eq!(statement.to_string(), expected_sql);
     }
 
-    // test index_visitor for str_match
+    #[test]
+    fn test_index_visitor6() {
+        let sql = "SELECT * FROM t WHERE (name not in ('a', 'b') AND match_all('foo')) or (name = 'c' and not match_all('bar'))";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true, true);
+        let _ = statement.visit(&mut index_visitor);
+        let expected = "((name NOT IN (a,b) AND _all:foo) OR (name=c AND NOT(_all:bar)))";
+        let expected_sql = "SELECT * FROM t";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
     #[test]
     fn test_index_visitor_str_match() {
         let sql = "SELECT * FROM t WHERE str_match(name, 'value')";

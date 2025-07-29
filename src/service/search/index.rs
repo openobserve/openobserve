@@ -234,7 +234,8 @@ pub enum Condition {
     Equal(String, String),
     // field, value, case_sensitive
     StrMatch(String, String, bool),
-    In(String, Vec<String>),
+    // field, values, negated
+    In(String, Vec<String>, bool),
     Regex(String, String),
     MatchAll(String),
     FuzzyMatchAll(String, u8),
@@ -256,7 +257,13 @@ impl Condition {
                     format!("str_match_ignore_case({field}, '{value}')")
                 }
             }
-            Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
+            Condition::In(field, values, negated) => {
+                if *negated {
+                    format!("{} NOT IN ({})", field, values.join(","))
+                } else {
+                    format!("{} IN ({})", field, values.join(","))
+                }
+            }
             Condition::Regex(field, value) => format!("{field}=~{value}"),
             Condition::MatchAll(value) => format!("{INDEX_FIELD_NAME_FOR_ALL}:{value}"),
             Condition::FuzzyMatchAll(value, distance) => {
@@ -290,11 +297,11 @@ impl Condition {
             Expr::InList {
                 expr,
                 list,
-                negated: _,
+                negated,
             } => {
                 let field = get_field_name(expr);
                 let values = list.iter().map(get_value).collect();
-                Condition::In(field, values)
+                Condition::In(field, values, *negated)
             }
             Expr::Function(func) => {
                 let fn_name = func.name.to_string().to_lowercase();
@@ -384,7 +391,7 @@ impl Condition {
                 let term = Term::from_field_text(field, value);
                 Box::new(TermQuery::new(term, IndexRecordOption::Basic))
             }
-            Condition::In(field, values) => {
+            Condition::In(field, values, negated) => {
                 let field = schema.get_field(field)?;
                 let terms: Vec<Box<dyn Query>> = values
                     .iter()
@@ -393,7 +400,15 @@ impl Condition {
                         Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _
                     })
                     .collect();
-                Box::new(BooleanQuery::union(terms))
+                let query = Box::new(BooleanQuery::union(terms));
+                if *negated {
+                    Box::new(BooleanQuery::new(vec![
+                        (Occur::MustNot, query),
+                        (Occur::Must, Box::new(AllQuery {})),
+                    ]))
+                } else {
+                    query
+                }
             }
             Condition::Regex(field, value) => {
                 let field = schema.get_field(field)?;
@@ -509,11 +524,15 @@ impl Condition {
             Condition::Not(condition) => {
                 fields.extend(condition.get_tantivy_fields());
             }
+            Condition::In(field, _, negated) if *negated => {
+                fields.insert(field.clone());
+            }
             Condition::All() | Condition::Equal(..) | Condition::In(..) => {}
         }
         fields
     }
 
+    // get the fields use for search in tantivy
     pub fn get_tantivy_fields(&self) -> HashSet<String> {
         let mut fields = HashSet::new();
         match self {
@@ -523,7 +542,7 @@ impl Condition {
             Condition::StrMatch(field, ..) => {
                 fields.insert(field.clone());
             }
-            Condition::In(field, _) => {
+            Condition::In(field, ..) => {
                 fields.insert(field.clone());
             }
             Condition::Regex(field, _) => {
@@ -547,6 +566,7 @@ impl Condition {
         fields
     }
 
+    // get the fields use for search in datafusion(for add filter back logical)
     pub fn get_schema_fields(&self, fst_fields: &[String]) -> HashSet<String> {
         let mut fields = HashSet::new();
         match self {
@@ -556,7 +576,7 @@ impl Condition {
             Condition::StrMatch(field, ..) => {
                 fields.insert(field.clone());
             }
-            Condition::In(field, _) => {
+            Condition::In(field, ..) => {
                 fields.insert(field.clone());
             }
             Condition::Regex(field, _) => {
@@ -611,7 +631,7 @@ impl Condition {
                 ));
                 Ok(udf_expr)
             }
-            Condition::In(name, values) => {
+            Condition::In(name, values, negated) => {
                 let index = schema.index_of(name).unwrap();
                 let left = Arc::new(Column::new(name, index));
                 let field = schema.field(index);
@@ -619,7 +639,7 @@ impl Condition {
                     .iter()
                     .map(|value| get_scalar_value(value, field.data_type()).map(|v| v as _))
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(Arc::new(InListExpr::new(left, values, false, None)))
+                Ok(Arc::new(InListExpr::new(left, values, *negated, None)))
             }
             Condition::Regex(..) => {
                 unreachable!("Condition::Regex query only support for promql")
@@ -738,11 +758,8 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
         Expr::InList {
             expr,
             list,
-            negated,
+            negated: _,
         } => {
-            if *negated {
-                return false;
-            }
             if !is_field(expr) || !index_fields.contains(&get_field_name(expr)) {
                 return false;
             }
@@ -897,6 +914,7 @@ mod tests {
                 "value2".to_string(),
                 "value3".to_string(),
             ],
+            false,
         );
         let fields = condition.get_tantivy_fields();
 
@@ -954,7 +972,7 @@ mod tests {
     #[test]
     fn test_condition_get_tantivy_fields_and_simple() {
         let left = Condition::Equal("field1".to_string(), "value1".to_string());
-        let right = Condition::In("field2".to_string(), vec!["value1".to_string()]);
+        let right = Condition::In("field2".to_string(), vec!["value1".to_string()], false);
         let condition = Condition::And(Box::new(left), Box::new(right));
         let fields = condition.get_tantivy_fields();
 
@@ -1013,7 +1031,7 @@ mod tests {
     fn test_condition_get_tantivy_fields_all_types_mixed() {
         // Test with all different condition types mixed together
         let equal_cond = Condition::Equal("equal_field".to_string(), "value".to_string());
-        let in_cond = Condition::In("in_field".to_string(), vec!["val1".to_string()]);
+        let in_cond = Condition::In("in_field".to_string(), vec!["val1".to_string()], false);
         let regex_cond = Condition::Regex("regex_field".to_string(), "pattern.*".to_string());
         let match_all_cond = Condition::MatchAll("search_term".to_string());
         let fuzzy_match_cond = Condition::FuzzyMatchAll("fuzzy_term".to_string(), 1);
@@ -1071,6 +1089,7 @@ mod tests {
         index_condition.add_condition(Condition::In(
             "field2".to_string(),
             vec!["val1".to_string()],
+            false,
         ));
 
         let fields = index_condition.get_tantivy_fields();
