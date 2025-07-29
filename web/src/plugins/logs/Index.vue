@@ -1424,8 +1424,6 @@ export default defineComponent({
               return;
             }
 
-            console.log("searchObj.data.queryResults", JSON.parse(JSON.stringify(searchObj.data.queryResults)));
-
             // set logs page data to searchResponseForVisualization
             if (shouldUseHistogram === true) {
               // replace hits with histogram query data
@@ -1443,6 +1441,11 @@ export default defineComponent({
                   searchObj?.data?.queryResults
                     ?.visualization_histogram_interval,
               };
+
+              // if hits is empty and filteredHit is present, then set hits to filteredHit
+              if (searchResponseForVisualization?.value?.hits?.length === 0 && searchResponseForVisualization?.value?.filteredHit) {
+                searchResponseForVisualization.value.hits = searchResponseForVisualization?.value?.filteredHit ?? [];
+              }
             }
 
             // run query
@@ -1542,13 +1545,6 @@ export default defineComponent({
                 searchObj.data.datetime.relativeTimePeriod,
               )
             : cloneDeep(searchObj.data.datetime);
-
-        if (searchObj.meta.logsVisualizeToggle === "visualize") {
-          dashboardPanelData.meta.dateTime = {
-            start_time: new Date(dateTime.startTime),
-            end_time: new Date(dateTime.endTime),
-          };
-        }
       },
       { deep: true },
     );
@@ -1594,6 +1590,20 @@ export default defineComponent({
           searchBarRef.value.dateTimeRef &&
           searchBarRef.value.dateTimeRef.refresh();
 
+          const dateTime =
+          searchObj.data.datetime.type === "relative"
+            ? getConsumableRelativeTime(
+                searchObj.data.datetime.relativeTimePeriod,
+              )
+            : cloneDeep(searchObj.data.datetime);
+
+        if (searchObj.meta.logsVisualizeToggle === "visualize") {
+          dashboardPanelData.meta.dateTime = {
+            start_time: new Date(dateTime.startTime),
+            end_time: new Date(dateTime.endTime),
+          };
+        }
+
         visualizeChartData.value = JSON.parse(
           JSON.stringify(dashboardPanelData.data),
         );
@@ -1616,21 +1626,22 @@ export default defineComponent({
       fieldsExtractionLoading: false, // track custom field extraction progress
     });
 
-    // Abort controller reference for field extraction so that it can be cancelled from outside (e.g. Cancel button)
-    const fieldsExtractionAbortController = ref<AbortController | null>(null);
 
     const extractVisualizationFields = async () => {
+      // Abort controller reference for field extraction so that it can be cancelled from outside (e.g. Cancel button)
+      let fieldsExtractionAbortController = null;
+
       // mark extraction as in-progress so that cancel button is shown
       variablesAndPanelsDataLoadingState.fieldsExtractionLoading = true;
 
       // Abort any previous extraction if still running
-      if (fieldsExtractionAbortController.value) {
-        fieldsExtractionAbortController.value.abort();
+      if (fieldsExtractionAbortController) {
+        fieldsExtractionAbortController.abort();
       }
 
       // Create a fresh AbortController for this cycle
-      fieldsExtractionAbortController.value = new AbortController();
-      const signal = fieldsExtractionAbortController.value.signal;
+      fieldsExtractionAbortController = new AbortController();
+      const signal = fieldsExtractionAbortController.signal;
 
       const checkAbort = () => {
         if (signal.aborted) {
@@ -1776,10 +1787,6 @@ export default defineComponent({
 
     // Helper to abort any ongoing field-extraction operation
     const cancelFieldExtraction = () => {
-      if (fieldsExtractionAbortController.value) {
-        fieldsExtractionAbortController.value.abort();
-        fieldsExtractionAbortController.value = null;
-      }
       variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
     };
 

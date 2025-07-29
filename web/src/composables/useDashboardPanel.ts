@@ -3350,7 +3350,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
               : dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].query,
-            // query funciton will be null for now
+            // query function will be null for now
             query_fn: null,
             // if i == 0 ? then do gap of 7 days
             start_time: startISOTimestamp,
@@ -3360,7 +3360,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             streaming_output: false,
             streaming_id: null,
           },
-          // pass encodig if enabled,
+          // pass encoding if enabled,
           // make sure that `encoding: null` is not being passed, that's why used object extraction logic
           ...(store.state.zoConfig.sql_base64_enabled
             ? { encoding: "base64" }
