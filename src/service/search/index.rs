@@ -66,11 +66,16 @@ pub fn get_index_condition_from_expr(
     index_fields: &HashSet<String>,
     expr: &Expr,
 ) -> (Option<IndexCondition>, Option<Expr>) {
+    let cfg = get_config();
     let mut other_expr = Vec::new();
     let expr_list = split_conjunction(expr);
     let mut index_condition = IndexCondition::default();
     for e in expr_list {
-        if !is_expr_valid_for_index(e, index_fields) {
+        if !is_expr_valid_for_index(
+            e,
+            index_fields,
+            cfg.common.feature_query_not_filter_with_index,
+        ) {
             other_expr.push(e);
             continue;
         }
@@ -738,13 +743,25 @@ impl Condition {
 // check if function is match_all and only have one argument
 // check if binary operator is equal and one side is field and the other side is value
 // and the field is in the index_fields
-fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool {
+fn is_expr_valid_for_index(
+    expr: &Expr,
+    index_fields: &HashSet<String>,
+    not_filter_with_index: bool,
+) -> bool {
     match expr {
         Expr::BinaryOp {
             left,
             op: BinaryOperator::Eq | BinaryOperator::NotEq,
             right,
         } => {
+            let op = match expr {
+                Expr::BinaryOp { op, .. } => op,
+                _ => unreachable!(),
+            };
+            if !not_filter_with_index && *op == BinaryOperator::NotEq {
+                return false;
+            }
+
             let field = if is_value(left) && is_field(right) {
                 right
             } else if is_value(right) && is_field(left) {
@@ -760,8 +777,12 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
         Expr::InList {
             expr,
             list,
-            negated: _,
+            negated,
         } => {
+            if !not_filter_with_index && *negated {
+                return false;
+            }
+
             if !is_field(expr) || !index_fields.contains(&get_field_name(expr)) {
                 return false;
             }
@@ -776,8 +797,8 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
             op: BinaryOperator::And | BinaryOperator::Or,
             right,
         } => {
-            return is_expr_valid_for_index(left, index_fields)
-                && is_expr_valid_for_index(right, index_fields);
+            return is_expr_valid_for_index(left, index_fields, not_filter_with_index)
+                && is_expr_valid_for_index(right, index_fields, not_filter_with_index);
         }
         Expr::Function(func) => {
             let fn_name = func.name.to_string().to_lowercase();
@@ -797,12 +818,14 @@ fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool 
                 _ => false,
             };
         }
-        Expr::Nested(expr) => return is_expr_valid_for_index(expr, index_fields),
+        Expr::Nested(expr) => {
+            return is_expr_valid_for_index(expr, index_fields, not_filter_with_index);
+        }
         Expr::UnaryOp {
             op: UnaryOperator::Not,
             expr,
-        } => {
-            return is_expr_valid_for_index(expr, index_fields);
+        } if not_filter_with_index => {
+            return is_expr_valid_for_index(expr, index_fields, not_filter_with_index);
         }
         _ => return false,
     }
@@ -936,6 +959,8 @@ fn _is_blank_or_alphanumeric(s: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use sqlparser::ast::{Function, FunctionArgumentList, Ident, ObjectName, Value};
+
     use super::*;
 
     #[test]
@@ -1191,5 +1216,82 @@ mod tests {
         assert!(_is_blank_or_alphanumeric("123abc"));
         assert!(_is_blank_or_alphanumeric("123 abc"));
         assert!(_is_blank_or_alphanumeric("123 abc 123"));
+    }
+
+    #[test]
+    fn test_is_expr_valid_for_index1() {
+        let index_fields = HashSet::from_iter(vec!["field1".to_string()]);
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::Identifier(Ident::new("field1"))),
+            op: BinaryOperator::NotEq,
+            right: Box::new(Expr::Value(
+                Value::SingleQuotedString("value1".to_string()).into(),
+            )),
+        };
+        let result = is_expr_valid_for_index(&expr, &index_fields, true);
+        assert!(result);
+    }
+
+    #[test]
+    fn test_is_expr_valid_for_index2() {
+        // name not in ('a', 'b') or name = 'c'
+        let index_fields = HashSet::from_iter(vec!["name".to_string()]);
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::InList {
+                expr: Box::new(Expr::Identifier(Ident::new("name"))),
+                list: vec![
+                    Expr::Value(Value::SingleQuotedString("a".to_string()).into()),
+                    Expr::Value(Value::SingleQuotedString("b".to_string()).into()),
+                ],
+                negated: true,
+            }),
+            op: BinaryOperator::Or,
+            right: Box::new(Expr::BinaryOp {
+                left: Box::new(Expr::Identifier(Ident::new("name"))),
+                op: BinaryOperator::Eq,
+                right: Box::new(Expr::Value(
+                    Value::SingleQuotedString("c".to_string()).into(),
+                )),
+            }),
+        };
+        let result = is_expr_valid_for_index(&expr, &index_fields, true);
+        assert!(result);
+    }
+
+    #[test]
+    fn test_is_expr_valid_for_index3() {
+        // not (match_all('foo') or name != 'c')
+        let index_fields = HashSet::from_iter(vec!["name".to_string()]);
+        let expr = Expr::UnaryOp {
+            op: UnaryOperator::Not,
+            expr: Box::new(Expr::BinaryOp {
+                left: Box::new(Expr::Function(Function {
+                    name: ObjectName::from(vec![Ident::new("match_all")]),
+                    uses_odbc_syntax: false,
+                    parameters: FunctionArguments::None,
+                    args: FunctionArguments::List(FunctionArgumentList {
+                        duplicate_treatment: None,
+                        args: vec![FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+                            Value::SingleQuotedString("foo".to_string()).into(),
+                        )))],
+                        clauses: vec![],
+                    }),
+                    filter: None,
+                    null_treatment: None,
+                    over: None,
+                    within_group: vec![],
+                })),
+                op: BinaryOperator::Or,
+                right: Box::new(Expr::BinaryOp {
+                    left: Box::new(Expr::Identifier(Ident::new("name"))),
+                    op: BinaryOperator::NotEq,
+                    right: Box::new(Expr::Value(
+                        Value::SingleQuotedString("c".to_string()).into(),
+                    )),
+                }),
+            }),
+        };
+        let result = is_expr_valid_for_index(&expr, &index_fields, true);
+        assert!(result);
     }
 }
