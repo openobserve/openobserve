@@ -1213,6 +1213,7 @@ const useLogs = () => {
               //here we need to get the histogram interval for the histogram query that needs to be called
               searchObj.data.queryResults.histogram_interval = res.data?.histogram_interval;
               //we get is_histogram_eligible flag to check from the BE so that if it is false then we dont need to make histogram call
+              //this is coming as a part of partition response
               searchObj.data.queryResults.is_histogram_eligible = res.data?.is_histogram_eligible;
 
               // check if histogram interval is undefined, then set current response as histogram response
@@ -2594,7 +2595,10 @@ const useLogs = () => {
               };
             }
           }
-
+          //here also we are getting the is_histogram_eligible flag from the BE
+          //so that we can use it whenever we might not send the partition call from here also it will get updated
+          //this is coming as a part of data api call which is search call
+          searchObj.data.queryResults.is_histogram_eligible = res.data.is_histogram_eligible;
           // check for pagination request for the partition and check for subpage if we have to pull data from multiple partitions
           // it will check for subpage and if subpage is present then it will send pagination request for next partition
           if (
