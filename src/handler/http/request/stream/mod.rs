@@ -593,9 +593,8 @@ async fn delete_stream_cache(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
-        ("start_ts" = String, Query, description = "Start unix timestamp in microseconds"),
-        ("end_ts" = String, Query, description = "End unix timestamp in microseconds"),
     ),
+    request_body(content = TimeRange, description = "Time range with start and end timestamps in microseconds", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
@@ -698,8 +697,6 @@ async fn delete_stream_data_by_time_range(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
-        ("start_ts" = String, Query, description = "Start unix timestamp in microseconds"),
-        ("end_ts" = String, Query, description = "End unix timestamp in microseconds"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
