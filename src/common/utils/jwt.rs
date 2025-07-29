@@ -51,6 +51,7 @@ fn key_algorithm_to_algorithm(key_algo: &KeyAlgorithm) -> Option<Algorithm> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 #[cfg(feature = "enterprise")]
 pub(crate) fn verify_decode_token(
     token: &str,
