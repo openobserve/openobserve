@@ -83,13 +83,13 @@ fn extract_where_clause(statement: &Statement) -> Result<String, Error> {
             let error = Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Query is not a SELECT statement".to_string(),
             ));
-            return Err(error);
+            Err(error)
         }
     } else {
         let error = Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
             "Statement is not a query".to_string(),
         ));
-        return Err(error);
+        Err(error)
     }
 }
 
