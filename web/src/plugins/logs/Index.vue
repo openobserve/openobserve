@@ -587,6 +587,7 @@ export default defineComponent({
       loadVisualizeData,
       buildSearch,
       cancelQuery,
+      processHttpHistogramResults,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -599,6 +600,8 @@ export default defineComponent({
 
     const expandedLogs = ref([]);
     const splitterModel = ref(10);
+    const chartRedrawTimeout = ref(null);
+    const updateColumnsTimeout = ref(null);
 
     const { showErrorNotification, showAliasErrorForVisualization } =
       useNotifications();
@@ -684,6 +687,9 @@ export default defineComponent({
       // Cancel all the search queries
       cancelQuery();
       removeAiContextHandler();
+
+      // Clear any pending timeouts
+      clearAllTimeouts();
     });
 
     onActivated(() => {
@@ -1978,6 +1984,17 @@ export default defineComponent({
       emit("sendToAiChat", value);
     };
 
+    const clearAllTimeouts = () => {
+      if (chartRedrawTimeout.value) {
+        clearTimeout(chartRedrawTimeout.value);
+        chartRedrawTimeout.value = null;
+      }
+      if (updateColumnsTimeout.value) {
+        clearTimeout(updateColumnsTimeout.value);
+        updateColumnsTimeout.value = null;
+      }
+    };
+
     return {
       t,
       store,
@@ -2041,6 +2058,7 @@ export default defineComponent({
       dashboardPanelData,
       searchResponseForVisualization,
       shouldUseHistogramQuery,
+      processHttpHistogramResults,
     };
   },
   computed: {
@@ -2093,7 +2111,11 @@ export default defineComponent({
         this.searchObj.meta.showHistogram == true &&
         this.searchObj.meta.sqlMode == false
       ) {
-        setTimeout(() => {
+        // Clear any existing timeout
+        if (chartRedrawTimeout.value) {
+          clearTimeout(chartRedrawTimeout.value);
+        }
+        chartRedrawTimeout.value = setTimeout(() => {
           if (this.searchResultRef) this.searchResultRef.reDrawChart();
         }, 100);
       }
@@ -2179,21 +2201,21 @@ export default defineComponent({
             return;
           }
 
-          this.getHistogramQueryData(this.searchObj.data.histogramQuery)
+          this.processHttpHistogramResults(
+            this.searchObj.data.customDownloadQueryObj,
+          )
             .then((res: any) => {
               this.refreshTimezone();
-              this.searchResultRef.reDrawChart();
-            })
-            .catch((err: any) => {
-              console.log(err, "err in updating chart");
+              const timeout = setTimeout(() => {
+                if (this.searchResultRef) this.searchResultRef.reDrawChart();
+              }, 100);
+
+              // Store timeout reference for cleanup
+              chartRedrawTimeout.value = timeout;
             })
             .finally(() => {
               this.searchObj.loadingHistogram = false;
             });
-
-          setTimeout(() => {
-            if (this.searchResultRef) this.searchResultRef.reDrawChart();
-          }, 100);
         }
       }
 
@@ -2225,7 +2247,11 @@ export default defineComponent({
     // },
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
-      setTimeout(() => {
+      // Clear any existing timeout
+      if (updateColumnsTimeout.value) {
+        clearTimeout(updateColumnsTimeout.value);
+      }
+      updateColumnsTimeout.value = setTimeout(() => {
         this.updateGridColumns();
       }, 50);
     },
