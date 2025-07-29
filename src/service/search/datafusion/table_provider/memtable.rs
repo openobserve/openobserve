@@ -163,7 +163,7 @@ fn wrap_sort(exec: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
                     nulls_first: false,
                 },
             }]);
-            Arc::new(SortExec::new(ordering, exec))
+            Arc::new(SortExec::new(ordering.unwrap(), exec))
         }
         Err(_) => exec,
     }) as _

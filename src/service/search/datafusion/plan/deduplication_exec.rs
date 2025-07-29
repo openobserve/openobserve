@@ -29,7 +29,10 @@ use datafusion::{
     arrow::datatypes::SchemaRef,
     common::{Result, Statistics, internal_err},
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, LexRequirement, Partitioning, PhysicalSortRequirement},
+    physical_expr::{
+        EquivalenceProperties, LexRequirement, OrderingRequirements, Partitioning,
+        PhysicalSortRequirement,
+    },
     physical_plan::{
         DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
@@ -140,7 +143,7 @@ impl ExecutionPlan for DeduplicationExec {
 
     // if don't have this, the optimizer will not merge the SortExec
     // and get wrong result
-    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
+    fn required_input_ordering(&self) -> Vec<Option<OrderingRequirements>> {
         let mut sort_requirment = self
             .deduplication_columns
             .iter()
@@ -157,7 +160,7 @@ impl ExecutionPlan for DeduplicationExec {
                 Some(SortOptions::new(true, false)),
             ));
         }
-        vec![Some(LexRequirement::new(sort_requirment))]
+        vec![LexRequirement::new(sort_requirment).map(OrderingRequirements::new)]
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {

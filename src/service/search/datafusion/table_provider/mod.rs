@@ -591,7 +591,7 @@ fn create_ordering(schema: &Schema, sort_order: &[Vec<SortExpr>]) -> Result<Vec<
 
     for exprs in sort_order {
         // Construct PhysicalSortExpr objects from Expr objects:
-        let mut sort_exprs = LexOrdering::default();
+        let mut sort_exprs = vec![];
         for sort in exprs {
             match &sort.expr {
                 Expr::Column(col) => match expressions::col(&col.name, schema) {
@@ -616,7 +616,7 @@ fn create_ordering(schema: &Schema, sort_order: &[Vec<SortExpr>]) -> Result<Vec<
             }
         }
         if !sort_exprs.is_empty() {
-            all_sort_orders.push(sort_exprs);
+            all_sort_orders.push(LexOrdering::new(sort_exprs).unwrap());
         }
     }
     Ok(all_sort_orders)
