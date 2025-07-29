@@ -215,7 +215,6 @@ describe("Use Logs Composable", () => {
           sql: "test query",
           start_time: 1000,
           end_time: 2000,
-          sql_mode: "context",
           streaming_output: true
         },
         page_type: wrapper.vm.searchObj.data.stream.streamType,

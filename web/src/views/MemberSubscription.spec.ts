@@ -161,7 +161,7 @@ describe('MemberSubscription.vue', () => {
 
     it('should call ProcessSubscription on component creation', async () => {
       const processSpy = vi.spyOn(MemberSubscription.methods!, 'ProcessSubscription');
-      wrapper = createWrapper('#token=test-token');
+      wrapper = createWrapper('#sub_key=test-token');
       
       await wrapper.vm.$nextTick();
       expect(processSpy).toHaveBeenCalledWith('test-token', 'confirm');
@@ -277,6 +277,7 @@ describe('MemberSubscription.vue', () => {
         },
       };
 
+      wrapper = createWrapper('#sub_key=test-token&org_id=test-org-id', true);
       mockOrganizationsService.process_subscription.mockResolvedValue(mockResponse);
 
       // Get the spy that was created in createWrapper and restore it
@@ -304,6 +305,7 @@ describe('MemberSubscription.vue', () => {
         },
       };
 
+      wrapper = createWrapper('#sub_key=test-token&org_id=test-org-id', true);
       mockOrganizationsService.process_subscription.mockResolvedValue(mockResponse);
 
       // Get the spy that was created in createWrapper and restore it
@@ -313,7 +315,7 @@ describe('MemberSubscription.vue', () => {
       await wrapper.vm.ProcessSubscription('test-token', 'confirm');
 
       expect(wrapper.vm.status).toBe('completed');
-      expect(window.location.href).toBe('/organizations');
+      expect(window.location.href).toBe('/organizations?org_identifier=test-org-id');
     });
 
     it('should handle subscription error', async () => {
