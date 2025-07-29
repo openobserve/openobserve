@@ -715,7 +715,7 @@ pub fn handle_histogram(
         return;
     };
 
-    // 0th capture is the whole histogram(...) , 
+    // 0th capture is the whole histogram(...) ,
     // 1st capture is the comma-delimited list of args
     // ideally there should be at least one arg, otherwise df with anyways complain,
     // so we we return from here if capture[1] is None
@@ -731,13 +731,12 @@ pub fn handle_histogram(
     let interval = if histogram_interval > 0 {
         format!("{histogram_interval} second")
     } else {
-        args
-            .get(1)
+        args.get(1)
             .map_or_else(|| generate_histogram_interval(q_time_range), |v| *v)
             .to_string()
     };
 
-    let field = args.get(0).unwrap_or(&"_timestamp");
+    let field = args.first().unwrap_or(&"_timestamp");
 
     *origin_sql = origin_sql.replace(
         caps.get(0).unwrap().as_str(),

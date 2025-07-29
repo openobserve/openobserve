@@ -161,7 +161,7 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                     // ts col is _timestamp, and is not aliased with some other name
                     let ts = match self.timestamp_alias.as_ref() {
                         Some(v) => v.as_str(),
-                        None => "_tiemstamp",
+                        None => "_timestamp",
                     };
                     match expr {
                         Expr::Column(col) => {
@@ -606,5 +606,23 @@ mod tests {
             extractor.projections,
             hashset!["time_bucket", "logs_count", "node_name", "pulled_jobs"]
         );
+
+        let sql = r#"WITH ErrorLogs AS (
+                SELECT 
+                    COALESCE(k8s_container_name, 'Unknown Container') AS container,
+                    COUNT(*) AS error_count
+                FROM "default"
+                GROUP BY container
+            )
+            SELECT * 
+            FROM ErrorLogs
+            WHERE error_count > 10"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.timeseries, None);
+        assert_eq!(extractor.ts_hist_alias, None);
+        assert_eq!(extractor.timestamp_alias, None);
+        assert_eq!(extractor.group_by, hashset!["container"]);
+        assert_eq!(extractor.projections, hashset!["container", "error_count"]);
     }
 }
