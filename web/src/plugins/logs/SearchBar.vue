@@ -3283,7 +3283,7 @@ export default defineComponent({
       ) {
         // cancel all the visualize queries
         cancelVisualizeQueries();
-        if(searchObj.meta.logsVisualizeDirtyFlag === true && (!Object.hasOwn(searchObj.data?.queryResults, "hits") || searchObj.data?.queryResults?.hits?.length == 0)) {
+        if(searchObj.meta.logsVisualizeDirtyFlag === true || !Object.hasOwn(searchObj.data?.queryResults, "hits") || searchObj.data?.queryResults?.hits?.length == 0) {
           searchObj.loading = true;
           getQueryData();
         }

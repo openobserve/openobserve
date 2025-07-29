@@ -910,7 +910,6 @@ export default defineComponent({
             loadLogsData();
           } else {
             loadVisualizeData();
-            searchObj.meta.logsVisualizeDirtyFlag = true;
             searchObj.loading = false;
           }
 
