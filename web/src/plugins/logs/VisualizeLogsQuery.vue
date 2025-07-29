@@ -156,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :width="6"
                         @error="handleChartApiError"
                         :searchResponse="searchResponse"
+                        :is_ui_histogram="is_ui_histogram"
                       />
                     </div>
                     <div
@@ -314,7 +315,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #after>
                       <PanelSchemaRenderer
                         @metadata-update="metaDataValue"
-                        :key="dashboardPanelData.data.type"
                         :panelSchema="chartData"
                         :selectedTimeObj="dashboardPanelData.meta.dateTime"
                         :variablesData="{}"
@@ -324,6 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :width="6"
                         @error="handleChartApiError"
                         :searchResponse="searchResponse"
+                        :is_ui_histogram="is_ui_histogram"
                       />
                     </template>
                   </q-splitter>
@@ -414,6 +415,11 @@ export default defineComponent({
       type: Object,
       required: false,
     },
+    is_ui_histogram: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
   },
   components: {
     ChartSelection,
@@ -446,7 +452,7 @@ export default defineComponent({
     };
     const { showErrorNotification } = useNotifications();
 
-    const { visualizeChartData }: any = toRefs(props);
+    const { visualizeChartData, is_ui_histogram }: any = toRefs(props);
     const chartData = ref(visualizeChartData.value);
 
     const showAddToDashboardDialog = ref(false);
@@ -748,6 +754,7 @@ export default defineComponent({
       updateVrlFunctionFieldList,
       splitterModel,
       collapseFieldList,
+      is_ui_histogram,
     };
   },
 });
