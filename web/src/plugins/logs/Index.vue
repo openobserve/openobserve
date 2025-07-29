@@ -276,6 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
               :searchResponse="searchResponseForVisualization"
+              :is_ui_histogram="shouldUseHistogramQuery"
             ></VisualizeLogsQuery>
           </div>
         </template>
@@ -1442,6 +1443,8 @@ export default defineComponent({
 
     const searchResponseForVisualization = ref({});
 
+    const shouldUseHistogramQuery = ref(false);
+
     let fieldsExtractionPromise = new Promise((resolve) => resolve(true));
 
     watch(
@@ -1460,15 +1463,15 @@ export default defineComponent({
             // reset old rendered chart
             visualizeChartData.value = {};
 
-            const shouldUseHistogram = await extractVisualizationFields();
+            shouldUseHistogramQuery.value = await extractVisualizationFields();
 
             // if not able to parse query, do not do anything
-            if (shouldUseHistogram === null) {
+            if (shouldUseHistogramQuery.value === null) {
               return;
             }
 
             // set logs page data to searchResponseForVisualization
-            if (shouldUseHistogram === true) {
+            if (shouldUseHistogramQuery.value === true) {
               // replace hits with histogram query data
               searchResponseForVisualization.value = {
                 ...searchObj.data.queryResults,
@@ -1544,10 +1547,10 @@ export default defineComponent({
           // reset old rendered chart
           visualizeChartData.value = {};
 
-          const shouldUseHistogram = await extractVisualizationFields();
+          shouldUseHistogramQuery.value = await extractVisualizationFields();
 
           // if not able to parse query, do not do anything
-          if (shouldUseHistogram === null) {
+          if (shouldUseHistogramQuery.value === null) {
             return false;
           }
 
@@ -1824,19 +1827,11 @@ export default defineComponent({
         };
 
         /* Decide whether to use histogram query */
-        const shouldUseHistogram = !(
+        shouldUseHistogramQuery.value = !(
           extractedFields?.group_by && extractedFields.group_by.length
         );
 
-        const histogramFallbackQuery =
-          searchObj?.data?.histogramQuery?.query?.sql ??
-          (searchObj?.data?.stream?.selectedStream?.[0]
-            ? `SELECT histogram(_timestamp) as "zo_sql_key", count(_timestamp) as "zo_sql_num"  FROM "${searchObj?.data?.stream?.selectedStream?.[0]}"  GROUP BY zo_sql_key ORDER BY zo_sql_key ASC`
-            : "");
-
-        const finalQuery = shouldUseHistogram
-          ? histogramFallbackQuery
-          : logsPageQuery;
+        const finalQuery = logsPageQuery;
 
         if (!finalQuery) {
           showErrorNotification("Query is empty, please write query to visualize");
@@ -1860,7 +1855,7 @@ export default defineComponent({
         /* Populate fields & axes */
         // For histogram queries, we need to modify the extractedFields to match the actual query structure
         let fieldsForVisualization = extractedFields;
-        if (shouldUseHistogram) {
+        if (shouldUseHistogramQuery.value) {
           // For histogram query, override the extracted fields to match the histogram structure
           fieldsForVisualization = {
             group_by: ["zo_sql_key"], // histogram field is grouped by zo_sql_key
@@ -1877,7 +1872,7 @@ export default defineComponent({
           JSON.stringify(dashboardPanelData.data),
         );
 
-        return shouldUseHistogram;
+        return shouldUseHistogramQuery.value;
       } catch (err) {
         variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
         throw err;
@@ -2089,6 +2084,7 @@ export default defineComponent({
       removeFieldByName,
       dashboardPanelData,
       searchResponseForVisualization,
+      shouldUseHistogramQuery,
     };
   },
   computed: {

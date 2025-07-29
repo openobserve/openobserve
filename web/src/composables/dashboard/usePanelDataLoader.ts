@@ -69,6 +69,7 @@ export const usePanelDataLoader = (
   folderId: any,
   reportId: any,
   searchResponse: any,
+  is_ui_histogram: any,
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -533,6 +534,7 @@ export const usePanelDataLoader = (
                   traceparent,
                   dashboard_id: dashboardId?.value,
                   folder_id: folderId?.value,
+                  is_ui_histogram: is_ui_histogram.value,
                 },
                 searchType.value ?? "dashboards",
               ),
@@ -854,6 +856,7 @@ export const usePanelDataLoader = (
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,
         fallback_order_by_col: getFallbackOrderByCol(),
+        is_ui_histogram: is_ui_histogram.value,
       },
     });
   };
@@ -1043,6 +1046,7 @@ export const usePanelDataLoader = (
           dashboard_id: dashboardId?.value,
           folder_id: folderId?.value,
           fallback_order_by_col: getFallbackOrderByCol(),
+          is_ui_histogram: is_ui_histogram.value,
         },
       };
 
@@ -1399,6 +1403,7 @@ export const usePanelDataLoader = (
                           traceparent,
                           dashboard_id: dashboardId?.value,
                           folder_id: folderId?.value,
+                          is_ui_histogram: is_ui_histogram.value,
                         },
                         searchType.value ?? "dashboards",
                       ),
