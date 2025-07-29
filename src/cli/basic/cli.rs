@@ -23,7 +23,8 @@ use crate::{
         cli::{Cli as dataCli, args as dataArgs},
         export, import,
     },
-    common::{infra::config::USERS, meta, migration},
+    common::{infra::config::USERS, meta},
+    migration,
     service::{compact, db, file_list, users},
 };
 
@@ -225,6 +226,8 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .num_args(1..)
                     .help("file"),
             ]),
+            clap::Command::new("upgrade-db")
+                .about("upgrade db table schemas").args(dataArgs()),
             clap::Command::new("query-optimiser").about("query optimiser").args([
                 clap::Arg::new("url")
                     .short('u')
@@ -533,6 +536,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 .collect::<Vec<_>>();
             let files = files.iter().map(|f| f.to_string()).collect::<Vec<_>>();
             super::http::consistent_hash(files).await?;
+        }
+        "upgrade-db" => {
+            crate::migration::init_db().await?;
         }
         "query-optimiser" => {
             let stream_name = command
