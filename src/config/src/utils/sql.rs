@@ -171,8 +171,7 @@ pub fn is_eligible_for_histogram(query: &str) -> Result<bool, sqlparser::parser:
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
         if let Statement::Query(query) = statement {
-            if has_subquery(statement) || has_distinct(query) || has_limit(query) || has_cte(query)
-            {
+            if has_distinct(query) || has_limit(query) || has_cte(query) {
                 return Ok(false);
             }
         }
