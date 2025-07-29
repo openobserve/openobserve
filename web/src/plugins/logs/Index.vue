@@ -586,6 +586,7 @@ export default defineComponent({
       getStream,
       loadVisualizeData,
       buildSearch,
+      cancelQuery,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -681,7 +682,7 @@ export default defineComponent({
 
     onBeforeUnmount(() => {
       // Cancel all the search queries
-      cancelOnGoingSearchQueries();
+      cancelQuery();
       removeAiContextHandler();
     });
 
@@ -1937,25 +1938,24 @@ export default defineComponent({
           }
 
           for (let i = 0; i < streams.length; i++) {
-
             const schema = await getStream(streams[i], streamType, true);
-            //here we are deep copying the schema before assiging it to schemaData so that we dont mutatat the orginial data 
+            //here we are deep copying the schema before assiging it to schemaData so that we dont mutatat the orginial data
             //if we do this we dont get duplicate fields in the schema
             let schemaData = deepCopy(schema.uds_schema || schema.schema || []);
             let isUdsEnabled = schema.uds_schema?.length > 0;
             //we only push the timestamp and all fields name in the schema if uds is enabled for that stream
-            if(isUdsEnabled){
+            if (isUdsEnabled) {
               let timestampColumn = store.state.zoConfig.timestamp_column;
               let allFieldsName = store.state.zoConfig.all_fields_name;
               schemaData.push({
-                name:timestampColumn,
-                type:'Int64'
-              })
-                schemaData.push({
-                  name:allFieldsName,
-                  type:'Utf8'
-                })
-              }
+                name: timestampColumn,
+                type: "Int64",
+              });
+              schemaData.push({
+                name: allFieldsName,
+                type: "Utf8",
+              });
+            }
             payload["stream_name_" + (i + 1)] = streams[i];
             payload["schema_" + (i + 1)] = schemaData;
           }

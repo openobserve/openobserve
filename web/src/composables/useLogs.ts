@@ -4455,7 +4455,8 @@ const useLogs = () => {
   const onStreamChange = async (queryStr: string) => {
     try {
       searchObj.loadingStream = true;
-
+      
+      await cancelQuery();
       // Reset query results
       searchObj.data.queryResults = { hits: [] };
 
@@ -4614,11 +4615,14 @@ const useLogs = () => {
     }
   };
 
-  const cancelQuery = () => {
+  const cancelQuery = async () : Promise<boolean> => {
+    return new Promise((resolve, reject) => {
+      try {
     if (searchObj.communicationMethod === "ws") {
       sendCancelSearchMessage([
         ...searchObj.data.searchWebSocketTraceIds,
       ]);
+          resolve(true);
       return;
     }
 
@@ -4626,6 +4630,7 @@ const useLogs = () => {
 
     if (!searchObj.data.searchRequestTraceIds.length) {
       searchObj.data.isOperationCancelled = false;
+      resolve(true);
       return;
     }
 
@@ -4662,6 +4667,17 @@ const useLogs = () => {
           searchObj.data.searchRequestTraceIds.filter(
             (id: string) => !tracesIds.includes(id),
           );
+            resolve(true);
+          });
+      } catch (error) {
+        $q.notify({
+          message: "Failed to cancel running query",
+          color: "negative",
+          position: "bottom",
+          timeout: 1500,
+        });
+        resolve(true);
+      }
       });
   };
 
