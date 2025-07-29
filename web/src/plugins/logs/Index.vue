@@ -2167,6 +2167,7 @@ export default defineComponent({
               "histogram",
               {
                 isHistogramOnly: this.searchObj.meta.histogramDirtyFlag,
+                is_ui_histogram: true
               },
             );
             const requestId = this.initializeSearchConnection(payload);
