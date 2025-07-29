@@ -135,45 +135,15 @@ fn create_cli_app() -> Command {
             ]),
             Command::new("upgrade-db")
                 .about("upgrade db table schemas").args(dataArgs()),
-                clap::Command::new("query-optimiser").about("query optimiser").args([
-                    clap::Arg::new("url")
-                        .short('u')
-                        .long("url")
-                        .required(true)
-                        .help("url"),
-                    clap::Arg::new("token")
-                        .short('t')
-                        .long("token")
-                        .required(true)
-                        .help("token"),
-                    clap::Arg::new("meta-token")
-                        .short('m')
-                        .long("meta-token")
-                        .required(false)
-                        .help("meta-token"),
-                    clap::Arg::new("duration")
-                        .short('d')
-                        .long("duration")
-                        .required(true)
-                        .help("duration"),
-                    clap::Arg::new("stream-name")
-                        .short('s')
-                        .long("stream-name")
-                        .required(false)
-                        .help("stream-name"),
-                    clap::Arg::new("top-x")
-                        .short('x')
-                        .long("top-x")
-                        .required(false)
-                        .default_value("5")
-                        .help("top-x"),
-                    clap::Arg::new("org-id")
-                        .short('o')
-                        .long("org-id")
-                        .required(false)
-                        .default_value("default")
-                        .help("org-id"),
-                ])
+            Command::new("query-optimiser").about("query optimiser").args([
+                    arg!("url", 'u', "url", "url", true),
+                    arg!("token", 't', "token", "token", true),
+                    arg!("meta-token", 'm', "meta-token", "meta-token"),
+                    arg!("duration", 'd', "duration", "duration", true),
+                    arg!("stream-name", 's', "stream-name", "stream-name"),
+                    arg!("top-x", 'x', "top-x", "top-x").default_value("5"),
+                    arg!("org-id", 'o', "org-id", "org-id").default_value("default"),
+            ])
         ])
 }
 
