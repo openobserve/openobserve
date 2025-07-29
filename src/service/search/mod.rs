@@ -912,7 +912,7 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
-    log::debug!(
+    log::info!(
         "[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}",
         total_secs,
         part_num,
