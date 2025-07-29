@@ -722,9 +722,10 @@ fn adapt_batch(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use arrow::array::{Int64Array, StringArray, Array};
+    use arrow::array::{Array, Int64Array, StringArray};
     use arrow_schema::Field;
+
+    use super::*;
 
     #[test]
     fn test_adapt_batch_exact_match() {
@@ -733,7 +734,7 @@ mod tests {
             Field::new("id", DataType::Int64, false),
             Field::new("name", DataType::Utf8, true),
         ]));
-        
+
         let latest_schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int64, false),
             Field::new("name", DataType::Utf8, true),
@@ -745,17 +746,26 @@ mod tests {
                 Arc::new(Int64Array::from(vec![1, 2, 3])),
                 Arc::new(StringArray::from(vec!["a", "b", "c"])),
             ],
-        ).unwrap();
+        )
+        .unwrap();
 
         let (result_batch, diff_fields) = adapt_batch(latest_schema, batch);
 
         assert_eq!(result_batch.schema().fields().len(), 2);
         assert_eq!(result_batch.num_rows(), 3);
         assert!(diff_fields.is_empty());
-        
+
         // Verify data is preserved
-        let id_col = result_batch.column(0).as_any().downcast_ref::<Int64Array>().unwrap();
-        let name_col = result_batch.column(1).as_any().downcast_ref::<StringArray>().unwrap();
+        let id_col = result_batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        let name_col = result_batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
         assert_eq!(id_col.value(0), 1);
         assert_eq!(id_col.value(1), 2);
         assert_eq!(id_col.value(2), 3);
@@ -767,10 +777,8 @@ mod tests {
     #[test]
     fn test_adapt_batch_missing_field() {
         // Test case: batch is missing a field that exists in latest schema
-        let batch_schema = Arc::new(Schema::new(vec![
-            Field::new("id", DataType::Int64, false),
-        ]));
-        
+        let batch_schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int64, false)]));
+
         let latest_schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int64, false),
             Field::new("name", DataType::Utf8, true),
@@ -779,38 +787,47 @@ mod tests {
 
         let batch = RecordBatch::try_new(
             batch_schema.clone(),
-            vec![
-                Arc::new(Int64Array::from(vec![1, 2, 3])),
-            ],
-        ).unwrap();
+            vec![Arc::new(Int64Array::from(vec![1, 2, 3]))],
+        )
+        .unwrap();
 
         let (result_batch, diff_fields) = adapt_batch(latest_schema, batch);
 
         assert_eq!(result_batch.schema().fields().len(), 3);
         assert_eq!(result_batch.num_rows(), 3);
         assert!(diff_fields.is_empty());
-        
+
         // Verify existing data is preserved
-        let id_col = result_batch.column(0).as_any().downcast_ref::<Int64Array>().unwrap();
+        let id_col = result_batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
         assert_eq!(id_col.value(0), 1);
         assert_eq!(id_col.value(1), 2);
         assert_eq!(id_col.value(2), 3);
-        
+
         // Verify missing fields are null
-        let name_col = result_batch.column(1).as_any().downcast_ref::<StringArray>().unwrap();
+        let name_col = result_batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
         assert_eq!(name_col.null_count(), 3);
-        
-        let active_col = result_batch.column(2).as_any().downcast_ref::<arrow::array::BooleanArray>().unwrap();
+
+        let active_col = result_batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<arrow::array::BooleanArray>()
+            .unwrap();
         assert_eq!(active_col.null_count(), 3);
     }
 
     #[test]
     fn test_adapt_batch_utf8view_field() {
         // Test case: latest schema has Utf8View field that's missing in batch
-        let batch_schema = Arc::new(Schema::new(vec![
-            Field::new("id", DataType::Int64, false),
-        ]));
-        
+        let batch_schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int64, false)]));
+
         let latest_schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int64, false),
             Field::new("description", DataType::Utf8View, true),
@@ -818,10 +835,9 @@ mod tests {
 
         let batch = RecordBatch::try_new(
             batch_schema.clone(),
-            vec![
-                Arc::new(Int64Array::from(vec![1, 2, 3])),
-            ],
-        ).unwrap();
+            vec![Arc::new(Int64Array::from(vec![1, 2, 3]))],
+        )
+        .unwrap();
 
         let (result_batch, diff_fields) = adapt_batch(latest_schema, batch);
 
@@ -829,15 +845,23 @@ mod tests {
         assert_eq!(result_batch.num_rows(), 3);
         assert_eq!(diff_fields.len(), 1);
         assert_eq!(diff_fields.get("description"), Some(&DataType::Utf8View));
-        
+
         // Verify existing data is preserved
-        let id_col = result_batch.column(0).as_any().downcast_ref::<Int64Array>().unwrap();
+        let id_col = result_batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
         assert_eq!(id_col.value(0), 1);
         assert_eq!(id_col.value(1), 2);
         assert_eq!(id_col.value(2), 3);
-        
+
         // Verify Utf8View field is added as Utf8 with nulls
-        let desc_col = result_batch.column(1).as_any().downcast_ref::<StringArray>().unwrap();
+        let desc_col = result_batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
         assert_eq!(desc_col.null_count(), 3);
         assert_eq!(desc_col.data_type(), &DataType::Utf8);
     }
@@ -850,7 +874,7 @@ mod tests {
             Field::new("name", DataType::Utf8, true),
             Field::new("extra_field", DataType::Int32, false),
         ]));
-        
+
         let latest_schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int64, false),
             Field::new("name", DataType::Utf8, true),
@@ -863,17 +887,26 @@ mod tests {
                 Arc::new(StringArray::from(vec!["a", "b", "c"])),
                 Arc::new(arrow::array::Int32Array::from(vec![10, 20, 30])),
             ],
-        ).unwrap();
+        )
+        .unwrap();
 
         let (result_batch, diff_fields) = adapt_batch(latest_schema, batch);
 
         assert_eq!(result_batch.schema().fields().len(), 2);
         assert_eq!(result_batch.num_rows(), 3);
         assert!(diff_fields.is_empty());
-        
+
         // Verify only fields from latest schema are included
-        let id_col = result_batch.column(0).as_any().downcast_ref::<Int64Array>().unwrap();
-        let name_col = result_batch.column(1).as_any().downcast_ref::<StringArray>().unwrap();
+        let id_col = result_batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        let name_col = result_batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
         assert_eq!(id_col.value(0), 1);
         assert_eq!(id_col.value(1), 2);
         assert_eq!(id_col.value(2), 3);
@@ -885,10 +918,8 @@ mod tests {
     #[test]
     fn test_adapt_batch_empty_batch() {
         // Test case: empty batch
-        let batch_schema = Arc::new(Schema::new(vec![
-            Field::new("id", DataType::Int64, false),
-        ]));
-        
+        let batch_schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int64, false)]));
+
         let latest_schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int64, false),
             Field::new("name", DataType::Utf8, true),
@@ -896,10 +927,9 @@ mod tests {
 
         let batch = RecordBatch::try_new(
             batch_schema.clone(),
-            vec![
-                Arc::new(Int64Array::from(Vec::<i64>::new())),
-            ],
-        ).unwrap();
+            vec![Arc::new(Int64Array::from(Vec::<i64>::new()))],
+        )
+        .unwrap();
 
         let (result_batch, diff_fields) = adapt_batch(latest_schema, batch);
 
@@ -915,7 +945,7 @@ mod tests {
             Field::new("name", DataType::Utf8, true),
             Field::new("id", DataType::Int64, false),
         ]));
-        
+
         let latest_schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int64, false),
             Field::new("name", DataType::Utf8, true),
@@ -927,17 +957,26 @@ mod tests {
                 Arc::new(StringArray::from(vec!["a", "b", "c"])),
                 Arc::new(Int64Array::from(vec![1, 2, 3])),
             ],
-        ).unwrap();
+        )
+        .unwrap();
 
         let (result_batch, diff_fields) = adapt_batch(latest_schema, batch);
 
         assert_eq!(result_batch.schema().fields().len(), 2);
         assert_eq!(result_batch.num_rows(), 3);
         assert!(diff_fields.is_empty());
-        
+
         // Verify fields are in the order of latest schema
-        let id_col = result_batch.column(0).as_any().downcast_ref::<Int64Array>().unwrap();
-        let name_col = result_batch.column(1).as_any().downcast_ref::<StringArray>().unwrap();
+        let id_col = result_batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        let name_col = result_batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
         assert_eq!(id_col.value(0), 1);
         assert_eq!(id_col.value(1), 2);
         assert_eq!(id_col.value(2), 3);
@@ -949,22 +988,20 @@ mod tests {
     #[test]
     fn test_adapt_batch_multiple_utf8view_fields() {
         // Test case: multiple Utf8View fields in latest schema
-        let batch_schema = Arc::new(Schema::new(vec![
-            Field::new("id", DataType::Int64, false),
-        ]));
-        
+        let batch_schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int64, false)]));
+
         let latest_schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int64, false),
             Field::new("title", DataType::Utf8View, true),
-            Field::new("description", DataType::Utf8View, true), // Make nullable since we'll add nulls
+            Field::new("description", DataType::Utf8View, true), /* Make nullable since we'll
+                                                                  * add nulls */
         ]));
 
         let batch = RecordBatch::try_new(
             batch_schema.clone(),
-            vec![
-                Arc::new(Int64Array::from(vec![1, 2, 3])),
-            ],
-        ).unwrap();
+            vec![Arc::new(Int64Array::from(vec![1, 2, 3]))],
+        )
+        .unwrap();
 
         let (result_batch, diff_fields) = adapt_batch(latest_schema, batch);
 
@@ -973,16 +1010,28 @@ mod tests {
         assert_eq!(diff_fields.len(), 2);
         assert_eq!(diff_fields.get("title"), Some(&DataType::Utf8View));
         assert_eq!(diff_fields.get("description"), Some(&DataType::Utf8View));
-        
+
         // Verify existing data is preserved
-        let id_col = result_batch.column(0).as_any().downcast_ref::<Int64Array>().unwrap();
+        let id_col = result_batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
         assert_eq!(id_col.value(0), 1);
         assert_eq!(id_col.value(1), 2);
         assert_eq!(id_col.value(2), 3);
-        
+
         // Verify Utf8View fields are added as Utf8 with nulls
-        let title_col = result_batch.column(1).as_any().downcast_ref::<StringArray>().unwrap();
-        let desc_col = result_batch.column(2).as_any().downcast_ref::<StringArray>().unwrap();
+        let title_col = result_batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let desc_col = result_batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
         assert_eq!(title_col.null_count(), 3);
         assert_eq!(desc_col.null_count(), 3);
         assert_eq!(title_col.data_type(), &DataType::Utf8);
@@ -995,26 +1044,29 @@ mod tests {
         let batch_schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int64, true), // nullable in batch
         ]));
-        
+
         let latest_schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int64, false), // non-nullable in latest
         ]));
 
         let batch = RecordBatch::try_new(
             batch_schema.clone(),
-            vec![
-                Arc::new(Int64Array::from(vec![Some(1), None, Some(3)])),
-            ],
-        ).unwrap();
+            vec![Arc::new(Int64Array::from(vec![Some(1), None, Some(3)]))],
+        )
+        .unwrap();
 
         let (result_batch, diff_fields) = adapt_batch(latest_schema, batch);
 
         assert_eq!(result_batch.schema().fields().len(), 1);
         assert_eq!(result_batch.num_rows(), 3);
         assert!(diff_fields.is_empty());
-        
+
         // Verify data is preserved (including nulls)
-        let id_col = result_batch.column(0).as_any().downcast_ref::<Int64Array>().unwrap();
+        let id_col = result_batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
         assert_eq!(id_col.null_count(), 1);
         assert_eq!(id_col.value(0), 1);
         assert!(id_col.is_null(1));

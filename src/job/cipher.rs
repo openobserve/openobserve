@@ -27,14 +27,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     let data_list = cipher::list_filtered(filter, None).await?;
 
-    let data_list: Result<Vec<_>, serde_json::Error> = data_list
+    let data_list = data_list
         .into_iter()
         .map(|e| {
             let cdata: Result<CipherData, _> = serde_json::from_str(&e.data);
             cdata.map(|d| (format!("{}:{}", e.org, e.name), d))
         })
-        .collect();
-    let data_list = data_list?;
+        .collect::<Result<Vec<_>, serde_json::Error>>()?;
 
     let mut keys = Vec::with_capacity(data_list.len());
 

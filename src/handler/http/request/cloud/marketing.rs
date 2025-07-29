@@ -23,14 +23,14 @@ use crate::{
         meta::{http::HttpResponse as MetaHttpResponse, telemetry},
         utils::auth::UserEmail,
     },
-    handler::http::models::billings::NewUserAttrition,
+    handler::http::models::billings::NewUserAttribution,
 };
 
-/// HandleUserAttritionEvent
+/// HandleUserAttributionEvent
 #[utoipa::path(
     context_path = "/api",
     tag = "Marketing",
-    operation_id = "HandleUserAttritionEvent",
+    operation_id = "HandleUserAttributionEvent",
     security(
         ("Authorization" = [])
     ),
@@ -38,8 +38,8 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
-        content = NewUserAttrition,
-        description = "New user attrition info",
+        content = NewUserAttribution,
+        description = "New user attribution info",
         example = json!({
             "from": "Over the web",
             "company": "Monster Inc.",
@@ -50,24 +50,24 @@ use crate::{
         (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
     ),
 )]
-#[post("/{org_id}/billings/new_user_attrition")]
-pub async fn handle_new_attrition_event(
+#[post("/{org_id}/billings/new_user_attribution")]
+pub async fn handle_new_attribution_event(
     user_email: UserEmail,
-    req_body: web::Json<NewUserAttrition>,
+    req_body: web::Json<NewUserAttribution>,
 ) -> impl Responder {
     let email = user_email.user_id.as_str();
-    let new_usr_attrition = req_body.into_inner();
+    let new_usr_attribution = req_body.into_inner();
 
     // Send new user info to ActiveCampaign via segment proxy
     log::info!("sending track event to segment");
     let segment_event_data = HashMap::from([
         (
             "from".to_string(),
-            json::Value::String(new_usr_attrition.from),
+            json::Value::String(new_usr_attribution.from),
         ),
         (
             "company".to_string(),
-            json::Value::String(new_usr_attrition.company),
+            json::Value::String(new_usr_attribution.company),
         ),
         ("email".to_string(), json::Value::String(email.to_string())),
         (
@@ -77,7 +77,7 @@ pub async fn handle_new_attrition_event(
     ]);
     telemetry::Telemetry::new()
         .send_track_event(
-            "OpenObserve - New user attrition",
+            "OpenObserve - New user attribution",
             Some(segment_event_data),
             false,
             false,

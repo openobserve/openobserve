@@ -19,21 +19,15 @@ use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 
 pub static REGISTRY: Lazy<RwLock<Registry>> = Lazy::new(|| RwLock::new(Registry::new()));
+
+#[derive(Default)]
 pub struct Registry {
     keys: HashMap<String, Box<dyn Cipher>>,
 }
 
-impl Default for Registry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Registry {
     pub fn new() -> Self {
-        Self {
-            keys: Default::default(),
-        }
+        Self::default()
     }
     pub fn new_with_keys(keys: HashMap<String, Box<dyn Cipher>>) -> Self {
         Self { keys }
@@ -46,5 +40,51 @@ impl Registry {
     }
     pub fn remove_key(&mut self, name: &str) {
         self.keys.remove(name);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use o2_enterprise::enterprise::cipher::{Key, algorithm::Algorithm};
+
+    use super::*;
+
+    #[test]
+    fn test_registry_operations() {
+        // Test registry creation
+        let registry = Registry::new();
+        assert!(
+            registry.get_key("any-key").is_none(),
+            "Empty registry should return None for any key"
+        );
+
+        // Test registry creation with empty keys
+        let keys = hashbrown::HashMap::new();
+        let registry_with_keys = Registry::new_with_keys(keys);
+        assert!(
+            registry_with_keys.get_key("any-key").is_none(),
+            "Registry with empty keys should return None for any key"
+        );
+    }
+
+    #[test]
+    fn test_registry_keys() {
+        let mut registry = Registry::new();
+        registry.add_key(
+            "test-key".to_string(),
+            Box::new(Key::try_new("dGVzdC1rZQ==".to_string(), Algorithm::Aes256Siv).unwrap()),
+        );
+        assert!(
+            registry.get_key("test-key").is_some(),
+            "Registry should return the added key"
+        );
+        registry.remove_key("test-key");
+        assert!(
+            registry.get_key("test-key").is_none(),
+            "Registry should return None after removing the key"
+        );
+
+        // Should not panic if key does not exist
+        registry.remove_key("test-key");
     }
 }
