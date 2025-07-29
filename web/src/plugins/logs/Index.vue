@@ -1670,11 +1670,29 @@ export default defineComponent({
       fieldsExtractionLoading: false, // track custom field extraction progress
     });
 
+    // -------------------------------------------------------------
+    // Debounce helpers for field-extraction (50 ms)
+    // -------------------------------------------------------------
+    const FIELD_EXTRACTION_DEBOUNCE_TIME = 50;
+    let fieldsExtractionAbortController: AbortController | null = null;
+
+    /**
+     * Waits for `FIELD_EXTRACTION_DEBOUNCE_TIME` ms unless the provided
+     * `signal` is aborted – mirrors the debounce utility in
+     * `usePanelDataLoader.ts`.
+     */
+    const waitForFieldExtractionTimeout = (signal: AbortSignal) => {
+      return new Promise<void>((resolve, reject) => {
+        const timeoutId = setTimeout(resolve, FIELD_EXTRACTION_DEBOUNCE_TIME);
+
+        signal.addEventListener("abort", () => {
+          clearTimeout(timeoutId);
+          reject(new DOMException("Aborted", "AbortError"));
+        });
+      });
+    };
 
     const extractVisualizationFields = async () => {
-      // Abort controller reference for field extraction so that it can be cancelled from outside (e.g. Cancel button)
-      let fieldsExtractionAbortController = null;
-
       // mark extraction as in-progress so that cancel button is shown
       variablesAndPanelsDataLoadingState.fieldsExtractionLoading = true;
 
@@ -1686,6 +1704,22 @@ export default defineComponent({
       // Create a fresh AbortController for this cycle
       fieldsExtractionAbortController = new AbortController();
       const signal = fieldsExtractionAbortController.signal;
+
+      // Debounce – wait briefly before starting expensive operations.
+      // If the call is aborted during the wait window, simply exit.
+      try {
+        await waitForFieldExtractionTimeout(signal);
+      } catch (e: any) {
+        if (e?.name === "AbortError") {
+          return null; // previous invocation cancelled
+        }
+        throw e;
+      }
+
+      // Exit early if a newer invocation already aborted this one
+      if (signal.aborted) {
+        return null;
+      }
 
       const checkAbort = () => {
         if (signal.aborted) {
@@ -1831,6 +1865,9 @@ export default defineComponent({
 
     // Helper to abort any ongoing field-extraction operation
     const cancelFieldExtraction = () => {
+      if (fieldsExtractionAbortController) {
+        fieldsExtractionAbortController.abort();
+      }
       variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
     };
 
