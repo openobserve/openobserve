@@ -732,11 +732,11 @@ async fn get_delete_stream_data_status(
             Ok(HttpResponse::Ok().json(res))
         }
         Err(e) => {
-            if let Some(infra_error) = e.downcast_ref::<InfraError>() {
-                if let InfraError::DbError(DbError::KeyNotExists(_)) = infra_error {
-                    let res = serde_json::json!({ "id": id, "status": "completed" });
-                    return Ok(HttpResponse::Ok().json(res));
-                }
+            if let Some(InfraError::DbError(DbError::KeyNotExists(_))) =
+                e.downcast_ref::<InfraError>()
+            {
+                let res = serde_json::json!({ "id": id, "status": "completed" });
+                return Ok(HttpResponse::Ok().json(res));
             }
             log::error!("get_key_from_id {id} error: {e}");
             Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
