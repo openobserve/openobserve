@@ -150,7 +150,8 @@ impl PartitionGenerator {
 
         while end > start_time {
             let mut start = max(end - step, start_time);
-            // If the step is greater than the duration, handle the alignment for the boundary partition
+            // If the step is greater than the duration, handle the alignment for the boundary
+            // partition
             if last_partition_step > 0 && duration > step {
                 // Handle alignment for the first partition
                 partitions.push([end - last_partition_step, end]);
