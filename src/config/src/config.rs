@@ -208,12 +208,13 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_SEARCH_AROUND_FIELDS: [&str; 5] = [
+const _DEFAULT_SEARCH_AROUND_FIELDS: [&str; 6] = [
     "k8s_cluster",
     "k8s_namespace_name",
     "k8s_pod_name",
     "kubernetes_namespace_name",
     "kubernetes_pod_name",
+    "hostname"
 ];
 pub static DEFAULT_SEARCH_AROUND_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
