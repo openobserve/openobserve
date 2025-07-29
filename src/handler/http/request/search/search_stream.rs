@@ -221,7 +221,7 @@ pub async fn search_http2_stream(
                 req.query.sql = histogram_query;
             }
             Err(e) => {
-                return MetaHttpResponse::bad_request(e);
+                return map_error_to_http_response(&(e.into()), Some(trace_id));
             }
         }
     }

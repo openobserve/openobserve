@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use anyhow::Result;
 use config::utils::sql::is_eligible_for_histogram;
+use infra::errors::{Error, ErrorCodes};
 use sqlparser::{
     ast::{SetExpr, Statement},
     dialect::PostgreSqlDialect,
@@ -23,12 +23,17 @@ use sqlparser::{
 
 /// Converts an original query to a histogram query
 /// Extracts WHERE clause and builds histogram query with provided stream name
-pub fn convert_to_histogram_query(original_query: &str, stream_names: &[String]) -> Result<String> {
-    let is_eligible = is_eligible_for_histogram(original_query)?;
+pub fn convert_to_histogram_query(
+    original_query: &str,
+    stream_names: &[String],
+) -> Result<String, Error> {
+    let is_eligible =
+        is_eligible_for_histogram(original_query).map_err(|e| Error::Message(e.to_string()))?;
     if !is_eligible {
-        return Err(anyhow::anyhow!(
-            "Histogram unavailable for SUBQUERY, CTE, DISTINCT and LIMIT queries."
+        let error = Error::ErrorCode(ErrorCodes::SearchHistogramNotAvailable(
+            "Histogram unavailable for SUBQUERY, CTE, DISTINCT and LIMIT queries.".to_string(),
         ));
+        return Err(error);
     }
 
     // Parse the original query
@@ -63,7 +68,7 @@ pub fn convert_to_histogram_query(original_query: &str, stream_names: &[String])
 }
 
 /// Extract WHERE clause from SQL statement
-fn extract_where_clause(statement: &Statement) -> Result<String> {
+fn extract_where_clause(statement: &Statement) -> Result<String, Error> {
     if let Statement::Query(query) = statement {
         if let SetExpr::Select(select) = &*query.body {
             // Extract WHERE clause
@@ -75,10 +80,16 @@ fn extract_where_clause(statement: &Statement) -> Result<String> {
 
             Ok(where_clause)
         } else {
-            Err(anyhow::anyhow!("Query is not a SELECT statement"))
+            let error = Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                "Query is not a SELECT statement".to_string(),
+            ));
+            return Err(error);
         }
     } else {
-        Err(anyhow::anyhow!("Statement is not a query"))
+        let error = Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+            "Statement is not a query".to_string(),
+        ));
+        return Err(error);
     }
 }
 
