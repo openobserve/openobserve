@@ -41,6 +41,8 @@ pub async fn query_optimiser(
     _meta_token: &Option<String>,
     _duration: i64,
     _stream_name: &Option<String>,
+    _top_x: usize,
+    _org_id: &str,
 ) -> Result<(), Error> {
     println!("query_optimiser not supported");
     Ok(())
