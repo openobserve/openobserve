@@ -231,6 +231,8 @@ pub struct Response {
     pub work_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_by: Option<OrderBy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub converted_histogram_query: Option<String>,
 }
 
 /// Iterator for Streaming response of search `Response`
@@ -392,6 +394,7 @@ impl Response {
             result_cache_ratio: 0,
             work_group: None,
             order_by: None,
+            converted_histogram_query: None,
         }
     }
 

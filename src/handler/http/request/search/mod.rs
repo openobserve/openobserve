@@ -245,6 +245,7 @@ pub async fn search(
     };
 
     // Handle histogram data for UI
+    let mut converted_histogram_query: Option<String> = None;
     if is_ui_histogram {
         // Convert the original query to a histogram query
         match crate::service::search::sql::histogram::convert_to_histogram_query(
@@ -253,6 +254,7 @@ pub async fn search(
         ) {
             Ok(histogram_query) => {
                 req.query.sql = histogram_query;
+                converted_histogram_query = Some(req.query.sql.clone());
             }
             Err(e) => {
                 return Ok(MetaHttpResponse::bad_request(e));
@@ -379,6 +381,7 @@ pub async fn search(
     match res {
         Ok(mut res) => {
             res.set_took(start.elapsed().as_millis() as usize);
+            res.converted_histogram_query = converted_histogram_query;
             Ok(HttpResponse::Ok().json(res))
         }
         Err(err) => {
