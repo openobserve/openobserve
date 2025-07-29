@@ -1590,19 +1590,17 @@ export default defineComponent({
           searchBarRef.value.dateTimeRef &&
           searchBarRef.value.dateTimeRef.refresh();
 
-          const dateTime =
+        const dateTime =
           searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
-                searchObj.data.datetime.relativeTimePeriod,
-              )
+              searchObj.data.datetime.relativeTimePeriod,
+            )
             : cloneDeep(searchObj.data.datetime);
 
-        if (searchObj.meta.logsVisualizeToggle === "visualize") {
-          dashboardPanelData.meta.dateTime = {
-            start_time: new Date(dateTime.startTime),
-            end_time: new Date(dateTime.endTime),
-          };
-        }
+        dashboardPanelData.meta.dateTime = {
+          start_time: new Date(dateTime.startTime),
+          end_time: new Date(dateTime.endTime),
+        };
 
         visualizeChartData.value = JSON.parse(
           JSON.stringify(dashboardPanelData.data),
