@@ -1176,7 +1176,7 @@ export const convertSQLData = async (
           margin: 10,
         },
         splitLine: {
-          show: true,
+          show: showGridlines,
         },
         axisLine: {
           show: searchQueryData?.every((it: any) => it.length == 0)
@@ -1241,7 +1241,7 @@ export const convertSQLData = async (
         },
       },
       splitLine: {
-        show: true,
+        show: showGridlines,
       },
       axisLine: {
         show: searchQueryData?.every((it: any) => it.length == 0)
@@ -1268,6 +1268,24 @@ export const convertSQLData = async (
     },
     series: [],
   };
+
+  // Ensure gridlines visibility is set for all xAxis and yAxis (handles both array and object cases)
+  if (options.xAxis) {
+    (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
+      (axis) => {
+        // if (!axis.splitLine) axis.splitLine = {};
+        axis.splitLine.show = showGridlines;
+      },
+    );
+  }
+  if (options.yAxis) {
+    (Array.isArray(options.yAxis) ? options.yAxis : [options.yAxis]).forEach(
+      (axis) => {
+        // if (!axis.splitLine) axis.splitLine = {};
+        axis.splitLine.show = showGridlines;
+      },
+    );
+  }
 
   const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema);
 
