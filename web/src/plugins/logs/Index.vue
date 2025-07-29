@@ -2147,8 +2147,7 @@ export default defineComponent({
         !this.searchObj.shouldIgnoreWatcher
       ) {
         this.searchObj.data.queryResults.aggs = [];
-
-        if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL) || !this.searchObj.data.queryResults.is_histogram_eligible) {
+        if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
             -1,
@@ -2156,7 +2155,7 @@ export default defineComponent({
           this.searchObj.meta.histogramDirtyFlag = false;
         } else if (
           this.searchObj.meta.sqlMode &&
-          (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL) || !this.searchObj.data.queryResults.is_histogram_eligible)
+          (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
         ) {
           this.resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
@@ -2216,6 +2215,13 @@ export default defineComponent({
             .finally(() => {
               this.searchObj.loadingHistogram = false;
             });
+        }
+        else if(!this.searchObj.data.queryResults.is_histogram_eligible){
+          this.resetHistogramWithError(
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            -1,
+          );
+          this.searchObj.meta.histogramDirtyFlag = false;
         }
       }
 
