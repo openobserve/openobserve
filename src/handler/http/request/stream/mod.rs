@@ -684,7 +684,7 @@ async fn delete_stream_data_by_time_range(
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
-    operation_id = "StreamDeleteDataByTimeRange",
+    operation_id = "StreamDeleteDataByTimeRangeJobStatus",
     security(
         ("Authorization"= [])
     ),
