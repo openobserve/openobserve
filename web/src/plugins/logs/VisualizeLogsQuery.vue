@@ -146,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <PanelSchemaRenderer
                         @metadata-update="metaDataValue"
+                        @result-metadata-update="onResultMetadataUpdate"
                         :key="dashboardPanelData.data.type"
                         :panelSchema="chartData"
                         :selectedTimeObj="dashboardPanelData.meta.dateTime"
@@ -315,6 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #after>
                       <PanelSchemaRenderer
                         @metadata-update="metaDataValue"
+                        @result-metadata-update="onResultMetadataUpdate"
                         :panelSchema="chartData"
                         :selectedTimeObj="dashboardPanelData.meta.dateTime"
                         :variablesData="{}"
@@ -736,6 +738,13 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
+    const onResultMetadataUpdate = (resultMetaData: any) => {
+      if (resultMetaData?.[0]?.converted_histogram_query) {
+        dashboardPanelData.data.queries[0].query =
+          resultMetaData?.[0]?.converted_histogram_query;
+      }
+    };
+
     return {
       t,
       layoutSplitterUpdated,
@@ -755,6 +764,7 @@ export default defineComponent({
       splitterModel,
       collapseFieldList,
       is_ui_histogram,
+      onResultMetadataUpdate,
     };
   },
 });
