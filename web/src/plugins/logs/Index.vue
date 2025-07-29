@@ -1549,12 +1549,14 @@ export default defineComponent({
 
           // if not able to parse query, do not do anything
           if (shouldUseHistogram === null) {
-            return;
+            return false;
           }
 
           // emit resize event
           // this will rerender/call resize method of already rendered chart to resize
           window.dispatchEvent(new Event("resize"));
+
+          return true;
         }
       } catch (error) {
         throw error;
@@ -1610,7 +1612,10 @@ export default defineComponent({
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
-          await updateVisualization();
+          const success = await updateVisualization();
+          if(!success){
+            return;
+          }
         } catch (err: any) {
           // this will clear dummy trace id
           cancelFieldExtraction();
@@ -1740,10 +1745,9 @@ export default defineComponent({
 
       try {
 
-        let logsPageQuery = searchObj.data.query;
-        
+        let logsPageQuery = searchObj.data.query;        
         // return if query is emptry and stream is not selected 
-        if(logsPageQuery === "" && searchObj.data.stream.selectedStream.length === 0){ 
+        if(logsPageQuery === "" && searchObj?.data?.stream?.selectedStream?.length === 0){ 
           showErrorNotification("Query is empty, please write query to visualize");
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -1752,7 +1756,14 @@ export default defineComponent({
         // handle sql mode
         if(!searchObj.data.sqlMode){
           const queryBuild= buildSearch();
-          logsPageQuery = queryBuild.query.sql;
+          logsPageQuery = queryBuild?.query?.sql ?? "";
+        }
+
+        // check if query is empty
+        if(logsPageQuery === ""){
+          showErrorNotification("Query is empty, please write query to visualize");
+          variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+          return null;
         }
 
 
