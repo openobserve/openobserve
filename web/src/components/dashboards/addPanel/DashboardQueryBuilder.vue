@@ -1190,8 +1190,14 @@ export default defineComponent({
               ? false
               : true;
         } else {
-          // For existing panels: set all to false (unchecked) initially
-          field.treatAsNonTimestamp = false;
+          // For existing panels: only set if treatAsNonTimestamp is not already defined
+          // This preserves the saved values from the database
+          if (
+            field.treatAsNonTimestamp === undefined ||
+            field.treatAsNonTimestamp === null
+          ) {
+            field.treatAsNonTimestamp = false;
+          }
         }
       };
 
