@@ -912,6 +912,8 @@ pub struct SearchQuery {
     pub skip_wal: bool,
     #[prost(string, tag = "15")]
     pub action_id: ::prost::alloc::string::String,
+    #[prost(int64, tag = "16")]
+    pub histogram_interval: i64,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2813,6 +2815,9 @@ pub struct QueryIdentifier {
     /// the unique id for each remote scan
     #[prost(string, tag = "5")]
     pub job_id: ::prost::alloc::string::String,
+    /// need special logic for loading enrich table
+    #[prost(bool, tag = "6")]
+    pub enrich_mode: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2829,6 +2834,8 @@ pub struct SearchInfo {
     pub end_time: i64,
     #[prost(int64, tag = "6")]
     pub timeout: i64,
+    #[prost(int64, tag = "7")]
+    pub histogram_interval: i64,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2863,7 +2870,7 @@ pub struct SuperClusterInfo {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IdxOptimizeMode {
-    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2")]
+    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2, 3, 4, 5")]
     pub mode: ::core::option::Option<idx_optimize_mode::Mode>,
 }
 /// Nested message and enum types in `IdxOptimizeMode`.
@@ -2875,6 +2882,12 @@ pub mod idx_optimize_mode {
         SimpleSelect(super::SimpleSelect),
         #[prost(message, tag = "2")]
         SimpleCount(super::SimpleCount),
+        #[prost(message, tag = "3")]
+        SimpleHistogram(super::SimpleHistogram),
+        #[prost(message, tag = "4")]
+        SimpleTopn(super::SimpleTopN),
+        #[prost(message, tag = "5")]
+        SimpleDistinct(super::SimpleDistinct),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2888,6 +2901,36 @@ pub struct SimpleSelect {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SimpleCount {}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleHistogram {
+    #[prost(int64, tag = "1")]
+    pub min_value: i64,
+    #[prost(uint64, tag = "2")]
+    pub bucket_width: u64,
+    #[prost(uint32, tag = "3")]
+    pub num_buckets: u32,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleTopN {
+    #[prost(string, tag = "1")]
+    pub field: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "2")]
+    pub limit: u32,
+    #[prost(bool, tag = "3")]
+    pub asc: bool,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleDistinct {
+    #[prost(string, tag = "1")]
+    pub field: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "2")]
+    pub limit: u32,
+    #[prost(bool, tag = "3")]
+    pub asc: bool,
+}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct KvItem {

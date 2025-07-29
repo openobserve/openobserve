@@ -21,7 +21,6 @@ use std::{
     time::UNIX_EPOCH,
 };
 
-use anyhow::Context;
 use arrow::{
     array::{
         Array, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Int64Array, Int64Builder,
@@ -47,13 +46,12 @@ use config::{
         arrow::record_batches_to_json_rows,
         async_file::get_file_meta,
         file::{get_file_size, scan_files_with_channel},
-        inverted_index::{convert_parquet_idx_file_name_to_tantivy_file, split_token},
+        inverted_index::split_token,
         json,
         parquet::{
             get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
         },
         schema_ext::SchemaExt,
-        tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
     },
 };
 use futures::TryStreamExt;
@@ -68,10 +66,7 @@ use infra::{
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
 use parquet::arrow::async_reader::ParquetRecordBatchStream;
-use tokio::{
-    sync::{Mutex, RwLock},
-    task::JoinHandle,
-};
+use tokio::sync::{Mutex, RwLock};
 
 use crate::{
     common::{
@@ -82,17 +77,15 @@ use crate::{
     service::{
         db,
         schema::generate_schema_for_defined_schema_fields,
-        search::{
-            datafusion::exec::{self, MergeParquetResult},
-            tantivy::puffin_directory::writer::PuffinDirWriter,
-        },
+        search::datafusion::exec::{self, MergeParquetResult},
+        tantivy::create_tantivy_index,
     },
 };
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    // add the pending delete files to processing list
+    // add the pending delete files to processing set
     let pending_delete_files = db::file_list::local::get_pending_delete().await;
     for file in pending_delete_files {
         PROCESSING_FILES.write().await.insert(file);
@@ -164,6 +157,9 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
         let Ok(file_size) = get_file_size(&file) else {
             continue;
         };
+        // delete metadata from cache
+        WAL_PARQUET_METADATA.write().await.remove(&file_key);
+        // delete file from disk
         if let Err(e) = remove_file(&file) {
             log::error!(
                 "[INGESTER:JOB] Failed to remove parquet file: {}, {}",
@@ -171,9 +167,6 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
                 e
             );
         }
-
-        // delete metadata from cache
-        WAL_PARQUET_METADATA.write().await.remove(&file_key);
         // need release the file
         PROCESSING_FILES.write().await.remove(&file_key);
         // delete from pending delete list
@@ -309,6 +302,9 @@ async fn prepare_files(
                 "[INGESTER:JOB] the file is empty, just delete file: {}",
                 file
             );
+            // delete metadata from cache
+            WAL_PARQUET_METADATA.write().await.remove(&file_key);
+            // delete file from disk
             if let Err(e) = remove_file(wal_dir.join(&file)) {
                 log::error!(
                     "[INGESTER:JOB] Failed to remove parquet file from disk: {}, {}",
@@ -316,8 +312,6 @@ async fn prepare_files(
                     e
                 );
             }
-            // delete metadata from cache
-            WAL_PARQUET_METADATA.write().await.remove(&file_key);
             continue;
         }
         let prefix = file_key[..file_key.rfind('/').unwrap()].to_string();
@@ -358,6 +352,9 @@ async fn move_files(
                 &stream_name,
                 file.key,
             );
+            // delete metadata from cache
+            WAL_PARQUET_METADATA.write().await.remove(&file.key);
+            // delete file from disk
             if let Err(e) = remove_file(wal_dir.join(&file.key)) {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
@@ -365,8 +362,7 @@ async fn move_files(
                     e
                 );
             }
-            // delete metadata from cache
-            WAL_PARQUET_METADATA.write().await.remove(&file.key);
+            // remove the file from processing set
             PROCESSING_FILES.write().await.remove(&file.key);
         }
         return Ok(());
@@ -402,6 +398,9 @@ async fn move_files(
                 &stream_name,
                 file.key,
             );
+            // delete metadata from cache
+            WAL_PARQUET_METADATA.write().await.remove(&file.key);
+            // delete file from disk
             if let Err(e) = remove_file(wal_dir.join(&file.key)) {
                 log::error!(
                     "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
@@ -409,8 +408,7 @@ async fn move_files(
                     e
                 );
             }
-            // delete metadata from cache
-            WAL_PARQUET_METADATA.write().await.remove(&file.key);
+            // remove the file from processing set
             PROCESSING_FILES.write().await.remove(&file.key);
         }
         return Ok(());
@@ -435,6 +433,9 @@ async fn move_files(
                     &stream_name,
                     file.key,
                 );
+                // delete metadata from cache
+                WAL_PARQUET_METADATA.write().await.remove(&file.key);
+                // delete file from disk
                 if let Err(e) = remove_file(wal_dir.join(&file.key)) {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk: {}, {}",
@@ -442,8 +443,7 @@ async fn move_files(
                         e
                     );
                 }
-                // delete metadata from cache
-                WAL_PARQUET_METADATA.write().await.remove(&file.key);
+                // remove the file from processing set
                 PROCESSING_FILES.write().await.remove(&file.key);
             }
             return Ok(());
@@ -547,8 +547,6 @@ async fn move_files(
         // check if allowed to delete the file
         for file in new_file_list.iter() {
             // use same lock to combine the operations of check lock and add to removing list
-            let wal_lock = infra::local_lock::lock("wal").await?;
-            let lock_guard = wal_lock.lock().await;
             let can_delete = if wal::lock_files_exists(&file.key) {
                 log::warn!(
                     "[INGESTER:JOB:{thread_id}] the file is in use, set to pending delete list: {}",
@@ -567,9 +565,11 @@ async fn move_files(
                 db::file_list::local::add_removing(&file.key).await?;
                 true
             };
-            drop(lock_guard);
 
             if can_delete {
+                // delete metadata from cache
+                WAL_PARQUET_METADATA.write().await.remove(&file.key);
+                // delete file from disk
                 match remove_file(wal_dir.join(&file.key)) {
                     Err(e) => {
                         log::warn!(
@@ -589,8 +589,6 @@ async fn move_files(
                         }
                     }
                     Ok(_) => {
-                        // delete metadata from cache
-                        WAL_PARQUET_METADATA.write().await.remove(&file.key);
                         // remove the file from processing set
                         PROCESSING_FILES.write().await.remove(&file.key);
                         // deleted successfully then update metrics
@@ -1427,210 +1425,4 @@ async fn prepare_index_record_batches(
     }
 
     Ok(indexed_record_batches_to_merge)
-}
-
-pub(crate) async fn create_tantivy_index(
-    caller: &str,
-    parquet_file_name: &str,
-    full_text_search_fields: &[String],
-    index_fields: &[String],
-    schema: Arc<Schema>,
-    reader: ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
-) -> Result<usize, anyhow::Error> {
-    let start = std::time::Instant::now();
-    let caller = format!("[{caller}:JOB]");
-
-    let dir = PuffinDirWriter::new();
-    let index = generate_tantivy_index(
-        dir.clone(),
-        reader,
-        full_text_search_fields,
-        index_fields,
-        schema,
-    )
-    .await?;
-    if index.is_none() {
-        return Ok(0);
-    }
-    let puffin_bytes = dir.to_puffin_bytes()?;
-    let index_size = puffin_bytes.len();
-
-    // write fst bytes into disk
-    let Some(idx_file_name) = convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
-    else {
-        return Ok(0);
-    };
-    match storage::put(&idx_file_name, Bytes::from(puffin_bytes)).await {
-        Ok(_) => {
-            log::info!(
-                "{} generated tantivy index file: {}, size {}, took: {} ms",
-                caller,
-                idx_file_name,
-                index_size,
-                start.elapsed().as_millis()
-            );
-        }
-        Err(e) => {
-            log::error!(
-                "{} generated tantivy index file error: {}",
-                caller,
-                e.to_string()
-            );
-            return Err(e.into());
-        }
-    }
-    Ok(index_size)
-}
-
-/// Create a tantivy index in the given directory for the record batch
-pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
-    tantivy_dir: D,
-    mut reader: ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
-    full_text_search_fields: &[String],
-    index_fields: &[String],
-    schema: Arc<Schema>,
-) -> Result<Option<tantivy::Index>, anyhow::Error> {
-    let mut tantivy_schema_builder = tantivy::schema::SchemaBuilder::new();
-    let schema_fields = schema
-        .fields()
-        .iter()
-        .map(|f| (f.name(), f))
-        .collect::<HashMap<_, _>>();
-
-    // filter out fields that are not in schema & not of type Utf8
-    let fts_fields = full_text_search_fields
-        .iter()
-        .filter(|f| {
-            schema_fields
-                .get(f)
-                .map(|v| v.data_type() == &DataType::Utf8)
-                .is_some()
-        })
-        .map(|f| f.to_string())
-        .collect::<HashSet<_>>();
-    let index_fields = index_fields
-        .iter()
-        .map(|f| f.to_string())
-        .collect::<HashSet<_>>();
-    let tantivy_fields = fts_fields
-        .union(&index_fields)
-        .cloned()
-        .collect::<HashSet<_>>();
-    // no fields need to create index, return
-    if tantivy_fields.is_empty() {
-        return Ok(None);
-    }
-
-    // add fields to tantivy schema
-    if !full_text_search_fields.is_empty() {
-        let fts_opts = tantivy::schema::TextOptions::default().set_indexing_options(
-            tantivy::schema::TextFieldIndexing::default()
-                .set_index_option(tantivy::schema::IndexRecordOption::Basic)
-                .set_tokenizer(O2_TOKENIZER)
-                .set_fieldnorms(false),
-        );
-        tantivy_schema_builder.add_text_field(INDEX_FIELD_NAME_FOR_ALL, fts_opts);
-    }
-    for field in index_fields.iter() {
-        let index_opts = tantivy::schema::TextOptions::default().set_indexing_options(
-            tantivy::schema::TextFieldIndexing::default()
-                .set_index_option(tantivy::schema::IndexRecordOption::Basic)
-                .set_tokenizer("raw")
-                .set_fieldnorms(false),
-        );
-        tantivy_schema_builder.add_text_field(field, index_opts);
-    }
-    let tantivy_schema = tantivy_schema_builder.build();
-    let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
-
-    let tokenizer_manager = tantivy::tokenizer::TokenizerManager::default();
-    tokenizer_manager.register(O2_TOKENIZER, o2_tokenizer_build());
-    let mut index_writer = tantivy::IndexBuilder::new()
-        .schema(tantivy_schema.clone())
-        .tokenizers(tokenizer_manager)
-        .single_segment_index_writer(tantivy_dir, 50_000_000)
-        .context("failed to create index builder")?;
-
-    // docs per row to be added in the tantivy index
-    log::debug!("start write documents to tantivy index");
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<tantivy::TantivyDocument>>(2);
-    let task: JoinHandle<Result<usize, anyhow::Error>> = tokio::task::spawn(async move {
-        let mut total_num_rows = 0;
-        loop {
-            let batch = reader.try_next().await?;
-            let Some(inverted_idx_batch) = batch else {
-                break;
-            };
-            let num_rows = inverted_idx_batch.num_rows();
-            if num_rows == 0 {
-                continue;
-            }
-
-            // update total_num_rows
-            total_num_rows += num_rows;
-
-            // process full text search fields
-            let mut docs = vec![tantivy::doc!(); num_rows];
-            for column_name in tantivy_fields.iter() {
-                let column_data = match inverted_idx_batch.column_by_name(column_name) {
-                    Some(column_data) => match column_data.as_any().downcast_ref::<StringArray>() {
-                        Some(column_data) => column_data,
-                        None => {
-                            // generate empty array to ensure the tantivy and parquet have same rows
-                            &StringArray::from(vec![""; num_rows])
-                        }
-                    },
-                    None => {
-                        // generate empty array to ensure the tantivy and parquet have same rows
-                        &StringArray::from(vec![""; num_rows])
-                    }
-                };
-
-                // get field
-                let field = match tantivy_schema.get_field(column_name) {
-                    Ok(f) => f,
-                    Err(_) => fts_field.unwrap(),
-                };
-                for (i, doc) in docs.iter_mut().enumerate() {
-                    doc.add_text(field, column_data.value(i));
-                    tokio::task::coop::consume_budget().await;
-                }
-            }
-
-            tx.send(docs).await?;
-        }
-        Ok(total_num_rows)
-    });
-
-    while let Some(docs) = rx.recv().await {
-        for doc in docs {
-            if let Err(e) = index_writer.add_document(doc) {
-                log::error!(
-                    "generate_tantivy_index: Failed to add document to index: {}",
-                    e
-                );
-                return Err(anyhow::anyhow!("Failed to add document to index: {}", e));
-            }
-            tokio::task::coop::consume_budget().await;
-        }
-    }
-    let total_num_rows = task.await??;
-    // no docs need to create index, return
-    if total_num_rows == 0 {
-        return Ok(None);
-    }
-    log::debug!("write documents to tantivy index success");
-
-    let index = tokio::task::spawn_blocking(move || {
-        index_writer.finalize().map_err(|e| {
-            log::error!(
-                "generate_tantivy_index: Failed to finalize the index writer: {}",
-                e
-            );
-            anyhow::anyhow!("Failed to finalize the index writer: {}", e)
-        })
-    })
-    .await??;
-
-    Ok(Some(index))
 }

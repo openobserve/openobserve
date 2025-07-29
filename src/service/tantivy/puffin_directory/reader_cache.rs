@@ -41,6 +41,9 @@ impl ReaderCache {
     pub fn len(&self) -> usize {
         self.readers.len()
     }
+    pub fn is_empty(&self) -> bool {
+        self.readers.is_empty()
+    }
 
     pub fn get(&self, key: &str) -> Option<IndexCache> {
         self.readers.get(key).map(|r| r.value().clone())

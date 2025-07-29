@@ -135,7 +135,17 @@ impl SchedulerWorker {
     pub async fn handle_trigger(&self, trace_id: &str, trigger: Trigger) -> Result<()> {
         let trace_id = trace_id.to_owned();
         // If there is any panic, it should not crash the scheduler worker
-        let handler_job = tokio::spawn(async move { handle_triggers(&trace_id, trigger).await });
+        let handler_job = tokio::spawn(async move {
+            let trigger_key = trigger.module_key.to_string();
+            if let Err(e) = handle_triggers(&trace_id, trigger).await {
+                log::error!(
+                    "[SCHEDULER] trace_id: {} Error handling trigger key {}: {}",
+                    trace_id,
+                    trigger_key,
+                    e
+                );
+            }
+        });
 
         if let Err(e) = handler_job.await {
             return Err(anyhow::anyhow!("Error in handler: {}", e));

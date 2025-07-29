@@ -395,25 +395,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     })
                     .or_insert(schema_versions);
                 drop(w);
-
-                let keys = item_key.split('/').collect::<Vec<&str>>();
-                let org_id = keys[0];
-                let stream_type = StreamType::from(keys[1]);
-                let stream_name = keys[2];
-
-                if stream_type.eq(&StreamType::EnrichmentTables) {
-                    let data = super::enrichment_table::get(org_id, stream_name)
-                        .await
-                        .unwrap();
-                    ENRICHMENT_TABLES.insert(
-                        item_key.to_owned(),
-                        StreamTable {
-                            org_id: org_id.to_string(),
-                            stream_name: stream_name.to_string(),
-                            data,
-                        },
-                    );
-                }
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
@@ -465,6 +446,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         };
                     }
                 }
+                if stream_type.eq(&StreamType::EnrichmentTables) {
+                    if let Err(e) =
+                        config::utils::enrichment_local_cache::delete(org_id, stream_name).await
+                    {
+                        log::error!("[Schema:watch] delete local enrichment file error: {}", e);
+                    }
+                }
             }
             db::Event::Empty => {}
         }
@@ -475,8 +463,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 pub async fn cache() -> Result<(), anyhow::Error> {
     let db_key = "/schema/";
     let items = db::list(db_key).await?;
-    let mut schemas: HashMap<String, Vec<(i64, Bytes)>> = HashMap::with_capacity(items.len());
-    for (key, val) in items {
+    let items_num = items.len();
+    let mut schemas: HashMap<String, Vec<(i64, Bytes)>> = HashMap::with_capacity(items_num);
+
+    log::info!("Cache schema got {} items", items_num);
+    for (i, (key, val)) in items.into_iter().enumerate() {
         let key = key.strip_prefix(db_key).unwrap();
         let columns = key.split('/').take(4).collect::<Vec<_>>();
         assert_eq!(columns.len(), 4, "BUG");
@@ -484,9 +475,14 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let start_dt: i64 = columns[3].parse().unwrap();
         let entry = schemas.entry(item_key).or_insert(Vec::new());
         entry.push((start_dt, val));
+        if i % 1000 == 0 {
+            log::info!("Cache schema progress: {}/{}", i, items_num);
+        }
     }
+    log::info!("Stream schemas Cached {} schemas", items_num);
+    let keys_num = schemas.keys().len();
     let keys = schemas.keys().map(|k| k.to_string()).collect::<Vec<_>>();
-    for item_key in keys.iter() {
+    for (i, item_key) in keys.iter().enumerate() {
         let Some(mut schema_versions) = schemas.remove(item_key) else {
             continue;
         };
@@ -535,8 +531,11 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let mut w = STREAM_SCHEMAS.write().await;
         w.insert(item_key.to_string(), schema_versions);
         drop(w);
+        if i % 1000 == 0 {
+            log::info!("Stream schemas Cached progress: {}/{}", i, keys.len());
+        }
     }
-    log::info!("Stream schemas Cached");
+    log::info!("Stream schemas Cached {} streams", keys_num);
     Ok(())
 }
 
@@ -584,7 +583,8 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
 
     // fill data
     for (key, tbl) in tables {
-        let data = super::enrichment_table::get(&tbl.org_id, &tbl.stream_name).await?;
+        let data =
+            super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name).await?;
         ENRICHMENT_TABLES.insert(
             key,
             StreamTable {
