@@ -561,6 +561,8 @@ pub struct SearchPartitionResponse {
     pub streaming_output: bool,
     pub streaming_aggs: bool,
     pub streaming_id: Option<String>,
+    #[serde(default)]
+    pub is_histogram_eligible: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]

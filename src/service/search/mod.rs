@@ -35,7 +35,10 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_aggregate_query, is_simple_distinct_query},
+        sql::{
+            is_aggregate_query, is_eligible_for_histogram, is_simple_aggregate_query,
+            is_simple_distinct_query,
+        },
         time::now_micros,
     },
 };
@@ -772,6 +775,8 @@ pub async fn search_partition(
         (records + f.records, original_size + f.original_size)
     });
 
+    let is_histogram_eligible = is_eligible_for_histogram(&req.sql).unwrap_or(false);
+
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
@@ -786,6 +791,7 @@ pub async fn search_partition(
         streaming_output: req.streaming_output && is_streaming_aggregate,
         streaming_aggs: req.streaming_output && is_streaming_aggregate,
         streaming_id: streaming_id.clone(),
+        is_histogram_eligible,
     };
 
     let mut min_step = Duration::try_seconds(1)
