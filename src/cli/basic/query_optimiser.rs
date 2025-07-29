@@ -15,7 +15,7 @@
 
 use anyhow::Error;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::recomendations::engine::get_recomendations;
+use o2_enterprise::enterprise::recommendations::engine::get_recommendations;
 
 #[cfg(feature = "enterprise")]
 pub async fn query_optimiser(
@@ -33,7 +33,7 @@ pub async fn query_optimiser(
         Some(meta_token) => meta_token,
         None => token,
     };
-    match get_recomendations(url, token, meta_token, duration, stream_name, top_x, org_id).await {
+    match get_recommendations(url, token, meta_token, duration, stream_name, top_x, org_id).await {
         Ok(recos) => {
             if !recos.is_empty() {
                 log::info!("Query recommendations ingested successfully");
