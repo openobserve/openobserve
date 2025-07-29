@@ -470,6 +470,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             : null,
         isDerived,
         havingConditions: [],
+        treatAsNonTimestamp:
+          row.name === store.state.zoConfig.timestamp_column ? false : true,
       });
     }
 
@@ -585,6 +587,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             : "count",
         isDerived,
         havingConditions: [],
+        treatAsNonTimestamp:
+          row.name === store.state.zoConfig.timestamp_column ? false : true,
       });
     }
     updateArrayAlias();

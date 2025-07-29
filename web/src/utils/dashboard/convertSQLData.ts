@@ -2447,7 +2447,8 @@ export const convertSQLData = async (
     );
 
     const isTimeSeriesData = isTimeSeries(sample);
-    const isTimeStampData = isTimeStamp(sample);
+
+    const isTimeStampData = isTimeStamp(sample, null);
 
     if (isTimeSeriesData || isTimeStampData) {
       // set timeseries flag as a true
