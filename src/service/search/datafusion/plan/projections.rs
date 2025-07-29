@@ -177,7 +177,7 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                     // ts col is _timestamp, and is not aliased with some other name
                     let ts = match self.timestamp_alias.as_ref() {
                         Some(v) => v.as_str(),
-                        None => "_tiemstamp",
+                        None => "_timestamp",
                     };
                     match expr {
                         Expr::Column(col) => {
