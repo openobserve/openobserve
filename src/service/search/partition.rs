@@ -52,13 +52,183 @@ impl PartitionGenerator {
         end_time: i64,
         step: i64,
         order_by: OrderBy,
+        add_mini_partition: bool,
     ) -> Vec<[i64; 2]> {
         if self.is_histogram {
             self.generate_partitions_aligned_with_histogram_interval(
-                start_time, end_time, step, order_by,
+                start_time,
+                end_time,
+                step,
+                order_by,
+                add_mini_partition,
             )
         } else {
             self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
+        }
+    }
+
+    /// Calculate mini partition size in microseconds
+    fn calculate_mini_partition_size(&self, step: i64) -> i64 {
+        std::cmp::min(self.mini_partition_duration_secs * 1_000_000, step as u64) as i64
+    }
+
+    /// Create a mini partition based on order
+    fn create_mini_partition(
+        &self,
+        start_time: i64,
+        end_time: i64,
+        mini_partition_size: i64,
+        order_by: OrderBy,
+    ) -> Option<[i64; 2]> {
+        let duration = end_time - start_time;
+        if mini_partition_size >= duration {
+            return None;
+        }
+
+        let mini_partition = match order_by {
+            OrderBy::Desc => {
+                // For DESC order, mini partition at the end time
+                let mini_start = std::cmp::max(end_time - mini_partition_size, start_time);
+                [mini_start, end_time]
+            }
+            OrderBy::Asc => {
+                // For ASC order, mini partition at the start time
+                let mini_end = std::cmp::min(start_time + mini_partition_size, end_time);
+                [start_time, mini_end]
+            }
+        };
+
+        Some(mini_partition)
+    }
+
+    /// Generate regular partitions without histogram alignment
+    fn generate_regular_partitions(
+        &self,
+        start_time: i64,
+        end_time: i64,
+        step: i64,
+        order_by: OrderBy,
+    ) -> Vec<[i64; 2]> {
+        let mut partitions = Vec::new();
+
+        match order_by {
+            OrderBy::Desc => {
+                let mut end = end_time;
+                while end > start_time {
+                    let start = std::cmp::max(end - step, start_time);
+                    partitions.push([start, end]);
+                    end = start;
+                }
+            }
+            OrderBy::Asc => {
+                let mut start = start_time;
+                while start < end_time {
+                    let end = std::cmp::min(start + step, end_time);
+                    partitions.push([start, end]);
+                    start = end;
+                }
+            }
+        }
+
+        partitions
+    }
+
+    /// Generate histogram-aligned partitions
+    fn generate_histogram_aligned_partitions(
+        &self,
+        start_time: i64,
+        end_time: i64,
+        step: i64,
+        order_by: OrderBy,
+    ) -> Vec<[i64; 2]> {
+        let mut partitions = Vec::new();
+        let duration = end_time - start_time;
+
+        // Generate partitions by DESC order first, then reverse if needed
+        let mut end = end_time;
+        let mut last_partition_step = end % self.min_step;
+
+        while end > start_time {
+            let mut start = max(end - step, start_time);
+            if last_partition_step > 0 && duration > self.min_step {
+                // Handle alignment for the first partition
+                partitions.push([end - last_partition_step, end]);
+                start -= last_partition_step;
+                end -= last_partition_step;
+            } else {
+                start = max(start - last_partition_step, start_time);
+            }
+            partitions.push([start, end]);
+            end = start;
+            last_partition_step = 0;
+        }
+
+        // We need to reverse partitions if query is ASC order
+        if order_by == OrderBy::Asc {
+            partitions.reverse();
+        }
+
+        partitions
+    }
+
+    /// Generate histogram-aligned partitions with mini partition
+    fn generate_histogram_aligned_partitions_with_mini(
+        &self,
+        start_time: i64,
+        end_time: i64,
+        step: i64,
+        order_by: OrderBy,
+        mini_partition_size: i64,
+    ) -> Vec<[i64; 2]> {
+        let mut partitions = Vec::new();
+
+        // Add mini partition
+        if let Some(mini_partition) =
+            self.create_mini_partition(start_time, end_time, mini_partition_size, order_by)
+        {
+            partitions.push(mini_partition);
+
+            // Generate remaining partitions with histogram alignment
+            match order_by {
+                OrderBy::Desc => {
+                    let remaining_start = mini_partition[0];
+                    let remaining_partitions = self.generate_histogram_aligned_partitions(
+                        start_time,
+                        remaining_start,
+                        step,
+                        OrderBy::Desc,
+                    );
+                    partitions.extend(remaining_partitions);
+                }
+                OrderBy::Asc => {
+                    let remaining_end = mini_partition[1];
+                    let remaining_partitions = self.generate_histogram_aligned_partitions(
+                        remaining_end,
+                        end_time,
+                        step,
+                        OrderBy::Desc,
+                    );
+                    partitions.extend(remaining_partitions);
+                }
+            }
+        } else {
+            // Fall back to regular histogram alignment if mini partition can't be created
+            partitions =
+                self.generate_histogram_aligned_partitions(start_time, end_time, step, order_by);
+        }
+
+        partitions
+    }
+
+    /// Handle edge case of empty partitions
+    fn handle_empty_partitions(
+        &self,
+        partitions: &mut Vec<[i64; 2]>,
+        start_time: i64,
+        end_time: i64,
+    ) {
+        if partitions.is_empty() {
+            partitions.push([start_time, end_time]);
         }
     }
 
@@ -79,61 +249,51 @@ impl PartitionGenerator {
         order_by: OrderBy,
     ) -> Vec<[i64; 2]> {
         let mut partitions = Vec::new();
+        let mini_partition_size = self.calculate_mini_partition_size(step);
 
-        // Create a single mini partition for faster initial results
-        let mini_partition_size_microseconds =
-            std::cmp::min(self.mini_partition_duration_secs * 1_000_000, step as u64) as i64;
-
-        log::info!(
+        log::debug!(
             "mini_partition_size_microseconds: {}, step: {}, end_time: {}, start_time: {}",
-            mini_partition_size_microseconds,
+            mini_partition_size,
             step,
             end_time,
             start_time
         );
 
-        // Different behavior based on order
-        if order_by == OrderBy::Desc {
-            // For DESC order, mini partition at the end time
-            let mut end = end_time;
+        // Add mini partition if possible
+        if let Some(mini_partition) =
+            self.create_mini_partition(start_time, end_time, mini_partition_size, order_by)
+        {
+            partitions.push(mini_partition);
 
-            // Handle mini partition if it's smaller than the total range
-            if mini_partition_size_microseconds < (end_time - start_time) {
-                let start = std::cmp::max(end - mini_partition_size_microseconds, start_time);
-                partitions.push([start, end]);
-                end = start;
-            }
-
-            // Calculate remaining time range
-            while end > start_time {
-                let start = std::cmp::max(end - step, start_time);
-                partitions.push([start, end]);
-                end = start;
+            // Generate remaining partitions
+            match order_by {
+                OrderBy::Desc => {
+                    let remaining_start = mini_partition[0];
+                    let remaining_partitions = self.generate_regular_partitions(
+                        start_time,
+                        remaining_start,
+                        step,
+                        OrderBy::Desc,
+                    );
+                    partitions.extend(remaining_partitions);
+                }
+                OrderBy::Asc => {
+                    let remaining_end = mini_partition[1];
+                    let remaining_partitions = self.generate_regular_partitions(
+                        remaining_end,
+                        end_time,
+                        step,
+                        OrderBy::Asc,
+                    );
+                    partitions.extend(remaining_partitions);
+                }
             }
         } else {
-            // For ASC order, mini partition at the start time
-            let mut start = start_time;
-
-            // Handle mini partition if it's smaller than the total range
-            if mini_partition_size_microseconds < (end_time - start_time) {
-                let end = std::cmp::min(start + mini_partition_size_microseconds, end_time);
-                partitions.push([start, end]);
-                start = end;
-            }
-
-            // Calculate remaining time range
-            while start < end_time {
-                let end = std::cmp::min(start + step, end_time);
-                partitions.push([start, end]);
-                start = end;
-            }
+            // Fall back to regular partitions if mini partition can't be created
+            partitions = self.generate_regular_partitions(start_time, end_time, step, order_by);
         }
 
-        // Handle edge case of empty partitions
-        if partitions.is_empty() {
-            partitions.push([start_time, end_time]);
-        }
-
+        self.handle_empty_partitions(&mut partitions, start_time, end_time);
         partitions
     }
 
@@ -145,38 +305,23 @@ impl PartitionGenerator {
         end_time: i64,
         step: i64,
         order_by: OrderBy,
+        add_mini_partition: bool,
     ) -> Vec<[i64; 2]> {
-        // Generate partitions by DESC order
-        let mut partitions = Vec::new();
-        let mut end = end_time;
-        let mut last_partition_step = end % self.min_step;
-        let duration = end_time - start_time;
+        let mini_partition_size = self.calculate_mini_partition_size(step);
 
-        while end > start_time {
-            let mut start = max(end - step, start_time);
-            if last_partition_step > 0 && duration > self.min_step {
-                // Handle alignment for the first partition
-                partitions.push([end - last_partition_step, end]);
-                start -= last_partition_step;
-                end -= last_partition_step;
-            } else {
-                start = max(start - last_partition_step, start_time);
-            }
-            partitions.push([start, end]);
-            end = start;
-            last_partition_step = 0;
-        }
+        let mut partitions = if add_mini_partition {
+            self.generate_histogram_aligned_partitions_with_mini(
+                start_time,
+                end_time,
+                step,
+                order_by,
+                mini_partition_size,
+            )
+        } else {
+            self.generate_histogram_aligned_partitions(start_time, end_time, step, order_by)
+        };
 
-        // Handle edge case of empty partitions
-        if partitions.is_empty() {
-            partitions.push([start_time, end_time]);
-        }
-
-        // We need to reverse partitions if query is ASC order
-        if order_by == OrderBy::Asc {
-            partitions.reverse();
-        }
-
+        self.handle_empty_partitions(&mut partitions, start_time, end_time);
         partitions
     }
 }
@@ -200,7 +345,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Desc);
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, false);
 
         // Expected partitions:
         // Partition 1: 10:15 - 10:17
@@ -252,7 +398,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Asc);
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, false);
 
         // Expected partitions for ASC order:
         // Partition 1: 10:02 - 10:05
@@ -324,7 +471,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Desc);
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, true);
 
         // Expected partitions:
         // 1. 10:16 - 10:17 (mini partition)
@@ -381,7 +529,8 @@ mod tests {
         );
         let step = 300000000; // 5 minutes
 
-        let partitions = generator.generate_partitions(start_time, end_time, step, OrderBy::Asc);
+        let partitions =
+            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, true);
 
         // Expected partitions with ASC order:
         // 1. 10:02 - 10:03 (mini partition)
@@ -421,5 +570,80 @@ mod tests {
             mini_partition[0], start_time,
             "Mini partition should start at start_time"
         );
+    }
+
+    #[test]
+    fn test_partition_generator_with_histogram_alignment_and_mini_partition() {
+        // Test case: 10:02 - 10:17 with 5-minute histogram interval and mini partition
+        let start_time = 1617267720000000; // 10:02
+        let end_time = 1617268620000000; // 10:17
+        let min_step = 300000000; // 5 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(
+            min_step,
+            mini_partition_duration_secs,
+            true, // is_histogram = true
+        );
+        let step = 300000000; // 5 minutes
+
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Desc,
+            true, // add_mini_partition = true
+        );
+
+        // Expected partitions with mini partition and histogram alignment:
+        // 1. 10:16 - 10:17 (mini partition)
+        // 2. 10:15 - 10:16 (histogram aligned)
+        // 3. 10:10 - 10:15 (histogram aligned)
+        // 4. 10:05 - 10:10 (histogram aligned)
+        // 5. 10:02 - 10:05 (histogram aligned)
+
+        // Print the actual partitions for debugging
+        println!("HISTOGRAM PARTITIONS WITH MINI PARTITION (DESC):");
+        println!("Number of partitions: {}", partitions.len());
+        for (i, [start, end]) in partitions.iter().enumerate() {
+            // Convert to human-readable time for debugging
+            let start_mins = (start - 1617267600000000) / 60000000; // Minutes since 10:00
+            let end_mins = (end - 1617267600000000) / 60000000;
+            println!(
+                "Partition {}: 10:{:02} - 10:{:02} ({} - {})",
+                i + 1,
+                start_mins,
+                end_mins,
+                start,
+                end
+            );
+        }
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.last().unwrap()[0], start_time);
+        assert_eq!(partitions.first().unwrap()[1], end_time);
+
+        // Verify mini partition is at the end (DESC order)
+        let mini_partition = &partitions[0];
+        let mini_partition_duration = mini_partition[1] - mini_partition[0];
+        assert!(
+            mini_partition_duration <= (mini_partition_duration_secs * 1_000_000) as i64,
+            "Mini partition size should not exceed the configured duration"
+        );
+        assert_eq!(
+            mini_partition[1], end_time,
+            "Mini partition should end at end_time"
+        );
+
+        // Verify histogram alignment for non-mini partitions
+        for (_i, [start, end]) in partitions.iter().enumerate().skip(1) {
+            if *start != start_time && *end != end_time {
+                assert_eq!(
+                    *start % min_step,
+                    0,
+                    "Partition start should align with histogram interval"
+                );
+            }
+        }
     }
 }

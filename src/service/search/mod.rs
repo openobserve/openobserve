@@ -869,11 +869,14 @@ pub async fn search_partition(
     }
 
     let mut is_histogram = sql.histogram_interval.is_some();
+    let mut add_mini_partition = false;
     // Set this to true to generate partitions aligned with interval
     // only for logs page when query is non-histogram, so that logs can reuse the same partitions
     // for histogram query
     if !is_histogram && req.search_type.eq(&Some(SearchEventType::UI)) {
         is_histogram = true;
+        // add mini partition for the histogram aligned partitions in the UI search
+        add_mini_partition = true;
     }
 
     let sql_order_by = sql
@@ -908,8 +911,13 @@ pub async fn search_partition(
     }
 
     // Generate partitions
-    let partitions =
-        generator.generate_partitions(req.start_time, req.end_time, step, sql_order_by);
+    let partitions = generator.generate_partitions(
+        req.start_time,
+        req.end_time,
+        step,
+        sql_order_by,
+        add_mini_partition,
+    );
 
     if sql_order_by == OrderBy::Asc {
         resp.order_by = OrderBy::Asc;
