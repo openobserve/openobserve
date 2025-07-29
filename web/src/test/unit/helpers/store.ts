@@ -35,14 +35,6 @@ const store = createStore({
       show_stream_stats_doc_num: true,
       default_functions: [
         {
-          name: "match_all_raw",
-          text: "match_all_raw('v')",
-        },
-        {
-          name: "match_all_raw_ignore_case",
-          text: "match_all_raw_ignore_case('v')",
-        },
-        {
           name: "match_all",
           text: "match_all('v')",
         },
