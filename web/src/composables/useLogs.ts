@@ -1908,8 +1908,7 @@ const useLogs = () => {
 
           }
           searchObj.meta.histogramDirtyFlag = false;
-        } 
-        else {
+        } else {
           let aggFlag = false;
           if (parsedSQL) {
             aggFlag = hasAggregation(parsedSQL?.columns);
@@ -1917,13 +1916,16 @@ const useLogs = () => {
           if (
             queryReq.query.from == 0 &&
             searchObj.data.queryResults.hits.length > 0 &&
-            !aggFlag
+            !aggFlag &&
+            searchObj.data.queryResults.aggs == undefined
           ) {
             setTimeout(async () => {
               searchObjDebug["pagecountStartTime"] = performance.now();
               await getPageCount(queryReq);
               searchObjDebug["pagecountEndTime"] = performance.now();
             }, 0);
+          } else {
+            await generateHistogramData();
           }
 
           if (searchObj.data.stream.selectedStream.length > 1) {
