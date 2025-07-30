@@ -615,6 +615,13 @@ async fn delete_stream_data_by_time_range(
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let time_range = body.into_inner();
 
+    if time_range.start > time_range.end {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Start time must be less than end time".to_string(),
+        )));
+    }
+
     // Convert the time range to RFC3339 format
     // If this is a log stream, we use the hour part of the timestamp
     // If the timestamp is 10:15:00, we use only the hour part
