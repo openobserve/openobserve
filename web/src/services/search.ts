@@ -184,17 +184,19 @@ const search = {
     query,
     page_type = "logs",
     traceparent,
+    searchType,
   }: {
     org_identifier: string;
     query: any;
     page_type: string;
     traceparent: string;
+    searchType: string;
   }) => {
     // const url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
 
-    let url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
+    let url = `/api/${org_identifier}/_search_partition?type=${page_type}&search_type=${searchType}`;
     if (typeof query.sql != "string") {
-      url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}`;
+      url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}&search_type=${searchType}`;
     }
 
     return http({
