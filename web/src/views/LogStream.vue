@@ -632,7 +632,6 @@ export default defineComponent({
                 listSchema({ row: element });
               }
             });
-            // onChangeStreamFilter(selectedStreamType.value);
             loadingState.value = false;
 
             addNewStreams(selectedStreamType.value, res.list);
@@ -850,7 +849,6 @@ export default defineComponent({
             }
           })
           .catch((err) => {
-            console.error(err);
             dateTime["period"] = "15m";
           })
           .finally(() => {

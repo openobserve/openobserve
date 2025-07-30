@@ -19,7 +19,7 @@ use arrow::array::{
     Array, AsArray, Float32Array, Int8Array, Int16Array, Int32Array, Int64Array, RecordBatch,
     UInt8Array, UInt16Array, UInt32Array, UInt64Array,
 };
-use arrow_schema::{Field, Schema};
+use arrow_schema::{Field, FieldRef, Schema};
 use datafusion::{
     arrow::{
         array::{ArrayRef, Float64Array},
@@ -89,15 +89,15 @@ impl AggregateUDFImpl for PercentileCont {
         Ok(arg_types[0].clone())
     }
 
-    fn state_fields(&self, args: StateFieldsArgs) -> Result<Vec<Field>> {
+    fn state_fields(&self, args: StateFieldsArgs) -> Result<Vec<FieldRef>> {
         // Intermediate state is a list of the elements we have collected so far
         let field = Field::new("item", DataType::Float64, true);
         let state_name = "percentile_cont";
-        Ok(vec![Field::new(
+        Ok(vec![Arc::new(Field::new(
             format_state_name(args.name, state_name),
             DataType::List(Arc::new(field)),
             true,
-        )])
+        ))])
     }
 
     fn accumulator(&self, args: AccumulatorArgs) -> Result<Box<dyn Accumulator>> {

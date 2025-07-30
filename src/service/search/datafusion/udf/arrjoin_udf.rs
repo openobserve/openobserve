@@ -48,7 +48,9 @@ pub fn arr_join_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
     log::debug!("Inside arrjoin");
     if args.len() != 2 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError("UDF params should be: arrjoin(field1, delim)".to_string()),
+            Box::new(ParserError::ParserError(
+                "UDF params should be: arrjoin(field1, delim)".to_string(),
+            )),
             None,
         ));
     }
