@@ -1101,10 +1101,6 @@ const useLogs = () => {
     return parsedSQL?.distinct?.type === "DISTINCT";
   };
 
-  const isWithQuery = (parsedSQL: any = null) => {
-    return parsedSQL?.with && parsedSQL?.with?.length > 0;
-  };
-
   const getQueryPartitions = async (queryReq: any) => {
     try {
       // const queryReq = buildSearch();
@@ -1407,7 +1403,7 @@ const useLogs = () => {
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
             (!searchObj.meta.sqlMode ||
-              (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL) && !isDistinctQuery(parsedSQL) && !isWithQuery(parsedSQL) && searchObj.data.queryResults.is_histogram_eligible))) ||
+              (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL) && !isDistinctQuery(parsedSQL) && searchObj.data.queryResults.is_histogram_eligible))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
@@ -1816,7 +1812,7 @@ const useLogs = () => {
             -1
           );
           searchObj.meta.histogramDirtyFlag = false;
-        } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)) {
+        } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)) {
           let aggFlag = false;
           if (parsedSQL) {
             aggFlag = hasAggregation(parsedSQL?.columns);
@@ -1833,7 +1829,7 @@ const useLogs = () => {
               searchObjDebug["pagecountEndTime"] = performance.now();
             }, 0);
           }
-          if(isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible){
+          if(!searchObj.data.queryResults.is_histogram_eligible){
             resetHistogramWithError(
               "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
               -1
@@ -2419,7 +2415,7 @@ const useLogs = () => {
           delete queryReq.query.track_total_hits;
         }
 
-        if (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible) {
+        if (isDistinctQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible) {
           delete queryReq.query.track_total_hits;
         }
       }
@@ -5173,7 +5169,7 @@ const useLogs = () => {
           delete queryReq.query.track_total_hits;
         }
 
-        if (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible) {
+        if (isDistinctQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible) {
           delete queryReq.query.track_total_hits;
         }
       }
@@ -6172,7 +6168,7 @@ const useLogs = () => {
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
       resetHistogramWithError("Histogram unavailable for CTEs, DISTINCT and LIMIT queries.", -1);
       searchObj.meta.histogramDirtyFlag = false;
-    } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)) {
+    } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)) {
       if (shouldGetPageCount(queryReq, parsedSQL) && isFromZero) {
         setTimeout(async () => {
           searchObjDebug["pagecountStartTime"] = performance.now();
@@ -6180,7 +6176,7 @@ const useLogs = () => {
           searchObjDebug["pagecountEndTime"] = performance.now();
         }, 0);
       }
-      if(isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible){
+      if(!searchObj.data.queryResults.is_histogram_eligible){
         resetHistogramWithError(
           "Histogram unavailable for CTEs, DISTINCT and LIMIT queries..",
           -1
@@ -6220,7 +6216,7 @@ const useLogs = () => {
   function isNonAggregatedSQLMode(searchObj: any, parsedSQL: any) {
     return !(
       searchObj.meta.sqlMode &&
-      (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)
+      (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)
     );
   }
 
@@ -6623,7 +6619,6 @@ const useLogs = () => {
     isActionsEnabled,
     sendCancelSearchMessage,
     isDistinctQuery,
-    isWithQuery,
     getStream,
     loadVisualizeData,
     processHttpHistogramResults

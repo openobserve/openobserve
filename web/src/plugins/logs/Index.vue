@@ -579,7 +579,6 @@ export default defineComponent({
       addTraceId,
       sendCancelSearchMessage,
       isDistinctQuery,
-      isWithQuery,
       getStream,
       loadVisualizeData,
       buildSearch,
@@ -2067,7 +2066,6 @@ export default defineComponent({
       showSearchScheduler,
       closeSearchSchedulerFn,
       isDistinctQuery,
-      isWithQuery,
       isStreamingEnabled,
       sendToAiChat,
       processInterestingFiledInSQLQuery,
@@ -2172,7 +2170,7 @@ export default defineComponent({
           this.searchObj.meta.histogramDirtyFlag = false;
         } else if (
           this.searchObj.meta.sqlMode &&
-          (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
+          (this.isDistinctQuery(parsedSQL))
         ) {
           this.resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
