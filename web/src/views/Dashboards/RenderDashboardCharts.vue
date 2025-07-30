@@ -70,7 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :forceLoad="forceLoad"
           :searchType="searchType"
-          :getPanelAndRunId="getPanelAndRunId"
           :globalRunId="globalRunId"
           @updated:data-zoom="$emit('updated:data-zoom', $event)"
           @onMovePanel="onMovePanel"
