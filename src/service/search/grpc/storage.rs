@@ -130,18 +130,18 @@ pub async fn search(
     // Condition:All() is used for TantivyOptimizeExec
     // the negated condition is TantivyOptimizeExec is fast,
     // but for row_ids it only fast when row_ids is small
+    let is_negated_condition =
+        index_condition.is_some() && index_condition.as_ref().unwrap().is_negated_condition();
     let use_inverted_index = query.use_inverted_index
         && index_condition.is_some()
         && !index_condition.as_ref().unwrap().is_condition_all()
-        && (get_config().common.feature_query_not_filter_with_index
-            || !index_condition.as_ref().unwrap().is_negated_condition());
-    if use_inverted_index {
-        log::info!(
-            "[trace_id {}] flight->search: use_inverted_index with tantivy format {}",
-            query.trace_id,
-            use_inverted_index
-        );
-    }
+        && (get_config().common.feature_query_not_filter_with_index || !is_negated_condition);
+    log::info!(
+        "[trace_id {}] flight->search: use_inverted_index {}, is_negated_condition {}",
+        query.trace_id,
+        use_inverted_index,
+        is_negated_condition
+    );
 
     let mut idx_took = 0;
     let mut is_add_filter_back = false;
@@ -180,6 +180,11 @@ pub async fn search(
                     .build()
             )
         );
+    }
+
+    // if the condition is negated and not use inverted index, we should not add filter back
+    if !use_inverted_index && is_negated_condition {
+        is_add_filter_back = true;
     }
 
     // set index_condition to None, means we do not need to add filter back
