@@ -21,8 +21,8 @@ use config::{get_config, is_local_disk_storage, utils::hash::Sum64};
 use futures::stream::BoxStream;
 use hashbrown::{HashMap, HashSet};
 use object_store::{
-    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore, PutMultipartOpts,
-    PutOptions, PutPayload, PutResult, Result, path::Path,
+    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
+    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, path::Path,
 };
 
 use crate::storage::{ObjectStoreExt, get_stream_from_file, remote::StorageConfig};
@@ -285,7 +285,7 @@ impl ObjectStoreExt for StorageClientFactory {
         &self,
         account: &str,
         location: &Path,
-        opts: PutMultipartOpts,
+        opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
         self.get_client_by_name(account)
             .put_multipart_opts(location, opts)

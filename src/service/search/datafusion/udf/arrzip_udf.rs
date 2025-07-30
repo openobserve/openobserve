@@ -48,9 +48,9 @@ pub fn arr_zip_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Columna
     log::debug!("Inside arrzip");
     if args.len() != 3 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError(
+            Box::new(ParserError::ParserError(
                 "UDF params should be: arrzip(field1, field2, delim)".to_string(),
-            ),
+            )),
             None,
         ));
     }

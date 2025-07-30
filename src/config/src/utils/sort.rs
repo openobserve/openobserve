@@ -48,7 +48,7 @@ mod tests {
 
     #[test]
     fn test_sort_float_array() {
-        let mut numbers = vec![
+        let mut numbers = [
             1.5,
             f64::NAN,
             0.0,
@@ -56,7 +56,7 @@ mod tests {
             -2.7,
             f64::NEG_INFINITY,
             f64::NAN,
-            3.14,
+            std::f64::consts::PI,
         ];
 
         // Sort the vector using our custom sort_float function
@@ -67,14 +67,14 @@ mod tests {
         // Then negative infinity
         // Then regular numbers in ascending order
         // Then positive infinity
-        let expected = vec![
+        let expected = [
             f64::NAN,
             f64::NAN,
             f64::NEG_INFINITY,
             -2.7,
             0.0,
             1.5,
-            3.14,
+            std::f64::consts::PI,
             f64::INFINITY,
         ];
 
@@ -86,8 +86,7 @@ mod tests {
             }
             assert_eq!(
                 actual, expected,
-                "Mismatch at position {}: expected {:?}, got {:?}",
-                i, expected, actual
+                "Mismatch at position {i}: expected {expected:?}, got {actual:?}"
             );
         }
     }

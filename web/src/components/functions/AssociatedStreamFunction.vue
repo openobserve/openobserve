@@ -467,11 +467,6 @@ export default defineComponent({
             if (logStream.value.length > 0) {
               getAllFunctions();
             }
-            // logStream.value.forEach((element: any) => {
-            //   if (element.name == router.currentRoute.value.query.dialog) {
-            //     listSchema({ row: element });
-            //   }
-            // });
 
             dismiss();
           })
@@ -700,14 +695,6 @@ export default defineComponent({
     });
 
     onActivated(() => {
-      // if (logStream.value.length > 0) {
-      //   logStream.value.forEach((element: any) => {
-      //     if (element.name == router.currentRoute.value.query.dialog) {
-      //       listSchema({ row: element });
-      //     }
-      //   });
-      // }
-      // getAllFunctions();
       if (
         previousOrgIdentifier.value !=
         store.state.selectedOrganization.identifier
