@@ -48,7 +48,9 @@ pub fn spath_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarV
     log::debug!("Inside spath");
     if args.len() != 2 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError("UDF params should be: spath(field, path)".to_string()),
+            Box::new(ParserError::ParserError(
+                "UDF params should be: spath(field, path)".to_string(),
+            )),
             None,
         ));
     }

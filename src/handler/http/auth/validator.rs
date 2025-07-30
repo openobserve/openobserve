@@ -393,9 +393,18 @@ pub async fn validate_credentials_ext(
 /// - This is a ingestion POST endpoint
 async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Result<(), Error> {
     let config = get_config();
-    let path_columns = path.split('/').collect::<Vec<&str>>();
+    let mut path_columns = path.split('/').collect::<Vec<&str>>();
+    if let Some(v) = path_columns.first()
+        && v.is_empty()
+    {
+        path_columns.remove(0);
+    }
     let url_len = path_columns.len();
     if path_columns.len() < 2 {
+        return Ok(());
+    }
+    // node is a special prefix, it does not need to create org
+    if path_columns[0].eq("node") {
         return Ok(());
     }
     // Hack for v2 apis
