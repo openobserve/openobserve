@@ -628,75 +628,73 @@ pub async fn do_partitioned_search(
             curr_res_size += total_hits;
         }
 
-        if !search_res.hits.is_empty() {
-            search_res = order_search_results(search_res, fallback_order_by_col.clone());
+        search_res = order_search_results(search_res, fallback_order_by_col.clone());
 
-            // set took
-            search_res.set_took(start_timer.elapsed().as_millis() as usize);
-            // reset start time
-            *start_timer = Instant::now();
+        // set took
+        search_res.set_took(start_timer.elapsed().as_millis() as usize);
+        // reset start time
+        *start_timer = Instant::now();
 
-            // check range error
-            if !range_error.is_empty() {
-                search_res.is_partial = true;
-                search_res.function_error = if search_res.function_error.is_empty() {
-                    vec![range_error.clone()]
-                } else {
-                    search_res.function_error.push(range_error.clone());
-                    search_res.function_error
-                };
-                search_res.new_start_time = Some(modified_start_time);
-                search_res.new_end_time = Some(modified_end_time);
-            }
-
-            // Accumulate the result
-            if is_streaming_aggs {
-                // Only accumulate the results of the last partition
-                if idx == partitions.len() - 1 {
-                    accumulated_results.push(SearchResultType::Search(search_res.clone()));
-                }
+        // check range error
+        if !range_error.is_empty() {
+            search_res.is_partial = true;
+            search_res.function_error = if search_res.function_error.is_empty() {
+                vec![range_error.clone()]
             } else {
+                search_res.function_error.push(range_error.clone());
+                search_res.function_error
+            };
+            search_res.new_start_time = Some(modified_start_time);
+            search_res.new_end_time = Some(modified_end_time);
+        }
+
+        // Accumulate the result
+        if is_streaming_aggs {
+            // Only accumulate the results of the last partition
+            if idx == partitions.len() - 1 {
                 accumulated_results.push(SearchResultType::Search(search_res.clone()));
             }
+        } else {
+            accumulated_results.push(SearchResultType::Search(search_res.clone()));
+        }
 
-            // add top k values for values search
-            if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
-                let search_stream_span = tracing::info_span!(
-                    "src::handler::http::request::search::process_stream::do_partitioned_search::get_top_k_values",
-                    org_id = %org_id,
-                );
-                let instant = Instant::now();
-                let field = values_ctx.as_ref().unwrap().field.clone();
-                let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
-                let no_count = values_ctx.as_ref().unwrap().no_count;
-                let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
-                    get_top_k_values(&search_res.hits, &field, top_k, no_count)
-                })
-                .instrument(search_stream_span.clone())
-                .await
-                .unwrap()?;
-                search_res.total = hit_count as usize;
-                search_res.hits = top_k_values;
-                let duration = instant.elapsed();
-                log::debug!("Top k values for partition {idx} took {:?}", duration);
-            }
+        // add top k values for values search
+        if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
+            let search_stream_span = tracing::info_span!(
+                "src::handler::http::request::search::process_stream::do_partitioned_search::get_top_k_values",
+                org_id = %org_id,
+            );
+            let instant = Instant::now();
+            let field = values_ctx.as_ref().unwrap().field.clone();
+            let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
+            let no_count = values_ctx.as_ref().unwrap().no_count;
+            let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
+                get_top_k_values(&search_res.hits, &field, top_k, no_count)
+            })
+            .instrument(search_stream_span.clone())
+            .await
+            .unwrap()?;
+            search_res.total = hit_count as usize;
+            search_res.hits = top_k_values;
+            let duration = instant.elapsed();
+            log::debug!("Top k values for partition {idx} took {:?}", duration);
+        }
 
-            // Send the cached response
-            let response = StreamResponses::SearchResponse {
-                results: search_res.clone(),
-                streaming_aggs: is_streaming_aggs,
-                time_offset: TimeOffset {
-                    start_time,
-                    end_time,
-                },
-            };
+        // Send the cached response
+        let response = StreamResponses::SearchResponse {
+            results: search_res.clone(),
+            streaming_aggs: is_streaming_aggs,
+            time_offset: TimeOffset {
+                start_time,
+                end_time,
+            },
+        };
 
-            if let Err(e) = sender.send(Ok(response)).await {
-                log::error!("Error sending response: {}", e);
-                return Err(infra::errors::Error::Message(
-                    "Error sending response".to_string(),
-                ));
-            }
+        if let Err(e) = sender.send(Ok(response)).await {
+            log::error!("Error sending response: {}", e);
+            return Err(infra::errors::Error::Message(
+                "Error sending response".to_string(),
+            ));
         }
 
         // Send progress update
@@ -1086,90 +1084,87 @@ async fn process_delta(
             trace_id
         );
 
-        if !search_res.hits.is_empty() {
-            // search_res = order_search_results(search_res, req.fallback_order_by_col.clone());
-            // for every partition, compute the queried range omitting the result cache ratio
-            let queried_range =
-                calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
-            *remaining_query_range -= queried_range;
+        // search_res = order_search_results(search_res, req.fallback_order_by_col.clone());
+        // for every partition, compute the queried range omitting the result cache ratio
+        let queried_range = calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
+        *remaining_query_range -= queried_range;
 
-            // set took
-            search_res.set_took(start_timer.elapsed().as_millis() as usize);
-            // reset start timer
-            *start_timer = Instant::now();
+        // set took
+        search_res.set_took(start_timer.elapsed().as_millis() as usize);
+        // reset start timer
+        *start_timer = Instant::now();
 
-            // when searching with limit queries
-            // the limit in sql takes precedence over the requested size
-            // hence, the search result needs to be trimmed when the req limit is reached
-            if *curr_res_size > req_size {
-                let excess_hits = *curr_res_size - req_size;
-                let total_hits = search_res.hits.len() as i64;
-                if total_hits > excess_hits {
-                    let cache_hits: usize = (total_hits - excess_hits) as usize;
-                    search_res.hits.truncate(cache_hits);
-                    search_res.total = cache_hits;
-                }
+        // when searching with limit queries
+        // the limit in sql takes precedence over the requested size
+        // hence, the search result needs to be trimmed when the req limit is reached
+        if *curr_res_size > req_size {
+            let excess_hits = *curr_res_size - req_size;
+            let total_hits = search_res.hits.len() as i64;
+            if total_hits > excess_hits {
+                let cache_hits: usize = (total_hits - excess_hits) as usize;
+                search_res.hits.truncate(cache_hits);
+                search_res.total = cache_hits;
             }
+        }
 
-            // Accumulate the result
-            if is_streaming_aggs {
-                // Only accumulate the results of the last partition
-                if idx == partitions.len() - 1 {
-                    accumulated_results.push(SearchResultType::Search(search_res.clone()));
-                }
-            } else {
+        // Accumulate the result
+        if is_streaming_aggs {
+            // Only accumulate the results of the last partition
+            if idx == partitions.len() - 1 {
                 accumulated_results.push(SearchResultType::Search(search_res.clone()));
             }
+        } else {
+            accumulated_results.push(SearchResultType::Search(search_res.clone()));
+        }
 
-            // `result_cache_ratio` will be 0 for delta search
-            let result_cache_ratio = search_res.result_cache_ratio;
+        // `result_cache_ratio` will be 0 for delta search
+        let result_cache_ratio = search_res.result_cache_ratio;
 
-            if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
-                let search_stream_span = tracing::info_span!(
-                    "src::handler::http::request::search::process_stream::process_delta::get_top_k_values",
-                    org_id = %org_id,
-                );
-
-                log::debug!("Getting top k values for partition {idx}");
-                let field = values_ctx.as_ref().unwrap().field.clone();
-                let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
-                let no_count = values_ctx.as_ref().unwrap().no_count;
-                let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
-                    get_top_k_values(&search_res.hits, &field, top_k, no_count)
-                })
-                .instrument(search_stream_span.clone())
-                .await
-                .unwrap()?;
-                search_res.total = hit_count as usize;
-                search_res.hits = top_k_values;
-            }
-
-            let response = StreamResponses::SearchResponse {
-                results: search_res.clone(),
-                streaming_aggs: is_streaming_aggs,
-                time_offset: TimeOffset {
-                    start_time,
-                    end_time,
-                },
-            };
-            log::info!(
-                "[HTTP2_STREAM]: Processing deltas for trace_id: {}, hits: {:?}",
-                trace_id,
-                search_res.hits
+        if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
+            let search_stream_span = tracing::info_span!(
+                "src::handler::http::request::search::process_stream::process_delta::get_top_k_values",
+                org_id = %org_id,
             );
-            log::debug!(
-                "[HTTP2_STREAM]: Sending search response for trace_id: {}, delta: {:?}, hits len: {}, result_cache_ratio: {}",
-                trace_id,
-                delta,
-                search_res.hits.len(),
-                result_cache_ratio,
-            );
-            if let Err(e) = sender.send(Ok(response)).await {
-                log::error!("Error sending search response: {}", e);
-                return Err(infra::errors::Error::Message(
-                    "Failed to send search response".to_string(),
-                ));
-            }
+
+            log::debug!("Getting top k values for partition {idx}");
+            let field = values_ctx.as_ref().unwrap().field.clone();
+            let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
+            let no_count = values_ctx.as_ref().unwrap().no_count;
+            let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
+                get_top_k_values(&search_res.hits, &field, top_k, no_count)
+            })
+            .instrument(search_stream_span.clone())
+            .await
+            .unwrap()?;
+            search_res.total = hit_count as usize;
+            search_res.hits = top_k_values;
+        }
+
+        let response = StreamResponses::SearchResponse {
+            results: search_res.clone(),
+            streaming_aggs: is_streaming_aggs,
+            time_offset: TimeOffset {
+                start_time,
+                end_time,
+            },
+        };
+        log::info!(
+            "[HTTP2_STREAM]: Processing deltas for trace_id: {}, hits: {:?}",
+            trace_id,
+            search_res.hits
+        );
+        log::debug!(
+            "[HTTP2_STREAM]: Sending search response for trace_id: {}, delta: {:?}, hits len: {}, result_cache_ratio: {}",
+            trace_id,
+            delta,
+            search_res.hits.len(),
+            result_cache_ratio,
+        );
+        if let Err(e) = sender.send(Ok(response)).await {
+            log::error!("Error sending search response: {}", e);
+            return Err(infra::errors::Error::Message(
+                "Failed to send search response".to_string(),
+            ));
         }
 
         // Stop if `remaining_query_range` is less than 0

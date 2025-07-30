@@ -1566,6 +1566,32 @@ impl StreamResponses {
                 let streaming_aggs = *streaming_aggs;
                 let time_offset = time_offset.clone();
 
+                if results.hits.is_empty() {
+                    // Send metadata first
+                    let metadata = StreamResponses::SearchResponseMetadata {
+                        results: results.clone(),
+                        streaming_aggs,
+                        time_offset: time_offset.clone(),
+                    };
+                    let metadata_data = serde_json::to_string(&metadata).unwrap_or_else(|_| {
+                        log::error!("Failed to serialize metadata: {:?}", metadata);
+                        String::new()
+                    });
+                    let metadata_bytes = format_event("search_response_metadata", &metadata_data);
+
+                    // Send empty hits
+                    let hits_bytes = format_event("search_response_hits", "{\"hits\":[]}");
+
+                    // Return both chunks in sequence
+                    let chunks_iter =
+                        std::iter::once(Ok(metadata_bytes)).chain(std::iter::once(Ok(hits_bytes)));
+
+                    return StreamResponseChunks {
+                        chunks_iter: Some(Box::new(chunks_iter)),
+                        single_chunk: None,
+                    };
+                }
+
                 // Create an iterator that maps each chunk to a formatted BytesImpl
                 let chunks_iter = iterator.map(move |chunk| {
                     let (event_type, data) = match chunk {
