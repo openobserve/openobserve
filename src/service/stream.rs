@@ -407,6 +407,10 @@ pub async fn update_stream_settings(
                 settings.index_all_values = index_all_values;
             }
 
+            if let Some(ddisable_distinct_fields) = new_settings.disable_distinct_fields {
+                settings.disable_distinct_fields = disable_distinct_fields;
+            }
+
             // if index_original_data is true, store_original_data must be true
             if settings.index_original_data {
                 settings.store_original_data = true;
