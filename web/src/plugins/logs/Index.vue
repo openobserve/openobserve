@@ -387,10 +387,7 @@ import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep, debounce } from "lodash-es";
-import {
-  buildSqlQuery,
-  getFieldsFromQuery,
-} from "@/utils/query/sqlUtils";
+import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
@@ -713,7 +710,10 @@ export default defineComponent({
           !type
         ) {
           searchObj.meta.pageType = "logs";
-          if(prev === "stream_explorer" && (type == undefined || type !== "stream_explorer")) {
+          if (
+            prev === "stream_explorer" &&
+            (type == undefined || type !== "stream_explorer")
+          ) {
             searchObj.meta.refreshHistogram = true;
           }
           loadLogsData();
@@ -831,10 +831,13 @@ export default defineComponent({
 
     // Main method for handling before mount logic
     async function handleBeforeMount() {
-      if(Object.hasOwn(router.currentRoute.value?.query, "logs_visualize_toggle")) {
-        searchObj.meta.logsVisualizeToggle = router.currentRoute.value.query.logs_visualize_toggle;
+      if (
+        Object.hasOwn(router.currentRoute.value?.query, "logs_visualize_toggle")
+      ) {
+        searchObj.meta.logsVisualizeToggle =
+          router.currentRoute.value.query.logs_visualize_toggle;
       }
-      
+
       await setupLogsTab();
       if (!isLogsTab()) {
         await importSqlParser();
@@ -861,6 +864,9 @@ export default defineComponent({
 
         resetStreamData();
 
+        searchObj.meta.quickMode = isQuickModeEnabled();
+        searchObj.meta.showHistogram = isHistogramEnabled();
+
         restoreUrlQueryParams();
 
         await importSqlParser();
@@ -869,7 +875,7 @@ export default defineComponent({
           await getRegionInfo();
         }
 
-        if(isLogsTab()) {
+        if (isLogsTab()) {
           loadLogsData();
         } else {
           loadVisualizeData();
@@ -879,9 +885,6 @@ export default defineComponent({
         if (isCloudEnvironment()) {
           setupCloudSpecificThreshold();
         }
-
-        searchObj.meta.quickMode = isQuickModeEnabled();
-        searchObj.meta.showHistogram = isHistogramEnabled();
 
         isLogsMounted.value = true;
       } catch (error) {
@@ -1452,8 +1455,12 @@ export default defineComponent({
               };
 
               // if hits is empty and filteredHit is present, then set hits to filteredHit
-              if (searchResponseForVisualization?.value?.hits?.length === 0 && searchResponseForVisualization?.value?.filteredHit) {
-                searchResponseForVisualization.value.hits = searchResponseForVisualization?.value?.filteredHit ?? [];
+              if (
+                searchResponseForVisualization?.value?.hits?.length === 0 &&
+                searchResponseForVisualization?.value?.filteredHit
+              ) {
+                searchResponseForVisualization.value.hits =
+                  searchResponseForVisualization?.value?.filteredHit ?? [];
               }
             }
 
@@ -1461,8 +1468,8 @@ export default defineComponent({
             const dateTime =
               searchObj.data.datetime.type === "relative"
                 ? getConsumableRelativeTime(
-                  searchObj.data.datetime.relativeTimePeriod,
-                )
+                    searchObj.data.datetime.relativeTimePeriod,
+                  )
                 : cloneDeep(searchObj.data.datetime);
 
             dashboardPanelData.meta.dateTime = {
@@ -1486,12 +1493,12 @@ export default defineComponent({
           // this will clear dummy trace id
           cancelFieldExtraction();
 
-          if(err.name === "AbortError"){
+          if (err.name === "AbortError") {
             return;
           }
 
-           // show error notification
-           showErrorNotification(
+          // show error notification
+          showErrorNotification(
             err.message ?? "Error in updating visualization",
           );
           return;
@@ -1578,7 +1585,7 @@ export default defineComponent({
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
           const success = await updateVisualization();
-          if(!success){
+          if (!success) {
             return;
           }
         } catch (err: any) {
@@ -1601,7 +1608,7 @@ export default defineComponent({
         const currentQuery =
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].query;        
+          ].query;
 
         // check if query is assigned and not empty
         // this prevents hard refresh early validation before query is assigned
@@ -1620,8 +1627,8 @@ export default defineComponent({
         const dateTime =
           searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
-              searchObj.data.datetime.relativeTimePeriod,
-            )
+                searchObj.data.datetime.relativeTimePeriod,
+              )
             : cloneDeep(searchObj.data.datetime);
 
         dashboardPanelData.meta.dateTime = {
@@ -1709,28 +1716,33 @@ export default defineComponent({
       };
 
       try {
-
-        let logsPageQuery = searchObj.data.query;        
-        // return if query is emptry and stream is not selected 
-        if(logsPageQuery === "" && searchObj?.data?.stream?.selectedStream?.length === 0){ 
-          showErrorNotification("Query is empty, please write query to visualize");
+        let logsPageQuery = searchObj.data.query;
+        // return if query is emptry and stream is not selected
+        if (
+          logsPageQuery === "" &&
+          searchObj?.data?.stream?.selectedStream?.length === 0
+        ) {
+          showErrorNotification(
+            "Query is empty, please write query to visualize",
+          );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
         }
 
         // handle sql mode
-        if(!searchObj.data.sqlMode){
-          const queryBuild= buildSearch();
+        if (!searchObj.data.sqlMode) {
+          const queryBuild = buildSearch();
           logsPageQuery = queryBuild?.query?.sql ?? "";
         }
 
         // check if query is empty
-        if(logsPageQuery === ""){
-          showErrorNotification("Query is empty, please write query to visualize");
+        if (logsPageQuery === "") {
+          showErrorNotification(
+            "Query is empty, please write query to visualize",
+          );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
         }
-
 
         /* ------------------------------------------------------------- */
         /* 1) Fetch schema for the user query                            */
@@ -1797,7 +1809,9 @@ export default defineComponent({
         const finalQuery = logsPageQuery;
 
         if (!finalQuery) {
-          showErrorNotification("Query is empty, please write query to visualize");
+          showErrorNotification(
+            "Query is empty, please write query to visualize",
+          );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
         }
@@ -1827,7 +1841,10 @@ export default defineComponent({
           };
         }
 
-        fieldsExtractionPromise = setCustomQueryFields(fieldsForVisualization, signal);
+        fieldsExtractionPromise = setCustomQueryFields(
+          fieldsForVisualization,
+          signal,
+        );
 
         await fieldsExtractionPromise;
 
@@ -2166,13 +2183,13 @@ export default defineComponent({
           this.resetHistogramWithError(
             "Histogram is not available for multi stream search.",
           );
-        }else if(!this.searchObj.data.queryResults.is_histogram_eligible){
+        } else if (!this.searchObj.data.queryResults.is_histogram_eligible) {
           this.resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
-        }else if (
+        } else if (
           this.searchObj.meta.histogramDirtyFlag == true &&
           this.searchObj.meta.jobId == ""
         ) {
@@ -2194,7 +2211,7 @@ export default defineComponent({
               "histogram",
               {
                 isHistogramOnly: this.searchObj.meta.histogramDirtyFlag,
-                is_ui_histogram: true
+                is_ui_histogram: true,
               },
             );
             const requestId = this.initializeSearchConnection(payload);
@@ -2222,7 +2239,6 @@ export default defineComponent({
               this.searchObj.loadingHistogram = false;
             });
         }
-
       }
 
       this.updateUrlQueryParams();
