@@ -388,6 +388,14 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
+    getPanelAndRunId: {
+      type: Function,
+      default: null,
+    },
+    globalRunId: {
+      type: String,
+      default: null,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -438,6 +446,8 @@ export default defineComponent({
       folderId,
       reportId,
       allowAnnotationsAdd,
+      getPanelAndRunId,
+      globalRunId,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -462,6 +472,8 @@ export default defineComponent({
       dashboardId,
       folderId,
       reportId,
+      getPanelAndRunId,
+      globalRunId,
     );
 
     const {

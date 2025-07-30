@@ -269,6 +269,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :searchType="searchType"
         @panelsValues="handleEmittedData"
         @searchRequestTraceIds="searchRequestTraceIds"
+        :getPanelAndRunId="getPanelAndRunId"
+        :globalRunId="globalRunId.value"
       />
 
       <q-dialog
@@ -369,6 +371,7 @@ import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import { useDashboardRunId } from "@/composables/dashboard/useDashboardRunId";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -441,6 +444,13 @@ export default defineComponent({
     const reportId = computed(() => route.query.tab);
 
     const renderDashboardChartsRef = ref(null);
+
+    // Initialize dashboard run ID management
+    const {
+      globalRunId,
+      generateNewDashboardRunId,
+      getPanelAndRunId,
+    } = useDashboardRunId();
 
     onBeforeMount(async () => {
       await importMoment();
@@ -826,6 +836,8 @@ export default defineComponent({
 
     const refreshData = () => {
       if (!arePanelsLoading.value) {
+        // Generate new run ID for whole dashboard refresh
+        generateNewDashboardRunId();
         dateTimePicker.value.refresh();
       }
     };
@@ -1226,6 +1238,8 @@ export default defineComponent({
       openJsonEditor,
       saveJsonDashboard,
       setTimeForVariables,
+      getPanelAndRunId,
+      globalRunId,
     };
   },
 });

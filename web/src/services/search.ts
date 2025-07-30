@@ -26,6 +26,8 @@ const search = {
       traceparent,
       dashboard_id,
       folder_id,
+      panel_id,
+      run_id,
     }: {
       org_identifier: string;
       query: any;
@@ -33,6 +35,8 @@ const search = {
       traceparent?: string;
       dashboard_id?: string;
       folder_id?: string;
+      panel_id?: string;
+      run_id?: string;
     },
     search_type: string = "ui",
   ) => {
@@ -45,6 +49,8 @@ const search = {
     let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
     if (folder_id) url += `&folder_id=${folder_id}`;
+    if (panel_id) url += `&panel_id=${panel_id}`;
+    if (run_id) url += `&run_id=${run_id}`;
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
       if (query.hasOwnProperty("aggs")) {
@@ -357,8 +363,8 @@ const search = {
       (window as any).use_cache !== undefined
         ? (window as any).use_cache
         : true;
-        let url = `/api/${org_identifier}/search_jobs/${jobId}/result?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
-          url += `&size=${size}&from=${from}`;
+    let url = `/api/${org_identifier}/search_jobs/${jobId}/result?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
+    url += `&size=${size}&from=${from}`;
 
     return http({ headers: { traceparent } }).get(url);
   },
