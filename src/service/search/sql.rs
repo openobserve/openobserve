@@ -2759,7 +2759,6 @@ mod tests {
         assert_eq!(statement.to_string(), expected_sql);
     }
 
-    // test index_visitor for str_match
     #[test]
     fn test_index_visitor_str_match() {
         let sql = "SELECT * FROM t WHERE str_match(name, 'value')";
