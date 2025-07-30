@@ -586,6 +586,8 @@ export default defineComponent({
       getStream,
       loadVisualizeData,
       buildSearch,
+      cancelQuery,
+      processHttpHistogramResults,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -598,6 +600,8 @@ export default defineComponent({
 
     const expandedLogs = ref([]);
     const splitterModel = ref(10);
+    const chartRedrawTimeout = ref(null);
+    const updateColumnsTimeout = ref(null);
 
     const { showErrorNotification, showAliasErrorForVisualization } =
       useNotifications();
@@ -681,8 +685,11 @@ export default defineComponent({
 
     onBeforeUnmount(() => {
       // Cancel all the search queries
-      cancelOnGoingSearchQueries();
+      cancelQuery();
       removeAiContextHandler();
+
+      // Clear any pending timeouts
+      clearAllTimeouts();
     });
 
     onActivated(() => {
@@ -1937,25 +1944,24 @@ export default defineComponent({
           }
 
           for (let i = 0; i < streams.length; i++) {
-
             const schema = await getStream(streams[i], streamType, true);
-            //here we are deep copying the schema before assiging it to schemaData so that we dont mutatat the orginial data 
+            //here we are deep copying the schema before assiging it to schemaData so that we dont mutatat the orginial data
             //if we do this we dont get duplicate fields in the schema
             let schemaData = deepCopy(schema.uds_schema || schema.schema || []);
             let isUdsEnabled = schema.uds_schema?.length > 0;
             //we only push the timestamp and all fields name in the schema if uds is enabled for that stream
-            if(isUdsEnabled){
+            if (isUdsEnabled) {
               let timestampColumn = store.state.zoConfig.timestamp_column;
               let allFieldsName = store.state.zoConfig.all_fields_name;
               schemaData.push({
-                name:timestampColumn,
-                type:'Int64'
-              })
-                schemaData.push({
-                  name:allFieldsName,
-                  type:'Utf8'
-                })
-              }
+                name: timestampColumn,
+                type: "Int64",
+              });
+              schemaData.push({
+                name: allFieldsName,
+                type: "Utf8",
+              });
+            }
             payload["stream_name_" + (i + 1)] = streams[i];
             payload["schema_" + (i + 1)] = schemaData;
           }
@@ -1976,6 +1982,17 @@ export default defineComponent({
 
     const sendToAiChat = (value: any) => {
       emit("sendToAiChat", value);
+    };
+
+    const clearAllTimeouts = () => {
+      if (chartRedrawTimeout.value) {
+        clearTimeout(chartRedrawTimeout.value);
+        chartRedrawTimeout.value = null;
+      }
+      if (updateColumnsTimeout.value) {
+        clearTimeout(updateColumnsTimeout.value);
+        updateColumnsTimeout.value = null;
+      }
     };
 
     return {
@@ -2041,6 +2058,7 @@ export default defineComponent({
       dashboardPanelData,
       searchResponseForVisualization,
       shouldUseHistogramQuery,
+      processHttpHistogramResults,
     };
   },
   computed: {
@@ -2093,7 +2111,11 @@ export default defineComponent({
         this.searchObj.meta.showHistogram == true &&
         this.searchObj.meta.sqlMode == false
       ) {
-        setTimeout(() => {
+        // Clear any existing timeout
+        if (chartRedrawTimeout.value) {
+          clearTimeout(chartRedrawTimeout.value);
+        }
+        chartRedrawTimeout.value = setTimeout(() => {
           if (this.searchResultRef) this.searchResultRef.reDrawChart();
         }, 100);
       }
@@ -2125,7 +2147,6 @@ export default defineComponent({
         !this.searchObj.shouldIgnoreWatcher
       ) {
         this.searchObj.data.queryResults.aggs = [];
-
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
@@ -2145,7 +2166,13 @@ export default defineComponent({
           this.resetHistogramWithError(
             "Histogram is not available for multi stream search.",
           );
-        } else if (
+        }else if(!this.searchObj.data.queryResults.is_histogram_eligible){
+          this.resetHistogramWithError(
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            -1,
+          );
+          this.searchObj.meta.histogramDirtyFlag = false;
+        }else if (
           this.searchObj.meta.histogramDirtyFlag == true &&
           this.searchObj.meta.jobId == ""
         ) {
@@ -2167,6 +2194,7 @@ export default defineComponent({
               "histogram",
               {
                 isHistogramOnly: this.searchObj.meta.histogramDirtyFlag,
+                is_ui_histogram: true
               },
             );
             const requestId = this.initializeSearchConnection(payload);
@@ -2178,22 +2206,23 @@ export default defineComponent({
             return;
           }
 
-          this.getHistogramQueryData(this.searchObj.data.histogramQuery)
+          this.processHttpHistogramResults(
+            this.searchObj.data.customDownloadQueryObj,
+          )
             .then((res: any) => {
               this.refreshTimezone();
-              this.searchResultRef.reDrawChart();
-            })
-            .catch((err: any) => {
-              console.log(err, "err in updating chart");
+              const timeout = setTimeout(() => {
+                if (this.searchResultRef) this.searchResultRef.reDrawChart();
+              }, 100);
+
+              // Store timeout reference for cleanup
+              chartRedrawTimeout.value = timeout;
             })
             .finally(() => {
               this.searchObj.loadingHistogram = false;
             });
-
-          setTimeout(() => {
-            if (this.searchResultRef) this.searchResultRef.reDrawChart();
-          }, 100);
         }
+
       }
 
       this.updateUrlQueryParams();
@@ -2224,7 +2253,11 @@ export default defineComponent({
     // },
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
-      setTimeout(() => {
+      // Clear any existing timeout
+      if (updateColumnsTimeout.value) {
+        clearTimeout(updateColumnsTimeout.value);
+      }
+      updateColumnsTimeout.value = setTimeout(() => {
         this.updateGridColumns();
       }, 50);
     },

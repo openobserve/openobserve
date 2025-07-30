@@ -866,6 +866,8 @@ mod tests {
                 result_cache_ratio: 33,
                 work_group: None,
                 order_by: Some(OrderBy::Asc),
+                is_histogram_eligible: None,
+                converted_histogram_query: None,
             },
             deltas: vec![],
             has_cached_data: true,

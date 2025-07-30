@@ -35,7 +35,10 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_aggregate_query, is_simple_distinct_query},
+        sql::{
+            is_aggregate_query, is_eligible_for_histogram, is_simple_aggregate_query,
+            is_simple_distinct_query,
+        },
         time::now_micros,
     },
 };
@@ -772,6 +775,8 @@ pub async fn search_partition(
         (records + f.records, original_size + f.original_size)
     });
 
+    let (is_histogram_eligible, _) = is_eligible_for_histogram(&req.sql).unwrap_or((false, false));
+
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
         file_num: files.len(),
@@ -786,6 +791,7 @@ pub async fn search_partition(
         streaming_output: req.streaming_output && is_streaming_aggregate,
         streaming_aggs: req.streaming_output && is_streaming_aggregate,
         streaming_id: streaming_id.clone(),
+        is_histogram_eligible,
     };
 
     let mut min_step = Duration::try_seconds(1)
@@ -793,7 +799,22 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        let hist_int = sql.histogram_interval.unwrap_or(1);
+        let hist_int = if let Some(hist_int) = sql.histogram_interval {
+            hist_int
+        } else {
+            let interval = generate_histogram_interval(Some((req.start_time, req.end_time)), 0);
+            match convert_histogram_interval_to_seconds(&interval) {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "[trace_id {trace_id}] search_partition:
+        convert_histogram_interval_to_seconds error: {:?}",
+                        e
+                    );
+                    10
+                }
+            }
+        };
         // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
         if hist_int > 0 {
             min_step *= hist_int;
@@ -869,11 +890,14 @@ pub async fn search_partition(
     }
 
     let mut is_histogram = sql.histogram_interval.is_some();
+    let mut add_mini_partition = false;
     // Set this to true to generate partitions aligned with interval
     // only for logs page when query is non-histogram, so that logs can reuse the same partitions
     // for histogram query
     if !is_histogram && req.search_type.eq(&Some(SearchEventType::UI)) {
         is_histogram = true;
+        // add mini partition for the histogram aligned partitions in the UI search
+        add_mini_partition = true;
     }
 
     let sql_order_by = sql
@@ -888,7 +912,7 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
-    log::debug!(
+    log::info!(
         "[trace_id {trace_id}] total_secs: {}, partition_num: {}, step: {}, min_step: {}, is_histogram: {}",
         total_secs,
         part_num,
@@ -908,8 +932,13 @@ pub async fn search_partition(
     }
 
     // Generate partitions
-    let partitions =
-        generator.generate_partitions(req.start_time, req.end_time, step, sql_order_by);
+    let partitions = generator.generate_partitions(
+        req.start_time,
+        req.end_time,
+        step,
+        sql_order_by,
+        add_mini_partition,
+    );
 
     if sql_order_by == OrderBy::Asc {
         resp.order_by = OrderBy::Asc;
@@ -1282,6 +1311,8 @@ pub async fn search_partition_multi(
         };
     }
     res.records = total_rec;
+    // Histogram is not eligible for multi-stream search
+    res.is_histogram_eligible = false;
     Ok(res)
 }
 

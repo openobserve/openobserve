@@ -26,7 +26,13 @@ use config::{
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
     },
-    utils::{base64, hash::Sum64, json, sql::is_aggregate_query, time::format_duration},
+    utils::{
+        base64,
+        hash::Sum64,
+        json,
+        sql::{is_aggregate_query, is_eligible_for_histogram},
+        time::format_duration,
+    },
 };
 use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
@@ -368,7 +374,7 @@ pub async fn search(
         } else {
             None
         },
-        request_body: Some(req.query.sql),
+        request_body: Some(req.query.sql.clone()),
         function: req.query.query_fn,
         user_email: user_id,
         min_ts: Some(req.query.start_time),
@@ -424,6 +430,10 @@ pub async fn search(
         res.new_start_time = Some(req.query.start_time);
         res.new_end_time = Some(req.query.end_time);
     }
+
+    res.is_histogram_eligible = is_eligible_for_histogram(&req.query.sql)
+        .ok()
+        .map(|(is_eligible, _)| is_eligible);
 
     // There are 3 types of partial responses:
     // 1. VRL error

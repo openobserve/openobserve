@@ -3142,6 +3142,7 @@ mod tests {
                 data_tmp_dir: String::default(),
                 default_hec_stream: String::default(),
                 align_partitions_for_index: bool::default(),
+                meta_ddl_dsn: String::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
