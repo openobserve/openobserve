@@ -468,11 +468,13 @@ fn generate_add_filter_back_condition(
     // if have datafusion_condition, always add filter back
     if datafusion_condition.is_some() {
         let mut index_condition = datafusion_condition.clone();
-        if tantivy_condition.is_some() && *is_add_filter_back {
+        if let Some(tantivy_cond) = tantivy_condition.as_ref()
+            && *is_add_filter_back
+        {
             index_condition
                 .as_mut()
                 .unwrap()
-                .add_index_condition(tantivy_condition.unwrap());
+                .add_index_condition(tantivy_cond.clone());
         }
         *is_add_filter_back = true;
         return index_condition;
