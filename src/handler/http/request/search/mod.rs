@@ -85,6 +85,10 @@ async fn can_use_distinct_stream(
         .await
         .unwrap_or_default();
 
+    if stream_settings.disable_distinct_fields {
+        return false;
+    }
+
     // all fields which are requested must be in the distinct stream
     let all_fields_distinct = fields.iter().all(|f| {
         if DISTINCT_FIELDS.contains(f) {
