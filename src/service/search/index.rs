@@ -928,12 +928,11 @@ fn create_str_match_expr(
         Arc::new(str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone())
     };
 
-    let udf_expr = Arc::new(ScalarFunctionExpr::new(
-        udf.name(),
+    let udf_expr = Arc::new(ScalarFunctionExpr::try_new(
         udf.clone(),
         vec![left, right],
-        DataType::Boolean,
-    ));
+        schema,
+    )?);
     Ok(udf_expr)
 }
 
