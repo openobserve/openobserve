@@ -36,7 +36,7 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             stream::{ListStream, StreamDeleteFields},
         },
-        utils::http::{get_stream_type_from_request, get_ts_from_request},
+        utils::http::{get_stream_type_from_request, get_ts_from_request_with_key},
     },
     service::stream,
 };
@@ -549,7 +549,15 @@ async fn delete_stream_cache(
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let delete_ts = get_ts_from_request(&query);
+    let delete_ts = match get_ts_from_request_with_key(&query, "ts") {
+        Ok(ts) => ts,
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e,
+            )));
+        }
+    };
 
     // If ts parameter is present, it must be > 0
     if delete_ts <= 0 {
@@ -591,8 +599,9 @@ async fn delete_stream_cache(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
+        ("start" = i64, Query, description = "Start timestamp in microseconds"),
+        ("end" = i64, Query, description = "End timestamp in microseconds"),
     ),
-    request_body(content = TimeRange, description = "Time range with start and end timestamps in microseconds", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!(
             {
@@ -605,7 +614,6 @@ async fn delete_stream_cache(
 #[delete("/{org_id}/streams/{stream_name}/data_by_time_range")]
 async fn delete_stream_data_by_time_range(
     path: web::Path<(String, String)>,
-    body: web::Json<TimeRange>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let cfg = config::get_config();
@@ -615,7 +623,25 @@ async fn delete_stream_data_by_time_range(
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let time_range = body.into_inner();
+    let start = match get_ts_from_request_with_key(&query, "start") {
+        Ok(ts) => ts,
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e,
+            )));
+        }
+    };
+    let end = match get_ts_from_request_with_key(&query, "end") {
+        Ok(ts) => ts,
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                e,
+            )));
+        }
+    };
+    let time_range = TimeRange::new(start, end);
 
     if time_range.start > time_range.end {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -676,8 +702,7 @@ async fn delete_stream_data_by_time_range(
         }
     };
 
-    // "default/logs/oly/2025-06-01T00:00:00Z,2025-06-30T00:00:00Z"
-    let time_range = match key.split('/').last() {
+    let time_range = match key.split('/').next_back() {
         Some(time_range) => time_range,
         None => {
             return Ok(
@@ -719,7 +744,10 @@ async fn get_delete_stream_data_status(
     path: web::Path<(String, String)>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
+    let (org_id, mut stream_name) = path.into_inner();
+    if !config::get_config().common.skip_formatting_stream_name {
+        stream_name = format_stream_name(&stream_name);
+    }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let time_range = match query.get("time_range") {
