@@ -128,9 +128,13 @@ pub async fn search(
     // Condition:All() means search tantivy without filter,
     // so we should not use inverted index in datafusion search
     // Condition:All() is used for TantivyOptimizeExec
+    // the negated condition is TantivyOptimizeExec is fast,
+    // but for row_ids it only fast when row_ids is small
     let use_inverted_index = query.use_inverted_index
         && index_condition.is_some()
-        && !index_condition.as_ref().unwrap().is_condition_all();
+        && !index_condition.as_ref().unwrap().is_condition_all()
+        && (get_config().common.feature_query_not_filter_with_index
+            || !index_condition.as_ref().unwrap().is_negated_condition());
     if use_inverted_index {
         log::info!(
             "[trace_id {}] flight->search: use_inverted_index with tantivy format {}",
@@ -726,8 +730,11 @@ pub async fn filter_file_list_by_tantivy_index(
                             query.trace_id,
                             index_condition,
                         );
-                        is_add_filter_back = true;
-                        continue;
+                        return Ok((
+                            start.elapsed().as_millis() as usize,
+                            true,
+                            TantivyMultiResult::RowNums(0),
+                        ));
                     }
                     match result {
                         TantivyResult::RowIdsBitVec(num_rows, bitvec) => {

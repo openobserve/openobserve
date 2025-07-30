@@ -66,16 +66,11 @@ pub fn get_index_condition_from_expr(
     index_fields: &HashSet<String>,
     expr: &Expr,
 ) -> (Option<IndexCondition>, Option<Expr>) {
-    let cfg = get_config();
     let mut other_expr = Vec::new();
     let expr_list = split_conjunction(expr);
     let mut index_condition = IndexCondition::default();
     for e in expr_list {
-        if !is_expr_valid_for_index(
-            e,
-            index_fields,
-            cfg.common.feature_query_not_filter_with_index,
-        ) {
+        if !is_expr_valid_for_index(e, index_fields) {
             other_expr.push(e);
             continue;
         }
@@ -231,6 +226,17 @@ impl IndexCondition {
     // for the condition that query without filter
     pub fn is_condition_all(&self) -> bool {
         self.conditions.len() == 1 && matches!(self.conditions[0], Condition::All())
+    }
+
+    // use for check if the index condition contains
+    // negated condition, like NOT(field = 'value')
+    pub fn is_negated_condition(&self) -> bool {
+        self.conditions.iter().any(|condition| {
+            matches!(
+                condition,
+                Condition::Not(_) | Condition::NotEqual(_, _) | Condition::In(_, _, true)
+            )
+        })
     }
 }
 
@@ -743,25 +749,13 @@ impl Condition {
 // check if function is match_all and only have one argument
 // check if binary operator is equal and one side is field and the other side is value
 // and the field is in the index_fields
-fn is_expr_valid_for_index(
-    expr: &Expr,
-    index_fields: &HashSet<String>,
-    not_filter_with_index: bool,
-) -> bool {
+fn is_expr_valid_for_index(expr: &Expr, index_fields: &HashSet<String>) -> bool {
     match expr {
         Expr::BinaryOp {
             left,
             op: BinaryOperator::Eq | BinaryOperator::NotEq,
             right,
         } => {
-            let op = match expr {
-                Expr::BinaryOp { op, .. } => op,
-                _ => unreachable!(),
-            };
-            if !not_filter_with_index && *op == BinaryOperator::NotEq {
-                return false;
-            }
-
             let field = if is_value(left) && is_field(right) {
                 right
             } else if is_value(right) && is_field(left) {
@@ -777,12 +771,8 @@ fn is_expr_valid_for_index(
         Expr::InList {
             expr,
             list,
-            negated,
+            negated: _,
         } => {
-            if !not_filter_with_index && *negated {
-                return false;
-            }
-
             if !is_field(expr) || !index_fields.contains(&get_field_name(expr)) {
                 return false;
             }
@@ -797,8 +787,8 @@ fn is_expr_valid_for_index(
             op: BinaryOperator::And | BinaryOperator::Or,
             right,
         } => {
-            return is_expr_valid_for_index(left, index_fields, not_filter_with_index)
-                && is_expr_valid_for_index(right, index_fields, not_filter_with_index);
+            return is_expr_valid_for_index(left, index_fields)
+                && is_expr_valid_for_index(right, index_fields);
         }
         Expr::Function(func) => {
             let fn_name = func.name.to_string().to_lowercase();
@@ -819,13 +809,13 @@ fn is_expr_valid_for_index(
             };
         }
         Expr::Nested(expr) => {
-            return is_expr_valid_for_index(expr, index_fields, not_filter_with_index);
+            return is_expr_valid_for_index(expr, index_fields);
         }
         Expr::UnaryOp {
             op: UnaryOperator::Not,
             expr,
-        } if not_filter_with_index => {
-            return is_expr_valid_for_index(expr, index_fields, not_filter_with_index);
+        } => {
+            return is_expr_valid_for_index(expr, index_fields);
         }
         _ => return false,
     }
@@ -1228,7 +1218,7 @@ mod tests {
                 Value::SingleQuotedString("value1".to_string()).into(),
             )),
         };
-        let result = is_expr_valid_for_index(&expr, &index_fields, true);
+        let result = is_expr_valid_for_index(&expr, &index_fields);
         assert!(result);
     }
 
@@ -1254,7 +1244,7 @@ mod tests {
                 )),
             }),
         };
-        let result = is_expr_valid_for_index(&expr, &index_fields, true);
+        let result = is_expr_valid_for_index(&expr, &index_fields);
         assert!(result);
     }
 
@@ -1291,7 +1281,7 @@ mod tests {
                 }),
             }),
         };
-        let result = is_expr_valid_for_index(&expr, &index_fields, true);
+        let result = is_expr_valid_for_index(&expr, &index_fields);
         assert!(result);
     }
 }
