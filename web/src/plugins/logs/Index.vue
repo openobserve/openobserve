@@ -838,7 +838,6 @@ export default defineComponent({
       await setupLogsTab();
       if (!isLogsTab()) {
         await importSqlParser();
-        handleVisualizeTab();
       }
     }
 
@@ -1014,7 +1013,7 @@ export default defineComponent({
 
     // Helper function for handling the visualize tab
     function handleVisualizeTab() {
-      // handleRunQueryFn();
+      handleRunQueryFn();
     }
 
     const refreshTimezone = () => {
