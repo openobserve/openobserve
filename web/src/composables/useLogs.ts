@@ -5183,7 +5183,7 @@ const useLogs = () => {
 
       if(!queryReq) return;
       
-      if(!isPagination && searchObj.meta.refreshInterval === 0) {
+      if(!isPagination && searchObj.meta.refreshInterval == 0) {
         resetQueryData();
         histogramResults = [];
         searchObj.data.queryResults.hits = [];
@@ -5199,13 +5199,11 @@ const useLogs = () => {
           errorMsg: "",
           errorDetail: "",
         };
-
-        if(searchObj.meta.refreshInterval == 0) searchObj.meta.resetPlotChart = true;
       }
 
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
       
-      if(shouldGetPageCount(queryReq, fnParsedSQL()) && searchObj.meta.refreshInterval === 0) {
+      if(shouldGetPageCount(queryReq, fnParsedSQL()) && searchObj.meta.refreshInterval == 0) {
         queryReq.query.size = queryReq.query.size + 1;
       }
 
@@ -5438,7 +5436,7 @@ const useLogs = () => {
       );
     } 
     
-    if (searchObj.meta.refreshInterval === 0) {
+    if (searchObj.meta.refreshInterval == 0) {
       updatePageCountTotal(payload.queryReq, response.content.results.hits.length, searchObj.data.queryResults.hits.length);
       trimPageCountExtraHit(payload.queryReq, searchObj.data.queryResults.hits.length);
     }
@@ -5503,7 +5501,7 @@ const useLogs = () => {
       searchObj.data.queryResults.is_histogram_eligible = response.content.results.is_histogram_eligible;
     }
 
-    if(searchObj.meta.refreshInterval === 0) {
+    if(searchObj.meta.refreshInterval == 0) {
       if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total === payload.queryReq.query.size)) {
         searchObj.data.queryResults.pageCountTotal = payload.queryReq.query.size * searchObj.data.resultGrid.currentPage;
       } else if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total != payload.queryReq.query.size)){
@@ -5879,7 +5877,7 @@ const useLogs = () => {
       searchObj.data.queryResults.hits = response.content.results.hits;
     }
 
-    if (!searchObj.meta.refreshInterval) {
+    if (searchObj.meta.refreshInterval == 0) {
       // In page count we set track_total_hits
       if (!queryReq.query.hasOwnProperty("track_total_hits")) {
         delete response.content.total;
@@ -6264,6 +6262,10 @@ const useLogs = () => {
 
     if(!searchObj.data.queryResults.hasOwnProperty('hits')){
       searchObj.data.queryResults.hits = [];
+    }
+
+    if(payload.type === "search" && !payload.isPagination && searchObj.meta.refreshInterval == 0) {
+      searchObj.meta.resetPlotChart = true;
     }
 
     if (
