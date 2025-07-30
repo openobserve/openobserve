@@ -1014,7 +1014,7 @@ export default defineComponent({
 
     // Helper function for handling the visualize tab
     function handleVisualizeTab() {
-      handleRunQueryFn();
+      // handleRunQueryFn();
     }
 
     const refreshTimezone = () => {
