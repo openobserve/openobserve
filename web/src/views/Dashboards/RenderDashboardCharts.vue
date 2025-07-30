@@ -120,7 +120,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :height="getPanelLayout(item, 'h')"
               :forceLoad="forceLoad"
               :searchType="searchType"
-              :getPanelAndRunId="getPanelAndRunId"
               :globalRunId="globalRunId"
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
               @onMovePanel="onMovePanel"
@@ -236,10 +235,6 @@ export default defineComponent({
     searchType: {
       default: null,
       type: String || null,
-    },
-    getPanelAndRunId: {
-      type: Function,
-      default: null,
     },
     globalRunId: {
       type: String,

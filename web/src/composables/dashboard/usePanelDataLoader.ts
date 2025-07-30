@@ -68,7 +68,6 @@ export const usePanelDataLoader = (
   dashboardId: any,
   folderId: any,
   reportId: any,
-  getPanelAndRunId?: any,
   globalRunId?: any,
 ) => {
   const log = (...args: any[]) => {
@@ -533,12 +532,8 @@ export const usePanelDataLoader = (
                   traceparent,
                   dashboard_id: dashboardId?.value,
                   folder_id: folderId?.value,
-                  panel_id: getPanelAndRunId?.value
-                    ? getPanelAndRunId.value(panelSchema.value.id).panelId
-                    : undefined,
-                  run_id: getPanelAndRunId?.value
-                    ? getPanelAndRunId.value(panelSchema.value.id).runId
-                    : undefined,
+                  panel_id: panelSchema.value.id,
+                  run_id: globalRunId?.value,
                 },
                 searchType.value ?? "dashboards",
               ),
@@ -859,12 +854,8 @@ export const usePanelDataLoader = (
         use_cache: (window as any).use_cache ?? true,
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,
-        panel_id: getPanelAndRunId?.value
-          ? getPanelAndRunId.value(panelSchema.value.id).panelId
-          : undefined,
-        run_id: getPanelAndRunId?.value
-          ? getPanelAndRunId.value(panelSchema.value.id).runId
-          : undefined,
+        panel_id: panelSchema.value.id,
+        run_id: globalRunId?.value,
         fallback_order_by_col: getFallbackOrderByCol(),
       },
     });
@@ -985,12 +976,8 @@ export const usePanelDataLoader = (
         pageType,
         meta: {
           currentQueryIndex,
-          panel_id: getPanelAndRunId?.value
-            ? getPanelAndRunId.value(panelSchema.value.id).panelId
-            : undefined,
-          run_id: getPanelAndRunId?.value
-            ? getPanelAndRunId.value(panelSchema.value.id).runId
-            : undefined,
+          panel_id: panelSchema.value.id,
+          run_id: globalRunId?.value,
         },
       };
 
@@ -1060,12 +1047,8 @@ export const usePanelDataLoader = (
           currentQueryIndex,
           dashboard_id: dashboardId?.value,
           folder_id: folderId?.value,
-          panel_id: getPanelAndRunId?.value
-            ? getPanelAndRunId.value(panelSchema.value.id).panelId
-            : undefined,
-          run_id: getPanelAndRunId?.value
-            ? getPanelAndRunId.value(panelSchema.value.id).runId
-            : undefined,
+          panel_id: panelSchema.value.id,
+          run_id: globalRunId?.value,
           fallback_order_by_col: getFallbackOrderByCol(),
         },
       };
@@ -1423,13 +1406,8 @@ export const usePanelDataLoader = (
                           traceparent,
                           dashboard_id: dashboardId?.value,
                           folder_id: folderId?.value,
-                          panel_id: getPanelAndRunId?.value
-                            ? getPanelAndRunId.value(panelSchema.value.id)
-                                .panelId
-                            : undefined,
-                          run_id: getPanelAndRunId?.value
-                            ? getPanelAndRunId.value(panelSchema.value.id).runId
-                            : undefined,
+                          panel_id: panelSchema.value.id,
+                          run_id: globalRunId?.value,
                         },
                         searchType.value ?? "dashboards",
                       ),
