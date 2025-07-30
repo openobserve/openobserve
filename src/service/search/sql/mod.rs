@@ -3554,7 +3554,8 @@ mod tests {
         assert_eq!(result, None);
 
         // Test SQL with EXISTS subquery - should return None
-        let sql = "SELECT * FROM logs WHERE EXISTS (SELECT 1 FROM users WHERE users.id = logs.user_id)";
+        let sql =
+            "SELECT * FROM logs WHERE EXISTS (SELECT 1 FROM users WHERE users.id = logs.user_id)";
         let result = pickup_where(sql).unwrap();
         assert_eq!(result, None);
 

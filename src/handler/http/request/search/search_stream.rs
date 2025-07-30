@@ -36,14 +36,10 @@ use tracing::Span;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
-        utils::{
-            http::{
-                get_fallback_order_by_col_from_request, get_is_ui_histogram_from_request,
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request,
-            },
-            websocket::update_histogram_interval_in_query,
+        utils::http::{
+            get_fallback_order_by_col_from_request, get_is_ui_histogram_from_request,
+            get_or_create_trace_id, get_search_event_context_from_request,
+            get_search_type_from_request, get_stream_type_from_request, get_use_cache_from_request,
         },
     },
     handler::http::request::search::{
@@ -211,6 +207,46 @@ pub async fn search_http2_stream(
         }
     };
 
+    // create new sql query with histogram interval
+    let sql = match crate::service::search::sql::Sql::new(
+        &req.query.clone().into(),
+        &org_id,
+        stream_type,
+        req.search_type,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("[trace_id: {}] Error parsing sql: {:?}", trace_id, e);
+
+            #[cfg(feature = "enterprise")]
+            let error_message = e.to_string();
+
+            let http_response = map_error_to_http_response(&e, Some(trace_id.clone()));
+
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    http_response.status().into(),
+                    Some(error_message),
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+            }
+            return http_response;
+        }
+    };
+
+    if let Some(interval) = sql.histogram_interval {
+        req.query.histogram_interval = interval;
+    }
+
     if is_ui_histogram {
         // Convert the original query to a histogram query
         match crate::service::search::sql::histogram::convert_to_histogram_query(
@@ -293,77 +329,6 @@ pub async fn search_http2_stream(
         }
     }
 
-    // create new sql query with histogram interval
-    let sql = match crate::service::search::sql::Sql::new(
-        &req.query.clone().into(),
-        &org_id,
-        stream_type,
-        req.search_type,
-    )
-    .await
-    {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("[trace_id: {}] Error parsing sql: {:?}", trace_id, e);
-
-            #[cfg(feature = "enterprise")]
-            let error_message = e.to_string();
-
-            let http_response = map_error_to_http_response(&e, Some(trace_id.clone()));
-
-            // Add audit before closing
-            #[cfg(feature = "enterprise")]
-            {
-                report_to_audit(
-                    user_id,
-                    org_id,
-                    trace_id,
-                    http_response.status().into(),
-                    Some(error_message),
-                    &in_req,
-                    body_bytes,
-                )
-                .await;
-            }
-            return http_response;
-        }
-    };
-
-    if let Some(interval) = sql.histogram_interval {
-        // modify the sql query statement to include the histogram interval
-        if let Ok(updated_query) = update_histogram_interval_in_query(&req.query.sql, interval) {
-            req.query.sql = updated_query;
-        } else {
-            log::error!(
-                "[HTTP2_STREAM] [trace_id: {}] Failed to update query with histogram interval: {}",
-                trace_id,
-                interval
-            );
-
-            // Add audit before closing
-            #[cfg(feature = "enterprise")]
-            {
-                report_to_audit(
-                    user_id,
-                    org_id,
-                    trace_id,
-                    400,
-                    Some("Failed to update query with histogram interval".to_string()),
-                    &in_req,
-                    body_bytes,
-                )
-                .await;
-            }
-
-            return MetaHttpResponse::bad_request("Failed to update query with histogram interval");
-        }
-        log::info!(
-            "[HTTP2_STREAM] [trace_id: {}] Updated query {}; with histogram interval: {}",
-            trace_id,
-            req.query.sql,
-            interval
-        );
-    }
     let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
 
     let search_span = setup_tracing_with_trace_id(
