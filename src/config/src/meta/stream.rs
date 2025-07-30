@@ -1346,7 +1346,7 @@ mod tests {
         let other = TimeRange::new(50, 100);
         let (left, right) = range.split_by_range(&other).unwrap();
         assert!(left.as_ref().is_some());
-        assert!(!right.is_some());
+        assert!(right.is_none());
         assert_eq!(left.unwrap(), TimeRange::new(0, 50));
 
         // equals

@@ -546,7 +546,9 @@ fn parse_bool_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusio
 
 #[cfg(test)]
 mod tests {
-    use arrow::array::Float64Array;
+    use arrow::array::{BooleanArray, Float64Array, Int64Array, StringArray, UInt64Array};
+    use arrow_schema::{DataType, Field, Schema, TimeUnit};
+    use config::meta::stream::{FileMeta, StreamType};
 
     use super::*;
 
@@ -562,5 +564,640 @@ mod tests {
         assert!(array_values.value(2).is_nan());
         assert_eq!(array_values.value(3), f64::INFINITY);
         assert_eq!(array_values.value(4), f64::NEG_INFINITY);
+    }
+
+    #[test]
+    fn test_parse_i64_array() {
+        let field_values = vec![
+            "123".to_string(),
+            "-456".to_string(),
+            "0".to_string(),
+            "".to_string(),
+        ];
+        let array = parse_i64_array(&field_values).unwrap();
+        let array_values = array.as_any().downcast_ref::<Int64Array>().unwrap();
+        assert_eq!(array_values.len(), 4);
+        assert_eq!(array_values.value(0), 123);
+        assert_eq!(array_values.value(1), -456);
+        assert_eq!(array_values.value(2), 0);
+        assert_eq!(array_values.value(3), 0); // empty string defaults to 0
+    }
+
+    #[test]
+    fn test_parse_u64_array() {
+        let field_values = vec![
+            "123".to_string(),
+            "456".to_string(),
+            "0".to_string(),
+            "".to_string(),
+        ];
+        let array = parse_u64_array(&field_values).unwrap();
+        let array_values = array.as_any().downcast_ref::<UInt64Array>().unwrap();
+        assert_eq!(array_values.len(), 4);
+        assert_eq!(array_values.value(0), 123);
+        assert_eq!(array_values.value(1), 456);
+        assert_eq!(array_values.value(2), 0);
+        assert_eq!(array_values.value(3), 0); // empty string defaults to 0
+    }
+
+    #[test]
+    fn test_parse_bool_array() {
+        let field_values = vec!["true".to_string(), "false".to_string(), "".to_string()];
+        let array = parse_bool_array(&field_values).unwrap();
+        let array_values = array.as_any().downcast_ref::<BooleanArray>().unwrap();
+        assert_eq!(array_values.len(), 3);
+        assert!(array_values.value(0));
+        assert!(!array_values.value(1));
+        assert!(!array_values.value(2)); // empty string defaults to false
+    }
+
+    #[test]
+    fn test_parse_i64_array_invalid_input() {
+        let field_values = vec!["123".to_string(), "invalid".to_string()];
+        let result = parse_i64_array(&field_values);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_u64_array_invalid_input() {
+        let field_values = vec!["123".to_string(), "invalid".to_string()];
+        let result = parse_u64_array(&field_values);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_f64_array_invalid_input() {
+        let field_values = vec!["123.45".to_string(), "invalid".to_string()];
+        let result = parse_f64_array(&field_values);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_bool_array_invalid_input() {
+        let field_values = vec!["true".to_string(), "invalid".to_string()];
+        let result = parse_bool_array(&field_values);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_create_field_array_string() {
+        let field = Field::new("test", DataType::Utf8, false);
+        let field_values = vec!["hello".to_string(), "world".to_string()];
+        let array = create_field_array(&field, field_values).unwrap();
+        let array_values = array.as_any().downcast_ref::<StringArray>().unwrap();
+        assert_eq!(array_values.len(), 2);
+        assert_eq!(array_values.value(0), "hello");
+        assert_eq!(array_values.value(1), "world");
+    }
+
+    #[test]
+    fn test_create_field_array_int64() {
+        let field = Field::new("test", DataType::Int64, false);
+        let field_values = vec!["123".to_string(), "456".to_string()];
+        let array = create_field_array(&field, field_values).unwrap();
+        let array_values = array.as_any().downcast_ref::<Int64Array>().unwrap();
+        assert_eq!(array_values.len(), 2);
+        assert_eq!(array_values.value(0), 123);
+        assert_eq!(array_values.value(1), 456);
+    }
+
+    #[test]
+    fn test_create_field_array_uint64() {
+        let field = Field::new("test", DataType::UInt64, false);
+        let field_values = vec!["123".to_string(), "456".to_string()];
+        let array = create_field_array(&field, field_values).unwrap();
+        let array_values = array.as_any().downcast_ref::<UInt64Array>().unwrap();
+        assert_eq!(array_values.len(), 2);
+        assert_eq!(array_values.value(0), 123);
+        assert_eq!(array_values.value(1), 456);
+    }
+
+    #[test]
+    fn test_create_field_array_float64() {
+        let field = Field::new("test", DataType::Float64, false);
+        let field_values = vec!["123.45".to_string(), "456.78".to_string()];
+        let array = create_field_array(&field, field_values).unwrap();
+        let array_values = array.as_any().downcast_ref::<Float64Array>().unwrap();
+        assert_eq!(array_values.len(), 2);
+        assert_eq!(array_values.value(0), 123.45);
+        assert_eq!(array_values.value(1), 456.78);
+    }
+
+    #[test]
+    fn test_create_field_array_boolean() {
+        let field = Field::new("test", DataType::Boolean, false);
+        let field_values = vec!["true".to_string(), "false".to_string()];
+        let array = create_field_array(&field, field_values).unwrap();
+        let array_values = array.as_any().downcast_ref::<BooleanArray>().unwrap();
+        assert_eq!(array_values.len(), 2);
+        assert!(array_values.value(0));
+        assert!(!array_values.value(1));
+    }
+
+    #[test]
+    fn test_create_field_array_unsupported_type() {
+        let field = Field::new("test", DataType::Int32, false);
+        let field_values = vec!["123".to_string()];
+        let result = create_field_array(&field, field_values);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_create_count_array_int64() {
+        let field = Field::new("count", DataType::Int64, false);
+        let count_values = vec![123, 456];
+        let array = create_count_array(&field, count_values).unwrap();
+        let array_values = array.as_any().downcast_ref::<Int64Array>().unwrap();
+        assert_eq!(array_values.len(), 2);
+        assert_eq!(array_values.value(0), 123);
+        assert_eq!(array_values.value(1), 456);
+    }
+
+    #[test]
+    fn test_create_count_array_uint64() {
+        let field = Field::new("count", DataType::UInt64, false);
+        let count_values = vec![123, 456];
+        let array = create_count_array(&field, count_values).unwrap();
+        let array_values = array.as_any().downcast_ref::<UInt64Array>().unwrap();
+        assert_eq!(array_values.len(), 2);
+        assert_eq!(array_values.value(0), 123);
+        assert_eq!(array_values.value(1), 456);
+    }
+
+    #[test]
+    fn test_create_count_array_int32() {
+        let field = Field::new("count", DataType::Int32, false);
+        let count_values = vec![123, 456];
+        let array = create_count_array(&field, count_values).unwrap();
+        let array_values = array
+            .as_any()
+            .downcast_ref::<arrow::array::Int32Array>()
+            .unwrap();
+        assert_eq!(array_values.len(), 2);
+        assert_eq!(array_values.value(0), 123);
+        assert_eq!(array_values.value(1), 456);
+    }
+
+    #[test]
+    fn test_create_count_array_uint32() {
+        let field = Field::new("count", DataType::UInt32, false);
+        let count_values = vec![123, 456];
+        let array = create_count_array(&field, count_values).unwrap();
+        let array_values = array
+            .as_any()
+            .downcast_ref::<arrow::array::UInt32Array>()
+            .unwrap();
+        assert_eq!(array_values.len(), 2);
+        assert_eq!(array_values.value(0), 123);
+        assert_eq!(array_values.value(1), 456);
+    }
+
+    #[test]
+    fn test_create_count_array_unsupported_type() {
+        let field = Field::new("count", DataType::Float64, false);
+        let count_values = vec![123, 456];
+        let result = create_count_array(&field, count_values);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_create_histogram_arrow_array_microsecond() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(
+                "timestamp",
+                DataType::Timestamp(TimeUnit::Microsecond, None),
+                false,
+            ),
+            Field::new("count", DataType::Int64, false),
+        ]));
+        let histogram_counts = vec![10, 0, 20, 0, 30];
+        let result = create_histogram_arrow_array(&schema, histogram_counts, 1000, 100, 5).unwrap();
+
+        assert_eq!(result.len(), 2);
+        let timestamp_array = result[0]
+            .as_any()
+            .downcast_ref::<TimestampMicrosecondArray>()
+            .unwrap();
+        let count_array = result[1].as_any().downcast_ref::<Int64Array>().unwrap();
+
+        assert_eq!(timestamp_array.len(), 3); // Only non-zero counts
+        assert_eq!(count_array.len(), 3);
+        assert_eq!(timestamp_array.value(0), 1000);
+        assert_eq!(timestamp_array.value(1), 1200);
+        assert_eq!(timestamp_array.value(2), 1400);
+        assert_eq!(count_array.value(0), 10);
+        assert_eq!(count_array.value(1), 20);
+        assert_eq!(count_array.value(2), 30);
+    }
+
+    #[test]
+    fn test_create_histogram_arrow_array_nanosecond() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(
+                "timestamp",
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                false,
+            ),
+            Field::new("count", DataType::UInt64, false),
+        ]));
+        let histogram_counts = vec![10, 20];
+        let result = create_histogram_arrow_array(&schema, histogram_counts, 1000, 100, 2).unwrap();
+
+        assert_eq!(result.len(), 2);
+        let timestamp_array = result[0]
+            .as_any()
+            .downcast_ref::<TimestampNanosecondArray>()
+            .unwrap();
+        let count_array = result[1].as_any().downcast_ref::<UInt64Array>().unwrap();
+
+        assert_eq!(timestamp_array.len(), 2);
+        assert_eq!(count_array.len(), 2);
+        assert_eq!(timestamp_array.value(0), 1000000); // 1000 * 1000
+        assert_eq!(timestamp_array.value(1), 1100000); // 1100 * 1000
+        assert_eq!(count_array.value(0), 10);
+        assert_eq!(count_array.value(1), 20);
+    }
+
+    #[test]
+    fn test_create_histogram_arrow_array_invalid_schema() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "timestamp",
+            DataType::Int64,
+            false,
+        )]));
+        let histogram_counts = vec![10, 20];
+        let result = create_histogram_arrow_array(&schema, histogram_counts, 1000, 100, 2);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_create_histogram_arrow_array_zero_bucket_width() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(
+                "timestamp",
+                DataType::Timestamp(TimeUnit::Microsecond, None),
+                false,
+            ),
+            Field::new("count", DataType::Int64, false),
+        ]));
+        let histogram_counts = vec![10, 20];
+        let result = create_histogram_arrow_array(&schema, histogram_counts, 1000, 0, 2);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_create_histogram_arrow_array_normalize_counts() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(
+                "timestamp",
+                DataType::Timestamp(TimeUnit::Microsecond, None),
+                false,
+            ),
+            Field::new("count", DataType::Int64, false),
+        ]));
+        let histogram_counts = vec![10, 20]; // Only 2 counts
+        let result = create_histogram_arrow_array(&schema, histogram_counts, 1000, 100, 5).unwrap();
+
+        assert_eq!(result.len(), 2);
+        let timestamp_array = result[0]
+            .as_any()
+            .downcast_ref::<TimestampMicrosecondArray>()
+            .unwrap();
+        let count_array = result[1].as_any().downcast_ref::<Int64Array>().unwrap();
+
+        assert_eq!(timestamp_array.len(), 2); // Only non-zero counts
+        assert_eq!(count_array.len(), 2);
+        assert_eq!(timestamp_array.value(0), 1000);
+        assert_eq!(timestamp_array.value(1), 1100);
+        assert_eq!(count_array.value(0), 10);
+        assert_eq!(count_array.value(1), 20);
+    }
+
+    #[test]
+    fn test_create_top_n_arrow_array() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("field", DataType::Utf8, false),
+            Field::new("count", DataType::Int64, false),
+        ]));
+        let top_n = vec![("a".to_string(), 10), ("b".to_string(), 20)];
+        let result = create_top_n_arrow_array(&schema, top_n, "field", 2).unwrap();
+
+        assert_eq!(result.len(), 1); // One batch
+        let batch = &result[0];
+        assert_eq!(batch.len(), 2); // Two arrays
+
+        let field_array = batch[0].as_any().downcast_ref::<StringArray>().unwrap();
+        let count_array = batch[1].as_any().downcast_ref::<Int64Array>().unwrap();
+
+        assert_eq!(field_array.len(), 2);
+        assert_eq!(count_array.len(), 2);
+        assert_eq!(field_array.value(0), "a");
+        assert_eq!(field_array.value(1), "b");
+        assert_eq!(count_array.value(0), 10);
+        assert_eq!(count_array.value(1), 20);
+    }
+
+    #[test]
+    fn test_create_top_n_arrow_array_empty() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("field", DataType::Utf8, false),
+            Field::new("count", DataType::Int64, false),
+        ]));
+        let result = create_top_n_arrow_array(&schema, vec![], "field", 2).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_create_top_n_arrow_array_invalid_schema() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "field",
+            DataType::Utf8,
+            false,
+        )]));
+        let top_n = vec![("a".to_string(), 10)];
+        let result = create_top_n_arrow_array(&schema, top_n, "field", 1);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_create_distinct_arrow_array() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "field",
+            DataType::Utf8,
+            false,
+        )]));
+        let distinct_values = vec!["a".to_string(), "b".to_string(), "c".to_string()]
+            .into_iter()
+            .collect();
+        let result = create_distinct_arrow_array(&schema, distinct_values).unwrap();
+
+        assert_eq!(result.len(), 1);
+        let field_array = result[0].as_any().downcast_ref::<StringArray>().unwrap();
+        assert_eq!(field_array.len(), 3);
+        // Note: HashSet order is not guaranteed, so we just check the length
+    }
+
+    #[test]
+    fn test_create_distinct_arrow_array_invalid_schema() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("field", DataType::Utf8, false),
+            Field::new("count", DataType::Int64, false),
+        ]));
+        let distinct_values = vec!["a".to_string()].into_iter().collect();
+        let result = create_distinct_arrow_array(&schema, distinct_values);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_tantivy_optimize_exec_new() {
+        let query = Arc::new(QueryParams {
+            trace_id: "test".to_string(),
+            org_id: "org".to_string(),
+            stream_type: StreamType::Logs,
+            stream_name: "test".to_string(),
+            time_range: None,
+            work_group: None,
+            use_inverted_index: false,
+        });
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "field",
+            DataType::Utf8,
+            false,
+        )]));
+        let file_list = vec![FileKey {
+            id: 1,
+            account: "test_account".to_string(),
+            key: "test.parquet".to_string(),
+            meta: FileMeta::default(),
+            deleted: false,
+            segment_ids: None,
+        }];
+        let index_condition = None;
+        let index_optimize_mode = IndexOptimizeMode::SimpleCount;
+
+        let exec = TantivyOptimizeExec::new(
+            query.clone(),
+            schema.clone(),
+            file_list.clone(),
+            index_condition.clone(),
+            index_optimize_mode.clone(),
+        );
+
+        assert_eq!(exec.query.trace_id, "test");
+        assert_eq!(exec.file_list.len(), 1);
+        assert_eq!(exec.index_optimize_mode, index_optimize_mode);
+    }
+
+    #[test]
+    fn test_tantivy_optimize_exec_display() {
+        let query = Arc::new(QueryParams {
+            trace_id: "test".to_string(),
+            org_id: "org".to_string(),
+            stream_type: StreamType::Logs,
+            stream_name: "test".to_string(),
+            time_range: None,
+            work_group: None,
+            use_inverted_index: false,
+        });
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "field",
+            DataType::Utf8,
+            false,
+        )]));
+        let file_list = vec![
+            FileKey {
+                id: 1,
+                account: "test_account".to_string(),
+                key: "file1.parquet".to_string(),
+                meta: FileMeta::default(),
+                deleted: false,
+                segment_ids: None,
+            },
+            FileKey {
+                id: 2,
+                account: "test_account".to_string(),
+                key: "file2.parquet".to_string(),
+                meta: FileMeta::default(),
+                deleted: false,
+                segment_ids: None,
+            },
+            FileKey {
+                id: 3,
+                account: "test_account".to_string(),
+                key: "file3.parquet".to_string(),
+                meta: FileMeta::default(),
+                deleted: false,
+                segment_ids: None,
+            },
+            FileKey {
+                id: 4,
+                account: "test_account".to_string(),
+                key: "file4.parquet".to_string(),
+                meta: FileMeta::default(),
+                deleted: false,
+                segment_ids: None,
+            },
+            FileKey {
+                id: 5,
+                account: "test_account".to_string(),
+                key: "file5.parquet".to_string(),
+                meta: FileMeta::default(),
+                deleted: false,
+                segment_ids: None,
+            },
+            FileKey {
+                id: 6,
+                account: "test_account".to_string(),
+                key: "file6.parquet".to_string(),
+                meta: FileMeta::default(),
+                deleted: false,
+                segment_ids: None,
+            },
+        ];
+        let index_condition = None;
+        let index_optimize_mode = IndexOptimizeMode::SimpleCount;
+
+        let exec = Arc::new(TantivyOptimizeExec::new(
+            query,
+            schema,
+            file_list,
+            index_condition,
+            index_optimize_mode,
+        ));
+
+        let display = format!(
+            "{}",
+            datafusion::physical_plan::displayable(exec.as_ref()).indent(false)
+        );
+        assert!(display.contains("TantivyOptimizeExec: files: 6"));
+        assert!(display.contains("optimize_mode: SimpleCount"));
+        assert!(display.contains(
+            "file_list: [file1.parquet, file2.parquet, file3.parquet, file4.parquet, file5.parquet"
+        ));
+    }
+
+    #[test]
+    fn test_tantivy_optimize_exec_execution_plan() {
+        let query = Arc::new(QueryParams {
+            trace_id: "test".to_string(),
+            org_id: "org".to_string(),
+            stream_type: StreamType::Logs,
+            stream_name: "test".to_string(),
+            time_range: None,
+            work_group: None,
+            use_inverted_index: false,
+        });
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "field",
+            DataType::Utf8,
+            false,
+        )]));
+        let file_list = vec![FileKey {
+            id: 1,
+            account: "test_account".to_string(),
+            key: "test.parquet".to_string(),
+            meta: FileMeta::default(),
+            deleted: false,
+            segment_ids: None,
+        }];
+        let index_condition = None;
+        let index_optimize_mode = IndexOptimizeMode::SimpleCount;
+
+        let exec = TantivyOptimizeExec::new(
+            query,
+            schema,
+            file_list,
+            index_condition,
+            index_optimize_mode,
+        );
+
+        assert_eq!(exec.name(), "TantivyOptimizeExec");
+        assert!(exec.children().is_empty());
+        assert_eq!(exec.properties().output_partitioning().partition_count(), 1);
+    }
+
+    #[test]
+    fn test_tantivy_optimize_exec_with_new_children() {
+        let query = Arc::new(QueryParams {
+            trace_id: "test".to_string(),
+            org_id: "org".to_string(),
+            stream_type: StreamType::Logs,
+            stream_name: "test".to_string(),
+            time_range: None,
+            work_group: None,
+            use_inverted_index: false,
+        });
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "field",
+            DataType::Utf8,
+            false,
+        )]));
+        let file_list = vec![FileKey {
+            id: 1,
+            account: "test_account".to_string(),
+            key: "test.parquet".to_string(),
+            meta: FileMeta::default(),
+            deleted: false,
+            segment_ids: None,
+        }];
+        let index_condition = None;
+        let index_optimize_mode = IndexOptimizeMode::SimpleCount;
+
+        let exec = Arc::new(TantivyOptimizeExec::new(
+            query,
+            schema,
+            file_list,
+            index_condition,
+            index_optimize_mode,
+        ));
+
+        let result = exec.with_new_children(vec![]);
+        assert!(result.is_ok());
+        let new_exec = result.unwrap();
+        assert_eq!(new_exec.name(), "TantivyOptimizeExec");
+    }
+
+    #[test]
+    fn test_tantivy_optimize_exec_statistics() {
+        let query = Arc::new(QueryParams {
+            trace_id: "test".to_string(),
+            org_id: "org".to_string(),
+            stream_type: StreamType::Logs,
+            stream_name: "test".to_string(),
+            time_range: None,
+            work_group: None,
+            use_inverted_index: false,
+        });
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "field",
+            DataType::Utf8,
+            false,
+        )]));
+        let file_list = vec![FileKey {
+            id: 1,
+            account: "test_account".to_string(),
+            key: "test.parquet".to_string(),
+            meta: FileMeta::default(),
+            deleted: false,
+            segment_ids: None,
+        }];
+        let index_condition = None;
+        let index_optimize_mode = IndexOptimizeMode::SimpleCount;
+
+        let exec = TantivyOptimizeExec::new(
+            query,
+            schema,
+            file_list,
+            index_condition,
+            index_optimize_mode,
+        );
+
+        let stats = exec.partition_statistics(None);
+        assert!(stats.is_ok());
+        let stats = stats.unwrap();
+        assert!(matches!(
+            stats.num_rows,
+            datafusion::common::stats::Precision::Absent
+        ));
     }
 }
