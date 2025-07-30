@@ -522,9 +522,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="wrap_text"
           class="float-left"
           size="32px"
+          :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
         >
           <q-tooltip>
-            {{ t("search.messageWrapContent") }}
+           {{ searchObj.meta.logsVisualizeToggle === 'visualize' ? 'Not supported for visualization' : t("search.messageWrapContent") }}
           </q-tooltip>
         </q-toggle>
 
@@ -1654,6 +1655,17 @@ export default defineComponent({
     watch(
       () => searchObj.meta.functionEditorPlaceholderFlag,
       (val) => {
+
+        if (searchObj.meta.logsVisualizeToggle === 'visualize' && val == false){
+          // show warning
+          $q.notify({
+            message: "Function editor is not supported for visualization",
+            color: "warning",
+            position: "bottom",
+            timeout: 5000,
+          });
+        }
+
         if (
           searchObj.meta.jobId != "" &&
           val == true &&
