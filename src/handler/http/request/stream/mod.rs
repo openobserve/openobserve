@@ -769,7 +769,7 @@ async fn get_delete_stream_data_status(
         // Super cluster is enabled, get status from all regions
         match get_super_cluster_delete_status(
             &org_id,
-            &stream_type.as_str(),
+            stream_type.as_str(),
             &stream_name,
             time_range,
         )
@@ -786,7 +786,7 @@ async fn get_delete_stream_data_status(
         }
     } else {
         // Super cluster not enabled, get local status
-        get_local_delete_status(&org_id, &stream_type.as_str(), &stream_name, time_range).await
+        get_local_delete_status(&org_id, stream_type.as_str(), &stream_name, time_range).await
     };
 
     #[cfg(not(feature = "enterprise"))]
