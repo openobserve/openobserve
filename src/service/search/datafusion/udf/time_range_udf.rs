@@ -49,9 +49,9 @@ pub(crate) static TIME_RANGE_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 pub fn time_range_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarValue> {
     if args.len() != 3 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError(
+            Box::new(ParserError::ParserError(
                 "UDF params should be: time_range(field, start, end)".to_string(),
-            ),
+            )),
             None,
         ));
     }

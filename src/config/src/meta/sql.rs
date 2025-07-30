@@ -1111,8 +1111,7 @@ mod tests {
     fn parse_sql_works() {
         let table = "index.1.2022";
         let sql = format!(
-            "select a, b, c from \"{}\" where a=1 and b=1 or c=1 order by c desc limit 5 offset 10",
-            table
+            "select a, b, c from \"{table}\" where a=1 and b=1 or c=1 order by c desc limit 5 offset 10"
         );
         let dialect = sqlparser::dialect::GenericDialect {};
         let statement = &Parser::parse_sql(&dialect, sql.as_ref()).unwrap()[0];
@@ -1129,8 +1128,7 @@ mod tests {
     fn test_sql_new() {
         let table = "index.1.2022";
         let sql = format!(
-            "select a, b, c from \"{}\" where a=1 and b=1 or c=1 order by c desc limit 5 offset 10",
-            table
+            "select a, b, c from \"{table}\" where a=1 and b=1 or c=1 order by c desc limit 5 offset 10"
         );
         let local_sql: Sql = Sql::new(sql.as_str()).unwrap();
         assert_eq!(local_sql.source, table);
@@ -1284,7 +1282,7 @@ mod tests {
     fn test_resolve_stream_names_with_type() {
         let sql = "select * from \"log\".default";
         let names = resolve_stream_names_with_type(sql).unwrap();
-        println!("{:?}", names);
+        println!("{names:?}");
     }
 
     #[test]

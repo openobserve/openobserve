@@ -190,3 +190,104 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::prelude::*;
+
+    use super::*;
+
+    #[test]
+    fn test_scheduled_jobs_enum() {
+        assert_eq!(ScheduledJobs::Table.to_string(), "scheduled_jobs");
+        assert_eq!(ScheduledJobs::Org.to_string(), "org");
+        assert_eq!(ScheduledJobs::Module.to_string(), "module");
+        assert_eq!(ScheduledJobs::ModuleKey.to_string(), "module_key");
+    }
+
+    #[test]
+    fn test_alerts_enum() {
+        assert_eq!(Alerts::Table.to_string(), "alerts");
+        assert_eq!(Alerts::Id.to_string(), "id");
+        assert_eq!(Alerts::Org.to_string(), "org");
+        assert_eq!(Alerts::StreamType.to_string(), "stream_type");
+        assert_eq!(Alerts::StreamName.to_string(), "stream_name");
+        assert_eq!(Alerts::Name.to_string(), "name");
+    }
+
+    #[test]
+    fn test_migration_name() {
+        let migration = Migration;
+        let name = migration.name();
+        assert!(!name.is_empty(), "Migration should have a name");
+        assert!(
+            name.contains("remove_alert_name_unique_constraint"),
+            "Migration name should contain the constraint name"
+        );
+    }
+
+    #[test]
+    fn test_module_key_parsing() {
+        // Test valid module key format
+        let valid_key = "logs/test_stream/test_alert";
+        let parts: Vec<&str> = valid_key.split('/').collect();
+        assert_eq!(parts.len(), 3, "Valid module key should have 3 parts");
+        assert_eq!(parts[0], "logs");
+        assert_eq!(parts[1], "test_stream");
+        assert_eq!(parts[2], "test_alert");
+
+        // Test invalid module key format
+        let invalid_key = "invalid_format";
+        let invalid_parts: Vec<&str> = invalid_key.split('/').collect();
+        assert_ne!(
+            invalid_parts.len(),
+            3,
+            "Invalid module key should not have 3 parts"
+        );
+    }
+
+    #[test]
+    fn test_alert_name_unique_constraint_constant() {
+        // Test that the constant is properly defined
+        assert_eq!(
+            ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX,
+            "alerts_org_stream_type_stream_name_name_idx_2"
+        );
+    }
+
+    #[test]
+    fn test_migration_structure() {
+        let migration = Migration;
+
+        // Test that the migration implements the required trait
+        let name = migration.name();
+        assert!(!name.is_empty());
+
+        // Test that the migration has the expected structure
+        assert!(name.contains("remove_alert_name_unique_constraint"));
+    }
+
+    #[test]
+    fn test_enum_derivation() {
+        // Test that the enums are properly derived
+        let scheduled_jobs_table = ScheduledJobs::Table;
+        let alerts_table = Alerts::Table;
+
+        assert_eq!(scheduled_jobs_table.to_string(), "scheduled_jobs");
+        assert_eq!(alerts_table.to_string(), "alerts");
+    }
+
+    #[test]
+    fn test_migration_trait_implementation() {
+        // Test that the migration implements MigrationTrait
+        let migration = Migration;
+
+        // This test ensures the migration has the required trait implementation
+        // The actual up/down methods are tested in integration tests
+        assert!(
+            migration
+                .name()
+                .contains("remove_alert_name_unique_constraint")
+        );
+    }
+}

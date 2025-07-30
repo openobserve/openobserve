@@ -297,7 +297,7 @@ impl NewListingTable {
         source = source
             .with_parquet_file_reader_factory(Arc::new(NewParquetFileReaderFactory::new(store)));
         if let Some(predicate) = predicate {
-            source = source.with_predicate(Arc::clone(&conf.file_schema), predicate);
+            source = source.with_predicate(predicate);
         }
         if let Some(metadata_size_hint) = metadata_size_hint {
             source = source.with_metadata_size_hint(metadata_size_hint)
@@ -591,7 +591,7 @@ fn create_ordering(schema: &Schema, sort_order: &[Vec<SortExpr>]) -> Result<Vec<
 
     for exprs in sort_order {
         // Construct PhysicalSortExpr objects from Expr objects:
-        let mut sort_exprs = LexOrdering::default();
+        let mut sort_exprs = vec![];
         for sort in exprs {
             match &sort.expr {
                 Expr::Column(col) => match expressions::col(&col.name, schema) {
@@ -616,7 +616,7 @@ fn create_ordering(schema: &Schema, sort_order: &[Vec<SortExpr>]) -> Result<Vec<
             }
         }
         if !sort_exprs.is_empty() {
-            all_sort_orders.push(sort_exprs);
+            all_sort_orders.push(LexOrdering::new(sort_exprs).unwrap());
         }
     }
     Ok(all_sort_orders)
@@ -728,7 +728,7 @@ pub fn compute_all_files_statistics(
     // Then summary statistics across all file groups
     let file_groups_statistics = file_groups_with_stats
         .iter()
-        .filter_map(|file_group| file_group.statistics());
+        .filter_map(|file_group| file_group.file_statistics(None));
 
     let mut statistics = Statistics::try_merge_iter(file_groups_statistics, &table_schema)?;
 

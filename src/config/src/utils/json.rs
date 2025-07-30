@@ -268,7 +268,7 @@ mod tests {
             Some(Value::Array(
                 [true, false, true]
                     .into_iter()
-                    .map(|v| Value::Bool(v))
+                    .map(Value::Bool)
                     .collect_vec()
             ))
         );
@@ -279,7 +279,7 @@ mod tests {
         assert_eq!(
             get_value_from_path(&val, ".*.a"),
             Some(Value::Array(
-                [true,].into_iter().map(|v| Value::Bool(v)).collect_vec()
+                [true,].into_iter().map(Value::Bool).collect_vec()
             ))
         );
 
@@ -291,7 +291,7 @@ mod tests {
             Some(Value::Array(
                 [true, false, true]
                     .into_iter()
-                    .map(|v| Value::Bool(v))
+                    .map(Value::Bool)
                     .collect_vec()
             ))
         );

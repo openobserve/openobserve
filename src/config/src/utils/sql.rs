@@ -698,8 +698,7 @@ mod tests {
             let result = is_timestamp_selected(sql)?;
             assert_eq!(
                 result, expected,
-                "Failed test case '{}': expected {}, got {}",
-                test_name, expected, result
+                "Failed test case '{test_name}': expected {expected}, got {result}"
             );
         }
 
@@ -710,7 +709,7 @@ mod tests {
     fn check_is_simple_aggregate() {
         let query = r#"SELECT histogram(_timestamp) AS zo_sql_time, "kubernetes_docker_id" AS zo_sql_key, SUM(count) AS zo_sql_num FROM "distinct_values_logs_default22" GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"#;
         let ab = is_aggregate_query(query);
-        print!("{:?}", ab);
+        print!("{ab:?}");
     }
 
     #[test]
@@ -868,13 +867,11 @@ mod tests {
         for (i, (query, description)) in queries.iter().enumerate() {
             let is_simple_aggregate = is_simple_aggregate_query(query).unwrap();
             println!(
-                "Query [{}]: {} - is_simple: {:?}",
-                i, description, is_simple_aggregate
+                "Query [{i}]: {description} - is_simple: {is_simple_aggregate:?}"
             );
-            assert_eq!(
-                is_simple_aggregate, false,
-                "Failed test case [{}]: '{}' - should not be simple but returned true",
-                i, description
+            assert!(
+                !is_simple_aggregate,
+                "Failed test case [{i}]: '{description}' - should not be simple but returned true"
             );
         }
     }
@@ -944,13 +941,11 @@ mod tests {
         for (i, (query, description)) in queries.iter().enumerate() {
             let is_simple_aggregate = is_simple_aggregate_query(query).unwrap();
             println!(
-                "Simple Query [{}]: {} - is_simple: {:?}",
-                i, description, is_simple_aggregate
+                "Simple Query [{i}]: {description} - is_simple: {is_simple_aggregate:?}"
             );
-            assert_eq!(
-                is_simple_aggregate, true,
-                "Failed test case [{}]: '{}' - should be simple but returned false",
-                i, description
+            assert!(
+                is_simple_aggregate,
+                "Failed test case [{i}]: '{description}' - should be simple but returned false"
             );
         }
     }
@@ -1007,8 +1002,8 @@ mod tests {
 
         for (i, query) in queries.iter().enumerate() {
             let is_simple_aggregate = is_simple_aggregate_query(query).unwrap();
-            println!("Query [{}] is_simple: {:?}", i, is_simple_aggregate);
-            assert_eq!(is_simple_aggregate, false);
+            println!("Query [{i}] is_simple: {is_simple_aggregate:?}");
+            assert!(!is_simple_aggregate);
         }
     }
 }

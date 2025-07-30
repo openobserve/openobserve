@@ -26,6 +26,15 @@ use {
 #[cfg(feature = "enterprise")]
 use crate::common::meta::user::TokenValidationResponse;
 
+#[cfg(feature = "enterprise")]
+type VerifyTokenResult = Result<
+    (
+        TokenValidationResponse,
+        Option<TokenData<HashMap<String, Value>>>,
+    ),
+    anyhow::Error,
+>;
+
 /// Convert a `KeyAlgorithm` to an `Algorithm`
 ///
 /// There's no built-in conversion from `KeyAlgorithm`
@@ -51,6 +60,7 @@ fn key_algorithm_to_algorithm(key_algo: &KeyAlgorithm) -> Option<Algorithm> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 #[cfg(feature = "enterprise")]
 pub(crate) fn verify_decode_token(
     token: &str,
@@ -58,13 +68,7 @@ pub(crate) fn verify_decode_token(
     aud: &str,
     get_decode_token: bool,
     login_flow: bool,
-) -> Result<
-    (
-        TokenValidationResponse,
-        Option<TokenData<HashMap<String, Value>>>,
-    ),
-    anyhow::Error,
-> {
+) -> VerifyTokenResult {
     use config::meta::user::UserRole;
     use infra::errors::JwtError;
 
