@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         min-height: calc(100% - 24px);
                         height: calc(100% - 24px);
                         width: 100%;
-                        margin-top: 24px;
+                        margin-top: 36px;
                       "
                     >
                       <PanelSchemaRenderer
