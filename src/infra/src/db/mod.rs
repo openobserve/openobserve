@@ -202,8 +202,6 @@ pub trait Db: Sync + Send + 'static {
         prefix: &str,
         start_dt: Option<(i64, i64)>,
     ) -> Result<Vec<(i64, Bytes)>>;
-    async fn get_id(&self, key: &str) -> Result<i64>;
-    async fn get_key_from_id(&self, id: i64) -> Result<String>;
     async fn count(&self, prefix: &str) -> Result<i64>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
     async fn close(&self) -> Result<()>;

@@ -133,14 +133,6 @@ impl super::Db for Etcd {
         Ok(Bytes::from(ret.kvs()[0].value().to_vec()))
     }
 
-    async fn get_id(&self, _key: &str) -> Result<i64> {
-        unimplemented!()
-    }
-
-    async fn get_key_from_id(&self, _id: i64) -> Result<String> {
-        unimplemented!()
-    }
-
     async fn put(
         &self,
         key: &str,

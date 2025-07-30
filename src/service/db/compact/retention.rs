@@ -54,13 +54,13 @@ pub async fn delete_stream(
     // write in cache
     if let Some(v) = CACHE.get(&key) {
         if v.value() + hour_micros(1) > now_micros() {
-            return Ok(db_key); // already in cache, don't create same task in one hour
+            return Ok(key); // already in cache, don't create same task in one hour
         }
     }
 
-    CACHE.insert(key, now_micros());
+    CACHE.insert(key.clone(), now_micros());
     db::put(&db_key, "OK".into(), db::NEED_WATCH, None).await?;
-    Ok(db_key) // return the db_key
+    Ok(key) // return the key
 }
 
 // set the stream is processing by the node
@@ -127,14 +127,9 @@ pub async fn list() -> Result<Vec<String>, anyhow::Error> {
     Ok(items)
 }
 
-pub async fn get_id(key: &str) -> Result<i64, anyhow::Error> {
-    let id = db::get_id(key).await?;
-    Ok(id)
-}
-
-pub async fn get_key_from_id(id: i64) -> Result<String, anyhow::Error> {
-    let key = db::get_key_from_id(id).await?;
-    Ok(key)
+pub async fn get(db_key: &str) -> Result<String, anyhow::Error> {
+    let ret = db::get(db_key).await?;
+    Ok(String::from_utf8_lossy(&ret).to_string())
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {

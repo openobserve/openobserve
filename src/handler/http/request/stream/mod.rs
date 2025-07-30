@@ -594,7 +594,11 @@ async fn delete_stream_cache(
     ),
     request_body(content = TimeRange, description = "Time range with start and end timestamps in microseconds", content_type = "application/json"),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse, example = json!(
+            {
+                "time_range": "2025-06-01T00:00:00Z,2025-06-30T00:00:00Z"
+            }
+        )),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
@@ -672,19 +676,20 @@ async fn delete_stream_data_by_time_range(
         }
     };
 
-    // Get the id from the key
-    let id = match crate::service::db::compact::retention::get_id(&key).await {
-        Ok(id) => id,
-        Err(e) => {
-            log::error!("get_id {key} error: {e}");
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            )));
+    // "default/logs/oly/2025-06-01T00:00:00Z,2025-06-30T00:00:00Z"
+    let time_range = match key.split('/').last() {
+        Some(time_range) => time_range,
+        None => {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    "failed to get time range from key".to_string(),
+                )),
+            );
         }
     };
 
-    let res = serde_json::json!({ "id": id });
+    let res = serde_json::json!({ "time_range": time_range });
     Ok(HttpResponse::Ok().json(res))
 }
 
@@ -702,45 +707,48 @@ async fn delete_stream_data_by_time_range(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
+        ("time_range" = String, Query, description = "Time range", example = "2025-06-01T00:00:00Z,2025-06-30T00:00:00Z"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/streams/{stream_name}/data_by_time_range/{id}")]
+#[get("/{org_id}/streams/{stream_name}/data_by_time_range/status")]
 async fn get_delete_stream_data_status(
-    path: web::Path<(String, String, String)>,
-    _req: HttpRequest,
+    path: web::Path<(String, String)>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (_org_id, _stream_name, id_str) = path.into_inner();
-
-    // Parse the id from the URL
-    let id: i64 = match id_str.parse() {
-        Ok(id) => id,
-        Err(_) => {
+    let (org_id, stream_name) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let time_range = match query.get("time_range") {
+        Some(time_range) => time_range,
+        None => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Invalid job ID".to_string(),
+                StatusCode::BAD_REQUEST.into(),
+                "time range is required".to_string(),
             )));
         }
     };
 
-    // Get the key from the ID
-    match crate::service::db::compact::retention::get_key_from_id(id).await {
+    let key = format!("{org_id}/{stream_type}/{stream_name}/{time_range}");
+    let db_key = format!("/compact/delete/{key}");
+    // Get the key from the database
+    match crate::service::db::compact::retention::get(&db_key).await {
         Ok(_) => {
             // Job still exists, return pending status
-            let res = serde_json::json!({ "id": id, "status": "pending" });
+            let res = serde_json::json!({ "key": key, "status": "pending" });
             Ok(HttpResponse::Ok().json(res))
         }
         Err(e) => {
             if let Some(InfraError::DbError(DbError::KeyNotExists(_))) =
                 e.downcast_ref::<InfraError>()
             {
-                let res = serde_json::json!({ "id": id, "status": "completed" });
+                let res = serde_json::json!({ "key": key, "status": "completed" });
                 return Ok(HttpResponse::Ok().json(res));
             }
-            log::error!("get_key_from_id {id} error: {e}");
+            log::error!("get_delete_stream_data_status {db_key} error: {e}");
             Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 e.to_string(),
