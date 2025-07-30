@@ -790,7 +790,8 @@ async fn get_delete_stream_data_status(
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let response = get_local_delete_status(&org_id, &stream_type, &stream_name, time_range).await;
+    let response =
+        get_local_delete_status(&org_id, stream_type.as_str(), &stream_name, time_range).await;
 
     Ok(HttpResponse::Ok().json(response))
 }
