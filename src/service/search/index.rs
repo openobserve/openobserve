@@ -103,6 +103,10 @@ impl IndexCondition {
     pub fn add_condition(&mut self, condition: Condition) {
         self.conditions.push(condition);
     }
+
+    pub fn add_index_condition(&mut self, index_condition: IndexCondition) {
+        self.conditions.extend(index_condition.conditions);
+    }
 }
 
 impl Debug for IndexCondition {
@@ -231,12 +235,35 @@ impl IndexCondition {
     // use for check if the index condition contains
     // negated condition, like NOT(field = 'value')
     pub fn is_negated_condition(&self) -> bool {
-        self.conditions.iter().any(|condition| {
-            matches!(
-                condition,
-                Condition::Not(_) | Condition::NotEqual(_, _) | Condition::In(_, _, true)
-            )
-        })
+        self.conditions
+            .iter()
+            .any(|condition| condition.is_negated_condition())
+    }
+
+    // split the index condition into negated and normal conditions
+    // return (positive_conditions, negative_conditions)
+    pub fn split_condition_by_negated(&self) -> (IndexCondition, IndexCondition) {
+        let mut positive_conditions = Vec::new();
+        let mut negative_conditions = Vec::new();
+        for condition in self.conditions.iter() {
+            if condition.is_negated_condition() {
+                negative_conditions.push(condition.clone());
+            } else {
+                positive_conditions.push(condition.clone());
+            }
+        }
+        (
+            IndexCondition {
+                conditions: positive_conditions,
+            },
+            IndexCondition {
+                conditions: negative_conditions,
+            },
+        )
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.conditions.is_empty()
     }
 }
 
@@ -741,6 +768,23 @@ impl Condition {
             Condition::Or(left, right) => left.can_remove_filter() && right.can_remove_filter(),
             Condition::And(left, right) => left.can_remove_filter() && right.can_remove_filter(),
             Condition::Not(condition) => condition.can_remove_filter(),
+        }
+    }
+
+    // check if the condition is negated
+    pub fn is_negated_condition(&self) -> bool {
+        match self {
+            Condition::Equal(..)
+            | Condition::StrMatch(..)
+            | Condition::In(_, _, false)
+            | Condition::Regex(..)
+            | Condition::MatchAll(..)
+            | Condition::FuzzyMatchAll(..)
+            | Condition::All() => false,
+            Condition::NotEqual(..) | Condition::Not(..) | Condition::In(_, _, true) => true,
+            Condition::Or(left, right) | Condition::And(left, right) => {
+                left.is_negated_condition() || right.is_negated_condition()
+            }
         }
     }
 }
