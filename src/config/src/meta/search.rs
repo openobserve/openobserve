@@ -1580,7 +1580,14 @@ impl StreamResponses {
                     let metadata_bytes = format_event("search_response_metadata", &metadata_data);
 
                     // Send empty hits
-                    let hits_bytes = format_event("search_response_hits", "{\"hits\":[]}");
+                    let hits = StreamResponses::SearchResponseHits {
+                        hits: results.hits.clone(),
+                    };
+                    let hits_data = serde_json::to_string(&hits).unwrap_or_else(|_| {
+                        log::error!("Failed to serialize hits: {:?}", hits);
+                        String::new()
+                    });
+                    let hits_bytes = format_event("search_response_hits", &hits_data);
 
                     // Return both chunks in sequence
                     let chunks_iter =
