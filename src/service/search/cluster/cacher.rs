@@ -250,7 +250,7 @@ pub async fn get_cached_results(
     }
 }
 
-pub async fn delete_cached_results(path: String, may_be_ts: Option<i64>) -> bool {
+pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
     let trace_id = path.clone();
     let mut delete_response = true;
     // get nodes from cluster
@@ -293,7 +293,7 @@ pub async fn delete_cached_results(path: String, may_be_ts: Option<i64>) -> bool
             async move {
                 let req = DeleteResultCacheRequest {
                    path: local_path.clone(),
-                   ts: may_be_ts.unwrap_or(0),
+                   ts: delete_ts,
                 };
 
                 let request = tonic::Request::new(req);
@@ -347,7 +347,7 @@ pub async fn delete_cached_results(path: String, may_be_ts: Option<i64>) -> bool
         );
         tasks.push(task);
     }
-    match crate::service::search::cache::cacher::delete_cache(&path, may_be_ts).await {
+    match crate::service::search::cache::cacher::delete_cache(&path, delete_ts).await {
         Ok(_) => {
             log::info!(
                 "[trace_id {trace_id}] delete_cached_results->grpc: local node delete success"

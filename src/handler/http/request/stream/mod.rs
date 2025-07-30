@@ -525,7 +525,7 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
-        ("ts" = Option<i64>, Query, description = "Timestamp in microseconds. If provided, must be > 0. Cache from this timestamp onwards will be retained, older cache will be deleted."),
+        ("ts" = i64, Query, description = "Timestamp in microseconds. If provided, must be > 0. Cache from this timestamp onwards will be retained, older cache will be deleted."),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
@@ -549,16 +549,14 @@ async fn delete_stream_cache(
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let may_be_ts = get_ts_from_request(&query);
+    let delete_ts = get_ts_from_request(&query);
 
     // If ts parameter is present, it must be > 0
-    if let Some(ts) = may_be_ts {
-        if ts <= 0 {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Timestamp parameter must be greater than 0".to_string(),
-            )));
-        }
+    if delete_ts <= 0 {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Timestamp parameter must be greater than 0".to_string(),
+        )));
     }
 
     let path = if stream_name.eq("_all") {
@@ -567,7 +565,7 @@ async fn delete_stream_cache(
         format!("{}/{}/{}", org_id, stream_type, stream_name)
     };
 
-    match crate::service::search::cluster::cacher::delete_cached_results(path, may_be_ts).await {
+    match crate::service::search::cluster::cacher::delete_cached_results(path, delete_ts).await {
         true => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
             "cache deleted".to_string(),

@@ -38,8 +38,11 @@ pub(crate) fn get_stream_type_from_request(
 }
 
 #[inline(always)]
-pub(crate) fn get_ts_from_request(query: &Query<HashMap<String, String>>) -> Option<i64> {
-    query.get("ts").map(|s| s.parse::<i64>().unwrap_or(0))
+pub(crate) fn get_ts_from_request(query: &Query<HashMap<String, String>>) -> i64 {
+    query
+        .get("ts")
+        .map(|s| s.parse::<i64>().unwrap_or(0))
+        .unwrap_or(0)
 }
 
 #[inline(always)]
