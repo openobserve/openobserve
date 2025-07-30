@@ -29,14 +29,14 @@ fn test_wal_new() {
     let path = build_file_path(dir, "org", "stream", "1".to_string());
     let (mut writer, _) = Writer::new(path.clone(), 1024_1024, 8 * 1024, None).unwrap();
     for i in 0..entry_num {
-        let data = format!("hello world {}", i);
+        let data = format!("hello world {i}");
         writer.write(data.as_bytes()).unwrap();
     }
     writer.close().unwrap();
 
     let mut reader = Reader::from_path(path).unwrap();
     for i in 0..entry_num {
-        let data = format!("hello world {}", i);
+        let data = format!("hello world {i}");
         let entry = reader.read_entry().unwrap().unwrap();
         assert_eq!(entry, data.as_bytes());
     }
@@ -53,7 +53,7 @@ fn test_wal_build() {
     let path = build_file_path(dir, "org", "stream", "1".to_string());
     let (mut writer, _) = Writer::new(path.clone(), 1024_1024, 8 * 1024, Some(header)).unwrap();
     for i in 0..entry_num {
-        let data = format!("hello world {}", i);
+        let data = format!("hello world {i}");
         writer.write(data.as_bytes()).unwrap();
     }
     writer.close().unwrap();
@@ -64,7 +64,7 @@ fn test_wal_build() {
     assert_eq!(header.get("key2"), Some(&"value2".to_string()));
 
     for i in 0..entry_num {
-        let data = format!("hello world {}", i);
+        let data = format!("hello world {i}");
         let entry = reader.read_entry().unwrap().unwrap();
         assert_eq!(entry, data.as_bytes());
     }
@@ -79,7 +79,7 @@ fn test_position() {
     let path = build_file_path(dir, "org", "stream", "1".to_string());
     let (mut writer, _) = Writer::new(path.clone(), 1024_1024, 8 * 1024, None).unwrap();
     for i in 0..entry_num {
-        let data = format!("hello world {}", i);
+        let data = format!("hello world {i}");
         writer.write(data.as_bytes()).unwrap();
     }
     writer.close().unwrap();
@@ -89,7 +89,7 @@ fn test_position() {
     for _ in 0..entry_num {
         let (_, len) = reader.read_entry_with_length().unwrap();
         pos += wal::ENTRY_HEADER_LEN + len;
-        assert_eq!(pos as u64, reader.current_position().unwrap());
+        assert_eq!(pos, reader.current_position().unwrap());
     }
     assert!(reader.read_entry().unwrap().is_none());
 }
@@ -102,7 +102,7 @@ fn test_metadata() {
     let path = build_file_path(dir, "org", "stream", "1".to_string());
     let (mut writer, _) = Writer::new(path, 1024_1024, 8 * 1024, None).unwrap();
     for i in 0..entry_num {
-        let data = format!("hello world {}", i);
+        let data = format!("hello world {i}");
         writer.write(data.as_bytes()).unwrap();
         sleep(Duration::from_millis(100));
         writer.sync().unwrap();
@@ -131,12 +131,11 @@ fn test_realtime_write_and_read() {
 
     std::thread::spawn(move || {
         for i in 0..entry_num {
-            let data = format!("hello world {}", i);
+            let data = format!("hello world {i}");
             writer.write(data.as_bytes()).unwrap();
             writer.sync().unwrap();
             println!(
-                "write data: {}, pos:{:?}, file_path: {}",
-                data,
+                "write data: {data}, pos:{:?}, file_path: {}",
                 writer.current_position(),
                 writer.path().display()
             );
@@ -186,7 +185,7 @@ fn test_reader_from_path_position_and_metadata() {
     let (mut writer, _) = Writer::new(path.clone(), 1024_1024, 8 * 1024, None).unwrap();
 
     for i in 0..entry_num {
-        let data = format!("hello {}", i);
+        let data = format!("hello {i}");
         writer.write(data.as_bytes()).unwrap();
     }
     writer.close().unwrap();
@@ -209,7 +208,7 @@ fn test_reader_from_path_position_and_metadata() {
 
     for i in 0..entry_num {
         let entry = reader.read_entry().unwrap().unwrap();
-        assert_eq!(entry, format!("hello {}", i).as_bytes());
+        assert_eq!(entry, format!("hello {i}").as_bytes());
     }
     assert!(reader.read_entry().unwrap().is_none());
 

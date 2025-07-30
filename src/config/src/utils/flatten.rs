@@ -232,7 +232,7 @@ mod tests {
         assert_eq!(
             flatten(obj).unwrap(),
             json!({
-                format!("s{k}a", k = KEY_SEPARATOR): "[1,2.0,\"b\",null,true]",
+                format!("s{KEY_SEPARATOR}a"): "[1,2.0,\"b\",null,true]",
             })
         );
     }
