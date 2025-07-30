@@ -760,27 +760,153 @@ async fn get_delete_stream_data_status(
         }
     };
 
+    // Check if super cluster is enabled
+    #[cfg(feature = "enterprise")]
+    let response = if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        // Super cluster is enabled, get status from all regions
+        match get_super_cluster_delete_status(
+            &org_id,
+            &stream_type.as_str(),
+            &stream_name,
+            time_range,
+        )
+        .await
+        {
+            Ok(res) => res,
+            Err(e) => {
+                log::error!("get_super_cluster_delete_status error: {e}");
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    e.to_string(),
+                )));
+            }
+        }
+    } else {
+        // Super cluster not enabled, get local status
+        get_local_delete_status(&org_id, &stream_type.as_str(), &stream_name, time_range).await
+    };
+
+    #[cfg(not(feature = "enterprise"))]
+    let response = get_local_delete_status(&org_id, &stream_type, &stream_name, time_range).await;
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+async fn get_local_delete_status(
+    org_id: &str,
+    stream_type: &str,
+    stream_name: &str,
+    time_range: &str,
+) -> serde_json::Value {
     let key = format!("{org_id}/{stream_type}/{stream_name}/{time_range}");
     let db_key = format!("/compact/delete/{key}");
+
     // Get the key from the database
+    let is_complete: bool;
     match crate::service::db::compact::retention::get(&db_key).await {
         Ok(_) => {
-            // Job still exists, return pending status
-            let res = serde_json::json!({ "key": key, "status": "pending" });
-            Ok(HttpResponse::Ok().json(res))
+            is_complete = false;
         }
         Err(e) => {
             if let Some(InfraError::DbError(DbError::KeyNotExists(_))) =
                 e.downcast_ref::<InfraError>()
             {
-                let res = serde_json::json!({ "key": key, "status": "completed" });
-                return Ok(HttpResponse::Ok().json(res));
+                is_complete = true;
+            } else {
+                log::error!("get_local_delete_status {key} error: {e}");
+                return serde_json::json!({ "key": key, "status": "error", "error": e.to_string() });
             }
-            log::error!("get_delete_stream_data_status {db_key} error: {e}");
-            Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            )))
+        }
+    };
+
+    serde_json::json!({ "key": key, "status": if is_complete { "completed" } else { "pending" } })
+}
+
+#[cfg(feature = "enterprise")]
+async fn get_super_cluster_delete_status(
+    org_id: &str,
+    stream_type: &str,
+    stream_name: &str,
+    time_range: &str,
+) -> Result<serde_json::Value, anyhow::Error> {
+    let key = format!("{org_id}/{stream_type}/{stream_name}/{time_range}");
+
+    // Get all clusters in the super cluster
+    let clusters = match o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes(
+        &config::ider::generate_trace_id(),
+        vec![], // pass empty vector to get all regions
+        vec![], // pass empty vector to get all clusters
+        Some(config::meta::cluster::RoleGroup::Interactive),
+    )
+    .await
+    {
+        Ok(nodes) => nodes,
+        Err(e) => {
+            log::error!("Failed to get super cluster nodes: {:?}", e);
+            return Err(anyhow::anyhow!(
+                "Failed to get super cluster nodes: {:?}",
+                e
+            ));
+        }
+    };
+
+    // For each node in the super cluster, get the delete status
+    let trace_id = config::ider::generate_trace_id();
+    let mut results = Vec::new();
+    let mut all_pending = false;
+    let mut all_completed = true;
+    let mut errors = Vec::new();
+
+    for cluster in clusters {
+        match crate::service::cluster_info::get_super_cluster_delete_job_status(
+            &trace_id,
+            cluster.clone(),
+            org_id,
+            stream_type,
+            stream_name,
+            time_range,
+        )
+        .await
+        {
+            Ok(response) => {
+                if !response.is_complete {
+                    all_pending = true;
+                    all_completed = false;
+                }
+                let res_json = serde_json::json!({
+                    "cluster": cluster.get_cluster(),
+                    "region": cluster.get_region(),
+                    "is_complete": response.is_complete,
+                });
+                results.push(res_json);
+            }
+            Err(e) => {
+                log::error!(
+                    "Failed to get delete job status from cluster {}: {:?}",
+                    cluster.get_cluster(),
+                    e
+                );
+                errors.push(e.to_string());
+            }
         }
     }
+
+    let status = if all_pending {
+        "pending"
+    } else if all_completed && errors.is_empty() {
+        "completed"
+    } else {
+        "error"
+    };
+
+    let mut response = serde_json::json!({ "key": key, "status": status, "cluter_info": results });
+
+    if !errors.is_empty() {
+        response["errors"] = serde_json::json!(errors);
+    }
+
+    Ok(response)
 }
