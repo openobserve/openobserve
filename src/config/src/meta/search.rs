@@ -1477,6 +1477,7 @@ mod tests {
             query_fn: Some("fn1".to_string()),
             streaming_output: false,
             histogram_interval: 0,
+            search_type: None,
         };
 
         req.decode().unwrap();
