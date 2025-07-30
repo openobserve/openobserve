@@ -728,7 +728,7 @@ pub fn handle_histogram(
         )
     };
 
-    let field = args.get(0).unwrap_or(&"_timestamp");
+    let field = args.first().unwrap_or(&"_timestamp");
 
     *origin_sql = origin_sql.replace(
         caps.get(0).unwrap().as_str(),
@@ -851,6 +851,8 @@ mod tests {
                 result_cache_ratio: 33,
                 work_group: None,
                 order_by: Some(OrderBy::Asc),
+                is_histogram_eligible: None,
+                converted_histogram_query: None,
             },
             deltas: vec![],
             has_cached_data: true,

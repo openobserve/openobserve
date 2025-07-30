@@ -28,10 +28,7 @@ use config::{
     metrics,
     utils::json,
 };
-use datafusion::{
-    common::tree_node::TreeNode,
-    physical_plan::{displayable, visit_execution_plan},
-};
+use datafusion::{common::tree_node::TreeNode, physical_plan::visit_execution_plan};
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;

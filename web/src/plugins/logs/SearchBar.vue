@@ -2355,7 +2355,8 @@ export default defineComponent({
       savedViewDropdownModel.value = false;
     };
 
-    const applySavedView = (item) => {
+    const applySavedView = async (item) => {
+      await cancelQuery();
       searchObj.shouldIgnoreWatcher = true;
       searchObj.meta.sqlMode = false;
       savedviewsService

@@ -233,6 +233,8 @@ pub struct Response {
     pub order_by: Option<OrderBy>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub converted_histogram_query: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_histogram_eligible: Option<bool>,
 }
 
 /// Iterator for Streaming response of search `Response`
@@ -395,6 +397,7 @@ impl Response {
             work_group: None,
             order_by: None,
             converted_histogram_query: None,
+            is_histogram_eligible: None,
         }
     }
 
@@ -564,6 +567,8 @@ pub struct SearchPartitionResponse {
     pub streaming_output: bool,
     pub streaming_aggs: bool,
     pub streaming_id: Option<String>,
+    #[serde(default)]
+    pub is_histogram_eligible: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]

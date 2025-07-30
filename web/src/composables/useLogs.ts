@@ -1210,8 +1210,11 @@ const useLogs = () => {
                 partitionTotal: [],
                 paginations: [],
               };
-
+              //here we need to get the histogram interval for the histogram query that needs to be called
               searchObj.data.queryResults.histogram_interval = res.data?.histogram_interval;
+              //we get is_histogram_eligible flag to check from the BE so that if it is false then we dont need to make histogram call
+              //this is coming as a part of partition response
+              searchObj.data.queryResults.is_histogram_eligible = res.data?.is_histogram_eligible;
 
               // check if histogram interval is undefined, then set current response as histogram response
               // for visualization, will require to set histogram interval to fill missing values
@@ -1404,7 +1407,7 @@ const useLogs = () => {
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
             (!searchObj.meta.sqlMode ||
-              (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL) && !isDistinctQuery(parsedSQL) && !isWithQuery(parsedSQL)))) ||
+              (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL) && !isDistinctQuery(parsedSQL) && !isWithQuery(parsedSQL) && searchObj.data.queryResults.is_histogram_eligible))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
@@ -1752,6 +1755,10 @@ const useLogs = () => {
           searchObj.data.resultGrid.currentPage - 1
         ][0].streaming_id;
 
+        // for custom download we need to set the streaming_output and streaming_id
+        searchObj.data.customDownloadQueryObj.query.streaming_output = queryReq.query.streaming_output;
+        searchObj.data.customDownloadQueryObj.query.streaming_id = queryReq.query.streaming_id;
+
         // setting subpage for pagination to handle below scenario
         // for one particular page, if we have to fetch data from multiple partitions in that case we need to set subpage
         // in below example we have 2 partitions and we need to fetch data from both partitions for page 2 to match recordsPerPage
@@ -1802,82 +1809,14 @@ const useLogs = () => {
             searchObj.data.stream.selectedStream.length <= 1 &&
             searchObj.meta.refreshHistogram == true)
         ) {
-          searchObj.meta.refreshHistogram = false;
-          if (searchObj.data.queryResults.hits.length > 0) {
-            if (searchObj.data.stream.selectedStream.length > 1) {
-              searchObj.data.histogram = {
-                xData: [],
-                yData: [],
-                chartParams: {
-                  title: getHistogramTitle(),
-                  unparsed_x_data: [],
-                  timezone: "",
-                },
-                errorCode: 0,
-                errorMsg: "Histogram is not available for multi stream search.",
-                errorDetail: "",
-              };
-            } else {
-              searchObjDebug["histogramStartTime"] = performance.now();
-              searchObj.data.histogram.errorMsg = "";
-              searchObj.data.histogram.errorCode = 0;
-              searchObj.data.histogram.errorDetail = "";
-              searchObj.loadingHistogram = true;
-
-              const parsedSQL: any = fnParsedSQL();
-              searchObj.data.queryResults.aggs = [];
-
-              const partitions = JSON.parse(
-                JSON.stringify(
-                  searchObj.data.queryResults.partitionDetail.partitions,
-                ),
-              );
-
-              // is _timestamp orderby ASC then reverse the partition array
-              if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
-                partitions.reverse();
-              }
-
-              await generateHistogramSkeleton();
-              for (const partition of partitions) {
-                searchObj.data.histogramQuery.query.start_time = partition[0];
-                searchObj.data.histogramQuery.query.end_time = partition[1];
-                //to improve the cancel query UI experience we add additional check here and further we need to remove it
-                if (searchObj.data.isOperationCancelled) {
-                  searchObj.loadingHistogram = false;
-                  searchObj.data.isOperationCancelled = false;
-
-                  if (!searchObj.data.histogram?.xData?.length) {
-                    notificationMsg.value = "Search query was cancelled";
-                    searchObj.data.histogram.errorMsg =
-                      "Search query was cancelled";
-                    searchObj.data.histogram.errorDetail =
-                      "Search query was cancelled";
-                  }
-
-                  showCancelSearchNotification();
-                  break;
-                }
-                await getHistogramQueryData(searchObj.data.histogramQuery);
-                if (partitions.length > 1) {
-                  setTimeout(async () => {
-                    await generateHistogramData();
-                    if(!queryReq.query?.streaming_output)  refreshPartitionPagination(true);
-                  }, 100);
-                }
-              }
-              searchObj.loadingHistogram = false;
-            }
-          }
-          await generateHistogramData();
-          if(!queryReq.query?.streaming_output) refreshPartitionPagination(true);
+          await processHttpHistogramResults(queryReq);
         } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
           resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
             -1
           );
           searchObj.meta.histogramDirtyFlag = false;
-        } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))) {
+        } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)) {
           let aggFlag = false;
           if (parsedSQL) {
             aggFlag = hasAggregation(parsedSQL?.columns);
@@ -1894,7 +1833,7 @@ const useLogs = () => {
               searchObjDebug["pagecountEndTime"] = performance.now();
             }, 0);
           }
-          if(isWithQuery(parsedSQL)){
+          if(isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible){
             resetHistogramWithError(
               "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
               -1
@@ -1902,7 +1841,7 @@ const useLogs = () => {
           }
           else{
             resetHistogramWithError(
-              "Histogram unavailable for CTEs, DISTINCT and LIMIT queries",
+              "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
               -1
             );
 
@@ -1958,6 +1897,87 @@ const useLogs = () => {
       notificationMsg.value = "";
     }
   };
+
+  const processHttpHistogramResults = async (queryReq: any) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        searchObj.meta.refreshHistogram = false;
+        if (searchObj.data.queryResults.hits.length > 0) {
+          if (searchObj.data.stream.selectedStream.length > 1) {
+            searchObj.data.histogram = {
+              xData: [],
+              yData: [],
+              chartParams: {
+                title: getHistogramTitle(),
+                unparsed_x_data: [],
+                timezone: "",
+              },
+              errorCode: 0,
+              errorMsg: "Histogram is not available for multi stream search.",
+              errorDetail: "",
+            };
+          } else {
+            searchObjDebug["histogramStartTime"] = performance.now();
+            searchObj.data.histogram.errorMsg = "";
+            searchObj.data.histogram.errorCode = 0;
+            searchObj.data.histogram.errorDetail = "";
+            searchObj.loadingHistogram = true;
+
+            const parsedSQL: any = fnParsedSQL();
+            searchObj.data.queryResults.aggs = [];
+
+            const partitions = JSON.parse(
+              JSON.stringify(
+                searchObj.data.queryResults.partitionDetail.partitions,
+              ),
+            );
+
+            // is _timestamp orderby ASC then reverse the partition array
+            if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
+              partitions.reverse();
+            }
+
+            await generateHistogramSkeleton();
+            for (const partition of partitions) {
+              searchObj.data.histogramQuery.query.start_time = partition[0];
+              searchObj.data.histogramQuery.query.end_time = partition[1];
+              //to improve the cancel query UI experience we add additional check here and further we need to remove it
+              if (searchObj.data.isOperationCancelled) {
+                searchObj.loadingHistogram = false;
+                searchObj.data.isOperationCancelled = false;
+
+                if (!searchObj.data.histogram?.xData?.length) {
+                  notificationMsg.value = "Search query was cancelled";
+                  searchObj.data.histogram.errorMsg =
+                    "Search query was cancelled";
+                  searchObj.data.histogram.errorDetail =
+                    "Search query was cancelled";
+                }
+
+                showCancelSearchNotification();
+                break;
+              }
+              await getHistogramQueryData(searchObj.data.histogramQuery);
+              if (partitions.length > 1) {
+                setTimeout(async () => {
+                  await generateHistogramData();
+                  if(!queryReq.query?.streaming_output)  refreshPartitionPagination(true);
+                }, 100);
+              }
+            }
+            searchObj.loadingHistogram = false;
+          }
+        }
+        await generateHistogramData();
+        if(!queryReq.query?.streaming_output) refreshPartitionPagination(true);
+        resolve(true);
+      } catch (error) {
+        console.info("Error while processing http histogram results", error);
+        resolve(true);
+      }
+    })
+  }
+
   const getJobData = async (isPagination = false) => {
     try {
       // get websocket enable config from store
@@ -2399,7 +2419,7 @@ const useLogs = () => {
           delete queryReq.query.track_total_hits;
         }
 
-        if (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL)) {
+        if (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible) {
           delete queryReq.query.track_total_hits;
         }
       }
@@ -2592,7 +2612,10 @@ const useLogs = () => {
               };
             }
           }
-
+          //here also we are getting the is_histogram_eligible flag from the BE
+          //so that we can use it whenever we might not send the partition call from here also it will get updated
+          //this is coming as a part of data api call which is search call
+          searchObj.data.queryResults.is_histogram_eligible = res.data.is_histogram_eligible;
           // check for pagination request for the partition and check for subpage if we have to pull data from multiple partitions
           // it will check for subpage and if subpage is present then it will send pagination request for next partition
           if (
@@ -4456,6 +4479,7 @@ const useLogs = () => {
     try {
       searchObj.loadingStream = true;
 
+      await cancelQuery();
       // Reset query results
       searchObj.data.queryResults = { hits: [] };
 
@@ -4614,11 +4638,14 @@ const useLogs = () => {
     }
   };
 
-  const cancelQuery = () => {
+  const cancelQuery = async () : Promise<boolean> => {
+    return new Promise((resolve, reject) => {
+      try {
     if (searchObj.communicationMethod === "ws") {
       sendCancelSearchMessage([
         ...searchObj.data.searchWebSocketTraceIds,
       ]);
+          resolve(true);
       return;
     }
 
@@ -4626,6 +4653,7 @@ const useLogs = () => {
 
     if (!searchObj.data.searchRequestTraceIds.length) {
       searchObj.data.isOperationCancelled = false;
+      resolve(true);
       return;
     }
 
@@ -4662,6 +4690,17 @@ const useLogs = () => {
           searchObj.data.searchRequestTraceIds.filter(
             (id: string) => !tracesIds.includes(id),
           );
+            resolve(true);
+          });
+      } catch (error) {
+        $q.notify({
+          message: "Failed to cancel running query",
+          color: "negative",
+          position: "bottom",
+          timeout: 1500,
+        });
+        resolve(true);
+      }
       });
   };
 
@@ -4787,8 +4826,8 @@ const useLogs = () => {
     try {
       const parsedSQL = fnParsedSQL();
 
-      if (!Object.hasOwn(parsedSQL, "from") || parsedSQL?.from.length === 0) {
-        console.error("Failed to parse SQL query:", value);
+      if (!Object.hasOwn(parsedSQL, "from") || parsedSQL?.from == null || parsedSQL?.from?.length == 0) {
+        console.info("Failed to parse SQL query:", value);
         throw new Error("Invalid SQL syntax");
       }
 
@@ -5134,7 +5173,7 @@ const useLogs = () => {
           delete queryReq.query.track_total_hits;
         }
 
-        if (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL)) {
+        if (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible) {
           delete queryReq.query.track_total_hits;
         }
       }
@@ -5148,7 +5187,7 @@ const useLogs = () => {
 
       if(!queryReq) return;
       
-      if(!isPagination) {
+      if(!isPagination && searchObj.meta.refreshInterval === 0) {
         resetQueryData();
         histogramResults = [];
         searchObj.data.queryResults.hits = [];
@@ -5423,6 +5462,8 @@ const useLogs = () => {
     ////// Handle reset field values ///////
     resetFieldValues();
 
+
+
     // In page count we set track_total_hits
     if (!payload.queryReq.query.hasOwnProperty("track_total_hits")) {
       delete response.content.total;
@@ -5458,6 +5499,12 @@ const useLogs = () => {
       } else {
         searchObj.data.queryResults = response.content.results;
       }
+    }
+    //check if the histogram is 
+    //here we add the is_histogram_eligible flag to the query results so that we can use it in the FE side
+    //to decide whether to call histogram or not
+    if(response.content.results.hasOwnProperty("is_histogram_eligible")){
+      searchObj.data.queryResults.is_histogram_eligible = response.content.results.is_histogram_eligible;
     }
 
     if(searchObj.meta.refreshInterval === 0) {
@@ -6125,7 +6172,7 @@ const useLogs = () => {
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
       resetHistogramWithError("Histogram unavailable for CTEs, DISTINCT and LIMIT queries.", -1);
       searchObj.meta.histogramDirtyFlag = false;
-    } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))) {
+    } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)) {
       if (shouldGetPageCount(queryReq, parsedSQL) && isFromZero) {
         setTimeout(async () => {
           searchObjDebug["pagecountStartTime"] = performance.now();
@@ -6133,9 +6180,9 @@ const useLogs = () => {
           searchObjDebug["pagecountEndTime"] = performance.now();
         }, 0);
       }
-      if(isWithQuery(parsedSQL)){
+      if(isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible){
         resetHistogramWithError(
-          "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+          "Histogram unavailable for CTEs, DISTINCT and LIMIT queries..",
           -1
         );
         searchObj.meta.histogramDirtyFlag = false;
@@ -6173,7 +6220,7 @@ const useLogs = () => {
   function isNonAggregatedSQLMode(searchObj: any, parsedSQL: any) {
     return !(
       searchObj.meta.sqlMode &&
-      (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))
+      (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)
     );
   }
 
@@ -6266,9 +6313,15 @@ const useLogs = () => {
       errorMsg = message;
     }
 
-    searchObj.data.errorDetail = error_detail || "";
-    searchObj.data.errorMsg = errorMsg;
-    notificationMsg.value = errorMsg;
+    if(request.type === 'pageCount') {
+      searchObj.data.countErrorMsg = "Error while retrieving total events: ";
+      if (trace_id) searchObj.data.countErrorMsg += " TraceID: " + trace_id;
+      notificationMsg.value = searchObj.data.countErrorMsg;
+    } else {
+      searchObj.data.errorDetail = error_detail || "";
+      searchObj.data.errorMsg = errorMsg;
+      notificationMsg.value = errorMsg;
+    }
   };
 
   const constructErrorMessage = ({
@@ -6573,6 +6626,7 @@ const useLogs = () => {
     isWithQuery,
     getStream,
     loadVisualizeData,
+    processHttpHistogramResults
   };
 };
 
