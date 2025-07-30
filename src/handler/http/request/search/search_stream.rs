@@ -247,6 +247,7 @@ pub async fn search_http2_stream(
         req.query.histogram_interval = interval;
     }
 
+    let mut converted_histogram_query: Option<String> = None;
     if is_ui_histogram {
         // Convert the original query to a histogram query
         match crate::service::search::sql::histogram::convert_to_histogram_query(
@@ -255,6 +256,7 @@ pub async fn search_http2_stream(
         ) {
             Ok(histogram_query) => {
                 req.query.sql = histogram_query;
+                converted_histogram_query = Some(req.query.sql.clone());
             }
             Err(e) => {
                 return map_error_to_http_response(&(e), Some(trace_id));
@@ -373,7 +375,17 @@ pub async fn search_http2_stream(
     // Return streaming response
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
         let chunks_iter = match result {
-            Ok(v) => v.to_chunks(),
+            Ok(mut v) => {
+                if is_ui_histogram {
+                    if let StreamResponses::SearchResponse {
+                        ref mut results, ..
+                    } = v
+                    {
+                        results.converted_histogram_query = converted_histogram_query.clone();
+                    }
+                }
+                v.to_chunks()
+            }
             Err(err) => {
                 log::error!(
                     "[HTTP2_STREAM] trace_id: {} Error in stream: {}",
