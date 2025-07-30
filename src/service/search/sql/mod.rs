@@ -2027,6 +2027,10 @@ impl VisitorMut for PickupWhereVisitor {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if query.with.is_some() {
+            self.where_str = None;
+            return ControlFlow::Break(());
+        }
         match query.body.as_ref() {
             sqlparser::ast::SetExpr::Select(select) => {
                 if select.from.len() > 1
@@ -3550,13 +3554,20 @@ mod tests {
         assert_eq!(result, None);
 
         // Test SQL with EXISTS subquery - should return None
-        let sql =
-            "SELECT * FROM logs WHERE EXISTS (SELECT 1 FROM users WHERE users.id = logs.user_id)";
+        let sql = "SELECT * FROM logs WHERE EXISTS (SELECT 1 FROM users WHERE users.id = logs.user_id)";
         let result = pickup_where(sql).unwrap();
         assert_eq!(result, None);
 
         // Test SQL with subquery in FROM - should return None
         let sql = "SELECT * FROM (SELECT * FROM logs WHERE level = 'error') sub WHERE sub.timestamp > 1234567890";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        let sql = "with t1 as (select log, message, kubernetes_namespace_name from default where kubernetes_namespace_name = 'ziox') select * from t1;";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        let sql = "with t1 as (select log, message, kubernetes_namespace_name from default) select * from t1 where kubernetes_namespace_name = 'ziox';";
         let result = pickup_where(sql).unwrap();
         assert_eq!(result, None);
     }
