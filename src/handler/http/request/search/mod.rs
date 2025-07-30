@@ -257,7 +257,7 @@ pub async fn search(
                 converted_histogram_query = Some(req.query.sql.clone());
             }
             Err(e) => {
-                return Ok(MetaHttpResponse::bad_request(e));
+                return Ok(map_error_to_http_response(&(e), Some(trace_id)));
             }
         }
     }
@@ -807,14 +807,13 @@ pub async fn build_search_request_per_field(
                     .any(|fn_name| decoded_sql.contains(&format!("{}(", fn_name)));
 
                 // pick up where clause from sql
-                let sql_where_from_query =
-                    match SearchService::sql::pickup_where(&decoded_sql, None) {
-                        Ok(Some(v)) => format!("WHERE {}", v),
-                        Ok(None) => "".to_string(),
-                        Err(e) => {
-                            return Err(Error::other(e));
-                        }
-                    };
+                let sql_where_from_query = match SearchService::sql::pickup_where(&decoded_sql) {
+                    Ok(Some(v)) => format!("WHERE {}", v),
+                    Ok(None) => "".to_string(),
+                    Err(e) => {
+                        return Err(Error::other(e));
+                    }
+                };
                 let can_use_distinct_stream = can_use_distinct_stream(
                     org_id,
                     stream_name,
@@ -993,7 +992,7 @@ async fn values_v1(
     };
 
     // pick up where clause from sql
-    let where_str = match SearchService::sql::pickup_where(&query_sql, None) {
+    let where_str = match SearchService::sql::pickup_where(&query_sql) {
         Ok(v) => v.unwrap_or_default(),
         Err(e) => {
             return Err(Error::other(e));
