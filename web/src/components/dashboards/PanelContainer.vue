@@ -331,6 +331,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboard-id="props.dashboardId"
       :folder-id="props.folderId"
       :report-id="props.reportId"
+      :getPanelAndRunId="props.getPanelAndRunId"
+      :globalRunId="props.globalRunId"
       @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
       @limit-number-of-series-warning-message-update="
@@ -435,6 +437,8 @@ export default defineComponent({
     "folderId",
     "reportId",
     "currentVariablesData",
+    "getPanelAndRunId",
+    "globalRunId",
   ],
   components: {
     PanelSchemaRenderer,
