@@ -790,7 +790,7 @@ pub async fn build_search_request_per_field(
 
                 // pick up where clause from sql
                 let sql_where_from_query = match SearchService::sql::pickup_where(&decoded_sql) {
-                    Ok(Some(v)) => format!("WHERE {}", v),
+                    Ok(Some(v)) => format!("WHERE {v}"),
                     Ok(None) => "".to_string(),
                     Err(e) => {
                         return Err(Error::other(e));
