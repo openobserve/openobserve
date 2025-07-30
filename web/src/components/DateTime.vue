@@ -854,7 +854,6 @@ export default defineComponent({
           selectedDate: JSON.parse(JSON.stringify(selectedDate.value)),
           selectedTime: JSON.parse(JSON.stringify(selectedTime.value)),
         };
-        // console.log(rVal)
         return rVal;
       }
     };
