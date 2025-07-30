@@ -233,7 +233,7 @@ export default defineComponent({
       //here we are checking if the foldersByType is empty then we are fetching the folders from the BE on mounted 
       onMounted(async () => {
         if(Object.keys(store.state.organizationData.foldersByType).length == 0) {          
-          await getFoldersListByType(store, "alerts");
+          await getFoldersListByType(store, props.type);
         }
         if(router.currentRoute.value.query.folder) {
           activeFolderId.value = router.currentRoute.value.query.folder;
