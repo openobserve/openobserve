@@ -177,7 +177,6 @@ pub async fn search(
     let mut index_condition = generate_add_filter_back_condition(
         tantivy_condition,
         datafusion_condition,
-        use_inverted_index,
         &mut is_add_filter_back, // pass by reference to modify the value
     );
 
@@ -188,7 +187,7 @@ pub async fn search(
     }
 
     log::info!(
-        "[trace_id {}] search->storage: index_condition {:?}, is_add_filter_back {}",
+        "[trace_id {}] search->storage: add filter back index_condition {:?}, is_add_filter_back {}",
         query.trace_id,
         index_condition,
         is_add_filter_back
@@ -459,30 +458,31 @@ fn check_inverted_index(
 fn generate_add_filter_back_condition(
     tantivy_condition: Option<IndexCondition>,
     datafusion_condition: Option<IndexCondition>,
-    use_inverted_index: bool,
     is_add_filter_back: &mut bool,
 ) -> Option<IndexCondition> {
-    // only negative condition, add filter back
-    if !use_inverted_index && datafusion_condition.is_some() {
-        *is_add_filter_back = true;
-        return datafusion_condition;
+    // early return if tantivy_condition or datafusion_condition is None
+    if tantivy_condition.is_none() && datafusion_condition.is_none() {
+        return None;
     }
 
-    let mut index_condition = tantivy_condition.clone();
-    if *is_add_filter_back {
-        match datafusion_condition {
-            Some(condition) => {
-                index_condition
-                    .as_mut()
-                    .unwrap()
-                    .add_index_condition(condition);
-                index_condition
-            }
-            None => index_condition,
+    // if have datafusion_condition, always add filter back
+    if datafusion_condition.is_some() {
+        let mut index_condition = datafusion_condition.clone();
+        if tantivy_condition.is_some() && *is_add_filter_back {
+            index_condition
+                .as_mut()
+                .unwrap()
+                .add_index_condition(tantivy_condition.unwrap());
         }
-    } else {
-        None
+        *is_add_filter_back = true;
+        return index_condition;
     }
+
+    if *is_add_filter_back {
+        return tantivy_condition;
+    }
+
+    None
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
