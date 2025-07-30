@@ -388,10 +388,6 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
-    getPanelAndRunId: {
-      type: Function,
-      default: null,
-    },
     globalRunId: {
       type: String,
       default: null,
@@ -586,14 +582,13 @@ export default defineComponent({
           [panelSchema?.value?.id]: false,
         };
       }
-      
+
       // Clear all refs to prevent memory leaks
       chartPanelRef.value = null;
       drilldownPopUpRef.value = null;
       annotationPopupRef.value = null;
       tableRendererRef.value = null;
       parser = null;
-      
     });
     watch(
       [data, store?.state],
