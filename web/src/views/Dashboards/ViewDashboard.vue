@@ -269,8 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :searchType="searchType"
         @panelsValues="handleEmittedData"
         @searchRequestTraceIds="searchRequestTraceIds"
-        :getPanelAndRunId="getPanelAndRunId"
-        :globalRunId="globalRunId.value"
+        :globalRunId="globalRunId"
       />
 
       <q-dialog
@@ -371,7 +370,7 @@ import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
-import { useDashboardRunId } from "@/composables/dashboard/useDashboardRunId";
+import { getUUID } from "@/utils/zincutils";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -446,11 +445,12 @@ export default defineComponent({
     const renderDashboardChartsRef = ref(null);
 
     // Initialize dashboard run ID management
-    const {
-      globalRunId,
-      generateNewDashboardRunId,
-      getPanelAndRunId,
-    } = useDashboardRunId();
+    const globalRunId = ref(getUUID().replace(/-/g, ""));
+
+    const generateNewDashboardRunId = () => {
+      globalRunId.value = getUUID().replace(/-/g, "");
+      return globalRunId.value;
+    };
 
     onBeforeMount(async () => {
       await importMoment();
@@ -623,7 +623,6 @@ export default defineComponent({
       if (!store.state.organizationData.folders.length) {
         await getFoldersList(store);
       }
-      
     });
 
     const setTimeString = () => {
@@ -921,6 +920,11 @@ export default defineComponent({
       // resize charts if needed
       await nextTick();
       window.dispatchEvent(new Event("resize"));
+    });
+
+    // Generate new run ID when time range changes
+    watch(selectedDate, () => {
+      generateNewDashboardRunId();
     });
 
     // whenever the refreshInterval is changed, update the query params
@@ -1238,7 +1242,6 @@ export default defineComponent({
       openJsonEditor,
       saveJsonDashboard,
       setTimeForVariables,
-      getPanelAndRunId,
       globalRunId,
     };
   },
