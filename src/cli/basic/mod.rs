@@ -16,4 +16,5 @@
 pub mod cli;
 mod http;
 mod load;
+mod query_optimiser;
 mod test;
