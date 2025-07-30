@@ -152,7 +152,7 @@ impl PartitionGenerator {
             let mut start = max(end - step, start_time);
             // If the step is greater than the duration, handle the alignment for the boundary
             // partition
-            if last_partition_step > 0 && duration > step {
+            if last_partition_step > 0 && duration > self.min_step {
                 // Handle alignment for the first partition
                 partitions.push([end - last_partition_step, end]);
                 start -= last_partition_step;
@@ -386,7 +386,8 @@ mod tests {
         // Input
         // 2025-07-29 10:00:00 - 2025-07-29 22:00:00
         // HISTOGRAM PARTITIONS NO MINI PARTITION (DESC):
-        // 2025-07-29 10:00:00 - 2025-07-29 22:00:00
+        // 2025-07-29 21:30:00 - 2025-07-29 22:00:00
+        // 2025-07-29 10:00:00 - 2025-07-29 21:30:00
 
         // Verify full coverage of time range
         assert_eq!(partitions.last().unwrap()[0], start_time);
@@ -407,11 +408,12 @@ mod tests {
         // Input
         // 2025-07-29 10:00:00 - 2025-07-29 22:00:00
         // HISTOGRAM PARTITIONS NO MINI PARTITION (ASC):
-        // 2025-07-29 10:00:00 - 2025-07-29 22:00:00
+        // 2025-07-29 10:00:00 - 2025-07-29 21:30:00
+        // 2025-07-29 21:30:00 - 2025-07-29 22:00:00
 
         // Verify full coverage of time range
-        assert_eq!(partitions.last().unwrap()[0], start_time);
-        assert_eq!(partitions.first().unwrap()[1], end_time);
+        assert_eq!(partitions.first().unwrap()[0], start_time);
+        assert_eq!(partitions.last().unwrap()[1], end_time);
     }
 
     #[test]
