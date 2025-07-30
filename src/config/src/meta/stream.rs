@@ -721,6 +721,8 @@ pub struct StreamSettings {
     pub index_original_data: bool,
     #[serde(default)]
     pub index_all_values: bool,
+    #[serde(default)]
+    pub disable_distinct_fields: bool
 }
 
 impl Serialize for StreamSettings {
