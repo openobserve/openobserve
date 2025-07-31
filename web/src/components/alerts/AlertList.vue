@@ -718,7 +718,9 @@ export default defineComponent({
         name: "folder2",
       },
     ]);
-    const activeFolderId = ref("default");
+    //if we get the folder from the query params then we are assigning it to the activeFolderId
+    //else we are assigning the default folder id
+    const activeFolderId = ref<any>(router.currentRoute.value.query.folder ?? "default");   
     const showMoveAlertDialog = ref(false);
     const expandedRow: Ref<any> = ref("");
     const triggerExpand = (props: any) => {
@@ -1014,23 +1016,22 @@ export default defineComponent({
       getDestinations();
     });
     onActivated(() => getDestinations());
-    onMounted(async () => {
-      if (!store.state.organizationData.foldersByType) {
-        await getFoldersListByType(store, "alerts");
-      }
-      if (
-        router.currentRoute.value.query.folder &&
-        store.state.organizationData?.foldersByType?.find(
-          (it: any) => it.folderId === router.currentRoute.value.query.folder,
-        )
-      ) {
-        activeFolderId.value = router.currentRoute.value.query.folder as string;
-      } else {
-        activeFolderId.value = "default";
-      }
-      await getAlertsFn(store, router.currentRoute.value.query.folder ?? "default");
-      filterAlertsByTab();
-    });
+    //here we are watching the foldersByType and if it is not empty then we are fetching the alerts by the folderID
+    //filterAlertsByTab is used to filter the alerts by the activeTab 
+    //immediate: true is used to fetch the alerts by the folderId when the component is mounted
+    //so we are watching the activeFolderId so here at onMounte also when user refreshes the page it will take the folderId from the query params 
+    //and fetches the alerts by folderId
+    watch(
+        () => store.state.organizationData.foldersByType["alerts"],
+        async (folders) => {
+          if (!folders) return;
+          const folderQuery = router.currentRoute.value.query.folder;
+          const matchingFolder = folders.find((it: any) => it.folderId === folderQuery);
+          activeFolderId.value = matchingFolder ? folderQuery : "default";
+          filterAlertsByTab();
+        },
+        { immediate: true }
+      );
     watch(
       () => activeFolderId.value,
       async (newVal) => {

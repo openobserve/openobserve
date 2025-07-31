@@ -2165,7 +2165,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             condition.value,
             condition.column,
           )})`;
-        } else if (condition.operator === "str_match") {
+        } else if (
+          condition.operator === "str_match" ||
+          condition.operator === "Contains"
+        ) {
           selectFilter += `str_match(${condition.column}, ${formatValue(
             condition.value,
             condition.column,
@@ -2198,12 +2201,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
                 condition.column,
               )}`;
               break;
-            case "Contains":
-              selectFilter +=
-                columnType === "Utf8"
-                  ? `LIKE '%${condition.value}%'`
-                  : `LIKE %${condition.value}%`;
-              break;
+            // case "Contains":
+            //   selectFilter +=
+            //     columnType === "Utf8"
+            //       ? `LIKE '%${condition.value}%'`
+            //       : `LIKE %${condition.value}%`;
+            //   break;
             case "Not Contains":
               selectFilter +=
                 columnType === "Utf8"

@@ -17,7 +17,10 @@ use std::sync::Arc;
 
 use config::meta::cluster::NodeInfo;
 use infra::file_list as infra_file_list;
-use proto::cluster_rpc::{CompactionInfo, EmptyRequest, GetClusterInfoResponse};
+use proto::cluster_rpc::{
+    CompactionInfo, EmptyRequest, GetClusterInfoResponse, GetDeleteJobStatusRequest,
+    GetDeleteJobStatusResponse,
+};
 use tonic::{Request, Response, Status};
 
 use crate::common::meta::organization::ClusterInfo;
@@ -60,6 +63,43 @@ impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for Clu
             }),
         }))
     }
+
+    async fn get_delete_job_status(
+        &self,
+        request: Request<GetDeleteJobStatusRequest>,
+    ) -> Result<Response<GetDeleteJobStatusResponse>, Status> {
+        let req = request.into_inner();
+        let key = format!(
+            "{}/{}/{}/{}",
+            req.org_id, req.stream_type, req.stream_name, req.time_range
+        );
+        let db_key = format!("/compact/delete/{}", key);
+
+        // Get the key from the database
+        match crate::service::db::compact::retention::get(&db_key).await {
+            Ok(_) => {
+                // Job still exists, return pending status
+                Ok(Response::new(GetDeleteJobStatusResponse {
+                    key,
+                    is_complete: false,
+                }))
+            }
+            Err(e) => {
+                if let Some(infra::errors::Error::DbError(infra::errors::DbError::KeyNotExists(
+                    _,
+                ))) = e.downcast_ref::<infra::errors::Error>()
+                {
+                    Ok(Response::new(GetDeleteJobStatusResponse {
+                        key,
+                        is_complete: true,
+                    }))
+                } else {
+                    log::error!("get_delete_job_status {db_key} error: {e}");
+                    Err(Status::internal(format!("Database error: {}", e)))
+                }
+            }
+        }
+    }
 }
 
 pub async fn get_super_cluster_info(
@@ -80,6 +120,41 @@ pub async fn get_super_cluster_info(
             );
             return Err(anyhow::anyhow!(
                 "Error getting cluster info from cluster node: {:?}",
+                err
+            ));
+        }
+    };
+
+    Ok(response)
+}
+
+pub async fn get_super_cluster_delete_job_status(
+    trace_id: &str,
+    node: Arc<dyn NodeInfo>,
+    org_id: &str,
+    stream_type: &str,
+    stream_name: &str,
+    time_range: &str,
+) -> Result<GetDeleteJobStatusResponse, anyhow::Error> {
+    let request = GetDeleteJobStatusRequest {
+        org_id: org_id.to_string(),
+        stream_type: stream_type.to_string(),
+        stream_name: stream_name.to_string(),
+        time_range: time_range.to_string(),
+    };
+    let mut grpc_request = Request::new(request.clone());
+    let mut client =
+        super::grpc::make_grpc_cluster_info_client(trace_id, &mut grpc_request, &node).await?;
+    let response = match client.get_delete_job_status(Request::new(request)).await {
+        Ok(response) => response.into_inner(),
+        Err(err) => {
+            log::error!(
+                "Failed to get delete job status from cluster node {}: {:?}",
+                node.get_grpc_addr(),
+                err
+            );
+            return Err(anyhow::anyhow!(
+                "Error getting delete job status from cluster node: {:?}",
                 err
             ));
         }

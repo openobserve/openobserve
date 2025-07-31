@@ -11,6 +11,7 @@ import "cluster/common.proto";
 // Cluster Info Service
 service ClusterInfoService {
   rpc GetClusterInfo(EmptyRequest) returns (GetClusterInfoResponse) {}
+  rpc GetDeleteJobStatus(GetDeleteJobStatusRequest) returns (GetDeleteJobStatusResponse) {}
 }
 
 // Response message for Get Cluster Info
@@ -23,4 +24,18 @@ message CompactionInfo {
     uint64 pending_jobs = 1;
     uint64 completed_jobs = 2;
     uint64 in_progress_jobs = 3;
+}
+
+// Request message for Get Delete Job Status
+message GetDeleteJobStatusRequest {
+  string org_id = 1;
+  string stream_type = 2;
+  string stream_name = 3;
+  string time_range = 4;
+}
+
+// Response message for Get Delete Job Status
+message GetDeleteJobStatusResponse {
+  string key = 1;
+  bool is_complete = 2;
 }

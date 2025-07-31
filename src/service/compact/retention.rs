@@ -342,14 +342,20 @@ pub async fn delete_by_date(
         .await;
     }
 
-    let mut date_start =
-        DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.0))?.with_timezone(&Utc);
+    let mut date_start = if date_range.0.ends_with("00Z") {
+        DateTime::parse_from_rfc3339(date_range.0)?.with_timezone(&Utc)
+    } else {
+        DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.0))?.with_timezone(&Utc)
+    };
     // Hack for 1970-01-01
-    if date_range.0 == "1970-01-01" {
+    if date_range.0.starts_with("1970-01-01") {
         date_start += Duration::try_milliseconds(1).unwrap();
     }
-    let date_end =
-        DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.1))?.with_timezone(&Utc);
+    let date_end = if date_range.1.ends_with("00Z") {
+        DateTime::parse_from_rfc3339(date_range.1)?.with_timezone(&Utc)
+    } else {
+        DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.1))?.with_timezone(&Utc)
+    };
     let time_range = {
         (
             date_start.timestamp_micros(),

@@ -197,7 +197,7 @@ export const getFoldersListByType = async (store: any, type: any) => {
       ],
     });
 
-    return store.state.organizationData.folders;
+    return store.state.organizationData.foldersByType[type];
   } catch (error) {
     throw error;
   }
