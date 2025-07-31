@@ -98,6 +98,7 @@ test.describe("Join for logs", () => {
         await pageManager.logsPage.selectIndexAndStreamJoin();
         await pageManager.logsPage.enableSQLMode();
         await pageManager.logsPage.clickQuickModeToggle();
+        await pageManager.logsPage.clickAllFieldsButton();
         await pageManager.logsPage.selectRunQuery();
         await pageManager.logsPage.clickInterestingFields();
         await pageManager.logsPage.validateInterestingFields();
@@ -108,6 +109,7 @@ test.describe("Join for logs", () => {
         await pageManager.logsPage.selectIndexAndStreamJoin();
         await pageManager.logsPage.enableSQLMode();
         await pageManager.logsPage.clickQuickModeToggle();
+        await pageManager.logsPage.clickAllFieldsButton();
         await pageManager.logsPage.selectRunQuery();
         await pageManager.logsPage.clickInterestingFields();
         await pageManager.logsPage.validateInterestingFieldsQuery();
@@ -118,6 +120,7 @@ test.describe("Join for logs", () => {
         await pageManager.logsPage.selectIndexAndStreamJoin();
         await pageManager.logsPage.enableSQLMode();
         await pageManager.logsPage.clickQuickModeToggle();
+        await pageManager.logsPage.clickAllFieldsButton();
         await pageManager.logsPage.selectRunQuery();
         await pageManager.logsPage.clickInterestingFields();
         await pageManager.logsPage.addRemoveInteresting();
