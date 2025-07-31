@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :searchType="searchType"
         @panelsValues="handleEmittedData"
         @searchRequestTraceIds="searchRequestTraceIds"
-        :globalRunId="globalRunId"
+        :runId="runId"
       />
 
       <q-dialog
@@ -445,11 +445,11 @@ export default defineComponent({
     const renderDashboardChartsRef = ref(null);
 
     // Initialize dashboard run ID management
-    const globalRunId = ref(getUUID().replace(/-/g, ""));
+    const runId = ref(getUUID().replace(/-/g, ""));
 
     const generateNewDashboardRunId = () => {
-      globalRunId.value = getUUID().replace(/-/g, "");
-      return globalRunId.value;
+      runId.value = getUUID().replace(/-/g, "");
+      return runId.value;
     };
 
     onBeforeMount(async () => {
@@ -1242,7 +1242,7 @@ export default defineComponent({
       openJsonEditor,
       saveJsonDashboard,
       setTimeForVariables,
-      globalRunId,
+      runId,
     };
   },
 });
