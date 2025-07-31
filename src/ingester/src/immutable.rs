@@ -155,7 +155,11 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
     let ret = immutable.persist(&path).await;
     let stat = match ret {
         Ok(v) => v,
-        Err(e) => return Err(e),
+        Err(e) => {
+            // remove from processing tables 
+            PROCESSING_TABLES.write().await.remove(&path);
+            return Err(e);
+        }
     };
     log::info!(
         "[INGESTER:MEM:{idx}] finish persist file: {}, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}, took: {} ms",
