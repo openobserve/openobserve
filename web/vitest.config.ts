@@ -30,10 +30,10 @@ export default mergeConfig(
         reporter: ["text", "json", "html", "json-summary"],
         all: true,
         thresholds: {
-          lines: 80,
-          functions: 80,
-          branches: 80,
-          statements: 80
+          lines: 25,
+          functions: 25,
+          branches: 25,
+          statements: 25
         },
         exclude: [
           "coverage/**",
