@@ -21,44 +21,72 @@ use datafusion::{
     execution::FunctionRegistry,
     physical_plan::ExecutionPlan,
 };
+use datafusion_proto::physical_plan::PhysicalExtensionCodec;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::aggregate_topk_exec::AggregateTopkExec;
+use o2_enterprise::enterprise::search::datafusion::distributed_plan::{
+    aggregate_topk_exec::AggregateTopkExec, streaming_aggs_exec::StreamingAggsExec,
+};
 use prost::Message;
 use proto::cluster_rpc;
 
-pub(crate) fn try_decode(
-    node: cluster_rpc::AggregateTopkExecNode,
-    inputs: &[Arc<dyn ExecutionPlan>],
-    _registry: &dyn FunctionRegistry,
-) -> Result<Arc<dyn ExecutionPlan>> {
-    Ok(Arc::new(AggregateTopkExec::new(
-        inputs[0].clone(),
-        &node.sort_field,
-        node.descending,
-        node.limit,
-    )))
-}
+use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyExec;
 
-pub(crate) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
-    let Some(node) = node.as_any().downcast_ref::<AggregateTopkExec>() else {
-        return internal_err!("Not supported");
-    };
-    let plan_node = cluster_rpc::AggregateTopkExecNode {
-        sort_field: node.sort_field().to_string(),
-        descending: node.descending(),
-        limit: node.limit(),
-    };
-    let proto = cluster_rpc::PhysicalPlanNode {
-        plan: Some(cluster_rpc::physical_plan_node::Plan::AggregateTopk(
-            plan_node,
-        )),
-    };
-    proto.encode(buf).map_err(|e| {
-        DataFusionError::Internal(format!(
-            "failed to encode AggregateTopkExecNode writer execution plan: {e:?}"
-        ))
-    })?;
-    Ok(())
+/// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
+#[derive(Debug)]
+pub struct PhysicalPlanNodePhysicalExtensionCodec;
+
+impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
+    fn try_decode(
+        &self,
+        buf: &[u8],
+        inputs: &[Arc<dyn ExecutionPlan>],
+        registry: &dyn FunctionRegistry,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        let proto = cluster_rpc::PhysicalPlanNode::decode(buf).map_err(|e| {
+            DataFusionError::Internal(format!(
+                "failed to decode PhysicalPlanNode writer execution plan: {e:?}"
+            ))
+        })?;
+        match proto.plan {
+            Some(cluster_rpc::physical_plan_node::Plan::EmptyExec(node)) => {
+                super::empty_exec::try_decode(node, inputs, registry)
+            }
+            #[cfg(feature = "enterprise")]
+            Some(cluster_rpc::physical_plan_node::Plan::AggregateTopk(node)) => {
+                super::aggregate_topk_exec::try_decode(node, inputs, registry)
+            }
+            #[cfg(feature = "enterprise")]
+            Some(cluster_rpc::physical_plan_node::Plan::StreamingAggs(node)) => {
+                super::streaming_aggs_exec::try_decode(node, inputs, registry)
+            }
+            #[cfg(not(feature = "enterprise"))]
+            Some(_) => {
+                internal_err!("Not supported")
+            }
+            None => {
+                internal_err!("PhysicalPlanNode is required")
+            }
+        }
+    }
+
+    fn try_encode(&self, node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
+        #[cfg(feature = "enterprise")]
+        if node.as_any().downcast_ref::<NewEmptyExec>().is_some() {
+            super::empty_exec::try_encode(node, buf)
+        } else if node.as_any().downcast_ref::<AggregateTopkExec>().is_some() {
+            super::aggregate_topk_exec::try_encode(node, buf)
+        } else if node.as_any().downcast_ref::<StreamingAggsExec>().is_some() {
+            super::streaming_aggs_exec::try_encode(node, buf)
+        } else {
+            internal_err!("Not supported")
+        }
+        #[cfg(not(feature = "enterprise"))]
+        if node.as_any().downcast_ref::<NewEmptyExec>().is_some() {
+            super::empty_exec::try_encode(node, buf)
+        } else {
+            internal_err!("Not supported")
+        }
+    }
 }
 
 #[cfg(test)]
