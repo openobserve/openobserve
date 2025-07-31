@@ -359,3 +359,86 @@
     background-color: $primary !important;
   }
 }
+
+//from here we are making the entire app use constant styles 
+//o2 typography styles that we use and as per the design 
+//for normal text we use nunito sans family
+//for editor text we use menlo family for code mirorr / monaco editor
+//those are auto inherited from the parent element 
+//by default the familes are nunito sans and menlo
+
+//h1 text
+.o2-h1{
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 24px;
+}
+
+//h2 text
+.o2-h2{
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 20px;
+}
+//o2 default text
+.o2-default-text{
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 16px;
+}
+
+//o2 default semibold text
+.o2-default-semibold-text{
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 16px;
+}
+
+//medium text
+.o2-medium-text{
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+//medium semibold text
+.o2-medium-semibold-text{
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 16px;
+}
+//so we have query editor which is monaco / code mirror inside that these text should be used
+
+// default text
+.o2-editor-default-text{
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+//default semibold text
+.o2-editor-default-semibold-text{
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 22px;
+}
+
+//default bold text
+.o2-editor-default-bold-text{
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 22px;
+}
+
+//small text
+.o2-editor-small-text{
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 22px;
+}
+//small bold text
+.o2-editor-small-bold-text{
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 22px;
+}
