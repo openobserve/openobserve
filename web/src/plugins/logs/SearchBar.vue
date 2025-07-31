@@ -1344,7 +1344,9 @@ import { useLoading } from "@/composables/useLoading";
 import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
+import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
+import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 
 const defaultValue: any = () => {
   return {
@@ -1492,6 +1494,7 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const store = useStore();
+    const { showErrorNotification } = useNotifications();
     const rowsPerPage = ref(10);
     const regionFilter = ref();
     const regionFilterRef = ref(null);
@@ -3238,6 +3241,27 @@ export default defineComponent({
           getQueryData();
         }
       } else {
+        // validate query
+        // return if query is emptry and stream is not selected 
+        if(searchObj.data.query === "" && searchObj?.data?.stream?.selectedStream?.length === 0){ 
+          showErrorNotification("Query is empty, please write query to visualize");
+          return;
+        }
+
+        let logsPageQuery = searchObj.data.query;
+
+        // handle sql mode
+        if(!searchObj.data.sqlMode){
+          const queryBuild= buildSearch();
+          logsPageQuery = queryBuild?.query?.sql ?? "";
+        }
+
+        // validate sql query that all fields have alias
+        if(!allSelectionFieldsHaveAlias(logsPageQuery)){
+          showErrorNotification("All fields must have alias in query to visualize");
+          return;
+        }
+
       }
       searchObj.meta.logsVisualizeToggle = value;
       updateUrlQueryParams();
