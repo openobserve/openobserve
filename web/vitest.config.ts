@@ -27,8 +27,14 @@ export default mergeConfig(
         inline: ["monaco-editor", "vitest-canvas-mock"],
       },
       coverage: {
-        reporter: ["text", "json", "html"],
+        reporter: ["text", "json", "html", "json-summary"],
         all: true,
+        thresholds: {
+          lines: 80,
+          functions: 80,
+          branches: 80,
+          statements: 80
+        },
         exclude: [
           "coverage/**",
           "dist/**",
