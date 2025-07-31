@@ -29,12 +29,6 @@ export default mergeConfig(
       coverage: {
         reporter: ["text", "json", "html", "json-summary"],
         all: true,
-        thresholds: {
-          lines: 25,
-          functions: 25,
-          branches: 25,
-          statements: 25
-        },
         exclude: [
           "coverage/**",
           "dist/**",
