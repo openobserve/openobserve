@@ -153,7 +153,6 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
     // persist entry to local disk
     let start = std::time::Instant::now();
     let ret = immutable.persist(&path).await;
-    PROCESSING_TABLES.write().await.remove(&path);
     let stat = match ret {
         Ok(v) => v,
         Err(e) => return Err(e),
@@ -172,6 +171,9 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
     let mut rw = IMMUTABLES.write().await;
     rw.swap_remove(&path);
     drop(rw);
+
+    // remove from processing tables 
+    PROCESSING_TABLES.write().await.remove(&path);
 
     // update metrics
     metrics::INGEST_MEMTABLE_BYTES
