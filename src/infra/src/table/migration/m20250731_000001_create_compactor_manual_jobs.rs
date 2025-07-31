@@ -53,6 +53,7 @@ fn create_table_stmt() -> TableCreateStatement {
         .col(
             ColumnDef::new(CompactorManualJobs::EndedAt)
                 .big_integer()
+                .not_null()
                 .default(0),
         )
         .col(

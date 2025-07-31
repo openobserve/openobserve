@@ -27,7 +27,7 @@ use crate::service::db;
 static CACHE: Lazy<RwHashMap<String, i64>> = Lazy::new(Default::default);
 
 #[inline]
-fn mk_key(
+pub fn mk_key(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,

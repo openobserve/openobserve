@@ -132,6 +132,16 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
                 (date_range[0], date_range[1]),
             )
             .await
+            .map_err(|e| {
+                log::error!(
+                    "[COMPACTOR] delete: delete [{}/{}/{}] error: {}",
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    e
+                );
+                e
+            })
         };
 
         if let Err(e) = ret {

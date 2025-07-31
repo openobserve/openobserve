@@ -9,7 +9,7 @@ pub struct Model {
     pub id: String,
     pub key: String,
     pub created_at: i64,
-    pub ended_at: Option<i64>,
+    pub ended_at: i64,
     pub status: i64,
 }
 

@@ -69,34 +69,22 @@ impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for Clu
         request: Request<GetDeleteJobStatusRequest>,
     ) -> Result<Response<GetDeleteJobStatusResponse>, Status> {
         let req = request.into_inner();
-        let key = format!(
-            "{}/{}/{}/{}",
-            req.org_id, req.stream_type, req.stream_name, req.time_range
-        );
-        let db_key = format!("/compact/delete/{}", key);
 
         // Get the key from the database
-        match crate::service::db::compact::retention::get(&db_key).await {
-            Ok(_) => {
+        match crate::service::db::compact::compactor_manual_jobs::get_job(&req.ksuid).await {
+            Ok(job) => {
                 // Job still exists, return pending status
                 Ok(Response::new(GetDeleteJobStatusResponse {
-                    key,
-                    is_complete: false,
+                    id: job.id,
+                    key: job.key,
+                    created_at: job.created_at,
+                    ended_at: job.ended_at,
+                    status: job.status as i64,
                 }))
             }
             Err(e) => {
-                if let Some(infra::errors::Error::DbError(infra::errors::DbError::KeyNotExists(
-                    _,
-                ))) = e.downcast_ref::<infra::errors::Error>()
-                {
-                    Ok(Response::new(GetDeleteJobStatusResponse {
-                        key,
-                        is_complete: true,
-                    }))
-                } else {
-                    log::error!("get_delete_job_status {db_key} error: {e}");
-                    Err(Status::internal(format!("Database error: {}", e)))
-                }
+                log::error!("get_delete_job_status {} error: {e}", req.ksuid);
+                Err(Status::internal(format!("Database error: {}", e)))
             }
         }
     }
@@ -131,16 +119,10 @@ pub async fn get_super_cluster_info(
 pub async fn get_super_cluster_delete_job_status(
     trace_id: &str,
     node: Arc<dyn NodeInfo>,
-    org_id: &str,
-    stream_type: &str,
-    stream_name: &str,
-    time_range: &str,
+    ksuid: &str,
 ) -> Result<GetDeleteJobStatusResponse, anyhow::Error> {
     let request = GetDeleteJobStatusRequest {
-        org_id: org_id.to_string(),
-        stream_type: stream_type.to_string(),
-        stream_name: stream_name.to_string(),
-        time_range: time_range.to_string(),
+        ksuid: ksuid.to_string(),
     };
     let mut grpc_request = Request::new(request.clone());
     let mut client =
