@@ -46,7 +46,7 @@ use crate::{
             http::{
                 get_or_create_trace_id, get_search_event_context_from_request,
                 get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request, get_work_group,
+                get_use_cache_from_request, get_work_group, get_dashboard_info_from_request,
             },
             stream::get_settings_max_query_range,
         },
@@ -244,6 +244,8 @@ pub async fn search(
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+
+    let dashboard_info = get_dashboard_info_from_request(&query);
 
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = match json::from_slice(&body) {

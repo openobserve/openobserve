@@ -214,6 +214,7 @@ impl Dashboard {
     }
 }
 
+pub mod usage_report;
 pub mod reports;
 pub mod v1;
 pub mod v2;
