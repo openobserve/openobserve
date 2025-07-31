@@ -261,6 +261,10 @@ pub async fn search_http2_stream(
                 req.query.sql = histogram_query;
                 converted_histogram_query = Some(req.query.sql.clone());
                 // Recalculate histogram interval
+                // The sql object needs to be updated as well
+                // Since the original query is now converted to a histogram query
+                // and the histogram interval needs to be recalculated
+                // and order by would be also be modified
                 sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
                     Ok(v) => v,
                     Err(e) => {
@@ -288,7 +292,7 @@ pub async fn search_http2_stream(
                         return http_response;
                     }
                 };
-                // Update histogram interval
+                // Update histogram interval -- second occurrence of histogram interval
                 if let Some(interval) = sql.histogram_interval {
                     req.query.histogram_interval = interval;
                 }
