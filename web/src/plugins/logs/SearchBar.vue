@@ -611,27 +611,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-item
                 style="min-width: 150px"
                 class="q-pa-sm saved-view-item"
-                clickable
-                v-close-popup
                 v-bind:disable="
                   searchObj.data.queryResults &&
                   searchObj.data.queryResults.hasOwnProperty('hits') &&
                   !searchObj.data.queryResults.hits.length
                 "
               >
-                <q-item-section
-                  @click.stop="downloadLogs(searchObj.data.queryResults.hits)"
-                  v-close-popup
-                >
+                <q-item-section class="cursor-pointer">
                   <q-item-label class="tw-flex tw-items-center tw-gap-2">
                     <img
                       :src="downloadTableIcon"
                       alt="Download Table"
                       style="width: 20px; height: 20px"
                     />
-                    {{ t("search.downloadTable") }}</q-item-label
-                  >
+                    {{ t("search.downloadTable") }}
+                  </q-item-label>
                 </q-item-section>
+                <q-item-section side>
+                  <q-icon name="keyboard_arrow_right" />
+                </q-item-section>
+                <q-menu 
+                  v-model="showDownloadMenu"
+                  anchor="top end" 
+                  self="top start"
+                >
+                  <q-list>
+                    <q-item
+                      data-test="search-download-csv-btn"
+                      class="q-pa-sm saved-view-item"
+                      clickable
+                      v-close-popup
+                      @click="downloadLogs(searchObj.data.queryResults.hits, 'csv')"
+                    >
+                      <q-icon name="grid_on" size="14px" class="q-pr-sm" />
+                      <q-item-section>
+                        <q-item-label class="tw-flex tw-items-center tw-gap-2 q-mr-md">
+                          {{ t("search.downloadCSV") }}
+                        </q-item-label>
+                      </q-item-section>
+                    </q-item>
+                    <q-item
+                      data-test="search-download-json-btn"
+                      class="q-pa-sm saved-view-item"
+                      clickable
+                      v-close-popup
+                      @click="downloadLogs(searchObj.data.queryResults.hits, 'json')"
+                    >
+                      <q-icon name="data_object" size="14px" class="q-pr-sm" />
+                      <q-item-section>
+                        <q-item-label class="tw-flex tw-items-center tw-gap-2 q-mr-md">
+                          {{ t("search.downloadJSON") }}
+                        </q-item-label>
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-menu>
               </q-item>
               <q-item
                 class="q-pa-sm saved-view-item"
@@ -1025,6 +1059,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
           />
+          <div class="q-py-sm file-type">
+            <label class="q-pr-sm">{{ t('search.fileType') }}</label><br />
+            <q-btn-group 
+              data-test="custom-download-file-type-button-group"
+              class="file-type-button-group q-mt-xs"
+            >
+              <q-btn
+                v-for="option in downloadCustomFileTypeOptions"
+                :key="option.value"
+                :data-test="`custom-download-file-type-${option.value}-btn`"
+                :class="downloadCustomFileType === option.value ? 'selected' : ''"
+                @click="downloadCustomFileType = option.value"
+                :label="option.label"
+                no-caps
+                size="sm"
+                outline
+              />
+            </q-btn-group>
+          </div>
         </q-card-section>
 
         <q-card-actions align="right">
@@ -1499,7 +1552,7 @@ export default defineComponent({
         .then((res) => {
           this.customDownloadDialog = false;
           if (res.data.hits.length > 0) {
-            this.downloadLogs(res.data.hits);
+            this.downloadLogs(res.data.hits, this.downloadCustomFileType);
           } else {
             this.$q.notify({
               message: "No data found to download.",
@@ -2102,35 +2155,64 @@ export default defineComponent({
         queryEditorRef.value.setValue(searchObj.data.query);
     };
 
-    const downloadLogs = async (data) => {
-      //here we are using a package json2csv which converts json to csv data
-      //why package because we faced one issue where user has , in some of the fields so
-      //it is treating it as seperate fields 
-      //eg: {body:"hey this is the email body , with some info in it "}
-      //after converting it will treat hey this is the email body this as the body and remaining will be the next column
-      //to solve this issue we are using json2csv package
-      try{
-        const convertedData = await json2csv(data)
-        const filename = "logs-data.csv";
-        const file = new File([convertedData], filename, {
-          type: "text/csv",
-        });
-        const url = URL.createObjectURL(file);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        $q.notify({
-          message: "Error downloading logs",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
+    const jsonToCsv = (jsonData) => {
+      const replacer = (key, value) => (value === null ? "" : value);
+      // const header = Object.keys(jsonData[0]);
+      const headerSet = new Set();
+      jsonData.forEach(row => {
+        Object.keys(row).forEach(key => headerSet.add(key));
+      });
+      const header = Array.from(headerSet);
+
+      // 2. Start CSV with header row
+      let csv = header.join(",") + "\r\n";
+      // let csv = header.join(",") + "\r\n";
+
+      for (let i = 0; i < jsonData.length; i++) {
+        const row = header
+          .map((fieldName) => JSON.stringify(jsonData[i][fieldName], replacer))
+          .join(",");
+        csv += row + "\r\n";
       }
+
+      return csv;
+    };
+
+    const downloadLogs = (data, format) => {
+      let filename = "logs-data";
+      let dataobj;
+
+      if (format === "csv") {
+        filename += ".csv";
+        dataobj = jsonToCsv(data);
+      } else {
+        filename += ".json";
+        dataobj = JSON.stringify(data, null, 2);
+      }
+      if (dataobj.length === 0) {
+        $q.notify({
+          type: "negative",
+          message: "No data available to download.",
+        });
+        return;
+      }
+      if (format === "csv") {
+        dataobj = new Blob([dataobj], { type: "text/csv" });
+      } else {
+        dataobj = new Blob([dataobj], { type: "application/json" });
+      }
+      const file = new File([dataobj], filename, {
+        type: format === "csv" ? "text/csv" : "application/json",
+      });
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showDownloadMenu.value = false;
     };
 
     onMounted(async () => {
@@ -3160,9 +3242,16 @@ export default defineComponent({
     };
 
     const customDownloadDialog = ref(false);
+    const showDownloadMenu = ref(false);
     const downloadCustomInitialNumber = ref(1);
     const downloadCustomRange = ref(100);
     const downloadCustomRangeOptions = ref([100, 500, 1000, 5000, 10000]);
+    const downloadCustomFileName = ref("");
+    const downloadCustomFileType = ref("csv");
+    const downloadCustomFileTypeOptions = ref([
+      { label: "CSV", value: "csv" },
+      { label: "JSON", value: "json" },
+    ]);
 
     const loadSavedView = () => {
       if (searchObj.data.savedViews.length == 0) {
@@ -3687,6 +3776,10 @@ export default defineComponent({
       getSearchObj,
       toggleHistogram,
       createSavedViews,
+      downloadCustomFileName,
+      downloadCustomFileType,
+      downloadCustomFileTypeOptions,
+      showDownloadMenu,
     };
   },
   computed: {
@@ -4278,10 +4371,58 @@ export default defineComponent({
     color: white;
   }
 }
+
+.file-type-button-group {
+  .q-btn {
+    border: 1px solid var(--q-border-color, #e0e0e0);
+    background-color: var(--q-field-bg, #fafafa);
+    color: var(--q-text-color, #000);
+    
+    &.selected {
+      background-color: var(--q-primary) !important;
+      color: white !important;
+      border-color: var(--q-primary) !important;
+    }
+    
+    &:first-child {
+      border-top-left-radius: 4px;
+      border-bottom-left-radius: 4px;
+    }
+    
+    &:last-child {
+      border-top-right-radius: 4px;
+      border-bottom-right-radius: 4px;
+    }
+    
+    &:not(:last-child) {
+      border-right: none;
+    }
+    
+    &:hover:not(.selected) {
+      background-color: var(--q-hover-color, #f5f5f5);
+    }
+  }
+}
 </style>
 <style scoped>
 .expand-on-focus {
   height: calc(100vh - 200px) !important;
   z-index: 20 !important;
+}
+
+.file-type label {
+    transform: translate(-0.75rem, -175%);
+    font-weight: bold;
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.6);
+}
+
+.q-dark .q-btn {
+  font-weight: 600;
+  border: 0px solid rgba(255, 255, 255, 0.2);
+}
+
+.q-dark .file-type label, .q-dark .file-type .q-btn {
+    color: rgba(255, 255, 255, 0.7);
 }
 </style>
