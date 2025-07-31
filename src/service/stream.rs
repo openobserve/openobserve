@@ -409,7 +409,8 @@ pub async fn update_stream_settings(
             let mut update_distinct_disable_fields = false;
             if let Some(disable_distinct_fields) = new_settings.disable_distinct_fields {
                 settings.disable_distinct_fields = disable_distinct_fields;
-                update_distinct_disable_fields = disable_distinct_fields;
+                // Reset timestamps only when explicitly enabling distinct fields (false)
+                update_distinct_disable_fields = !disable_distinct_fields;
             }
 
             // if index_original_data is true, store_original_data must be true
