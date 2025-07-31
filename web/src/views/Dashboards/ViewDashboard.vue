@@ -922,13 +922,9 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     });
 
-    // Generate new run ID when time range changes
-    watch(selectedDate, () => {
-      generateNewDashboardRunId();
-    });
-
     // whenever the refreshInterval is changed, update the query params
     watch([refreshInterval, selectedDate, selectedTabId], () => {
+      generateNewDashboardRunId();
       router.replace({
         query: {
           ...route.query, // used to keep current variables data as is
