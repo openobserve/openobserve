@@ -1436,6 +1436,9 @@ export default defineComponent({
 
             // set logs page data to searchResponseForVisualization
             if (shouldUseHistogramQuery.value === true) {
+
+              // only do it if is_histogram_eligible is true on logs page
+              if(searchObj.data.queryResults.is_histogram_eligible === true){
               // replace hits with histogram query data
               searchResponseForVisualization.value = {
                 ...searchObj.data.queryResults,
@@ -1451,6 +1454,7 @@ export default defineComponent({
                   dashboardPanelData.layout.currentQueryIndex
                 ].converted_histogram_query = searchObj.data.queryResults.converted_histogram_query ;
               }
+            }
 
             } else {
               searchResponseForVisualization.value = {
