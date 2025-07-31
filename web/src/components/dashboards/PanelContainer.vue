@@ -331,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboard-id="props.dashboardId"
       :folder-id="props.folderId"
       :report-id="props.reportId"
-      :globalRunId="props.globalRunId"
+      :runId="props.runId"
       :tabId="props.tabId"
       :tabName="props.tabName"
       @loading-state-change="handleLoadingStateChange"
@@ -438,7 +438,7 @@ export default defineComponent({
     "folderId",
     "reportId",
     "currentVariablesData",
-    "globalRunId",
+    "runId",
     "tabId",
     "tabName",
   ],

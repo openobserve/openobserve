@@ -388,7 +388,7 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
-    globalRunId: {
+    runId: {
       type: String,
       default: null,
     },
@@ -450,7 +450,7 @@ export default defineComponent({
       folderId,
       reportId,
       allowAnnotationsAdd,
-      globalRunId,
+      runId,
       tabId,
       tabName,
     } = toRefs(props);
@@ -477,7 +477,7 @@ export default defineComponent({
       dashboardId,
       folderId,
       reportId,
-      globalRunId,
+      runId,
       tabId,
       tabName,
     );

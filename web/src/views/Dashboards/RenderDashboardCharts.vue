@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :forceLoad="forceLoad"
           :searchType="searchType"
-          :globalRunId="globalRunId"
+          :runId="runId"
           :tabId="selectedTabId"
           :tabName="
             dashboardData?.tabs?.find((tab: any) => tab.tabId === selectedTabId)
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :height="getPanelLayout(item, 'h')"
               :forceLoad="forceLoad"
               :searchType="searchType"
-              :globalRunId="globalRunId"
+              :runId="runId"
               :tabId="selectedTabId"
               :tabName="
                 dashboardData?.tabs?.find(
@@ -246,7 +246,7 @@ export default defineComponent({
       default: null,
       type: String || null,
     },
-    globalRunId: {
+    runId: {
       type: String,
       default: null,
     },
