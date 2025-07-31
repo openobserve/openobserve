@@ -208,9 +208,8 @@ pub async fn search_http2_stream(
         }
     };
 
-    let histogram_interval = match get_sql(&req.query, &org_id, stream_type, req.search_type).await
-    {
-        Ok(sql) => sql.histogram_interval,
+    let mut sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
+        Ok(sql) => sql,
         Err(e) => {
             log::error!(
                 "[trace_id: {}] Error getting histogram interval: {:?}",
@@ -240,8 +239,13 @@ pub async fn search_http2_stream(
             return http_response;
         }
     };
-    // Update histogram interval
-    if let Some(interval) = histogram_interval {
+    // Update histogram interval -- first occurrence of histogram interval
+    // Need to calculate the histogram interval before converting the query to a histogram query
+    // when `is_ui_histogram` is true. This is because if a query is already a histogram query
+    // with interval Since for http2 streaming at the point of converting the query to a
+    // histogram query the interval will be generated again and not honor the original interval
+    // mentioned in the query.
+    if let Some(interval) = sql.histogram_interval {
         req.query.histogram_interval = interval;
     }
 
@@ -256,44 +260,43 @@ pub async fn search_http2_stream(
             Ok(histogram_query) => {
                 req.query.sql = histogram_query;
                 converted_histogram_query = Some(req.query.sql.clone());
+                // Recalculate histogram interval
+                sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!("[trace_id: {}] Error parsing sql: {:?}", trace_id, e);
+
+                        #[cfg(feature = "enterprise")]
+                        let error_message = e.to_string();
+
+                        let http_response = map_error_to_http_response(&e, Some(trace_id.clone()));
+
+                        // Add audit before closing
+                        #[cfg(feature = "enterprise")]
+                        {
+                            report_to_audit(
+                                user_id,
+                                org_id,
+                                trace_id,
+                                http_response.status().into(),
+                                Some(error_message),
+                                &in_req,
+                                body_bytes,
+                            )
+                            .await;
+                        }
+                        return http_response;
+                    }
+                };
+                // Update histogram interval
+                if let Some(interval) = sql.histogram_interval {
+                    req.query.histogram_interval = interval;
+                }
             }
             Err(e) => {
                 return map_error_to_http_response(&(e), Some(trace_id));
             }
         }
-    }
-
-    // Recalculate histogram interval
-    let sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("[trace_id: {}] Error parsing sql: {:?}", trace_id, e);
-
-            #[cfg(feature = "enterprise")]
-            let error_message = e.to_string();
-
-            let http_response = map_error_to_http_response(&e, Some(trace_id.clone()));
-
-            // Add audit before closing
-            #[cfg(feature = "enterprise")]
-            {
-                report_to_audit(
-                    user_id,
-                    org_id,
-                    trace_id,
-                    http_response.status().into(),
-                    Some(error_message),
-                    &in_req,
-                    body_bytes,
-                )
-                .await;
-            }
-            return http_response;
-        }
-    };
-    // Update histogram interval
-    if let Some(interval) = sql.histogram_interval {
-        req.query.histogram_interval = interval;
     }
 
     // Set use_cache from query params
