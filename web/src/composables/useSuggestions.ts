@@ -143,6 +143,106 @@ const useSqlSuggestions = () => {
       kind: "Text",
       insertText: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
     },
+    {
+      label: (_keyword: string) => `arr_descending('${_keyword}')`,
+      kind: "Text",
+      insertText: (_keyword: string) => `arr_descending('${_keyword}')`,
+    },
+    {
+      label: (_keyword: string) => `arrcount('${_keyword}')`,
+      kind: "Text",
+      insertText: (_keyword: string) => `arrcount('${_keyword}')`,
+    },
+    {
+      label: (_keyword: string) => `arrsort('${_keyword}')`,
+      kind: "Text",
+      insertText: (_keyword: string) => `arrsort('${_keyword}')`,
+    },
+    {
+      label: (_keyword: string) => `cast_to_arr('${_keyword}')`,
+      kind: "Text",
+      insertText: (_keyword: string) => `cast_to_arr('${_keyword}')`,
+    },
+    {
+      label: (_keyword: string,start:number= 1 ,end:number= 10) => `arrindex('${_keyword}', ${start}, ${end})`,
+      kind: "Text",
+      insertText: (_keyword: string,start:number= 1 ,end:number= 10) => `arrindex('${_keyword}', ${start}, ${end})`,
+    },
+    {
+      label: (_keyword: string,delimiter:string= 'delimiter') => `arrjoin('${_keyword}', '${delimiter}')`,
+      kind: "Text",
+      insertText: (_keyword: string,delimiter:string= 'delimiter') => `arrjoin('${_keyword}', '${delimiter}')`,
+    },
+  
+    {
+      label: (_keyword: string,_keyword2:string,delimiter:string= 'delimiter') => `arrzip('${_keyword}', '${_keyword2}', '${delimiter}')`,
+      kind: "Text",
+      insertText: (_keyword: string,_keyword2:string,delimiter:string= 'delimiter') => `arrzip('${_keyword}', '${_keyword2}', '${delimiter}')`,
+    },
+    {
+      label: (_keyword: string,path:string= 'path') => `spath('${_keyword}', '${path}')`,
+      kind: "Text",
+      insertText: (_keyword: string,path:string= 'path') => `spath('${_keyword}', '${path}')`,
+    },
+    {
+      label: (array: string= 'array') => `to_array_string('${array}')`,
+      kind: "Text",
+      insertText: (array: string= 'array') => `to_array_string('${array}')`,
+    },
+    {
+      label: () => `unnest`,
+      kind: "Text",
+      insertText: () => `unnest`,
+    },
+    {
+      label: () => `array_extract`,
+      kind: "Text",
+      insertText: () => `array_extract`,
+    },
+
+    //from here aggregation functions are added 
+    {
+      label: (_keyword: string) => `sum('${_keyword}')`,
+      kind: "Text",
+      insertText: (_keyword: string) => `sum('${_keyword}')`,
+    },
+    {
+      label: (_keyword: string) => `avg('${_keyword}')`,
+      kind: "Text",
+      insertText: (_keyword: string) => `avg('${_keyword}')`,
+    },
+    {
+      label: (_keyword: string) => `count('${_keyword}')`,
+      kind: "Text",
+      insertText: (_keyword: string) => `count('${_keyword}')`,
+    },
+    {
+      label: (_keyword: string) => `max('${_keyword}')`,
+      kind: "Text",
+      insertText: (_keyword: string) => `max('${_keyword}')`,
+    },
+    {
+      label: (_keyword: string) => `min('${_keyword}')`,
+      kind: "Text",
+      insertText: (_keyword: string) => `min('${_keyword}')`,
+    },
+    //histogram function
+    {
+      label: (_keyword: string,duration:string= 'duration') => `histogram('${_keyword}', '${duration}')`,
+      kind: "Text",
+      insertText: (_keyword: string,duration:string= 'duration') => `histogram('${_keyword}', '${duration}')`,
+    },
+    {
+      label: (_keyword: string,number_of_frequent_values:number = 10) => `approx_topk('${_keyword}', ${number_of_frequent_values})`,
+      kind: "Text",
+      insertText: (_keyword: string,number_of_frequent_values:number = 10) => `approx_topk('${_keyword}', ${number_of_frequent_values})`,
+    },
+    {
+      label: (_keyword: string,_keyword2:string,number_of_frequent_values:number = 10) => `approx_topk_distinct('${_keyword}', '${_keyword2}', ${number_of_frequent_values})`,
+      kind: "Text",
+      insertText: (_keyword: string,_keyword2:string,number_of_frequent_values:number = 10) => `approx_topk_distinct('${_keyword}', '${_keyword2}', ${number_of_frequent_values})`,
+    },
+    
   ];
   const autoCompleteData = ref({
     fieldValues: {} as any, // { kubernetes_host: new Set([value1, value2]) }
