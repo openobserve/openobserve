@@ -24,14 +24,15 @@ use datafusion_proto::physical_plan::PhysicalExtensionCodec;
 #[cfg(feature = "enterprise")]
 mod aggregate_topk_exec;
 mod empty_exec;
+mod physical_plan_node;
+#[cfg(feature = "enterprise")]
+mod streaming_aggs_exec;
 
 pub fn get_physical_extension_codec() -> ComposedPhysicalExtensionCodec {
     ComposedPhysicalExtensionCodec {
-        codecs: vec![
-            Arc::new(empty_exec::EmptyExecPhysicalExtensionCodec {}),
-            #[cfg(feature = "enterprise")]
-            Arc::new(aggregate_topk_exec::AggregateTopkExecPhysicalExtensionCodec {}),
-        ],
+        codecs: vec![Arc::new(
+            physical_plan_node::PhysicalPlanNodePhysicalExtensionCodec {},
+        )],
     }
 }
 

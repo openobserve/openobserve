@@ -810,7 +810,7 @@ pub async fn delete_group(_path: web::Path<(String, String)>) -> Result<HttpResp
 mod tests {
     use std::collections::HashSet;
 
-    use actix_web::{App, test};
+    use actix_web::{App, http::header::HeaderName, test};
 
     use super::*;
     use crate::common::meta::user::{UserGroup, UserGroupRequest, UserRoleRequest};
@@ -928,8 +928,10 @@ mod tests {
             let mut req = test::TestRequest::get().uri("/test_org/roles").to_request();
 
             // Add user_id header that the function expects
-            req.headers_mut()
-                .insert("user_id", "test_user".parse().unwrap());
+            req.headers_mut().insert(
+                HeaderName::from_static("user_id"),
+                "test_user".parse().unwrap(),
+            );
 
             let resp = test::call_service(&app, req).await;
             // Will likely fail due to missing OFGA setup, but testing structure
@@ -952,10 +954,16 @@ mod tests {
         {
             let app = test::init_service(App::new().service(update_role)).await;
             let role_request = o2_dex::meta::auth::RoleRequest {
-                add: Some(vec!["permission1".to_string()]),
-                remove: Some(vec!["permission2".to_string()]),
-                add_users: Some(vec!["user1".to_string()]),
-                remove_users: Some(vec!["user2".to_string()]),
+                add: vec![o2_dex::meta::auth::O2EntityAuthorization {
+                    object: "permission1".to_string(),
+                    permission: o2_dex::meta::auth::Permission::AllowAll,
+                }],
+                remove: vec![o2_dex::meta::auth::O2EntityAuthorization {
+                    object: "permission2".to_string(),
+                    permission: o2_dex::meta::auth::Permission::AllowAll,
+                }],
+                add_users: Some(HashSet::from_iter(vec!["user1".to_string()])),
+                remove_users: Some(HashSet::from_iter(vec!["user2".to_string()])),
             };
 
             let req = test::TestRequest::put()
@@ -1184,8 +1192,10 @@ mod tests {
                 .to_request();
 
             // Add user_id header that the function expects
-            req.headers_mut()
-                .insert("user_id", "test_user".parse().unwrap());
+            req.headers_mut().insert(
+                HeaderName::from_static("user_id"),
+                "test_user".parse().unwrap(),
+            );
 
             let resp = test::call_service(&app, req).await;
             // Will likely fail due to missing OFGA setup, but testing structure
