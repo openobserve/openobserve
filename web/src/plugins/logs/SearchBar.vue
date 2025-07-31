@@ -864,6 +864,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 100%; height: 100%"
             >
               <template v-if="showFunctionEditor">
+              <div class="tw-relative tw-h-full tw-w-full"
+              >
                 <query-editor
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"
@@ -881,6 +883,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
                   @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
                 />
+             </div>
+               <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'" 
+               :class="store.state.theme == 'dark' ? 'tw-bg-white tw-bg-opacity-10' : 'tw-bg-black tw-bg-opacity-10'"
+               class="tw-absolute tw-bottom-0 tw-w-full " style="margin-top: 12px; display: flex; align-items: center; flex">
+                <q-icon name="warning" color="warning" size="20px" class="q-mx-sm" />
+                <span class="text-negative q-pa-sm" style="font-weight: semibold; font-size: 14px;">VRL Function Editor is not supported in visualize mode.</span>
+              </div>
               </template>
               <template v-else-if="searchObj.data.transformType === 'action'">
                 <query-editor
@@ -1658,16 +1667,6 @@ export default defineComponent({
     watch(
       () => searchObj.meta.functionEditorPlaceholderFlag,
       (val) => {
-
-        if (searchObj.meta.logsVisualizeToggle === 'visualize' && val == false){
-          // show warning
-          $q.notify({
-            message: "Function editor is not supported for visualization",
-            color: "warning",
-            position: "bottom",
-            timeout: 5000,
-          });
-        }
 
         if (
           searchObj.meta.jobId != "" &&

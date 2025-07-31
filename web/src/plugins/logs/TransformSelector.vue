@@ -162,16 +162,6 @@ const { t } = useI18n();
 
 const { searchObj, isActionsEnabled } = useLogs();
 
-// Watch logsVisualizeToggle and set showTransformEditor to false if condition matches
-watch(
-  () => searchObj.meta.logsVisualizeToggle,
-  () => {
-    if (searchObj.meta.logsVisualizeToggle === 'visualize') {
-      searchObj.meta.showTransformEditor = false;
-    }
-  }
-);
-
 const store = useStore();
 
 const functionModel = ref(false);
