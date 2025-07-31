@@ -824,7 +824,7 @@ async fn get_super_cluster_delete_status(
     // For each node in the super cluster, get the delete status
     let trace_id = config::ider::generate_trace_id();
     let mut results = Vec::new();
-    let mut all_pending = false;
+    let mut any_pending = false;
     let mut all_completed = true;
     let mut errors = Vec::new();
 
@@ -837,13 +837,10 @@ async fn get_super_cluster_delete_status(
         .await
         {
             Ok(response) => {
-                if CompactorManualJobStatus::from(response.status)
-                    == CompactorManualJobStatus::Pending
-                {
-                    all_pending = true;
-                } else if CompactorManualJobStatus::from(response.status)
-                    == CompactorManualJobStatus::Completed
-                {
+                let job_status = CompactorManualJobStatus::from(response.status);
+                if job_status == CompactorManualJobStatus::Pending {
+                    any_pending = true;
+                } else if job_status != CompactorManualJobStatus::Completed {
                     all_completed = false;
                 }
                 let res = CompactorManualJobResEntry {
@@ -854,7 +851,7 @@ async fn get_super_cluster_delete_status(
                         key: response.key,
                         created_at: response.created_at,
                         ended_at: response.ended_at,
-                        status: CompactorManualJobStatus::from(response.status),
+                        status: job_status,
                     },
                 };
                 results.push(res);
@@ -870,7 +867,7 @@ async fn get_super_cluster_delete_status(
         }
     }
 
-    let status = if all_pending {
+    let status = if any_pending {
         CompactorManualJobStatus::Pending
     } else if all_completed && errors.is_empty() {
         CompactorManualJobStatus::Completed
