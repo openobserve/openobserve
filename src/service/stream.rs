@@ -587,7 +587,7 @@ pub async fn update_stream_settings(
                     });
                     log::info!(
                         "Re-enabling distinct fields for stream {}/{}/{}. Resetting timestamps for {} fields.",
-                        org_id, stream_type, stream_name, settings.distinct_value_fields.len()
+                        org_id, stream_type, stream_name, settings.distinct_value_fields
                     );
                 }
             }
