@@ -726,30 +726,24 @@ pub async fn filter_file_list_by_tantivy_index(
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
     let time_range = query.time_range.unwrap_or((0, 0));
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
-    let (mut index_parquet_files, query_limit) =
+    let (index_parquet_files, query_limit) =
         partition_tantivy_files(index_parquet_files, &idx_optimize_mode, target_partitions);
 
     let mut no_more_files = false;
     let mut tantivy_result_builder = TantivyMultiResultBuilder::new(&idx_optimize_mode);
-    let group_num = index_parquet_files.len();
-    let max_group_len = index_parquet_files
-        .iter()
-        .map(|g| g.len())
-        .max()
-        .unwrap_or(0);
+    let group_num = index_parquet_files.first().unwrap_or(&vec![]).len();
+    let max_group_len = index_parquet_files.len();
 
     log::info!(
         "[trace_id {}] search->tantivy: target_partitions: {target_partitions}, group_num: {group_num}, max_group_len: {max_group_len}",
         query.trace_id,
     );
 
-    for _ in 0..max_group_len {
+    for file_group in index_parquet_files {
         if no_more_files {
             // delete the rest of the files
-            for i in 0..group_num {
-                if let Some(file) = extract_file_from_group(&mut index_parquet_files, i) {
-                    file_list_map.remove(&file.key);
-                }
+            for file in file_group {
+                file_list_map.remove(&file.key);
             }
             continue;
         }
@@ -757,10 +751,7 @@ pub async fn filter_file_list_by_tantivy_index(
         // Spawn a task for each group of files get row_id from index
         let mut tasks = Vec::new();
         let semaphore = std::sync::Arc::new(Semaphore::new(target_partitions));
-        for i in 0..group_num {
-            let Some(file) = extract_file_from_group(&mut index_parquet_files, i) else {
-                continue;
-            };
+        for file in file_group {
             let trace_id = query.trace_id.to_string();
             let index_condition_clone = index_condition.clone();
             let idx_optimize_rule_clone = idx_optimize_mode.clone();
@@ -1126,24 +1117,72 @@ fn get_simple_distinct_field(idx_optimize_rule: &Option<IndexOptimizeMode>) -> V
 }
 
 // partition the tantivy files by time range
+// the return file groups should execte one by one
 fn partition_tantivy_files(
     index_parquet_files: Vec<FileKey>,
     idx_optimize_mode: &Option<IndexOptimizeMode>,
     target_partitions: usize,
 ) -> (Vec<Vec<FileKey>>, usize) {
-    if let Some(IndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_mode
+    let (file_groups, limit) = if let Some(IndexOptimizeMode::SimpleSelect(limit, _ascend)) =
+        idx_optimize_mode
         && *limit > 0
     {
-        (
-            group_files_by_time_range(index_parquet_files, target_partitions),
-            *limit,
-        )
+        let file_groups = group_files_by_time_range(index_parquet_files, target_partitions);
+        (file_groups, *limit)
     } else {
-        (
-            index_parquet_files.into_iter().map(|f| vec![f]).collect(),
-            0,
-        )
+        // splite the filter groups by target partitions
+        let file_groups = into_chunks(index_parquet_files, target_partitions);
+        (file_groups, 0)
+    };
+
+    if limit == 0 {
+        (file_groups, limit)
+    } else {
+        (regroup_tantivy_files(file_groups), limit)
     }
+}
+
+// regroup the tantivy for better performance
+// after [`partition_tantivy_files`] we get multiple groups that order by time range desc and each
+// group's time range not overlap, when execute the tantivy search, we get the last file in each
+// group and do the tantivy search.
+// so in this function, we recursive collect the last file in each group
+fn regroup_tantivy_files(file_groups: Vec<Vec<FileKey>>) -> Vec<Vec<FileKey>> {
+    let group_num = file_groups.len();
+    let max_group_len = file_groups.iter().map(|g| g.len()).max().unwrap_or(0);
+    let mut new_file_groups: Vec<Vec<FileKey>> = vec![Vec::new(); max_group_len];
+
+    let mut file_groups: Vec<_> = file_groups
+        .into_iter()
+        .map(|mut group| {
+            group.reverse();
+            group.into_iter()
+        })
+        .collect();
+
+    for new_group in new_file_groups.iter_mut().take(max_group_len) {
+        for file_group in file_groups.iter_mut().take(group_num) {
+            if let Some(file) = file_group.next() {
+                new_group.push(file)
+            }
+        }
+    }
+
+    new_file_groups
+}
+
+fn into_chunks<T>(mut v: Vec<T>, chunk_size: usize) -> Vec<Vec<T>> {
+    let mut chunks = Vec::new();
+    while !v.is_empty() {
+        let take = if v.len() >= chunk_size {
+            chunk_size
+        } else {
+            v.len()
+        };
+        let chunk: Vec<T> = v.drain(..take).collect();
+        chunks.push(chunk);
+    }
+    chunks
 }
 
 // Group files by time range
@@ -1203,20 +1242,6 @@ fn repartition_sorted_groups(
     }
 
     groups
-}
-
-// Helper function to extract a file from a group at the specified index
-fn extract_file_from_group(
-    index_parquet_files: &mut [Vec<FileKey>],
-    group_index: usize,
-) -> Option<FileKey> {
-    index_parquet_files.get_mut(group_index).and_then(|g| {
-        if g.is_empty() {
-            None
-        } else {
-            Some(g.remove(g.len() - 1))
-        }
-    })
 }
 
 #[cfg(test)]
