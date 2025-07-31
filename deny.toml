@@ -37,6 +37,7 @@ exceptions = [
     { name = "quoted_printable", allow = ["0BSD"] },
     { name = "ring", allow = ["BSD-4-Clause", "OpenSSL"] },
     { name = "inferno", allow = ["CDDL-1.0"] },
+    { name = "libbz2-rs-sys", allow = ["BSD-2-Clause"] },
 ]
 
 allow = [
