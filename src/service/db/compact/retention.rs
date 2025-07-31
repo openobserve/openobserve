@@ -47,20 +47,20 @@ pub async fn delete_stream(
     stream_type: StreamType,
     stream_name: &str,
     date_range: Option<(&str, &str)>,
-) -> Result<(), anyhow::Error> {
+) -> Result<String, anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name, date_range);
+    let db_key = format!("/compact/delete/{key}");
 
     // write in cache
     if let Some(v) = CACHE.get(&key) {
         if v.value() + hour_micros(1) > now_micros() {
-            return Ok(()); // already in cache, don't create same task in one hour
+            return Ok(key); // already in cache, don't create same task in one hour
         }
     }
 
-    let db_key = format!("/compact/delete/{key}");
-    CACHE.insert(key, now_micros());
-
-    Ok(db::put(&db_key, "OK".into(), db::NEED_WATCH, None).await?)
+    CACHE.insert(key.clone(), now_micros());
+    db::put(&db_key, "OK".into(), db::NEED_WATCH, None).await?;
+    Ok(key) // return the key
 }
 
 // set the stream is processing by the node
@@ -125,6 +125,11 @@ pub async fn list() -> Result<Vec<String>, anyhow::Error> {
         items.push(item_key.to_string());
     }
     Ok(items)
+}
+
+pub async fn get(db_key: &str) -> Result<String, anyhow::Error> {
+    let ret = db::get(db_key).await?;
+    Ok(String::from_utf8_lossy(&ret).to_string())
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {

@@ -38,6 +38,19 @@ pub(crate) fn get_stream_type_from_request(
 }
 
 #[inline(always)]
+pub(crate) fn get_ts_from_request_with_key(
+    query: &Query<HashMap<String, String>>,
+    key: &str,
+) -> Result<i64, String> {
+    let value = query
+        .get(key)
+        .ok_or_else(|| format!("{} parameter is missing", key))?
+        .parse::<i64>()
+        .map_err(|_| format!("{} is not a valid timestamp", key))?;
+    Ok(value)
+}
+
+#[inline(always)]
 pub(crate) fn get_fallback_order_by_col_from_request(
     query: &Query<HashMap<String, String>>,
 ) -> Option<String> {
