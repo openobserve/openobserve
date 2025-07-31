@@ -410,7 +410,7 @@ pub async fn run_datafusion(
 
     // 7. rewrite physical plan
     let match_all_keys = sql.match_items.clone().unwrap_or_default();
-    let mut equal_keys = sql
+    let equal_keys = sql
         .equal_items
         .iter()
         .map(|(stream_name, fields)| {
@@ -423,19 +423,6 @@ pub async fn run_datafusion(
             )
         })
         .collect::<HashMap<_, _>>();
-
-    // check inverted index prefix search
-    #[allow(deprecated)]
-    if sql.stream_type == StreamType::Index
-        && cfg.common.full_text_search_type.to_lowercase() != "contains"
-    {
-        for (stream, items) in sql.prefix_items.iter() {
-            equal_keys
-                .entry(stream.clone())
-                .or_insert_with(Vec::new)
-                .extend(items.iter().map(|(k, v)| cluster_rpc::KvItem::new(k, v)));
-        }
-    }
 
     #[cfg(feature = "enterprise")]
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));

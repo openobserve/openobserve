@@ -415,7 +415,9 @@ pub async fn get_users_with_role(path: web::Path<(String, String)>) -> Result<Ht
     )
 )]
 #[get("/{org_id}/roles/{role_id}/users")]
-pub async fn get_users_with_role(_path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn get_users_with_role(
+    _path: web::Path<(String, String)>,
+) -> Result<HttpResponse, Error> {
     Ok(MetaHttpResponse::forbidden("Not Supported"))
 }
 

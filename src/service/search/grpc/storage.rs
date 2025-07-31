@@ -36,7 +36,7 @@ use config::{
     },
 };
 use datafusion::execution::cache::cache_manager::FileStatisticsCache;
-use futures::future::try_join_all;
+use futures::{StreamExt, stream};
 use hashbrown::HashMap;
 use infra::{
     cache::file_data,
@@ -45,6 +45,7 @@ use infra::{
 use itertools::Itertools;
 use tantivy::Directory;
 use tokio::sync::Semaphore;
+use tokio_stream::StreamExt as _;
 use tracing::Instrument;
 
 use crate::service::{
@@ -763,8 +764,9 @@ pub async fn filter_file_list_by_tantivy_index(
             let trace_id = query.trace_id.to_string();
             let index_condition_clone = index_condition.clone();
             let idx_optimize_rule_clone = idx_optimize_mode.clone();
-            let permit = semaphore.clone().acquire_owned().await.unwrap();
+            let semaphore_clone = semaphore.clone();
             let task = tokio::task::spawn(async move {
+                let permit = semaphore_clone.acquire_owned().await.unwrap();
                 let ret = search_tantivy_index(
                     &trace_id,
                     time_range,
@@ -789,33 +791,36 @@ pub async fn filter_file_list_by_tantivy_index(
             tasks.push(task)
         }
 
-        // Wait for all tasks to complete
-        let tasks = match try_join_all(tasks).await {
-            Ok(results) => results,
+        // if more than cpu_num's file returned many row_ids, we skip tantivy search
+        let mut threshold_num = cfg.limit.cpu_num;
+        let mut tasks = stream::iter(tasks).buffer_unordered(target_partitions);
+        while let Some(result) = match tasks.try_next().await {
             Err(e) => {
+                let took = start.elapsed().as_millis() as usize;
                 log::error!(
-                    "[trace_id {}] search->tantivy: error filtering via index, error: {e:?}",
+                    "[trace_id {}] search->tantivy: error filtering via index, error: {e:?}, took: {took} ms",
                     query.trace_id,
                 );
                 // search error, need add filter back
-                return Ok((
-                    start.elapsed().as_millis() as usize,
-                    true,
-                    TantivyMultiResult::RowNums(0),
-                ));
+                return Ok((took, true, TantivyMultiResult::RowNums(0)));
             }
-        };
-        for result in tasks {
+            Ok(result) => result,
+        } {
             // Each result corresponds to a file in the file list
             match result {
                 Ok((file_name, result)) => {
                     if file_name.is_empty() {
                         // no need inverted index for this file, need add filter back
-                        log::warn!(
-                            "[trace_id {}] search->tantivy: no hits for index_condition: {:?}. Adding the parquet file back for Datafusion search",
-                            query.trace_id,
-                            index_condition,
-                        );
+                        let took = start.elapsed().as_millis() as usize;
+                        threshold_num -= 1;
+                        if threshold_num == 0 {
+                            log::warn!(
+                                "[trace_id {}] search->tantivy: skip tantivy search, too many row_ids returned from tantivy index, took: {took} ms",
+                                query.trace_id,
+                            );
+                            file_list.extend(file_list_map.into_values());
+                            return Ok((took, true, TantivyMultiResult::RowNums(0)));
+                        }
                         is_add_filter_back = true;
                         continue;
                     }
@@ -1080,18 +1085,11 @@ async fn search_tantivy_index(
                 return Ok((key, TantivyResult::RowIdsBitVec(0, BitVec::EMPTY)));
             }
             // return early if the number of matched docs is too large
-            if cfg.limit.inverted_index_skip_threshold > 0
-                && row_ids.len()
-                    > (parquet_file.meta.records as usize / 100
-                        * cfg.limit.inverted_index_skip_threshold)
-                && !matches!(idx_optimize_rule, Some(IndexOptimizeMode::SimpleCount))
+            let skip_threshold = cfg.limit.inverted_index_skip_threshold;
+            if skip_threshold > 0
+                && row_ids.len() > (parquet_file.meta.records as usize / 100 * skip_threshold)
             {
-                log::debug!(
-                    "[trace_id {trace_id}] matched docs over [{}/100] in tantivy index, skip this file: {}",
-                    cfg.limit.inverted_index_skip_threshold,
-                    parquet_file.key
-                );
-                // return empty file name means we need to add filter back
+                // return empty file name means we need to add filter back and skip tantivy search
                 return Ok((
                     "".to_string(),
                     TantivyResult::RowIdsBitVec(0, BitVec::EMPTY),
