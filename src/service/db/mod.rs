@@ -83,7 +83,10 @@ pub(crate) async fn put(
     {
         o2_enterprise::enterprise::super_cluster::queue::put(key, value, need_watch, start_dt)
             .await
-            .map_err(|e| Error::Message(e.to_string()))?;
+            .map_err(|e| {
+                log::error!("[COMPACTOR] put to super cluster failed: {key} - {e}");
+                Error::Message(e.to_string())
+            })?;
     }
 
     Ok(())
