@@ -73,7 +73,6 @@ use crate::service::search::{
             STR_MATCH_UDF_NAME,
         },
     },
-    index::get_arg_name,
     utils::get_field_name,
 };
 
@@ -331,8 +330,8 @@ impl Sql {
                 let bucket_width = histogram_interval_visitor.interval.unwrap() as u64 * 1_000_000;
                 // round the bucket edges to even start
                 let rounding_by = bucket_width as i64;
-                let min_value = (query.start_time / rounding_by) * rounding_by;
-                let max_value = (query.end_time / rounding_by) * rounding_by;
+                let min_value = query.start_time - query.start_time % rounding_by;
+                let max_value = query.end_time;
                 let num_buckets =
                     ((max_value - min_value) as f64 / bucket_width as f64).ceil() as usize;
                 index_optimize_mode = Some(IndexOptimizeMode::SimpleHistogram(
@@ -689,7 +688,6 @@ struct ColumnVisitor<'a> {
     is_wildcard: bool,
     is_distinct: bool,
     has_agg_function: bool,
-    use_inverted_index: bool,
 }
 
 impl<'a> ColumnVisitor<'a> {
@@ -705,7 +703,6 @@ impl<'a> ColumnVisitor<'a> {
             is_wildcard: false,
             is_distinct: false,
             has_agg_function: false,
-            use_inverted_index: false,
         }
     }
 }
@@ -799,35 +796,6 @@ impl VisitorMut for ColumnVisitor<'_> {
             }
             if select.distinct.is_some() {
                 self.is_distinct = true;
-            }
-            if let Some(expr) = select.selection.as_ref() {
-                // TODO: match_all only support single stream
-                if self.schemas.len() == 1 {
-                    for (_, schema) in self.schemas.iter() {
-                        let stream_settings = unwrap_stream_settings(schema.schema());
-                        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
-                        let index_fields = get_stream_setting_index_fields(&stream_settings);
-                        let index_fields = itertools::chain(fts_fields.iter(), index_fields.iter())
-                            .collect::<HashSet<_>>();
-                        self.use_inverted_index =
-                            checking_inverted_index_inner(&index_fields, expr);
-                    }
-                }
-            } else if is_simple_count_query(select) || is_simple_histogram_query(select) {
-                // if there is no selection, but have histogram and fst_fields, also can use
-                // inverted index
-                if self.schemas.len() == 1 {
-                    for (_, schema) in self.schemas.iter() {
-                        let stream_settings = unwrap_stream_settings(schema.schema());
-                        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
-                        let index_fields = get_stream_setting_index_fields(&stream_settings);
-                        let index_fields = itertools::chain(fts_fields.iter(), index_fields.iter())
-                            .collect::<HashSet<_>>();
-                        if !index_fields.is_empty() {
-                            self.use_inverted_index = true;
-                        }
-                    }
-                }
             }
         }
         if let Some(limit) = query.limit.as_ref()
@@ -2030,57 +1998,6 @@ fn generate_table_reference(idents: &[Ident]) -> (TableReference, String) {
         let table_name = idents[1].value.as_str();
         let field_name = idents[2].value.clone();
         (TableReference::partial(stream_type, table_name), field_name)
-    }
-}
-
-fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -> bool {
-    match expr {
-        Expr::Identifier(Ident {
-            value,
-            quote_style: _,
-            span: _,
-        }) => index_fields.contains(value),
-        Expr::Nested(expr) => checking_inverted_index_inner(index_fields, expr),
-        Expr::BinaryOp { left, op, right } => match op {
-            BinaryOperator::And => true,
-            BinaryOperator::Or => {
-                checking_inverted_index_inner(index_fields, left)
-                    && checking_inverted_index_inner(index_fields, right)
-            }
-            BinaryOperator::Eq => checking_inverted_index_inner(index_fields, left),
-            _ => false,
-        },
-        Expr::InList {
-            expr,
-            list: _,
-            negated: _,
-        } => checking_inverted_index_inner(index_fields, expr),
-        Expr::Like {
-            negated: _,
-            expr,
-            pattern: _,
-            escape_char: _,
-            any: _,
-        } => checking_inverted_index_inner(index_fields, expr),
-        Expr::Function(func) => {
-            let f = func.name.to_string().to_lowercase();
-
-            if f == MATCH_ALL_UDF_NAME || f == FUZZY_MATCH_ALL_UDF_NAME {
-                return true;
-            }
-
-            if (f == STR_MATCH_UDF_NAME
-                || f == STR_MATCH_UDF_IGNORE_CASE_NAME
-                || f == MATCH_FIELD_UDF_NAME
-                || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME)
-                && let FunctionArguments::List(list) = &func.args
-            {
-                return list.args.len() == 2 && index_fields.contains(&get_arg_name(&list.args[0]));
-            }
-
-            false
-        }
-        _ => false,
     }
 }
 

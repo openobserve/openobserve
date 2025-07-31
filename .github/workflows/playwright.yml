@@ -31,7 +31,6 @@ env:
   ZO_USAGE_PUBLISH_INTERVAL: 2
   ZO_USAGE_REPORTING_ENABLED: true
   ZO_MIN_AUTO_REFRESH_INTERVAL: 5
-  ZO_WEBSOCKET_ENABLED: true
   ZO_STREAMING_ENABLED: true
   ZO_COLS_PER_RECORD_LIMIT: "80000"
   ZO_SMTP_ENABLED: true
@@ -144,7 +143,6 @@ jobs:
             "Logs/logsqueries.cte.spec.js",
             "Logs/logsqueries.matchall.spec.js",
             "GeneralTests/usersOrg.spec.js",
-            "Logs/websocket.spec.js",
             "Pipelines/pipeline-dynamic.spec.js",
             "Logs/searchpartition.spec.js",
             "Pipelines/pipeline-core.spec.js",

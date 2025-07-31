@@ -21,7 +21,6 @@ dependencies = [
     "ruff>=0.1.8",
     "tink>=1.10.0",
     "protobuf",
-    "websocket-client>=1.8.0",
 ]
 
 [build-system]

@@ -7594,7 +7594,7 @@ dependencies = [
  "datafusion",
  "datafusion-proto",
  "prost 0.13.4",
- "prost-build 0.12.6",
+ "prost-build 0.13.4",
  "prost-wkt-types",
  "serde",
  "serde_json",
