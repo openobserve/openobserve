@@ -19,6 +19,7 @@ use config::{
     meta::{
         search::{SearchEventType, StreamResponses, ValuesEventContext},
         sql::{OrderBy, resolve_stream_names},
+        stream::StreamType,
     },
     utils::json,
 };
@@ -207,15 +208,63 @@ pub async fn search_http2_stream(
         }
     };
 
-    // create new sql query with histogram interval
-    let sql = match crate::service::search::sql::Sql::new(
-        &req.query.clone().into(),
-        &org_id,
-        stream_type,
-        req.search_type,
-    )
-    .await
+    let histogram_interval = match get_sql(&req.query, &org_id, stream_type, req.search_type).await
     {
+        Ok(sql) => sql.histogram_interval,
+        Err(e) => {
+            log::error!(
+                "[trace_id: {}] Error getting histogram interval: {:?}",
+                trace_id,
+                e
+            );
+
+            #[cfg(feature = "enterprise")]
+            let error_message = e.to_string();
+
+            let http_response = map_error_to_http_response(&e, Some(trace_id.clone()));
+
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    http_response.status().into(),
+                    Some(error_message),
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+            }
+            return http_response;
+        }
+    };
+    // Update histogram interval
+    if let Some(interval) = histogram_interval {
+        req.query.histogram_interval = interval;
+    }
+
+    // Convert the original query to a histogram query
+    let mut converted_histogram_query: Option<String> = None;
+    if is_ui_histogram {
+        // Convert the original query to a histogram query
+        match crate::service::search::sql::histogram::convert_to_histogram_query(
+            &req.query.sql,
+            &stream_names,
+        ) {
+            Ok(histogram_query) => {
+                req.query.sql = histogram_query;
+                converted_histogram_query = Some(req.query.sql.clone());
+            }
+            Err(e) => {
+                return map_error_to_http_response(&(e), Some(trace_id));
+            }
+        }
+    }
+
+    // Recalculate histogram interval
+    let sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("[trace_id: {}] Error parsing sql: {:?}", trace_id, e);
@@ -242,26 +291,9 @@ pub async fn search_http2_stream(
             return http_response;
         }
     };
-
+    // Update histogram interval
     if let Some(interval) = sql.histogram_interval {
         req.query.histogram_interval = interval;
-    }
-
-    let mut converted_histogram_query: Option<String> = None;
-    if is_ui_histogram {
-        // Convert the original query to a histogram query
-        match crate::service::search::sql::histogram::convert_to_histogram_query(
-            &req.query.sql,
-            &stream_names,
-        ) {
-            Ok(histogram_query) => {
-                req.query.sql = histogram_query;
-                converted_histogram_query = Some(req.query.sql.clone());
-            }
-            Err(e) => {
-                return map_error_to_http_response(&(e), Some(trace_id));
-            }
-        }
     }
 
     // Set use_cache from query params
@@ -723,4 +755,15 @@ pub async fn values_http2_stream(
     HttpResponse::Ok()
         .content_type("text/event-stream")
         .streaming(stream)
+}
+
+// Helper function to get histogram interval from sql query
+async fn get_sql(
+    query: &config::meta::search::Query,
+    org_id: &str,
+    stream_type: StreamType,
+    search_type: Option<SearchEventType>,
+) -> Result<crate::service::search::sql::Sql, infra::errors::Error> {
+    crate::service::search::sql::Sql::new(&query.clone().into(), &org_id, stream_type, search_type)
+        .await
 }
