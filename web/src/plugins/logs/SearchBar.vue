@@ -2085,9 +2085,17 @@ export default defineComponent({
     };
 
     const jsonToCsv = (jsonData) => {
-      const replacer = (key, value) => (value === null ? "-" : value);
-      const header = Object.keys(jsonData[0]);
+      const replacer = (key, value) => (value === null ? "" : value);
+      // const header = Object.keys(jsonData[0]);
+      const headerSet = new Set();
+      jsonData.forEach(row => {
+        Object.keys(row).forEach(key => headerSet.add(key));
+      });
+      const header = Array.from(headerSet);
+
+      // 2. Start CSV with header row
       let csv = header.join(",") + "\r\n";
+      // let csv = header.join(",") + "\r\n";
 
       for (let i = 0; i < jsonData.length; i++) {
         const row = header
