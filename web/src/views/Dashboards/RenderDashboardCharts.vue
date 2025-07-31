@@ -71,6 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :forceLoad="forceLoad"
           :searchType="searchType"
           :globalRunId="globalRunId"
+          :tabId="selectedTabId"
+          :tabName="
+            dashboardData?.tabs?.find((tab: any) => tab.tabId === selectedTabId)
+              ?.name
+          "
           @updated:data-zoom="$emit('updated:data-zoom', $event)"
           @onMovePanel="onMovePanel"
           @refreshPanelRequest="refreshPanelRequest"
@@ -120,6 +125,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :forceLoad="forceLoad"
               :searchType="searchType"
               :globalRunId="globalRunId"
+              :tabId="selectedTabId"
+              :tabName="
+                dashboardData?.tabs?.find(
+                  (tab: any) => tab.tabId === selectedTabId,
+                )?.name
+              "
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
               @onMovePanel="onMovePanel"
               @refreshPanelRequest="refreshPanelRequest"

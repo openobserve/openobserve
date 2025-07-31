@@ -69,6 +69,8 @@ export const usePanelDataLoader = (
   folderId: any,
   reportId: any,
   globalRunId?: any,
+  tabId?: any,
+  tabName?: any,
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -533,7 +535,10 @@ export const usePanelDataLoader = (
                   dashboard_id: dashboardId?.value,
                   folder_id: folderId?.value,
                   panel_id: panelSchema.value.id,
+                  panel_name: panelSchema.value.title,
                   run_id: globalRunId?.value,
+                  tab_id: tabId?.value,
+                  tab_name: tabName?.value,
                 },
                 searchType.value ?? "dashboards",
               ),
@@ -855,7 +860,10 @@ export const usePanelDataLoader = (
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,
         panel_id: panelSchema.value.id,
+        panel_name: panelSchema.value.title,
         run_id: globalRunId?.value,
+        tab_id: tabId?.value,
+        tab_name: tabName?.value,
         fallback_order_by_col: getFallbackOrderByCol(),
       },
     });
@@ -977,7 +985,10 @@ export const usePanelDataLoader = (
         meta: {
           currentQueryIndex,
           panel_id: panelSchema.value.id,
+          panel_name: panelSchema.value.title,
           run_id: globalRunId?.value,
+          tab_id: tabId?.value,
+          tab_name: tabName?.value,
         },
       };
 
@@ -1048,7 +1059,10 @@ export const usePanelDataLoader = (
           dashboard_id: dashboardId?.value,
           folder_id: folderId?.value,
           panel_id: panelSchema.value.id,
+          panel_name: panelSchema.value.title,
           run_id: globalRunId?.value,
+          tab_id: tabId?.value,
+          tab_name: tabName?.value,
           fallback_order_by_col: getFallbackOrderByCol(),
         },
       };
@@ -1407,7 +1421,10 @@ export const usePanelDataLoader = (
                           dashboard_id: dashboardId?.value,
                           folder_id: folderId?.value,
                           panel_id: panelSchema.value.id,
+                          panel_name: panelSchema.value.title,
                           run_id: globalRunId?.value,
+                          tab_id: tabId?.value,
+                          tab_name: tabName?.value,
                         },
                         searchType.value ?? "dashboards",
                       ),

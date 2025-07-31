@@ -332,6 +332,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :folder-id="props.folderId"
       :report-id="props.reportId"
       :globalRunId="props.globalRunId"
+      :tabId="props.tabId"
+      :tabName="props.tabName"
       @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
       @limit-number-of-series-warning-message-update="
@@ -437,6 +439,8 @@ export default defineComponent({
     "reportId",
     "currentVariablesData",
     "globalRunId",
+    "tabId",
+    "tabName",
   ],
   components: {
     PanelSchemaRenderer,

@@ -194,7 +194,12 @@ const useHttpStreaming = () => {
       if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
       if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
       if (meta?.panel_id) url += `&panel_id=${meta?.panel_id}`;
+      if (meta?.panel_name)
+        url += `&panel_name=${encodeURIComponent(meta?.panel_name)}`;
       if (meta?.run_id) url += `&run_id=${meta?.run_id}`;
+      if (meta?.tab_id) url += `&tab_id=${meta?.tab_id}`;
+      if (meta?.tab_name)
+        url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
       if (meta?.fallback_order_by_col)
         url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
     } else if (type === "values") {
