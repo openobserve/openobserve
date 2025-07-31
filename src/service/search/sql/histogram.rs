@@ -31,7 +31,7 @@ pub fn convert_to_histogram_query(
         is_eligible_for_histogram(original_query).map_err(|e| Error::Message(e.to_string()))?;
     if !is_eligible {
         let error = Error::ErrorCode(ErrorCodes::SearchHistogramNotAvailable(
-            "Histogram unavailable for SUBQUERY, CTE, DISTINCT and LIMIT queries.".to_string(),
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.".to_string(),
         ));
         return Err(error);
     }

@@ -54,18 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
-                :disabled="isVisualizeToggleDisabled"
                 no-caps
                 size="sm"
                 style="height: 32px"
               >
-                <q-tooltip>
-                  {{
-                    isVisualizeToggleDisabled
-                      ? t("search.visualizeDisabledForMultiStream")
-                      : t("search.visualize")
-                  }}
-                </q-tooltip>
                 <img
                   :src="visualizeIcon"
                   alt="Visualize"
@@ -522,9 +514,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="wrap_text"
           class="float-left"
           size="32px"
+          :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
         >
           <q-tooltip>
-            {{ t("search.messageWrapContent") }}
+           {{ searchObj.meta.logsVisualizeToggle === 'visualize' ? 'Not supported for visualization' : t("search.messageWrapContent") }}
           </q-tooltip>
         </q-toggle>
 
@@ -863,6 +856,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 100%; height: 100%"
             >
               <template v-if="showFunctionEditor">
+              <div class="tw-relative tw-h-full tw-w-full"
+              >
                 <query-editor
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"
@@ -880,6 +875,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
                   @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
                 />
+             </div>
+               <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'" 
+               :class="store.state.theme == 'dark' ? 'tw-bg-white tw-bg-opacity-10' : 'tw-bg-black tw-bg-opacity-10'"
+               class="tw-absolute tw-bottom-0 tw-w-full " style="margin-top: 12px; display: flex; align-items: center; flex">
+                <q-icon name="warning" color="warning" size="20px" class="q-mx-sm" />
+                <span class="text-negative q-pa-sm" style="font-weight: semibold; font-size: 14px;">VRL Function Editor is not supported in visualize mode.</span>
+              </div>
               </template>
               <template v-else-if="searchObj.data.transformType === 'action'">
                 <query-editor
@@ -1343,7 +1345,9 @@ import { useLoading } from "@/composables/useLoading";
 import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
+import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
+import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 
 const defaultValue: any = () => {
   return {
@@ -1491,6 +1495,7 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const store = useStore();
+    const { showErrorNotification } = useNotifications();
     const rowsPerPage = ref(10);
     const regionFilter = ref();
     const regionFilterRef = ref(null);
@@ -1654,6 +1659,7 @@ export default defineComponent({
     watch(
       () => searchObj.meta.functionEditorPlaceholderFlag,
       (val) => {
+
         if (
           searchObj.meta.jobId != "" &&
           val == true &&
@@ -3226,6 +3232,27 @@ export default defineComponent({
           getQueryData();
         }
       } else {
+        // validate query
+        // return if query is emptry and stream is not selected 
+        if(searchObj.data.query === "" && searchObj?.data?.stream?.selectedStream?.length === 0){ 
+          showErrorNotification("Query is empty, please write query to visualize");
+          return;
+        }
+
+        let logsPageQuery = searchObj.data.query;
+
+        // handle sql mode
+        if(!searchObj.data.sqlMode){
+          const queryBuild= buildSearch();
+          logsPageQuery = queryBuild?.query?.sql ?? "";
+        }
+
+        // validate sql query that all fields have alias
+        if(!allSelectionFieldsHaveAlias(logsPageQuery)){
+          showErrorNotification("All fields must have alias in query to visualize");
+          return;
+        }
+
       }
       searchObj.meta.logsVisualizeToggle = value;
       updateUrlQueryParams();
@@ -3240,10 +3267,6 @@ export default defineComponent({
     );
     const { dashboardPanelData, resetDashboardPanelData } =
       useDashboardPanelData(dashboardPanelDataPageKey);
-
-    const isVisualizeToggleDisabled = computed(() => {
-      return searchObj.data.stream.selectedStream.length > 1;
-    });
 
     // [START] cancel running queries
 
@@ -3563,7 +3586,6 @@ export default defineComponent({
       resetRegionFilter,
       validateFilterForMultiStream,
       cancelQuery,
-      isVisualizeToggleDisabled,
       onLogsVisualizeToggleUpdate,
       visualizeSearchRequestTraceIds,
       disable,

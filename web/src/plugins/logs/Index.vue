@@ -840,7 +840,6 @@ export default defineComponent({
       await setupLogsTab();
       if (!isLogsTab()) {
         await importSqlParser();
-        handleVisualizeTab();
       }
     }
 
@@ -1715,15 +1714,11 @@ export default defineComponent({
       };
 
       try {
-        let logsPageQuery = searchObj.data.query;
-        // return if query is emptry and stream is not selected
-        if (
-          logsPageQuery === "" &&
-          searchObj?.data?.stream?.selectedStream?.length === 0
-        ) {
-          showErrorNotification(
-            "Query is empty, please write query to visualize",
-          );
+
+        let logsPageQuery = searchObj.data.query;        
+        // return if query is empty and stream is not selected 
+        if(logsPageQuery === "" && searchObj?.data?.stream?.selectedStream?.length === 0){ 
+          showErrorNotification("Query is empty, please write query to visualize");
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
         }
