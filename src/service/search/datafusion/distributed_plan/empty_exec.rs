@@ -100,14 +100,17 @@ impl NewEmptyExec {
         } else {
             match index {
                 Ok(index) => {
-                    let ordering = vec![LexOrdering::new(vec![PhysicalSortExpr {
-                        expr: Arc::new(Column::new(TIMESTAMP_COL_NAME, index)),
-                        options: SortOptions {
-                            descending: true,
-                            nulls_first: false,
-                        },
-                    }])];
-                    EquivalenceProperties::new_with_orderings(schema, &ordering)
+                    let orderings = vec![
+                        LexOrdering::new(vec![PhysicalSortExpr {
+                            expr: Arc::new(Column::new(TIMESTAMP_COL_NAME, index)),
+                            options: SortOptions {
+                                descending: true,
+                                nulls_first: false,
+                            },
+                        }])
+                        .unwrap(),
+                    ];
+                    EquivalenceProperties::new_with_orderings(schema, orderings)
                 }
                 Err(_) => EquivalenceProperties::new(schema),
             }

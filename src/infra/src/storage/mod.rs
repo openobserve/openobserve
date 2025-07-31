@@ -22,8 +22,8 @@ use datafusion::parquet::{data_type::AsBytes, file::metadata::ParquetMetaData};
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hashbrown::HashMap;
 use object_store::{
-    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, PutMultipartOpts, PutOptions,
-    PutPayload, PutResult, Result, WriteMultipart, path::Path,
+    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, PutMultipartOptions,
+    PutOptions, PutPayload, PutResult, Result, WriteMultipart, path::Path,
 };
 use once_cell::sync::Lazy;
 use parquet::file::metadata::ParquetMetaDataReader;
@@ -60,7 +60,7 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
         &self,
         account: &str,
         location: &Path,
-        opts: PutMultipartOpts,
+        opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>>;
     async fn get(&self, account: &str, location: &Path) -> Result<GetResult>;
     async fn get_opts(

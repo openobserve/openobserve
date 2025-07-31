@@ -73,7 +73,7 @@ pub async fn search(
     file_list: &[FileKey],
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
-    mut index_condition: Option<IndexCondition>,
+    index_condition: Option<IndexCondition>,
     mut fst_fields: Vec<String>,
     idx_optimize_rule: Option<IndexOptimizeMode>,
 ) -> super::SearchTable {
@@ -125,19 +125,15 @@ pub async fn search(
         files.len(),
     );
 
-    // Condition:All() means search tantivy without filter,
-    // so we should not use inverted index in datafusion search
-    // Condition:All() is used for TantivyOptimizeExec
-    let use_inverted_index = query.use_inverted_index
-        && index_condition.is_some()
-        && !index_condition.as_ref().unwrap().is_condition_all();
-    if use_inverted_index {
-        log::info!(
-            "[trace_id {}] flight->search: use_inverted_index with tantivy format {}",
-            query.trace_id,
-            use_inverted_index
-        );
-    }
+    let (use_inverted_index, tantivy_condition, datafusion_condition) =
+        check_inverted_index(query.clone(), index_condition);
+    log::info!(
+        "[trace_id {}] flight->search: use_inverted_index {}, tantivy_condition {:?}, datafusion_condition {:?}",
+        query.trace_id,
+        use_inverted_index,
+        tantivy_condition,
+        datafusion_condition
+    );
 
     let mut idx_took = 0;
     let mut is_add_filter_back = false;
@@ -145,7 +141,7 @@ pub async fn search(
         (idx_took, is_add_filter_back, ..) = filter_file_list_by_tantivy_index(
             query.clone(),
             &mut files,
-            index_condition.clone(),
+            tantivy_condition.clone(),
             idx_optimize_rule,
         )
         .await?;
@@ -178,11 +174,24 @@ pub async fn search(
         );
     }
 
+    let mut index_condition = generate_add_filter_back_condition(
+        tantivy_condition,
+        datafusion_condition,
+        &mut is_add_filter_back, // pass by reference to modify the value
+    );
+
     // set index_condition to None, means we do not need to add filter back
     if !is_add_filter_back {
         index_condition = None;
         fst_fields = vec![];
     }
+
+    log::info!(
+        "[trace_id {}] search->storage: add filter back index_condition {:?}, is_add_filter_back {}",
+        query.trace_id,
+        index_condition,
+        is_add_filter_back
+    );
 
     let cfg = get_config();
     let mut files_group: HashMap<usize, Vec<FileKey>> =
@@ -395,6 +404,87 @@ pub async fn search(
         )
     );
     Ok((tables, scan_stats))
+}
+
+// if Condition::All() -> disable inverted index
+// if negated condition
+//    1. split the negated condition into two parts (negative_conditions, positive_conditions)
+//    2. if negative_conditions is empty or enable not filter env, use inverted index
+//    3. if negative_conditions is not empty and positive_conditions is empty, do not use inverted
+//       index
+//    4. if negative_conditions is not empty and positive_conditions is not empty, use
+//       positive_conditions search tantivy, and if search error add filter back, always add
+//       negative_conditions to filter back
+// return
+//     1. use_inverted_index,
+//     2. index_condition(positive conditions used for tantivy search, if search tantivy error, also
+//        need add filter back)
+//     3. index_condition(negative conditions used for add filter back),
+fn check_inverted_index(
+    query: Arc<super::QueryParams>,
+    index_condition: Option<IndexCondition>,
+) -> (bool, Option<IndexCondition>, Option<IndexCondition>) {
+    if !query.use_inverted_index || index_condition.is_none() {
+        return (false, None, None);
+    }
+
+    // Condition:All() means search tantivy without filter,
+    // so we should not use inverted index in datafusion search
+    // Condition:All() is used for TantivyOptimizeExec
+    let index_condition = index_condition.unwrap();
+    if index_condition.is_condition_all() {
+        return (false, None, None);
+    }
+
+    // negative conditions with TantivyOptimizeExec is fast,
+    // but for row_ids it only fast when row_ids is small
+    // only positive conditions or enable not filter env, use inverted index
+    if get_config().common.feature_query_not_filter_with_index
+        || !index_condition.is_negated_condition()
+    {
+        return (true, Some(index_condition), None);
+    }
+
+    // only negative conditions, do not use inverted index
+    let (positive_conditions, negative_conditions) = index_condition.split_condition_by_negated();
+    if positive_conditions.is_empty() {
+        return (false, None, Some(negative_conditions));
+    }
+
+    // positive and negative conditions, use inverted index
+    (true, Some(positive_conditions), Some(negative_conditions))
+}
+
+fn generate_add_filter_back_condition(
+    tantivy_condition: Option<IndexCondition>,
+    datafusion_condition: Option<IndexCondition>,
+    is_add_filter_back: &mut bool,
+) -> Option<IndexCondition> {
+    // early return if tantivy_condition or datafusion_condition is None
+    if tantivy_condition.is_none() && datafusion_condition.is_none() {
+        return None;
+    }
+
+    // if have datafusion_condition, always add filter back
+    if datafusion_condition.is_some() {
+        let mut index_condition = datafusion_condition.clone();
+        if let Some(tantivy_cond) = tantivy_condition.as_ref()
+            && *is_add_filter_back
+        {
+            index_condition
+                .as_mut()
+                .unwrap()
+                .add_index_condition(tantivy_cond.clone());
+        }
+        *is_add_filter_back = true;
+        return index_condition;
+    }
+
+    if *is_add_filter_back {
+        return tantivy_condition;
+    }
+
+    None
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]

@@ -76,7 +76,7 @@ pub fn expr_applicable_for_cols(col_names: &[String], expr: &Expr) -> bool {
                     Ok(TreeNodeRecursion::Stop)
                 }
             }
-            Expr::Literal(_)
+            Expr::Literal(..)
             | Expr::Alias(_)
             | Expr::OuterReferenceColumn(..)
             | Expr::ScalarVariable(..)
@@ -145,7 +145,7 @@ pub async fn list_files<'a>(
     Ok(Box::pin(
         store
             .list(Some(table_path.prefix()))
-            .map_err(DataFusionError::ObjectStore)
+            .map_err(|e| DataFusionError::ObjectStore(Box::new(e)))
             .map_ok(|object_meta| object_meta.into()),
     ))
 }

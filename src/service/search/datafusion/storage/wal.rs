@@ -20,8 +20,8 @@ use bytes::Bytes;
 use futures::{StreamExt, stream::BoxStream};
 use infra::storage;
 use object_store::{
-    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore, PutMultipartOpts,
-    PutOptions, PutPayload, PutResult, Result, path::Path,
+    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
+    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, path::Path,
 };
 
 use super::format_location;
@@ -105,7 +105,7 @@ impl ObjectStore for FS {
     async fn put_multipart_opts(
         &self,
         location: &Path,
-        _opts: PutMultipartOpts,
+        _opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
         log::error!("NotImplemented put_multipart_opts: {}", location);
         Err(object_store::Error::NotImplemented)
