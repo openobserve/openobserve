@@ -106,7 +106,29 @@ pub async fn get(ksuid: &str) -> Result<CompactorManualJob, errors::Error> {
     }
 }
 
-pub async fn get_by_key(key: &str) -> Result<Vec<CompactorManualJob>, errors::Error> {
+pub async fn get_by_key(
+    key: &str,
+    status: Option<Status>,
+) -> Result<CompactorManualJob, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let res;
+    if let Some(status) = status {
+        res = Entity::find()
+            .filter(Column::Key.eq(key))
+            .filter(Column::Status.eq(status as i64))
+            .one(client)
+            .await;
+    } else {
+        res = Entity::find().filter(Column::Key.eq(key)).one(client).await;
+    }
+    match res {
+        Ok(Some(model)) => Ok(model.into()),
+        Ok(None) => orm_err!("job not found"),
+        Err(e) => orm_err!(format!("get job error: {e}")),
+    }
+}
+
+pub async fn list_by_key(key: &str) -> Result<Vec<CompactorManualJob>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find().filter(Column::Key.eq(key)).all(client).await;
     match res {

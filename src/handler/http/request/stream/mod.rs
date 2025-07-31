@@ -698,9 +698,8 @@ async fn delete_stream_data_by_time_range(
         created_at: Utc::now().timestamp_micros(),
         ended_at: 0,
     };
-    let job_id = job.id.clone();
-    match crate::service::db::compact::compactor_manual_jobs::add_job(job).await {
-        Ok(_) => {}
+    let job_id = match crate::service::db::compact::compactor_manual_jobs::add_job(job).await {
+        Ok(id) => id,
         Err(e) => {
             return Ok(map_error_to_http_response(&e, None));
         }

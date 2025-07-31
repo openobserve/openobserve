@@ -16,7 +16,9 @@
 use config::meta::stream::StreamType;
 use infra::{
     errors,
-    table::compactor_manual_jobs::{CompactorManualJob, add, bulk_update, get, get_by_key},
+    table::compactor_manual_jobs::{
+        CompactorManualJob, Status, add, bulk_update, get, get_by_key, list_by_key,
+    },
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
@@ -30,11 +32,17 @@ pub async fn get_jobs_by_key(
     date_range: Option<(&str, &str)>,
 ) -> Vec<CompactorManualJob> {
     let key = mk_key(org_id, stream_type, stream_name, date_range);
-    get_by_key(&key).await.unwrap_or_default()
+    list_by_key(&key).await.unwrap_or_default()
 }
 
-pub async fn add_job(job: CompactorManualJob) -> Result<(), errors::Error> {
-    // First add to local database
+pub async fn add_job(job: CompactorManualJob) -> Result<String, errors::Error> {
+    // Check if pending job already exists
+    if let Ok(existing_job) = get_by_key(&job.key, Some(Status::Pending)).await {
+        return Ok(existing_job.id);
+    }
+
+    // Insert job
+    let job_id = job.id.clone();
     add(job.clone()).await?;
 
     #[cfg(feature = "enterprise")]
@@ -54,7 +62,7 @@ pub async fn add_job(job: CompactorManualJob) -> Result<(), errors::Error> {
         .map_err(|e| errors::Error::Message(e.to_string()))?;
     }
 
-    Ok(())
+    Ok(job_id)
 }
 
 pub async fn bulk_update_jobs(jobs: Vec<CompactorManualJob>) -> Result<(), errors::Error> {
