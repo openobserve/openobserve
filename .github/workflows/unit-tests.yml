@@ -114,7 +114,7 @@ jobs:
           # finally print the coverage data
           ./coverage.sh check
 
-  frontend_tests:
+  ui_unit_tests:
     runs-on: ubuntu-latest
     
     steps:
