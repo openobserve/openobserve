@@ -59,6 +59,7 @@ export interface WebSocketSearchResponse {
       order_by?: string;
       histogram_interval?: number;
       is_histogram_eligible?: boolean;
+      converted_histogram_query?: string;
     };
     streaming_aggs?: boolean;
     total?: number;
