@@ -123,7 +123,9 @@ impl ScalarUDFImpl for StrMatchIgnoreCaseUdf {
 fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<ColumnarValue> {
     if args.len() != 2 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError("str_match UDF expects two string".to_string()),
+            Box::new(ParserError::ParserError(
+                "str_match UDF expects two string".to_string(),
+            )),
             None,
         ));
     }
@@ -131,18 +133,18 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
     // 1. cast both arguments to be aligned with the signature
     let ColumnarValue::Array(haystack) = &args[0] else {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError(
+            Box::new(ParserError::ParserError(
                 "Invalid argument types[haystack] to str_match function".to_string(),
-            ),
+            )),
             None,
         ));
     };
     let haystack = as_string_array(&haystack)?;
     let ColumnarValue::Scalar(needle) = &args[1] else {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError(
+            Box::new(ParserError::ParserError(
                 "Invalid argument types[needle] to str_match function".to_string(),
-            ),
+            )),
             None,
         ));
     };
@@ -152,9 +154,9 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
         ScalarValue::LargeUtf8(v) => v,
         _ => {
             return Err(DataFusionError::SQL(
-                ParserError::ParserError(
+                Box::new(ParserError::ParserError(
                     "Invalid argument types[needle] to str_match function".to_string(),
-                ),
+                )),
                 None,
             ));
         }
@@ -162,9 +164,9 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
     .as_ref()
     .ok_or_else(|| {
         DataFusionError::SQL(
-            ParserError::ParserError(
+            Box::new(ParserError::ParserError(
                 "Invalid argument types[needle] to str_match function".to_string(),
-            ),
+            )),
             None,
         )
     })?

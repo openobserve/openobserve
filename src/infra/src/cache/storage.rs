@@ -21,8 +21,8 @@ use config::utils::time::BASE_TIME;
 use futures::{StreamExt, stream::BoxStream};
 use object_store::{
     Attributes, Error, GetOptions, GetResult, GetResultPayload, ListResult, MultipartUpload,
-    OBJECT_STORE_COALESCE_DEFAULT, ObjectMeta, PutMultipartOpts, PutOptions, PutPayload, PutResult,
-    Result, coalesce_ranges, path::Path,
+    OBJECT_STORE_COALESCE_DEFAULT, ObjectMeta, PutMultipartOptions, PutOptions, PutPayload,
+    PutResult, Result, coalesce_ranges, path::Path,
 };
 use once_cell::sync::Lazy;
 
@@ -86,7 +86,7 @@ impl ObjectStoreExt for CacheFS {
         &self,
         _account: &str,
         _location: &Path,
-        _opts: PutMultipartOpts,
+        _opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
         Err(Error::NotImplemented)
     }
@@ -320,7 +320,7 @@ mod tests {
     async fn test_cache_fs_put_multipart_opts() {
         let cache_fs = CacheFS {};
         let location = Path::from("test/file.txt");
-        let opts = PutMultipartOpts::default();
+        let opts = PutMultipartOptions::default();
 
         let result = cache_fs
             .put_multipart_opts("default", &location, opts)

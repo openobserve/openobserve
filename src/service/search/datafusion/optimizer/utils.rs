@@ -132,12 +132,14 @@ impl TreeNodeRewriter for AddSortAndLimit {
 
 fn generate_limit_plan(input: Arc<LogicalPlan>, limit: usize, skip: usize) -> LogicalPlan {
     LogicalPlan::Limit(Limit {
-        skip: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
-            skip as i64,
-        ))))),
-        fetch: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
-            limit as i64,
-        ))))),
+        skip: Some(Box::new(Expr::Literal(
+            ScalarValue::Int64(Some(skip as i64)),
+            None,
+        ))),
+        fetch: Some(Box::new(Expr::Literal(
+            ScalarValue::Int64(Some(limit as i64)),
+            None,
+        ))),
         input,
     })
 }
@@ -188,12 +190,14 @@ fn generate_limit_and_sort_plan(
     let (sort, schema) = generate_sort_plan(input, limit + skip);
     (
         LogicalPlan::Limit(Limit {
-            skip: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
-                skip as i64,
-            ))))),
-            fetch: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
-                limit as i64,
-            ))))),
+            skip: Some(Box::new(Expr::Literal(
+                ScalarValue::Int64(Some(skip as i64)),
+                None,
+            ))),
+            fetch: Some(Box::new(Expr::Literal(
+                ScalarValue::Int64(Some(limit as i64)),
+                None,
+            ))),
             input: Arc::new(sort),
         }),
         schema,
@@ -203,7 +207,7 @@ fn generate_limit_and_sort_plan(
 fn get_int_from_expr(expr: &Option<Box<Expr>>) -> usize {
     match expr {
         Some(expr) => match expr.as_ref() {
-            Expr::Literal(ScalarValue::Int64(Some(value))) => *value as usize,
+            Expr::Literal(ScalarValue::Int64(Some(value)), _) => *value as usize,
             _ => 0,
         },
         _ => 0,

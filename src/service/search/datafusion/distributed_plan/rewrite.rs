@@ -129,7 +129,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         let sort = child.as_any().downcast_ref::<SortExec>().unwrap();
                         let sort_merge = Arc::new(
                             SortPreservingMergeExec::new(
-                                LexOrdering::new(sort.expr().to_vec()),
+                                LexOrdering::new(sort.expr().to_vec()).unwrap(),
                                 Arc::new(sort.clone()),
                             )
                             .with_fetch(sort.fetch()),

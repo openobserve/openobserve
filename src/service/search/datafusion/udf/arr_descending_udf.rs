@@ -50,7 +50,9 @@ pub fn arr_descending_impl(args: &[ColumnarValue]) -> datafusion::error::Result<
     log::debug!("Inside arr_descending");
     if args.len() != 1 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError("UDF params should be: arr_descending(field1)".to_string()),
+            Box::new(ParserError::ParserError(
+                "UDF params should be: arr_descending(field1)".to_string(),
+            )),
             None,
         ));
     }

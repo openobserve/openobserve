@@ -55,7 +55,9 @@ pub fn to_arr_string_impl(args: &[ColumnarValue]) -> datafusion::error::Result<C
     log::debug!("Inside cast_to_arr_impl");
     if args.len() != 1 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError("UDF params should be: to_array_string(array)".to_string()),
+            Box::new(ParserError::ParserError(
+                "UDF params should be: to_array_string(array)".to_string(),
+            )),
             None,
         ));
     }
