@@ -549,23 +549,7 @@ async fn delete_stream_cache(
     }
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let delete_ts = match get_ts_from_request_with_key(&query, "ts") {
-        Ok(ts) => ts,
-        Err(e) => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                e,
-            )));
-        }
-    };
-
-    // If ts parameter is present, it must be > 0
-    if delete_ts <= 0 {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            "Timestamp parameter must be greater than 0".to_string(),
-        )));
-    }
+    let delete_ts = get_ts_from_request_with_key(&query, "ts").unwrap_or(0);
 
     let path = if stream_name.eq("_all") {
         org_id

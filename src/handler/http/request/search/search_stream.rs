@@ -771,6 +771,6 @@ async fn get_sql(
     stream_type: StreamType,
     search_type: Option<SearchEventType>,
 ) -> Result<crate::service::search::sql::Sql, infra::errors::Error> {
-    crate::service::search::sql::Sql::new(&query.clone().into(), &org_id, stream_type, search_type)
+    crate::service::search::sql::Sql::new(&query.clone().into(), org_id, stream_type, search_type)
         .await
 }
