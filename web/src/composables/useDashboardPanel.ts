@@ -3005,7 +3005,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   }
 
   // This function parses the custom query and generates the errors and custom fields
-  const updateQueryValue = () => {
+  const updateQueryValue = (shouldSkipCustomQueryFields: boolean = false) => {
     // store the query in the dashboard panel data
     // dashboardPanelData.meta.editorValue = value;
     // dashboardPanelData.data.query = value;
@@ -3075,7 +3075,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       // get the columns first
       if (
         Array.isArray(dashboardPanelData.meta.parsedQuery?.columns) &&
-        dashboardPanelData.meta.parsedQuery?.columns?.length > 0
+        dashboardPanelData.meta.parsedQuery?.columns?.length > 0 &&
+        !shouldSkipCustomQueryFields
       ) {
         const oldCustomQueryFields = JSON.parse(
           JSON.stringify(dashboardPanelData.meta.stream.customQueryFields),
@@ -3155,9 +3156,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
       // if pageKey is logs, then return
       // because custom query fields will be extracted from the query using the result schema api
-      if (pageKey == "logs") {
-        return;
-      }
+      // NOW: we need to only skip custom query fields for logs page
+      // not stream selection, so commented below code and in updateQueryValue function will skip custom query fields extraction
+      // if (pageKey == "logs") {
+      //   return;
+      // }
 
       // Check if customQuery mode has changed
       const customQueryChanged = newVal[1] !== oldVal[1];
@@ -3170,7 +3173,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.data.queryType == "sql"
       ) {
         // Call the updateQueryValue function
-        if (parser) updateQueryValue();
+        // will skip custom query fields extraction for logs page
+        if (parser) updateQueryValue(pageKey == "logs" ? true : false);
       } else if (customQueryChanged) {
         // Only clear lists when switching modes
         // auto query mode selected
