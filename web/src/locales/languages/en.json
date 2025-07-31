@@ -166,7 +166,10 @@
     "visualizeDisabledForMultiStream": "Visualization is disabled for multi stream",
     "transformType": "Transform Type",
     "saveActionDisabled": "Saving Action is currently unavailable",
-    "moreActions": "More Actions"
+    "moreActions": "More Actions",
+    "downloadCSV": "CSV",
+    "downloadJSON": "JSON",
+    "fileType": "File Type"
   },
   "menu": {
     "home": "Home",
