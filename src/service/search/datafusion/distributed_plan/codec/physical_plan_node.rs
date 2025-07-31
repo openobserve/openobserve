@@ -91,16 +91,7 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
 
 #[cfg(test)]
 mod tests {
-    use datafusion::{
-        arrow::datatypes::{DataType, Field, Schema},
-        functions_aggregate::count::count_udaf,
-        physical_expr::aggregate::AggregateExprBuilder,
-        physical_plan::{
-            aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
-            empty::EmptyExec,
-            expressions::{col, lit},
-        },
-    };
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion_proto::bytes::{
         physical_plan_from_bytes_with_extension_codec, physical_plan_to_bytes_with_extension_codec,
     };
@@ -110,33 +101,14 @@ mod tests {
     #[tokio::test]
     async fn test_datafusion_codec() -> Result<()> {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
-
-        let grouping_set = PhysicalGroupBy::new(
-            vec![(col("a", &schema)?, "a".to_string())],
-            vec![],
-            vec![vec![false]],
-        );
-
-        let aggregates = vec![Arc::new(
-            AggregateExprBuilder::new(count_udaf(), vec![lit(1i32)])
-                .schema(Arc::clone(&schema))
-                .alias("COUNT(1)")
-                .build()?,
-        )];
-
-        let agg_plan = AggregateExec::try_new(
-            AggregateMode::Partial,
-            grouping_set.clone(),
-            aggregates.clone(),
-            vec![None],
-            Arc::new(EmptyExec::new(Arc::clone(&schema))),
+        let plan: Arc<dyn ExecutionPlan> = Arc::new(NewEmptyExec::new(
+            "test",
             Arc::clone(&schema),
-        )?;
-        let plan: Arc<dyn ExecutionPlan> = Arc::new(AggregateTopkExec::new(
-            Arc::new(agg_plan) as Arc<dyn ExecutionPlan>,
-            "COUNT(1)",
+            Some(&vec![0]),
+            &[],
+            Some(10),
             false,
-            10,
+            Arc::clone(&schema),
         ));
 
         // encode
@@ -146,12 +118,16 @@ mod tests {
         // decode
         let ctx = datafusion::prelude::SessionContext::new();
         let plan2 = physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx, &proto)?;
-        let plan2 = plan2.as_any().downcast_ref::<AggregateTopkExec>().unwrap();
-        let plan = plan.as_any().downcast_ref::<AggregateTopkExec>().unwrap();
+        let plan2 = plan2.as_any().downcast_ref::<NewEmptyExec>().unwrap();
+        let plan = plan.as_any().downcast_ref::<NewEmptyExec>().unwrap();
 
         // check
+        assert_eq!(plan.name(), plan2.name());
+        assert_eq!(plan.schema(), plan2.schema());
+        assert_eq!(plan.projection(), plan2.projection());
+        assert_eq!(plan.filters(), plan2.filters());
         assert_eq!(plan.limit(), plan2.limit());
-        assert_eq!(plan.descending(), plan2.descending());
+        assert_eq!(plan.full_schema(), plan2.full_schema());
 
         Ok(())
     }
