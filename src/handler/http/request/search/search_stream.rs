@@ -239,10 +239,10 @@ pub async fn search_http2_stream(
             return http_response;
         }
     };
-    // Update histogram interval -- first occurrence of histogram interval
+    // Update histogram interval -- initial interval assignment
     // Need to calculate the histogram interval before converting the query to a histogram query
     // when `is_ui_histogram` is true. This is because if a query is already a histogram query
-    // with interval Since for http2 streaming at the point of converting the query to a
+    // with interval, for http2 streaming at the point of converting the query to a
     // histogram query the interval will be generated again and not honor the original interval
     // mentioned in the query.
     if let Some(interval) = sql.histogram_interval {
