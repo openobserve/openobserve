@@ -53,6 +53,10 @@ fn main() -> Result<()> {
         .type_attribute("MetricsQueryResponse", "#[derive(serde::Serialize)]")
         .type_attribute("ScanStats", "#[derive(Eq)]")
         .type_attribute("ScanStats", "#[derive(serde::Serialize)]")
+        .type_attribute(
+            "PhysicalPlanNode.plan",
+            "#[allow(clippy::large_enum_variant)]",
+        )
         .extern_path(".datafusion_common", "::datafusion_proto::protobuf")
         .extern_path(".datafusion", "::datafusion_proto::protobuf")
         .compile(
