@@ -866,9 +866,7 @@ mod tests {
 
         for (i, (query, description)) in queries.iter().enumerate() {
             let is_simple_aggregate = is_simple_aggregate_query(query).unwrap();
-            println!(
-                "Query [{i}]: {description} - is_simple: {is_simple_aggregate:?}"
-            );
+            println!("Query [{i}]: {description} - is_simple: {is_simple_aggregate:?}");
             assert!(
                 !is_simple_aggregate,
                 "Failed test case [{i}]: '{description}' - should not be simple but returned true"
@@ -940,9 +938,7 @@ mod tests {
 
         for (i, (query, description)) in queries.iter().enumerate() {
             let is_simple_aggregate = is_simple_aggregate_query(query).unwrap();
-            println!(
-                "Simple Query [{i}]: {description} - is_simple: {is_simple_aggregate:?}"
-            );
+            println!("Simple Query [{i}]: {description} - is_simple: {is_simple_aggregate:?}");
             assert!(
                 is_simple_aggregate,
                 "Failed test case [{i}]: '{description}' - should be simple but returned false"
