@@ -34,6 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'q-router-link--active':
         router.currentRoute.value.path.indexOf(link) == 0 && link != '/',
       'q-link-function': title == 'Functions',
+      'light-mode-link': store?.state?.theme == 'light',
+      'dark-mode-link': store?.state?.theme == 'dark',
     }"
     :target="target"
     @click="external ? openWebPage(link) : ''"
@@ -116,14 +118,13 @@ export default defineComponent({
 <style scoped lang="scss">
 .q-item {
   padding: 3px 8px;
-  margin: 0 8px;
-  border-radius: 6px;
+  margin: 0 0px;
 
   /* Overriding default height */
   min-height: 30px;
+  
 
   &.q-router-link--active {
-    background-color: $primary;
     color: white;
 
     &::before {
@@ -134,9 +135,10 @@ export default defineComponent({
       left: -30px;
       top: 0;
       background-color: inherit;
-      border-radius: 6px;
     }
   }
+
+
 
   &.ql-item-mini {
     margin: 0;
@@ -152,4 +154,5 @@ export default defineComponent({
   padding: 0;
   min-width: 40px;
 }
+
 </style>

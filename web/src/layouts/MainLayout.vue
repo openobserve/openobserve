@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
   <q-layout
     view="hHh Lpr lff"
-    :class="[store.state.printMode === true ? 'printMode' : '']"
+    :class="[store.state.printMode === true ? 'printMode' : '', store?.state?.theme == 'dark' ? 'dark-mode-layout' : 'light-mode-layout']"
   >
     <q-header
       :class="[store?.state?.theme == 'dark' ? 'dark-mode' : 'bg-white']"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :src="
               `data:image; base64, ` + store.state.zoConfig?.custom_logo_img
             "
-            style="max-width: 150px; max-height: 31px"
+            style="max-width: 150px; max-height: 32px"
           />
           <img
             v-if="store.state.zoConfig.custom_hide_self_logo == false"
@@ -484,7 +484,7 @@ class="padding-none" />
     <q-drawer
       v-model="drawer"
       show-if-above
-      :width="80"
+      :width="74"
       :breakpoint="500"
       bordered
       class="o2-bg-color"
@@ -1527,7 +1527,7 @@ export default defineComponent({
   .appLogo {
     width: 120px;
     max-width: 150px;
-    max-height: 31px;
+    max-height: 32px;
     cursor: pointer;
 
     &__mini {
@@ -1557,25 +1557,26 @@ export default defineComponent({
   padding: 8px 8px;
 }
 
-.o2-bg-color {
-  background-color: rgba(89, 96, 178, 0.08);
-}
-
 .q-list {
   &.leftNavList {
     padding-bottom: 0px;
 
     .q-item {
-      margin: 5px 5px 5px 5px;
       display: list-item;
       text-align: center;
       list-style: none;
-      padding: 5px 2px;
-      border-radius: 5px;
+      padding: 6px 2px;
+      cursor: pointer !important;
+      width: 73px !important;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
 
       .q-icon {
-        height: 1.5rem;
-        width: 1.5rem;
+        height: 20px !important;
+        width: 20px !important;
       }
 
       &.q-router-link--active {
@@ -1594,6 +1595,7 @@ export default defineComponent({
         font-weight: 600;
         color: grey;
       }
+
     }
   }
 
@@ -1609,7 +1611,6 @@ export default defineComponent({
     &__section {
       &--avatar {
         padding-right: 0px !important;
-        min-width: 1.5rem;
         display: list-item;
         text-align: center;
         list-style: none;
@@ -1863,6 +1864,44 @@ body.ai-chat-open {
       font-size: 14px;
     }
   }
+  }
+}
+
+.dark-mode-layout{
+  .o2-bg-color{
+    background-color: #28282D;
+  }
+}
+.light-mode-layout{
+  .o2-bg-color{
+    background-color: #F8FAFC;
+  }
+}
+
+//handle dark and light mode link active state here
+.q-item{
+  &.light-mode-link{
+    &.q-router-link--active{
+      background-color: #45A4F3;
+      &:hover{
+        background-color: #45A4F3 !important;
+      }
+    }
+    &:hover{
+      background-color: #E8F5FF !important;
+    }
+  }
+
+  &.dark-mode-link{
+    &.q-router-link--active{
+      background-color: #45A4F3;
+      &:hover{
+        background-color: #45A4F3 !important;
+      }
+    }
+    &:hover{
+      background-color: #4D677A !important;
+    }
   }
 }
 </style>
