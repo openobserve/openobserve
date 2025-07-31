@@ -65,6 +65,8 @@ pub async fn add_job(job: CompactorManualJob) -> Result<String, errors::Error> {
     Ok(job_id)
 }
 
+// Bulk update jobs, intentionally does not do super cluster sync
+// to keep the updates of the job local to the cluster
 pub async fn bulk_update_jobs(jobs: Vec<CompactorManualJob>) -> Result<(), errors::Error> {
     bulk_update(jobs).await
 }
