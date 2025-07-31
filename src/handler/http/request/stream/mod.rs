@@ -785,7 +785,7 @@ async fn get_local_delete_status(id: &str) -> CompactorManualJobStatusRes {
             key: job.key,
             created_at: job.created_at,
             ended_at: job.ended_at,
-            status: job.status.clone(),
+            status: job.status,
         },
         cluster: "".to_string(),
         region: "".to_string(),
@@ -793,7 +793,7 @@ async fn get_local_delete_status(id: &str) -> CompactorManualJobStatusRes {
 
     CompactorManualJobStatusRes {
         id: id.to_string(),
-        status: job.status.clone(),
+        status: job.status,
         metadata: vec![entry],
         errors: vec![],
     }
@@ -838,11 +838,11 @@ async fn get_super_cluster_delete_status(
         .await
         {
             Ok(response) => {
-                if CompactorManualJobStatus::from(response.status as i64)
+                if CompactorManualJobStatus::from(response.status)
                     == CompactorManualJobStatus::Pending
                 {
                     all_pending = true;
-                } else if CompactorManualJobStatus::from(response.status as i64)
+                } else if CompactorManualJobStatus::from(response.status)
                     == CompactorManualJobStatus::Completed
                 {
                     all_completed = false;
@@ -855,7 +855,7 @@ async fn get_super_cluster_delete_status(
                         key: response.key,
                         created_at: response.created_at,
                         ended_at: response.ended_at,
-                        status: CompactorManualJobStatus::from(response.status as i64),
+                        status: CompactorManualJobStatus::from(response.status),
                     },
                 };
                 results.push(res);
