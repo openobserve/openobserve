@@ -1444,6 +1444,14 @@ export default defineComponent({
                   searchObj?.data?.queryResults
                     ?.visualization_histogram_interval,
               };
+
+              // assign converted_histogram_query to dashboardPanelData
+              if(searchObj.data.queryResults.converted_histogram_query){
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].converted_histogram_query = searchObj.data.queryResults.converted_histogram_query ;
+              }
+
             } else {
               searchResponseForVisualization.value = {
                 ...searchObj.data.queryResults,
