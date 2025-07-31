@@ -172,12 +172,12 @@ export default defineComponent({
           });
         })
         .catch((err) => {
-          compilationErr.value = err.response.data["message"];
-          if(err.response.status != 403){
+          compilationErr.value = err.response?.data?.["message"] || err.message || "Unknown error";
+          if(err.response?.status != 403){
             q.notify({
             type: "negative",
             message:
-              JSON.stringify(err.response.data["error"]) ||
+              JSON.stringify(err.response?.data?.["error"]) ||
               "Enrichment Table creation failed",
           });
           }

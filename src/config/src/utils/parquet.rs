@@ -266,7 +266,7 @@ mod tests {
         // Write to parquet
         let data = write_recordbatch_to_parquet(
             schema.clone(),
-            &[batch.clone()],
+            std::slice::from_ref(&batch),
             &["name".to_string()],
             &metadata,
         )

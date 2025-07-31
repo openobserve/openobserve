@@ -38,7 +38,7 @@ mod tests {
             "hello", "world", "foo", "bar", "test", "test1", "test2", "test3",
         ] {
             let sum = h.sum64(key);
-            println!("{}: {}", key, sum);
+            println!("{key}: {sum}");
         }
         assert_eq!(h.sum64("hello"), 13009744463427800296);
         assert_eq!(h.sum64("world"), 16436542438370751598);

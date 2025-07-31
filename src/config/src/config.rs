@@ -208,12 +208,13 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_SEARCH_AROUND_FIELDS: [&str; 5] = [
+const _DEFAULT_SEARCH_AROUND_FIELDS: [&str; 6] = [
     "k8s_cluster",
     "k8s_namespace_name",
     "k8s_pod_name",
     "kubernetes_namespace_name",
     "kubernetes_pod_name",
+    "hostname",
 ];
 pub static DEFAULT_SEARCH_AROUND_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
@@ -760,6 +761,8 @@ pub struct Common {
     pub feature_query_without_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
     pub feature_query_remove_filter_with_index: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_NOT_FILTER_WITH_INDEX", default = false)]
+    pub feature_query_not_filter_with_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
     pub feature_query_streaming_aggs: bool,
     #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]

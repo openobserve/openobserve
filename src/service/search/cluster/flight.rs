@@ -463,14 +463,19 @@ pub async fn run_datafusion(
         context,
     );
 
-    // TODO: if there is only one table and single node, we can skip the remote scan rewrite
+    // if there is only one table and single node, we can skip the remote scan rewrite
     let mut empty_exec_count_visitor = NewEmptyExecCountVisitor::default();
     physical_plan.visit(&mut empty_exec_count_visitor)?;
-    let _empty_exec_count = empty_exec_count_visitor.get_count();
-    physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
+    let empty_exec_count = empty_exec_count_visitor.get_count();
+    let is_changed = if empty_exec_count <= 1 && config::cluster::LOCAL_NODE.is_single_node() {
+        false
+    } else {
+        physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
+        rewrite.is_changed
+    };
 
     // add remote scan exec to top if physical plan is not changed
-    if !rewrite.is_changed {
+    if !is_changed {
         let table_name = sql.stream_names.first().unwrap();
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
@@ -872,12 +877,20 @@ pub(crate) async fn partition_file_by_hash(
     for fk in file_id_list {
         let node_name =
             infra_cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group)
-                .await
-                .expect("there is no querier node in consistent hash ring");
-        let idx = match node_idx.get(&node_name) {
-            Some(idx) => *idx,
+                .await;
+        let idx = match node_name {
+            Some(node_name) => match node_idx.get(&node_name) {
+                Some(idx) => *idx,
+                None => {
+                    log::warn!("partition_file_by_hash: {node_name} not found in node_idx");
+                    0
+                }
+            },
             None => {
-                log::error!("partition_file_by_hash: {node_name} not found in node_idx");
+                log::warn!(
+                    "partition_file_by_hash: {} can't get a node from consistent hashing",
+                    fk.id
+                );
                 0
             }
         };
