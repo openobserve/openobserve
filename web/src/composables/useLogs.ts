@@ -2831,6 +2831,9 @@ const useLogs = () => {
               searchObj.data.queryResults.aggs = [];
             }
 
+            // copy converted_histogram_query to queryResults
+            searchObj.data.queryResults.converted_histogram_query = res?.data?.converted_histogram_query ?? "";
+
             const parsedSQL: any = fnParsedSQL();
             const partitions = JSON.parse(
               JSON.stringify(
@@ -5677,6 +5680,9 @@ const useLogs = () => {
     searchObj.data.queryResults.histogram_interval = response.content.results.histogram_interval;
     if(searchObj.data.queryResults.histogram_interval) searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
     searchObj.data.queryResults.order_by = response?.content?.results?.order_by ?? "desc";
+
+    // copy converted_histogram_query to queryResults
+    searchObj.data.queryResults.converted_histogram_query = response?.content?.results?.converted_histogram_query ?? "";
 
     // check if histogram interval is undefined, then set current response as histogram response
     // for visualization, will require to set histogram interval to fill missing values

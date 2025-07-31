@@ -1436,6 +1436,9 @@ export default defineComponent({
 
             // set logs page data to searchResponseForVisualization
             if (shouldUseHistogramQuery.value === true) {
+
+              // only do it if is_histogram_eligible is true on logs page
+              if(searchObj.data.queryResults.is_histogram_eligible === true){
               // replace hits with histogram query data
               searchResponseForVisualization.value = {
                 ...searchObj.data.queryResults,
@@ -1444,6 +1447,15 @@ export default defineComponent({
                   searchObj?.data?.queryResults
                     ?.visualization_histogram_interval,
               };
+
+              // assign converted_histogram_query to dashboardPanelData
+              if(searchObj.data.queryResults.converted_histogram_query){
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].converted_histogram_query = searchObj.data.queryResults.converted_histogram_query ;
+              }
+            }
+
             } else {
               searchResponseForVisualization.value = {
                 ...searchObj.data.queryResults,
@@ -1714,11 +1726,15 @@ export default defineComponent({
       };
 
       try {
-
-        let logsPageQuery = searchObj.data.query;        
-        // return if query is empty and stream is not selected 
-        if(logsPageQuery === "" && searchObj?.data?.stream?.selectedStream?.length === 0){ 
-          showErrorNotification("Query is empty, please write query to visualize");
+        let logsPageQuery = searchObj.data.query;
+        // return if query is empty and stream is not selected
+        if (
+          logsPageQuery === "" &&
+          searchObj?.data?.stream?.selectedStream?.length === 0
+        ) {
+          showErrorNotification(
+            "Query is empty, please write query to visualize",
+          );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
         }
@@ -2165,7 +2181,7 @@ export default defineComponent({
           this.searchObj.meta.histogramDirtyFlag = false;
         } else if (
           this.searchObj.meta.sqlMode &&
-          (this.isDistinctQuery(parsedSQL))
+          this.isDistinctQuery(parsedSQL)
         ) {
           this.resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
@@ -2263,10 +2279,10 @@ export default defineComponent({
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
       // Clear any existing timeout
-      if (updateColumnsTimeout.value) {
-        clearTimeout(updateColumnsTimeout.value);
+      if (this.updateColumnsTimeout) {
+        clearTimeout(this.updateColumnsTimeout);
       }
-      updateColumnsTimeout.value = setTimeout(() => {
+      this.updateColumnsTimeout = setTimeout(() => {
         this.updateGridColumns();
       }, 50);
     },
