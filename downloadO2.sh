@@ -6,7 +6,7 @@ BASE_URL="https://downloads.openobserve.ai/releases"
 
 # 2. Set base URL based on release type
 if [ "$RELEASE_TYPE" == "opensource" ]; then
-  URL="${BASE_URL}/opensource"
+  URL="${BASE_URL}/openobserve"
   BINARY_NAME="openobserve"
 else
   URL="${BASE_URL}/o2-enterprise"
