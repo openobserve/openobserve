@@ -317,8 +317,8 @@ impl Sql {
                 let bucket_width = histogram_interval.unwrap() as u64 * 1_000_000;
                 // round the bucket edges to even start
                 let rounding_by = bucket_width as i64;
-                let min_value = (query.start_time / rounding_by) * rounding_by;
-                let max_value = (query.end_time / rounding_by) * rounding_by;
+                let min_value = query.start_time - query.start_time % rounding_by;
+                let max_value = query.end_time;
                 let num_buckets =
                     ((max_value - min_value) as f64 / bucket_width as f64).ceil() as usize;
                 index_optimize_mode = Some(IndexOptimizeMode::SimpleHistogram(
