@@ -540,6 +540,7 @@ export default defineComponent({
     provide("hoveredSeriesState", hoveredSeriesState);
 
     const addToDashboard = () => {
+
       const errors: any = [];
       // will push errors in errors array
       validatePanel(errors, true);
@@ -739,7 +740,8 @@ export default defineComponent({
     };
 
     const onResultMetadataUpdate = (resultMetaData: any) => {
-      if (resultMetaData?.[0]?.converted_histogram_query) {
+      // only copy if is_ui_histogram is true
+      if (resultMetaData?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
         dashboardPanelData.data.queries[0].query =
           resultMetaData?.[0]?.converted_histogram_query;
 
