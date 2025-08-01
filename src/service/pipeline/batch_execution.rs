@@ -1004,8 +1004,7 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
             let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
             if let Err(e) = writer.write_wal(records_to_write).await {
                 let err_msg = format!(
-                    "DestinationNode error persisting data for batch_key '{}' to be ingested externally: {}",
-                    batch_key, e
+                    "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
                 );
                 log::error!("{err_msg}");
             }
