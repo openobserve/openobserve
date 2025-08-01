@@ -138,8 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       style="
                         flex: 1;
-                        min-height: calc(100% - 24px);
-                        height: calc(100% - 24px);
+                        min-height: calc(100% - 36px);
+                        height: calc(100% - 36px);
                         width: 100%;
                         margin-top: 36px;
                       "
@@ -464,7 +464,7 @@ export default defineComponent({
       async () => {
         // await nextTick();
         chartData.value = JSON.parse(JSON.stringify(visualizeChartData.value));
-      },
+      },{deep: true}
     );
 
     const isOutDated = computed(() => {
@@ -540,6 +540,7 @@ export default defineComponent({
     provide("hoveredSeriesState", hoveredSeriesState);
 
     const addToDashboard = () => {
+
       const errors: any = [];
       // will push errors in errors array
       validatePanel(errors, true);
@@ -739,9 +740,13 @@ export default defineComponent({
     };
 
     const onResultMetadataUpdate = (resultMetaData: any) => {
-      if (resultMetaData?.[0]?.converted_histogram_query) {
+      // only copy if is_ui_histogram is true
+      if (resultMetaData?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
         dashboardPanelData.data.queries[0].query =
           resultMetaData?.[0]?.converted_histogram_query;
+
+        // assign to visualizeChartData as well
+        visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query
       }
     };
 
