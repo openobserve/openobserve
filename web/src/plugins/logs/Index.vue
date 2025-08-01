@@ -2138,10 +2138,10 @@ export default defineComponent({
         this.searchObj.meta.sqlMode == false
       ) {
         // Clear any existing timeout
-        if (chartRedrawTimeout.value) {
-          clearTimeout(chartRedrawTimeout.value);
+        if (this.chartRedrawTimeout) {
+          clearTimeout(this.chartRedrawTimeout);
         }
-        chartRedrawTimeout.value = setTimeout(() => {
+        this.chartRedrawTimeout = setTimeout(() => {
           if (this.searchResultRef) this.searchResultRef.reDrawChart();
         }, 100);
       }
@@ -2242,7 +2242,7 @@ export default defineComponent({
               }, 100);
 
               // Store timeout reference for cleanup
-              chartRedrawTimeout.value = timeout;
+              this.chartRedrawTimeout = timeout;
             })
             .finally(() => {
               this.searchObj.loadingHistogram = false;
