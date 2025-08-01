@@ -953,13 +953,6 @@ pub struct Common {
         help = "Toggle inverted index count optimizer."
     )]
     pub inverted_index_count_optimizer_enabled: bool,
-    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
-    #[env_config(
-        name = "ZO_FULL_TEXT_SEARCH_TYPE",
-        default = "eq",
-        help = "Search through full text fields with either 'contains' , 'eq' or 'prefix' match."
-    )]
-    pub full_text_search_type: String,
     #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
