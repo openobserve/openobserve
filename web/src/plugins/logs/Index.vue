@@ -1479,18 +1479,26 @@ export default defineComponent({
               }
             }
 
-            // set date time
-            const dateTime =
-              searchObj.data.datetime.type === "relative"
-                ? getConsumableRelativeTime(
+
+            if (searchObj?.data?.customDownloadQueryObj?.query?.end_time && searchObj?.data?.datetime?.startTime) {
+              dashboardPanelData.meta.dateTime = {
+                start_time: new Date(searchObj.data.customDownloadQueryObj.query.start_time),
+                end_time: new Date(searchObj.data.customDownloadQueryObj.query.end_time),
+              };
+            } else {
+              // set date time
+              const dateTime =
+                searchObj.data.datetime.type === "relative"
+                  ? getConsumableRelativeTime(
                     searchObj.data.datetime.relativeTimePeriod,
                   )
-                : cloneDeep(searchObj.data.datetime);
+                  : cloneDeep(searchObj.data.datetime);
 
-            dashboardPanelData.meta.dateTime = {
-              start_time: new Date(dateTime.startTime),
-              end_time: new Date(dateTime.endTime),
-            };
+              dashboardPanelData.meta.dateTime = {
+                start_time: new Date(dateTime.startTime),
+                end_time: new Date(dateTime.endTime),
+              };
+            }
 
             // run query
             visualizeChartData.value = JSON.parse(
