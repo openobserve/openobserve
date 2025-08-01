@@ -727,6 +727,7 @@ async fn process_delta(
                 new_start_time,
                 new_end_time,
                 search_res.order_by,
+                search_res.order_by_metadata.clone(),
                 is_streaming_aggs,
                 response_tx.clone(),
             )
@@ -1096,6 +1097,7 @@ async fn send_partial_search_resp(
     new_start_time: i64,
     new_end_time: i64,
     order_by: Option<OrderBy>,
+    order_by_metadata: Vec<(String, OrderBy)>,
     is_streaming_aggs: bool,
     response_tx: Sender<WsServerEvents>,
 ) -> Result<(), Error> {
@@ -1110,6 +1112,7 @@ async fn send_partial_search_resp(
         new_start_time: Some(new_start_time),
         new_end_time: Some(new_end_time),
         order_by,
+        order_by_metadata,
         trace_id: trace_id.to_string(),
         ..Default::default()
     };

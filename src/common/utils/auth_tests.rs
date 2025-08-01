@@ -3455,6 +3455,8 @@ mod tests {
                 remove_file_after_max_retry: bool::default(),
                 max_retry_count: u32::default(),
                 max_retry_time_in_hours: u64::default(),
+                pipeline_max_file_retention_time_seconds: u64::default(),
+                pipeline_max_file_size_on_disk_mb: usize::default(),
             },
             encryption: config::Encryption {
                 algorithm: String::default(),

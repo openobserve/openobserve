@@ -624,6 +624,7 @@ pub async fn do_partitioned_search(
             );
             search_res.hits.truncate(req_size as usize);
             curr_res_size += req_size;
+            search_res.total = search_res.hits.len();
         } else {
             curr_res_size += total_hits;
         }
@@ -1074,6 +1075,7 @@ async fn process_delta(
             );
             search_res.hits.truncate(req.query.size as usize);
             *curr_res_size += req.query.size;
+            search_res.total = search_res.hits.len();
         } else {
             *curr_res_size += total_hits;
         }
@@ -1184,6 +1186,7 @@ async fn process_delta(
                 new_start_time,
                 new_end_time,
                 search_res.order_by,
+                search_res.order_by_metadata.clone(),
                 is_streaming_aggs,
                 sender,
             )
@@ -1226,12 +1229,14 @@ async fn process_delta(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send_partial_search_resp(
     trace_id: &str,
     error: &str,
     new_start_time: i64,
     new_end_time: i64,
     order_by: Option<OrderBy>,
+    order_by_metadata: Vec<(String, OrderBy)>,
     is_streaming_aggs: bool,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
 ) -> Result<(), infra::errors::Error> {
@@ -1246,6 +1251,7 @@ async fn send_partial_search_resp(
         new_start_time: Some(new_start_time),
         new_end_time: Some(new_end_time),
         order_by,
+        order_by_metadata,
         trace_id: trace_id.to_string(),
         ..Default::default()
     };
