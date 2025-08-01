@@ -1868,6 +1868,8 @@ export default defineComponent({
 
         return shouldUseHistogramQuery.value;
       } catch (err) {
+        visualizeErrorData.errors.splice(0);
+        visualizeErrorData.errors.push(err.response?.data?.message);
         variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
         throw err;
       }
