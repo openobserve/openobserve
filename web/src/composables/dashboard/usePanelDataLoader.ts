@@ -1715,9 +1715,9 @@ export const usePanelDataLoader = (
         const errorDetailValue =
           error?.response?.data.error_detail ||
           error?.response?.data.message ||
+          error?.error_detail ||
           error?.message ||
-          error?.error ||
-          error?.error_detail;
+          error?.error;
 
         const trimmedErrorMessage =
           errorDetailValue?.length > 300
@@ -1726,10 +1726,15 @@ export const usePanelDataLoader = (
 
         const errorCode =
           isWebSocketEnabled() || isStreamingEnabled()
-            ? error?.response?.data?.code || error?.code || error?.status || ""
-            : error?.response?.status ||
+            ? error?.response?.status ||
               error?.status ||
               error?.response?.data?.code ||
+              error?.code ||
+              ""
+            : error?.response?.status ||
+              error?.response?.data?.code ||
+              error?.status ||
+              error?.code ||
               "";
 
         state.errorDetail = {

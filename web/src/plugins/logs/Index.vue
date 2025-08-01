@@ -1438,7 +1438,9 @@ export default defineComponent({
             if (shouldUseHistogramQuery.value === true) {
 
               // only do it if is_histogram_eligible is true on logs page
-              if(searchObj.data.queryResults.is_histogram_eligible === true){
+              // and showHistogram is true on logs page
+              if(searchObj?.data?.queryResults?.is_histogram_eligible === true && searchObj?.meta?.showHistogram === true){
+
               // replace hits with histogram query data
               searchResponseForVisualization.value = {
                 ...searchObj.data.queryResults,
@@ -1452,7 +1454,10 @@ export default defineComponent({
               if(searchObj.data.queryResults.converted_histogram_query){
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].converted_histogram_query = searchObj.data.queryResults.converted_histogram_query ;
+                ].query = searchObj.data.queryResults.converted_histogram_query;
+
+                // assign to visualizeChartData as well
+                visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query
               }
             }
 
@@ -1474,18 +1479,26 @@ export default defineComponent({
               }
             }
 
-            // set date time
-            const dateTime =
-              searchObj.data.datetime.type === "relative"
-                ? getConsumableRelativeTime(
+
+            if (searchObj?.data?.customDownloadQueryObj?.query?.end_time && searchObj?.data?.datetime?.startTime) {
+              dashboardPanelData.meta.dateTime = {
+                start_time: new Date(searchObj.data.customDownloadQueryObj.query.start_time),
+                end_time: new Date(searchObj.data.customDownloadQueryObj.query.end_time),
+              };
+            } else {
+              // set date time
+              const dateTime =
+                searchObj.data.datetime.type === "relative"
+                  ? getConsumableRelativeTime(
                     searchObj.data.datetime.relativeTimePeriod,
                   )
-                : cloneDeep(searchObj.data.datetime);
+                  : cloneDeep(searchObj.data.datetime);
 
-            dashboardPanelData.meta.dateTime = {
-              start_time: new Date(dateTime.startTime),
-              end_time: new Date(dateTime.endTime),
-            };
+              dashboardPanelData.meta.dateTime = {
+                start_time: new Date(dateTime.startTime),
+                end_time: new Date(dateTime.endTime),
+              };
+            }
 
             // run query
             visualizeChartData.value = JSON.parse(
