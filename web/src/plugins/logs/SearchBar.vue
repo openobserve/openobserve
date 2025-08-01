@@ -904,6 +904,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'empty-function'
                       : ''
                   "
+                  :readOnly="searchObj.meta.logsVisualizeToggle === 'visualize'"
                   @keydown="handleKeyDown"
                   language="vrl"
                   @focus="searchObj.meta.functionEditorPlaceholderFlag = false"

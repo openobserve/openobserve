@@ -60,8 +60,9 @@ pub async fn get_enrichment_table_data(
         use_cache: None,
         local_mode: Some(true),
     };
-    log::debug!(
-        "get enrichment table {} data req start time: {}",
+    log::info!(
+        "get enrichment table {}/{} data req start time: {}",
+        org_id,
         name,
         start_time
     );
@@ -75,7 +76,12 @@ pub async fn get_enrichment_table_data(
             }
         }
         Err(err) => {
-            log::error!("get enrichment table data error: {:?}", err);
+            log::error!(
+                "get enrichment table {}/{} data error: {:?}",
+                org_id,
+                name,
+                err
+            );
             Ok(vec![])
         }
     }

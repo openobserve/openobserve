@@ -20,6 +20,7 @@ mod compactor_manual_jobs;
 mod dashboards;
 mod destinations;
 mod distinct_values;
+mod enrichment_table;
 mod folders;
 mod meta;
 mod pipelines;
@@ -53,6 +54,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_cipher_key_msg: cipher_keys::process,
         on_rate_limit_msg: ratelimit::process,
         on_compactor_manual_job_msg: compactor_manual_jobs::process,
+        on_enrichment_file_list_delete_msg: enrichment_table::process_file_list_delete,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,
