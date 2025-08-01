@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'metric_icon_present'
             : ''
         "
+        :readonly="dashboardPanelDataPageKey === 'logs'"
       >
         <template
           v-if="

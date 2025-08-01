@@ -3294,6 +3294,7 @@ export default defineComponent({
           if(searchObj.meta.sqlMode) {
             searchObj.data.queryResults.aggs = undefined;
           }
+          searchObj.meta.refreshHistogram = true;
           getQueryData();
           searchObj.meta.logsVisualizeDirtyFlag = false;
         }

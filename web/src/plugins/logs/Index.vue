@@ -361,6 +361,7 @@ import {
   provide,
   onMounted,
   onBeforeUnmount,
+  onUnmounted,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -617,42 +618,10 @@ export default defineComponent({
 
     const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 
-    // function restoreUrlQueryParams() {
-    //   const queryParams = router.currentRoute.value.query;
-    //   if (!queryParams.stream) {
-    //     return;
-    //   }
-    //   const date = {
-    //     startTime: queryParams.from,
-    //     endTime: queryParams.to,
-    //     relativeTimePeriod: queryParams.period || null,
-    //     type: queryParams.period ? "relative" : "absolute",
-    //   };
-    //   if (date) {
-    //     searchObj.data.datetime = date;
-    //   }
-    //   if (queryParams.query) {
-    //     searchObj.meta.sqlMode = queryParams.sql_mode == "true" ? true : false;
-    //     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
-    //     searchObj.data.query = b64DecodeUnicode(queryParams.query);
-    //   }
-    //   if (queryParams.refresh) {
-    //     searchObj.meta.refreshInterval = queryParams.refresh;
-    //   }
-    // }
-
-    // async function loadPageData() {
-    //   try {
-    //     loadLogsData();
-    //   } catch (e) {
-    //     searchObj.loading = false;
-    //     console.log(e);
-    //   }
-    // }
-    // onUnmounted(() => {
-    // resetSearchObj();
-    // resetStreamData();
-    // });
+    onUnmounted(() => {
+      // reset logsVisualizeToggle when user navigate to other page with keepAlive is false and navigate back to logs page
+      searchObj.meta.logsVisualizeToggle = 'logs';
+    });
 
     onBeforeMount(() => {
       handleBeforeMount();
@@ -1678,6 +1647,10 @@ export default defineComponent({
           searchBarRef.value.dateTimeRef &&
           searchBarRef.value.dateTimeRef.refresh();
 
+
+        // set logsVisualizeDirtyFlag to true
+        searchObj.meta.logsVisualizeDirtyFlag = true;
+
         const dateTime =
           searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
@@ -1780,8 +1753,8 @@ export default defineComponent({
         }
 
         // handle sql mode
-        if(!searchObj.data.sqlMode){
-          const queryBuild= buildSearch();
+        if(!searchObj.meta.sqlMode){
+          const queryBuild = buildSearch();
           logsPageQuery = queryBuild?.query?.sql ?? "";
         }
 
@@ -1898,6 +1871,8 @@ export default defineComponent({
 
         return shouldUseHistogramQuery.value;
       } catch (err) {
+        visualizeErrorData.errors.splice(0);
+        visualizeErrorData.errors.push(err.response?.data?.message);
         variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
         throw err;
       }
