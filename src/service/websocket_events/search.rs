@@ -726,7 +726,7 @@ async fn process_delta(
                 MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE,
                 new_start_time,
                 new_end_time,
-                search_res.order_by,
+                search_res.order_by.clone(),
                 is_streaming_aggs,
                 response_tx.clone(),
             )
@@ -1095,7 +1095,7 @@ async fn send_partial_search_resp(
     error: &str,
     new_start_time: i64,
     new_end_time: i64,
-    order_by: Option<OrderBy>,
+    order_by: Vec<(String, OrderBy)>,
     is_streaming_aggs: bool,
     response_tx: Sender<WsServerEvents>,
 ) -> Result<(), Error> {

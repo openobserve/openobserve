@@ -61,8 +61,8 @@ fn apply_sort_strategy(search_res: &mut Response, strategy: SortStrategy) {
             };
 
             sort_by_column(search_res, &col, is_string, is_descending);
-            if search_res.order_by.is_none() {
-                search_res.order_by = Some(order);
+            if search_res.order_by.is_empty() {
+                search_res.order_by = vec![(col, order)];
             }
         }
         SortStrategy::AutoDetermine(col, is_string) => {
@@ -78,11 +78,11 @@ fn determine_sort_strategy(
     fallback_order_by_col: Option<String>,
 ) -> SortStrategy {
     // Check SQL ORDER BY first
-    if let Some(order_by) = search_res.order_by {
+    if !search_res.order_by.is_empty() {
         log::info!(
             "[trace_id: {}] Using user-specified ORDER BY: {:?}",
             &search_res.trace_id,
-            order_by
+            search_res.order_by
         );
         return SortStrategy::SqlOrderBy;
     }

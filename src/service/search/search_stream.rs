@@ -1233,7 +1233,7 @@ async fn send_partial_search_resp(
     error: &str,
     new_start_time: i64,
     new_end_time: i64,
-    order_by: Option<OrderBy>,
+    order_by: Vec<(String, OrderBy)>,
     is_streaming_aggs: bool,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
 ) -> Result<(), infra::errors::Error> {
