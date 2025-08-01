@@ -85,7 +85,7 @@ async fn can_use_distinct_stream(
         .await
         .unwrap_or_default();
 
-    if stream_settings.disable_distinct_fields {
+    if !stream_settings.enable_distinct_fields {
         return false;
     }
 

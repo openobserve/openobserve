@@ -595,7 +595,7 @@ pub struct UpdateStreamSettings {
     #[serde(default)]
     pub pattern_associations: UpdateSettingsWrapper<PatternAssociation>,
     #[serde(default)]
-    pub disable_distinct_fields: Option<bool>,
+    pub enable_distinct_fields: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
@@ -724,7 +724,7 @@ pub struct StreamSettings {
     #[serde(default)]
     pub index_all_values: bool,
     #[serde(default)]
-    pub disable_distinct_fields: bool
+    pub enable_distinct_fields: bool
 }
 
 impl Serialize for StreamSettings {
@@ -754,7 +754,7 @@ impl Serialize for StreamSettings {
         state.serialize_field("extended_retention_days", &self.extended_retention_days)?;
         state.serialize_field("index_original_data", &self.index_original_data)?;
         state.serialize_field("index_all_values", &self.index_all_values)?;
-        state.serialize_field("disable_distinct_fields", &self.disable_distinct_fields)?;
+        state.serialize_field("disable_distinct_fields", &self.enable_distinct_fields)?;
 
         if !self.defined_schema_fields.is_empty() {
             let mut fields = self.defined_schema_fields.clone();
@@ -909,10 +909,10 @@ impl From<&str> for StreamSettings {
             .get("index_all_values")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
-        let disable_distinct_fields = settings
-            .get("disable_distinct_fields")
+        let enable_distinct_fields = settings
+            .get("enable_distinct_fields")
             .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+            .unwrap_or(true);
         Self {
             partition_time_level,
             partition_keys,
@@ -930,7 +930,7 @@ impl From<&str> for StreamSettings {
             extended_retention_days,
             index_original_data,
             index_all_values,
-            disable_distinct_fields
+            enable_distinct_fields
         }
     }
 }
