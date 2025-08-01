@@ -2613,13 +2613,13 @@ const useLogs = () => {
           if (
             searchObj.data.queryResults.hits.length > 0 &&
             store.state.zoConfig.timestamp_column != "" &&
-            res.data.hasOwnProperty("orderby_meta_data") &&
-            res.data.orderby_meta_data.length > 0 
+            res.data.hasOwnProperty("order_by_metadata") &&
+            res.data.order_by_metadata.length > 0 
           ) {
             sortResponse(
               searchObj.data.queryResults.hits,
               store.state.zoConfig.timestamp_column,
-              res.data.orderby_meta_data
+              res.data.order_by_metadata
             );
           }
 
