@@ -450,14 +450,19 @@ pub async fn run_datafusion(
         context,
     );
 
-    // TODO: if there is only one table and single node, we can skip the remote scan rewrite
+    // if there is only one table and single node, we can skip the remote scan rewrite
     let mut empty_exec_count_visitor = NewEmptyExecCountVisitor::default();
     physical_plan.visit(&mut empty_exec_count_visitor)?;
-    let _empty_exec_count = empty_exec_count_visitor.get_count();
-    physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
+    let empty_exec_count = empty_exec_count_visitor.get_count();
+    let is_changed = if empty_exec_count <= 1 && config::cluster::LOCAL_NODE.is_single_node() {
+        false
+    } else {
+        physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
+        rewrite.is_changed
+    };
 
     // add remote scan exec to top if physical plan is not changed
-    if !rewrite.is_changed {
+    if !is_changed {
         let table_name = sql.stream_names.first().unwrap();
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,

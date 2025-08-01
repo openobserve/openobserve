@@ -238,6 +238,36 @@ async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     MetaHttpResponse::json(resp_body)
 }
 
+/// ExportDashboard
+///
+/// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"get"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "ExportDashboard",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard ID"),
+    ),
+    responses(
+        (status = StatusCode::OK, body = GetDashboardResponseBody),
+        (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
+    ),
+)]
+#[get("/{org_id}/dashboards/{dashboard_id}/export")]
+pub async fn export_dashboard(path: web::Path<(String, String)>) -> impl Responder {
+    let (org_id, dashboard_id) = path.into_inner();
+    let dashboard = match dashboards::get_dashboard(&org_id, &dashboard_id).await {
+        Ok(dashboard) => dashboard,
+        Err(err) => return err.into(),
+    };
+    let resp_body: GetDashboardResponseBody = dashboard.into();
+    MetaHttpResponse::json(resp_body)
+}
+
 /// DeleteDashboard
 ///
 /// #{"ratelimit_module":"Dashboards", "ratelimit_module_operation":"delete"}#
