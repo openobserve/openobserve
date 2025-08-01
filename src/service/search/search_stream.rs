@@ -1185,7 +1185,7 @@ async fn process_delta(
                 "reached max query range limit",
                 new_start_time,
                 new_end_time,
-                search_res.order_by.clone(),
+                search_res.order_by,
                 search_res.order_by_metadata.clone(),
                 is_streaming_aggs,
                 sender,
@@ -1229,6 +1229,7 @@ async fn process_delta(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send_partial_search_resp(
     trace_id: &str,
     error: &str,

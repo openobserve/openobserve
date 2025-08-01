@@ -726,7 +726,7 @@ async fn process_delta(
                 MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE,
                 new_start_time,
                 new_end_time,
-                search_res.order_by.clone(),
+                search_res.order_by,
                 search_res.order_by_metadata.clone(),
                 is_streaming_aggs,
                 response_tx.clone(),

@@ -601,7 +601,7 @@ pub fn merge_response(
     cache_response.took_detail = res_took;
     cache_response.order_by = search_response
         .first()
-        .map(|res| res.order_by.clone())
+        .map(|res| res.order_by)
         .unwrap_or_default();
     cache_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
         / ((result_cache_len + cache_hits_len) as f64))

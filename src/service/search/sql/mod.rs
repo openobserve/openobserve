@@ -2032,7 +2032,7 @@ pub fn validate_and_adjust_histogram_interval(
 
     // If no valid interval found (requested interval is larger than max valid interval)
     // Return the maximum valid interval (1 day)
-    (*valid_intervals.last().unwrap()).into()
+    *valid_intervals.last().unwrap()
 }
 
 pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
