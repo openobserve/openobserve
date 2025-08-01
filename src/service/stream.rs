@@ -406,12 +406,6 @@ pub async fn update_stream_settings(
             if let Some(index_all_values) = new_settings.index_all_values {
                 settings.index_all_values = index_all_values;
             }
-            let mut update_distinct_disable_fields = false;
-            if let Some(disable_distinct_fields) = new_settings.disable_distinct_fields {
-                settings.disable_distinct_fields = disable_distinct_fields;
-                // Reset timestamps only when explicitly enabling distinct fields (false)
-                update_distinct_disable_fields = !disable_distinct_fields;
-            }
 
             // if index_original_data is true, store_original_data must be true
             if settings.index_original_data {
@@ -580,8 +574,14 @@ pub async fn update_stream_settings(
                         .remove
                         .contains(&field.name)
                 });
+            }
 
-                if update_distinct_disable_fields {
+            if let Some(disable_distinct_fields) = new_settings.disable_distinct_fields {
+                // Only reset timestamps when transitioning from disabled to enabled
+                let was_disabled = settings.disable_distinct_fields;
+                settings.disable_distinct_fields = disable_distinct_fields;
+                if was_disabled && !disable_distinct_fields {
+
                     let current_time = now_micros();
                     settings.distinct_value_fields.iter_mut().for_each(|f| {
                         f.added_ts = current_time;
@@ -590,6 +590,7 @@ pub async fn update_stream_settings(
                         "Re-enabling distinct fields for stream {}/{}/{}. Resetting timestamps for {:?} fields.",
                         org_id, stream_type, stream_name, settings.distinct_value_fields
                     );
+
                 }
             }
 
