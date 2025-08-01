@@ -270,6 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @panelsValues="handleEmittedData"
         @searchRequestTraceIds="searchRequestTraceIds"
         :runId="runId"
+        @update:runId="updateRunId"
       />
 
       <q-dialog
@@ -1140,6 +1141,10 @@ export default defineComponent({
       }
     };
 
+    const updateRunId = (newRunId) => {
+      runId.value = newRunId;
+    };
+
     // Add these new refs and methods
     const showJsonEditorDialog = ref(false);
 
@@ -1203,6 +1208,7 @@ export default defineComponent({
       openSettingsDialog,
       loadDashboard,
       refreshPanelRequest,
+      updateRunId,
       initialVariableValues,
       getQueryParamsForDuration,
       onDataZoom,

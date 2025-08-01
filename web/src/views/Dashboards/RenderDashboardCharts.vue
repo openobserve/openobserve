@@ -137,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @refresh="refreshDashboard"
               @update:initial-variable-values="updateInitialVariableValues"
               @onEditLayout="openEditLayout"
+              @update:runId="updateRunId"
             >
             </PanelContainer>
           </div>
@@ -779,6 +780,10 @@ export default defineComponent({
       };
     };
 
+    const updateRunId = (newRunId) => {
+      emit("update:runId", newRunId);
+    };
+
     const openEditLayout = (id: string) => {
       emit("openEditLayout", id);
     };
@@ -800,6 +805,7 @@ export default defineComponent({
       refreshDashboard,
       onMovePanel,
       refreshPanelRequest,
+      updateRunId,
       variablesValueSelectorRef,
       updateInitialVariableValues,
       isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
