@@ -76,13 +76,7 @@ blake3 = { version = "1.6", features = ["rayon"] }
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
-clap = { version = "4.1", default-features = false, features = [
-    "std",
-    "help",
-    "usage",
-    "suggestions",
-    "cargo",
-] }
+clap.workspace = true
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 cron.workspace = true
 csv = "1.3"
@@ -246,6 +240,13 @@ chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
 ], default-features = false, rev = "6f2392f78ae851e2acf33df8e9764cc299d837db" }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
+clap = { version = "4.1", default-features = false, features = [
+    "std",
+    "help",
+    "usage",
+    "suggestions",
+    "cargo",
+] }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
