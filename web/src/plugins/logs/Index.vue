@@ -1453,6 +1453,9 @@ export default defineComponent({
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].converted_histogram_query = searchObj.data.queryResults.converted_histogram_query ;
+
+                // assign to visualizeChartData as well
+                visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query
               }
             }
 

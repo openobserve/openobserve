@@ -464,7 +464,7 @@ export default defineComponent({
       async () => {
         // await nextTick();
         chartData.value = JSON.parse(JSON.stringify(visualizeChartData.value));
-      },
+      },{deep: true}
     );
 
     const isOutDated = computed(() => {
@@ -742,6 +742,9 @@ export default defineComponent({
       if (resultMetaData?.[0]?.converted_histogram_query) {
         dashboardPanelData.data.queries[0].query =
           resultMetaData?.[0]?.converted_histogram_query;
+
+        // assign to visualizeChartData as well
+        visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query
       }
     };
 
