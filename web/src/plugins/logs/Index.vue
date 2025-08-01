@@ -1740,9 +1740,8 @@ export default defineComponent({
         }
 
         // handle sql mode
-        if (!searchObj.data.sqlMode) {
-          const queryBuild = buildSearch();
-          logsPageQuery = queryBuild?.query?.sql ?? "";
+        if (!searchObj.meta.sqlMode) {
+          logsPageQuery = searchObj.data.customDownloadQueryObj?.query?.sql ?? "";
         }
 
         // check if query is empty

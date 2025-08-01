@@ -3338,9 +3338,8 @@ export default defineComponent({
         let logsPageQuery = searchObj.data.query;
 
         // handle sql mode
-        if(!searchObj.data.sqlMode){
-          const queryBuild= buildSearch();
-          logsPageQuery = queryBuild?.query?.sql ?? "";
+        if(!searchObj.meta.sqlMode){
+          logsPageQuery = searchObj.data.customDownloadQueryObj?.query?.sql ?? "";
         }
 
         // validate sql query that all fields have alias
