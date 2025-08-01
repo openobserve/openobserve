@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="addToDashboard"
                         title="Add To Dashboard"
                         :disabled="
-                          errorData?.errors.length > 0 ||
+                          errorData?.errors?.length > 0 ||
                           errorData?.value?.message !== ''
                         "
                         >Add To Dashboard</q-btn
