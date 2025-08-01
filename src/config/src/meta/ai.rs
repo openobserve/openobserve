@@ -13,36 +13,67 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::fmt::Display;
+
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SystemPrompt {
-    pub id: String,
-    pub name: String,
-    pub content: String,
-    pub version: i32,
-    pub created_at: i64,
-    pub updated_at: i64,
-    pub is_active: bool,
-    pub tags: Vec<String>,
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PromptType {
+    #[default]
+    System,
+    User,
 }
 
+impl From<&str> for PromptType {
+    fn from(value: &str) -> Self {
+        match value {
+            "system" => Self::System,
+            "user" => Self::User,
+            _ => Self::default(),
+        }
+    }
+}
+
+impl Display for PromptType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PromptType::System => write!(f, "system"),
+            PromptType::User => write!(f, "user"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct SystemPrompt {
+    pub r#type: PromptType,
+    pub content: String,
+    pub updated_at: i64,
+}
 
 impl SystemPrompt {
-    pub fn new_default(content: String) -> Self {
-        let now = Utc::now().timestamp_millis();
-        const DEFAULT_VERSION: i32 = 0;
-        const DEFAULT_ID: &str = "default";
+    fn new(r#type: PromptType, content: String) -> Self {
+        let updated_at = if r#type == PromptType::System {
+            0
+        } else {
+            Utc::now().timestamp_millis()
+        };
+
         Self {
-            id: DEFAULT_ID.to_string(),
-            name: DEFAULT_ID.to_string(),
+            r#type,
             content,
-            version: DEFAULT_VERSION,
-            created_at: now,
-            updated_at: now,
-            is_active: true,
-            tags: vec![DEFAULT_ID.to_string()],
+            updated_at,
         }
+    }
+
+    /// Returns a new user prompt
+    pub fn user(content: String) -> Self {
+        Self::new(PromptType::User, content)
+    }
+
+    /// Returns a new system prompt
+    pub fn system(content: String) -> Self {
+        Self::new(PromptType::System, content)
     }
 }

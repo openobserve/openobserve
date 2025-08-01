@@ -5,16 +5,11 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "system_prompts")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub id: String,
-    pub name: String,
-    #[sea_orm(column_type = "Text")]
+    #[sea_orm(primary_key, column_type = "Text", unique, not_null)]
+    pub r#type: String,
+    #[sea_orm(column_type = "Text", not_null)]
     pub content: String,
-    pub version: i32,
-    pub created_at: i64,
     pub updated_at: i64,
-    pub is_active: bool,
-    pub tags: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

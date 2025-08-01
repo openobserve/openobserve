@@ -48,18 +48,14 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            db::Event::Put(ev) => {
-                let prompt_id = ev.key.strip_prefix(AI_PROMPTS_WATCH_PREFIX).unwrap();
+            db::Event::Put(_) => {
                 // Call the enterprise update_prompt_in_memory function to update the cache
                 if let Err(e) =
-                    o2_enterprise::enterprise::ai::prompt::service::update_prompt_in_memory(
-                        prompt_id,
-                    )
-                    .await
+                    o2_enterprise::enterprise::ai::prompt::service::update_prompt_in_memory().await
                 {
                     log::error!("Failed to update AI prompt in memory cache: {e}");
                 }
-                log::debug!("Updated AI prompt in memory cache: {prompt_id}");
+                log::debug!("Updated AI prompt in memory cache");
             }
             // db::Event::Delete(ev) => {
             //     let prompt_id = ev.key.strip_prefix(AI_PROMPTS_WATCH_PREFIX).unwrap();

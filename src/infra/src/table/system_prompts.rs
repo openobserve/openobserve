@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::ai::SystemPrompt;
+use config::meta::ai::{PromptType, SystemPrompt};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Schema, Set, Unchanged,
+    QuerySelect, Schema, Set,
 };
 
 use super::{entity::system_prompts::Model, get_lock};
@@ -31,14 +31,9 @@ impl TryFrom<Model> for SystemPrompt {
 
     fn try_from(model: Model) -> Result<Self, Self::Error> {
         Ok(SystemPrompt {
-            id: model.id,
-            name: model.name,
+            r#type: model.r#type.as_str().into(),
             content: model.content,
-            version: model.version,
-            created_at: model.created_at,
             updated_at: model.updated_at,
-            is_active: model.is_active,
-            tags: serde_json::from_value(model.tags.clone())?,
         })
     }
 }
@@ -57,64 +52,54 @@ pub async fn create_table() -> Result<(), errors::Error> {
     Ok(())
 }
 
-pub async fn add(prompt: &SystemPrompt) -> Result<String, errors::Error> {
+pub async fn add(prompt: &SystemPrompt) -> Result<(), errors::Error> {
     let record = ActiveModel {
-        id: Set(prompt.id.clone()),
-        name: Set(prompt.name.clone()),
+        r#type: Set(prompt.r#type.to_string()),
         content: Set(prompt.content.clone()),
-        version: Set(prompt.version),
-        created_at: Set(prompt.created_at),
         updated_at: Set(prompt.updated_at),
-        is_active: Set(prompt.is_active),
-        tags: Set(prompt.tags.clone().into()),
     };
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let uuid = Entity::insert(record).exec(client).await?.last_insert_id;
+    Entity::insert(record).exec(client).await?;
 
-    Ok(uuid)
+    Ok(())
 }
 
-pub async fn update(prompt: &SystemPrompt) -> Result<String, errors::Error> {
-    let id = prompt.id.clone();
+pub async fn update(prompt: &SystemPrompt) -> Result<(), errors::Error> {
     let record = ActiveModel {
-        id: Unchanged(id),
-        name: Set(prompt.name.clone()),
+        r#type: Set(prompt.r#type.to_string()),
         content: Set(prompt.content.clone()),
-        version: Set(prompt.version),
-        created_at: Set(prompt.created_at),
         updated_at: Set(prompt.updated_at),
-        is_active: Set(prompt.is_active),
-        tags: Set(prompt.tags.clone().into()),
     };
 
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let prompt = Entity::update(record).exec(client).await?;
+    Entity::update(record).exec(client).await?;
 
-    Ok(prompt.id)
+    Ok(())
 }
-pub async fn remove(_org_id: &str, id: &str) -> Result<(), errors::Error> {
+pub async fn remove(_org_id: &str, r#type: PromptType) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let _ = Entity::delete_many()
-        .filter(Column::Id.eq(id))
+        .filter(Column::Type.eq(r#type.to_string()))
         .exec(client)
         .await?;
 
     Ok(())
 }
 
-pub async fn get(id: &str, _org_id: &str) -> Result<Option<SystemPrompt>, errors::Error> {
+pub async fn get(r#type: PromptType) -> Result<Option<SystemPrompt>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
-    let record = Entity::find_by_id(id)
+    let record = Entity::find()
+        .filter(Column::Type.eq(r#type.to_string()))
         .one(client)
         .await?
         .map(SystemPrompt::try_from)
@@ -123,26 +108,38 @@ pub async fn get(id: &str, _org_id: &str) -> Result<Option<SystemPrompt>, errors
     Ok(record)
 }
 
-pub async fn list(_org_id: &str, limit: Option<i64>) -> Result<Vec<SystemPrompt>, errors::Error> {
-    let limit = limit.unwrap_or(100);
+/// Returns the system prompt and the user prompt.
+///
+/// If the user prompt is not found, it returns None
+pub async fn get_all() -> Result<(Option<SystemPrompt>, Option<SystemPrompt>), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let res = Entity::find()
-        .limit(limit as u64)
-        .order_by(Column::Id, Order::Desc);
+        // This limit doesn't matter much, but still
+        .limit(2 as u64)
+        .order_by(Column::Type, Order::Asc);
 
     let records = res
         .all(client)
         .await?
         .into_iter()
         .map(SystemPrompt::try_from)
-        .collect::<Result<_, errors::Error>>()?;
+        .collect::<Result<Vec<SystemPrompt>, errors::Error>>()?;
 
-    Ok(records)
+    let user_prompt = records
+        .iter()
+        .find(|p| p.r#type == PromptType::User)
+        .cloned();
+    let system_prompt = records.into_iter().find(|p| p.r#type == PromptType::System);
+
+    Ok((system_prompt, user_prompt))
 }
 
-pub async fn contains(id: &str, _org_id: &str) -> Result<bool, errors::Error> {
+pub async fn exists(r#type: PromptType) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let record = Entity::find().filter(Column::Id.eq(id)).one(client).await?;
+    let record = Entity::find()
+        .filter(Column::Type.eq(r#type.to_string()))
+        .one(client)
+        .await?;
 
     Ok(record.is_some())
 }

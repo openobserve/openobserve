@@ -36,41 +36,31 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 
 pub(crate) async fn process_msg(msg: AiPromptMessage) -> Result<()> {
     match msg {
-        AiPromptMessage::Update {
-            id,
-            name,
-            content,
-            tags,
-            is_active,
-        } => {
+        AiPromptMessage::Update { content } => {
             // Check if the prompt exists in the DB, if it does, return early
-            if table::system_prompts::get(&id, "").await?.is_some() {
+            if table::system_prompts::get(config::meta::ai::PromptType::User)
+                .await?
+                .is_some()
+            {
                 return Ok(());
             }
 
-            // Create the SystemPrompt struct
-            let now = chrono::Utc::now().timestamp_millis();
-            let prompt = SystemPrompt {
-                id,
-                name,
-                content,
-                version: 0, // Start with version 0 for new prompts
-                created_at: now,
-                updated_at: now,
-                is_active,
-                tags,
-            };
+            let prompt = SystemPrompt::user(content);
 
             // Add to database
             table::system_prompts::add(&prompt).await?;
 
             // Emit cluster coordinator event to notify nodes in current cluster
-            infra::cluster_coordinator::ai_prompts::emit_put_event(&prompt.id).await?;
+            infra::cluster_coordinator::ai_prompts::emit_put_event().await?;
 
-            log::info!(
-                "[SUPER_CLUSTER:AI_PROMPT] Created system prompt: {}",
-                prompt.id
-            );
+            log::info!("[SUPER_CLUSTER:AI_PROMPT] Created system prompt");
+        }
+        AiPromptMessage::Rollback => {
+            // Rollback to default system prompt
+            table::system_prompts::remove("", config::meta::ai::PromptType::User).await?;
+
+            // Emit cluster coordinator event to notify nodes in current cluster
+            infra::cluster_coordinator::ai_prompts::emit_rollback_event().await?;
         }
     };
     Ok(())

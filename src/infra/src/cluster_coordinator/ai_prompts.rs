@@ -19,19 +19,19 @@ pub const AI_PROMPTS_WATCH_PREFIX: &str = "/ai_prompts/";
 
 /// Sends event to the cluster coordinator indicating that an AI prompt has been put
 /// into the database.
-pub async fn emit_put_event(prompt_id: &str) -> Result<(), Error> {
-    let key = format!("{AI_PROMPTS_WATCH_PREFIX}{prompt_id}");
+pub async fn emit_put_event() -> Result<(), Error> {
     let cluster_coordinator = super::get_coordinator().await;
     cluster_coordinator
-        .put(&key, bytes::Bytes::from(""), true, None)
+        .put(AI_PROMPTS_WATCH_PREFIX, bytes::Bytes::from(""), true, None)
         .await?;
     Ok(())
 }
 
-/// Sends event to the cluster coordinator indicating that an AI prompt has been
-/// deleted from the database.
-pub async fn emit_delete_event(prompt_id: &str) -> Result<(), Error> {
-    let key = format!("{AI_PROMPTS_WATCH_PREFIX}{prompt_id}");
+/// Sends event to the cluster coordinator indicating that AI prompt
+/// has been rolled back to default system prompt
+pub async fn emit_rollback_event() -> Result<(), Error> {
     let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator.delete(&key, false, true, None).await
-} 
+    cluster_coordinator
+        .delete(AI_PROMPTS_WATCH_PREFIX, false, true, None)
+        .await
+}
