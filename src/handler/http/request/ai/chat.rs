@@ -13,14 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_web::{HttpRequest, HttpResponse, Responder, post, web};
+use actix_http::StatusCode;
+use actix_web::{
+    HttpRequest, HttpResponse, Responder, post,
+    web::{self, Json},
+};
 use o2_enterprise::enterprise::{ai, common::config::get_config as get_o2_config};
+use serde::Deserialize;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::{
         models::ai::{PromptRequest, PromptResponse},
-        request::search::search_stream::report_to_audit,
+        request::{ai::util::Headers, search::search_stream::report_to_audit},
     },
 };
 
@@ -56,16 +61,12 @@ use crate::{
     ),
 )]
 #[post("/{org_id}/ai/chat")]
-pub async fn chat(body: web::Json<PromptRequest>) -> impl Responder {
+pub async fn chat(Json(body): Json<PromptRequest>) -> impl Responder {
     let config = get_o2_config();
 
     if config.ai.enabled {
-        let req_body = body.into_inner();
-        let response = ai::service::chat(ai::meta::AiServerRequest::new(
-            req_body.messages,
-            req_body.model,
-        ))
-        .await;
+        let response =
+            ai::service::chat(ai::meta::AiServerRequest::new(body.messages, body.model)).await;
         match response {
             Ok(response) => HttpResponse::Ok().json(PromptResponse::from(response)),
             Err(e) => {
@@ -76,6 +77,13 @@ pub async fn chat(body: web::Json<PromptRequest>) -> impl Responder {
     } else {
         MetaHttpResponse::bad_request("AI is not enabled")
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct TraceInfo {
+    user_id: String,
+    #[serde(default)]
+    trace_id: String,
 }
 
 /// CreateChatStream
@@ -111,30 +119,21 @@ pub async fn chat(body: web::Json<PromptRequest>) -> impl Responder {
 )]
 #[post("/{org_id}/ai/chat_stream")]
 pub async fn chat_stream(
+    Headers(auth_data): Headers<TraceInfo>,
     org_id: web::Path<String>,
     body: web::Json<PromptRequest>,
     in_req: HttpRequest,
 ) -> impl Responder {
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let TraceInfo { user_id, trace_id } = auth_data;
     let org_id = org_id.into_inner();
-    let trace_id = in_req
-        .headers()
-        .get("trace_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-    let mut code = 200;
+
+    let mut code = StatusCode::OK.as_u16();
     let req_body = body.into_inner();
     let body_bytes = serde_json::to_string(&req_body).unwrap();
 
     if !get_o2_config().ai.enabled {
         let error_message = Some("AI is not enabled".to_string());
-        code = 400;
+        code = StatusCode::BAD_REQUEST.as_u16();
         report_to_audit(
             user_id,
             org_id,
@@ -161,7 +160,7 @@ pub async fn chat_stream(
         Err(e) => {
             let error_message = Some(e.to_string());
             // TODO: Handle the error rather than hard coding
-            code = 500;
+            code = StatusCode::INTERNAL_SERVER_ERROR.as_u16();
             report_to_audit(
                 user_id,
                 org_id,
@@ -180,6 +179,6 @@ pub async fn chat_stream(
 
     report_to_audit(user_id, org_id, trace_id, code, None, &in_req, body_bytes).await;
     HttpResponse::Ok()
-        .content_type("text/event-stream")
+        .content_type(mime::TEXT_EVENT_STREAM)
         .streaming(stream)
 }
