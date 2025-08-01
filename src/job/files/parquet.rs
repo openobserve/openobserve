@@ -382,7 +382,6 @@ async fn move_files(
     }
     let num_uds_fields = stream_settings
         .defined_schema_fields
-        .unwrap_or_default()
         .len();
     if stream_data_retention_days > 0 {
         let date =
@@ -475,7 +474,7 @@ async fn move_files(
         tokio::task::yield_now().await;
         // merge file and get the big file key
         let (account, new_file_name, new_file_meta, new_file_list) =
-            match merge_files(thread_id, latest_schema.clone(), &wal_dir, &files_with_size).await {
+            match merge_files(thread_id, latest_schema.clone(), &wal_dir, &files_with_size, num_uds_fields).await {
                 Ok(v) => v,
                 Err(e) => {
                     log::error!("[INGESTER:JOB] merge files failed: {e}");
