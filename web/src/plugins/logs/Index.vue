@@ -1634,6 +1634,10 @@ export default defineComponent({
           searchBarRef.value.dateTimeRef &&
           searchBarRef.value.dateTimeRef.refresh();
 
+
+        // set logsVisualizeDirtyFlag to true
+        searchObj.meta.logsVisualizeDirtyFlag = true;
+
         const dateTime =
           searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
