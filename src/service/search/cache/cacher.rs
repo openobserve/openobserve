@@ -865,7 +865,7 @@ mod tests {
                 new_end_time: None,
                 result_cache_ratio: 33,
                 work_group: None,
-                order_by: Some(OrderBy::Asc),
+                order_by: vec![(String::from("x_axis_1"), OrderBy::Asc)],
                 is_histogram_eligible: None,
                 converted_histogram_query: None,
             },
