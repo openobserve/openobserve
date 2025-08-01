@@ -331,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboard-id="props.dashboardId"
       :folder-id="props.folderId"
       :report-id="props.reportId"
-      :runId="props.runId"
+      :runId="runId"
       :tabId="props.tabId"
       :tabName="props.tabName"
       @loading-state-change="handleLoadingStateChange"
@@ -402,7 +402,7 @@ import {
 } from "@quasar/extras/material-symbols-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
-import { getFunctionErrorMessage } from "@/utils/zincutils";
+import { getFunctionErrorMessage, getUUID } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -423,6 +423,7 @@ export default defineComponent({
     "refresh",
     "update:initial-variable-values",
     "onEditLayout",
+    "update:runId",
   ],
   props: [
     "data",
@@ -739,7 +740,31 @@ export default defineComponent({
       isPanelLoading.value = isLoading;
     };
 
+    // Initialize dashboard run ID management
+    const runId = ref(props.runId || getUUID().replace(/-/g, ""));
+
+    // Watch for changes in the runId prop and update local runId
+    watch(
+      () => props.runId,
+      (newRunId) => {
+        if (newRunId) {
+          runId.value = newRunId;
+        }
+      },
+    );
+
+    const generateNewDashboardRunId = () => {
+      const newRunId = getUUID().replace(/-/g, "");
+      runId.value = newRunId;
+      // Emit the new run ID to parent component
+      emit("update:runId", newRunId);
+      return newRunId;
+    };
+
     const onRefreshPanel = async () => {
+      // Need to generate a new run id when refreshing the panel
+      generateNewDashboardRunId();
+
       if (isPanelLoading.value) return;
 
       isPanelLoading.value = true;
