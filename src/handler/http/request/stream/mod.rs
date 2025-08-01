@@ -773,7 +773,9 @@ async fn get_local_delete_status(id: &str) -> CompactorManualJobStatusRes {
                 id: id.to_string(),
                 status: CompactorManualJobStatus::Pending,
                 metadata: vec![],
-                errors: vec![e.to_string()],
+                errors: vec![serde_json::json!({
+                    "error": e.to_string(),
+                })],
             };
         }
     };
@@ -862,7 +864,12 @@ async fn get_super_cluster_delete_status(
                     cluster.get_cluster(),
                     e
                 );
-                errors.push(e.to_string());
+                let err = serde_json::json!({
+                    "cluster": cluster.get_cluster(),
+                    "region": cluster.get_region(),
+                    "error": e.to_string(),
+                });
+                errors.push(err);
             }
         }
     }

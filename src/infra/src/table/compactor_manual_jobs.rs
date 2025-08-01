@@ -87,7 +87,7 @@ pub struct CompactorManualJobStatusRes {
     pub status: Status,
     pub metadata: Vec<CompactorManualJobResEntry>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub errors: Vec<String>,
+    pub errors: Vec<serde_json::Value>,
 }
 
 pub async fn get(ksuid: &str) -> Result<CompactorManualJob, errors::Error> {
