@@ -150,7 +150,15 @@ pub async fn save_enrichment_data(
     .await;
 
     if stream_schema.has_fields && !append_data {
-        delete_enrichment_table(org_id, stream_name, StreamType::EnrichmentTables).await;
+        let start_time = db::enrichment_table::get_start_time(org_id, stream_name).await;
+        let now = Utc::now().timestamp_micros();
+        delete_enrichment_table(
+            org_id,
+            stream_name,
+            StreamType::EnrichmentTables,
+            (start_time, now),
+        )
+        .await;
         stream_schema_map.remove(stream_name);
     }
 
@@ -332,7 +340,12 @@ pub async fn save_enrichment_data(
     )))
 }
 
-pub async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: StreamType) {
+pub async fn delete_enrichment_table(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    time_range: (i64, i64),
+) {
     log::info!("deleting enrichment table  {stream_name}");
     // delete stream schema
     if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
@@ -348,10 +361,21 @@ pub async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_typ
     }
 
     // create delete for compactor
-    if let Err(e) =
-        db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
+    // if let Err(e) =
+    //     db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
+    // {
+    //     log::error!("Error creating stream retention job: {e}");
+    // }
+
+    if let Err(e) = crate::service::compact::retention::delete_from_file_list(
+        org_id,
+        stream_type,
+        stream_name,
+        time_range,
+    )
+    .await
     {
-        log::error!("Error creating stream retention job: {e}");
+        log::error!("Error deleting enrichment table from file list: {}", e);
     }
 
     // delete stream schema cache
@@ -475,4 +499,58 @@ pub async fn cleanup_enrichment_table_resources(
     // delete stream stats cache
     stats::remove_stream_stats(org_id, stream_name, stream_type);
     log::info!("deleted enrichment table  {stream_name}");
+}
+
+pub async fn delete_from_file_list(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_range: (i64, i64),
+) -> Result<(), anyhow::Error> {
+    crate::service::compact::retention::delete_from_file_list(
+        org_id,
+        stream_type,
+        stream_name,
+        time_range,
+    )
+    .await
+    .map_err(|e| {
+        log::error!("[ENRICHMENT_TABLE] delete_from_file_list failed: {}", e);
+        e
+    })?;
+
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+        let cfg = get_o2_config();
+        if cfg.super_cluster.enabled {
+            let time_range = config::meta::stream::TimeRange::new(time_range.0, time_range.1);
+            let time_range_str = serde_json::to_string(&time_range).unwrap();
+            let file_list_key =
+                format!("/enrichment_file_list_delete/{org_id}/{stream_type}/{stream_name}");
+
+            // broadcast the event to other region compactor nodes
+            if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::put(
+                &file_list_key,
+                time_range_str.into(),
+                false,
+                None,
+            )
+            .await
+            {
+                log::error!(
+                    "[ENRICHMENT_TABLE] Error broadcasting enrichment table {}/{} file list delete event: {}",
+                    org_id,
+                    stream_name,
+                    e
+                );
+            }
+            // let _ = o2_enterprise::enterprise::super_cluster::queue::file_list_delete(
+            //     file_list_key,
+            //     time_range,
+            // )
+            // .await;
+        }
+    }
+    Ok(())
 }
