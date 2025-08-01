@@ -3339,7 +3339,15 @@ export default defineComponent({
 
         // handle sql mode
         if(!searchObj.meta.sqlMode){
-          logsPageQuery = searchObj.data.customDownloadQueryObj?.query?.sql ?? "";
+          //if user click on run query button then use customDownloadQueryObj else use build search
+          //because if user didn't clicked on run query button then build search will be used
+          if(searchObj.data.customDownloadQueryObj?.query?.sql){
+            logsPageQuery = searchObj.data.customDownloadQueryObj?.query?.sql;
+          }
+          else{
+            const queryBuild = buildSearch();
+            logsPageQuery = queryBuild?.query?.sql ?? "";
+          }
         }
 
         // validate sql query that all fields have alias
