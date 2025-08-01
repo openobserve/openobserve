@@ -216,7 +216,7 @@ impl TraceListIndex {
                 extended_retention_days: vec![],
                 index_all_values: false,
                 index_original_data: false,
-                disable_distinct_fields: false,
+                enable_distinct_fields: true,
             };
 
             stream::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)
