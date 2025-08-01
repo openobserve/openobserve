@@ -2030,9 +2030,9 @@ pub fn validate_and_adjust_histogram_interval(
         }
     }
 
-    // If no valid interval found
-    let interval = generate_histogram_interval(time_range, 0);
-    convert_histogram_interval_to_seconds(&interval).unwrap_or(10)
+    // If no valid interval found (requested interval is larger than max valid interval)
+    // Return the maximum valid interval (1 day)
+    (*valid_intervals.last().unwrap()).into()
 }
 
 pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
@@ -2968,7 +2968,7 @@ mod tests {
         assert_eq!(validate_and_adjust_histogram_interval(0, None), 3600); // 0 -> default 1 hour
         assert_eq!(validate_and_adjust_histogram_interval(-100, None), 3600); // negative -> default 1 hour
         assert_eq!(validate_and_adjust_histogram_interval(1, None), 1); // 1 second is valid
-        assert_eq!(validate_and_adjust_histogram_interval(100000, None), 3600); // very large -> 1 day
+        assert_eq!(validate_and_adjust_histogram_interval(100000, None), 86400); // very large -> 1 day
     }
 
     #[test]
