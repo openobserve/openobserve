@@ -365,6 +365,7 @@ import {
   provide,
   onMounted,
   onBeforeUnmount,
+  onUnmounted,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -649,10 +650,10 @@ export default defineComponent({
     //     console.log(e);
     //   }
     // }
-    // onUnmounted(() => {
-    // resetSearchObj();
-    // resetStreamData();
-    // });
+    onUnmounted(() => {
+      //here we need to reset the visualize toggle to logs
+      // searchObj.meta.logsVisualizeToggle = 'logs';
+    });
 
     onBeforeMount(() => {
       handleBeforeMount();

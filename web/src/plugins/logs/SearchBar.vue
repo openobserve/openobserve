@@ -2182,8 +2182,7 @@ export default defineComponent({
         fnEditorRef?.value?.resetEditorLayout();
       });
       window.removeEventListener("keydown", handleEscKey);
-      //here we need to reset the visualize toggle to logs
-      searchObj.meta.logsVisualizeToggle = 'logs';
+
     });
 
     onActivated(() => {
