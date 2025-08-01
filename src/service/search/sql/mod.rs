@@ -2954,21 +2954,21 @@ mod tests {
     #[test]
     fn test_validate_and_adjust_histogram_interval() {
         // Test valid intervals that don't need adjustment
-        assert_eq!(validate_and_adjust_histogram_interval(3600), 3600); // 1 hour
-        assert_eq!(validate_and_adjust_histogram_interval(7200), 7200); // 2 hours
-        assert_eq!(validate_and_adjust_histogram_interval(21600), 21600); // 6 hours
-        assert_eq!(validate_and_adjust_histogram_interval(86400), 86400); // 1 day
+        assert_eq!(validate_and_adjust_histogram_interval(3600, None), 3600); // 1 hour
+        assert_eq!(validate_and_adjust_histogram_interval(7200, None), 7200); // 2 hours
+        assert_eq!(validate_and_adjust_histogram_interval(21600, None), 21600); // 6 hours
+        assert_eq!(validate_and_adjust_histogram_interval(86400, None), 86400); // 1 day
 
         // Test intervals that need adjustment (example from TODO: 5 hours -> 6 hours)
-        assert_eq!(validate_and_adjust_histogram_interval(18000), 21600); // 5 hours -> 6 hours
-        assert_eq!(validate_and_adjust_histogram_interval(10000), 14400); // ~2.8 hours -> 4 hours
-        assert_eq!(validate_and_adjust_histogram_interval(5000), 7200); // ~1.4 hours -> 2 hours
+        assert_eq!(validate_and_adjust_histogram_interval(18000, None), 21600); // 5 hours -> 6 hours
+        assert_eq!(validate_and_adjust_histogram_interval(10000, None), 14400); // ~2.8 hours -> 4 hours
+        assert_eq!(validate_and_adjust_histogram_interval(5000, None), 7200); // ~1.4 hours -> 2 hours
 
         // Test edge cases
-        assert_eq!(validate_and_adjust_histogram_interval(0), 3600); // 0 -> default 1 hour
-        assert_eq!(validate_and_adjust_histogram_interval(-100), 3600); // negative -> default 1 hour
-        assert_eq!(validate_and_adjust_histogram_interval(1), 1); // 1 second is valid
-        assert_eq!(validate_and_adjust_histogram_interval(100000), 86400); // very large -> 1 day
+        assert_eq!(validate_and_adjust_histogram_interval(0, None), 3600); // 0 -> default 1 hour
+        assert_eq!(validate_and_adjust_histogram_interval(-100, None), 3600); // negative -> default 1 hour
+        assert_eq!(validate_and_adjust_histogram_interval(1, None), 1); // 1 second is valid
+        assert_eq!(validate_and_adjust_histogram_interval(100000, None), 3600); // very large -> 1 day
     }
 
     #[test]
@@ -2992,7 +2992,7 @@ mod tests {
         const TWENTY_FOUR_HOURS: i64 = 24 * 60 * 60; // 86400 seconds
 
         for &interval in &test_intervals {
-            let adjusted = validate_and_adjust_histogram_interval(interval);
+            let adjusted = validate_and_adjust_histogram_interval(interval, None);
             // Verify that the adjusted interval can divide 24 hours evenly
             assert_eq!(
                 TWENTY_FOUR_HOURS % adjusted,
