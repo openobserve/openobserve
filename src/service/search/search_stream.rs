@@ -616,14 +616,16 @@ pub async fn do_partitioned_search(
             );
         }
 
-        if req_size > 0 && total_hits > req_size {
+        if req_size > 0 && curr_res_size + total_hits > req_size {
+            // ideally we should break after this, but the actual break happens at the end of parition search
+            // after the rest of business logic is applied 
             log::info!(
                 "[HTTP2_STREAM] trace_id: {}, Reached requested result size ({}), truncating results",
                 trace_id,
                 req_size
             );
             search_res.hits.truncate(req_size as usize);
-            curr_res_size += req_size;
+            curr_res_size = req_size;
         } else {
             curr_res_size += total_hits;
         }
