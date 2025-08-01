@@ -138,8 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       style="
                         flex: 1;
-                        min-height: calc(100% - 24px);
-                        height: calc(100% - 24px);
+                        min-height: calc(100% - 36px);
+                        height: calc(100% - 36px);
                         width: 100%;
                         margin-top: 36px;
                       "
