@@ -1361,4 +1361,96 @@ mod tests {
         let histogram = searcher.search(&all_query, &histogram_collector).unwrap();
         assert_eq!(histogram, vec![1, 1, 0, 1]);
     }
+
+    #[test]
+    fn test_regroup_tantivy_files_basic() {
+        let file_groups = vec![
+            vec![create_file_key(1, 10), create_file_key(11, 20)],
+            vec![create_file_key(21, 30), create_file_key(31, 40)],
+        ];
+        let result = regroup_tantivy_files(file_groups);
+
+        // Should have 2 groups (max length of input groups)
+        assert_eq!(result.len(), 2);
+
+        // First group should contain the last file from each input group
+        assert_eq!(result[0].len(), 2);
+        assert_eq!(result[0][0].key, "file_11_20"); // Last file from first group
+        assert_eq!(result[0][1].key, "file_31_40"); // Last file from second group
+
+        // Second group should contain the first file from each input group
+        assert_eq!(result[1].len(), 2);
+        assert_eq!(result[1][0].key, "file_1_10"); // First file from first group
+        assert_eq!(result[1][1].key, "file_21_30"); // First file from second group
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_uneven_groups() {
+        let file_groups = vec![
+            vec![
+                create_file_key(1, 10),
+                create_file_key(11, 20),
+                create_file_key(21, 30),
+            ],
+            vec![create_file_key(31, 40)],
+        ];
+        let result = regroup_tantivy_files(file_groups);
+
+        // Should have 3 groups (max length of input groups)
+        assert_eq!(result.len(), 3);
+
+        // First group should contain the last file from each input group
+        assert_eq!(result[0].len(), 2);
+        assert_eq!(result[0][0].key, "file_21_30"); // Last file from first group
+        assert_eq!(result[0][1].key, "file_31_40"); // Last file from second group
+
+        // Second group should contain the middle file from first group, none from second
+        assert_eq!(result[1].len(), 1);
+        assert_eq!(result[1][0].key, "file_11_20"); // Middle file from first group
+
+        // Third group should contain the first file from first group, none from second
+        assert_eq!(result[2].len(), 1);
+        assert_eq!(result[2][0].key, "file_1_10"); // First file from first group
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_empty_groups() {
+        let file_groups: Vec<Vec<FileKey>> = vec![];
+        let result = regroup_tantivy_files(file_groups);
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_single_group() {
+        let file_groups = vec![vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+        ]];
+        let result = regroup_tantivy_files(file_groups);
+
+        // Should have 3 groups (length of the single input group)
+        assert_eq!(result.len(), 3);
+
+        // Each group should contain one file
+        assert_eq!(result[0].len(), 1);
+        assert_eq!(result[0][0].key, "file_21_30"); // Last file
+
+        assert_eq!(result[1].len(), 1);
+        assert_eq!(result[1][0].key, "file_11_20"); // Middle file
+
+        assert_eq!(result[2].len(), 1);
+        assert_eq!(result[2][0].key, "file_1_10"); // First file
+    }
+
+    #[test]
+    fn test_into_chunks_basic() {
+        let v = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let chunks = into_chunks(v, 3);
+
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], vec![1, 2, 3]);
+        assert_eq!(chunks[1], vec![4, 5, 6]);
+        assert_eq!(chunks[2], vec![7, 8]);
+    }
 }
