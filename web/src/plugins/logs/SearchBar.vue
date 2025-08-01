@@ -2182,8 +2182,6 @@ export default defineComponent({
         fnEditorRef?.value?.resetEditorLayout();
       });
       window.removeEventListener("keydown", handleEscKey);
-      //here we need to reset the visualize toggle to logs
-      searchObj.meta.logsVisualizeToggle = 'logs';
     });
 
     onActivated(() => {
@@ -3327,6 +3325,7 @@ export default defineComponent({
         cancelVisualizeQueries();
         if(searchObj.meta.logsVisualizeDirtyFlag === true || !Object.hasOwn(searchObj.data?.queryResults, "hits") || searchObj.data?.queryResults?.hits?.length == 0) {
           searchObj.loading = true;
+          searchObj.meta.refreshHistogram = true;
           getQueryData();
         }
       } else {
