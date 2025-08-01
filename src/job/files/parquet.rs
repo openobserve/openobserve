@@ -380,6 +380,10 @@ async fn move_files(
     if stream_settings.data_retention > 0 {
         stream_data_retention_days = stream_settings.data_retention;
     }
+    let num_uds_fields = stream_settings
+        .defined_schema_fields
+        .unwrap_or_default()
+        .len();
     if stream_data_retention_days > 0 {
         let date =
             config::utils::time::now() - Duration::try_days(stream_data_retention_days).unwrap();
@@ -589,6 +593,7 @@ async fn merge_files(
     latest_schema: Arc<Schema>,
     wal_dir: &Path,
     files_with_size: &[FileKey],
+    num_uds_fields: usize,
 ) -> Result<(String, String, FileMeta, Vec<FileKey>), anyhow::Error> {
     if files_with_size.is_empty() {
         return Ok((
@@ -603,7 +608,11 @@ async fn merge_files(
     let mut new_file_size: i64 = 0;
     let mut new_compressed_file_size = 0;
     let mut new_file_list = Vec::new();
-    let stream_fields_num = latest_schema.fields().len();
+    let stream_fields_num = if num_uds_fields > 0 {
+        num_uds_fields
+    } else {
+        latest_schema.fields().len()
+    };
     let max_file_size = std::cmp::min(
         cfg.limit.max_file_size_on_disk as i64,
         cfg.compact.max_file_size as i64,
