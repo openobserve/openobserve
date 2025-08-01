@@ -54,18 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
-                :disabled="isVisualizeToggleDisabled"
                 no-caps
                 size="sm"
                 style="height: 32px"
               >
-                <q-tooltip>
-                  {{
-                    isVisualizeToggleDisabled
-                      ? t("search.visualizeDisabledForMultiStream")
-                      : t("search.visualize")
-                  }}
-                </q-tooltip>
                 <img
                   :src="visualizeIcon"
                   alt="Visualize"
@@ -1318,13 +1310,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmUpdate = false"
       v-model="confirmUpdate"
     />
-    <ConfirmDialog
-      title="Reset Changes"
-      message="Navigating away from visualize will reset your changes. Are you sure you want to proceed?"
-      @update:ok="changeLogsVisualizeToggle"
-      @update:cancel="confirmLogsVisualizeModeChangeDialog = false"
-      v-model="confirmLogsVisualizeModeChangeDialog"
-    />
   </div>
 </template>
 
@@ -1586,9 +1571,6 @@ export default defineComponent({
     const saveFunctionLoader = ref(false);
 
     const isFocused = ref(false);
-
-    // confirm dialog for logs visualization toggle
-    const confirmLogsVisualizeModeChangeDialog = ref(false);
 
     const confirmDialogVisible: boolean = ref(false);
     const confirmSavedViewDialogVisible: boolean = ref(false);
@@ -3291,12 +3273,21 @@ export default defineComponent({
         value == "logs" &&
         searchObj.meta.logsVisualizeToggle == "visualize"
       ) {
-        confirmLogsVisualizeModeChangeDialog.value = true;
+        // cancel all the visualize queries
+        cancelVisualizeQueries();
+        if(searchObj.meta.logsVisualizeDirtyFlag === true || !Object.hasOwn(searchObj.data?.queryResults, "hits") || searchObj.data?.queryResults?.hits?.length == 0) {
+          searchObj.loading = true;
+          getQueryData();
+        }
       } else {
         // cancel all the logs queries
         cancelQuery();
-        searchObj.meta.logsVisualizeToggle = value;
       }
+      searchObj.meta.logsVisualizeToggle = value;
+      updateUrlQueryParams();
+
+      // dispatch resize event
+      window.dispatchEvent(new Event("resize"));
     };
 
     const dashboardPanelDataPageKey = inject(
@@ -3306,28 +3297,6 @@ export default defineComponent({
     const { dashboardPanelData, resetDashboardPanelData } =
       useDashboardPanelData(dashboardPanelDataPageKey);
 
-    const isVisualizeToggleDisabled = computed(() => {
-      return searchObj.data.stream.selectedStream.length > 1;
-    });
-
-    const changeLogsVisualizeToggle = () => {
-      // change logs visualize toggle
-      searchObj.meta.logsVisualizeToggle = "logs";
-      confirmLogsVisualizeModeChangeDialog.value = false;
-
-      // cancel all the visualize queries
-      cancelVisualizeQueries();
-
-      // store dashboardPanelData meta object
-      const dashboardPanelDataMetaObj = dashboardPanelData.meta;
-
-      // reset old dashboardPanelData
-      resetDashboardPanelData();
-
-      // assign, old dashboardPanelData meta object
-      dashboardPanelData.meta = dashboardPanelDataMetaObj;
-    };
-
     // [START] cancel running queries
 
     const variablesAndPanelsDataLoadingState =
@@ -3336,9 +3305,15 @@ export default defineComponent({
     const visualizeSearchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
         variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
-      ).filter((item: any) => item.length > 0);
+      ).filter((item: any) => item.length > 0)
+        .flat() as string[];
 
-      return searchIds.flat() as string[];
+      // If custom field extraction is in progress, push a dummy trace id so that cancel button is visible.
+      if (variablesAndPanelsDataLoadingState?.fieldsExtractionLoading) {
+        searchIds.push("fieldExtraction");
+      }
+
+      return searchIds;
     });
     const backgroundColorStyle = computed(() => {
       const isDarkMode = store.state.theme === "dark";
@@ -3375,7 +3350,11 @@ export default defineComponent({
     const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery();
 
     const cancelVisualizeQueries = () => {
-      traceIdRef.value = visualizeSearchRequestTraceIds.value;
+      // Filter out the dummy id before sending to backend cancel API
+      traceIdRef.value = visualizeSearchRequestTraceIds.value.filter(
+        (id: any) => id !== "fieldExtraction",
+      );
+
       cancelVisualizeQuery();
     };
 
@@ -3635,9 +3614,6 @@ export default defineComponent({
       resetRegionFilter,
       validateFilterForMultiStream,
       cancelQuery,
-      confirmLogsVisualizeModeChangeDialog,
-      changeLogsVisualizeToggle,
-      isVisualizeToggleDisabled,
       onLogsVisualizeToggleUpdate,
       visualizeSearchRequestTraceIds,
       disable,
