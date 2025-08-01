@@ -27,7 +27,10 @@ use config::{
     utils::schema::format_stream_name,
 };
 use hashbrown::HashMap;
-use infra::errors::{DbError, Error as InfraError};
+use infra::table::compactor_manual_jobs::{
+    CompactorManualJob, CompactorManualJobResEntry, CompactorManualJobStatusRes,
+    Status as CompactorManualJobStatus,
+};
 
 use crate::{
     common::{
@@ -38,6 +41,7 @@ use crate::{
         },
         utils::http::{get_stream_type_from_request, get_ts_from_request_with_key},
     },
+    handler::http::request::search::error_utils::map_error_to_http_response,
     service::stream,
 };
 
@@ -686,19 +690,22 @@ async fn delete_stream_data_by_time_range(
         }
     };
 
-    let time_range = match key.split('/').next_back() {
-        Some(time_range) => time_range,
-        None => {
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    "failed to get time range from key".to_string(),
-                )),
-            );
+    // Create a job in the compact manual jobs table
+    let job = infra::table::compactor_manual_jobs::CompactorManualJob {
+        id: config::ider::uuid(),
+        key,
+        status: CompactorManualJobStatus::Pending,
+        created_at: Utc::now().timestamp_micros(),
+        ended_at: 0,
+    };
+    let job_id = match crate::service::db::compact::compactor_manual_jobs::add_job(job).await {
+        Ok(id) => id,
+        Err(e) => {
+            return Ok(map_error_to_http_response(&e, None));
         }
     };
 
-    let res = serde_json::json!({ "time_range": time_range });
+    let res = serde_json::json!({ "id": job_id });
     Ok(HttpResponse::Ok().json(res))
 }
 
@@ -715,34 +722,18 @@ async fn delete_stream_data_by_time_range(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
-        ("type" = String, Query, description = "Stream type"),
-        ("time_range" = String, Query, description = "Time range", example = "2025-06-01T00:00:00Z,2025-06-30T00:00:00Z"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/streams/{stream_name}/data_by_time_range/status")]
+#[get("/{org_id}/streams/{stream_name}/data_by_time_range/status/{id}")]
 async fn get_delete_stream_data_status(
-    path: web::Path<(String, String)>,
-    req: HttpRequest,
+    path: web::Path<(String, String, String)>,
+    _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, mut stream_name) = path.into_inner();
-    if !config::get_config().common.skip_formatting_stream_name {
-        stream_name = format_stream_name(&stream_name);
-    }
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let time_range = match query.get("time_range") {
-        Some(time_range) => time_range,
-        None => {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                StatusCode::BAD_REQUEST.into(),
-                "time range is required".to_string(),
-            )));
-        }
-    };
+    let (_, _, ksuid) = path.into_inner();
 
     // Check if super cluster is enabled
     #[cfg(feature = "enterprise")]
@@ -751,14 +742,7 @@ async fn get_delete_stream_data_status(
         .enabled
     {
         // Super cluster is enabled, get status from all regions
-        match get_super_cluster_delete_status(
-            &org_id,
-            stream_type.as_str(),
-            &stream_name,
-            time_range,
-        )
-        .await
-        {
+        match get_super_cluster_delete_status(&ksuid).await {
             Ok(res) => res,
             Err(e) => {
                 log::error!("get_super_cluster_delete_status error: {e}");
@@ -770,55 +754,56 @@ async fn get_delete_stream_data_status(
         }
     } else {
         // Super cluster not enabled, get local status
-        get_local_delete_status(&org_id, stream_type.as_str(), &stream_name, time_range).await
+        get_local_delete_status(&ksuid).await
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let response =
-        get_local_delete_status(&org_id, stream_type.as_str(), &stream_name, time_range).await;
+    let response = get_local_delete_status(&ksuid).await;
 
     Ok(HttpResponse::Ok().json(response))
 }
 
-async fn get_local_delete_status(
-    org_id: &str,
-    stream_type: &str,
-    stream_name: &str,
-    time_range: &str,
-) -> serde_json::Value {
-    let key = format!("{org_id}/{stream_type}/{stream_name}/{time_range}");
-    let db_key = format!("/compact/delete/{key}");
-
-    // Get the key from the database
-    let is_complete: bool;
-    match crate::service::db::compact::retention::get(&db_key).await {
-        Ok(_) => {
-            is_complete = false;
-        }
+async fn get_local_delete_status(id: &str) -> CompactorManualJobStatusRes {
+    let job = match crate::service::db::compact::compactor_manual_jobs::get_job(id).await {
+        Ok(job) => job,
         Err(e) => {
-            if let Some(InfraError::DbError(DbError::KeyNotExists(_))) =
-                e.downcast_ref::<InfraError>()
-            {
-                is_complete = true;
-            } else {
-                log::error!("get_local_delete_status {key} error: {e}");
-                return serde_json::json!({ "key": key, "status": "error", "error": e.to_string() });
-            }
+            log::error!("get_local_delete_status {id} error: {e}");
+
+            return CompactorManualJobStatusRes {
+                id: id.to_string(),
+                status: CompactorManualJobStatus::Pending,
+                metadata: vec![],
+                errors: vec![serde_json::json!({
+                    "error": e.to_string(),
+                })],
+            };
         }
     };
 
-    serde_json::json!({ "key": key, "status": if is_complete { "completed" } else { "pending" } })
+    let entry = CompactorManualJobResEntry {
+        job: CompactorManualJob {
+            id: job.id,
+            key: job.key,
+            created_at: job.created_at,
+            ended_at: job.ended_at,
+            status: job.status,
+        },
+        cluster: "".to_string(),
+        region: "".to_string(),
+    };
+
+    CompactorManualJobStatusRes {
+        id: id.to_string(),
+        status: job.status,
+        metadata: vec![entry],
+        errors: vec![],
+    }
 }
 
 #[cfg(feature = "enterprise")]
 async fn get_super_cluster_delete_status(
-    org_id: &str,
-    stream_type: &str,
-    stream_name: &str,
-    time_range: &str,
-) -> Result<serde_json::Value, anyhow::Error> {
-    let key = format!("{org_id}/{stream_type}/{stream_name}/{time_range}");
-
+    id: &str,
+) -> Result<CompactorManualJobStatusRes, anyhow::Error> {
     // Get all clusters in the super cluster
     let clusters = match o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes(
         &config::ider::generate_trace_id(),
@@ -841,7 +826,7 @@ async fn get_super_cluster_delete_status(
     // For each node in the super cluster, get the delete status
     let trace_id = config::ider::generate_trace_id();
     let mut results = Vec::new();
-    let mut all_pending = false;
+    let mut any_pending = false;
     let mut all_completed = true;
     let mut errors = Vec::new();
 
@@ -849,24 +834,29 @@ async fn get_super_cluster_delete_status(
         match crate::service::cluster_info::get_super_cluster_delete_job_status(
             &trace_id,
             cluster.clone(),
-            org_id,
-            stream_type,
-            stream_name,
-            time_range,
+            id,
         )
         .await
         {
             Ok(response) => {
-                if !response.is_complete {
-                    all_pending = true;
+                let job_status = CompactorManualJobStatus::from(response.status);
+                if job_status == CompactorManualJobStatus::Pending {
+                    any_pending = true;
+                } else if job_status != CompactorManualJobStatus::Completed {
                     all_completed = false;
                 }
-                let res_json = serde_json::json!({
-                    "cluster": cluster.get_cluster(),
-                    "region": cluster.get_region(),
-                    "is_complete": response.is_complete,
-                });
-                results.push(res_json);
+                let res = CompactorManualJobResEntry {
+                    cluster: cluster.get_cluster(),
+                    region: cluster.get_region(),
+                    job: CompactorManualJob {
+                        id: response.id,
+                        key: response.key,
+                        created_at: response.created_at,
+                        ended_at: response.ended_at,
+                        status: job_status,
+                    },
+                };
+                results.push(res);
             }
             Err(e) => {
                 log::error!(
@@ -874,24 +864,30 @@ async fn get_super_cluster_delete_status(
                     cluster.get_cluster(),
                     e
                 );
-                errors.push(e.to_string());
+                let err = serde_json::json!({
+                    "cluster": cluster.get_cluster(),
+                    "region": cluster.get_region(),
+                    "error": e.to_string(),
+                });
+                errors.push(err);
             }
         }
     }
 
-    let status = if all_pending {
-        "pending"
+    let status = if any_pending {
+        CompactorManualJobStatus::Pending
     } else if all_completed && errors.is_empty() {
-        "completed"
+        CompactorManualJobStatus::Completed
     } else {
-        "error"
+        CompactorManualJobStatus::Pending
     };
 
-    let mut response = serde_json::json!({ "key": key, "status": status, "cluter_info": results });
-
-    if !errors.is_empty() {
-        response["errors"] = serde_json::json!(errors);
-    }
+    let response = CompactorManualJobStatusRes {
+        id: id.to_string(),
+        status,
+        metadata: results,
+        errors,
+    };
 
     Ok(response)
 }

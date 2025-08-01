@@ -2,8 +2,9 @@
 
 pub use super::{
     action_scripts::Entity as ActionScripts, alerts::Entity as Alerts,
-    cipher_keys::Entity as CipherKeys, dashboards::Entity as Dashboards,
-    destinations::Entity as Destinations, distinct_value_fields::Entity as DistinctValueFields,
+    cipher_keys::Entity as CipherKeys, compactor_manual_jobs::Entity as CompactorManualJobs,
+    dashboards::Entity as Dashboards, destinations::Entity as Destinations,
+    distinct_value_fields::Entity as DistinctValueFields,
     enrichment_tables::Entity as EnrichmentTables, folders::Entity as Folders,
     search_job_partitions::Entity as SearchJobPartitions,
     search_job_results::Entity as SearchJobResults, search_jobs::Entity as SearchJobs,

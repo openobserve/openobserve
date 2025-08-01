@@ -5,6 +5,7 @@ pub mod prelude;
 pub mod action_scripts;
 pub mod alerts;
 pub mod cipher_keys;
+pub mod compactor_manual_jobs;
 pub mod dashboards;
 pub mod destinations;
 pub mod distinct_value_fields;

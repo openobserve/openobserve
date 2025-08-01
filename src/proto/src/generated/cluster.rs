@@ -3426,22 +3426,22 @@ pub struct CompactionInfo {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetDeleteJobStatusRequest {
     #[prost(string, tag = "1")]
-    pub org_id: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub stream_type: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
-    pub stream_name: ::prost::alloc::string::String,
-    #[prost(string, tag = "4")]
-    pub time_range: ::prost::alloc::string::String,
+    pub ksuid: ::prost::alloc::string::String,
 }
 /// Response message for Get Delete Job Status
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetDeleteJobStatusResponse {
     #[prost(string, tag = "1")]
+    pub id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
     pub key: ::prost::alloc::string::String,
-    #[prost(bool, tag = "2")]
-    pub is_complete: bool,
+    #[prost(int64, tag = "3")]
+    pub created_at: i64,
+    #[prost(int64, tag = "4")]
+    pub ended_at: i64,
+    #[prost(int64, tag = "5")]
+    pub status: i64,
 }
 /// Generated client implementations.
 pub mod cluster_info_service_client {

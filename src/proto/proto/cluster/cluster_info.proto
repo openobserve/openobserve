@@ -28,14 +28,14 @@ message CompactionInfo {
 
 // Request message for Get Delete Job Status
 message GetDeleteJobStatusRequest {
-  string org_id = 1;
-  string stream_type = 2;
-  string stream_name = 3;
-  string time_range = 4;
+  string ksuid = 1;
 }
 
 // Response message for Get Delete Job Status
 message GetDeleteJobStatusResponse {
-  string key = 1;
-  bool is_complete = 2;
+  string id = 1;
+  string key = 2;
+  int64 created_at = 3;
+  int64 ended_at = 4;
+  int64 status = 5;
 }
