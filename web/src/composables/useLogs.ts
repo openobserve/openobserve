@@ -2449,7 +2449,7 @@ const useLogs = () => {
           },
           "ui",
         )
-        .then(async (res) => {
+        .then(async (res: any) => {
           if (
             res.data.hasOwnProperty("function_error") &&
             res.data.function_error != ""
@@ -2608,6 +2608,21 @@ const useLogs = () => {
               };
             }
           }
+
+          // sort the hits based on timestamp column
+          if (
+            searchObj.data.queryResults.hits.length > 0 &&
+            store.state.zoConfig.timestamp_column != "" &&
+            res.data.hasOwnProperty("order_by") &&
+            res.data.order_by.length > 0 
+          ) {
+            sortResponse(
+              searchObj.data.queryResults.hits,
+              store.state.zoConfig.timestamp_column,
+              res.data.order_by
+            );
+          }
+
           //here also we are getting the is_histogram_eligible flag from the BE
           //so that we can use it whenever we might not send the partition call from here also it will get updated
           //this is coming as a part of data api call which is search call
@@ -2741,6 +2756,80 @@ const useLogs = () => {
         });
     });
   };
+
+  // Convert timestamp to microseconds
+  interface RecordWithTimestamp {
+    [key: string]: any;
+  }
+
+  function getTsValue(tsColumn: string, record: RecordWithTimestamp): number {
+    const ts = record[tsColumn];
+
+    if (ts === undefined || ts === null) return 0;
+
+    if (typeof ts === 'string') {
+      const timestamp = Date.parse(ts);
+      return timestamp * 1000;
+    }
+
+    if (typeof ts === 'number') return ts;
+
+    return 0;
+  }
+
+  // Sorting function
+  interface OrderByField {
+    0: string;
+    1: "asc" | "desc" | "ASC" | "DESC";
+  }
+
+  type OrderByArray = OrderByField[];
+
+  interface RecordObject {
+    [key: string]: any;
+  }
+
+  function sortResponse(
+    responseObj: RecordObject[],
+    tsColumn: string,
+    orderBy: OrderByArray
+  ): void {
+    if (!Array.isArray(orderBy) || orderBy.length === 0) return;
+
+    responseObj.sort((a: RecordObject, b: RecordObject) => {
+      for (const entry of orderBy) {
+        if (!Array.isArray(entry) || entry.length !== 2) continue;
+        const [field, order] = entry;
+        let cmp = 0;
+
+        if (field === tsColumn) {
+          const aTs = getTsValue(tsColumn, a);
+          const bTs = getTsValue(tsColumn, b);
+          cmp = aTs - bTs;
+        } else {
+          const aVal = a[field] ?? null;
+          const bVal = b[field] ?? null;
+
+          if (typeof aVal === 'string' && typeof bVal === 'string') {
+            cmp = aVal.localeCompare(bVal);
+          } else if (typeof aVal === 'number' && typeof bVal === 'number') {
+            cmp = aVal - bVal;
+          } else if (typeof aVal === 'string' && typeof bVal === 'number') {
+            cmp = -1;
+          } else if (typeof aVal === 'number' && typeof bVal === 'string') {
+            cmp = 1;
+          } else {
+            cmp = 0;
+          }
+        }
+
+        const finalCmp = order === "desc" ? -cmp : cmp;
+        if (finalCmp !== 0) return finalCmp;
+      }
+      return 0;
+    });
+  }
+
 
   const filterHitsColumns = () => {
     searchObj.data.queryResults.filteredHit = [];
