@@ -229,8 +229,10 @@ pub struct Response {
     pub result_cache_ratio: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub work_group: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order_by: Option<OrderBy>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub order_by: Vec<(String, OrderBy)>,
+    pub order_by_metadata: Vec<(String, OrderBy)>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub converted_histogram_query: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -395,7 +397,8 @@ impl Response {
             new_end_time: None,
             result_cache_ratio: 0,
             work_group: None,
-            order_by: Vec::new(),
+            order_by: None,
+            order_by_metadata: Vec::new(),
             converted_histogram_query: None,
             is_histogram_eligible: None,
         }
@@ -491,8 +494,12 @@ impl Response {
         self.work_group = val;
     }
 
-    pub fn set_order_by(&mut self, val: Vec<(String, OrderBy)>) {
+    pub fn set_order_by(&mut self, val: Option<OrderBy>) {
         self.order_by = val;
+    }
+
+    pub fn set_order_by_metadata(&mut self, val: Vec<(String, OrderBy)>) {
+        self.order_by_metadata = val;
     }
 }
 
