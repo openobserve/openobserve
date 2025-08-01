@@ -1438,7 +1438,9 @@ export default defineComponent({
             if (shouldUseHistogramQuery.value === true) {
 
               // only do it if is_histogram_eligible is true on logs page
-              if(searchObj.data.queryResults.is_histogram_eligible === true){
+              // and showHistogram is true on logs page
+              if(searchObj?.data?.queryResults?.is_histogram_eligible === true && searchObj?.meta?.showHistogram === true){
+
               // replace hits with histogram query data
               searchResponseForVisualization.value = {
                 ...searchObj.data.queryResults,
