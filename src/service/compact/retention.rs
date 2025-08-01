@@ -626,7 +626,7 @@ async fn handle_delete_by_date_done(
 
     // Check if the key is also present in the `compactor_manual_jobs` table
     // If it is, mark the job as completed
-    let mut jobs = db::compact::compactor_manual_jobs::get_jobs_by_key(
+    let mut jobs = db::compact::compactor_manual_jobs::list_jobs_by_key(
         org_id,
         stream_type,
         stream_name,
@@ -639,12 +639,17 @@ async fn handle_delete_by_date_done(
         job.ended_at = Utc::now().timestamp_micros();
     });
 
-    db::compact::compactor_manual_jobs::bulk_update_jobs(jobs)
+    // Note: Manual job operations are isolated - any errors are logged and ignored
+    // to prevent them from affecting the main compactor retention job
+    let _ = db::compact::compactor_manual_jobs::bulk_update_jobs(jobs)
         .await
         .map_err(|e| {
-            log::error!("[COMPACTOR] delete_by_date update job failed: {}", e);
+            log::error!(
+                "[COMPACTOR] delete_by_date bulk update manual job failed: {}",
+                e
+            );
             e
-        })?;
+        });
 
     Ok(())
 }

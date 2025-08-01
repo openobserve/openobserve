@@ -25,7 +25,7 @@ use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_confi
 
 use crate::service::db::compact::retention::mk_key;
 
-pub async fn get_jobs_by_key(
+pub async fn list_jobs_by_key(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
