@@ -173,6 +173,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         color="primary"
                         @click="addToDashboard"
                         title="Add To Dashboard"
+                        :disabled="
+                          errorData.length > 0 || errorData?.value?.message !== ''
+                        "
                         >Add To Dashboard</q-btn
                       >
                     </div>
@@ -510,6 +513,7 @@ export default defineComponent({
     const expandedSplitterHeight = ref(null);
 
     const handleChartApiError = (errorMessage: any) => {
+      props.errorData.value = errorMessage.message || errorMessage;
       emit("handleChartApiError", errorMessage);
     };
 
