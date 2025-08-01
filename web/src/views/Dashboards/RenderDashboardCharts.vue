@@ -70,6 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :forceLoad="forceLoad"
           :searchType="searchType"
+          :runId="runId"
+          :tabId="selectedTabId"
+          :tabName="
+            dashboardData?.tabs?.find((tab: any) => tab.tabId === selectedTabId)
+              ?.name
+          "
           @updated:data-zoom="$emit('updated:data-zoom', $event)"
           @onMovePanel="onMovePanel"
           @refreshPanelRequest="refreshPanelRequest"
@@ -118,12 +124,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :height="getPanelLayout(item, 'h')"
               :forceLoad="forceLoad"
               :searchType="searchType"
+              :runId="runId"
+              :tabId="selectedTabId"
+              :tabName="
+                dashboardData?.tabs?.find(
+                  (tab: any) => tab.tabId === selectedTabId,
+                )?.name
+              "
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
               @onMovePanel="onMovePanel"
               @refreshPanelRequest="refreshPanelRequest"
               @refresh="refreshDashboard"
               @update:initial-variable-values="updateInitialVariableValues"
               @onEditLayout="openEditLayout"
+              @update:runId="updateRunId"
             >
             </PanelContainer>
           </div>
@@ -232,6 +246,10 @@ export default defineComponent({
     searchType: {
       default: null,
       type: String || null,
+    },
+    runId: {
+      type: String,
+      default: null,
     },
   },
 
@@ -762,6 +780,10 @@ export default defineComponent({
       };
     };
 
+    const updateRunId = (newRunId) => {
+      emit("update:runId", newRunId);
+    };
+
     const openEditLayout = (id: string) => {
       emit("openEditLayout", id);
     };
@@ -783,6 +805,7 @@ export default defineComponent({
       refreshDashboard,
       onMovePanel,
       refreshPanelRequest,
+      updateRunId,
       variablesValueSelectorRef,
       updateInitialVariableValues,
       isDashboardVariablesAndPanelsDataLoadedDebouncedValue,

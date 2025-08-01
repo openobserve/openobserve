@@ -26,6 +26,11 @@ const search = {
       traceparent,
       dashboard_id,
       folder_id,
+      panel_id,
+      panel_name,
+      run_id,
+      tab_id,
+      tab_name,
     }: {
       org_identifier: string;
       query: any;
@@ -33,6 +38,11 @@ const search = {
       traceparent?: string;
       dashboard_id?: string;
       folder_id?: string;
+      panel_id?: string;
+      panel_name?: string;
+      run_id?: string;
+      tab_id?: string;
+      tab_name?: string;
     },
     search_type: string = "ui",
   ) => {
@@ -45,6 +55,12 @@ const search = {
     let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
     if (folder_id) url += `&folder_id=${folder_id}`;
+    if (panel_id) url += `&panel_id=${panel_id}`;
+    if (panel_name) url += `&panel_name=${encodeURIComponent(panel_name)}`;
+    if (run_id) url += `&run_id=${run_id}`;
+    if (tab_id) url += `&tab_id=${tab_id}`;
+    if (tab_name) url += `&tab_name=${encodeURIComponent(tab_name)}`;
+
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
       if (query.hasOwnProperty("aggs")) {
@@ -357,8 +373,8 @@ const search = {
       (window as any).use_cache !== undefined
         ? (window as any).use_cache
         : true;
-        let url = `/api/${org_identifier}/search_jobs/${jobId}/result?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
-          url += `&size=${size}&from=${from}`;
+    let url = `/api/${org_identifier}/search_jobs/${jobId}/result?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
+    url += `&size=${size}&from=${from}`;
 
     return http({ headers: { traceparent } }).get(url);
   },
