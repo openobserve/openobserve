@@ -1253,6 +1253,13 @@ export const usePanelDataLoader = (
                     start_time: startISOTimestamp,
                     end_time: endISOTimestamp,
                     step: panelSchema.value.config.step_value ?? "0",
+                    dashboard_id: dashboardId?.value,
+                    folder_id: folderId?.value,
+                    panel_id: panelSchema.value.id,
+                    panel_name: panelSchema.value.title,
+                    run_id: runId?.value,
+                    tab_id: tabId?.value,
+                    tab_name: tabName?.value,
                   }),
                 abortController.signal,
               );
