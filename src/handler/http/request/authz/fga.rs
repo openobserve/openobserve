@@ -810,7 +810,7 @@ pub async fn delete_group(_path: web::Path<(String, String)>) -> Result<HttpResp
 mod tests {
     use std::collections::HashSet;
 
-    use actix_web::{App, http::header::HeaderName, test};
+    use actix_web::{App, test};
 
     use super::*;
     use crate::common::meta::user::{UserGroup, UserGroupRequest, UserRoleRequest};
