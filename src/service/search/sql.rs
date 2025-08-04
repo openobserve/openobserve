@@ -21,9 +21,7 @@ use config::{
     meta::{
         inverted_index::IndexOptimizeMode,
         search::SearchEventType,
-        sql::{
-            MAX_LIMIT, OrderBy, Sql as MetaSql, TableReferenceExt, resolve_stream_names_with_type,
-        },
+        sql::{MAX_LIMIT, OrderBy, TableReferenceExt, resolve_stream_names_with_type},
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
@@ -47,8 +45,8 @@ use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
         FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, ObjectNamePart,
-        OrderByExpr, OrderByKind, Query, Select, SelectFlavor, SelectItem, SetExpr, Statement,
-        TableFactor, TableWithJoins, Value, ValueWithSpan, VisitMut, VisitorMut,
+        OrderByExpr, OrderByKind, OrderByOptions, Query, Select, SelectFlavor, SelectItem, SetExpr,
+        Statement, TableFactor, TableWithJoins, Value, ValueWithSpan, VisitMut, VisitorMut,
         helpers::attached_token::AttachedToken,
     },
     dialect::PostgreSqlDialect,
@@ -75,13 +73,11 @@ use crate::service::search::{
             STR_MATCH_UDF_NAME,
         },
     },
-    index::get_arg_name,
     utils::get_field_name,
 };
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
-pub static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 
 pub static RE_HISTOGRAM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
@@ -266,7 +262,11 @@ impl Sql {
         };
 
         //********************Change the sql start*********************************//
-        // 11. add _timestamp and _o2_id if need
+        // 11. replace approx_percentile_cont to new format
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+
+        // 12. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
@@ -276,7 +276,7 @@ impl Sql {
             }
         }
 
-        // 12. generate tantivy query
+        // 13. generate tantivy query
         // TODO: merge IndexVisitor and IndexOptimizeModeVisitor
         let mut index_condition = None;
         let mut can_optimize = false;
@@ -302,7 +302,7 @@ impl Sql {
         // set use_inverted_index use index_condition
         let use_inverted_index = index_condition.is_some();
 
-        // 13. check `select * from table where match_all()` optimizer
+        // 14. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
             && order_by.len() == 1
@@ -315,7 +315,7 @@ impl Sql {
             ));
         }
 
-        // 14. check other inverted index optimize modes
+        // 15. check other inverted index optimize modes
         // `select count(*) from table where match_all` -> SimpleCount
         // or `select histogram(..), count(*) from table where match_all` -> SimpleHistogram
         // or `select id, count(*) from t group by id order by cnt desc limit 10` -> SimpleTopN
@@ -327,11 +327,11 @@ impl Sql {
             if visitor.is_simple_count {
                 index_optimize_mode = Some(IndexOptimizeMode::SimpleCount);
             } else if visitor.is_simple_histogram && histogram_interval_visitor.interval.is_some() {
-                let bucket_width = histogram_interval_visitor.interval.unwrap() as u64 * 1_000_000;
+                let bucket_width = histogram_interval.unwrap() as u64 * 1_000_000;
                 // round the bucket edges to even start
                 let rounding_by = bucket_width as i64;
-                let min_value = (query.start_time / rounding_by) * rounding_by;
-                let max_value = (query.end_time / rounding_by) * rounding_by;
+                let min_value = query.start_time - query.start_time % rounding_by;
+                let max_value = query.end_time;
                 let num_buckets =
                     ((max_value - min_value) as f64 / bucket_width as f64).ceil() as usize;
                 index_optimize_mode = Some(IndexOptimizeMode::SimpleHistogram(
@@ -346,7 +346,7 @@ impl Sql {
             }
         }
 
-        // 15. replace the Utf8 to Utf8View type
+        // 16. replace the Utf8 to Utf8View type
         let final_schemas = if cfg.common.utf8_view_enabled {
             let mut final_schemas = HashMap::with_capacity(used_schemas.len());
             for (stream, schema) in used_schemas.iter() {
@@ -688,7 +688,6 @@ struct ColumnVisitor<'a> {
     is_wildcard: bool,
     is_distinct: bool,
     has_agg_function: bool,
-    use_inverted_index: bool,
 }
 
 impl<'a> ColumnVisitor<'a> {
@@ -704,7 +703,6 @@ impl<'a> ColumnVisitor<'a> {
             is_wildcard: false,
             is_distinct: false,
             has_agg_function: false,
-            use_inverted_index: false,
         }
     }
 }
@@ -798,35 +796,6 @@ impl VisitorMut for ColumnVisitor<'_> {
             }
             if select.distinct.is_some() {
                 self.is_distinct = true;
-            }
-            if let Some(expr) = select.selection.as_ref() {
-                // TODO: match_all only support single stream
-                if self.schemas.len() == 1 {
-                    for (_, schema) in self.schemas.iter() {
-                        let stream_settings = unwrap_stream_settings(schema.schema());
-                        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
-                        let index_fields = get_stream_setting_index_fields(&stream_settings);
-                        let index_fields = itertools::chain(fts_fields.iter(), index_fields.iter())
-                            .collect::<HashSet<_>>();
-                        self.use_inverted_index =
-                            checking_inverted_index_inner(&index_fields, expr);
-                    }
-                }
-            } else if is_simple_count_query(select) || is_simple_histogram_query(select) {
-                // if there is no selection, but have histogram and fst_fields, also can use
-                // inverted index
-                if self.schemas.len() == 1 {
-                    for (_, schema) in self.schemas.iter() {
-                        let stream_settings = unwrap_stream_settings(schema.schema());
-                        let fts_fields = get_stream_setting_fts_fields(&stream_settings);
-                        let index_fields = get_stream_setting_index_fields(&stream_settings);
-                        let index_fields = itertools::chain(fts_fields.iter(), index_fields.iter())
-                            .collect::<HashSet<_>>();
-                        if !index_fields.is_empty() {
-                            self.use_inverted_index = true;
-                        }
-                    }
-                }
             }
         }
         if let Some(limit) = query.limit.as_ref()
@@ -1914,6 +1883,111 @@ impl VisitorMut for TrackTotalHitsVisitor {
     }
 }
 
+struct ReplaceApproxPercentiletVisitor {}
+
+impl ReplaceApproxPercentiletVisitor {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VisitorMut for ReplaceApproxPercentiletVisitor {
+    type Break = ();
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        if let Expr::Function(func) = expr {
+            if !func.within_group.is_empty() {
+                return ControlFlow::Continue(());
+            }
+            let name = func.name.to_string().to_lowercase();
+            if name == "approx_percentile_cont" {
+                let (first, others) = splite_function_args(&func.args);
+                *expr = Expr::Function(Function {
+                    name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new(
+                        "approx_percentile_cont",
+                    ))]),
+                    parameters: FunctionArguments::None,
+                    args: FunctionArguments::List(FunctionArgumentList {
+                        args: others,
+                        duplicate_treatment: None,
+                        clauses: vec![],
+                    }),
+                    filter: None,
+                    null_treatment: None,
+                    over: None,
+                    within_group: vec![convert_args_to_order_expr(first)],
+                    uses_odbc_syntax: false,
+                });
+            } else if name == "approx_percentile_cont_with_weight" {
+                let (first, others) = splite_function_args(&func.args);
+                *expr = Expr::Function(Function {
+                    name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new(
+                        "approx_percentile_cont_with_weight",
+                    ))]),
+                    parameters: FunctionArguments::None,
+                    args: FunctionArguments::List(FunctionArgumentList {
+                        args: others,
+                        duplicate_treatment: None,
+                        clauses: vec![],
+                    }),
+                    filter: None,
+                    null_treatment: None,
+                    over: None,
+                    within_group: vec![convert_args_to_order_expr(first)],
+                    uses_odbc_syntax: false,
+                });
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+fn splite_function_args(args: &FunctionArguments) -> (FunctionArg, Vec<FunctionArg>) {
+    match args {
+        FunctionArguments::List(list) => {
+            let (first, others) = list.args.split_first().unwrap();
+            (first.clone(), others.to_vec())
+        }
+        _ => {
+            log::error!("Unsupported function arguments: {:?}", args);
+            (FunctionArg::Unnamed(FunctionArgExpr::Wildcard), vec![])
+        }
+    }
+}
+
+fn convert_args_to_order_expr(args: FunctionArg) -> OrderByExpr {
+    let expr = convert_function_args_to_expr(args);
+    OrderByExpr {
+        expr: expr.clone(),
+        options: OrderByOptions {
+            asc: None,
+            nulls_first: None,
+        },
+        with_fill: None,
+    }
+}
+
+fn convert_function_args_to_expr(args: FunctionArg) -> Expr {
+    match args {
+        FunctionArg::Named {
+            name: _,
+            arg: FunctionArgExpr::Expr(arg),
+            operator: _,
+        } => arg,
+        FunctionArg::Named {
+            name: _,
+            arg: FunctionArgExpr::Wildcard,
+            operator: _,
+        } => Expr::Wildcard(AttachedToken::empty()),
+        FunctionArg::Unnamed(FunctionArgExpr::Expr(arg)) => arg,
+        FunctionArg::Unnamed(FunctionArgExpr::Wildcard) => Expr::Wildcard(AttachedToken::empty()),
+        _ => {
+            log::error!("Unsupported function argument: {:?}", args);
+            Expr::Wildcard(AttachedToken::empty())
+        }
+    }
+}
+
 fn generate_table_reference(idents: &[Ident]) -> (TableReference, String) {
     if idents.len() == 2 {
         let table_name = idents[0].value.as_str();
@@ -1924,57 +1998,6 @@ fn generate_table_reference(idents: &[Ident]) -> (TableReference, String) {
         let table_name = idents[1].value.as_str();
         let field_name = idents[2].value.clone();
         (TableReference::partial(stream_type, table_name), field_name)
-    }
-}
-
-fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -> bool {
-    match expr {
-        Expr::Identifier(Ident {
-            value,
-            quote_style: _,
-            span: _,
-        }) => index_fields.contains(value),
-        Expr::Nested(expr) => checking_inverted_index_inner(index_fields, expr),
-        Expr::BinaryOp { left, op, right } => match op {
-            BinaryOperator::And => true,
-            BinaryOperator::Or => {
-                checking_inverted_index_inner(index_fields, left)
-                    && checking_inverted_index_inner(index_fields, right)
-            }
-            BinaryOperator::Eq => checking_inverted_index_inner(index_fields, left),
-            _ => false,
-        },
-        Expr::InList {
-            expr,
-            list: _,
-            negated: _,
-        } => checking_inverted_index_inner(index_fields, expr),
-        Expr::Like {
-            negated: _,
-            expr,
-            pattern: _,
-            escape_char: _,
-            any: _,
-        } => checking_inverted_index_inner(index_fields, expr),
-        Expr::Function(func) => {
-            let f = func.name.to_string().to_lowercase();
-
-            if f == MATCH_ALL_UDF_NAME || f == FUZZY_MATCH_ALL_UDF_NAME {
-                return true;
-            }
-
-            if (f == STR_MATCH_UDF_NAME
-                || f == STR_MATCH_UDF_IGNORE_CASE_NAME
-                || f == MATCH_FIELD_UDF_NAME
-                || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME)
-                && let FunctionArguments::List(list) = &func.args
-            {
-                return list.args.len() == 2 && index_fields.contains(&get_arg_name(&list.args[0]));
-            }
-
-            false
-        }
-        _ => false,
     }
 }
 
@@ -2049,46 +2072,81 @@ pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Erro
     Ok(seconds)
 }
 
-pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, Error> {
-    #[allow(deprecated)]
-    let meta = match meta {
-        Some(v) => v,
-        None => match MetaSql::new(sql) {
-            Ok(meta) => meta,
-            Err(_) => {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                    sql.to_string(),
-                )));
+pub fn pickup_where(sql: &str) -> Result<Option<String>, Error> {
+    // disable subquery, join, union, except, intersect, etc.
+    let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+        .map_err(|e| Error::Message(e.to_string()))?
+        .pop()
+        .unwrap();
+    let mut visitor = PickupWhereVisitor::new();
+    let _ = statement.visit(&mut visitor);
+    if let Some(where_str) = visitor.where_str {
+        return Ok(Some(where_str));
+    }
+    Ok(None)
+}
+
+struct PickupWhereVisitor {
+    where_str: Option<String>,
+}
+
+impl PickupWhereVisitor {
+    fn new() -> Self {
+        Self { where_str: None }
+    }
+}
+
+impl VisitorMut for PickupWhereVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if query.with.is_some() {
+            self.where_str = None;
+            return ControlFlow::Break(());
+        }
+        match query.body.as_ref() {
+            sqlparser::ast::SetExpr::Select(select) => {
+                if select.from.len() > 1
+                    || select.from.iter().any(|from| {
+                        !from.joins.is_empty()
+                            || matches!(
+                                from.relation,
+                                TableFactor::Derived { .. } | TableFactor::Function { .. }
+                            )
+                    })
+                {
+                    self.where_str = None;
+                    return ControlFlow::Break(());
+                }
+
+                if let Some(selection) = select.selection.as_ref() {
+                    self.where_str = Some(selection.to_string());
+                    return ControlFlow::Continue(());
+                } else {
+                    self.where_str = None;
+                    return ControlFlow::Break(());
+                }
             }
-        },
-    };
-    let Some(caps) = RE_WHERE.captures(sql) else {
-        return Ok(None);
-    };
-    let mut where_str = caps.get(1).unwrap().as_str().to_string();
-    let where_str_lower = where_str.to_lowercase();
-
-    let clause_to_strip = if !meta.group_by.is_empty() {
-        Some(" group ")
-    } else if meta.having {
-        Some(" having ")
-    } else if !meta.order_by.is_empty() {
-        Some(" order ")
-    } else if meta.limit > 0 || where_str_lower.ends_with(" limit 0") {
-        Some(" limit ")
-    } else if meta.offset > 0 {
-        Some(" offset ")
-    } else {
-        None
-    };
-
-    if let Some(clause) = clause_to_strip
-        && let Some(pos) = where_str_lower.rfind(clause)
-    {
-        where_str.truncate(pos);
+            sqlparser::ast::SetExpr::SetOperation { .. } => {
+                self.where_str = None;
+                return ControlFlow::Break(());
+            }
+            _ => {}
+        }
+        ControlFlow::Continue(())
     }
 
-    Ok(Some(where_str))
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        match expr {
+            // check if has subquery
+            Expr::Subquery(_) | Expr::Exists { .. } | Expr::InSubquery { .. } => {
+                self.where_str = None;
+                return ControlFlow::Break(());
+            }
+            _ => {}
+        }
+        ControlFlow::Continue(())
+    }
 }
 
 fn o2_id_is_needed(
@@ -2618,7 +2676,6 @@ mod tests {
         assert_eq!(statement.to_string(), expected_sql);
     }
 
-    // test index_visitor for str_match
     #[test]
     fn test_index_visitor_str_match() {
         let sql = "SELECT * FROM t WHERE str_match(name, 'value')";
@@ -3761,5 +3818,263 @@ mod tests {
             .pop()
             .unwrap();
         assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_replace_approx_percentilet_visitor1() {
+        let sql = "select approx_percentile_cont(a, 0.5) from stream";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+        assert_eq!(
+            statement.to_string(),
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY a) FROM stream"
+        );
+    }
+
+    #[test]
+    fn test_replace_approx_percentilet_visitor2() {
+        let sql = "select approx_percentile_cont(arrow_cast(a, 'int'), 0.5) from stream";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+        assert_eq!(
+            statement.to_string(),
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY arrow_cast(a, 'int')) FROM stream"
+        );
+    }
+
+    #[test]
+    fn test_replace_approx_percentilet_visitor3() {
+        let sql = "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY a) FROM stream";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+        assert_eq!(
+            statement.to_string(),
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY a) FROM stream"
+        );
+    }
+
+    #[test]
+    fn test_replace_approx_percentilet_visitor4() {
+        let sql = "select approx_percentile_cont(arrow_cast(a, 'int') / 1000, 0.5) from stream";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+        assert_eq!(
+            statement.to_string(),
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY arrow_cast(a, 'int') / 1000) FROM stream"
+        );
+    }
+
+    #[test]
+    fn test_replace_approx_percentilet_visitor5() {
+        let sql = "select approx_percentile_cont(CAST(json_get_str(array_element(cast_to_arr(spath(log, 'error')), 1), 'code') AS INT), 0.5) from stream";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+        assert_eq!(
+            statement.to_string(),
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY CAST(json_get_str(array_element(cast_to_arr(spath(log, 'error')), 1), 'code') AS INT)) FROM stream"
+        );
+    }
+
+    #[test]
+    fn test_pickup_where_normal_sql() {
+        // Test normal SQL with WHERE clause
+        let sql = "SELECT * FROM logs WHERE level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("level = 'error'".to_string()));
+
+        // Test normal SQL with complex WHERE clause
+        let sql = "SELECT * FROM logs WHERE level = 'error' AND timestamp > 1234567890";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("level = 'error' AND timestamp > 1234567890".to_string())
+        );
+
+        // Test normal SQL with OR condition
+        let sql = "SELECT * FROM logs WHERE level = 'error' OR level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("level = 'error' OR level = 'warn'".to_string())
+        );
+
+        // Test normal SQL with IN clause
+        let sql = "SELECT * FROM logs WHERE level IN ('error', 'warn', 'info')";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("level IN ('error', 'warn', 'info')".to_string())
+        );
+
+        // Test normal SQL with LIKE clause
+        let sql = "SELECT * FROM logs WHERE message LIKE '%error%'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("message LIKE '%error%'".to_string()));
+    }
+
+    #[test]
+    fn test_pickup_where_no_where_clause() {
+        // Test SQL without WHERE clause
+        let sql = "SELECT * FROM logs";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with only SELECT and FROM
+        let sql = "SELECT id, name FROM users";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_pickup_where_with_joins() {
+        // Test SQL with JOIN - should return None
+        let sql = "SELECT * FROM logs l JOIN users u ON l.user_id = u.id WHERE l.level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with multiple FROM tables - should return None
+        let sql = "SELECT * FROM logs, users WHERE logs.user_id = users.id";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with LEFT JOIN - should return None
+        let sql =
+            "SELECT * FROM logs l LEFT JOIN users u ON l.user_id = u.id WHERE l.level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with INNER JOIN - should return None
+        let sql =
+            "SELECT * FROM logs l INNER JOIN users u ON l.user_id = u.id WHERE l.level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_pickup_where_with_subqueries() {
+        // Test SQL with subquery in WHERE - should return None
+        let sql = "SELECT * FROM logs WHERE user_id IN (SELECT id FROM users WHERE active = true)";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with EXISTS subquery - should return None
+        let sql =
+            "SELECT * FROM logs WHERE EXISTS (SELECT 1 FROM users WHERE users.id = logs.user_id)";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with subquery in FROM - should return None
+        let sql = "SELECT * FROM (SELECT * FROM logs WHERE level = 'error') sub WHERE sub.timestamp > 1234567890";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        let sql = "with t1 as (select log, message, kubernetes_namespace_name from default where kubernetes_namespace_name = 'ziox') select * from t1;";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        let sql = "with t1 as (select log, message, kubernetes_namespace_name from default) select * from t1 where kubernetes_namespace_name = 'ziox';";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_pickup_where_with_union() {
+        // Test SQL with UNION - should return None
+        let sql = "SELECT * FROM logs WHERE level = 'error' UNION SELECT * FROM logs WHERE level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with UNION ALL - should return None
+        let sql = "SELECT * FROM logs WHERE level = 'error' UNION ALL SELECT * FROM logs WHERE level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with INTERSECT - should return None
+        let sql = "SELECT * FROM logs WHERE level = 'error' INTERSECT SELECT * FROM logs WHERE level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with EXCEPT - should return None
+        let sql = "SELECT * FROM logs WHERE level = 'error' EXCEPT SELECT * FROM logs WHERE level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_pickup_where_complex_where_clauses() {
+        // Test complex WHERE with parentheses
+        let sql = "SELECT * FROM logs WHERE (level = 'error' OR level = 'warn') AND timestamp > 1234567890";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("(level = 'error' OR level = 'warn') AND timestamp > 1234567890".to_string())
+        );
+
+        // Test WHERE with function calls
+        let sql = "SELECT * FROM logs WHERE LENGTH(message) > 100 AND level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("LENGTH(message) > 100 AND level = 'error'".to_string())
+        );
+
+        // Test WHERE with BETWEEN
+        let sql = "SELECT * FROM logs WHERE timestamp BETWEEN 1234567890 AND 1234567999";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("timestamp BETWEEN 1234567890 AND 1234567999".to_string())
+        );
+
+        // Test WHERE with IS NULL
+        let sql = "SELECT * FROM logs WHERE user_id IS NULL AND level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("user_id IS NULL AND level = 'error'".to_string())
+        );
+
+        // Test WHERE with IS NOT NULL
+        let sql = "SELECT * FROM logs WHERE user_id IS NOT NULL";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("user_id IS NOT NULL".to_string()));
+    }
+
+    #[test]
+    fn test_pickup_where_edge_cases() {
+        // Test SQL with table alias but no joins
+        let sql = "SELECT * FROM logs l WHERE l.level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("l.level = 'error'".to_string()));
+
+        // Test SQL with quoted identifiers
+        let sql = "SELECT * FROM \"logs\" WHERE \"level\" = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("\"level\" = 'error'".to_string()));
+
+        // Test SQL with schema prefix
+        let sql = "SELECT * FROM public.logs WHERE level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("level = 'error'".to_string()));
     }
 }

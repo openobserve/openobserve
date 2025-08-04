@@ -51,9 +51,9 @@ pub fn arr_index_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Colum
     log::debug!("Inside arrindex");
     if args.len() < 2 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError(
+            Box::new(ParserError::ParserError(
                 "UDF params should be: arrindex(field1, start, end)".to_string(),
-            ),
+            )),
             None,
         ));
     }

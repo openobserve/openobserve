@@ -33,6 +33,13 @@ jobs:
       - name: Checkout git repo
         uses: actions/checkout@v4
 
+      - name: Check if API code has changes and skip if none
+        run: |
+          if [[ -n "${{ github.event.before }}" ]] && ! git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^src/"; then
+            echo "API code hasn't changed, skipping unit tests"
+            exit 0
+          fi
+
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -64,7 +71,7 @@ jobs:
           version: "0.27.0"
 
       - name: Start OpenObserve
-        run: ZO_WEBSOCKET_ENABLED=true target/debug/openobserve &
+        run: target/debug/openobserve &
 
       - name: Wait for start
         run: sleep 15
@@ -80,11 +87,3 @@ jobs:
       - name: Run tests
         run: rye run pytest --force-sugar
         working-directory: tests/api-testing/
-
-      - name: Setup websocket client
-        run: pip install websocat
-        working-directory: "tests/api-testing/"
-
-      - name: Run websocket tests
-        run: echo "Skipping websocket tests for now"
-        working-directory: "tests/api-testing/"

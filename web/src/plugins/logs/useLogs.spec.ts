@@ -215,7 +215,6 @@ describe("Use Logs Composable", () => {
           sql: "test query",
           start_time: 1000,
           end_time: 2000,
-          sql_mode: "context",
           streaming_output: true
         },
         page_type: wrapper.vm.searchObj.data.stream.streamType,
@@ -699,18 +698,13 @@ describe("Use Logs Composable", () => {
 
     it("should correctly generate paginations for given partitions and calculate total", () => {
 
-      console.log(wrapper.vm.searchObj.data.queryResults,'wrapper.vm.searchObj.data.queryResults')
       wrapper.vm.refreshPartitionPagination(false, false);
 
       const { paginations, partitionTotal } =
         wrapper.vm.searchObj.data.queryResults.partitionDetail;
       const { total } = wrapper.vm.searchObj.data.queryResults;
 
-
       expect(paginations).toHaveLength(2);
-
-      // Page 1: 50 records from partition 1
-      console.log(paginations,'paginatoins')
 
       expect(paginations[0]).toEqual([
         {
@@ -982,7 +976,6 @@ describe("Use Logs Composable", () => {
 
       // Verify state updates
 
-      console.log(wrapper.vm.searchObj.data.queryResults,'wrapper.vm.searchObj.data.queryResults')
       expect(wrapper.vm.searchObj.data.queryResults.scan_size).toBe(1000);
       expect(wrapper.vm.searchObj.data.queryResults.took).toBe(50);
       expect(wrapper.vm.searchObj.data.queryResults.partitionDetail.partitionTotal[0]).toBe(100);

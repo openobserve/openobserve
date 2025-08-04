@@ -410,7 +410,7 @@ pub async fn run_datafusion(
 
     // 7. rewrite physical plan
     let match_all_keys = sql.match_items.clone().unwrap_or_default();
-    let mut equal_keys = sql
+    let equal_keys = sql
         .equal_items
         .iter()
         .map(|(stream_name, fields)| {
@@ -423,19 +423,6 @@ pub async fn run_datafusion(
             )
         })
         .collect::<HashMap<_, _>>();
-
-    // check inverted index prefix search
-    #[allow(deprecated)]
-    if sql.stream_type == StreamType::Index
-        && cfg.common.full_text_search_type.to_lowercase() != "contains"
-    {
-        for (stream, items) in sql.prefix_items.iter() {
-            equal_keys
-                .entry(stream.clone())
-                .or_insert_with(Vec::new)
-                .extend(items.iter().map(|(k, v)| cluster_rpc::KvItem::new(k, v)));
-        }
-    }
 
     #[cfg(feature = "enterprise")]
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
@@ -463,14 +450,19 @@ pub async fn run_datafusion(
         context,
     );
 
-    // TODO: if there is only one table and single node, we can skip the remote scan rewrite
+    // if there is only one table and single node, we can skip the remote scan rewrite
     let mut empty_exec_count_visitor = NewEmptyExecCountVisitor::default();
     physical_plan.visit(&mut empty_exec_count_visitor)?;
-    let _empty_exec_count = empty_exec_count_visitor.get_count();
-    physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
+    let empty_exec_count = empty_exec_count_visitor.get_count();
+    let is_changed = if empty_exec_count <= 1 && config::cluster::LOCAL_NODE.is_single_node() {
+        false
+    } else {
+        physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
+        rewrite.is_changed
+    };
 
     // add remote scan exec to top if physical plan is not changed
-    if !rewrite.is_changed {
+    if !is_changed {
         let table_name = sql.stream_names.first().unwrap();
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
@@ -872,12 +864,20 @@ pub(crate) async fn partition_file_by_hash(
     for fk in file_id_list {
         let node_name =
             infra_cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group)
-                .await
-                .expect("there is no querier node in consistent hash ring");
-        let idx = match node_idx.get(&node_name) {
-            Some(idx) => *idx,
+                .await;
+        let idx = match node_name {
+            Some(node_name) => match node_idx.get(&node_name) {
+                Some(idx) => *idx,
+                None => {
+                    log::warn!("partition_file_by_hash: {node_name} not found in node_idx");
+                    0
+                }
+            },
             None => {
-                log::error!("partition_file_by_hash: {node_name} not found in node_idx");
+                log::warn!(
+                    "partition_file_by_hash: {} can't get a node from consistent hashing",
+                    fk.id
+                );
                 0
             }
         };

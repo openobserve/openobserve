@@ -26,7 +26,7 @@ pub enum ReportDestination {
     Email(String), // Supports email only
 }
 
-#[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema)]
+#[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema, PartialEq)]
 pub enum ReportMediaType {
     #[default]
     #[serde(rename = "pdf")]
@@ -54,11 +54,10 @@ pub struct ReportDashboard {
 }
 
 #[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
 pub enum ReportTimerangeType {
     #[default]
-    #[serde(rename = "relative")]
     Relative,
-    #[serde(rename = "absolute")]
     Absolute,
 }
 
@@ -83,19 +82,14 @@ impl Default for ReportTimerange {
 }
 
 #[derive(Serialize, Debug, Default, Deserialize, PartialEq, Clone, ToSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum ReportFrequencyType {
-    #[serde(rename = "once")]
     Once,
-    #[serde(rename = "hours")]
     Hours,
-    #[serde(rename = "days")]
     Days,
-    #[serde(rename = "weeks")]
     #[default]
     Weeks,
-    #[serde(rename = "months")]
     Months,
-    #[serde(rename = "cron")]
     Cron,
 }
 
@@ -288,7 +282,7 @@ pub struct ReportListFilters {
 }
 
 impl ReportListFilters {
-    pub fn into_parmas(self, org_id: &str) -> ListReportsParams {
+    pub fn into_params(self, org_id: &str) -> ListReportsParams {
         ListReportsParams {
             org_id: org_id.to_string(),
             folder_snowflake_id: self.folder,
@@ -318,5 +312,405 @@ mod tests {
         let email_details_from_alias: ReportEmailDetails =
             serde_json::from_str(&json_using_alias).unwrap();
         assert_eq!(email_details, email_details_from_alias);
+    }
+
+    #[test]
+    fn test_report_destination_serialization() {
+        let destination = ReportDestination::Email("test@example.com".to_string());
+        let serialized = serde_json::to_string(&destination).unwrap();
+        assert_eq!(serialized, r#"{"email":"test@example.com"}"#);
+
+        let deserialized: ReportDestination = serde_json::from_str(&serialized).unwrap();
+        assert!(matches!(deserialized, ReportDestination::Email(_)));
+    }
+
+    #[test]
+    fn test_report_media_type_default() {
+        assert_eq!(ReportMediaType::default(), ReportMediaType::Pdf);
+    }
+
+    #[test]
+    fn test_report_dashboard_variable_default() {
+        let variable = ReportDashboardVariable {
+            key: "test_key".to_string(),
+            value: "test_value".to_string(),
+            id: Some("test_id".to_string()),
+        };
+
+        assert_eq!(variable.key, "test_key");
+        assert_eq!(variable.value, "test_value");
+        assert_eq!(variable.id, Some("test_id".to_string()));
+    }
+
+    #[test]
+    fn test_report_dashboard_serialization() {
+        let dashboard = ReportDashboard {
+            dashboard: "test_dashboard".to_string(),
+            folder: "test_folder".to_string(),
+            tabs: vec!["tab1".to_string(), "tab2".to_string()],
+            variables: vec![ReportDashboardVariable {
+                key: "var1".to_string(),
+                value: "value1".to_string(),
+                id: None,
+            }],
+            timerange: ReportTimerange::default(),
+        };
+
+        let serialized = serde_json::to_string(&dashboard).unwrap();
+        let deserialized: ReportDashboard = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.dashboard, "test_dashboard");
+        assert_eq!(deserialized.folder, "test_folder");
+        assert_eq!(deserialized.tabs.len(), 2);
+        assert_eq!(deserialized.variables.len(), 1);
+    }
+
+    #[test]
+    fn test_report_timerange_default() {
+        let timerange = ReportTimerange::default();
+        assert_eq!(timerange.range_type, ReportTimerangeType::Relative);
+        assert_eq!(timerange.period, "1w");
+        assert_eq!(timerange.from, 0);
+        assert_eq!(timerange.to, 0);
+    }
+
+    #[test]
+    fn test_report_timerange_absolute() {
+        let timerange = ReportTimerange {
+            range_type: ReportTimerangeType::Absolute,
+            period: "".to_string(),
+            from: 1640995200000000, // 2022-01-01 00:00:00 UTC in microseconds
+            to: 1641081600000000,   // 2022-01-02 00:00:00 UTC in microseconds
+        };
+
+        assert_eq!(timerange.range_type, ReportTimerangeType::Absolute);
+        assert_eq!(timerange.from, 1640995200000000);
+        assert_eq!(timerange.to, 1641081600000000);
+    }
+
+    #[test]
+    fn test_report_timerange_type_default() {
+        assert_eq!(
+            ReportTimerangeType::default(),
+            ReportTimerangeType::Relative
+        );
+    }
+
+    #[test]
+    fn test_report_frequency_type_default() {
+        assert_eq!(ReportFrequencyType::default(), ReportFrequencyType::Weeks);
+    }
+
+    #[test]
+    fn test_report_frequency_default() {
+        let frequency = ReportFrequency::default();
+        assert_eq!(frequency.interval, 1);
+        assert_eq!(frequency.cron, "");
+        assert_eq!(frequency.frequency_type, ReportFrequencyType::Weeks);
+        assert_eq!(frequency.align_time, default_align_time());
+    }
+
+    #[test]
+    fn test_report_frequency_cron() {
+        let frequency = ReportFrequency {
+            interval: 0,
+            cron: "0 0 * * *".to_string(),
+            frequency_type: ReportFrequencyType::Cron,
+            align_time: false,
+        };
+
+        assert_eq!(frequency.cron, "0 0 * * *");
+        assert_eq!(frequency.frequency_type, ReportFrequencyType::Cron);
+        assert!(!frequency.align_time);
+    }
+
+    #[test]
+    fn test_report_default() {
+        let report = Report::default();
+        assert!(report.name.is_empty());
+        assert!(report.title.is_empty());
+        assert!(report.org_id.is_empty());
+        assert!(report.destinations.is_empty());
+        assert!(report.dashboards.is_empty());
+        assert!(report.description.is_empty());
+        assert!(report.message.is_empty());
+        assert!(!report.enabled);
+        assert_eq!(report.media_type, ReportMediaType::Pdf);
+        assert!(report.timezone.is_empty());
+        assert_eq!(report.tz_offset, 0);
+        assert!(report.updated_at.is_none());
+        assert!(report.owner.is_empty());
+        assert!(report.last_edited_by.is_empty());
+    }
+
+    #[test]
+    fn test_report_with_data() {
+        let now = Utc::now().timestamp_micros();
+        let report = Report {
+            name: "test_report".to_string(),
+            title: "Test Report".to_string(),
+            org_id: "test_org".to_string(),
+            frequency: ReportFrequency::default(),
+            start: now,
+            dashboards: vec![ReportDashboard {
+                dashboard: "dashboard1".to_string(),
+                folder: "folder1".to_string(),
+                tabs: vec!["tab1".to_string()],
+                variables: vec![],
+                timerange: ReportTimerange::default(),
+            }],
+            destinations: vec![ReportDestination::Email("test@example.com".to_string())],
+            description: "Test description".to_string(),
+            message: "Test message".to_string(),
+            enabled: true,
+            media_type: ReportMediaType::Pdf,
+            timezone: "UTC".to_string(),
+            tz_offset: 0,
+            created_at: datetime_now(),
+            updated_at: None,
+            owner: "test_owner".to_string(),
+            last_edited_by: "test_editor".to_string(),
+        };
+
+        assert_eq!(report.name, "test_report");
+        assert_eq!(report.title, "Test Report");
+        assert_eq!(report.org_id, "test_org");
+        assert_eq!(report.start, now);
+        assert_eq!(report.dashboards.len(), 1);
+        assert_eq!(report.destinations.len(), 1);
+        assert_eq!(report.description, "Test description");
+        assert_eq!(report.message, "Test message");
+        assert!(report.enabled);
+        assert_eq!(report.timezone, "UTC");
+        assert_eq!(report.tz_offset, 0);
+        assert_eq!(report.owner, "test_owner");
+        assert_eq!(report.last_edited_by, "test_editor");
+    }
+
+    #[test]
+    fn test_report_serialization() {
+        let report = Report {
+            name: "test_report".to_string(),
+            title: "Test Report".to_string(),
+            org_id: "test_org".to_string(),
+            frequency: ReportFrequency::default(),
+            start: Utc::now().timestamp_micros(),
+            dashboards: vec![],
+            destinations: vec![ReportDestination::Email("test@example.com".to_string())],
+            description: "Test description".to_string(),
+            message: "Test message".to_string(),
+            enabled: true,
+            media_type: ReportMediaType::Pdf,
+            timezone: "UTC".to_string(),
+            tz_offset: 0,
+            created_at: datetime_now(),
+            updated_at: None,
+            owner: "test_owner".to_string(),
+            last_edited_by: "test_editor".to_string(),
+        };
+
+        let serialized = serde_json::to_string(&report).unwrap();
+        let deserialized: Report = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.name, "test_report");
+        assert_eq!(deserialized.title, "Test Report");
+        assert_eq!(deserialized.org_id, "test_org");
+        assert!(deserialized.enabled);
+    }
+
+    #[test]
+    fn test_report_email_details() {
+        let email_details = ReportEmailDetails {
+            recipients: vec![
+                "user1@example.com".to_string(),
+                "user2@example.com".to_string(),
+            ],
+            title: "Test Email".to_string(),
+            name: "test_name".to_string(),
+            message: "Test message".to_string(),
+            dashb_url: "https://example.com/dashboard".to_string(),
+        };
+
+        assert_eq!(email_details.recipients.len(), 2);
+        assert_eq!(email_details.title, "Test Email");
+        assert_eq!(email_details.name, "test_name");
+        assert_eq!(email_details.message, "Test message");
+        assert_eq!(email_details.dashb_url, "https://example.com/dashboard");
+    }
+
+    #[test]
+    fn test_http_report_payload() {
+        let email_details = ReportEmailDetails {
+            recipients: vec!["test@example.com".to_string()],
+            title: "Test".to_string(),
+            name: "test".to_string(),
+            message: "test".to_string(),
+            dashb_url: "https://example.com".to_string(),
+        };
+
+        let payload = HttpReportPayload {
+            dashboards: vec![ReportDashboard {
+                dashboard: "dashboard1".to_string(),
+                folder: "folder1".to_string(),
+                tabs: vec!["tab1".to_string()],
+                variables: vec![],
+                timerange: ReportTimerange::default(),
+            }],
+            email_details: email_details.clone(),
+        };
+
+        assert_eq!(payload.dashboards.len(), 1);
+        assert_eq!(payload.email_details.recipients, email_details.recipients);
+    }
+
+    #[test]
+    fn test_list_reports_params_new() {
+        let params = ListReportsParams::new("test_org");
+        assert_eq!(params.org_id, "test_org");
+        assert!(params.folder_snowflake_id.is_none());
+        assert!(params.dashboard_snowflake_id.is_none());
+        assert!(params.page_size_and_idx.is_none());
+        assert!(params.has_destinations.is_none());
+    }
+
+    #[test]
+    fn test_list_reports_params_builder_methods() {
+        let params = ListReportsParams::new("test_org")
+            .in_folder("folder_123")
+            .for_dashboard("dashboard_456")
+            .has_destinations(true)
+            .paginate(10, 0);
+
+        assert_eq!(params.org_id, "test_org");
+        assert_eq!(params.folder_snowflake_id, Some("folder_123".to_string()));
+        assert_eq!(
+            params.dashboard_snowflake_id,
+            Some("dashboard_456".to_string())
+        );
+        assert_eq!(params.has_destinations, Some(true));
+        assert_eq!(params.page_size_and_idx, Some((10, 0)));
+    }
+
+    #[test]
+    fn test_list_report_item() {
+        let item = ListReportItem {
+            name: "test_report".to_string(),
+            owner: "test_owner".to_string(),
+            description: Some("Test description".to_string()),
+            last_triggered_at: 1640995200000000,
+        };
+
+        assert_eq!(item.name, "test_report");
+        assert_eq!(item.owner, "test_owner");
+        assert_eq!(item.description, Some("Test description".to_string()));
+        assert_eq!(item.last_triggered_at, 1640995200000000);
+    }
+
+    #[test]
+    fn test_report_list_filters() {
+        let filters = ReportListFilters {
+            dashboard: Some("dashboard_123".to_string()),
+            folder: Some("folder_456".to_string()),
+            destination_less: Some(true),
+        };
+
+        let params = filters.into_params("test_org");
+        assert_eq!(params.org_id, "test_org");
+        assert_eq!(
+            params.dashboard_snowflake_id,
+            Some("dashboard_123".to_string())
+        );
+        assert_eq!(params.folder_snowflake_id, Some("folder_456".to_string()));
+        assert_eq!(params.has_destinations, Some(false)); // destination_less = true means has_destinations = false
+    }
+
+    #[test]
+    fn test_report_timerange_equality() {
+        let timerange1 = ReportTimerange {
+            range_type: ReportTimerangeType::Relative,
+            period: "1w".to_string(),
+            from: 0,
+            to: 0,
+        };
+
+        let timerange2 = ReportTimerange {
+            range_type: ReportTimerangeType::Relative,
+            period: "1w".to_string(),
+            from: 0,
+            to: 0,
+        };
+
+        assert_eq!(timerange1, timerange2);
+    }
+
+    #[test]
+    fn test_report_frequency_type_equality() {
+        assert_eq!(ReportFrequencyType::Once, ReportFrequencyType::Once);
+        assert_ne!(ReportFrequencyType::Once, ReportFrequencyType::Weeks);
+        assert_ne!(ReportFrequencyType::Hours, ReportFrequencyType::Days);
+    }
+
+    #[test]
+    fn test_report_media_type_clone() {
+        let media_type = ReportMediaType::Pdf;
+        let cloned = media_type.clone();
+        assert_eq!(media_type, cloned);
+    }
+
+    #[test]
+    fn test_report_dashboard_variable_equality() {
+        let var1 = ReportDashboardVariable {
+            key: "test_key".to_string(),
+            value: "test_value".to_string(),
+            id: Some("test_id".to_string()),
+        };
+
+        let var2 = ReportDashboardVariable {
+            key: "test_key".to_string(),
+            value: "test_value".to_string(),
+            id: Some("test_id".to_string()),
+        };
+
+        assert_eq!(var1, var2);
+    }
+
+    #[test]
+    fn test_report_dashboard_variable_without_id() {
+        let variable = ReportDashboardVariable {
+            key: "test_key".to_string(),
+            value: "test_value".to_string(),
+            id: None,
+        };
+
+        assert_eq!(variable.key, "test_key");
+        assert_eq!(variable.value, "test_value");
+        assert!(variable.id.is_none());
+    }
+
+    #[test]
+    fn test_report_timerange_type_serialization() {
+        let relative = ReportTimerangeType::Relative;
+        let absolute = ReportTimerangeType::Absolute;
+
+        let relative_json = serde_json::to_string(&relative).unwrap();
+        let absolute_json = serde_json::to_string(&absolute).unwrap();
+
+        assert_eq!(relative_json, r#""relative""#);
+        assert_eq!(absolute_json, r#""absolute""#);
+    }
+
+    #[test]
+    fn test_report_frequency_type_serialization() {
+        let once = ReportFrequencyType::Once;
+        let weeks = ReportFrequencyType::Weeks;
+        let cron = ReportFrequencyType::Cron;
+
+        let once_json = serde_json::to_string(&once).unwrap();
+        let weeks_json = serde_json::to_string(&weeks).unwrap();
+        let cron_json = serde_json::to_string(&cron).unwrap();
+
+        assert_eq!(once_json, r#""once""#);
+        assert_eq!(weeks_json, r#""weeks""#);
+        assert_eq!(cron_json, r#""cron""#);
     }
 }

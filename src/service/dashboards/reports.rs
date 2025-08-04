@@ -240,7 +240,7 @@ pub async fn list(
     permitted: Option<Vec<String>>,
 ) -> Result<Vec<table::reports::ListReportsQueryResult>, ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let params = filters.into_parmas(org_id);
+    let params = filters.into_params(org_id);
     let reports = db::dashboards::reports::list(conn, &params)
         .await
         .map_err(ReportError::DbError)?;

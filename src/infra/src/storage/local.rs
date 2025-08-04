@@ -21,7 +21,7 @@ use config::metrics;
 use futures::stream::BoxStream;
 use object_store::{
     Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
-    PutMultipartOpts, PutOptions, PutPayload, PutResult, Result, limit::LimitStore,
+    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore,
     local::LocalFileSystem, path::Path,
 };
 
@@ -111,7 +111,7 @@ impl ObjectStore for Local {
     async fn put_multipart_opts(
         &self,
         location: &Path,
-        opts: PutMultipartOpts,
+        opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
         self.client
             .put_multipart_opts(

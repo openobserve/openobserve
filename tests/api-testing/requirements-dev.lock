@@ -54,5 +54,3 @@ tink==1.10.0
     # via pytest-openobserve
 urllib3==2.1.0
     # via requests
-websocket-client==1.8.0
-    # via pytest-openobserve

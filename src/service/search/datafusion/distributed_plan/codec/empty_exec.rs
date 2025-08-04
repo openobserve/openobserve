@@ -26,7 +26,6 @@ use datafusion_proto::{
     logical_plan::{
         DefaultLogicalExtensionCodec, from_proto::parse_expr, to_proto::serialize_exprs,
     },
-    physical_plan::PhysicalExtensionCodec,
     protobuf::proto_error,
 };
 use prost::Message;
@@ -34,77 +33,67 @@ use proto::cluster_rpc;
 
 use super::super::empty_exec::NewEmptyExec;
 
-/// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
-#[derive(Debug)]
-pub struct EmptyExecPhysicalExtensionCodec;
+pub(crate) fn try_decode(
+    node: cluster_rpc::NewEmptyExecNode,
+    _inputs: &[Arc<dyn ExecutionPlan>],
+    registry: &dyn FunctionRegistry,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    let schema = Arc::new(convert_required!(node.schema)?);
+    let full_schema = Arc::new(convert_required!(node.full_schema)?);
+    let extension_codec = DefaultLogicalExtensionCodec {};
+    let filters = node
+        .filters
+        .iter()
+        .map(|v| parse_expr(v, registry, &extension_codec))
+        .collect::<Result<Vec<_>, _>>()?;
+    let projection = if node.projection.is_empty() {
+        None
+    } else {
+        Some(
+            node.projection
+                .iter()
+                .map(|v| *v as usize)
+                .collect::<Vec<_>>(),
+        )
+    };
+    Ok(Arc::new(NewEmptyExec::new(
+        &node.name,
+        schema,
+        projection.as_ref(),
+        &filters,
+        node.limit.map(|v| v as usize),
+        node.sorted_by_time,
+        full_schema,
+    )))
+}
 
-impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
-    fn try_decode(
-        &self,
-        buf: &[u8],
-        _inputs: &[Arc<dyn ExecutionPlan>],
-        registry: &dyn FunctionRegistry,
-    ) -> Result<Arc<dyn ExecutionPlan>> {
-        let proto = cluster_rpc::NewEmptyExecNode::decode(buf).map_err(|e| {
-            DataFusionError::Internal(format!(
-                "failed to decode NewEmptyExecNode writer execution plan: {e:?}"
-            ))
-        })?;
-        let schema = Arc::new(convert_required!(proto.schema)?);
-        let full_schema = Arc::new(convert_required!(proto.full_schema)?);
-        let extension_codec = DefaultLogicalExtensionCodec {};
-        let filters = proto
-            .filters
-            .iter()
-            .map(|v| parse_expr(v, registry, &extension_codec))
-            .collect::<Result<Vec<_>, _>>()?;
-        let projection = if proto.projection.is_empty() {
-            None
-        } else {
-            Some(
-                proto
-                    .projection
-                    .iter()
-                    .map(|v| *v as usize)
-                    .collect::<Vec<_>>(),
-            )
-        };
-        Ok(Arc::new(NewEmptyExec::new(
-            &proto.name,
-            schema,
-            projection.as_ref(),
-            &filters,
-            proto.limit.map(|v| v as usize),
-            proto.sorted_by_time,
-            full_schema,
-        )))
-    }
-
-    fn try_encode(&self, node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
-        let Some(node) = node.as_any().downcast_ref::<NewEmptyExec>() else {
-            return internal_err!("Not supported");
-        };
-        let extension_codec = DefaultLogicalExtensionCodec {};
-        let filters = serialize_exprs(node.filters(), &extension_codec)?;
-        let proto = cluster_rpc::NewEmptyExecNode {
-            name: node.name().to_string(),
-            schema: Some(node.schema().as_ref().try_into()?),
-            projection: match node.projection() {
-                Some(v) => v.iter().map(|v| *v as u64).collect(),
-                None => vec![],
-            },
-            filters,
-            limit: node.limit().map(|v| v as u64),
-            sorted_by_time: node.sorted_by_time(),
-            full_schema: Some(node.full_schema().as_ref().try_into()?),
-        };
-        proto.encode(buf).map_err(|e| {
-            DataFusionError::Internal(format!(
-                "failed to encode NewEmptyExecNode writer execution plan: {e:?}"
-            ))
-        })?;
-        Ok(())
-    }
+pub(crate) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
+    let Some(node) = node.as_any().downcast_ref::<NewEmptyExec>() else {
+        return internal_err!("Not supported");
+    };
+    let extension_codec = DefaultLogicalExtensionCodec {};
+    let filters = serialize_exprs(node.filters(), &extension_codec)?;
+    let plan_node = cluster_rpc::NewEmptyExecNode {
+        name: node.name().to_string(),
+        schema: Some(node.schema().as_ref().try_into()?),
+        projection: match node.projection() {
+            Some(v) => v.iter().map(|v| *v as u64).collect(),
+            None => vec![],
+        },
+        filters,
+        limit: node.limit().map(|v| v as u64),
+        sorted_by_time: node.sorted_by_time(),
+        full_schema: Some(node.full_schema().as_ref().try_into()?),
+    };
+    let proto = cluster_rpc::PhysicalPlanNode {
+        plan: Some(cluster_rpc::physical_plan_node::Plan::EmptyExec(plan_node)),
+    };
+    proto.encode(buf).map_err(|e| {
+        DataFusionError::Internal(format!(
+            "failed to encode NewEmptyExecNode writer execution plan: {e:?}"
+        ))
+    })?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -130,9 +119,7 @@ mod tests {
         ));
 
         // encode
-        let proto = super::super::ComposedPhysicalExtensionCodec {
-            codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
-        };
+        let proto = super::super::get_physical_extension_codec();
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode
