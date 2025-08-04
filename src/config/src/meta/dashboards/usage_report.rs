@@ -16,7 +16,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema,PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct DashboardInfo {
     pub run_id: String,
     pub panel_id: String,

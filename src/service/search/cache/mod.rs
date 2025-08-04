@@ -21,6 +21,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        dashboards::usage_report::DashboardInfo,
         function::RESULT_ARRAY_SKIP_VRL,
         search::{self, ResponseTook},
         self_reporting::usage::{RequestStats, UsageType},
@@ -33,7 +34,6 @@ use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
-use config::meta::dashboards::usage_report::DashboardInfo;
 use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
 use tracing::Instrument;
@@ -59,6 +59,7 @@ pub mod multi;
 pub mod result_utils;
 
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
+#[allow(clippy::too_many_arguments)]
 pub async fn search(
     trace_id: &str,
     org_id: &str,
@@ -400,7 +401,7 @@ pub async fn search(
         took_wait_in_queue: Some(res.took_detail.wait_in_queue),
         work_group,
         result_cache_ratio: Some(res.result_cache_ratio),
-        dashboard_info: dashboard_info,
+        dashboard_info,
         ..Default::default()
     };
     report_request_usage_stats(

@@ -16,9 +16,12 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    get_config, meta::{
-        dashboards::usage_report::DashboardInfo, search::{SearchEventContext, SearchEventType}, stream::{FileMeta, StreamType}
-    }, SIZE_IN_MB
+    SIZE_IN_MB, get_config,
+    meta::{
+        dashboards::usage_report::DashboardInfo,
+        search::{SearchEventContext, SearchEventType},
+        stream::{FileMeta, StreamType},
+    },
 };
 
 pub const USAGE_STREAM: &str = "usage";

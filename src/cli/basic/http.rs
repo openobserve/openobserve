@@ -396,15 +396,9 @@ mod tests {
     fn test_prettytable_functionality() {
         // Test that table creation works correctly
         let mut table = Table::new();
-        table.add_row(Row::new(vec![
-            Cell::new("Header1"),
-            Cell::new("Header2"),
-        ]));
-        table.add_row(Row::new(vec![
-            Cell::new("Data1"),
-            Cell::new("Data2"),
-        ]));
-        
+        table.add_row(Row::new(vec![Cell::new("Header1"), Cell::new("Header2")]));
+        table.add_row(Row::new(vec![Cell::new("Data1"), Cell::new("Data2")]));
+
         // Verify table can be created without panicking
         let table_string = format!("{}", table);
         assert!(table_string.contains("Header1"));
@@ -414,7 +408,7 @@ mod tests {
     #[test]
     fn test_search_query_structure() {
         use config::meta::search::{Query, Request};
-        
+
         let query = Query {
             sql: "SELECT * FROM test".to_string(),
             from: 0,
@@ -424,12 +418,12 @@ mod tests {
             quick_mode: false,
             ..Default::default()
         };
-        
+
         let search_req = Request {
             query,
             ..Default::default()
         };
-        
+
         // Test serialization
         let json = serde_json::to_string(&search_req);
         assert!(json.is_ok());
@@ -442,15 +436,15 @@ mod tests {
         let org = "test_org";
         let url = format!("/api/{org}/_search");
         assert_eq!(url, "/api/test_org/_search");
-        
+
         let node_urls = [
             "/node/enable?value=false",
-            "/node/enable?value=true", 
+            "/node/enable?value=true",
             "/node/flush",
             "/node/list",
-            "/node/metrics"
+            "/node/metrics",
         ];
-        
+
         for url in node_urls {
             assert!(url.starts_with("/node/"));
         }
@@ -461,10 +455,10 @@ mod tests {
         // Test anyhow error creation
         let error = anyhow::anyhow!("query failed");
         assert_eq!(error.to_string(), "query failed");
-        
-        let error = anyhow::anyhow!("node list failed");  
+
+        let error = anyhow::anyhow!("node list failed");
         assert_eq!(error.to_string(), "node list failed");
-        
+
         let error = anyhow::anyhow!("node metrics failed");
         assert_eq!(error.to_string(), "node metrics failed");
     }
@@ -477,25 +471,25 @@ mod tests {
             reqwest::Method::POST,
             reqwest::Method::PUT,
         ];
-        
+
         for method in methods {
             assert!(format!("{}", method).len() > 0);
         }
     }
 
-    #[test] 
+    #[test]
     fn test_json_value_handling() {
         use serde_json::Value;
-        
+
         // Test JSON object handling as used in query function
         let json_str = r#"{"field1": "value1", "field2": 42}"#;
         let value: Value = serde_json::from_str(json_str).unwrap();
-        
+
         if let Some(obj) = value.as_object() {
             let mut keys: Vec<_> = obj.keys().collect();
             keys.sort();
             assert_eq!(keys, vec!["field1", "field2"]);
-            
+
             // Test value conversion as done in query function
             for (key, val) in obj {
                 let string_val = val.to_string();
@@ -511,12 +505,12 @@ mod tests {
     #[test]
     fn test_hashset_column_deduplication() {
         use hashbrown::HashSet;
-        
+
         // Simulate the column deduplication logic from query function
         let mut columns = Vec::new();
         let mut columns_set = HashSet::new();
         let test_keys = vec!["field1", "field2", "field1", "field3", "field2"];
-        
+
         for key in test_keys {
             if columns_set.contains(key) {
                 continue;
@@ -524,7 +518,7 @@ mod tests {
             columns_set.insert(key.to_string());
             columns.push(key.to_string());
         }
-        
+
         assert_eq!(columns.len(), 3);
         assert!(columns.contains(&"field1".to_string()));
         assert!(columns.contains(&"field2".to_string()));
@@ -534,16 +528,25 @@ mod tests {
     #[test]
     fn test_node_sorting() {
         use config::meta::cluster::Node;
-        
+
         // Test node sorting logic as used in node_list functions
         let mut nodes = vec![
-            Node { id: 3, ..Default::default() },
-            Node { id: 1, ..Default::default() },
-            Node { id: 2, ..Default::default() },
+            Node {
+                id: 3,
+                ..Default::default()
+            },
+            Node {
+                id: 1,
+                ..Default::default()
+            },
+            Node {
+                id: 2,
+                ..Default::default()
+            },
         ];
-        
+
         nodes.sort_by_key(|node| node.id);
-        
+
         assert_eq!(nodes[0].id, 1);
         assert_eq!(nodes[1].id, 2);
         assert_eq!(nodes[2].id, 3);
@@ -552,7 +555,7 @@ mod tests {
     #[test]
     fn test_response_json_parsing() {
         use config::meta::search::Response;
-        
+
         // Test response parsing structure
         let json_response = r#"{
             "hits": [],
@@ -565,10 +568,10 @@ mod tests {
             "idx_scan_size": 0,
             "scan_records": 0
         }"#;
-        
+
         let response: Result<Response, _> = serde_json::from_str(json_response);
         assert!(response.is_ok());
-        
+
         let response = response.unwrap();
         assert_eq!(response.hits.len(), 0);
         assert_eq!(response.total, 0);
@@ -585,10 +588,10 @@ mod tests {
     fn test_query_request_construction() {
         // Test that query requests are constructed correctly
         use config::meta::search::{Query, Request};
-        
+
         let time_end = config::utils::time::now_micros();
         let time_start = time_end - (3600000 * 1000); // 1 hour ago
-        
+
         let query = Query {
             sql: "SELECT * FROM logs WHERE level='ERROR'".to_string(),
             from: 0,
@@ -598,13 +601,16 @@ mod tests {
             quick_mode: false,
             ..Default::default()
         };
-        
+
         let search_req = Request {
             query: query.clone(),
             ..Default::default()
         };
-        
-        assert_eq!(search_req.query.sql, "SELECT * FROM logs WHERE level='ERROR'");
+
+        assert_eq!(
+            search_req.query.sql,
+            "SELECT * FROM logs WHERE level='ERROR'"
+        );
         assert_eq!(search_req.query.size, 50);
         assert_eq!(search_req.query.start_time, time_start);
         assert_eq!(search_req.query.end_time, time_end);
