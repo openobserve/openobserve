@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         borderless
         dense
         class="q-mb-xs"
+        :readonly="dashboardPanelDataPageKey === 'logs'"
       ></q-select>
       <q-select
         v-model="
