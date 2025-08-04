@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, onBeforeMount, ref } from "vue";
+import { defineComponent, onBeforeMount, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
@@ -297,6 +297,25 @@ export default defineComponent({
     onBeforeMount(() => {
       getLookupTables();
     });
+    //here we need to check if the action is there or not 
+    //because if action is there user before refresh the page user was there in add / update page
+    //so to maitain consistency we are checking the action and if action is there we are showing the add / update page
+    //else we are showing the list of enrichment tables
+    onMounted(()=>{
+      //it is for showing empty add page when user refresh the page
+      if(router.currentRoute.value.query.action == "add"){
+        showAddUpdateFn({})
+      }
+      //it is for showing the update page when user refresh the page
+      //we are passing the name of the enrichment table to the update page
+      else if(router.currentRoute.value.query.action == "update"){
+        showAddUpdateFn({
+          row: {
+            name: router.currentRoute.value.query.name,
+          }
+        })
+      }
+    })
 
     const getLookupTables = (force: boolean = false) => {
       const dismiss = $q.notify({
