@@ -60,7 +60,7 @@ export default defineComponent({
       tls: "",
     });
 
-    const ingestionURL = getIngestionURL();
+    const ingestionURL = getIngestionURL(store);
     endpoint.value = getEndPoint(ingestionURL);
     const content = `[OUTPUT]
   Name http

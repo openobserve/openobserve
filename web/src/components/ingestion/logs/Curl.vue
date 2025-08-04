@@ -49,7 +49,7 @@ export default defineComponent({
     });
     //here we can use the getIngestionURL function to get the ingestion URL
     //it calls the store.state.API_ENDPOINT if it is not present in the store.state.zoConfig.ingestion_url
-    const ingestionURL = getIngestionURL();
+    const ingestionURL = getIngestionURL(store);
     endpoint.value = getEndPoint(ingestionURL);
 
     const content = `curl -u [EMAIL]:[PASSCODE] -k ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/default/_json -d '[{"level":"info","job":"test","log":"test message for openobserve"}]'`;

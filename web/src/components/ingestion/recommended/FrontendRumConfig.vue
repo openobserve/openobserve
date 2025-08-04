@@ -156,7 +156,7 @@ openobserveRum.startSessionReplayRecording();`;
       rumToken.value = store.state.organizationData.rumToken.rum_token;
       let configData = defaultConfig;
 
-      const ingestionURL = getIngestionURL();
+      const ingestionURL = getIngestionURL(store);
 
       configData = configData.replace(
         /<OPENOBSERVE_SITE>/g,

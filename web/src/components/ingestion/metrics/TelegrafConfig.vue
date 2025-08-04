@@ -47,7 +47,7 @@ export default defineComponent({
       protocol: "",
       tls: "",
     });
-    const ingestionURL = getIngestionURL();
+    const ingestionURL = getIngestionURL(store);
     endpoint.value = getEndPoint(ingestionURL);
 
     const content = `[[outputs.http]]

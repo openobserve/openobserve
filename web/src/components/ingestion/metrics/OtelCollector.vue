@@ -37,7 +37,7 @@ const endpoint: any = ref({
   tls: "",
 });
 
-const ingestionURL = getIngestionURL();
+const ingestionURL = getIngestionURL(store);
 endpoint.value = getEndPoint(ingestionURL);
 
 const accessKey = computed(() => {

@@ -68,7 +68,7 @@ export default defineComponent({
       tls: "",
     });
 
-    const ingestionURL = getIngestionURL();
+    const ingestionURL = getIngestionURL(store);
     endpoint.value = getEndPoint(ingestionURL);
 
     const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/cloudwatch_metrics/_kinesis_firehose

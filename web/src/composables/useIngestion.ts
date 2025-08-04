@@ -27,7 +27,7 @@ const useIngestion = () => {
     protocol: "",
     tls: "",
   });
-  const ingestionURL = getIngestionURL();
+  const ingestionURL = getIngestionURL(store);
   endpoint.value = getEndPoint(ingestionURL);
 
   const databaseContent = `exporters:

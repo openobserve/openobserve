@@ -57,7 +57,7 @@ export default defineComponent({
       tls: "",
     });
 
-    const ingestionURL = getIngestionURL();
+    const ingestionURL = getIngestionURL(store);
     endpoint.value = getEndPoint(ingestionURL);
     const content = `destination d_openobserve_http {
     openobserve-log(

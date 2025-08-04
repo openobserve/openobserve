@@ -70,7 +70,7 @@ export default defineComponent({
     });
 
     try {
-      const ingestionURL = getIngestionURL();
+      const ingestionURL = getIngestionURL(store);
       endpoint.value = getEndPoint(ingestionURL);
     } catch (e) {
       console.error("Error while creating end point", e);

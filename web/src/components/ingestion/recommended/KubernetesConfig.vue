@@ -170,7 +170,7 @@ const endpoint: any = ref({
   tls: "",
 });
 
-const ingestionURL = getIngestionURL();
+const ingestionURL = getIngestionURL(store);
 const tab = ref("external");
 const { t } = useI18n();
 
