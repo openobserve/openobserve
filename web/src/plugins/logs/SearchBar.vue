@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
         <!-- moved to dropdown if ai chat is enabled -->
         <syntax-guide
-        v-if="!store.state.isAiChatEnabled"
+          v-if="!store.state.isAiChatEnabled"
           data-test="logs-search-bar-sql-mode-toggle-btn"
           :sqlmode="searchObj.meta.sqlMode"
         >
@@ -366,100 +366,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn-group>
         <!-- this is the button group responsible for showing all the utilities when ai chat is enabled -->
         <q-btn
-          v-if="store.state.isAiChatEnabled "
-            class="tw-text-[12px]  tw-font-[500] q-ml-xs q-px-sm   "
-            no-caps
-            menu-anchor="bottom left"
-            menu-self="top left"
-            icon="menu"
-            size="sm"
-            dense
-            >
-            <q-menu>
-              <div class="row tw-gap-2">
-                <div class="q-mt-xs">
-                  <div class="row no-wrap q-pl-sm  q-mt-sm tw-w-[140px] tw-flex tw-items-center">
-                    <div class="tw-w-[30%]">
-                      <q-toggle 
-                        data-test="logs-search-bar-show-histogram-toggle-btn"
-                        v-model="searchObj.meta.showHistogram" 
-                        dense
-                        class="q-pb-xs"
-                        size="32px"
-                        ></q-toggle>
-                    </div>
-                        <q-item-label>
-                          {{ t('search.showHistogramLabel') }}
-                        </q-item-label>
-
-
-                  </div>
-
-                  <q-separator />
-
-                  <div class="row no-wrap q-pl-sm q-mt-sm q-py-xs tw-w-[140px] tw-flex tw-items-start ">
+          v-if="store.state.isAiChatEnabled"
+          class="tw-text-[12px] tw-font-[500] q-ml-xs q-px-sm"
+          no-caps
+          menu-anchor="bottom left"
+          menu-self="top left"
+          icon="menu"
+          size="sm"
+          dense
+        >
+          <q-menu>
+            <div class="row tw-gap-2">
+              <div class="q-mt-xs">
+                <div
+                  class="row no-wrap q-pl-sm q-mt-sm tw-w-[140px] tw-flex tw-items-center"
+                >
                   <div class="tw-w-[30%]">
-                    <q-toggle 
+                    <q-toggle
+                      data-test="logs-search-bar-show-histogram-toggle-btn"
+                      v-model="searchObj.meta.showHistogram"
+                      dense
+                      class="q-pb-xs"
+                      size="32px"
+                    ></q-toggle>
+                  </div>
+                  <q-item-label>
+                    {{ t("search.showHistogramLabel") }}
+                  </q-item-label>
+                </div>
+
+                <q-separator />
+
+                <div
+                  class="row no-wrap q-pl-sm q-mt-sm q-py-xs tw-w-[140px] tw-flex tw-items-start"
+                >
+                  <div class="tw-w-[30%]">
+                    <q-toggle
                       data-test="logs-search-bar-wrap-table-content-toggle-btn"
                       v-model="searchObj.meta.toggleSourceWrap"
                       icon="wrap_text"
-                      style="margin: 0px;"
+                      style="margin: 0px"
                       size="32px"
                       class="q-pb-xs"
                       dense
-                      ></q-toggle>
+                    ></q-toggle>
                   </div>
-                      <q-item-label>
-                      Wrap Content
-                      </q-item-label>
-
-
+                  <q-item-label> Wrap Content </q-item-label>
                 </div>
                 <q-separator />
 
-                <div class="row no-wrap q-pl-sm  q-mt-sm tw-w-[140px] tw-flex tw-items-start ">
-                <div class="tw-w-[30%]">
-                <q-toggle 
-                  data-test="logs-search-bar-quick-mode-toggle-btn"
-                  v-model="searchObj.meta.quickMode"
-                  @click="handleQuickMode"
-                  class="q-pb-xs"
-                  size="32px"
-
-                  dense
-                  ></q-toggle>
-                </div>
+                <div
+                  class="row no-wrap q-pl-sm q-mt-sm tw-w-[140px] tw-flex tw-items-start"
+                >
+                  <div class="tw-w-[30%]">
+                    <q-toggle
+                      data-test="logs-search-bar-quick-mode-toggle-btn"
+                      v-model="searchObj.meta.quickMode"
+                      @click="handleQuickMode"
+                      class="q-pb-xs"
+                      size="32px"
+                      dense
+                    ></q-toggle>
+                  </div>
                   <q-item-label>
                     {{ t("search.quickModeLabel") }}
                   </q-item-label>
-
-
                 </div>
                 <q-separator />
 
-                <div class="row tw-h-[30px] q-pl-sm  q-mt-xs no-wrap q-py-xs tw-w-[140px] tw-flex tw-items-center">
-                    <div class="tw-w-[30%]">
-                      <syntax-guide
+                <div
+                  class="row tw-h-[30px] q-pl-sm q-mt-xs no-wrap q-py-xs tw-w-[140px] tw-flex tw-items-center"
+                >
+                  <div class="tw-w-[30%]">
+                    <syntax-guide
                       data-test="logs-search-bar-sql-mode-toggle-btn"
                       :sqlmode="searchObj.meta.sqlMode"
                       size="10px"
-                      style="margin: 0px; "
+                      style="margin: 0px"
                       :style="{
-                        border: !searchObj.meta.sqlMode ? '1px solid #c4c4c4' : 'none'
+                        border: !searchObj.meta.sqlMode
+                          ? '1px solid #c4c4c4'
+                          : 'none',
                       }"
-                      
-                  >
-                  </syntax-guide>
-                    </div>
-                      <q-item-label>
-                        Syntax Guide
-                      </q-item-label>
-
+                    >
+                    </syntax-guide>
                   </div>
-                  <q-separator />
-                  <div class="row no-wrap q-pl-sm q-mt-xs q-py-xs tw-w-[140px] tw-flex tw-items-center">
-                    <div class="tw-w-[30%]">
-                      <q-btn
+                  <q-item-label> Syntax Guide </q-item-label>
+                </div>
+                <q-separator />
+                <div
+                  class="row no-wrap q-pl-sm q-mt-xs q-py-xs tw-w-[140px] tw-flex tw-items-center"
+                >
+                  <div class="tw-w-[30%]">
+                    <q-btn
                       data-test="logs-search-bar-reset-filters-btn"
                       no-caps
                       icon="restart_alt"
@@ -469,19 +468,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="resetFilters"
                     >
                     </q-btn>
-                    </div>
-                    <q-item-label>
-                      {{ t('search.resetFilters') }}
-                    </q-item-label>
-
                   </div>
-                </div>
-                <div>
-
+                  <q-item-label>
+                    {{ t("search.resetFilters") }}
+                  </q-item-label>
                 </div>
               </div>
-            </q-menu>
-          </q-btn>
+              <div></div>
+            </div>
+          </q-menu>
+        </q-btn>
         <!-- moved to dropdown if ai chat is enabled -->
         <div
           style="border: 1px solid #c4c4c4; border-radius: 5px"
@@ -517,7 +513,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
         >
           <q-tooltip>
-           {{ searchObj.meta.logsVisualizeToggle === 'visualize' ? 'Not supported for visualization' : t("search.messageWrapContent") }}
+            {{
+              searchObj.meta.logsVisualizeToggle === "visualize"
+                ? "Not supported for visualization"
+                : t("search.messageWrapContent")
+            }}
           </q-tooltip>
         </q-toggle>
 
@@ -528,7 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @save:function="fnSavedFunctionDialog"
         />
         <function-selector
-        v-else
+          v-else
           :function-options="functionOptions"
           @select:function="populateFunctionImplementation"
           @save:function="fnSavedFunctionDialog"
@@ -595,9 +595,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-item-section side>
                   <q-icon name="keyboard_arrow_right" />
                 </q-item-section>
-                <q-menu 
+                <q-menu
                   v-model="showDownloadMenu"
-                  anchor="top end" 
+                  anchor="top end"
                   self="top start"
                 >
                   <q-list>
@@ -606,11 +606,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-pa-sm saved-view-item"
                       clickable
                       v-close-popup
-                      @click="downloadLogs(searchObj.data.queryResults.hits, 'csv')"
+                      @click="
+                        downloadLogs(searchObj.data.queryResults.hits, 'csv')
+                      "
                     >
                       <q-icon name="grid_on" size="14px" class="q-pr-sm" />
                       <q-item-section>
-                        <q-item-label class="tw-flex tw-items-center tw-gap-2 q-mr-md">
+                        <q-item-label
+                          class="tw-flex tw-items-center tw-gap-2 q-mr-md"
+                        >
                           {{ t("search.downloadCSV") }}
                         </q-item-label>
                       </q-item-section>
@@ -620,11 +624,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-pa-sm saved-view-item"
                       clickable
                       v-close-popup
-                      @click="downloadLogs(searchObj.data.queryResults.hits, 'json')"
+                      @click="
+                        downloadLogs(searchObj.data.queryResults.hits, 'json')
+                      "
                     >
                       <q-icon name="data_object" size="14px" class="q-pr-sm" />
                       <q-item-section>
-                        <q-item-label class="tw-flex tw-items-center tw-gap-2 q-mr-md">
+                        <q-item-label
+                          class="tw-flex tw-items-center tw-gap-2 q-mr-md"
+                        >
                           {{ t("search.downloadJSON") }}
                         </q-item-label>
                       </q-item-section>
@@ -705,7 +713,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.moreActions") }}
           </q-tooltip>
         </q-btn>
-        <div class="float-left" >
+        <div class="float-left">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -890,33 +898,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 100%; height: 100%"
             >
               <template v-if="showFunctionEditor">
-              <div class="tw-relative tw-h-full tw-w-full"
-              >
-                <query-editor
-                  data-test="logs-vrl-function-editor"
-                  ref="fnEditorRef"
-                  editor-id="fnEditor"
-                  class="monaco-editor"
-                  v-model:query="searchObj.data.tempFunctionContent"
+                <div class="tw-relative tw-h-full tw-w-full">
+                  <query-editor
+                    data-test="logs-vrl-function-editor"
+                    ref="fnEditorRef"
+                    editor-id="fnEditor"
+                    class="monaco-editor"
+                    v-model:query="searchObj.data.tempFunctionContent"
+                    :class="
+                      searchObj.data.tempFunctionContent == '' &&
+                      searchObj.meta.functionEditorPlaceholderFlag
+                        ? 'empty-function'
+                        : ''
+                    "
+                    :readOnly="
+                      searchObj.meta.logsVisualizeToggle === 'visualize'
+                    "
+                    @keydown="handleKeyDown"
+                    language="vrl"
+                    @focus="
+                      searchObj.meta.functionEditorPlaceholderFlag = false
+                    "
+                    @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
+                  />
+                </div>
+                <div
+                  v-if="searchObj.meta.logsVisualizeToggle === 'visualize'"
                   :class="
-                    searchObj.data.tempFunctionContent == '' &&
-                    searchObj.meta.functionEditorPlaceholderFlag
-                      ? 'empty-function'
-                      : ''
+                    store.state.theme == 'dark'
+                      ? 'tw-bg-white tw-bg-opacity-10'
+                      : 'tw-bg-black tw-bg-opacity-10'
                   "
-                  :readOnly="searchObj.meta.logsVisualizeToggle === 'visualize'"
-                  @keydown="handleKeyDown"
-                  language="vrl"
-                  @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
-                  @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
-                />
-             </div>
-               <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'" 
-               :class="store.state.theme == 'dark' ? 'tw-bg-white tw-bg-opacity-10' : 'tw-bg-black tw-bg-opacity-10'"
-               class="tw-absolute tw-bottom-0 tw-w-full " style="margin-top: 12px; display: flex; align-items: center; flex">
-                <q-icon name="warning" color="warning" size="20px" class="q-mx-sm" />
-                <span class="text-negative q-pa-sm" style="font-weight: semibold; font-size: 14px;">VRL Function Editor is not supported in visualize mode.</span>
-              </div>
+                  class="tw-absolute tw-bottom-0 tw-w-full"
+                  style="margin-top: 12px; display: flex; align-items: center; flex"
+                >
+                  <q-icon
+                    name="warning"
+                    color="warning"
+                    size="20px"
+                    class="q-mx-sm"
+                  />
+                  <span
+                    class="text-negative q-pa-sm"
+                    style="font-weight: semibold; font-size: 14px"
+                    >VRL Function Editor is not supported in visualize
+                    mode.</span
+                  >
+                </div>
               </template>
               <template v-else-if="searchObj.data.transformType === 'action'">
                 <query-editor
@@ -1030,8 +1058,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
           />
           <div class="q-py-sm file-type">
-            <label class="q-pr-sm">{{ t('search.fileType') }}</label><br />
-            <q-btn-group 
+            <label class="q-pr-sm">{{ t("search.fileType") }}</label
+            ><br />
+            <q-btn-group
               data-test="custom-download-file-type-button-group"
               class="file-type-button-group q-mt-xs"
             >
@@ -1039,7 +1068,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="option in downloadCustomFileTypeOptions"
                 :key="option.value"
                 :data-test="`custom-download-file-type-${option.value}-btn`"
-                :class="downloadCustomFileType === option.value ? 'selected' : ''"
+                :class="
+                  downloadCustomFileType === option.value ? 'selected' : ''
+                "
                 @click="downloadCustomFileType = option.value"
                 :label="option.label"
                 no-caps
@@ -1713,7 +1744,6 @@ export default defineComponent({
     watch(
       () => searchObj.meta.functionEditorPlaceholderFlag,
       (val) => {
-
         if (
           searchObj.meta.jobId != "" &&
           val == true &&
@@ -2095,8 +2125,8 @@ export default defineComponent({
       const replacer = (key, value) => (value === null ? "" : value);
       // const header = Object.keys(jsonData[0]);
       const headerSet = new Set();
-      jsonData.forEach(row => {
-        Object.keys(row).forEach(key => headerSet.add(key));
+      jsonData.forEach((row) => {
+        Object.keys(row).forEach((key) => headerSet.add(key));
       });
       const header = Array.from(headerSet);
 
@@ -2129,13 +2159,6 @@ export default defineComponent({
         $q.notify({
           type: "negative",
           message: "No data available to download.",
-        });
-        return;
-      }
-      if (dataobj.length > 1000000) {
-        $q.notify({
-          type: "negative",
-          message: "Data size is too large to download.",
         });
         return;
       }
@@ -3324,10 +3347,14 @@ export default defineComponent({
       ) {
         // cancel all the visualize queries
         cancelVisualizeQueries();
-        if(searchObj.meta.logsVisualizeDirtyFlag === true || !Object.hasOwn(searchObj.data?.queryResults, "hits") || searchObj.data?.queryResults?.hits?.length == 0) {
+        if (
+          searchObj.meta.logsVisualizeDirtyFlag === true ||
+          !Object.hasOwn(searchObj.data?.queryResults, "hits") ||
+          searchObj.data?.queryResults?.hits?.length == 0
+        ) {
           searchObj.loading = true;
           searchObj.meta.refreshHistogram = true;
-          if(searchObj.meta.sqlMode) {
+          if (searchObj.meta.sqlMode) {
             searchObj.data.queryResults.aggs = undefined;
           }
           getQueryData();
@@ -3335,33 +3362,38 @@ export default defineComponent({
         }
       } else {
         // validate query
-        // return if query is emptry and stream is not selected 
-        if(searchObj.data.query === "" && searchObj?.data?.stream?.selectedStream?.length === 0){ 
-          showErrorNotification("Query is empty, please write query to visualize");
+        // return if query is emptry and stream is not selected
+        if (
+          searchObj.data.query === "" &&
+          searchObj?.data?.stream?.selectedStream?.length === 0
+        ) {
+          showErrorNotification(
+            "Query is empty, please write query to visualize",
+          );
           return;
         }
 
         let logsPageQuery = searchObj.data.query;
 
         // handle sql mode
-        if(!searchObj.meta.sqlMode){
+        if (!searchObj.meta.sqlMode) {
           //if user click on run query button then use customDownloadQueryObj else use build search
           //because if user didn't clicked on run query button then build search will be used
-          if(searchObj.data.customDownloadQueryObj?.query?.sql){
+          if (searchObj.data.customDownloadQueryObj?.query?.sql) {
             logsPageQuery = searchObj.data.customDownloadQueryObj?.query?.sql;
-          }
-          else{
+          } else {
             const queryBuild = buildSearch();
             logsPageQuery = queryBuild?.query?.sql ?? "";
           }
         }
 
         // validate sql query that all fields have alias
-        if(!allSelectionFieldsHaveAlias(logsPageQuery)){
-          showErrorNotification("All fields must have alias in query to visualize");
+        if (!allSelectionFieldsHaveAlias(logsPageQuery)) {
+          showErrorNotification(
+            "All fields must have alias in query to visualize",
+          );
           return;
         }
-
       }
       searchObj.meta.logsVisualizeToggle = value;
       updateUrlQueryParams();
@@ -3385,7 +3417,8 @@ export default defineComponent({
     const visualizeSearchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
         variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
-      ).filter((item: any) => item.length > 0)
+      )
+        .filter((item: any) => item.length > 0)
         .flat() as string[];
 
       // If custom field extraction is in progress, push a dummy trace id so that cancel button is visible.
@@ -4331,27 +4364,27 @@ export default defineComponent({
     border: 1px solid var(--q-border-color, #e0e0e0);
     background-color: var(--q-field-bg, #fafafa);
     color: var(--q-text-color, #000);
-    
+
     &.selected {
       background-color: var(--q-primary) !important;
       color: white !important;
       border-color: var(--q-primary) !important;
     }
-    
+
     &:first-child {
       border-top-left-radius: 4px;
       border-bottom-left-radius: 4px;
     }
-    
+
     &:last-child {
       border-top-right-radius: 4px;
       border-bottom-right-radius: 4px;
     }
-    
+
     &:not(:last-child) {
       border-right: none;
     }
-    
+
     &:hover:not(.selected) {
       background-color: var(--q-hover-color, #f5f5f5);
     }
@@ -4365,10 +4398,10 @@ export default defineComponent({
 }
 
 .file-type label {
-    transform: translate(-0.75rem, -175%);
-    font-weight: bold;
-    font-size: 14px;
-    color: rgba(0, 0, 0, 0.6);
+  transform: translate(-0.75rem, -175%);
+  font-weight: bold;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.6);
 }
 
 .q-dark .q-btn {
@@ -4376,7 +4409,8 @@ export default defineComponent({
   border: 0px solid rgba(255, 255, 255, 0.2);
 }
 
-.q-dark .file-type label, .q-dark .file-type .q-btn {
-    color: rgba(255, 255, 255, 0.7);
+.q-dark .file-type label,
+.q-dark .file-type .q-btn {
+  color: rgba(255, 255, 255, 0.7);
 }
 </style>
