@@ -503,3 +503,32 @@ pub mod deprecated {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_folder_error_conversion() {
+        // Test conversion from FolderError to HttpResponse
+        let test_cases = vec![
+            (FolderError::MissingName, 400),
+            (FolderError::UpdateDefaultFolder, 400),
+            (FolderError::NotFound, 404),
+            (FolderError::FolderNameAlreadyExists, 400),
+            (FolderError::DeleteWithDashboards, 400),
+            (FolderError::DeleteWithAlerts, 400),
+            (FolderError::DeleteWithReports, 400),
+            (FolderError::PermittedFoldersMissingUser, 403),
+            (
+                FolderError::PermittedFoldersValidator("test".to_string()),
+                403,
+            ),
+        ];
+
+        for (error, expected_status) in test_cases {
+            let response: HttpResponse = error.into();
+            assert_eq!(response.status().as_u16(), expected_status);
+        }
+    }
+}

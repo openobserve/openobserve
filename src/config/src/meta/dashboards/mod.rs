@@ -278,3 +278,181 @@ impl ListDashboardsParams {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    #[test]
+    fn test_default_version() {
+        assert_eq!(default_version(), 1);
+    }
+
+    #[test]
+    fn test_dashboard_version() {
+        let version = DashboardVersion { version: 2 };
+        assert_eq!(version.version, 2);
+    }
+
+    #[test]
+    fn test_dashboard_default() {
+        let dashboard = Dashboard::default();
+        assert!(dashboard.v1.is_none());
+        assert!(dashboard.v2.is_none());
+        assert!(dashboard.v3.is_none());
+        assert!(dashboard.v4.is_none());
+        assert!(dashboard.v5.is_none());
+        assert_eq!(dashboard.version, 0);
+        assert_eq!(dashboard.hash, "");
+        assert_eq!(dashboard.updated_at, 0);
+    }
+
+    #[test]
+    fn test_dashboard_id_methods() {
+        // Test with unsupported version
+        let dashboard = Dashboard {
+            version: 99,
+            ..Default::default()
+        };
+        assert_eq!(dashboard.dashboard_id(), None);
+    }
+
+    #[test]
+    fn test_set_updated_at() {
+        let mut dashboard = Dashboard::default();
+        let before = Utc::now().timestamp_micros();
+        
+        dashboard.set_updated_at();
+        
+        let after = Utc::now().timestamp_micros();
+        assert!(dashboard.updated_at >= before);
+        assert!(dashboard.updated_at <= after);
+    }
+
+    #[test]
+    fn test_owner_methods() {
+        // Test with unsupported version
+        let dashboard = Dashboard {
+            version: 10,
+            ..Default::default()
+        };
+        assert_eq!(dashboard.owner(), None);
+    }
+
+    #[test]
+    fn test_title_methods() {
+        // Test with unsupported version
+        let dashboard = Dashboard {
+            version: 0,
+            ..Default::default()
+        };
+        assert_eq!(dashboard.title(), None);
+    }
+
+    #[test]
+    fn test_description_method() {
+        // Test with no matching version
+        let dashboard = Dashboard {
+            version: 99,
+            ..Default::default()
+        };
+        assert_eq!(dashboard.description(), None);
+    }
+
+    #[test]
+    fn test_role_method() {
+        // Test with no matching version
+        let dashboard = Dashboard {
+            version: 0,
+            ..Default::default()
+        };
+        assert_eq!(dashboard.role(), None);
+    }
+
+    #[test]
+    fn test_list_dashboards_params_new() {
+        let params = ListDashboardsParams::new("test_org");
+        
+        assert_eq!(params.org_id, "test_org");
+        assert!(params.folder_id.is_none());
+        assert!(params.title_pat.is_none());
+        assert!(params.page_size_and_idx.is_none());
+    }
+
+    #[test]
+    fn test_list_dashboards_params_with_folder_id() {
+        let params = ListDashboardsParams::new("test_org")
+            .with_folder_id("folder123");
+        
+        assert_eq!(params.org_id, "test_org");
+        assert_eq!(params.folder_id, Some("folder123".to_string()));
+        assert!(params.title_pat.is_none());
+        assert!(params.page_size_and_idx.is_none());
+    }
+
+    #[test]
+    fn test_list_dashboards_params_where_title_contains() {
+        let params = ListDashboardsParams::new("test_org")
+            .where_title_contains("analytics");
+        
+        assert_eq!(params.org_id, "test_org");
+        assert!(params.folder_id.is_none());
+        assert_eq!(params.title_pat, Some("analytics".to_string()));
+        assert!(params.page_size_and_idx.is_none());
+    }
+
+    #[test]
+    fn test_list_dashboards_params_paginate() {
+        let params = ListDashboardsParams::new("test_org")
+            .paginate(10, 2);
+        
+        assert_eq!(params.org_id, "test_org");
+        assert!(params.folder_id.is_none());
+        assert!(params.title_pat.is_none());
+        assert_eq!(params.page_size_and_idx, Some((10, 2)));
+    }
+
+    #[test]
+    fn test_list_dashboards_params_chaining() {
+        let params = ListDashboardsParams::new("my_org")
+            .with_folder_id("main_folder")
+            .where_title_contains("performance")
+            .paginate(20, 1);
+        
+        assert_eq!(params.org_id, "my_org");
+        assert_eq!(params.folder_id, Some("main_folder".to_string()));
+        assert_eq!(params.title_pat, Some("performance".to_string()));
+        assert_eq!(params.page_size_and_idx, Some((20, 1)));
+    }
+
+    #[test]
+    fn test_dashboard_serialization() {
+        let dashboard = Dashboard {
+            version: 0,
+            hash: "test_hash".to_string(),
+            updated_at: 1234567890,
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&dashboard).expect("Failed to serialize");
+        assert!(!json.is_empty());
+
+        let deserialized: Dashboard = serde_json::from_str(&json).expect("Failed to deserialize");
+        assert_eq!(deserialized.version, 0);
+        assert_eq!(deserialized.hash, "test_hash");
+        assert_eq!(deserialized.updated_at, 1234567890);
+        assert_eq!(deserialized.dashboard_id(), None);
+    }
+
+    #[test]
+    fn test_dashboard_version_serialization() {
+        let version = DashboardVersion { version: 3 };
+        
+        let json = serde_json::to_string(&version).expect("Failed to serialize");
+        assert!(json.contains("3"));
+
+        let deserialized: DashboardVersion = serde_json::from_str(&json).expect("Failed to deserialize");
+        assert_eq!(deserialized.version, 3);
+    }
+}

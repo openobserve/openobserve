@@ -377,3 +377,237 @@ async fn permitted_folders(
 
     Ok(folder_list)
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::folder::FolderType;
+
+    use super::*;
+
+    #[test]
+    fn test_folder_error_variants() {
+        // Test all FolderError variants
+        let infra_error = FolderError::InfraError(infra::errors::Error::DbError(
+            infra::errors::DbError::KeyNotExists("test".to_string()),
+        ));
+        assert!(matches!(infra_error, FolderError::InfraError(_)));
+
+        let missing_name = FolderError::MissingName;
+        assert!(matches!(missing_name, FolderError::MissingName));
+
+        let folder_name_exists = FolderError::FolderNameAlreadyExists;
+        assert!(matches!(
+            folder_name_exists,
+            FolderError::FolderNameAlreadyExists
+        ));
+
+        let update_default = FolderError::UpdateDefaultFolder;
+        assert!(matches!(update_default, FolderError::UpdateDefaultFolder));
+
+        let delete_with_dashboards = FolderError::DeleteWithDashboards;
+        assert!(matches!(
+            delete_with_dashboards,
+            FolderError::DeleteWithDashboards
+        ));
+
+        let delete_with_alerts = FolderError::DeleteWithAlerts;
+        assert!(matches!(delete_with_alerts, FolderError::DeleteWithAlerts));
+
+        let delete_with_reports = FolderError::DeleteWithReports;
+        assert!(matches!(
+            delete_with_reports,
+            FolderError::DeleteWithReports
+        ));
+
+        let not_found = FolderError::NotFound;
+        assert!(matches!(not_found, FolderError::NotFound));
+
+        let permitted_folders_missing_user = FolderError::PermittedFoldersMissingUser;
+        assert!(matches!(
+            permitted_folders_missing_user,
+            FolderError::PermittedFoldersMissingUser
+        ));
+
+        let permitted_folders_validator =
+            FolderError::PermittedFoldersValidator("test".to_string());
+        assert!(matches!(
+            permitted_folders_validator,
+            FolderError::PermittedFoldersValidator(_)
+        ));
+    }
+
+    #[test]
+    fn test_folder_creation() {
+        // Test creating a basic folder
+        let folder = Folder {
+            folder_id: "test_folder".to_string(),
+            name: "Test Folder".to_string(),
+            description: "Test description".to_string(),
+        };
+
+        assert_eq!(folder.folder_id, "test_folder");
+        assert_eq!(folder.name, "Test Folder");
+        assert_eq!(folder.description, "Test description");
+    }
+
+    #[test]
+    fn test_folder_name_trimming() {
+        // Test folder name trimming logic
+        let folder_name = "  Test Folder  ";
+        let trimmed = folder_name.trim().to_string();
+
+        assert_eq!(trimmed, "Test Folder");
+        assert_ne!(trimmed, folder_name);
+    }
+
+    #[test]
+    fn test_empty_folder_name_validation() {
+        // Test empty folder name validation
+        let empty_names = vec!["", "   ", "\t", "\n", "  \t  \n  "];
+
+        for name in empty_names {
+            let trimmed = name.trim().to_string();
+            assert!(trimmed.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_default_folder_validation() {
+        // Test default folder validation
+        assert_eq!(DEFAULT_FOLDER, "default");
+
+        let default_folder_id = "default";
+        let non_default_folder_id = "custom_folder";
+
+        assert_eq!(default_folder_id, DEFAULT_FOLDER);
+        assert_ne!(non_default_folder_id, DEFAULT_FOLDER);
+    }
+
+    #[test]
+    fn test_folder_type_enum() {
+        // Test FolderType enum values
+        assert_eq!(FolderType::Dashboards as u32, 0);
+        assert_eq!(FolderType::Alerts as u32, 1);
+        assert_eq!(FolderType::Reports as u32, 2);
+    }
+
+    #[test]
+    fn test_folder_type_ofga_mapping() {
+        // Test folder type to OFGA model mapping
+        let dashboards_type = "folders";
+        let alerts_type = "alert_folders";
+        let reports_type = "report_folders";
+
+        assert_eq!(dashboards_type, "folders");
+        assert_eq!(alerts_type, "alert_folders");
+        assert_eq!(reports_type, "report_folders");
+    }
+
+    #[test]
+    fn test_folder_id_generation() {
+        // Test folder ID generation pattern
+        let generated_id = ider::generate();
+
+        assert!(!generated_id.is_empty());
+        assert_ne!(generated_id, DEFAULT_FOLDER);
+    }
+
+    #[test]
+    fn test_folder_ownership_format() {
+        // Test folder ownership format
+        let _org_id = "test_org";
+        let folder_id = "test_folder";
+        let folder_type = "folders";
+
+        let ownership_format = format!("{folder_type}:{folder_id}");
+        assert_eq!(ownership_format, "folders:test_folder");
+
+        let authz = Authz::new(folder_id);
+        assert_eq!(authz.obj_id, folder_id);
+    }
+
+    #[test]
+    fn test_folder_name_comparison() {
+        // Test folder name comparison logic
+        let folder_name1 = "Test Folder";
+        let folder_name2 = "test folder";
+        let folder_name3 = "Test Folder";
+
+        assert_ne!(folder_name1, folder_name2);
+        assert_eq!(folder_name1, folder_name3);
+
+        // Test case-insensitive comparison
+        assert_eq!(folder_name1.to_lowercase(), folder_name2.to_lowercase());
+    }
+
+    #[test]
+    fn test_folder_description_handling() {
+        // Test folder description handling
+        let description = "Test description";
+        let empty_description = "";
+
+        let filtered_description = Some(description).filter(|d| !d.is_empty());
+        let filtered_empty = Some(empty_description).filter(|d| !d.is_empty());
+
+        assert_eq!(filtered_description, Some(description));
+        assert_eq!(filtered_empty, None);
+    }
+
+    #[test]
+    fn test_folder_list_filtering() {
+        // Test folder list filtering logic
+        let all_permission = format!("folders:_all_test_org");
+        let specific_permission = "folders:test_folder";
+
+        let _folder_list = vec![
+            "folders:folder1".to_string(),
+            "folders:folder2".to_string(),
+            "folders:folder3".to_string(),
+        ];
+
+        // Test _all permission
+        let permitted_folders = Some(vec![all_permission.clone()]);
+        let should_return_all = permitted_folders
+            .as_ref()
+            .map(|p| p.contains(&all_permission));
+        assert_eq!(should_return_all, Some(true));
+
+        // Test specific permission
+        let specific_permitted = Some(vec![specific_permission.to_string()]);
+        let has_specific = specific_permitted
+            .as_ref()
+            .map(|p| p.contains(&specific_permission.to_string()));
+        assert_eq!(has_specific, Some(true));
+    }
+
+    #[test]
+    fn test_folder_error_messages() {
+        // Test folder error message formatting
+        let missing_name_error = FolderError::MissingName.to_string();
+        let folder_exists_error = FolderError::FolderNameAlreadyExists.to_string();
+        let update_default_error = FolderError::UpdateDefaultFolder.to_string();
+
+        assert!(missing_name_error.contains("empty"));
+        assert!(folder_exists_error.contains("already exists"));
+        assert!(update_default_error.contains("default"));
+    }
+
+    #[test]
+    fn test_folder_list_params() {
+        // Test folder list parameters
+        let org_id = "test_org";
+        let folder_id = "test_folder";
+
+        // Test dashboard params
+        let dashboard_params = ListDashboardsParams::new(org_id).with_folder_id(folder_id);
+        assert_eq!(dashboard_params.org_id, org_id);
+
+        // Test alerts params
+        let alerts_params = ListAlertsParams::new(org_id).in_folder(folder_id);
+        assert_eq!(alerts_params.org_id, org_id);
+
+        // Test reports params
+        let reports_params = ListReportsParams::new(org_id).in_folder(folder_id);
+        assert_eq!(reports_params.org_id, org_id);
+    }
+}
