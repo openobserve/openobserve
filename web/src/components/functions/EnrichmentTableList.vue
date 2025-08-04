@@ -303,12 +303,12 @@ export default defineComponent({
     //else we are showing the list of enrichment tables
     onMounted(()=>{
       //it is for showing empty add page when user refresh the page
-      if(router.currentRoute.value.query.action == "add"){
+      if(router.currentRoute.value.query.action === "add"){
         showAddUpdateFn({})
       }
       //it is for showing the update page when user refresh the page
       //we are passing the name of the enrichment table to the update page
-      else if(router.currentRoute.value.query.action == "update"){
+      else if(router.currentRoute.value.query.action === "update"){
         showAddUpdateFn({
           row: {
             name: router.currentRoute.value.query.name,
