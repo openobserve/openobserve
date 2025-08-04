@@ -558,7 +558,12 @@ mod tests {
             "hits": [],
             "total": 0,
             "took": 100,
-            "scan_size": 0
+            "scan_size": 0,
+            "from": 0,
+            "size": 50,
+            "cached_ratio": 0,
+            "idx_scan_size": 0,
+            "scan_records": 0
         }"#;
         
         let response: Result<Response, _> = serde_json::from_str(json_response);
@@ -569,6 +574,11 @@ mod tests {
         assert_eq!(response.total, 0);
         assert_eq!(response.took, 100);
         assert_eq!(response.scan_size, 0);
+        assert_eq!(response.from, 0);
+        assert_eq!(response.size, 50);
+        assert_eq!(response.cached_ratio, 0);
+        assert_eq!(response.idx_scan_size, 0);
+        assert_eq!(response.scan_records, 0);
     }
 
     #[test]
