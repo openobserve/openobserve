@@ -357,7 +357,7 @@ async fn handle_alert_triggers(
                 start_time,
                 end_time: *skipped_last_timestamp,
                 retries: trigger.retries,
-                delay_in_secs: Some(delay),
+                delay_in_secs: Some(Duration::microseconds(delay).num_seconds()),
                 error: None,
                 success_response: None,
                 is_partial: None,
