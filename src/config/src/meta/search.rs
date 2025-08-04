@@ -886,6 +886,7 @@ pub enum SearchEventType {
     RUM,
     DerivedStream,
     SearchJob,
+    Download,
 }
 
 impl<'de> Deserialize<'de> for SearchEventType {
@@ -926,6 +927,7 @@ impl std::fmt::Display for SearchEventType {
             Self::RUM => write!(f, "rum"),
             Self::DerivedStream => write!(f, "derived_stream"),
             Self::SearchJob => write!(f, "search_job"),
+            Self::Download => write!(f, "download"),
         }
     }
 }
@@ -943,6 +945,7 @@ impl TryFrom<&str> for SearchEventType {
             "rum" => Ok(Self::RUM),
             "derived_stream" | "derivedstream" => Ok(Self::DerivedStream),
             "search_job" | "searchjob" => Ok(Self::SearchJob),
+            "download" => Ok(Self::Download),
             _ => Err(format!(
                 "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`"
             )),

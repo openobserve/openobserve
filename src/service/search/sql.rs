@@ -327,7 +327,7 @@ impl Sql {
             if visitor.is_simple_count {
                 index_optimize_mode = Some(IndexOptimizeMode::SimpleCount);
             } else if visitor.is_simple_histogram && histogram_interval_visitor.interval.is_some() {
-                let bucket_width = histogram_interval_visitor.interval.unwrap() as u64 * 1_000_000;
+                let bucket_width = histogram_interval.unwrap() as u64 * 1_000_000;
                 // round the bucket edges to even start
                 let rounding_by = bucket_width as i64;
                 let min_value = query.start_time - query.start_time % rounding_by;
