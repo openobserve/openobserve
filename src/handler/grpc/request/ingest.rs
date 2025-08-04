@@ -183,3 +183,364 @@ impl Ingest for Ingester {
         Ok(Response::new(reply))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use proto::cluster_rpc::{IngestRequestMetadata, IngestionData};
+
+    use super::*;
+
+    #[test]
+    fn test_ingester_struct() {
+        // Test that Ingester can be created
+        let ingester = Ingester::default();
+        // Ingester is a unit struct, so its size is 0
+        assert_eq!(std::mem::size_of_val(&ingester), 0);
+    }
+
+    #[test]
+    fn test_ingestion_request_creation() {
+        // Test creating an IngestionRequest
+        let request = IngestionRequest {
+            org_id: "test_org".to_string(),
+            stream_type: "logs".to_string(),
+            stream_name: "test_stream".to_string(),
+            data: Some(IngestionData {
+                data: b"test data".to_vec(),
+            }),
+            ingestion_type: Some(IngestionType::Json as i32),
+            metadata: Some(IngestRequestMetadata {
+                data: HashMap::new(),
+            }),
+        };
+
+        assert_eq!(request.org_id, "test_org");
+        assert_eq!(request.stream_type, "logs");
+        assert_eq!(request.stream_name, "test_stream");
+        assert!(request.data.is_some_and(|d| d.data == b"test data"));
+    }
+
+    #[test]
+    fn test_ingestion_response_creation() {
+        // Test creating an IngestionResponse
+        let success_response = IngestionResponse {
+            status_code: 200,
+            message: "OK".to_string(),
+        };
+
+        assert_eq!(success_response.status_code, 200);
+        assert_eq!(success_response.message, "OK");
+
+        let error_response = IngestionResponse {
+            status_code: 500,
+            message: "Error occurred".to_string(),
+        };
+
+        assert_eq!(error_response.status_code, 500);
+        assert_eq!(error_response.message, "Error occurred");
+    }
+
+    #[test]
+    fn test_ingestion_data_creation() {
+        // Test creating IngestionData
+        let data = IngestionData {
+            data: b"test log data".to_vec(),
+        };
+
+        assert_eq!(data.data, b"test log data");
+        assert_eq!(data.data.len(), 13);
+    }
+
+    #[test]
+    fn test_ingestion_metadata_creation() {
+        // Test creating IngestRequestMetadata
+        let mut metadata_map = HashMap::new();
+        metadata_map.insert("is_derived".to_string(), "true".to_string());
+        metadata_map.insert("append_data".to_string(), "false".to_string());
+
+        let metadata = IngestRequestMetadata { data: metadata_map };
+
+        assert_eq!(metadata.data.len(), 2);
+        assert_eq!(metadata.data.get("is_derived"), Some(&"true".to_string()));
+        assert_eq!(metadata.data.get("append_data"), Some(&"false".to_string()));
+    }
+
+    #[test]
+    fn test_stream_type_conversion() {
+        // Test converting string stream types to StreamType enum
+        let logs_type: StreamType = "logs".into();
+        assert_eq!(logs_type, StreamType::Logs);
+
+        let metrics_type: StreamType = "metrics".into();
+        assert_eq!(metrics_type, StreamType::Metrics);
+
+        let traces_type: StreamType = "traces".into();
+        assert_eq!(traces_type, StreamType::Traces);
+
+        let enrichment_type: StreamType = "enrichment_tables".into();
+        assert_eq!(enrichment_type, StreamType::EnrichmentTables);
+    }
+
+    #[test]
+    fn test_ingestion_type_enum() {
+        // Test IngestionType enum values
+        assert_eq!(IngestionType::Json as i32, 0);
+        assert_eq!(IngestionType::Multi as i32, 1);
+        assert_eq!(IngestionType::Gcp as i32, 2);
+        assert_eq!(IngestionType::Kinesisfh as i32, 3);
+        assert_eq!(IngestionType::Rum as i32, 4);
+        assert_eq!(IngestionType::Usage as i32, 5);
+    }
+
+    #[test]
+    fn test_is_derived_parsing() {
+        // Test parsing is_derived from metadata
+        let mut metadata_map = HashMap::new();
+        metadata_map.insert("is_derived".to_string(), "true".to_string());
+
+        let metadata = IngestRequestMetadata { data: metadata_map };
+        let is_derived = metadata
+            .data
+            .get("is_derived")
+            .and_then(|v| v.parse::<bool>().ok())
+            .unwrap_or(false);
+
+        assert!(is_derived);
+
+        // Test with false value
+        let mut metadata_map_false = HashMap::new();
+        metadata_map_false.insert("is_derived".to_string(), "false".to_string());
+
+        let metadata_false = IngestRequestMetadata {
+            data: metadata_map_false,
+        };
+        let is_derived_false = metadata_false
+            .data
+            .get("is_derived")
+            .and_then(|v| v.parse::<bool>().ok())
+            .unwrap_or(false);
+
+        assert!(!is_derived_false);
+
+        // Test with missing key
+        let empty_metadata = IngestRequestMetadata {
+            data: HashMap::new(),
+        };
+        let is_derived_missing = empty_metadata
+            .data
+            .get("is_derived")
+            .and_then(|v| v.parse::<bool>().ok())
+            .unwrap_or(false);
+
+        assert!(!is_derived_missing);
+    }
+
+    #[test]
+    fn test_append_data_parsing() {
+        // Test parsing append_data from metadata
+        let mut metadata_map = HashMap::new();
+        metadata_map.insert("append_data".to_string(), "true".to_string());
+
+        let metadata = IngestRequestMetadata { data: metadata_map };
+        let append_data = metadata
+            .data
+            .get("append_data")
+            .and_then(|v| v.parse::<bool>().ok())
+            .unwrap_or(true);
+
+        assert!(append_data);
+
+        // Test with false value
+        let mut metadata_map_false = HashMap::new();
+        metadata_map_false.insert("append_data".to_string(), "false".to_string());
+
+        let metadata_false = IngestRequestMetadata {
+            data: metadata_map_false,
+        };
+        let append_data_false = metadata_false
+            .data
+            .get("append_data")
+            .and_then(|v| v.parse::<bool>().ok())
+            .unwrap_or(true);
+
+        assert!(!append_data_false);
+
+        // Test with missing key (defaults to true)
+        let empty_metadata = IngestRequestMetadata {
+            data: HashMap::new(),
+        };
+        let append_data_missing = empty_metadata
+            .data
+            .get("append_data")
+            .and_then(|v| v.parse::<bool>().ok())
+            .unwrap_or(true);
+
+        assert!(append_data_missing);
+    }
+
+    #[test]
+    fn test_bytes_conversion() {
+        // Test converting Vec<u8> to bytes::Bytes
+        let data_vec = b"test data".to_vec();
+        let bytes_data = bytes::Bytes::from(data_vec.clone());
+
+        assert_eq!(bytes_data, data_vec);
+        assert_eq!(bytes_data.len(), 9);
+    }
+
+    #[test]
+    fn test_json_parsing_patterns() {
+        // Test JSON parsing patterns used in the code
+        let json_data = r#"[{"key": "value"}, {"another": "data"}]"#;
+        let parsed: Result<Vec<json::Map<String, json::Value>>, _> =
+            json::from_slice(json_data.as_bytes());
+
+        assert!(parsed.is_ok());
+        let result = parsed.unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(
+            result[0].get("key"),
+            Some(&json::Value::String("value".to_string()))
+        );
+        assert_eq!(
+            result[1].get("another"),
+            Some(&json::Value::String("data".to_string()))
+        );
+
+        // Test fallback parsing for non-object arrays
+        let mixed_json_data = r#"[{"key": "value"}, "string_value", 123]"#;
+        let parsed_mixed: Result<Vec<json::Value>, _> =
+            json::from_slice(mixed_json_data.as_bytes());
+        assert!(parsed_mixed.is_ok());
+
+        let mixed_result = parsed_mixed.unwrap();
+        assert_eq!(mixed_result.len(), 3);
+        assert!(matches!(mixed_result[0], json::Value::Object(_)));
+        assert!(matches!(mixed_result[1], json::Value::String(_)));
+        assert!(matches!(mixed_result[2], json::Value::Number(_)));
+    }
+
+    #[test]
+    fn test_error_handling_patterns() {
+        // Test error handling patterns used in the code
+        let result: Result<(), Error> = Err(Error::IngestionError("test error".to_string()));
+
+        match result {
+            Ok(_) => panic!("Expected error"),
+            Err(Error::IngestionError(msg)) => {
+                assert_eq!(msg, "test error");
+            }
+            Err(_) => panic!("Expected IngestionError"),
+        }
+    }
+
+    #[test]
+    fn test_status_code_handling() {
+        // Test status code handling patterns
+        let success_status = StatusCode::OK;
+        assert_eq!(success_status.as_u16(), 200);
+
+        let error_status = StatusCode::INTERNAL_SERVER_ERROR;
+        assert_eq!(error_status.as_u16(), 500);
+
+        // Test status code comparison
+        assert!(success_status != error_status);
+        assert_eq!(success_status, StatusCode::OK);
+    }
+
+    #[test]
+    fn test_ingestion_type_conversion() {
+        // Test IngestionType conversion patterns
+        let json_type = IngestionType::Json;
+        let json_int: i32 = json_type as i32;
+        assert_eq!(json_int, 0);
+
+        let multi_type = IngestionType::Multi;
+        let multi_int: i32 = multi_type as i32;
+        assert_eq!(multi_int, 1);
+
+        // Test try_into conversion
+        let json_type_from_int: Result<IngestionType, _> = 0.try_into();
+        assert!(json_type_from_int.is_ok());
+        assert_eq!(json_type_from_int.unwrap(), IngestionType::Json);
+
+        let invalid_type: Result<IngestionType, _> = 999.try_into();
+        assert!(invalid_type.is_err());
+    }
+
+    #[test]
+    fn test_otlp_request_type() {
+        // Test OtlpRequestType enum
+        assert_eq!(OtlpRequestType::Grpc as i32, 0);
+        assert_eq!(OtlpRequestType::HttpJson as i32, 1);
+        assert_eq!(OtlpRequestType::HttpProtobuf as i32, 2);
+    }
+
+    #[test]
+    fn test_metrics_recording_patterns() {
+        // Test metrics recording patterns used in the code
+        let _time = 0.123f64;
+        let path = "/ingest/inner";
+        let status = "200";
+        let org_id = "";
+        let stream_type = "";
+        let stream_name = "";
+
+        // This test just ensures the metrics format is valid
+        let metric_labels = [path, status, org_id, stream_type, stream_name, ""];
+        assert_eq!(metric_labels.len(), 6);
+        assert_eq!(metric_labels[0], "/ingest/inner");
+        assert_eq!(metric_labels[1], "200");
+    }
+
+    #[test]
+    fn test_logging_patterns() {
+        // Test logging patterns used in the code
+        let status: StatusCode = StatusCode::INTERNAL_SERVER_ERROR;
+        let body = "error body";
+
+        // This test just ensures the logging format is valid
+        let log_message = format!(
+            "Internal gPRC ingestion service errors saving enrichment data: code: {status}, body: {:?}",
+            body
+        );
+
+        assert!(log_message.contains("Internal gPRC ingestion service errors"));
+        assert!(log_message.contains("code: 500"));
+        assert!(log_message.contains("body: \"error body\""));
+    }
+
+    #[test]
+    fn test_stream_type_validation() {
+        // Test stream type validation patterns
+        let valid_stream_types = vec!["logs", "metrics", "traces", "enrichment_tables"];
+
+        for stream_type in valid_stream_types {
+            let converted: StreamType = stream_type.into();
+            match converted {
+                StreamType::Logs
+                | StreamType::Metrics
+                | StreamType::Traces
+                | StreamType::EnrichmentTables => {
+                    // Valid stream types
+                }
+                _ => panic!("Unexpected stream type: {:?}", converted),
+            }
+        }
+    }
+
+    #[test]
+    fn test_ingestion_data_validation() {
+        // Test ingestion data validation patterns
+        let empty_data = IngestionData { data: vec![] };
+        assert!(empty_data.data.is_empty());
+
+        let non_empty_data = IngestionData {
+            data: b"some data".to_vec(),
+        };
+        assert!(!non_empty_data.data.is_empty());
+        assert_eq!(non_empty_data.data.len(), 9);
+    }
+}
