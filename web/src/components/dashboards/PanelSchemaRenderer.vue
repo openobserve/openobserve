@@ -388,6 +388,10 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
+    searchResponse: {
+      required: false,
+      type: Object,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -438,6 +442,7 @@ export default defineComponent({
       folderId,
       reportId,
       allowAnnotationsAdd,
+      searchResponse,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -462,6 +467,7 @@ export default defineComponent({
       dashboardId,
       folderId,
       reportId,
+      searchResponse,
     );
 
     const {
