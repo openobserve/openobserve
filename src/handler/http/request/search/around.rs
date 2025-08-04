@@ -30,7 +30,13 @@ use tracing::{Instrument, Span};
 use crate::{
     common::utils::http::get_work_group,
     service::{
-        search as SearchService,
+        search::{
+            self as SearchService,
+            sql::visitor::{
+                add_new_filter::add_new_filters_with_and_operator,
+                add_ordering_term::check_or_add_order_by_timestamp,
+            },
+        },
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
@@ -97,7 +103,7 @@ pub(crate) async fn around(
         }
     }
     if !filters.is_empty() {
-        around_sql = SearchService::sql::add_new_filters_with_and_operator(&around_sql, filters)?;
+        around_sql = add_new_filters_with_and_operator(&around_sql, filters)?;
     }
 
     let around_size = query
@@ -134,8 +140,8 @@ pub(crate) async fn around(
             .unwrap();
 
     // search forward
-    let fw_sql = SearchService::sql::check_or_add_order_by_timestamp(&around_sql, false)
-        .unwrap_or(around_sql.to_string());
+    let fw_sql =
+        check_or_add_order_by_timestamp(&around_sql, false).unwrap_or(around_sql.to_string());
     let fw_sql =
         config::utils::query_select_utils::replace_o2_custom_patterns(&fw_sql).unwrap_or(fw_sql);
 
@@ -171,8 +177,8 @@ pub(crate) async fn around(
         .await?;
 
     // search backward
-    let bw_sql = SearchService::sql::check_or_add_order_by_timestamp(&around_sql, true)
-        .unwrap_or(around_sql.to_string());
+    let bw_sql =
+        check_or_add_order_by_timestamp(&around_sql, true).unwrap_or(around_sql.to_string());
     let bw_sql =
         config::utils::query_select_utils::replace_o2_custom_patterns(&bw_sql).unwrap_or(bw_sql);
     let req = config::meta::search::Request {

@@ -15,10 +15,11 @@
 
 use std::{collections::HashSet, ops::ControlFlow};
 
-use config::meta::sql::MAX_LIMIT;
+use config::{meta::sql::MAX_LIMIT, utils::sql::AGGREGATE_UDF_LIST};
 use datafusion::sql::TableReference;
 use sqlparser::ast::{
-    Expr, FunctionArguments, GroupByExpr, Ident, OrderByKind, Query, Select, SelectItem, Value, ValueWithSpan, VisitorMut
+    Expr, FunctionArguments, GroupByExpr, Ident, OrderByKind, Query, Select, SelectItem, Statement,
+    Value, ValueWithSpan, VisitMut, VisitorMut,
 };
 
 use crate::service::search::utils::{get_field_name, trim_quotes};
@@ -41,6 +42,90 @@ impl VisitorMut for FieldNameVisitor {
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Identifier(ident) = expr {
             self.field_names.insert(ident.value.clone());
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+pub fn is_complex_query(statement: &mut Statement) -> bool {
+    let mut visitor = ComplexQueryVisitor::new();
+    let _ = statement.visit(&mut visitor);
+    visitor.is_complex
+}
+
+// check if the query is complex query
+// 1. has subquery
+// 2. has join
+// 3. has group by
+// 4. has aggregate
+// 5. has SetOperation(UNION/EXCEPT/INTERSECT of two queries)
+// 6. has distinct
+// 7. has wildcard
+struct ComplexQueryVisitor {
+    pub is_complex: bool,
+}
+
+impl ComplexQueryVisitor {
+    fn new() -> Self {
+        Self { is_complex: false }
+    }
+}
+
+impl VisitorMut for ComplexQueryVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        match query.body.as_ref() {
+            sqlparser::ast::SetExpr::Select(select) => {
+                // check if has group by
+                match select.group_by {
+                    GroupByExpr::Expressions(ref expr, _) => self.is_complex = !expr.is_empty(),
+                    _ => self.is_complex = true,
+                }
+                // check if has join
+                if select.from.len() > 1 || select.from.iter().any(|from| !from.joins.is_empty()) {
+                    self.is_complex = true;
+                }
+                if select.distinct.is_some() {
+                    self.is_complex = true;
+                }
+                if self.is_complex {
+                    return ControlFlow::Break(());
+                }
+            }
+            // check if SetOperation
+            sqlparser::ast::SetExpr::SetOperation { .. } => {
+                self.is_complex = true;
+                return ControlFlow::Break(());
+            }
+            _ => {}
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        match expr {
+            // check if has subquery
+            Expr::Subquery(_) | Expr::Exists { .. } | Expr::InSubquery { .. } => {
+                self.is_complex = true;
+            }
+            // check if has aggregate function or window function
+            Expr::Function(func) => {
+                if AGGREGATE_UDF_LIST
+                    .contains(&trim_quotes(&func.name.to_string().to_lowercase()).as_str())
+                    || func.filter.is_some()
+                    || func.over.is_some()
+                    || !func.within_group.is_empty()
+                {
+                    self.is_complex = true;
+                }
+            }
+            // check select * from table
+            Expr::Wildcard(_) => self.is_complex = true,
+            _ => {}
+        }
+        if self.is_complex {
+            return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
     }
@@ -356,5 +441,20 @@ mod tests {
             Some("alias1"),
             "alias2"
         ));
+    }
+
+    #[test]
+    fn test_complex_query_visitor() {
+        let sql = "SELECT * FROM users WHERE name IN (SELECT name FROM admins)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut complex_visitor = ComplexQueryVisitor::new();
+        let _ = statement.visit(&mut complex_visitor);
+
+        // Should detect complex query due to subquery
+        assert!(complex_visitor.is_complex);
     }
 }

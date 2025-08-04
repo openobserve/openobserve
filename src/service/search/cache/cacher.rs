@@ -35,7 +35,10 @@ use crate::{
             MultiCachedQueryResponse,
             result_utils::{get_ts_value, round_down_to_nearest_minute},
         },
-        sql::{RE_HISTOGRAM, RE_SELECT_FROM, Sql, generate_histogram_interval},
+        sql::{
+            RE_HISTOGRAM, RE_SELECT_FROM, Sql,
+            visitor::histogram_interval::generate_histogram_interval,
+        },
     },
 };
 

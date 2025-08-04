@@ -57,9 +57,9 @@ impl VisitorMut for MatchVisitor {
 #[cfg(test)]
 mod tests {
 
-   use sqlparser::{ast::VisitMut, dialect::GenericDialect};
+    use sqlparser::{ast::VisitMut, dialect::GenericDialect};
 
-    use super::*; 
+    use super::*;
 
     #[test]
     fn test_match_visitor() {
