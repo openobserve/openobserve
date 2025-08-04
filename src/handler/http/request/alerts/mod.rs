@@ -170,6 +170,44 @@ async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     }
 }
 
+/// ExportAlert
+///
+/// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"get"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ExportAlert",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = Ksuid, Path, description = "Alert ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
+      ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = GetAlertResponseBody),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/v2/{org_id}/alerts/{alert_id}/export")]
+pub async fn export_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
+    let (org_id, alert_id) = path.into_inner();
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    match alert::get_by_id(client, &org_id, alert_id).await {
+        Ok(alert) => {
+            let key = alert.get_unique_key();
+            let scheduled_job = scheduler::get(&org_id, TriggerModule::Alert, &key)
+                .await
+                .ok();
+            let resp_body: GetAlertResponseBody = (alert, scheduled_job).into();
+            MetaHttpResponse::json(resp_body)
+        }
+        Err(e) => e.into(),
+    }
+}
+
 /// UpdateAlert
 ///
 /// #{"ratelimit_module":"Alerts", "ratelimit_module_operation":"update"}#
