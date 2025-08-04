@@ -49,6 +49,16 @@ pub enum TantivyResult {
 }
 
 impl TantivyResult {
+    // used for skip tantivy search
+    pub fn percent(&self) -> usize {
+        match self {
+            Self::RowIdsBitVec(percent, _) => *percent,
+            _ => 0,
+        }
+    }
+}
+
+impl TantivyResult {
     pub fn handle_matched_docs(searcher: &Searcher, query: Box<dyn Query>) -> anyhow::Result<Self> {
         let res = searcher.search(&query, &tantivy::collector::DocSetCollector)?;
 

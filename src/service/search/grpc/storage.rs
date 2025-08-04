@@ -784,6 +784,7 @@ pub async fn filter_file_list_by_tantivy_index(
 
         // if more than cpu_num's file returned many row_ids, we skip tantivy search
         let mut threshold_num = cfg.limit.cpu_num;
+        let mut total_row_ids_percent = 0;
         let mut tasks = stream::iter(tasks).buffer_unordered(target_partitions);
         while let Some(result) = match tasks.try_next().await {
             Err(e) => {
@@ -804,10 +805,12 @@ pub async fn filter_file_list_by_tantivy_index(
                         // no need inverted index for this file, need add filter back
                         let took = start.elapsed().as_millis() as usize;
                         threshold_num -= 1;
+                        total_row_ids_percent += result.percent();
                         if threshold_num == 0 {
                             log::warn!(
-                                "[trace_id {}] search->tantivy: skip tantivy search, too many row_ids returned from tantivy index, took: {took} ms",
+                                "[trace_id {}] search->tantivy: skip tantivy search, too many row_ids returned from tantivy index, avg percent: {}, took: {took} ms",
                                 query.trace_id,
+                                total_row_ids_percent as f64 / cfg.limit.cpu_num as f64,
                             );
                             file_list.extend(file_list_map.into_values());
                             return Ok((took, true, TantivyMultiResult::RowNums(0)));
@@ -1072,18 +1075,17 @@ async fn search_tantivy_index(
         TantivyResult::TopN(top_n) => Ok((key, TantivyResult::TopN(top_n))),
         TantivyResult::Distinct(distinct) => Ok((key, TantivyResult::Distinct(distinct))),
         TantivyResult::RowIds(row_ids) => {
-            if row_ids.is_empty() {
+            if row_ids.is_empty() || parquet_file.meta.records == 0 {
                 return Ok((key, TantivyResult::RowIdsBitVec(0, BitVec::EMPTY)));
             }
             // return early if the number of matched docs is too large
             let skip_threshold = cfg.limit.inverted_index_skip_threshold;
-            if skip_threshold > 0
-                && row_ids.len() > (parquet_file.meta.records as usize / 100 * skip_threshold)
-            {
+            let row_ids_percent = row_ids.len() as f64 / parquet_file.meta.records as f64 * 100.0;
+            if skip_threshold > 0 && row_ids_percent > skip_threshold as f64 {
                 // return empty file name means we need to add filter back and skip tantivy search
                 return Ok((
                     "".to_string(),
-                    TantivyResult::RowIdsBitVec(0, BitVec::EMPTY),
+                    TantivyResult::RowIdsBitVec(row_ids_percent as usize, BitVec::EMPTY),
                 ));
             }
             let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
