@@ -44,7 +44,7 @@ use crate::{
             functions,
             http::{
                 get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
+                get_search_type_from_request, get_stream_type_from_request,get_dashboard_info_from_request
             },
             stream::get_settings_max_query_range,
         },
@@ -158,6 +158,8 @@ pub async fn search_multi(
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+
+    let dashboard_info = get_dashboard_info_from_request(&query);
 
     let search_type = match get_search_type_from_request(&query) {
         Ok(v) => v,
@@ -351,6 +353,7 @@ pub async fn search_multi(
             &req,
             range_error.clone(),
             false,
+            dashboard_info.clone(),
         )
         .instrument(http_span.clone())
         .await;
