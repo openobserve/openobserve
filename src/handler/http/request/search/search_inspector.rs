@@ -271,6 +271,7 @@ pub async fn get_search_profile(
         &req,
         range_error,
         false,
+        None,
     )
     .instrument(http_span)
     .await;

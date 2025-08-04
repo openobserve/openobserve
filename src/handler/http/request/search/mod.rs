@@ -376,6 +376,7 @@ pub async fn search(
         &req,
         range_error,
         false,
+        dashboard_info,
     )
     .instrument(http_span)
     .await;
@@ -1157,6 +1158,7 @@ async fn values_v1(
             &req,
             "".to_string(),
             false,
+            None,
         )
         .instrument(http_span)
         .await;

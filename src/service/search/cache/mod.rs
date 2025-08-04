@@ -33,6 +33,7 @@ use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
+use config::meta::dashboards::usage_report::DashboardInfo;
 use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
 use tracing::Instrument;
@@ -66,6 +67,7 @@ pub async fn search(
     in_req: &search::Request,
     range_error: String,
     is_http2_streaming: bool,
+    dashboard_info: Option<DashboardInfo>,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
@@ -398,6 +400,7 @@ pub async fn search(
         took_wait_in_queue: Some(res.took_detail.wait_in_queue),
         work_group,
         result_cache_ratio: Some(res.result_cache_ratio),
+        dashboard_info: dashboard_info,
         ..Default::default()
     };
     report_request_usage_stats(
