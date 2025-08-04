@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             round
             flat
             icon="cancel"
+            data-test="close-button"
             @click="
               router.push({
                 name: 'serviceAccounts',
@@ -53,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="input-border"
             bg-color="input-bg"
             class="q-py-md showLabelOnTop"
+            ref="email"
             stack-label
             outlined
             filled
@@ -69,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="input-border"
             bg-color="input-bg"
             class="q-py-md showLabelOnTop q-mt-sm"
+            ref="description"
             stack-label
             outlined
             filled
@@ -81,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('user.cancel')"
               text-color="light-text"
               padding="sm md"
+              data-test="cancel-button"
               no-caps
               @click="$emit('cancel:hideform')"
             />
