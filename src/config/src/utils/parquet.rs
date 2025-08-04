@@ -25,8 +25,9 @@ use arrow_schema::Schema;
 use futures::TryStreamExt;
 use parquet::{
     arrow::{
-        AsyncArrowWriter, ParquetRecordBatchStreamBuilder, arrow_reader::ArrowReaderMetadata,
-        async_reader::ParquetRecordBatchStream,
+        AsyncArrowWriter, ParquetRecordBatchStreamBuilder,
+        arrow_reader::ArrowReaderMetadata,
+        async_reader::{AsyncFileReader, ParquetRecordBatchStream},
     },
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
@@ -127,30 +128,35 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
     Ok((stream_key, date_key, file_name))
 }
 
-pub async fn get_recordbatch_reader_from_bytes(
-    data: &bytes::Bytes,
-) -> Result<(Arc<Schema>, ParquetRecordBatchStream<Cursor<bytes::Bytes>>), anyhow::Error> {
-    let schema_reader = Cursor::new(data.clone());
-    let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
+/// A generic wrapper for getting a record batch stream from a reader.
+/// It can be used for both bytes and file.
+async fn get_recordbatch_reader<T>(
+    reader: T,
+) -> Result<(Arc<Schema>, ParquetRecordBatchStream<T>), anyhow::Error>
+where
+    T: AsyncFileReader + Send + 'static,
+{
+    let arrow_reader = ParquetRecordBatchStreamBuilder::new(reader).await?;
     let schema = arrow_reader.schema().clone();
     let reader = arrow_reader.with_batch_size(PARQUET_BATCH_SIZE).build()?;
     Ok((schema, reader))
 }
 
-pub async fn get_recordbatch_reader_from_file(
-    path: &PathBuf,
-) -> Result<(Arc<Schema>, ParquetRecordBatchStream<tokio::fs::File>), anyhow::Error> {
-    let file = tokio::fs::File::open(path).await?;
-    let arrow_reader = ParquetRecordBatchStreamBuilder::new(file).await?;
-    let schema = arrow_reader.schema().clone();
-    let reader = arrow_reader.with_batch_size(PARQUET_BATCH_SIZE).build()?;
+pub async fn get_recordbatch_reader_from_bytes(
+    data: &bytes::Bytes,
+) -> Result<(Arc<Schema>, ParquetRecordBatchStream<Cursor<bytes::Bytes>>), anyhow::Error> {
+    let schema_reader = Cursor::new(data.clone());
+
+    let (schema, reader) = get_recordbatch_reader(schema_reader).await?;
+
     Ok((schema, reader))
 }
 
 pub async fn read_recordbatch_from_bytes(
     data: &bytes::Bytes,
 ) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
-    let (schema, reader) = get_recordbatch_reader_from_bytes(data).await?;
+    let reader = Cursor::new(data.clone());
+    let (schema, reader) = get_recordbatch_reader(reader).await?;
     let batches = reader.try_collect().await?;
     Ok((schema, batches))
 }
@@ -158,7 +164,8 @@ pub async fn read_recordbatch_from_bytes(
 pub async fn read_recordbatch_from_file(
     path: &PathBuf,
 ) -> Result<(Arc<Schema>, Vec<RecordBatch>), anyhow::Error> {
-    let (schema, reader) = get_recordbatch_reader_from_file(path).await?;
+    let file = tokio::fs::File::open(path).await?;
+    let (schema, reader) = get_recordbatch_reader(file).await?;
     let batches = reader.try_collect().await?;
     Ok((schema, batches))
 }
