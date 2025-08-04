@@ -183,28 +183,11 @@ pub fn get_server_url_from_cert(cert: &[u8]) -> Result<String, anyhow::Error> {
                             })
                         {
                             if ip_addr.len() == 4 {
-                                let ip_addr = [ip_addr[0], ip_addr[1], ip_addr[2], ip_addr[3]];
-                                return Ok(Ipv4Addr::from(ip_addr).to_string());
+                                let ip_addr = <&[u8; 4]>::try_from(*ip_addr).unwrap();
+                                return Ok(Ipv4Addr::from(*ip_addr).to_string());
                             } else if ip_addr.len() == 16 {
-                                let ip_addr = [
-                                    ip_addr[0],
-                                    ip_addr[1],
-                                    ip_addr[2],
-                                    ip_addr[3],
-                                    ip_addr[4],
-                                    ip_addr[5],
-                                    ip_addr[6],
-                                    ip_addr[7],
-                                    ip_addr[8],
-                                    ip_addr[9],
-                                    ip_addr[10],
-                                    ip_addr[11],
-                                    ip_addr[12],
-                                    ip_addr[13],
-                                    ip_addr[14],
-                                    ip_addr[15],
-                                ];
-                                return Ok(Ipv6Addr::from(ip_addr).to_string());
+                                let ip_addr = <&[u8; 16]>::try_from(*ip_addr).unwrap();
+                                return Ok(Ipv6Addr::from(*ip_addr).to_string());
                             } else {
                                 return Err(anyhow::anyhow!(
                                     "Failed to parse certificate, invalid IP address length"
