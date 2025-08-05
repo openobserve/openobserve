@@ -26,11 +26,8 @@ use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config,
-    meta::{
-        // self_reporting::usage::UsageType,
-        stream::StreamType,
-    },
-    utils::{flatten::format_key, json},
+    meta::stream::StreamType,
+    utils::{flatten::format_key, json, time::BASE_TIME},
 };
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashSet;
@@ -46,11 +43,8 @@ use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::router::ERROR_HEADER,
     service::{
-        db,
-        format_stream_name,
-        // ingestion::write_file,
+        db, format_stream_name,
         schema::{check_for_schema, stream_schema_exists},
-        // self_reporting::report_request_usage_stats,
     },
 };
 
@@ -155,7 +149,7 @@ pub async fn save_enrichment_data(
     .await;
 
     if stream_schema.has_fields && !append_data {
-        let start_time = db::enrichment_table::get_start_time(org_id, stream_name).await;
+        let start_time = BASE_TIME.timestamp_micros();
         let now = Utc::now().timestamp_micros();
         delete_enrichment_table(
             org_id,
@@ -367,9 +361,6 @@ pub async fn delete_enrichment_table(
         log::error!("Error deleting stream schema: {}", e);
     }
 
-    // if let Err(e) = crate::service::enrichment::storage::remote::delete(org_id,
-    // stream_name).await {     log::error!("Error deleting enrichment table from S3: {e}");
-    // }
     if let Err(e) = crate::service::enrichment::storage::local::delete(org_id, stream_name).await {
         log::error!("Error deleting enrichment table from local cache: {e}");
     }
@@ -378,21 +369,7 @@ pub async fn delete_enrichment_table(
         log::error!("Error deleting enrichment table from database: {e}");
     }
 
-    // create delete for compactor
-    // if let Err(e) =
-    //     db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
-    // {
-    //     log::error!("Error creating stream retention job: {}", e);
-    // }
-
-    if let Err(e) = crate::service::compact::retention::delete_from_file_list(
-        org_id,
-        stream_type,
-        stream_name,
-        time_range,
-    )
-    .await
-    {
+    if let Err(e) = delete_from_file_list(org_id, stream_type, stream_name, time_range).await {
         log::error!("Error deleting enrichment table from file list: {}", e);
     }
 
@@ -494,16 +471,14 @@ pub async fn extract_multipart(
     Ok(records)
 }
 
+/// Does not delete stream schema, file lists. Only deletes local cache and database and the memory
+/// cache.
 pub async fn cleanup_enrichment_table_resources(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
 ) {
     log::info!("cleaning up enrichment table  resources {stream_name}");
-
-    if let Err(e) = crate::service::enrichment::storage::remote::delete(org_id, stream_name).await {
-        log::error!("Error deleting enrichment table from S3: {e}");
-    }
     if let Err(e) = crate::service::enrichment::storage::local::delete(org_id, stream_name).await {
         log::error!("Error deleting enrichment table from local cache: {e}");
     }
@@ -566,11 +541,6 @@ pub async fn delete_from_file_list(
                     e
                 );
             }
-            // let _ = o2_enterprise::enterprise::super_cluster::queue::file_list_delete(
-            //     file_list_key,
-            //     time_range,
-            // )
-            // .await;
         }
     }
     Ok(())
