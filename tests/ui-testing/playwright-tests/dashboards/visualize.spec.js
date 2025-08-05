@@ -176,7 +176,7 @@ test.describe(" visualize UI testcases", () => {
 
     await expect(
       page.locator('[data-test="selected-chart-line-item"]').locator("..")
-    ).toHaveClass(/bg-grey-3|5/); // matches light (3) or dark (5) theme
+    ).toHaveClass(/bg-grey-3|5/); //
   });
 
   test.skip("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
