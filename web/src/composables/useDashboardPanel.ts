@@ -3391,11 +3391,14 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       fields.x.push(extractedFields.timeseries_field);
     }
 
-    // here upto 1 group by will be available, add group by as breakdown
     extractedFields.group_by.forEach((field: any) => {
-      // if field is not timeseries field, then add it as breakdown
-      if (field !== extractedFields.timeseries_field) {
-        fields.breakdown.push(field);
+      if (field != extractedFields.timeseries_field) {
+        // if x axis is empty then first add group by as x axis
+        if (fields.x.length == 0) {
+          fields.x.push(field);
+        } else {
+          fields.breakdown.push(field);
+        }
       }
     });
 
