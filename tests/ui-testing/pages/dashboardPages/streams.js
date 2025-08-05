@@ -48,8 +48,10 @@ export default class StreamSettingsPage {
     await this.saveButton.waitFor({ state: "visible", timeout: 15000 });
     await this.saveButton.click();
 
+    await this.page.waitForTimeout(3000);
+
     // Close the modal
-    await this.closeButton.waitFor({ state: "visible", timeout: 15000 });
+    // await this.closeButton.waitFor({ state: "visible", timeout: 15000 });
     await this.closeButton.click();
   }
 }
