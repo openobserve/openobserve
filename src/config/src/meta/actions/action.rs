@@ -198,10 +198,12 @@ pub struct ActionRunningStatusResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use chrono::Utc;
     use std::collections::HashMap;
+
+    use chrono::Utc;
     use svix_ksuid::{Ksuid, KsuidLike};
+
+    use super::*;
 
     #[test]
     fn test_execution_details_type_display() {
@@ -212,9 +214,18 @@ mod tests {
 
     #[test]
     fn test_execution_details_type_try_from_str() {
-        assert_eq!(ExecutionDetailsType::try_from("once").unwrap(), ExecutionDetailsType::Once);
-        assert_eq!(ExecutionDetailsType::try_from("repeat").unwrap(), ExecutionDetailsType::Repeat);
-        assert_eq!(ExecutionDetailsType::try_from("service").unwrap(), ExecutionDetailsType::Service);
+        assert_eq!(
+            ExecutionDetailsType::try_from("once").unwrap(),
+            ExecutionDetailsType::Once
+        );
+        assert_eq!(
+            ExecutionDetailsType::try_from("repeat").unwrap(),
+            ExecutionDetailsType::Repeat
+        );
+        assert_eq!(
+            ExecutionDetailsType::try_from("service").unwrap(),
+            ExecutionDetailsType::Service
+        );
         assert!(ExecutionDetailsType::try_from("invalid").is_err());
     }
 
@@ -228,10 +239,22 @@ mod tests {
 
     #[test]
     fn test_action_status_try_from_str() {
-        assert_eq!(ActionStatus::try_from("ready").unwrap(), ActionStatus::Ready);
-        assert_eq!(ActionStatus::try_from("running").unwrap(), ActionStatus::Running);
-        assert_eq!(ActionStatus::try_from("errored").unwrap(), ActionStatus::Errored);
-        assert_eq!(ActionStatus::try_from("completed").unwrap(), ActionStatus::Completed);
+        assert_eq!(
+            ActionStatus::try_from("ready").unwrap(),
+            ActionStatus::Ready
+        );
+        assert_eq!(
+            ActionStatus::try_from("running").unwrap(),
+            ActionStatus::Running
+        );
+        assert_eq!(
+            ActionStatus::try_from("errored").unwrap(),
+            ActionStatus::Errored
+        );
+        assert_eq!(
+            ActionStatus::try_from("completed").unwrap(),
+            ActionStatus::Completed
+        );
         assert!(ActionStatus::try_from("invalid").is_err());
     }
 
@@ -245,16 +268,31 @@ mod tests {
     #[test]
     fn test_action_type_try_from_str() {
         assert_eq!(ActionType::try_from("job").unwrap(), ActionType::Job);
-        assert_eq!(ActionType::try_from("cronjob").unwrap(), ActionType::CronJob);
-        assert_eq!(ActionType::try_from("service").unwrap(), ActionType::Service);
+        assert_eq!(
+            ActionType::try_from("cronjob").unwrap(),
+            ActionType::CronJob
+        );
+        assert_eq!(
+            ActionType::try_from("service").unwrap(),
+            ActionType::Service
+        );
         assert!(ActionType::try_from("invalid").is_err());
     }
 
     #[test]
     fn test_action_type_from_execution_details_type() {
-        assert_eq!(ActionType::from(ExecutionDetailsType::Once), ActionType::Job);
-        assert_eq!(ActionType::from(ExecutionDetailsType::Repeat), ActionType::CronJob);
-        assert_eq!(ActionType::from(ExecutionDetailsType::Service), ActionType::Service);
+        assert_eq!(
+            ActionType::from(ExecutionDetailsType::Once),
+            ActionType::Job
+        );
+        assert_eq!(
+            ActionType::from(ExecutionDetailsType::Repeat),
+            ActionType::CronJob
+        );
+        assert_eq!(
+            ActionType::from(ExecutionDetailsType::Service),
+            ActionType::Service
+        );
     }
 
     #[test]
@@ -311,10 +349,13 @@ mod tests {
         assert_eq!(request.environment_variables, Some(env_vars));
         assert_eq!(request.cron_expr, Some("0 0 * * *".to_string()));
         assert_eq!(request.description, Some("Updated description".to_string()));
-        assert_eq!(request.service_account, Some("updated_service_account".to_string()));
+        assert_eq!(
+            request.service_account,
+            Some("updated_service_account".to_string())
+        );
     }
 
-    #[test]  
+    #[test]
     fn test_update_action_request() {
         let mut env_vars = HashMap::new();
         env_vars.insert("JOB_KEY".to_string(), "JOB_VALUE".to_string());

@@ -37,7 +37,7 @@ use utils::check_stream_permissions;
 use {crate::service::organization::is_org_in_free_trial_period, actix_web::http::StatusCode};
 
 #[cfg(feature = "enterprise")]
-use crate::service::search::sql::get_cipher_key_names;
+use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -54,7 +54,7 @@ use crate::{
     service::{
         db::enrichment_table,
         metadata::distinct_values::DISTINCT_STREAM_PREFIX,
-        search as SearchService,
+        search::{self as SearchService, sql::visitor::pickup_where::pickup_where},
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
@@ -805,7 +805,7 @@ pub async fn build_search_request_per_field(
                     .any(|fn_name| decoded_sql.contains(&format!("{fn_name}(")));
 
                 // pick up where clause from sql
-                let sql_where_from_query = match SearchService::sql::pickup_where(&decoded_sql) {
+                let sql_where_from_query = match pickup_where(&decoded_sql) {
                     Ok(Some(v)) => format!("WHERE {v}"),
                     Ok(None) => "".to_string(),
                     Err(e) => {
@@ -992,7 +992,7 @@ async fn values_v1(
     };
 
     // pick up where clause from sql
-    let where_str = match SearchService::sql::pickup_where(&query_sql) {
+    let where_str = match pickup_where(&query_sql) {
         Ok(v) => v.unwrap_or_default(),
         Err(e) => {
             return Err(Error::other(e));

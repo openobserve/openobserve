@@ -156,7 +156,7 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
     let stat = match ret {
         Ok(v) => v,
         Err(e) => {
-            // remove from processing tables 
+            // remove from processing tables
             PROCESSING_TABLES.write().await.remove(&path);
             return Err(e);
         }
@@ -176,7 +176,7 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
     rw.swap_remove(&path);
     drop(rw);
 
-    // remove from processing tables 
+    // remove from processing tables
     PROCESSING_TABLES.write().await.remove(&path);
 
     // update metrics
