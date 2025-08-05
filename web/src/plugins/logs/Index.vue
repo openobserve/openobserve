@@ -1810,8 +1810,6 @@ export default defineComponent({
           extractedFields?.group_by && extractedFields.group_by.length
         );
 
-        console.log("shouldUseHistogramQuery.value", shouldUseHistogramQuery.value);
-
         const finalQuery = logsPageQuery;
 
         if (!finalQuery) {
