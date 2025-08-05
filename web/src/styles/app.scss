@@ -359,3 +359,63 @@
     background-color: $primary !important;
   }
 }
+
+
+
+.o2-route-tabs {
+  margin: 0.5rem 1rem 0rem 1rem;
+  padding: 0px !important;
+
+    .q-tab {
+      justify-content: flex-start;
+      padding: 0 0.6rem 0 0.6rem;
+      margin-bottom: 0.5rem;
+      text-transform: capitalize;
+
+      &__content.tab_content {
+        .q-tab {
+          &__icon + &__label {
+            padding-left: 0.875rem;
+            font-weight: 600;
+          }
+        }
+      }
+
+      .q-tab__label{
+        font-size: 13px !important;
+      }
+      .q-tab__content{
+        padding: 0px !important;
+        height: 32px !important;
+      }
+
+    }
+
+}
+
+.o2-route-tabs-light {
+  .q-tab {
+    &:hover{
+      background-color: #EBECF0;
+    }
+    &--active {
+      .q-tab__indicator{
+        color: #826AF9;
+      }
+    }
+  }
+
+}
+
+.o2-route-tabs-dark {
+  .q-tab {
+    &:hover{
+      background-color: #393B40;
+    }
+    &--active {
+      .q-tab__indicator{
+        color: #9E86FF;
+      }
+    }
+  }
+}
