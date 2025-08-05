@@ -144,6 +144,7 @@ pub async fn report_request_usage_stats(
             is_partial: stats.is_partial,
             work_group: None,
             node_name: stats.node_name.clone(),
+            dashboard_info: stats.dashboard_info.clone(),
         });
     };
 
@@ -185,6 +186,7 @@ pub async fn report_request_usage_stats(
         is_partial: stats.is_partial,
         work_group: stats.work_group,
         node_name: stats.node_name,
+        dashboard_info: stats.dashboard_info,
     });
     if !usage.is_empty() {
         publish_usage(usage).await;

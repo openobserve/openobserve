@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     SIZE_IN_MB, get_config,
     meta::{
+        dashboards::usage_report::DashboardInfo,
         search::{SearchEventContext, SearchEventType},
         stream::{FileMeta, StreamType},
     },
@@ -128,6 +129,8 @@ pub struct UsageData {
     pub work_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub node_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub dashboard_info: Option<DashboardInfo>,
 }
 
 #[derive(Hash, PartialEq, Eq)]
@@ -335,6 +338,8 @@ pub struct RequestStats {
     pub work_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub node_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub dashboard_info: Option<DashboardInfo>,
 }
 impl Default for RequestStats {
     fn default() -> Self {
@@ -359,6 +364,7 @@ impl Default for RequestStats {
             is_partial: false,
             work_group: None,
             node_name: Some(get_config().common.instance_name.clone()),
+            dashboard_info: None,
         }
     }
 }
@@ -386,6 +392,7 @@ impl From<FileMeta> for RequestStats {
             is_partial: false,
             work_group: None,
             node_name: None,
+            dashboard_info: None,
         }
     }
 }

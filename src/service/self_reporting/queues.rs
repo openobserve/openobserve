@@ -278,6 +278,7 @@ mod tests {
             is_partial: false,
             work_group: None,
             node_name: None,
+            dashboard_info: None,
         }
     }
 

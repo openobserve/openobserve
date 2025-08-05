@@ -357,6 +357,7 @@ pub async fn do_search(
         &req,
         "".to_string(),
         true,
+        None,
     )
     .await;
 
