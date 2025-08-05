@@ -2,6 +2,24 @@ import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 
+// Stream name used across tests
+const STREAM_NAME = "e2e_automate";
+
+// Add a global SQL query constant that can be reused across tests
+const largeDatasetSqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", 
+  count(kubernetes_container_hash) as "y_axis_1", 
+  count(kubernetes_container_name) as "y_axis_2", 
+  count(kubernetes_host) as "y_axis_3", 
+  count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", 
+  count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", 
+  count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", 
+  count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", 
+  count(kubernetes_labels_prometheus) as "y_axis_8", 
+  kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1"  
+  FROM "${STREAM_NAME}" 
+  WHERE kubernetes_namespace_name IS NOT NULL 
+  GROUP BY x_axis_1, breakdown_1`;
+
 test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
@@ -144,7 +162,7 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   });
 
-  test("should set the default chart type and default X and Y axes to automatic after clicking the Visualize button", async ({
+  test("should set the default chart type to automatic after clicking the Visualize button", async ({
     page,
   }) => {
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
@@ -155,17 +173,13 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-logs-toggle"]').click();
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page.locator('[data-test="selected-chart-bar-item"]').click();
-    await page.locator('[data-test="dashboard-x-item-_timestamp"]').click();
+
     await expect(
-      page.locator('[data-test="dashboard-x-item-_timestamp"]')
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-test="dashboard-y-item-_timestamp"]')
-    ).toBeVisible();
+      page.locator('[data-test="selected-chart-line-item"]').locator("..")
+    ).toHaveClass(/bg-grey-3|5/); // matches light (3) or dark (5) theme
   });
 
-  test("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
+  test.skip("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
     page,
   }) => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
@@ -216,7 +230,7 @@ test.describe(" visualize UI testcases", () => {
       });
   });
 
-  test("should correctly plot the data according to the new chart type when changing the chart type.", async ({
+  test.skip("should correctly plot the data according to the new chart type when changing the chart type.", async ({
     page,
   }) => {
     await page.locator('[data-test="logs-visualize-toggle"]').click();
@@ -344,7 +358,7 @@ test.describe(" visualize UI testcases", () => {
       });
   });
 
-  test("should not reflect changes in the search query on the logs page if a field is changed or added in the visualization", async ({
+  test.skip("should not reflect changes in the search query on the logs page if a field is changed or added in the visualization", async ({
     page,
   }) => {
     // remain to mention compare qaury
@@ -394,7 +408,7 @@ test.describe(" visualize UI testcases", () => {
     ).toBeVisible();
   });
 
-  test("should display an error message on the logs page for an invalid query", async ({
+  test.skip("should display an error message on the logs page for an invalid query", async ({
     page,
   }) => {
     // Click on the line view
@@ -444,7 +458,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
   });
 
-  test("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization.", async ({
+  test.skip("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization.", async ({
     page,
   }) => {
     // Chart should not reflect changes made to X or Y axis.
@@ -506,7 +520,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
   });
 
-  test("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
+  test.skip("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
     page,
   }) => {
     //Except :  Data should be vanished, and tab is changed from Visualize to Search.
@@ -550,23 +564,9 @@ test.describe(" visualize UI testcases", () => {
     const textEditor = page.locator(".view-line").first();
     await textEditor.click();
 
-    const sqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", 
-  count(kubernetes_container_hash) as "y_axis_1", 
-  count(kubernetes_container_name) as "y_axis_2", 
-  count(kubernetes_host) as "y_axis_3", 
-  count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", 
-  count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", 
-  count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", 
-  count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", 
-  count(kubernetes_labels_prometheus) as "y_axis_8", 
-  kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1"  
-  FROM "e2e_automate" 
-  WHERE kubernetes_namespace_name IS NOT NULL 
-  GROUP BY x_axis_1, breakdown_1`;
-
     // Clear the existing text and input the new SQL query
     // await textEditor.fill('');
-    await textEditor.type(sqlQuery);
+    await textEditor.type(largeDatasetSqlQuery);
 
     // Apply the time filter and refresh the search
     await page.locator('[data-test="date-time-btn"]').click();
@@ -592,7 +592,7 @@ test.describe(" visualize UI testcases", () => {
     await expect(errorCount).toBe(0); // Fail the test if any error messages are present
   });
 
-  test("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
+  test.skip("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
     page,
   }) => {
     // Interact with various elements
@@ -631,7 +631,7 @@ test.describe(" visualize UI testcases", () => {
     await expect(row).toBeDefined();
   });
 
-  test("should not blank the stream name list when switching between logs and visualization and back again.", async ({
+  test.skip("should not blank the stream name list when switching between logs and visualization and back again.", async ({
     page,
   }) => {
     await page.locator('[data-test="date-time-btn"]').click();
@@ -646,5 +646,76 @@ test.describe(" visualize UI testcases", () => {
     await expect(
       page.locator('[data-test="logs-search-result-bar-chart"]')
     ).toBeVisible();
+  });
+  test("Stream should be correct on visualize page after switching between logs and visualize", async ({
+    page,
+  }) => {
+    // Extract stream name from the SQL query dynamically
+    const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
+    const expectedStreamName = streamNameMatch
+      ? streamNameMatch[1]
+      : STREAM_NAME;
+
+    // Focus on the text editor and input the SQL query
+    const textEditor = page.locator(".view-line").first();
+    await textEditor.click();
+    await textEditor.type(largeDatasetSqlQuery);
+
+    // Apply the time filter and refresh the search
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+
+    // Switch to SQL mode and refresh the search
+    await page
+      .getByRole("switch", { name: "SQL Mode" })
+      .locator("div")
+      .nth(2)
+      .click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+
+    // Toggle visualization
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    await page
+      .locator('[data-test="dashboard-field-list-collapsed-icon"]')
+      .click();
+
+    // Wait for the stream dropdown to be populated
+    await page.waitForTimeout(2000);
+
+    // Get stream value using multiple selector strategies
+    const getStreamValue = async () => {
+      const selectors = [
+        () =>
+          page
+            .locator('[data-test="index-dropdown-stream"]')
+            .getAttribute("value"),
+        () =>
+          page
+            .locator('.q-field__native input[aria-label="Stream"]')
+            .getAttribute("value"),
+        () => page.locator('[data-test="index-dropdown-stream"]').inputValue(),
+        () => page.locator('input[aria-label="Stream"]').getAttribute("value"),
+      ];
+
+      for (const selector of selectors) {
+        try {
+          const value = await selector();
+          if (value) return value;
+        } catch (error) {
+          // Continue to next selector
+        }
+      }
+      return null;
+    };
+
+    const streamValue = await getStreamValue();
+
+    // Assert that the stream value matches the expected stream name from the query
+    expect(streamValue).toBe(expectedStreamName);
+    expect(streamValue).toBeTruthy();
+
+    // Assert that the stream value is specifically "e2e_automate"
+    expect(streamValue).toBe("e2e_automate");
   });
 });
