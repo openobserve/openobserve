@@ -141,3 +141,103 @@ impl VisitorMut for TrackTotalHitsVisitor {
         ControlFlow::Break(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use sqlparser::{ast::VisitMut, dialect::GenericDialect};
+
+    use super::*;
+
+    #[test]
+    fn test_track_total_hits1() {
+        let sql = "SELECT * FROM t WHERE name = 'a'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        let _ = statement.visit(&mut track_total_hits_visitor);
+        let expected_sql = "SELECT count(*) AS zo_sql_num FROM t WHERE name = 'a'";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits2() {
+        let sql = "SELECT name, count(*) FROM t WHERE name = 'a' group by name order by name";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        let _ = statement.visit(&mut track_total_hits_visitor);
+        let expected_sql = "SELECT count(*) AS zo_sql_num FROM t WHERE name = 'a'";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits3() {
+        let sql = "SELECT t1.name, t2.name from t1 join t2 on t1.name = t2.name where t1.name = 'openobserve' group by t1.name, t2.name order by t1.name, t2.name";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        let _ = statement.visit(&mut track_total_hits_visitor);
+        let expected_sql = "SELECT count(*) AS zo_sql_num FROM t1 JOIN t2 ON t1.name = t2.name WHERE t1.name = 'openobserve'";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits4() {
+        let sql = "SELECT name from t1 where name not in (select name from t2)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        let _ = statement.visit(&mut track_total_hits_visitor);
+        let expected_sql =
+            "SELECT count(*) AS zo_sql_num FROM t1 WHERE name NOT IN (SELECT name FROM t2)";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits5() {
+        let sql = "SELECT name from t1 union select name from t2";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        let _ = statement.visit(&mut track_total_hits_visitor);
+        let expected_sql =
+            "SELECT count(*) AS zo_sql_num FROM (SELECT name FROM t1 UNION SELECT name FROM t2)";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits6() {
+        let sql = "(SELECT name from t1) union (select name from t2)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        let _ = statement.visit(&mut track_total_hits_visitor);
+        let expected_sql = "SELECT count(*) AS zo_sql_num FROM ((SELECT name FROM t1) UNION (SELECT name FROM t2))";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits7() {
+        let sql = "SELECT name from t1 union select name from t2 union select name from t3";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        let _ = statement.visit(&mut track_total_hits_visitor);
+        let expected_sql = "SELECT count(*) AS zo_sql_num FROM (SELECT name FROM t1 UNION SELECT name FROM t2 UNION SELECT name FROM t3)";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+}
