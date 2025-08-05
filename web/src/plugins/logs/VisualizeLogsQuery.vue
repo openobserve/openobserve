@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <ChartSelection
-          :allowedchartstype="['area','area-stacked','bar', 'h-bar', 'line', 'scatter','stacked', 'h-stacked', 'table', 'pie', 'donut', 'metric']"
+          :allowedchartstype="['area', 'bar', 'h-bar', 'line', 'scatter', 'table']"
           v-model:selectedChartType="dashboardPanelData.data.type"
           @update:selected-chart-type="resetAggregationFunction"
         />
