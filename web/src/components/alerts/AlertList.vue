@@ -31,10 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.header") }}
       </div>
       <div class="flex q-ml-auto tw-ps-2 items-center">
-        <div class="app-tabs-container q-mr-md">
+        <div class="o2-app-tabs-container q-mr-md">
           <app-tabs
           class="tabs-selection-container"
-          :class="store.state.theme === 'dark' ? 'tabs-selection-container-dark' : 'tabs-selection-container-light'"
+          :class="store.state.theme === 'dark' ? 'o2-tabs-selection-container-dark' : 'o2-tabs-selection-container-light'"
           :tabs="tabs"
           v-model:active-tab="activeTab"
           @update:active-tab="filterAlertsByTab"

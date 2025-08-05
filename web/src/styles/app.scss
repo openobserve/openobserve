@@ -301,15 +301,15 @@
   }
 }
 //this is used to add a border to the tabs container 
-//so to make this work just introduce a new div around the app-tabs component and add the class app-tabs-container to it
-//and then add the class tabs-selection-container-dark or tabs-selection-container-light to the app-tabs component
-.app-tabs-container{
+//so to make this work just introduce a new div around the app-tabs component and add the class o2-app-tabs-container to it
+//and then add the class o2-tabs-selection-container-dark or o2-tabs-selection-container-light to the app-tabs component
+.o2-app-tabs-container{
   border: 1px solid #cacaca;
   padding: 4px;
   border-radius: 2px;
 }
 
-.tabs-selection-container-dark{
+.o2-tabs-selection-container-dark{
   border: none !important;
   border-radius: none !important;
   .rum-tab{
@@ -335,7 +335,7 @@
   }
 }
 
-.tabs-selection-container-light{
+.o2-tabs-selection-container-light{
   border: none !important;
   border-radius: none !important;
   .rum-tab{
@@ -361,7 +361,9 @@
 }
 
 
-
+//this is used to target the tabs in the app 
+//these are the horizontal tabs and apply it add this classes and also add dense so that the height will get decreased 
+//add the class o2-route-tabs-dark or o2-route-tabs-light to the tabs to apply the dark or light theme
 .o2-route-tabs {
   margin: 0.5rem 1rem 0rem 1rem;
   padding: 0px !important;
