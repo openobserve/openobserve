@@ -99,14 +99,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <q-dialog
     v-model="pipelineObj.dialog.show"
+    full-width
     position="right"
-    full-height
-    maximized
     @keydown.stop
+    maximized
   >
     <div
       data-test="pipeline-nodes-list-dragable"
-      class="stream-routing-dialog-container full-height"
+      class="stream-routing-dialog-container"
       @keydown.stop
       tabindex="0"
     >

@@ -52,6 +52,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="table"
             :label="t('common.table')"
           />
+          <!-- o2 ai context add button in the detail table -->
+          <O2AIContextAddBtn 
+            class="tw-px-2 tw-py-2" 
+            @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
+             />
         </q-tabs>
       </div>
       <div
@@ -90,6 +95,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @add-field-to-table="addFieldToTable"
             @add-search-term="toggleIncludeSearchTerm"
             @view-trace="viewTrace"
+            @send-to-ai-chat="sendToAiChat"
+            @closeTable="closeTable"
           />
         </q-card-section>
       </q-tab-panel>
@@ -336,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -346,6 +353,7 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import JsonPreview from "./JsonPreview.vue";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 
 const defaultValue: any = () => {
   return {
@@ -355,7 +363,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { EqualIcon, NotEqualIcon, JsonPreview },
+  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn },
   emits: [
     "showPrevDetail",
     "showNextDetail",
@@ -364,6 +372,8 @@ export default defineComponent({
     "search:timeboxed",
     "add:table",
     "view-trace",
+    "sendToAiChat",
+    "closeTable"
   ],
   props: {
     modelValue: {
@@ -477,6 +487,13 @@ export default defineComponent({
       emit("view-trace");
     };
 
+    const sendToAiChat = (value: any) => {
+      emit("sendToAiChat", value);
+      emit("closeTable");
+    };
+    const closeTable = () => {
+      emit("closeTable");
+    }
     return {
       t,
       store,
@@ -494,6 +511,8 @@ export default defineComponent({
       searchObj,
       multiStreamFields,
       viewTrace,
+      sendToAiChat,
+      closeTable
     };
   },
   async created() {

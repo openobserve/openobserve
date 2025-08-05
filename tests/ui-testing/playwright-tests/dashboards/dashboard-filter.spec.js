@@ -1017,10 +1017,13 @@ test.describe("dashboard filter testcases", () => {
     await page.locator('[data-test="common-auto-complete"]').click();
     await page.locator('[data-test="common-auto-complete-option"]').click();
     await page.locator('[data-test="dashboard-apply"]').click();
-    // await page.getByText("Error Loading Data").click();
-    await expect(
-      page.getByText("sql parser error: Expected:").first()
-    ).toBeVisible();
+
+    // Matches either message (case–insensitive)
+    const errorMsg = page.getByText(
+      /(sql parser error: Expected:|Search field not found:)/i
+    );
+
+    await expect(errorMsg.first()).toBeVisible();
 
     await page
       .locator(

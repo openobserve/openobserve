@@ -19,6 +19,7 @@ use config::{
     meta::{
         search::{SearchEventType, StreamResponses, ValuesEventContext},
         sql::{OrderBy, resolve_stream_names},
+        stream::StreamType,
     },
     utils::json,
 };
@@ -40,6 +41,9 @@ use crate::{
             get_fallback_order_by_col_from_request, get_or_create_trace_id,
             get_search_event_context_from_request, get_search_type_from_request,
             get_stream_type_from_request, get_use_cache_from_request,
+            get_fallback_order_by_col_from_request, get_is_ui_histogram_from_request,
+            get_or_create_trace_id, get_search_event_context_from_request,
+            get_search_type_from_request, get_stream_type_from_request, get_use_cache_from_request,
         },
     },
     handler::http::request::search::{
@@ -64,6 +68,7 @@ use crate::{
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
     ),
     request_body(content = String, description = "Search query", content_type = "application/json", example = json!({
         "sql": "select * from logs LIMIT 10",
@@ -127,6 +132,7 @@ pub async fn search_http2_stream(
         return MetaHttpResponse::bad_request("Invalid query parameters");
     };
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let is_ui_histogram = get_is_ui_histogram_from_request(&query);
 
     // Parse the search request
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
@@ -178,6 +184,128 @@ pub async fn search_http2_stream(
         return http_response;
     }
 
+    // get stream name
+    let stream_names = match resolve_stream_names(&req.query.sql) {
+        Ok(v) => v.clone(),
+        Err(e) => {
+            #[cfg(feature = "enterprise")]
+            let error_message = e.to_string();
+
+            let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
+
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    http_response.status().into(),
+                    Some(error_message),
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+            }
+            return http_response;
+        }
+    };
+
+    let mut sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
+        Ok(sql) => sql,
+        Err(e) => {
+            log::error!(
+                "[trace_id: {}] Error getting histogram interval: {:?}",
+                trace_id,
+                e
+            );
+
+            #[cfg(feature = "enterprise")]
+            let error_message = e.to_string();
+
+            let http_response = map_error_to_http_response(&e, Some(trace_id.clone()));
+
+            // Add audit before closing
+            #[cfg(feature = "enterprise")]
+            {
+                report_to_audit(
+                    user_id,
+                    org_id,
+                    trace_id,
+                    http_response.status().into(),
+                    Some(error_message),
+                    &in_req,
+                    body_bytes,
+                )
+                .await;
+            }
+            return http_response;
+        }
+    };
+    // Update histogram interval -- initial interval assignment
+    // Need to calculate the histogram interval before converting the query to a histogram query
+    // when `is_ui_histogram` is true. This is because if a query is already a histogram query
+    // with interval, for http2 streaming at the point of converting the query to a
+    // histogram query the interval will be generated again and not honor the original interval
+    // mentioned in the query.
+    if let Some(interval) = sql.histogram_interval {
+        req.query.histogram_interval = interval;
+    }
+
+    // Convert the original query to a histogram query
+    let mut converted_histogram_query: Option<String> = None;
+    if is_ui_histogram {
+        // Convert the original query to a histogram query
+        match crate::service::search::sql::histogram::convert_to_histogram_query(
+            &req.query.sql,
+            &stream_names,
+        ) {
+            Ok(histogram_query) => {
+                req.query.sql = histogram_query;
+                converted_histogram_query = Some(req.query.sql.clone());
+                // Recalculate histogram interval
+                // The sql object needs to be updated as well
+                // Since the original query is now converted to a histogram query
+                // and the histogram interval needs to be recalculated
+                // and order by would be also be modified
+                sql = match get_sql(&req.query, &org_id, stream_type, req.search_type).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!("[trace_id: {}] Error parsing sql: {:?}", trace_id, e);
+
+                        #[cfg(feature = "enterprise")]
+                        let error_message = e.to_string();
+
+                        let http_response = map_error_to_http_response(&e, Some(trace_id.clone()));
+
+                        // Add audit before closing
+                        #[cfg(feature = "enterprise")]
+                        {
+                            report_to_audit(
+                                user_id,
+                                org_id,
+                                trace_id,
+                                http_response.status().into(),
+                                Some(error_message),
+                                &in_req,
+                                body_bytes,
+                            )
+                            .await;
+                        }
+                        return http_response;
+                    }
+                };
+                // Update histogram interval -- second occurrence of histogram interval
+                if let Some(interval) = sql.histogram_interval {
+                    req.query.histogram_interval = interval;
+                }
+            }
+            Err(e) => {
+                return map_error_to_http_response(&(e), Some(trace_id));
+            }
+        }
+    }
+
     // Set use_cache from query params
     req.use_cache = get_use_cache_from_request(&query);
 
@@ -219,33 +347,6 @@ pub async fn search_http2_stream(
             .as_ref()
             .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
     }
-
-    // get stream name
-    let stream_names = match resolve_stream_names(&req.query.sql) {
-        Ok(v) => v.clone(),
-        Err(e) => {
-            #[cfg(feature = "enterprise")]
-            let error_message = e.to_string();
-
-            let http_response = map_error_to_http_response(&(e.into()), Some(trace_id.clone()));
-
-            // Add audit before closing
-            #[cfg(feature = "enterprise")]
-            {
-                report_to_audit(
-                    user_id,
-                    org_id,
-                    trace_id,
-                    http_response.status().into(),
-                    Some(error_message),
-                    &in_req,
-                    body_bytes,
-                )
-                .await;
-            }
-            return http_response;
-        }
-    };
 
     // Check permissions for each stream
     #[cfg(feature = "enterprise")]
@@ -314,6 +415,7 @@ pub async fn search_http2_stream(
     if let Some(interval) = sql.histogram_interval {
         req.query.histogram_interval = interval;
     }
+
     let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
 
     let search_span = setup_tracing_with_trace_id(
@@ -358,7 +460,17 @@ pub async fn search_http2_stream(
     // Return streaming response
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
         let chunks_iter = match result {
-            Ok(v) => v.to_chunks(),
+            Ok(mut v) => {
+                if is_ui_histogram {
+                    if let StreamResponses::SearchResponse {
+                        ref mut results, ..
+                    } = v
+                    {
+                        results.converted_histogram_query = converted_histogram_query.clone();
+                    }
+                }
+                v.to_chunks()
+            }
             Err(err) => {
                 log::error!(
                     "[HTTP2_STREAM trace_id {}] Error in search stream: {}",
@@ -534,12 +646,17 @@ pub async fn values_http2_stream(
     // Get use_cache from query params
     values_req.use_cache = get_use_cache_from_request(&query);
 
+    let keyword = match query.get("keyword") {
+        None => "".to_string(),
+        Some(v) => v.trim().to_string(),
+    };
     // Build search requests per field and use only the first one
     let reqs = match build_search_request_per_field(
         &values_req,
         &org_id,
-        stream_type,
+        values_req.stream_type,
         &values_req.stream_name,
+        &keyword,
     )
     .await
     {
@@ -697,4 +814,15 @@ pub async fn values_http2_stream(
     HttpResponse::Ok()
         .content_type("text/event-stream")
         .streaming(stream)
+}
+
+// Helper function to get histogram interval from sql query
+async fn get_sql(
+    query: &config::meta::search::Query,
+    org_id: &str,
+    stream_type: StreamType,
+    search_type: Option<SearchEventType>,
+) -> Result<crate::service::search::sql::Sql, infra::errors::Error> {
+    crate::service::search::sql::Sql::new(&query.clone().into(), org_id, stream_type, search_type)
+        .await
 }

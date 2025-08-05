@@ -29,31 +29,104 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="q-pb-sm stream-routing-title q-pl-xs">
           {{ t("pipeline.query") }}
         </div>
-      </div>
-      <div class="flex items-center">
-        <div class="flex items-center">
-          <q-tabs
-            data-test="scheduled-pipeline-tabs"
-            v-model="tab"
+        
+          <div class="flex items-center">
+            <q-btn
+            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+            :ripple="false"
+            @click="toggleAIChat"
+            data-test="menu-link-ai-item"
             no-caps
-            outside-arrows
-            size="sm"
-            mobile-arrows
-            class="bg-white text-primary scheduled-pipeline-tabs q-mr-sm"
-            @update:model-value="updateTab"
-            style="height: 34px !important"
-            :disable="selectedStreamType != 'metrics'"
+            :borderless="true"
+            flat
+            dense
+            class="o2-button ai-hover-btn q-px-sm q-py-sm q-mr-sm"
+            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+            style="border-radius: 100%;"
+            @mouseenter="isHovered = true"
+            @mouseleave="isHovered = false"
+
           >
-            <q-tab
-              data-test="scheduled-pipeline-sql-tab"
-              name="sql"
-              :label="t('alerts.sql')"
+            <div class="row items-center no-wrap tw-gap-2  ">
+              <img  :src="getBtnLogo" class="header-icon ai-icon" />
+            </div>
+          </q-btn>
+            <div class="flex items-center">
+              <q-tabs
+                data-test="scheduled-pipeline-tabs"
+                v-model="tab"
+                no-caps
+                outside-arrows
+                size="sm"
+                mobile-arrows
+                class="bg-white text-primary scheduled-pipeline-tabs q-mr-sm"
+                @update:model-value="updateTab"
+                style="height: 34px !important;"
+                :disable="selectedStreamType != 'metrics'"
+              >
+                <q-tab
+                  data-test="scheduled-pipeline-sql-tab"
+                  name="sql"
+                  :label="t('alerts.sql')"
+                />
+                <q-tab
+                  data-test="scheduled-pipeline-metrics-tab"
+                  name="promql"
+                  :disable="selectedStreamType !== 'metrics'"
+                  :label="t('alerts.promql')"
+                >
+                  <q-tooltip v-if="selectedStreamType !== 'metrics'">
+                    Promql is only available for metrics stream type
+                  </q-tooltip>
+                </q-tab>
+              </q-tabs>
+            </div>
+            <DateTime
+            style="height: 34px !important; border-radius: 3px;"
+            @on:date-change="updateDateChange"
+            class="q-mr-sm" />
+              <q-btn
+                data-test="logs-search-bar-refresh-btn"
+                data-cy="search-bar-refresh-button"
+                dense
+                flat
+                :title="t('search.runQuery')"
+                class="q-pa-none q-mr-sm search-button-pipeline"
+                @click="{
+                  expandState.output = true;
+                  expandState.query = false;
+                  runQuery();
+                }"
+                >{{ t("search.runQuery") }}</q-btn
+              >
+
+          <q-btn
+              data-test="add-function-fullscreen-btn"
+              :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
+              dense
+              style="height: 34px;" 
+              no-caps
+              :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+              @click="handleFullScreen"
             />
-            <q-tab
-              data-test="scheduled-pipeline-metrics-tab"
-              name="promql"
-              :disable="selectedStreamType !== 'metrics'"
-              :label="t('alerts.promql')"
+
+         
+          </div>
+
+
+
+  </div>
+  <q-separator />
+
+    <div  class="q-mb-sm stepper-header tw-w-full tw-flex tw-h-full" >
+            <div  :class="store.state.isAiChatEnabled ? 'tw-w-[75%]' : 'tw-w-[100%]'" style="height: 100% !important;">
+  
+           
+  
+           <q-splitter
+              v-model="splitterModel"
+              style="width: 100%;"
+              class="full-height"
             >
               <q-tooltip v-if="selectedStreamType !== 'metrics'">
                 Promql is only available for metrics stream type
@@ -1032,32 +1105,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
             </q-splitter>
-          </template>
-          <template #separator>
-            <q-btn
-              data-test="logs-search-field-list-collapse-btn"
-              :icon="collapseFields ? 'chevron_right' : 'chevron_left'"
-              :title="collapseFields ? 'Collapse Fields' : 'Open Fields'"
-              dense
-              size="20px"
-              round
-              class="q-mr-xs field-list-collapse-btn"
-              color="primary"
-              style="
-                left: 10px;
-                position: absolute;
-                overflow: auto !important;
-                top: 0px;
-                z-index: 100 !important;
-              "
-              @click="collapseFieldList"
-            ></q-btn>
-          </template>
-          <template #after>
-            <div
-              class="full-width"
-              style="height: calc(100vh - 140px) !important"
-            >
+
+            </template>
+            <template #separator>
+              <q-btn
+                    data-test="logs-search-field-list-collapse-btn"
+                    :icon="
+                      collapseFields
+                        ? 'chevron_right'
+                        : 'chevron_left'
+                    "
+                    :title="
+                     collapseFields
+                        ? 'Collapse Fields'
+                        : 'Open Fields'
+                    "
+                    dense
+                    size="20px"
+                    round
+                    class="q-mr-xs field-list-collapse-btn"
+                    color="primary"
+                    style="left: 10px; position: absolute; overflow: auto !important; top: 0px; z-index: 100 !important;"
+                   
+                    @click="collapseFieldList"
+                  ></q-btn>
+            </template>
+            <template #after>
+             <div class="full-width tw-flex ">
+
+              <div :style="{
+              }" style="height: calc(100vh - 140px) !important; width: 100%;" >
               <div class="query-editor-container scheduled-pipelines">
                 <span @click.stop="expandState.query = !expandState.query">
                   <FullViewContainer
@@ -1089,11 +1166,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div>
                 <span @click.stop="expandState.output = !expandState.output">
-                  <FullViewContainer
-                    name="output"
-                    v-model:is-expanded="expandState.output"
-                    label="Output"
-                    class="tw-mt-1"
+                <FullViewContainer
+                  name="output"
+                  v-model:is-expanded="expandState.output"
+                  label="Output"
+                  class="tw-mt-1"
+                />
+                </span>
+                  <TenstackTable
+                    style="height: calc(100vh - 190px) !important;"
+                    v-show="expandState.output && rows.length > 0 && tab == 'sql'"
+                    ref="searchTableRef"
+                    :columns="getColumns"
+                    :rows="rows"
+                    :jsonpreviewStreamName="selectedStreamName"
+                    :expandedRows="expandedLogs"
+                    @expand-row="expandLog"
+                    @copy="copyLogToClipboard"
+                    @sendToAiChat="sendToAiChat"
                   />
                 </span>
                 <TenstackTable
@@ -1152,6 +1242,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
+
+          </div>
+
             <div class="flex justify-end q-mt-md">
               <q-btn
                 data-test="stream-routing-query-cancel-btn"
@@ -1189,9 +1282,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-splitter>
 
-        <!-- query-eidtor-part -->
-      </div>
-    </div>
+          <q-btn
+                  data-test="stream-routing-query-cancel-btn"
+                  class="text-bold q-ml-md no border"
+                  :label="t('alerts.cancel')"
+                  text-color="light-text"
+                  padding="sm md"
+                  no-caps
+                  @click="$emit('cancel:form')"
+                />
+                <q-btn
+                  data-test="stream-routing-query-save-btn"
+                  :label="validatingSqlQuery ? 'Validating...' : 'Validate and Close'"
+                  class="text-bold no-border q-ml-md"
+                  color="secondary"
+                  padding="sm xl"
+                  no-caps
+                  type="submit"
+                  @click="$emit('submit:form')"
+                  :disable="validatingSqlQuery"
+                />
+                <q-btn
+                  v-if="pipelineObj.isEditNode"
+                  data-test="stream-routing-query-delete-btn"
+                  :label="t('pipeline.deleteNode')"
+                  class="text-bold no-border q-ml-md"
+                  color="negative"
+                  padding="sm xl"
+                  no-caps
+                  @click="$emit('delete:node')"
+                />
+          </div>   
+
+            
+            </template>
+          
+          </q-splitter>
+
+                
+
+
+
+           <!-- query-eidtor-part -->
+            
+          </div>
+
+          <div  class="q-ml-sm" v-if="store.state.isAiChatEnabled " style="width: 25%; max-width: 100%; min-width: 75px; height: calc(100vh - 70px) !important;  " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
+              <O2AIChat style="height: calc(100vh - 70px) !important;" :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" :aiChatInputContext="aiChatInputContext" />
+
+            </div>
+
+
+
+   </div>   
+
   </div>
 </template>
 
@@ -1231,6 +1375,7 @@ import IndexList from "@/plugins/logs/IndexList.vue";
 import { split } from "postcss/lib/list";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
+import O2AIChat from "@/components/O2AIChat.vue";
 
 import DateTime from "@/components/DateTime.vue";
 
@@ -1241,6 +1386,12 @@ import useStreams from "@/composables/useStreams";
 
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
+
+import config from "../../../aws-exports";
+
+import useAiChat from "@/composables/useAiChat";
+import { onBeforeUnmount } from "vue";
+
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -1294,12 +1445,14 @@ const emits = defineEmits([
 ]);
 const { pipelineObj } = useDragAndDrop();
 const { searchObj } = useLogs();
-const { getStream, getStreams } = useStreams();
+const { getStream, getStreams } = useStreams ();
+const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 let parser: any;
 
 const selectedStreamName = ref("");
 
 const streamOptions = ref([]);
+
 
 const getColumns = computed(() => {
   return [
@@ -1328,7 +1481,7 @@ const getColumns = computed(() => {
         showWrap: false,
         wrapContent: true,
       },
-      size: 200,
+      size: 260
     },
     {
       name: "source",
@@ -1380,9 +1533,14 @@ const dateTime = ref({
   valueType: "absolute",
 });
 const streamFields: any = ref([]);
-const previewPromqlQueryRef: any = ref(null);
-
+const previewPromqlQueryRef : any = ref(null);
+const isHovered = ref(false);
 const loading = ref(false);
+
+const aiChatInputContext = ref("");
+
+const userDefinedFields = ref<any[]>([]);
+
 
 const selectedStreamType = ref(props.streamType || "logs");
 
@@ -1453,7 +1611,14 @@ onMounted(async () => {
       getStreamFields();
     }
   }, 200);
-});
+
+  registerAiContextHandler();
+  
+})
+
+onBeforeUnmount(()=>{
+  removeAiContextHandler();
+})
 
 const importSqlParser = async () => {
   const useSqlParser: any = await import("@/composables/useParser");
@@ -1951,10 +2116,16 @@ const getStreamFields = () => {
     getStream(selectedStreamName.value, selectedStreamType.value, true)
       .then((stream: any) => {
         streamFields.value = [];
+        userDefinedFields.value = [];
         stream.schema?.forEach((field: any) => {
           streamFields.value.push({
             ...field,
             showValues: true,
+          });
+        });
+        stream.uds_schema?.forEach((field: any) => {
+          userDefinedFields.value.push({
+            ...field,
           });
         });
       })
@@ -1966,7 +2137,6 @@ const getStreamFields = () => {
         }
         expandState.value.query = true;
         expandState.value.output = false;
-
         resolve(true);
       });
   });
@@ -2155,6 +2325,88 @@ const updateDelay = (val: any) => {
   emits("update:delay", val);
 };
 
+const toggleAIChat = () => {
+  const isEnabled = !store.state.isAiChatEnabled;
+  store.dispatch("setIsAiChatEnabled", isEnabled);
+}
+
+
+const getBtnLogo = computed(() => {
+      if (isHovered.value || store.state.isAiChatEnabled) {
+        return getImageURL('images/common/ai_icon_dark.svg')
+      }
+
+      return store.state.theme === 'dark'
+        ? getImageURL('images/common/ai_icon_dark.svg')
+        : getImageURL('images/common/ai_icon.svg')
+    })
+
+
+    // [START] O2 AI Context Handler
+
+    const registerAiContextHandler = () => {
+      registerAiChatHandler(getContext);
+    };
+
+    const getContext = async () => {
+      return new Promise(async (resolve, reject) => {
+        try {
+          const payload : any = {};
+
+
+          if (!selectedStreamType.value || !selectedStreamName.value) {
+            resolve("");
+            return;
+          }
+
+          const schema = streamFields.value.map((field: any) => {
+            return {
+              name: field.name,
+              type: field.type
+            }
+          })
+
+          //if uds is enabled we need to push the timestamp and all fields name in the schema
+          const hasTimestampColumn = userDefinedFields.value.some((field: any) => field.name === store.state.zoConfig.timestamp_column);
+          const hasAllFieldsName = userDefinedFields.value.some((field: any) => field.name === store.state.zoConfig.all_fields_name);
+            if(userDefinedFields.value.length > 0){ 
+              if(!hasTimestampColumn){
+              userDefinedFields.value.push({
+                name:store.state.zoConfig.timestamp_column,
+                type:'Int64'
+              })
+            }
+            if(!hasAllFieldsName){
+              userDefinedFields.value.push({
+                name:store.state.zoConfig.all_fields_name,
+                type:'Utf8'
+              })
+            }
+          }
+
+          payload["stream_name"] = selectedStreamName.value;
+          payload["schema_"] = userDefinedFields.value.length > 0 ? userDefinedFields.value : schema;
+
+          resolve(payload);
+        } catch (error) {
+          console.error("Error in getContext for logs page", error);
+          resolve("");
+        }
+      });
+    };
+
+    const removeAiContextHandler = () => {
+      removeAiChatHandler();
+    };
+
+    // [END] O2 AI Context Handler
+
+    const sendToAiChat = (value: any) => {
+      aiChatInputContext.value = value;
+      store.dispatch("setIsAiChatEnabled", true);
+    };
+
+
 defineExpose({
   tab,
   validateInputs,
@@ -2186,6 +2438,11 @@ defineExpose({
   copyToClipboard,
   updateDelay,
   delayCondition,
+  toggleAIChat,
+  isHovered,
+  getBtnLogo,
+  sendToAiChat,
+  aiChatInputContext
 });
 </script>
 

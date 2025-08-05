@@ -136,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-pa-sm"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
+        @sendToAiChat="sendToAiChat"
       />
     </div>
     <ConfirmDialog
@@ -228,6 +229,7 @@ export default defineComponent({
     "updated:fields",
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
+    "sendToAiChat"
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -538,6 +540,10 @@ export default defineComponent({
 
     const forceDeleteFn = () => {};
 
+    const sendToAiChat = (value: any) => {
+      emit("sendToAiChat", value);
+    };
+
     return {
       t,
       qTable,
@@ -587,6 +593,7 @@ export default defineComponent({
       },
       getImageURL,
       verifyOrganizationStatus,
+      sendToAiChat
     };
   },
   computed: {

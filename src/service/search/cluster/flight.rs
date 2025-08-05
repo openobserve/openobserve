@@ -34,6 +34,7 @@ use config::{
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
     physical_plan::{ExecutionPlan, visit_execution_plan},
+    physical_plan::visit_execution_plan,
     prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
@@ -164,8 +165,16 @@ pub async fn search(
     let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
-    if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
-        nodes.retain(|n| n.is_ingester() || n.name.eq(&LOCAL_NODE.name));
+    if req.local_mode.unwrap_or_default() {
+        if LOCAL_NODE.is_querier() {
+            nodes.retain(|n| n.name.eq(&LOCAL_NODE.name));
+        } else {
+            nodes = nodes
+                .into_iter()
+                .filter(|n| n.is_querier())
+                .take(1)
+                .collect();
+        }
     }
 
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
@@ -423,7 +432,11 @@ pub async fn run_datafusion(
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
-        print_plan(&trace_id, &physical_plan, "before");
+        log::info!("[trace_id {trace_id}] leader physical plan before rewrite");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+        );
     }
 
     // 7. rewrite physical plan
@@ -574,7 +587,11 @@ pub async fn run_datafusion(
     }
 
     if cfg.common.print_key_sql {
-        print_plan(&trace_id, &physical_plan, "after");
+        log::info!("[trace_id {trace_id}] leader physical plan after rewrite");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+        );
     }
 
     // run datafusion
@@ -1203,12 +1220,4 @@ pub async fn get_inverted_index_file_list(
         resp.scan_size,
         start.elapsed().as_millis() as usize,
     ))
-}
-
-pub fn print_plan(trace_id: &str, physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
-    log::info!("[trace_id {trace_id}] leader physical plan {stage} rewrite");
-    log::info!(
-        "{}",
-        config::meta::plan::generate_plan_string(trace_id, physical_plan.as_ref())
-    );
 }

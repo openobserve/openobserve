@@ -915,6 +915,11 @@ pub static PIPELINE_WAL_INGESTION_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &[],
+            "Bytes ingested per pipeline",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["pipeline_id"],
     )
     .expect("Metric created")
 });
@@ -954,6 +959,11 @@ pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &[],
+            "Bytes exported per destination",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["destination"],
     )
     .expect("Metric created")
 });

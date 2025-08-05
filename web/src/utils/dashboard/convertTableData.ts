@@ -21,6 +21,7 @@ import {
   getUnitValue,
   isTimeSeries,
   isTimeStamp,
+  convert16DigitTimestamp,
 } from "./convertDataIntoUnitValue";
 
 const applyValueMapping = (value: any, mappings: any) => {
@@ -93,6 +94,7 @@ export const convertTableData = (
       column: key,
       color: null,
       isDerived: false,
+      treatAsNonTimestamp: false,
     }));
 
     // add responseKeys to columnData
@@ -109,7 +111,7 @@ export const convertTableData = (
           ?.slice(0, Math.min(20, tableRows.length))
           ?.map((it: any) => it[field.alias]);
         const isTimeSeriesData = isTimeSeries(sample);
-        const isTimeStampData = isTimeStamp(sample);
+        const isTimeStampData = isTimeStamp(sample, field.treatAsNonTimestamp);
 
         if (isTimeSeriesData || isTimeStampData) {
           histogramFields.push(field.alias);
@@ -126,7 +128,7 @@ export const convertTableData = (
           ?.slice(0, Math.min(20, tableRows.length))
           ?.map((it: any) => it[field.alias]);
         const isTimeSeriesData = isTimeSeries(sample);
-        const isTimeStampData = isTimeStamp(sample);
+        const isTimeStampData = isTimeStamp(sample, field.treatAsNonTimestamp);
 
         if (isTimeSeriesData || isTimeStampData) {
           histogramFields.push(field.alias);
@@ -224,11 +226,14 @@ export const convertTableData = (
             return valueMapping;
           }
 
+          // Check if the value is a 16-digit timestamp and convert it
+          const convertedVal = convert16DigitTimestamp(val);
+
           return formatDate(
             toZonedTime(
-              typeof val === "string"
-                ? `${val}Z`
-                : new Date(val)?.getTime() / 1000,
+              typeof convertedVal === "string"
+                ? `${convertedVal}Z`
+                : new Date(convertedVal)?.getTime() / 1000,
               store.state.timezone,
             ),
           );
@@ -372,11 +377,15 @@ export const convertTableData = (
             if (valueMapping != null) {
               return valueMapping;
             }
+
+            // Check if the value is a 16-digit timestamp and convert it
+            const convertedVal = convert16DigitTimestamp(val);
+
             return formatDate(
               toZonedTime(
-                typeof val === "string"
-                  ? `${val}Z`
-                  : new Date(val)?.getTime() / 1000,
+                typeof convertedVal === "string"
+                  ? `${convertedVal}Z`
+                  : new Date(convertedVal)?.getTime() / 1000,
                 store.state.timezone,
               ),
             );
@@ -395,9 +404,9 @@ export const convertTableData = (
           acc[curr] = histogramFields.includes(it.alias)
             ? formatDate(
                 toZonedTime(
-                  typeof value === "string"
-                    ? `${value}Z`
-                    : new Date(value)?.getTime() / 1000,
+                  typeof convert16DigitTimestamp(value) === "string"
+                    ? `${convert16DigitTimestamp(value)}Z`
+                    : new Date(convert16DigitTimestamp(value))?.getTime() / 1000,
                   store.state.timezone,
                 ),
               )

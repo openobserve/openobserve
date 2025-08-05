@@ -118,7 +118,7 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
             Expr::ScalarFunction(ScalarFunction { func, args }) => {
                 let name = func.name();
                 if name == MATCH_ALL_UDF_NAME {
-                    let Expr::Literal(ScalarValue::Utf8(Some(item))) = args[0].clone() else {
+                    let Expr::Literal(ScalarValue::Utf8(Some(item)), _) = args[0].clone() else {
                         return Err(DataFusionError::Internal(format!(
                             "Unexpected argument type for match_all() keyword: {:?}",
                             args[0]
@@ -131,12 +131,13 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                         .trim_end_matches('*') // prefix or contains
                         .to_string(); // remove prefix and suffix *
                     let item = if get_config().common.utf8_view_enabled {
-                        Expr::Literal(ScalarValue::Utf8View(Some(format!("%{item}%"))))
+                        Expr::Literal(ScalarValue::Utf8View(Some(format!("%{item}%"))), None)
                     } else {
-                        Expr::Literal(ScalarValue::Utf8(Some(format!("%{item}%"))))
+                        Expr::Literal(ScalarValue::Utf8(Some(format!("%{item}%"))), None)
                     };
                     for field in self.fields.iter() {
-                        expr_list.push(create_like_expr_with_not_null(field, item.clone()));
+                        let new_expr = create_like_expr_with_not_null(field, item.clone());
+                        expr_list.push(new_expr);
                     }
                     if expr_list.is_empty() {
                         return Err(DataFusionError::Internal(
@@ -146,13 +147,14 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                     let new_expr = disjunction(expr_list).unwrap();
                     Ok(Transformed::yes(new_expr))
                 } else if name == FUZZY_MATCH_ALL_UDF_NAME {
-                    let Expr::Literal(ScalarValue::Utf8(Some(item))) = args[0].clone() else {
+                    let Expr::Literal(ScalarValue::Utf8(Some(item)), _) = args[0].clone() else {
                         return Err(DataFusionError::Internal(format!(
                             "Unexpected argument type for fuzzy_match_all() keyword: {:?}",
                             args[0]
                         )));
                     };
-                    let Expr::Literal(ScalarValue::Int64(Some(distance))) = args[1].clone() else {
+                    let Expr::Literal(ScalarValue::Int64(Some(distance)), _) = args[1].clone()
+                    else {
                         return Err(DataFusionError::Internal(format!(
                             "Unexpected argument type for fuzzy_match_all() distance: {:?}",
                             args[1]
@@ -160,11 +162,11 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                     };
                     let mut expr_list = Vec::with_capacity(self.fields.len());
                     let item = if get_config().common.utf8_view_enabled {
-                        Expr::Literal(ScalarValue::Utf8View(Some(item.to_string())))
+                        Expr::Literal(ScalarValue::Utf8View(Some(item.to_string())), None)
                     } else {
-                        Expr::Literal(ScalarValue::Utf8(Some(item.to_string())))
+                        Expr::Literal(ScalarValue::Utf8(Some(item.to_string())), None)
                     };
-                    let distance = Expr::Literal(ScalarValue::Int64(Some(distance)));
+                    let distance = Expr::Literal(ScalarValue::Int64(Some(distance)), None);
                     let fuzzy_expr = fuzzy_match_udf::FUZZY_MATCH_UDF.clone();
                     for field in self.fields.iter() {
                         let new_expr = fuzzy_expr.call(vec![
@@ -224,6 +226,7 @@ mod tests {
         prelude::{SessionConfig, SessionContext},
     };
 
+    use super::*;
     use crate::service::search::datafusion::{
         optimizer::rewrite_match::RewriteMatch, udf::match_all_udf,
     };
@@ -336,5 +339,125 @@ mod tests {
             let data = df.collect().await.unwrap();
             assert_batches_eq!(item.1, &data);
         }
+    }
+
+    #[tokio::test]
+    async fn test_rewrite_not_match() {
+        let sqls = [(
+            "select * from t where not match_all('open')",
+            vec![
+                "+------------+---------+---------+",
+                "| _timestamp | name    | log     |",
+                "+------------+---------+---------+",
+                "| 2          | observe |         |",
+                "| 4          |         | obSERVE |",
+                "+------------+---------+---------+",
+            ],
+        )];
+
+        let schema = if get_config().common.utf8_view_enabled {
+            // define a schema.
+            Arc::new(Schema::new(vec![
+                Field::new("_timestamp", DataType::Int64, false),
+                Field::new("name", DataType::Utf8View, true),
+                Field::new("log", DataType::Utf8View, true),
+            ]))
+        } else {
+            Arc::new(Schema::new(vec![
+                Field::new("_timestamp", DataType::Int64, false),
+                Field::new("name", DataType::Utf8, true),
+                Field::new("log", DataType::Utf8, true),
+            ]))
+        };
+
+        let name_array: Arc<dyn Array> = if get_config().common.utf8_view_enabled {
+            Arc::new(StringViewArray::from(vec![
+                Some("open"),
+                Some("observe"),
+                Some("openobserve"),
+                None,
+                None,
+            ]))
+        } else {
+            Arc::new(StringArray::from(vec![
+                Some("open"),
+                Some("observe"),
+                Some("openobserve"),
+                None,
+                None,
+            ]))
+        };
+
+        let log_array: Arc<dyn Array> = if get_config().common.utf8_view_enabled {
+            Arc::new(StringViewArray::from(vec![
+                None,
+                None,
+                Some("o2"),
+                Some("obSERVE"),
+                Some("openobserve"),
+            ]))
+        } else {
+            Arc::new(StringArray::from(vec![
+                None,
+                None,
+                Some("o2"),
+                Some("obSERVE"),
+                Some("openobserve"),
+            ]))
+        };
+
+        // define data.
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5])),
+                name_array,
+                log_array,
+            ],
+        )
+        .unwrap();
+
+        let fields = vec!["name".to_string(), "log".to_string()];
+
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new())
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .with_optimizer_rules(vec![Arc::new(RewriteMatch::new(fields.clone()))])
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+        ctx.register_udf(match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
+
+        for item in sqls {
+            let df = ctx.sql(item.0).await.unwrap();
+            let data = df.collect().await.unwrap();
+            assert_batches_eq!(item.1, &data);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_like_expr_with_not_null() {
+        let field = "name";
+        let item = Expr::Literal(ScalarValue::Utf8(Some("open".to_string())), None);
+        let expr = create_like_expr_with_not_null(field, item.clone());
+        assert_eq!(
+            expr,
+            Expr::BinaryExpr(BinaryExpr {
+                left: Box::new(Expr::IsNotNull(Box::new(Expr::Column(
+                    Column::new_unqualified(field),
+                )))),
+                right: Box::new(Expr::Like(Like {
+                    negated: false,
+                    expr: Box::new(Expr::Column(Column::new_unqualified(field))),
+                    pattern: Box::new(item),
+                    escape_char: None,
+                    case_insensitive: true,
+                })),
+                op: Operator::And,
+            }),
+        );
     }
 }

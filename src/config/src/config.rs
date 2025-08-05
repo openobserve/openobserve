@@ -87,6 +87,10 @@ pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
 
+// for DDL commands and migrations
+pub const DB_SCHEMA_VERSION: u64 = 2;
+pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
+
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "body", "json"];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
@@ -197,12 +201,13 @@ pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_SEARCH_AROUND_FIELDS: [&str; 5] = [
+const _DEFAULT_SEARCH_AROUND_FIELDS: [&str; 6] = [
     "k8s_cluster",
     "k8s_namespace_name",
     "k8s_pod_name",
     "kubernetes_namespace_name",
     "kubernetes_pod_name",
+    "hostname",
 ];
 pub static DEFAULT_SEARCH_AROUND_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
@@ -389,13 +394,12 @@ pub async fn get_sns_client() -> &'static aws_sdk_sns::Client {
 }
 
 pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
-    let blocked_streams = get_config()
+    get_config()
         .common
         .blocked_streams
         .split(',')
         .map(|x| x.to_string())
-        .collect();
-    blocked_streams
+        .collect()
 });
 
 #[derive(EnvConfig)]
@@ -427,6 +431,7 @@ pub struct Config {
     pub pipeline: Pipeline,
     pub health_check: HealthCheck,
     pub encryption: Encryption,
+    pub enrichment_table: EnrichmentTable,
 }
 
 #[derive(EnvConfig)]
@@ -695,6 +700,8 @@ pub struct Common {
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
     #[env_config(name = "ZO_META_MYSQL_RO_DSN", default = "")]
     pub meta_mysql_ro_dsn: String, // mysql://root:12345678@readonly:3306/openobserve
+    #[env_config(name = "ZO_META_DDL_DSN", default = "")]
+    pub meta_ddl_dsn: String, // same db as meta store, but user with ddl perms
     #[env_config(name = "ZO_NODE_ROLE", default = "all")]
     pub node_role: String,
     #[env_config(
@@ -964,12 +971,6 @@ pub struct Common {
     )]
     pub inverted_index_search_format: String,
     #[env_config(
-        name = "ZO_INVERTED_INDEX_TANTIVY_MODE",
-        default = "",
-        help = "Tantivy search mode, puffin or mmap, default is puffin."
-    )]
-    pub inverted_index_tantivy_mode: String,
-    #[env_config(
         name = "ZO_INVERTED_INDEX_CAMEL_CASE_TOKENIZER_DISABLED",
         default = false,
         help = "Disable camel case tokenizer for inverted index."
@@ -1122,6 +1123,8 @@ pub struct Common {
         help = "Enable to show symbol in dashboard"
     )]
     pub dashboard_show_symbol_enabled: bool,
+    #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")] // use comma to split
+    pub default_hec_stream: String,
     #[env_config(
         name = "ZO_ALIGN_PARTITIONS_FOR_INDEX",
         default = false,
@@ -1874,6 +1877,24 @@ pub struct Pipeline {
     )]
     pub batch_size_bytes: usize,
     #[env_config(
+        name = "ZO_PIPELINE_BATCH_RETRY_MAX_ATTEMPTS",
+        default = 3,
+        help = "Maximum number of retries for batch flush"
+    )]
+    pub batch_retry_max_attempts: u32,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_RETRY_INITIAL_DELAY_MS",
+        default = 1000, // 1 second
+        help = "Initial delay for batch flush retry (in milliseconds)"
+    )]
+    pub batch_retry_initial_delay_ms: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_BATCH_RETRY_MAX_DELAY_MS",
+        default = 30000, // 30 seconds
+        help = "Maximum delay for batch flush retry (in milliseconds)"
+    )]
+    pub batch_retry_max_delay_ms: u64,
+    #[env_config(
         name = "ZO_PIPELINE_USE_SHARED_HTTP_CLIENT",
         default = false,
         help = "Use shared HTTP client instances for better connection pooling"
@@ -1897,6 +1918,18 @@ pub struct Pipeline {
         help = "pipeline exporter client max retry time in hours"
     )]
     pub max_retry_time_in_hours: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_FILE_SIZE_ON_DISK_MB",
+        default = 128,
+        help = "pipeline max file size on disk in MB"
+    )]
+    pub pipeline_max_file_size_on_disk_mb: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_FILE_RETENTION_TIME_SECONDS",
+        default = 600,
+        help = "pipeline max file retention time in seconds"
+    )]
+    pub pipeline_max_file_retention_time_seconds: u64,
 }
 
 #[derive(EnvConfig)]
@@ -1923,6 +1956,28 @@ pub struct HealthCheck {
         help = "The node will be removed from consistent hash if health check failed exceed this times"
     )]
     pub failed_times: usize,
+}
+
+#[derive(EnvConfig)]
+pub struct EnrichmentTable {
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_CACHE_DIR",
+        default = "",
+        help = "Local cache directory for enrichment tables"
+    )]
+    pub cache_dir: String,
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_MERGE_THRESHOLD_MB",
+        default = 60,
+        help = "Threshold for merging small files before S3 upload (in MB)"
+    )]
+    pub merge_threshold_mb: u64,
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_MERGE_INTERVAL",
+        default = 600,
+        help = "Background sync interval in seconds"
+    )]
+    pub merge_interval: u64,
 }
 
 pub fn init() -> Config {
@@ -2277,6 +2332,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.feature_join_right_side_max_rows = 50_000;
     }
 
+    if cfg.common.default_hec_stream.is_empty() {
+        cfg.common.default_hec_stream = "_hec".to_string();
+    }
+
     Ok(())
 }
 
@@ -2602,17 +2661,6 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.disk_cache.max_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.release_size /= cfg.disk_cache.bucket_num;
     cfg.disk_cache.gc_size /= cfg.disk_cache.bucket_num;
-
-    // check disk cache with tantivy mode
-    cfg.common.inverted_index_tantivy_mode = cfg.common.inverted_index_tantivy_mode.to_lowercase();
-    if cfg.common.inverted_index_tantivy_mode.is_empty() {
-        cfg.common.inverted_index_tantivy_mode = "puffin".to_string();
-    }
-    if !cfg.disk_cache.enabled && cfg.common.inverted_index_tantivy_mode == "mmap" {
-        return Err(anyhow::anyhow!(
-            "Inverted index tantivy mode can not be set to mmap when disk cache is disabled."
-        ));
-    }
 
     Ok(())
 }

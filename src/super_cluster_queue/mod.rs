@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,9 +16,11 @@
 mod action_scripts;
 mod alerts;
 mod cipher_keys;
+mod compactor_manual_jobs;
 mod dashboards;
 mod destinations;
 mod distinct_values;
+mod enrichment_table;
 mod folders;
 mod meta;
 mod pipelines;
@@ -51,6 +53,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_pipeline_msg: pipelines::process,
         on_cipher_key_msg: cipher_keys::process,
         on_rate_limit_msg: ratelimit::process,
+        on_compactor_manual_job_msg: compactor_manual_jobs::process,
+        on_enrichment_file_list_delete_msg: enrichment_table::process_file_list_delete,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,

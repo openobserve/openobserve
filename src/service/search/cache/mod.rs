@@ -27,7 +27,13 @@ use config::{
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
     },
-    utils::{base64, hash::Sum64, json, sql::is_aggregate_query, time::format_duration},
+    utils::{
+        base64,
+        hash::Sum64,
+        json,
+        sql::{is_aggregate_query, is_eligible_for_histogram},
+        time::format_duration,
+    },
 };
 use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
@@ -448,6 +454,9 @@ pub async fn search(
 
     let write_res = deep_copy_response(&res);
     let mut local_res = deep_copy_response(&res);
+    res.is_histogram_eligible = is_eligible_for_histogram(&req.query.sql)
+        .ok()
+        .map(|(is_eligible, _)| is_eligible);
 
     // There are 3 types of partial responses:
     // 1. VRL error
@@ -625,7 +634,10 @@ pub fn merge_response(
         result_cache_len
     );
     cache_response.took_detail = res_took;
-    cache_response.order_by = search_response.first().and_then(|res| res.order_by);
+    cache_response.order_by = search_response
+        .first()
+        .map(|res| res.order_by)
+        .unwrap_or_default();
     cache_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
         / ((result_cache_len + cache_hits_len) as f64))
         as usize;

@@ -208,6 +208,16 @@
             </q-tooltip>
           </q-icon>
         </template>
+        <template #right>
+          <!-- o2 ai context add button in the test function -->
+          <O2AIContextAddBtn
+            @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
+            :size="'6px'"
+            :imageHeight="'16px'"
+            :imageWidth="'16px'"
+            :class="'tw-px-2 tw-mr-4'"
+           />
+          </template>
       </FullViewContainer>
       <div
         v-show="expandState.events"
@@ -219,6 +229,7 @@
           ref="eventsEditorRef"
           editor-id="test-function-events-input-editor"
           class="monaco-editor test-function-input-editor"
+          :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="inputEvents"
           language="json"
         />
@@ -290,6 +301,7 @@
           ref="outputEventsEditorRef"
           editor-id="test-function-events-output-editor"
           class="monaco-editor test-function-output-editor"
+          :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="outputEvents"
           language="json"
           read-only
@@ -316,22 +328,27 @@ import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
 import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 import useQuery from "@/composables/useQuery";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
 import { event, useQuasar } from "quasar";
 import { getConsumableRelativeTime } from "@/utils/date";
 import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
+import O2AIContextAddBtn from "../common/O2AIContextAddBtn.vue";
 
 const props = defineProps({
   vrlFunction: {
     type: Object,
     required: true,
   },
+  heightOffset: {
+    type: Number,
+    default: 0,
+  },
 });
 
-const emit = defineEmits(["function-error"]);
+const emit = defineEmits(["function-error","sendToAiChat"]);
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -730,9 +747,14 @@ function highlightSpecificEvent() {
     console.log("Error in highlightSpecificEvent", e);
   }
 }
+const sendToAiChat = (value: any) => {
+  emit("sendToAiChat", value);
+};
 
 defineExpose({
   testFunction,
+  sendToAiChat,
+  store
 });
 </script>
 
@@ -743,10 +765,10 @@ defineExpose({
   border-radius: 5px;
 }
 
-.test-function-input-editor,
-.test-function-output-editor {
-  height: calc((100vh - 260px) / 2) !important;
-}
+// .test-function-input-editor,
+// .test-function-output-editor {
+//   height: calc((100vh - (260px + 75px)) / 2) !important;
+// }
 
 .test-function-option-tabs {
   :deep(.rum-tab) {

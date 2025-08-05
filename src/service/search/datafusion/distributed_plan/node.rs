@@ -16,7 +16,10 @@
 use std::sync::Arc;
 
 use config::{
-    meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey},
+    meta::{
+        cluster::NodeInfo, inverted_index::IndexOptimizeMode, sql::TableReferenceExt,
+        stream::FileKey,
+    },
     utils::json,
 };
 use datafusion::common::TableReference;
@@ -38,7 +41,7 @@ pub struct RemoteScanNodes {
     pub equal_keys: HashMap<TableReference, Vec<KvItem>>,
     pub match_all_keys: Vec<String>,
     pub index_condition: Option<IndexCondition>,
-    pub index_optimize_mode: Option<InvertedIndexOptimizeMode>,
+    pub index_optimize_mode: Option<IndexOptimizeMode>,
     pub is_leader: bool, // for super cluster
     pub opentelemetry_context: opentelemetry::Context,
 }
@@ -53,7 +56,7 @@ impl RemoteScanNodes {
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
-        index_optimize_mode: Option<InvertedIndexOptimizeMode>,
+        index_optimize_mode: Option<IndexOptimizeMode>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
     ) -> Self {
@@ -75,9 +78,10 @@ impl RemoteScanNodes {
         let query_identifier = QueryIdentifier {
             trace_id: self.req.trace_id.clone(),
             org_id: self.req.org_id.clone(),
-            stream_type: self.req.stream_type.to_string(),
+            stream_type: table_name.get_stream_type(self.req.stream_type).to_string(),
             partition: 0,           // set in FlightSearchRequest
             job_id: "".to_string(), // set in FlightSearchRequest
+            enrich_mode: false,
         };
 
         let search_infos = SearchInfos {

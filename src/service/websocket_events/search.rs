@@ -608,8 +608,11 @@ async fn process_delta(
         trace_id
     );
 
-    // for dashboards & histograms
-    if req.search_type == SearchEventType::Dashboards || req.payload.query.size == -1 {
+    // for dashboards & histograms, expect for ui
+    let search_type = req.payload.search_type.expect("populate search_type");
+    if search_type == SearchEventType::Dashboards
+        || (req.payload.query.size == -1 && search_type != SearchEventType::UI)
+    {
         // sort partitions by timestamp in desc
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
     }
@@ -725,6 +728,7 @@ async fn process_delta(
                 new_start_time,
                 new_end_time,
                 search_res.order_by,
+                search_res.order_by_metadata.clone(),
                 is_streaming_aggs,
                 response_tx.clone(),
             )
@@ -788,6 +792,7 @@ async fn get_partitions(
         query_fn: Default::default(),
         streaming_output: true,
         histogram_interval: search_payload.query.histogram_interval,
+        search_type: Some(req.search_type),
     };
 
     let res = SearchService::search_partition(
@@ -957,7 +962,11 @@ pub async fn do_partitioned_search(
     // unless the query is a dashboard or histogram
     let mut partition_order_by = req_order_by;
     // sort partitions in desc by _timestamp for dashboards & histograms
-    if req.search_type == SearchEventType::Dashboards || req.payload.query.size == -1 {
+    // expect if search_type is UI
+    let search_type = req.payload.search_type.expect("populate search_type");
+    if search_type == SearchEventType::Dashboards
+        || (req.payload.query.size == -1 && search_type != SearchEventType::UI)
+    {
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
         partition_order_by = &OrderBy::Desc;
     }
@@ -1092,6 +1101,7 @@ async fn send_partial_search_resp(
     new_start_time: i64,
     new_end_time: i64,
     order_by: Option<OrderBy>,
+    order_by_metadata: Vec<(String, OrderBy)>,
     is_streaming_aggs: bool,
     response_tx: Sender<WsServerEvents>,
 ) -> Result<(), Error> {
@@ -1106,6 +1116,7 @@ async fn send_partial_search_resp(
         new_start_time: Some(new_start_time),
         new_end_time: Some(new_end_time),
         order_by,
+        order_by_metadata,
         trace_id: trace_id.to_string(),
         ..Default::default()
     };

@@ -46,6 +46,8 @@ mod m20250125_172300_delete_metas_templates;
 mod m20250213_000001_add_dashboard_updated_at;
 mod m20250217_115548_ratelimit_table;
 mod m20250320_000001_remove_alert_name_unique_constraint;
+mod m20250716_000001_create_enrichment_table;
+mod m20250731_000001_create_compactor_manual_jobs;
 
 pub struct Migrator;
 
@@ -83,6 +85,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20250213_000001_add_dashboard_updated_at::Migration),
             Box::new(m20250217_115548_ratelimit_table::Migration),
             Box::new(m20250320_000001_remove_alert_name_unique_constraint::Migration),
+            Box::new(m20250716_000001_create_enrichment_table::Migration),
+            Box::new(m20250731_000001_create_compactor_manual_jobs::Migration),
         ]
     }
 }

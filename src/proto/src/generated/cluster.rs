@@ -2309,6 +2309,8 @@ pub struct MultiQueryCacheResponse {
 pub struct DeleteResultCacheRequest {
     #[prost(string, tag = "1")]
     pub path: ::prost::alloc::string::String,
+    #[prost(int64, tag = "2")]
+    pub ts: i64,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2828,6 +2830,9 @@ pub struct QueryIdentifier {
     /// the unique id for each remote scan
     #[prost(string, tag = "5")]
     pub job_id: ::prost::alloc::string::String,
+    /// need special logic for loading enrich table
+    #[prost(bool, tag = "6")]
+    pub enrich_mode: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2882,7 +2887,7 @@ pub struct SuperClusterInfo {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IdxOptimizeMode {
-    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2")]
+    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2, 3, 4, 5")]
     pub mode: ::core::option::Option<idx_optimize_mode::Mode>,
 }
 /// Nested message and enum types in `IdxOptimizeMode`.
@@ -2894,6 +2899,12 @@ pub mod idx_optimize_mode {
         SimpleSelect(super::SimpleSelect),
         #[prost(message, tag = "2")]
         SimpleCount(super::SimpleCount),
+        #[prost(message, tag = "3")]
+        SimpleHistogram(super::SimpleHistogram),
+        #[prost(message, tag = "4")]
+        SimpleTopn(super::SimpleTopN),
+        #[prost(message, tag = "5")]
+        SimpleDistinct(super::SimpleDistinct),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2907,6 +2918,36 @@ pub struct SimpleSelect {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SimpleCount {}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleHistogram {
+    #[prost(int64, tag = "1")]
+    pub min_value: i64,
+    #[prost(uint64, tag = "2")]
+    pub bucket_width: u64,
+    #[prost(uint32, tag = "3")]
+    pub num_buckets: u32,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleTopN {
+    #[prost(string, tag = "1")]
+    pub field: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "2")]
+    pub limit: u32,
+    #[prost(bool, tag = "3")]
+    pub asc: bool,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleDistinct {
+    #[prost(string, tag = "1")]
+    pub field: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "2")]
+    pub limit: u32,
+    #[prost(bool, tag = "3")]
+    pub asc: bool,
+}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct KvItem {
@@ -3395,6 +3436,28 @@ pub struct CompactionInfo {
     #[prost(uint64, tag = "3")]
     pub in_progress_jobs: u64,
 }
+/// Request message for Get Delete Job Status
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetDeleteJobStatusRequest {
+    #[prost(string, tag = "1")]
+    pub ksuid: ::prost::alloc::string::String,
+}
+/// Response message for Get Delete Job Status
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetDeleteJobStatusResponse {
+    #[prost(string, tag = "1")]
+    pub id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub key: ::prost::alloc::string::String,
+    #[prost(int64, tag = "3")]
+    pub created_at: i64,
+    #[prost(int64, tag = "4")]
+    pub ended_at: i64,
+    #[prost(int64, tag = "5")]
+    pub status: i64,
+}
 /// Generated client implementations.
 pub mod cluster_info_service_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -3506,6 +3569,33 @@ pub mod cluster_info_service_client {
                 .insert(GrpcMethod::new("cluster.ClusterInfoService", "GetClusterInfo"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn get_delete_job_status(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetDeleteJobStatusRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetDeleteJobStatusResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.ClusterInfoService/GetDeleteJobStatus",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("cluster.ClusterInfoService", "GetDeleteJobStatus"),
+                );
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -3520,6 +3610,13 @@ pub mod cluster_info_service_server {
             request: tonic::Request<super::EmptyRequest>,
         ) -> std::result::Result<
             tonic::Response<super::GetClusterInfoResponse>,
+            tonic::Status,
+        >;
+        async fn get_delete_job_status(
+            &self,
+            request: tonic::Request<super::GetDeleteJobStatusRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetDeleteJobStatusResponse>,
             tonic::Status,
         >;
     }
@@ -3635,6 +3732,56 @@ pub mod cluster_info_service_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = GetClusterInfoSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.ClusterInfoService/GetDeleteJobStatus" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetDeleteJobStatusSvc<T: ClusterInfoService>(pub Arc<T>);
+                    impl<
+                        T: ClusterInfoService,
+                    > tonic::server::UnaryService<super::GetDeleteJobStatusRequest>
+                    for GetDeleteJobStatusSvc<T> {
+                        type Response = super::GetDeleteJobStatusResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetDeleteJobStatusRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as ClusterInfoService>::get_delete_job_status(
+                                        &inner,
+                                        request,
+                                    )
+                                    .await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = GetDeleteJobStatusSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

@@ -107,10 +107,10 @@ export const addLabelToSQlQuery = async (
     condition = `re_not_match(${label}, ${formatValue(value)})`;
   } else {
     switch (operator) {
-      case "Contains":
-        operator = "LIKE";
-        value = "%" + escapeSingleQuotes(value) + "%";
-        break;
+      // case "Contains":
+      //   operator = "LIKE";
+      //   value = "%" + escapeSingleQuotes(value) + "%";
+      //   break;
       case "Not Contains":
         operator = "NOT LIKE";
         value = "%" + escapeSingleQuotes(value) + "%";

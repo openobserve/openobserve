@@ -23,7 +23,8 @@ use crate::{
         cli::{Cli as dataCli, args as dataArgs},
         export, import,
     },
-    common::{infra::config::USERS, meta, migration},
+    common::{infra::config::USERS, meta},
+    migration,
     service::{compact, db, file_list, users},
 };
 
@@ -225,6 +226,47 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .num_args(1..)
                     .help("file"),
             ]),
+            clap::Command::new("upgrade-db")
+                .about("upgrade db table schemas").args(dataArgs()),
+                clap::Command::new("query-optimiser").about("query optimiser").args([
+                    clap::Arg::new("url")
+                        .short('u')
+                        .long("url")
+                        .required(true)
+                        .help("url"),
+                    clap::Arg::new("token")
+                        .short('t')
+                        .long("token")
+                        .required(true)
+                        .help("token"),
+                    clap::Arg::new("meta-token")
+                        .short('m')
+                        .long("meta-token")
+                        .required(false)
+                        .help("meta-token"),
+                    clap::Arg::new("duration")
+                        .short('d')
+                        .long("duration")
+                        .required(true)
+                        .help("duration"),
+                    clap::Arg::new("stream-name")
+                        .short('s')
+                        .long("stream-name")
+                        .required(false)
+                        .help("stream-name"),
+                    clap::Arg::new("top-x")
+                        .short('x')
+                        .long("top-x")
+                        .required(false)
+                        .default_value("5")
+                        .help("top-x"),
+                    clap::Arg::new("org-id")
+                        .short('o')
+                        .long("org-id")
+                        .required(false)
+                        .default_value("default")
+                        .help("org-id"),
+                ])
         ])
         .get_matches();
 
@@ -324,7 +366,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "version" => {
-                    println!("version: {}", db::version::get().await?);
+                    println!("version: {}", db::metas::version::get().await?);
                 }
                 "user" => {
                     db::user::cache().await?;
@@ -494,6 +536,40 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 .collect::<Vec<_>>();
             let files = files.iter().map(|f| f.to_string()).collect::<Vec<_>>();
             super::http::consistent_hash(files).await?;
+        }
+        "upgrade-db" => {
+            crate::migration::init_db().await?;
+        }
+        "query-optimiser" => {
+            let stream_name = command
+                .get_one::<String>("stream-name")
+                .map(|stream_name| stream_name.to_string());
+
+            let meta_token = command
+                .get_one::<String>("meta-token")
+                .map(|meta_token| meta_token.to_string());
+
+            let url = command.get_one::<String>("url").expect("url is required");
+            let token = command
+                .get_one::<String>("token")
+                .expect("token is required");
+
+            let duration = command.get_one::<String>("duration").unwrap();
+            let duration = duration.parse::<i64>().unwrap_or(12);
+            let top_x = command.get_one::<String>("top-x").unwrap();
+            let top_x = top_x.parse::<usize>().unwrap_or(5);
+            let org_id = command.get_one::<String>("org-id").unwrap();
+
+            super::query_optimiser::query_optimiser(
+                url,
+                token,
+                &meta_token,
+                duration,
+                &stream_name,
+                top_x,
+                org_id,
+            )
+            .await?;
         }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));

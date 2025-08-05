@@ -191,8 +191,24 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
                 },
                 _ => None,
             }
-        })
-        .collect::<BooleanArray>();
+
+        });
+        if needle.is_none() {
+            return Err(DataFusionError::SQL(
+                ParserError::ParserError(
+                    "Invalid argument types[needle] to str_match function".to_string(),
+                ),
+                None,
+            ));
+        }
+        // pre-compute the needle
+        let needle = if case_insensitive {
+            needle.as_ref().unwrap().to_lowercase()
+        } else {
+            needle.as_ref().unwrap().to_string()
+        };
+
+        let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
 
     // `Ok` because no error occurred during the calculation
     // `Arc` because arrays are immutable, thread-safe, trait objects.

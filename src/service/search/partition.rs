@@ -54,6 +54,7 @@ impl PartitionGenerator {
         order_by: OrderBy,
         _is_streaming_aggregate: bool,
         _streaming_interval_micros: i64,
+        add_mini_partition: bool,
     ) -> Vec<[i64; 2]> {
         #[cfg(feature = "enterprise")]
         if _is_streaming_aggregate {
@@ -67,10 +68,183 @@ impl PartitionGenerator {
 
         if self.is_histogram {
             self.generate_partitions_aligned_with_histogram_interval(
-                start_time, end_time, step, order_by,
+                start_time,
+                end_time,
+                step,
+                order_by,
+                add_mini_partition,
             )
         } else {
             self.generate_partitions_with_mini_partition(start_time, end_time, step, order_by)
+        }
+    }
+
+    /// Calculate mini partition size in microseconds
+    fn calculate_mini_partition_size(&self, step: i64) -> i64 {
+        std::cmp::min(self.mini_partition_duration_secs * 1_000_000, step as u64) as i64
+    }
+
+    /// Create a mini partition based on order
+    fn create_mini_partition(
+        &self,
+        start_time: i64,
+        end_time: i64,
+        mini_partition_size: i64,
+        order_by: OrderBy,
+    ) -> Option<[i64; 2]> {
+        let duration = end_time - start_time;
+        if mini_partition_size >= duration {
+            return None;
+        }
+
+        let mini_partition = match order_by {
+            OrderBy::Desc => {
+                // For DESC order, mini partition at the end time
+                let mini_start = std::cmp::max(end_time - mini_partition_size, start_time);
+                [mini_start, end_time]
+            }
+            OrderBy::Asc => {
+                // For ASC order, mini partition at the start time
+                let mini_end = std::cmp::min(start_time + mini_partition_size, end_time);
+                [start_time, mini_end]
+            }
+        };
+
+        Some(mini_partition)
+    }
+
+    /// Generate regular partitions without histogram alignment
+    fn generate_regular_partitions(
+        &self,
+        start_time: i64,
+        end_time: i64,
+        step: i64,
+        order_by: OrderBy,
+    ) -> Vec<[i64; 2]> {
+        let mut partitions = Vec::new();
+
+        match order_by {
+            OrderBy::Desc => {
+                let mut end = end_time;
+                while end > start_time {
+                    let start = std::cmp::max(end - step, start_time);
+                    partitions.push([start, end]);
+                    end = start;
+                }
+            }
+            OrderBy::Asc => {
+                let mut start = start_time;
+                while start < end_time {
+                    let end = std::cmp::min(start + step, end_time);
+                    partitions.push([start, end]);
+                    start = end;
+                }
+            }
+        }
+
+        partitions
+    }
+
+    /// Generate histogram-aligned partitions
+    fn generate_histogram_aligned_partitions(
+        &self,
+        start_time: i64,
+        end_time: i64,
+        step: i64,
+        order_by: OrderBy,
+    ) -> Vec<[i64; 2]> {
+        let mut partitions = Vec::new();
+        let duration = end_time - start_time;
+
+        // Generate partitions by DESC order first, then reverse if needed
+        let mut end = end_time;
+        let mut last_partition_step = end % self.min_step;
+
+        while end > start_time {
+            let mut start = max(end - step, start_time);
+            // If the step is greater than the duration, handle the alignment for the boundary
+            // partition
+            if last_partition_step > 0 && duration > self.min_step {
+                // Handle alignment for the first partition
+                partitions.push([end - last_partition_step, end]);
+                start -= last_partition_step;
+                end -= last_partition_step;
+            } else {
+                start = max(start - last_partition_step, start_time);
+            }
+            // Ensure the start time is not less than the start time of the query
+            start = max(start, start_time);
+            partitions.push([start, end]);
+            end = start;
+            last_partition_step = 0;
+        }
+
+        // We need to reverse partitions if query is ASC order
+        if order_by == OrderBy::Asc {
+            partitions.reverse();
+        }
+
+        partitions
+    }
+
+    /// Generate histogram-aligned partitions with mini partition
+    fn generate_histogram_aligned_partitions_with_mini(
+        &self,
+        start_time: i64,
+        end_time: i64,
+        step: i64,
+        order_by: OrderBy,
+        mini_partition_size: i64,
+    ) -> Vec<[i64; 2]> {
+        let mut partitions = Vec::new();
+
+        // Add mini partition
+        if let Some(mini_partition) =
+            self.create_mini_partition(start_time, end_time, mini_partition_size, order_by)
+        {
+            partitions.push(mini_partition);
+
+            // Generate remaining partitions with histogram alignment
+            match order_by {
+                OrderBy::Desc => {
+                    let remaining_start = mini_partition[0];
+                    let remaining_partitions = self.generate_histogram_aligned_partitions(
+                        start_time,
+                        remaining_start,
+                        step,
+                        OrderBy::Desc,
+                    );
+                    partitions.extend(remaining_partitions);
+                }
+                OrderBy::Asc => {
+                    let remaining_end = mini_partition[1];
+                    let remaining_partitions = self.generate_histogram_aligned_partitions(
+                        remaining_end,
+                        end_time,
+                        step,
+                        OrderBy::Asc,
+                    );
+                    partitions.extend(remaining_partitions);
+                }
+            }
+        } else {
+            // Fall back to regular histogram alignment if mini partition can't be created
+            partitions =
+                self.generate_histogram_aligned_partitions(start_time, end_time, step, order_by);
+        }
+
+        partitions
+    }
+
+    /// Handle edge case of empty partitions
+    fn handle_empty_partitions(
+        &self,
+        partitions: &mut Vec<[i64; 2]>,
+        start_time: i64,
+        end_time: i64,
+    ) {
+        if partitions.is_empty() {
+            partitions.push([start_time, end_time]);
         }
     }
 
@@ -91,61 +265,51 @@ impl PartitionGenerator {
         order_by: OrderBy,
     ) -> Vec<[i64; 2]> {
         let mut partitions = Vec::new();
+        let mini_partition_size = self.calculate_mini_partition_size(step);
 
-        // Create a single mini partition for faster initial results
-        let mini_partition_size_microseconds =
-            std::cmp::min(self.mini_partition_duration_secs * 1_000_000, step as u64) as i64;
-
-        log::info!(
+        log::debug!(
             "mini_partition_size_microseconds: {}, step: {}, end_time: {}, start_time: {}",
-            mini_partition_size_microseconds,
+            mini_partition_size,
             step,
             end_time,
             start_time
         );
 
-        // Different behavior based on order
-        if order_by == OrderBy::Desc {
-            // For DESC order, mini partition at the end time
-            let mut end = end_time;
+        // Add mini partition if possible
+        if let Some(mini_partition) =
+            self.create_mini_partition(start_time, end_time, mini_partition_size, order_by)
+        {
+            partitions.push(mini_partition);
 
-            // Handle mini partition if it's smaller than the total range
-            if mini_partition_size_microseconds < (end_time - start_time) {
-                let start = std::cmp::max(end - mini_partition_size_microseconds, start_time);
-                partitions.push([start, end]);
-                end = start;
-            }
-
-            // Calculate remaining time range
-            while end > start_time {
-                let start = std::cmp::max(end - step, start_time);
-                partitions.push([start, end]);
-                end = start;
+            // Generate remaining partitions
+            match order_by {
+                OrderBy::Desc => {
+                    let remaining_start = mini_partition[0];
+                    let remaining_partitions = self.generate_regular_partitions(
+                        start_time,
+                        remaining_start,
+                        step,
+                        OrderBy::Desc,
+                    );
+                    partitions.extend(remaining_partitions);
+                }
+                OrderBy::Asc => {
+                    let remaining_end = mini_partition[1];
+                    let remaining_partitions = self.generate_regular_partitions(
+                        remaining_end,
+                        end_time,
+                        step,
+                        OrderBy::Asc,
+                    );
+                    partitions.extend(remaining_partitions);
+                }
             }
         } else {
-            // For ASC order, mini partition at the start time
-            let mut start = start_time;
-
-            // Handle mini partition if it's smaller than the total range
-            if mini_partition_size_microseconds < (end_time - start_time) {
-                let end = std::cmp::min(start + mini_partition_size_microseconds, end_time);
-                partitions.push([start, end]);
-                start = end;
-            }
-
-            // Calculate remaining time range
-            while start < end_time {
-                let end = std::cmp::min(start + step, end_time);
-                partitions.push([start, end]);
-                start = end;
-            }
+            // Fall back to regular partitions if mini partition can't be created
+            partitions = self.generate_regular_partitions(start_time, end_time, step, order_by);
         }
 
-        // Handle edge case of empty partitions
-        if partitions.is_empty() {
-            partitions.push([start_time, end_time]);
-        }
-
+        self.handle_empty_partitions(&mut partitions, start_time, end_time);
         partitions
     }
 
@@ -188,38 +352,23 @@ impl PartitionGenerator {
         end_time: i64,
         step: i64,
         order_by: OrderBy,
+        add_mini_partition: bool,
     ) -> Vec<[i64; 2]> {
-        // Generate partitions by DESC order
-        let mut partitions = Vec::new();
-        let mut end = end_time;
-        let mut last_partition_step = end % self.min_step;
-        let duration = end_time - start_time;
+        let mini_partition_size = self.calculate_mini_partition_size(step);
 
-        while end > start_time {
-            let mut start = max(end - step, start_time);
-            if last_partition_step > 0 && duration > self.min_step {
-                // Handle alignment for the first partition
-                partitions.push([end - last_partition_step, end]);
-                start -= last_partition_step;
-                end -= last_partition_step;
-            } else {
-                start = max(start - last_partition_step, start_time);
-            }
-            partitions.push([start, end]);
-            end = start;
-            last_partition_step = 0;
-        }
+        let mut partitions = if add_mini_partition {
+            self.generate_histogram_aligned_partitions_with_mini(
+                start_time,
+                end_time,
+                step,
+                order_by,
+                mini_partition_size,
+            )
+        } else {
+            self.generate_histogram_aligned_partitions(start_time, end_time, step, order_by)
+        };
 
-        // Handle edge case of empty partitions
-        if partitions.is_empty() {
-            partitions.push([start_time, end_time]);
-        }
-
-        // We need to reverse partitions if query is ASC order
-        if order_by == OrderBy::Asc {
-            partitions.reverse();
-        }
-
+        self.handle_empty_partitions(&mut partitions, start_time, end_time);
         partitions
     }
 }
@@ -278,15 +427,31 @@ mod tests {
                     "Partition start should align with histogram interval"
                 );
             }
+    fn print_partitions(title: &str, partitions: &[[i64; 2]]) {
+        println!("{}", title);
+        for (_i, [start, end]) in partitions.iter().enumerate() {
+            let start = chrono::DateTime::from_timestamp_micros(*start)
+                .unwrap()
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string();
+            let end = chrono::DateTime::from_timestamp_micros(*end)
+                .unwrap()
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string();
+            println!("{} - {}", start, end);
         }
     }
 
+    // Actual start
     #[test]
-    fn test_partition_generator_with_histogram_alignment_asc_order() {
-        // Test case: 10:02 - 10:17 with 5-minute histogram interval
-        let start_time = 1617267720000000; // 10:02
-        let end_time = 1617268620000000; // 10:17
-        let min_step = 300000000; // 5 minutes in microseconds
+    fn test_partition_generator_with_histogram_alignment_no_mini_partition_where_step_is_equal_to_query_duration()
+     {
+        let start_time = 1753763400000000; // Tuesday, July 29, 2025 at 10:00:00 AM GMT+5:30
+        let end_time = 1753806600000000; // Tuesday, July 29, 2025 at 10:00:00 PM GMT+5:30
+        let min_step_seconds = 3600; // 60 minutes in seconds
+        let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
         let mini_partition_duration_secs = 60;
 
         let generator = PartitionGenerator::new(
@@ -294,7 +459,7 @@ mod tests {
             mini_partition_duration_secs,
             true, // is_histogram = true
         );
-        let step = 300000000; // 5 minutes
+        let step = 43200000000; // 12 hours in microseconds
 
         let partitions =
             generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, false, 0);
@@ -325,49 +490,20 @@ mod tests {
         // Verify histogram alignment and ASC order
         assert_eq!(
             partitions.first().unwrap()[0],
+        // Test Descending
+        let partitions = generator.generate_partitions(
             start_time,
-            "First partition should start at start_time"
-        );
-        assert_eq!(
-            partitions.last().unwrap()[1],
             end_time,
-            "Last partition should end at end_time"
+            step,
+            OrderBy::Desc,
+            false, // add_mini_partition = false
         );
 
-        // Verify histogram alignment
-        for [start, end] in &partitions {
-            if *start != start_time && *end != end_time {
-                assert_eq!(
-                    *start % min_step,
-                    0,
-                    "Partition start should align with histogram interval"
-                );
-            }
-        }
-
-        // Verify the partitions are in ascending order
-        let mut prev_end = start_time;
-        for [start, end] in &partitions {
-            assert_eq!(*start, prev_end, "Partitions should be contiguous");
-            assert!(*end > *start, "End time should be greater than start time");
-            prev_end = *end;
-        }
-    }
-
-    #[test]
-    fn test_partition_generator_without_histogram_alignment_mini_partition() {
-        // Test case: 10:02 - 10:17 with the same parameters as the histogram test
-        let start_time = 1617267720000000; // 10:02
-        let end_time = 1617268620000000; // 10:17
-        let min_step = 300000000; // 5 minutes in microseconds
-        let mini_partition_duration_secs = 60;
-
-        let generator = PartitionGenerator::new(
-            min_step,
-            mini_partition_duration_secs,
-            false, // is_histogram = false
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions(
+            "HISTOGRAM PARTITIONS NO MINI PARTITION (DESC):",
+            &partitions,
         );
-        let step = 300000000; // 5 minutes
 
         let partitions =
             generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, false, 0);
@@ -394,80 +530,574 @@ mod tests {
                 end
             );
         }
+        // Input
+        // 2025-07-29 10:00:00 - 2025-07-29 22:00:00
+        // HISTOGRAM PARTITIONS NO MINI PARTITION (DESC):
+        // 2025-07-29 21:30:00 - 2025-07-29 22:00:00
+        // 2025-07-29 10:00:00 - 2025-07-29 21:30:00
 
         // Verify full coverage of time range
         assert_eq!(partitions.last().unwrap()[0], start_time);
         assert_eq!(partitions.first().unwrap()[1], end_time);
 
-        // Verify mini partition is at the end (DESC order)
-        let mini_partition = &partitions[0];
-        let mini_partition_duration = mini_partition[1] - mini_partition[0];
-        assert!(
-            mini_partition_duration <= (mini_partition_duration_secs * 1_000_000) as i64,
-            "Mini partition size should not exceed the configured duration"
+        // Test Ascending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Asc,
+            false, // add_mini_partition = false
         );
-        assert_eq!(
-            mini_partition[1], end_time,
-            "Mini partition should end at end_time"
-        );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions("HISTOGRAM PARTITIONS NO MINI PARTITION (ASC):", &partitions);
+
+        // Input
+        // 2025-07-29 10:00:00 - 2025-07-29 22:00:00
+        // HISTOGRAM PARTITIONS NO MINI PARTITION (ASC):
+        // 2025-07-29 10:00:00 - 2025-07-29 21:30:00
+        // 2025-07-29 21:30:00 - 2025-07-29 22:00:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.first().unwrap()[0], start_time);
+        assert_eq!(partitions.last().unwrap()[1], end_time);
     }
 
     #[test]
-    fn test_partition_generator_asc_order_with_mini_partition() {
-        // Test case: 10:02 - 10:17 with 5-minute intervals
-        let start_time = 1617267720000000; // 10:02
-        let end_time = 1617268620000000; // 10:17
-        let min_step = 300000000; // 5 minutes in microseconds
+    fn test_partition_generator_with_histogram_alignment_no_mini_partition_where_step_is_less_than_query_duration()
+     {
+        let start_time = 1753763400000000; // Tuesday, July 29, 2025 at 10:00:00 AM GMT+5:30
+        let end_time = 1753806600000000; // Tuesday, July 29, 2025 at 10:00:00 PM GMT+5:30
+        // let min_step_seconds = 1800; // 30 minutes in seconds
+        let min_step_seconds = 3600; // 60 minutes in seconds
+        let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
         let mini_partition_duration_secs = 60;
 
         let generator = PartitionGenerator::new(
             min_step,
             mini_partition_duration_secs,
-            false, // is_histogram = false
+            true, // is_histogram = true
         );
-        let step = 300000000; // 5 minutes
+        // let step = min_step; // 30 minutes in microseconds
+        let step = 14400000000; // 4 hours in microseconds
 
         let partitions =
             generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, false, 0);
 
-        // Expected partitions with ASC order:
-        // 1. 10:02 - 10:03 (mini partition)
-        // 2. 10:03 - 10:08
-        // 3. 10:08 - 10:13
-        // 4. 10:13 - 10:17
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions(
+            "HISTOGRAM PARTITIONS NO MINI PARTITION (DESC):",
+            &partitions,
+        );
 
-        // Print the actual partitions for debugging
-        println!("NON-HISTOGRAM PARTITIONS (ASC):");
-        println!("Number of partitions: {}", partitions.len());
-        for (i, [start, end]) in partitions.iter().enumerate() {
-            // Convert to human-readable time for debugging
-            let start_mins = (start - 1617267600000000) / 60000000; // Minutes since 10:00
-            let end_mins = (end - 1617267600000000) / 60000000;
-            println!(
-                "Partition {}: 10:{:02} - 10:{:02} ({} - {})",
-                i + 1,
-                start_mins,
-                end_mins,
-                start,
-                end
-            );
-        }
+        // Input
+        // 2025-07-29 10:00:00 - 2025-07-29 22:00:00
+        // HISTOGRAM PARTITIONS NO MINI PARTITION (DESC):
+        // 2025-07-29 21:30:00 - 2025-07-29 22:00:00
+        // 2025-07-29 17:30:00 - 2025-07-29 21:30:00
+        // 2025-07-29 13:30:00 - 2025-07-29 17:30:00
+        // 2025-07-29 10:00:00 - 2025-07-29 13:30:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.last().unwrap()[0], start_time);
+        assert_eq!(partitions.first().unwrap()[1], end_time);
+
+        // Test Ascending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Asc,
+            false, // add_mini_partition = false
+        );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions("HISTOGRAM PARTITIONS NO MINI PARTITION (ASC):", &partitions);
+
+        // Input
+        // 2025-07-29 10:00:00 - 2025-07-29 22:00:00
+        // HISTOGRAM PARTITIONS NO MINI PARTITION (ASC):
+        // 2025-07-29 10:00:00 - 2025-07-29 13:30:00
+        // 2025-07-29 13:30:00 - 2025-07-29 17:30:00
+        // 2025-07-29 17:30:00 - 2025-07-29 21:30:00
+        // 2025-07-29 21:30:00 - 2025-07-29 22:00:00
 
         // Verify full coverage of time range
         assert_eq!(partitions.first().unwrap()[0], start_time);
         assert_eq!(partitions.last().unwrap()[1], end_time);
+    }
 
-        // Verify mini partition is at the start (ASC order)
-        let mini_partition = &partitions[0];
-        let mini_partition_duration = mini_partition[1] - mini_partition[0];
-        assert!(
-            mini_partition_duration <= (mini_partition_duration_secs * 1_000_000) as i64,
-            "Mini partition size should not exceed the configured duration"
+    #[test]
+    fn test_partition_generator_with_histogram_alignment_no_mini_partition_with_uneven_time_range()
+    {
+        let start_time = 1746074700000000; // Thursday, May 1, 2025 at 10:15:00 AM GMT+5:30
+        let end_time = 1746117300000000; // Thursday, May 1, 2025 at 10:05:00 PM GMT+5:30
+        let min_step_seconds = 3600; // 60 minutes in seconds
+        let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(
+            min_step,
+            mini_partition_duration_secs,
+            true, // is_histogram = true
         );
-        assert_eq!(
-            mini_partition[0], start_time,
-            "Mini partition should start at start_time"
+        // let step = 39600000000; // 11 hours in microseconds
+        let step = 14400000000; // 4 hours in microseconds
+
+        // Test Descending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Desc,
+            false, // add_mini_partition = false
         );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions(
+            "HISTOGRAM PARTITIONS NO MINI PARTITION (DESC):",
+            &partitions,
+        );
+
+        // Input
+        // 2025-05-01 10:15:00 - 2025-05-01 22:05:00
+        // HISTOGRAM PARTITIONS NO MINI PARTITION (DESC):
+        // 2025-05-01 21:30:00 - 2025-05-01 22:05:00
+        // 2025-05-01 17:30:00 - 2025-05-01 21:30:00
+        // 2025-05-01 13:30:00 - 2025-05-01 17:30:00
+        // 2025-05-01 10:15:00 - 2025-05-01 13:30:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.last().unwrap()[0], start_time);
+        assert_eq!(partitions.first().unwrap()[1], end_time);
+
+        // Test Ascending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Asc,
+            false, // add_mini_partition = false
+        );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions("HISTOGRAM PARTITIONS NO MINI PARTITION (ASC):", &partitions);
+        // Input
+        // 2025-05-01 10:15:00 - 2025-05-01 22:05:00
+        // HISTOGRAM PARTITIONS NO MINI PARTITION (ASC):
+        // 2025-05-01 10:15:00 - 2025-05-01 13:30:00
+        // 2025-05-01 13:30:00 - 2025-05-01 17:30:00
+        // 2025-05-01 17:30:00 - 2025-05-01 21:30:00
+        // 2025-05-01 21:30:00 - 2025-05-01 22:05:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.first().unwrap()[0], start_time);
+        assert_eq!(partitions.last().unwrap()[1], end_time);
+    }
+
+    #[test]
+    fn test_partition_generator_with_histogram_alignment_no_mini_partition_with_uneven_time_range_2()
+     {
+        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30 
+        let end_time = 1746074820000000; // Thursday, May 1, 2025 at 10:17:00 AM GMT+5:30
+        let min_step_seconds = 300; // 5 minutes in seconds
+        let min_step = min_step_seconds * 1_000_000; // 5 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(
+            min_step,
+            mini_partition_duration_secs,
+            true, // is_histogram = true
+        );
+        let step = min_step; // 5 minutes in microseconds
+
+        // Test Descending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Desc,
+            false, // add_mini_partition = false
+        );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions(
+            "HISTOGRAM PARTITIONS NO MINI PARTITION (DESC):",
+            &partitions,
+        );
+
+        // Input
+        // 2025-05-01 10:02:00 - 2025-05-01 10:17:00
+        // HISTOGRAM PARTITIONS NO MINI PARTITION (DESC):
+        // 2025-05-01 10:15:00 - 2025-05-01 10:17:00
+        // 2025-05-01 10:10:00 - 2025-05-01 10:15:00
+        // 2025-05-01 10:05:00 - 2025-05-01 10:10:00
+        // 2025-05-01 10:02:00 - 2025-05-01 10:05:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.last().unwrap()[0], start_time);
+        assert_eq!(partitions.first().unwrap()[1], end_time);
+
+        // Test Ascending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Asc,
+            false, // add_mini_partition = false
+        );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions("HISTOGRAM PARTITIONS NO MINI PARTITION (ASC):", &partitions);
+
+        // Input
+        // 2025-05-01 10:02:00 - 2025-05-01 10:17:00
+        // HISTOGRAM PARTITIONS NO MINI PARTITION (ASC):
+        // 2025-05-01 10:02:00 - 2025-05-01 10:05:00
+        // 2025-05-01 10:05:00 - 2025-05-01 10:10:00
+        // 2025-05-01 10:10:00 - 2025-05-01 10:15:00
+        // 2025-05-01 10:15:00 - 2025-05-01 10:17:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.first().unwrap()[0], start_time);
+        assert_eq!(partitions.last().unwrap()[1], end_time);
+    }
+
+    #[test]
+    fn test_partition_generator_with_histogram_alignment_mini_partition_with_uneven_time_range_2() {
+        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30 
+        let end_time = 1746074820000000; // Thursday, May 1, 2025 at 10:17:00 AM GMT+5:30
+        let min_step_seconds = 300; // 5 minutes in seconds
+        let min_step = min_step_seconds * 1_000_000; // 5 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(
+            min_step,
+            mini_partition_duration_secs,
+            true, // is_histogram = true
+        );
+        let step = min_step; // 5 minutes in microseconds
+
+        // Test Descending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Desc,
+            true, // add_mini_partition = true
+        );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions(
+            "HISTOGRAM PARTITIONS WITH MINI PARTITION (DESC):",
+            &partitions,
+        );
+
+        // Input
+        // 2025-05-01 10:02:00 - 2025-05-01 10:17:00
+        // HISTOGRAM PARTITIONS WITH MINI PARTITION (DESC):
+        // 2025-05-01 10:16:00 - 2025-05-01 10:17:00
+        // 2025-05-01 10:15:00 - 2025-05-01 10:16:00
+        // 2025-05-01 10:10:00 - 2025-05-01 10:15:00
+        // 2025-05-01 10:05:00 - 2025-05-01 10:10:00
+        // 2025-05-01 10:02:00 - 2025-05-01 10:05:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.last().unwrap()[0], start_time);
+        assert_eq!(partitions.first().unwrap()[1], end_time);
+
+        // Test Ascending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Asc,
+            true, // add_mini_partition = true
+        );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions(
+            "HISTOGRAM PARTITIONS WITH MINI PARTITION (ASC):",
+            &partitions,
+        );
+
+        // Input
+        // 2025-05-01 10:02:00 - 2025-05-01 10:17:00
+        // HISTOGRAM PARTITIONS WITH MINI PARTITION (ASC):
+        // 2025-05-01 10:02:00 - 2025-05-01 10:03:00
+        // 2025-05-01 10:03:00 - 2025-05-01 10:05:00
+        // 2025-05-01 10:05:00 - 2025-05-01 10:10:00
+        // 2025-05-01 10:10:00 - 2025-05-01 10:15:00
+        // 2025-05-01 10:15:00 - 2025-05-01 10:17:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.first().unwrap()[0], start_time);
+        assert_eq!(partitions.last().unwrap()[1], end_time);
+    }
+
+    #[test]
+    fn test_partition_generator_with_histogram_alignment_and_mini_partition_with_step_equal_to_query_duration()
+     {
+        let start_time = 1753763400000000; // Tuesday, July 29, 2025 at 10:00:00 AM GMT+5:30
+        let end_time = 1753806600000000; // Tuesday, July 29, 2025 at 10:00:00 PM GMT+5:30
+        let min_step_seconds = 1800; // 30 minutes in seconds
+        let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(
+            min_step,
+            mini_partition_duration_secs,
+            true, // is_histogram = true
+        );
+        let step = 43200000000; // 12 hours in microseconds
+
+        // Test Descending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Desc,
+            true, // add_mini_partition = true
+        );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions(
+            "HISTOGRAM PARTITIONS WITH MINI PARTITION (DESC):",
+            &partitions,
+        );
+
+        // Input
+        // 2025-07-29 10:00:00 - 2025-07-29 22:00:00
+        // HISTOGRAM PARTITIONS WITH MINI PARTITION (DESC):
+        // 2025-07-29 21:59:00 - 2025-07-29 22:00:00
+        // 2025-07-29 10:00:00 - 2025-07-29 21:59:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.last().unwrap()[0], start_time);
+        assert_eq!(partitions.first().unwrap()[1], end_time);
+
+        // Test Ascending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Asc,
+            true, // add_mini_partition = true
+        );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions(
+            "HISTOGRAM PARTITIONS WITH MINI PARTITION (ASC):",
+            &partitions,
+        );
+
+        // Input
+        // 2025-07-29 10:00:00 - 2025-07-29 22:00:00
+        // HISTOGRAM PARTITIONS WITH MINI PARTITION (ASC):
+        // 2025-07-29 10:00:00 - 2025-07-29 10:01:00
+        // 2025-07-29 10:01:00 - 2025-07-29 22:00:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.first().unwrap()[0], start_time);
+        assert_eq!(partitions.last().unwrap()[1], end_time);
+    }
+
+    #[test]
+    fn test_partition_generator_with_histogram_alignment_and_mini_partition_with_step_less_than_query_duration()
+     {
+        let start_time = 1753763400000000; // Tuesday, July 29, 2025 at 10:00:00 AM GMT+5:30
+        let end_time = 1753806600000000; // Tuesday, July 29, 2025 at 10:00:00 PM GMT+5:30
+        let min_step_seconds = 3600; // 60 minutes in seconds
+        let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(
+            min_step,
+            mini_partition_duration_secs,
+            true, // is_histogram = true
+        );
+        let step = 14400000000; // 4 hours in microseconds
+
+        // Test Descending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Desc,
+            true, // add_mini_partition = true
+        );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions(
+            "HISTOGRAM PARTITIONS WITH MINI PARTITION (DESC):",
+            &partitions,
+        );
+
+        // Input
+        // 2025-07-29 10:00:00 - 2025-07-29 22:00:00
+        // HISTOGRAM PARTITIONS WITH MINI PARTITION (DESC):
+        // 2025-07-29 21:59:00 - 2025-07-29 22:00:00
+        // 2025-07-29 21:30:00 - 2025-07-29 21:59:00
+        // 2025-07-29 17:30:00 - 2025-07-29 21:30:00
+        // 2025-07-29 13:30:00 - 2025-07-29 17:30:00
+        // 2025-07-29 10:00:00 - 2025-07-29 13:30:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.last().unwrap()[0], start_time);
+        assert_eq!(partitions.first().unwrap()[1], end_time);
+
+        // Test Ascending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Asc,
+            true, // add_mini_partition = true
+        );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions(
+            "HISTOGRAM PARTITIONS WITH MINI PARTITION (ASC):",
+            &partitions,
+        );
+
+        // Input
+        // 2025-07-29 10:00:00 - 2025-07-29 22:00:00
+        // HISTOGRAM PARTITIONS WITH MINI PARTITION (ASC):
+        // 2025-07-29 10:00:00 - 2025-07-29 10:01:00 - mini partition - Duplicates expected
+        // 2025-07-29 10:01:00 - 2025-07-29 13:30:00 - boundary - Duplicates expected
+        // 2025-07-29 13:30:00 - 2025-07-29 17:30:00 - 4hr -- Duplicates here
+        // 2025-07-29 17:30:00 - 2025-07-29 21:30:00 - 4hr -- Duplicates here
+        // 2025-07-29 21:30:00 - 2025-07-29 22:00:00 - boundary
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.first().unwrap()[0], start_time);
+        assert_eq!(partitions.last().unwrap()[1], end_time);
+    }
+
+    #[test]
+    fn test_partition_generator_with_histogram_alignment_and_mini_partition_with_step_greater_than_query_duration()
+     {
+        let start_time = 1746073920000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30 
+        let end_time = 1746161220000000; // Friday, May 2, 2025 at 10:17:00 AM GMT+5:30
+        let min_step_seconds = 3600; // 60 minutes in seconds
+        let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(
+            min_step,
+            mini_partition_duration_secs,
+            true, // is_histogram = true
+        );
+        let step = 86400000000; // 24 hours in microseconds
+
+        // Test Descending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Desc,
+            true, // add_mini_partition = true
+        );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions(
+            "HISTOGRAM PARTITIONS WITH MINI PARTITION (DESC):",
+            &partitions,
+        );
+
+        // Input
+        // 2025-05-01 10:02:00 - 2025-05-02 10:17:00
+        // HISTOGRAM PARTITIONS WITH MINI PARTITION (DESC):
+        // 2025-05-02 10:16:00 - 2025-05-02 10:17:00
+        // 2025-05-02 09:30:00 - 2025-05-02 10:16:00
+        // 2025-05-01 10:02:00 - 2025-05-02 09:30:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.last().unwrap()[0], start_time);
+        assert_eq!(partitions.first().unwrap()[1], end_time);
+
+        // Test Ascending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Asc,
+            true, // add_mini_partition = true
+        );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions(
+            "HISTOGRAM PARTITIONS WITH MINI PARTITION (ASC):",
+            &partitions,
+        );
+
+        // Input
+        // 2025-05-01 10:02:00 - 2025-05-02 10:17:00
+        // HISTOGRAM PARTITIONS WITH MINI PARTITION (ASC):
+        // 2025-05-01 10:02:00 - 2025-05-01 10:03:00
+        // 2025-05-01 10:03:00 - 2025-05-02 09:30:00
+        // 2025-05-02 09:30:00 - 2025-05-02 10:17:00
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.first().unwrap()[0], start_time);
+        assert_eq!(partitions.last().unwrap()[1], end_time);
+    }
+
+    #[test]
+    fn test_partition_generator_with_histogram_alignment_and_mini_partition_with_step_greater_than_query_duration_bug()
+     {
+        let start_time = 1752568628000000; // Thursday, May 1, 2025 at 10:02:00 AM GMT+5:30 
+        let end_time = 1752741428000000; // Friday, May 2, 2025 at 10:17:00 AM GMT+5:30
+        let min_step_seconds = 18000; // 300 minutes in seconds
+        let min_step = min_step_seconds * 1_000_000; // 30 minutes in microseconds
+        let mini_partition_duration_secs = 60;
+
+        let generator = PartitionGenerator::new(
+            min_step,
+            mini_partition_duration_secs,
+            true, // is_histogram = true
+        );
+        let step = 72000000000; // 24 hours in microseconds
+
+        // Test Descending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Desc,
+            true, // add_mini_partition = true
+        );
+
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions(
+            "HISTOGRAM PARTITIONS WITH MINI PARTITION (DESC):",
+            &partitions,
+        );
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.last().unwrap()[0], start_time);
+        assert_eq!(partitions.first().unwrap()[1], end_time);
+
+        // Test Ascending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Asc,
+            true, // add_mini_partition = true
+        );
+
+        println!("partitions: {:#?}", partitions);
+        print_partitions("Input", &[[start_time, end_time]]);
+        print_partitions(
+            "HISTOGRAM PARTITIONS WITH MINI PARTITION (ASC):",
+            &partitions,
+        );
+
+        // Verify full coverage of time range
+        assert_eq!(partitions.first().unwrap()[0], start_time);
+        assert_eq!(partitions.last().unwrap()[1], end_time);
     }
 
     #[test]

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,17 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::errors::Result;
+import http from "./http";
 
-pub async fn get() -> Result<Option<String>> {
-    let ret = super::get("/instance/").await?;
-    let loc_value = String::from_utf8_lossy(&ret).to_string();
-    let loc_value = loc_value.trim().trim_matches('"').to_string();
-    let value = Some(loc_value);
-    Ok(value)
-}
+export const getAiChat = (messages: any) => {
+  return http().post("/api/default/ai/chat_stream", { messages });
+};
 
-pub async fn set(id: &str) -> Result<()> {
-    let data = bytes::Bytes::from(id.to_string());
-    super::put("/instance/", data, super::NO_NEED_WATCH, None).await
-}

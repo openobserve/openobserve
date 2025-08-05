@@ -124,7 +124,7 @@
     "exportLogs": "Export logs",
     "runQuery": "Run query",
     "syntaxGuideLabel": "Syntax Guide",
-    "legendLabel":"Legends",
+    "legendLabel": "Legend",
     "logs": "Logs",
     "enrichmentTables": "Enrichment Tables",
     "savedViewsLabel": "Saved View",
@@ -166,7 +166,10 @@
     "transformType": "Transform Type",
     "saveActionDisabled": "Saving Action is currently unavailable",
     "moreActions": "More Actions",
-    "showOnlyInterestingFields": "Interesting Fields"
+    "showOnlyInterestingFields": "Interesting Fields",
+    "downloadCSV": "CSV",
+    "downloadJSON": "JSON",
+    "fileType": "File Type"
   },
   "menu": {
     "home": "Home",

@@ -13,5 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod puffin;
-pub mod puffin_directory;
+use o2_enterprise::enterprise::ai::meta::AiMessage;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PromptRequest {
+    pub messages: Vec<AiMessage>,
+    #[serde(default)]
+    pub model: String,
+    #[serde(default)]
+    pub provider: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PromptResponse {
+    pub role: String,
+    pub content: String,
+}
+
+impl From<AiMessage> for PromptResponse {
+    fn from(message: AiMessage) -> Self {
+        Self {
+            role: message.role,
+            content: message.content,
+        }
+    }
+}

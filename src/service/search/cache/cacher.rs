@@ -164,7 +164,7 @@ pub async fn check_cache(
             } else {
                 sql.time_range
             };
-        handle_histogram(origin_sql, q_time_range, req.query.histogram_interval);
+        handle_histogram(origin_sql, q_time_range, interval);
         req.query.sql = origin_sql.clone();
         discard_interval = interval * 1000 * 1000; // in microseconds
     }
@@ -662,7 +662,7 @@ pub fn get_ts_col_order_by(
 }
 
 #[tracing::instrument]
-pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
+pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
     let root_dir = disk::get_dir().await;
     // Part 1: delete the results cache
     let pattern = format!("{root_dir}/results/{path}");
@@ -671,6 +671,21 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     let mut remove_files: Vec<String> = vec![];
 
     for file in files {
+        // If timestamp is provided, check if we should delete this file
+        if delete_ts > 0 {
+            // Parse the start_time from filename:
+            // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
+            if let Some(file_name) = file.split('/').next_back() {
+                if let Some(start_time_str) = file_name.split('_').next() {
+                    if let Ok(start_time) = start_time_str.parse::<i64>() {
+                        // Only delete if start_time < delete_ts (keep cache from delete_ts onwards)
+                        if start_time > delete_ts {
+                            continue; // Skip this file, keep it
+                        }
+                    }
+                }
+            }
+        }
         match disk::remove("", file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
             Err(e) => {
@@ -723,36 +738,44 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     Ok(true)
 }
 
-fn handle_histogram(
+pub fn handle_histogram(
     origin_sql: &mut String,
     q_time_range: Option<(i64, i64)>,
     histogram_interval: i64,
 ) {
-    let caps = RE_HISTOGRAM.captures(origin_sql.as_str()).unwrap();
-    let interval = if histogram_interval > 0 {
-        format!("{} seconds", histogram_interval)
+    let caps = if let Some(caps) = RE_HISTOGRAM.captures(origin_sql.as_str()) {
+        caps
     } else {
-        let attrs = caps
-            .get(1)
-            .unwrap()
+        return;
+    };
+
+    // 0th capture is the whole histogram(...) ,
+    // 1st capture is the comma-delimited list of args
+    // ideally there should be at least one arg, otherwise df with anyways complain,
+    // so we we return from here if capture[1] is None
+    let args = match caps.get(1) {
+        Some(v) => v
             .as_str()
             .split(',')
             .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
-            .collect::<Vec<&str>>();
-
-        let interval = match attrs.get(1) {
-            Some(v) => match v.parse::<u16>() {
-                Ok(v) => generate_histogram_interval(q_time_range, v),
-                Err(_) => v.to_string(),
-            },
-            None => generate_histogram_interval(q_time_range, 0),
-        };
-        interval
+            .collect::<Vec<&str>>(),
+        None => return,
     };
+
+    let interval = if histogram_interval > 0 {
+        format!("{histogram_interval} second")
+    } else {
+        args.get(1).map_or_else(
+            || generate_histogram_interval(q_time_range, 0),
+            |v| v.to_string(),
+        )
+    };
+
+    let field = args.first().unwrap_or(&"_timestamp");
 
     *origin_sql = origin_sql.replace(
         caps.get(0).unwrap().as_str(),
-        &format!("histogram(_timestamp,'{}')", interval),
+        &format!("histogram({field},'{interval}')"),
     );
 }
 
@@ -871,6 +894,9 @@ mod tests {
                 result_cache_ratio: 33,
                 work_group: None,
                 order_by: Some(OrderBy::Asc),
+                order_by_metadata: vec![(String::from("x_axis_1"), OrderBy::Asc)],
+                is_histogram_eligible: None,
+                converted_histogram_query: None,
             },
             deltas: vec![],
             has_cached_data: true,

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{cmp::max, num::NonZero, str::FromStr, sync::Arc};
+use std::{num::NonZero, str::FromStr, sync::Arc};
 
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Field;
@@ -159,17 +160,6 @@ pub async fn merge_parquet_files(
     let plan = ctx.state().create_logical_plan(&sql).await?;
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
     let schema = physical_plan.schema();
-
-    // print the physical plan
-    if cfg.common.print_key_sql {
-        let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
-            .indent(false)
-            .to_string();
-        println!("+---------------------------+--------------------------+");
-        println!("merge_parquet_files");
-        println!("+---------------------------+--------------------------+");
-        println!("{}", plan);
-    }
 
     // write result to parquet file
     let mut buf = Vec::new();
@@ -556,6 +546,12 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
     ctx.register_udf(super::udf::histogram_udf::HISTOGRAM_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
+    #[cfg(feature = "enterprise")]
+    ctx.register_udf(super::udf::cipher_udf::DECRYPT_UDF.clone());
+    #[cfg(feature = "enterprise")]
+    ctx.register_udf(super::udf::cipher_udf::ENCRYPT_UDF.clone());
+    #[cfg(feature = "enterprise")]
+    ctx.register_udf(super::udf::cipher_udf::DECRYPT_SLOW_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::percentile_cont::PercentileCont::new(),

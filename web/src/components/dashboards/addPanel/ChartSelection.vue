@@ -30,16 +30,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ]"
           v-for="(item, index) in ChartsArray"
           :disable="
-            promqlMode &&
-            item.id != 'line' &&
-            item.id != 'area' &&
-            item.id != 'bar' &&
-            item.id != 'scatter' &&
-            item.id != 'area-stacked' &&
-            item.id != 'metric' &&
-            item.id != 'gauge' &&
-            item.id != 'html' &&
-            item.id != 'markdown'
+            (promqlMode &&
+              item.id != 'line' &&
+              item.id != 'area' &&
+              item.id != 'bar' &&
+              item.id != 'scatter' &&
+              item.id != 'area-stacked' &&
+              item.id != 'metric' &&
+              item.id != 'gauge' &&
+              item.id != 'html' &&
+              item.id != 'markdown') ||
+            (allowedchartstype && 
+              allowedchartstype.length > 0 && 
+              !allowedchartstype.includes(item.id))
           "
           :key="index"
           clickable
@@ -87,7 +90,7 @@ import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "ChartSelection",
-  props: ["selectedChartType"],
+  props: ["selectedChartType", "allowedchartstype"],
   emits: ["update:selectedChartType"],
 
   setup() {
