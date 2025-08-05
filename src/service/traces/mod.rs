@@ -852,7 +852,7 @@ async fn write_traces(
     for (timestamp, record_val) in json_data {
         // get service_name
         let service_name = json::get_string_value(record_val.get("service_name").unwrap());
-        // get distinct_value item=
+        // get distinct_value item
         if stream_settings.enable_distinct_fields {
             let mut map = Map::new();
             for field in DISTINCT_FIELDS.iter().chain(
