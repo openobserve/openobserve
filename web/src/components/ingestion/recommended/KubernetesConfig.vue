@@ -41,7 +41,7 @@
       <ContentCopy class="q-mt-sm" :content="collectorCmd" />
     </div>
     <div v-else>
-      <q-tabs v-model="tab" horizontalalign="left" no-caps>
+      <q-tabs dense v-model="tab" horizontalalign="left" no-caps class="o2-route-tabs" :class="store.state.theme == 'dark' ? 'o2-route-tabs-dark' : 'o2-route-tabs-light'">
         <q-tab
           data-test="kubernetes-default-tab"
           name="external"
@@ -217,4 +217,9 @@ helm repo update`;
 });
 </script>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+  .q-tabs--dense .q-tab{
+      min-height: 32px !important;
+      height: 32px !important;
+    }
+</style>
