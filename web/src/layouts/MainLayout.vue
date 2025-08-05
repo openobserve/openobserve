@@ -453,14 +453,7 @@ class="padding-none" />
     >
       <q-page-container>
         <router-view v-slot="{ Component }">
-          <template v-if="$route.meta.keepAlive">
-            <keep-alive>
-              <component :is="Component"  @sendToAiChat="sendToAiChat" />
-            </keep-alive>
-          </template>
-          <template v-else>
-            <component :is="Component"  @sendToAiChat="sendToAiChat" />
-          </template>
+          <component :is="Component"  @sendToAiChat="sendToAiChat" />
         </router-view>
       </q-page-container>
     </div>
