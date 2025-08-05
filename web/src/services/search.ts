@@ -63,6 +63,13 @@ const search = {
 
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
+      if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
+      if (folder_id) url += `&folder_id=${folder_id}`;
+      if (panel_id) url += `&panel_id=${panel_id}`;
+      if (panel_name) url += `&panel_name=${encodeURIComponent(panel_name)}`;
+      if (run_id) url += `&run_id=${run_id}`;
+      if (tab_id) url += `&tab_id=${tab_id}`;
+      if (tab_name) url += `&tab_name=${encodeURIComponent(tab_name)}`;
       if (query.hasOwnProperty("aggs")) {
         return http({ headers: { traceparent } }).post(url, {
           ...query.query,
