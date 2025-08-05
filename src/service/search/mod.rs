@@ -35,7 +35,6 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_distinct_query},
         sql::{
             is_aggregate_query, is_eligible_for_histogram, is_simple_aggregate_query,
             is_simple_distinct_query,
@@ -894,7 +893,7 @@ pub async fn search_partition(
 
     #[cfg(feature = "enterprise")]
     let streaming_aggs = is_streaming_aggregate && req.streaming_output && streaming_id.is_some();
-    
+
     let (is_histogram_eligible, _) = is_eligible_for_histogram(&req.sql).unwrap_or((false, false));
 
     let mut resp = search::SearchPartitionResponse {

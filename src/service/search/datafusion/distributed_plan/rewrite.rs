@@ -24,7 +24,6 @@ use datafusion::{
     physical_expr::{LexOrdering, utils::collect_columns},
     physical_plan::{
         ExecutionPlan, ExecutionPlanProperties, Partitioning,
-        aggregates::AggregateExec,
         aggregates::{AggregateExec, AggregateMode},
         repartition::RepartitionExec,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
@@ -35,11 +34,6 @@ use hashbrown::{HashMap, HashSet};
 use proto::cluster_rpc::KvItem;
 
 use super::{empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec};
-use crate::service::search::{index::IndexCondition, request::Request};
-use super::{
-    empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec,
-    streaming_aggs_exec,
-};
 use crate::service::search::{
     datafusion::plan::tantivy_optimize_exec::TantivyOptimizeExec, grpc::QueryParams,
     index::IndexCondition, request::Request,

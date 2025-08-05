@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{cmp::max, num::NonZero, str::FromStr, sync::Arc};
-use std::{num::NonZero, str::FromStr, sync::Arc};
 
 use arrow::record_batch::RecordBatch;
 use arrow_schema::Field;

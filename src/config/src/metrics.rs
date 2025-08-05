@@ -692,7 +692,7 @@ pub static DB_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
         Opts::new("db_query_nums", "db query number")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["operation", "table", "key"],
+        &["operation", "table"],
     )
     .expect("Metric created")
 });
@@ -910,11 +910,6 @@ pub static PIPELINE_WAL_INGESTION_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "pipeline_wal_ingestion_bytes",
-            "Bytes ingested across all pipelines",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &[],
             "Bytes ingested per pipeline",
         )
         .namespace(NAMESPACE)
@@ -928,11 +923,11 @@ pub static PIPELINE_EXPORTED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "pipeline_http_exported_bytes",
-            "Bytes exported across all pipelines",
+            "Bytes exported per destination",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[],
+        &["destination"],
     )
     .expect("Metric created")
 });
@@ -959,11 +954,6 @@ pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &[],
-            "Bytes exported per destination",
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["destination"],
     )
     .expect("Metric created")
 });

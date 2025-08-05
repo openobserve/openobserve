@@ -51,8 +51,7 @@ use crate::service::{
         datafusion::{
             distributed_plan::{
                 NewEmptyExecVisitor, ReplaceTableScanExec, codec::get_physical_extension_codec,
-                empty_exec::NewEmptyExec,
-                rewrite::tantivy_optimize_rewrite,
+                empty_exec::NewEmptyExec, rewrite::tantivy_optimize_rewrite,
             },
             exec::{prepare_datafusion_context, register_udf},
             table_provider::{enrich_table::NewEnrichTable, uniontable::NewUnionTable},

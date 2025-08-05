@@ -507,8 +507,10 @@ impl Response {
     pub fn set_order_by(&mut self, val: Option<OrderBy>) {
         self.order_by = val;
     }
+
     pub fn set_result_cache_ratio(&mut self, val: usize) {
         self.result_cache_ratio = val;
+    }
 
     pub fn set_order_by_metadata(&mut self, val: Vec<(String, OrderBy)>) {
         self.order_by_metadata = val;
@@ -1621,6 +1623,7 @@ impl StreamResponses {
                         results: results.clone(),
                         streaming_aggs,
                         time_offset: time_offset.clone(),
+                        streaming_id: streaming_id.clone(),
                     };
                     let metadata_data = serde_json::to_string(&metadata).unwrap_or_else(|_| {
                         log::error!("Failed to serialize metadata: {:?}", metadata);

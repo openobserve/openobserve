@@ -175,40 +175,37 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
     let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
 
     // 2. perform the computation
-    let array = haystack
-        .iter()
-        .map(|haystack| {
-            match haystack {
-                // in arrow, any value can be null.
-                // Here we decide to make our UDF to return null when haystack is null.
-                Some(haystack) => match case_insensitive {
-                    true => Some(
-                        mem_finder
-                            .find(haystack.to_lowercase().as_bytes())
-                            .is_some(),
-                    ),
-                    false => Some(mem_finder.find(haystack.as_bytes()).is_some()),
-                },
-                _ => None,
-            }
-
-        });
-        if needle.is_none() {
-            return Err(DataFusionError::SQL(
-                ParserError::ParserError(
-                    "Invalid argument types[needle] to str_match function".to_string(),
+    let array = haystack.iter().map(|haystack| {
+        match haystack {
+            // in arrow, any value can be null.
+            // Here we decide to make our UDF to return null when haystack is null.
+            Some(haystack) => match case_insensitive {
+                true => Some(
+                    mem_finder
+                        .find(haystack.to_lowercase().as_bytes())
+                        .is_some(),
                 ),
-                None,
-            ));
+                false => Some(mem_finder.find(haystack.as_bytes()).is_some()),
+            },
+            _ => None,
         }
-        // pre-compute the needle
-        let needle = if case_insensitive {
-            needle.as_ref().unwrap().to_lowercase()
-        } else {
-            needle.as_ref().unwrap().to_string()
-        };
+    });
+    if needle.is_none() {
+        return Err(DataFusionError::SQL(
+            ParserError::ParserError(
+                "Invalid argument types[needle] to str_match function".to_string(),
+            ),
+            None,
+        ));
+    }
+    // pre-compute the needle
+    let needle = if case_insensitive {
+        needle.as_ref().unwrap().to_lowercase()
+    } else {
+        needle.as_ref().unwrap().to_string()
+    };
 
-        let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
+    let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
 
     // `Ok` because no error occurred during the calculation
     // `Arc` because arrays are immutable, thread-safe, trait objects.

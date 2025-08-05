@@ -34,7 +34,6 @@ use config::{
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
     physical_plan::{ExecutionPlan, visit_execution_plan},
-    physical_plan::visit_execution_plan,
     prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};

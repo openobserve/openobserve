@@ -28,7 +28,7 @@ use sqlparser::{
 
 use crate::TIMESTAMP_COL_NAME;
 
-pub const AGGREGATE_UDF_LIST: [&str; 18] = [
+pub const AGGREGATE_UDF_LIST: [&str; 17] = [
     "min",
     "max",
     "avg",

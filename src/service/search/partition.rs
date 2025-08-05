@@ -377,6 +377,23 @@ impl PartitionGenerator {
 mod tests {
     use super::*;
 
+    fn print_partitions(title: &str, partitions: &[[i64; 2]]) {
+        println!("{}", title);
+        for (_i, [start, end]) in partitions.iter().enumerate() {
+            let start = chrono::DateTime::from_timestamp_micros(*start)
+                .unwrap()
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string();
+            let end = chrono::DateTime::from_timestamp_micros(*end)
+                .unwrap()
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string();
+            println!("{} - {}", start, end);
+        }
+    }
+
     #[test]
     fn test_partition_generator_with_histogram_alignment_desc_order() {
         // Test case: 10:02 - 10:17 with 5-minute histogram interval
@@ -427,20 +444,6 @@ mod tests {
                     "Partition start should align with histogram interval"
                 );
             }
-    fn print_partitions(title: &str, partitions: &[[i64; 2]]) {
-        println!("{}", title);
-        for (_i, [start, end]) in partitions.iter().enumerate() {
-            let start = chrono::DateTime::from_timestamp_micros(*start)
-                .unwrap()
-                .with_timezone(&chrono::Local)
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string();
-            let end = chrono::DateTime::from_timestamp_micros(*end)
-                .unwrap()
-                .with_timezone(&chrono::Local)
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string();
-            println!("{} - {}", start, end);
         }
     }
 
@@ -461,35 +464,6 @@ mod tests {
         );
         let step = 43200000000; // 12 hours in microseconds
 
-        let partitions =
-            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, false, 0);
-
-        // Expected partitions for ASC order:
-        // Partition 1: 10:02 - 10:05
-        // Partition 2: 10:05 - 10:10
-        // Partition 3: 10:10 - 10:15
-        // Partition 4: 10:15 - 10:17
-
-        // Print the actual partitions for debugging
-        println!("HISTOGRAM PARTITIONS (ASC):");
-        println!("Number of partitions: {}", partitions.len());
-        for (i, [start, end]) in partitions.iter().enumerate() {
-            // Convert to human-readable time for debugging
-            let start_mins = (start - 1617267600000000) / 60000000; // Minutes since 10:00
-            let end_mins = (end - 1617267600000000) / 60000000;
-            println!(
-                "Partition {}: 10:{:02} - 10:{:02} ({} - {})",
-                i + 1,
-                start_mins,
-                end_mins,
-                start,
-                end
-            );
-        }
-
-        // Verify histogram alignment and ASC order
-        assert_eq!(
-            partitions.first().unwrap()[0],
         // Test Descending
         let partitions = generator.generate_partitions(
             start_time,
@@ -505,31 +479,6 @@ mod tests {
             &partitions,
         );
 
-        let partitions =
-            generator.generate_partitions(start_time, end_time, step, OrderBy::Desc, false, 0);
-
-        // Expected partitions:
-        // 1. 10:16 - 10:17 (mini partition)
-        // 2. 10:11 - 10:16
-        // 3. 10:06 - 10:11
-        // 4. 10:02 - 10:06
-
-        // Print the actual partitions for debugging
-        println!("NON-HISTOGRAM PARTITIONS (DESC):");
-        println!("Number of partitions: {}", partitions.len());
-        for (i, [start, end]) in partitions.iter().enumerate() {
-            // Convert to human-readable time for debugging
-            let start_mins = (start - 1617267600000000) / 60000000; // Minutes since 10:00
-            let end_mins = (end - 1617267600000000) / 60000000;
-            println!(
-                "Partition {}: 10:{:02} - 10:{:02} ({} - {})",
-                i + 1,
-                start_mins,
-                end_mins,
-                start,
-                end
-            );
-        }
         // Input
         // 2025-07-29 10:00:00 - 2025-07-29 22:00:00
         // HISTOGRAM PARTITIONS NO MINI PARTITION (DESC):
@@ -581,8 +530,16 @@ mod tests {
         // let step = min_step; // 30 minutes in microseconds
         let step = 14400000000; // 4 hours in microseconds
 
-        let partitions =
-            generator.generate_partitions(start_time, end_time, step, OrderBy::Asc, false, 0);
+        // Test Descending
+        let partitions = generator.generate_partitions(
+            start_time,
+            end_time,
+            step,
+            OrderBy::Desc,
+            false, // add_mini_partition = false
+            0,
+            0,
+        );
 
         print_partitions("Input", &[[start_time, end_time]]);
         print_partitions(

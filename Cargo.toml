@@ -106,7 +106,6 @@ hashbrown.workspace = true
 hex.workspace = true
 http-auth-basic = "0.3"
 tantivy-fst.workspace = true
-tantivy-fst.workspace = true
 ipnetwork.workspace = true
 itertools.workspace = true
 jsonwebtoken = "9.3"

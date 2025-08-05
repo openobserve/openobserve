@@ -38,9 +38,6 @@ use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::http::{
-            get_fallback_order_by_col_from_request, get_or_create_trace_id,
-            get_search_event_context_from_request, get_search_type_from_request,
-            get_stream_type_from_request, get_use_cache_from_request,
             get_fallback_order_by_col_from_request, get_is_ui_histogram_from_request,
             get_or_create_trace_id, get_search_event_context_from_request,
             get_search_type_from_request, get_stream_type_from_request, get_use_cache_from_request,

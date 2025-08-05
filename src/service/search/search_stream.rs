@@ -764,74 +764,73 @@ pub async fn do_partitioned_search(
             log::debug!("Top k values for partition {idx} took {:?}", duration);
         }
 
-            if is_result_array_skip_vrl {
-                search_res.hits = crate::service::search::cache::apply_vrl_to_response(
-                    backup_query_fn.clone(),
-                    &mut search_res,
-                    org_id,
-                    stream_name,
-                    &trace_id,
-                );
-            }
-
-            // Send the cached response
-            let response = StreamResponses::SearchResponse {
-                results: search_res.clone(),
-                streaming_aggs: is_streaming_aggs,
-                streaming_id: partition_resp.streaming_id.clone(),
-                time_offset: TimeOffset {
-                    start_time,
-                    end_time,
-                },
-            };
-
-            if sender.send(Ok(response)).await.is_err() {
-                log::warn!(
-                    "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stopping do_partitioned_search",
-                );
-                return Ok(());
-            }
+        if is_result_array_skip_vrl {
+            search_res.hits = crate::service::search::cache::apply_vrl_to_response(
+                backup_query_fn.clone(),
+                &mut search_res,
+                org_id,
+                stream_name,
+                &trace_id,
+            );
         }
 
-        // Send progress update
-        {
-            let percent = calculate_progress_percentage(
+        // Send the cached response
+        let response = StreamResponses::SearchResponse {
+            results: search_res.clone(),
+            streaming_aggs: is_streaming_aggs,
+            streaming_id: partition_resp.streaming_id.clone(),
+            time_offset: TimeOffset {
                 start_time,
                 end_time,
-                modified_start_time,
-                modified_end_time,
-                partition_order_by,
+            },
+        };
+
+        if sender.send(Ok(response)).await.is_err() {
+            log::warn!(
+                "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stopping do_partitioned_search",
             );
-            if sender
-                .send(Ok(StreamResponses::Progress { percent }))
-                .await
-                .is_err()
-            {
-                log::warn!(
-                    "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stopping do_partitioned_search",
-                );
-                return Ok(());
-            }
+            return Ok(());
         }
-        let stop_values_search = req_size != -1
-            && req_size != 0
-            && req.search_type == Some(SearchEventType::Values)
-            && curr_res_size >= req_size;
-        if stop_values_search {
-            log::info!(
-                "[HTTP2_STREAM]: Reached requested result size ({}), stopping search",
-                req_size
+    }
+
+    // Send progress update
+    {
+        let percent = calculate_progress_percentage(
+            start_time,
+            end_time,
+            modified_start_time,
+            modified_end_time,
+            partition_order_by,
+        );
+        if sender
+            .send(Ok(StreamResponses::Progress { percent }))
+            .await
+            .is_err()
+        {
+            log::warn!(
+                "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stopping do_partitioned_search",
             );
-            break;
+            return Ok(());
         }
-        // Stop if reached the requested result size and it is not a streaming aggs query
-        if req_size != -1 && req_size != 0 && curr_res_size >= req_size && !is_streaming_aggs {
-            log::info!(
-                "[HTTP2_STREAM]: Reached requested result size ({}), stopping search",
-                req_size
-            );
-            break;
-        }
+    }
+    let stop_values_search = req_size != -1
+        && req_size != 0
+        && req.search_type == Some(SearchEventType::Values)
+        && curr_res_size >= req_size;
+    if stop_values_search {
+        log::info!(
+            "[HTTP2_STREAM]: Reached requested result size ({}), stopping search",
+            req_size
+        );
+        break;
+    }
+    // Stop if reached the requested result size and it is not a streaming aggs query
+    if req_size != -1 && req_size != 0 && curr_res_size >= req_size && !is_streaming_aggs {
+        log::info!(
+            "[HTTP2_STREAM]: Reached requested result size ({}), stopping search",
+            req_size
+        );
+        break;
     }
 
     // Remove the streaming_aggs cache

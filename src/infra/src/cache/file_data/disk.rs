@@ -92,7 +92,6 @@ static AGGREGATION_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
     for _ in 0..cfg.disk_cache.bucket_num {
         files.push(FileData::new(FileType::Aggregation));
-
     }
     files
 });
@@ -304,7 +303,6 @@ impl FileData {
                     e
                 );
             }
-
 
             if key.starts_with("results/") {
                 let columns = key.split('/').collect::<Vec<&str>>();
@@ -954,7 +952,6 @@ pub fn parse_result_cache_key(file: &str) -> Option<(String, String, String, Res
 
     Some((org_id, stream_type, query_key, meta))
 }
-
 
 // parse the aggregation cache key from the file name
 // returns (org_id, stream_type, query_key, ResultCacheMeta)
