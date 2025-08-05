@@ -396,6 +396,17 @@ export default defineComponent({
       type: Boolean,
       required: false,
       default: false,
+    runId: {
+      type: String,
+      default: null,
+    },
+    tabId: {
+      type: String,
+      default: null,
+    },
+    tabName: {
+      type: String,
+      default: null,
     },
   },
   emits: [
@@ -449,6 +460,9 @@ export default defineComponent({
       allowAnnotationsAdd,
       searchResponse,
       is_ui_histogram,
+      runId,
+      tabId,
+      tabName,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -475,6 +489,9 @@ export default defineComponent({
       reportId,
       searchResponse,
       is_ui_histogram,
+      runId,
+      tabId,
+      tabName,
     );
 
     const {
@@ -589,14 +606,13 @@ export default defineComponent({
           [panelSchema?.value?.id]: false,
         };
       }
-      
+
       // Clear all refs to prevent memory leaks
       chartPanelRef.value = null;
       drilldownPopUpRef.value = null;
       annotationPopupRef.value = null;
       tableRendererRef.value = null;
       parser = null;
-      
     });
     watch(
       [data, store?.state],

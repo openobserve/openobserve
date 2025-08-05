@@ -27,6 +27,11 @@ const search = {
       dashboard_id,
       folder_id,
       is_ui_histogram,
+      panel_id,
+      panel_name,
+      run_id,
+      tab_id,
+      tab_name,
     }: {
       org_identifier: string;
       query: any;
@@ -35,6 +40,11 @@ const search = {
       dashboard_id?: string;
       folder_id?: string;
       is_ui_histogram?: boolean;
+      panel_id?: string;
+      panel_name?: string;
+      run_id?: string;
+      tab_id?: string;
+      tab_name?: string;
     },
     search_type: string = "ui",
     is_multi_stream_search: boolean = false,
@@ -50,8 +60,21 @@ const search = {
     if (folder_id) url += `&folder_id=${folder_id}`;
     if (is_ui_histogram) url += `&is_ui_histogram=${is_ui_histogram}`;
     if (is_multi_stream_search) url += `&is_multi_stream_search=${is_multi_stream_search}`;
+    if (panel_id) url += `&panel_id=${panel_id}`;
+    if (panel_name) url += `&panel_name=${encodeURIComponent(panel_name)}`;
+    if (run_id) url += `&run_id=${run_id}`;
+    if (tab_id) url += `&tab_id=${tab_id}`;
+    if (tab_name) url += `&tab_name=${encodeURIComponent(tab_name)}`;
+
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
+      if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
+      if (folder_id) url += `&folder_id=${folder_id}`;
+      if (panel_id) url += `&panel_id=${panel_id}`;
+      if (panel_name) url += `&panel_name=${encodeURIComponent(panel_name)}`;
+      if (run_id) url += `&run_id=${run_id}`;
+      if (tab_id) url += `&tab_id=${tab_id}`;
+      if (tab_name) url += `&tab_name=${encodeURIComponent(tab_name)}`;
       if (query.hasOwnProperty("aggs")) {
         return http({ headers: { traceparent } }).post(url, {
           ...query.query,
@@ -166,16 +189,37 @@ const search = {
     start_time,
     end_time,
     step,
+    dashboard_id,
+    folder_id,
+    panel_id,
+    panel_name,
+    run_id,
+    tab_id,
+    tab_name,
   }: {
     org_identifier: string;
     query: string;
     start_time: number;
     end_time: number;
     step: string;
+    dashboard_id?: string;
+    folder_id?: string;
+    panel_id?: string;
+    panel_name?: string;
+    run_id?: string;
+    tab_id?: string;
+    tab_name?: string;
   }) => {
-    const url = `/api/${org_identifier}/prometheus/api/v1/query_range?start=${start_time}&end=${end_time}&step=${step}&query=${encodeURIComponent(
+    let url = `/api/${org_identifier}/prometheus/api/v1/query_range?start=${start_time}&end=${end_time}&step=${step}&query=${encodeURIComponent(
       query,
     )}`;
+    if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
+    if (folder_id) url += `&folder_id=${folder_id}`;
+    if (panel_id) url += `&panel_id=${panel_id}`;
+    if (panel_name) url += `&panel_name=${encodeURIComponent(panel_name)}`;
+    if (run_id) url += `&run_id=${run_id}`;
+    if (tab_id) url += `&tab_id=${tab_id}`;
+    if (tab_name) url += `&tab_name=${encodeURIComponent(tab_name)}`;
     return http().get(url);
   },
   metrics_query: ({
@@ -408,8 +452,8 @@ const search = {
       (window as any).use_cache !== undefined
         ? (window as any).use_cache
         : true;
-        let url = `/api/${org_identifier}/search_jobs/${jobId}/result?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
-          url += `&size=${size}&from=${from}`;
+    let url = `/api/${org_identifier}/search_jobs/${jobId}/result?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
+    url += `&size=${size}&from=${from}`;
 
     return http({ headers: { traceparent } }).get(url);
   },
