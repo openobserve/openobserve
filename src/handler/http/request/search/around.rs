@@ -32,7 +32,7 @@ use crate::{
     service::{
         search::{
             self as SearchService,
-            sql::visitor::{
+            sql::rewriter::{
                 add_new_filter::add_new_filters_with_and_operator,
                 add_ordering_term::check_or_add_order_by_timestamp,
             },

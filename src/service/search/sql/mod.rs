@@ -41,18 +41,22 @@ use super::{
     request::Request,
 };
 use crate::service::search::sql::{
+    rewriter::{
+        add_o2_id::AddO2IdVisitor, add_timestamp::AddTimestampVisitor,
+        approx_percentile::ReplaceApproxPercentiletVisitor, index::IndexVisitor,
+        remove_dashboard_placeholder::RemoveDashboardAllVisitor,
+        track_total_hits::TrackTotalHitsVisitor,
+    },
     schema::{generate_schema_fields, generate_select_star_schema, has_original_column},
     visitor::{
-        add_o2_id::AddO2IdVisitor, add_timestamp::AddTimestampVisitor,
-        approx_percentile::ReplaceApproxPercentiletVisitor, column::ColumnVisitor,
-        histogram_interval::HistogramIntervalVisitor, index::IndexVisitor,
+        column::ColumnVisitor, histogram_interval::HistogramIntervalVisitor,
         index_optimize::IndexOptimizeModeVisitor, match_all::MatchVisitor,
         partition_column::PartitionColumnVisitor, prefix_column::PrefixColumnVisitor,
-        remove_dashboard_placeholder::RemoveDashboardAllVisitor,
-        track_total_hits::TrackTotalHitsVisitor, utils::is_complex_query,
+        utils::is_complex_query,
     },
 };
 
+pub mod rewriter;
 pub mod schema;
 pub mod visitor;
 

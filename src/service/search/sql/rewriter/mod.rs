@@ -13,15 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
-pub mod cipher_key;
-pub mod column;
-#[cfg(feature = "enterprise")]
-pub mod group_by;
-pub mod histogram_interval;
-pub mod index_optimize;
-pub mod match_all;
-pub mod partition_column;
-pub mod pickup_where;
-pub mod prefix_column;
-pub mod utils;
+pub mod add_new_filter;
+pub mod add_o2_id;
+pub mod add_ordering_term;
+pub mod add_timestamp;
+pub mod approx_percentile;
+pub mod remove_dashboard_placeholder;
+pub mod track_total_hits;
+pub mod index;
