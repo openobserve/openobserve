@@ -978,6 +978,7 @@ async fn write_traces(
 #[cfg(test)]
 mod tests {
     use config::utils::json::json;
+    use opentelemetry_proto::tonic::trace::v1::{Status, status::StatusCode};
 
     use crate::service::ingestion::grpc::get_val_for_attr;
 
@@ -987,5 +988,99 @@ mod tests {
         let input = json!({ "key": in_val });
         let resp = get_val_for_attr(input);
         assert_eq!(resp.as_str().unwrap(), in_val.to_string());
+    }
+
+    #[test]
+    fn test_get_span_status() {
+        // Test OK status
+        let status = Status {
+            code: StatusCode::Ok as i32,
+            message: "success".to_string(),
+        };
+        assert_eq!(super::get_span_status(Some(status)), "OK");
+
+        // Test ERROR status
+        let status = Status {
+            code: StatusCode::Error as i32,
+            message: "error occurred".to_string(),
+        };
+        assert_eq!(super::get_span_status(Some(status)), "ERROR");
+
+        // Test UNSET status
+        let status = Status {
+            code: StatusCode::Unset as i32,
+            message: "".to_string(),
+        };
+        assert_eq!(super::get_span_status(Some(status)), "UNSET");
+
+        // Test None status (default case)
+        assert_eq!(super::get_span_status(None), "UNSET");
+    }
+
+    #[test]
+    fn test_format_response_success() {
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 0,
+                error_message: "".to_string(),
+            };
+
+        let result = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpJson,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_format_response_partial() {
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 5,
+                error_message: "".to_string(),
+            };
+
+        let result = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpJson,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_format_response_protobuf() {
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 0,
+                error_message: "".to_string(),
+            };
+
+        let result =
+            super::format_response(partial_success, config::meta::otlp::OtlpRequestType::Grpc);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_constants() {
+        // Test that constants are properly defined
+        assert_eq!(super::SERVICE_NAME, "service.name");
+        assert_eq!(super::SERVICE, "service");
+        assert_eq!(super::PARENT_SPAN_ID, "reference.parent_span_id");
+        assert_eq!(super::PARENT_TRACE_ID, "reference.parent_trace_id");
+        assert_eq!(super::REF_TYPE, "reference.ref_type");
+        assert_eq!(super::SPAN_ID_BYTES_COUNT, 8);
+        assert_eq!(super::TRACE_ID_BYTES_COUNT, 16);
+        assert_eq!(super::ATTR_STATUS_CODE, "status_code");
+        assert_eq!(super::ATTR_STATUS_MESSAGE, "status_message");
+    }
+
+    #[test]
+    fn test_block_fields() {
+        // Test that BLOCK_FIELDS contains expected values
+        let expected_fields = ["_timestamp", "duration", "start_time", "end_time"];
+        for field in expected_fields {
+            assert!(super::BLOCK_FIELDS.contains(&field));
+        }
+        assert_eq!(super::BLOCK_FIELDS.len(), 4);
     }
 }

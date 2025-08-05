@@ -215,6 +215,7 @@ impl Dashboard {
 }
 
 pub mod reports;
+pub mod usage_report;
 pub mod v1;
 pub mod v2;
 pub mod v3;
@@ -280,8 +281,9 @@ impl ListDashboardsParams {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::Utc;
+
+    use super::*;
 
     #[test]
     fn test_default_version() {
@@ -321,9 +323,9 @@ mod tests {
     fn test_set_updated_at() {
         let mut dashboard = Dashboard::default();
         let before = Utc::now().timestamp_micros();
-        
+
         dashboard.set_updated_at();
-        
+
         let after = Utc::now().timestamp_micros();
         assert!(dashboard.updated_at >= before);
         assert!(dashboard.updated_at <= after);
@@ -372,7 +374,7 @@ mod tests {
     #[test]
     fn test_list_dashboards_params_new() {
         let params = ListDashboardsParams::new("test_org");
-        
+
         assert_eq!(params.org_id, "test_org");
         assert!(params.folder_id.is_none());
         assert!(params.title_pat.is_none());
@@ -381,9 +383,8 @@ mod tests {
 
     #[test]
     fn test_list_dashboards_params_with_folder_id() {
-        let params = ListDashboardsParams::new("test_org")
-            .with_folder_id("folder123");
-        
+        let params = ListDashboardsParams::new("test_org").with_folder_id("folder123");
+
         assert_eq!(params.org_id, "test_org");
         assert_eq!(params.folder_id, Some("folder123".to_string()));
         assert!(params.title_pat.is_none());
@@ -392,9 +393,8 @@ mod tests {
 
     #[test]
     fn test_list_dashboards_params_where_title_contains() {
-        let params = ListDashboardsParams::new("test_org")
-            .where_title_contains("analytics");
-        
+        let params = ListDashboardsParams::new("test_org").where_title_contains("analytics");
+
         assert_eq!(params.org_id, "test_org");
         assert!(params.folder_id.is_none());
         assert_eq!(params.title_pat, Some("analytics".to_string()));
@@ -403,9 +403,8 @@ mod tests {
 
     #[test]
     fn test_list_dashboards_params_paginate() {
-        let params = ListDashboardsParams::new("test_org")
-            .paginate(10, 2);
-        
+        let params = ListDashboardsParams::new("test_org").paginate(10, 2);
+
         assert_eq!(params.org_id, "test_org");
         assert!(params.folder_id.is_none());
         assert!(params.title_pat.is_none());
@@ -418,7 +417,7 @@ mod tests {
             .with_folder_id("main_folder")
             .where_title_contains("performance")
             .paginate(20, 1);
-        
+
         assert_eq!(params.org_id, "my_org");
         assert_eq!(params.folder_id, Some("main_folder".to_string()));
         assert_eq!(params.title_pat, Some("performance".to_string()));
@@ -447,11 +446,12 @@ mod tests {
     #[test]
     fn test_dashboard_version_serialization() {
         let version = DashboardVersion { version: 3 };
-        
+
         let json = serde_json::to_string(&version).expect("Failed to serialize");
         assert!(json.contains("3"));
 
-        let deserialized: DashboardVersion = serde_json::from_str(&json).expect("Failed to deserialize");
+        let deserialized: DashboardVersion =
+            serde_json::from_str(&json).expect("Failed to deserialize");
         assert_eq!(deserialized.version, 3);
     }
 }

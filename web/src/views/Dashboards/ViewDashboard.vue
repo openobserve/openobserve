@@ -269,6 +269,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :searchType="searchType"
         @panelsValues="handleEmittedData"
         @searchRequestTraceIds="searchRequestTraceIds"
+        :runId="runId"
+        @update:runId="updateRunId"
       />
 
       <q-dialog
@@ -369,6 +371,7 @@ import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
+import { getUUID } from "@/utils/zincutils";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -441,6 +444,14 @@ export default defineComponent({
     const reportId = computed(() => route.query.tab);
 
     const renderDashboardChartsRef = ref(null);
+
+    // Initialize dashboard run ID management
+    const runId = ref(getUUID().replace(/-/g, ""));
+
+    const generateNewDashboardRunId = () => {
+      runId.value = getUUID().replace(/-/g, "");
+      return runId.value;
+    };
 
     onBeforeMount(async () => {
       await importMoment();
@@ -613,7 +624,6 @@ export default defineComponent({
       if (!store.state.organizationData.folders.length) {
         await getFoldersList(store);
       }
-      
     });
 
     const setTimeString = () => {
@@ -826,6 +836,8 @@ export default defineComponent({
 
     const refreshData = () => {
       if (!arePanelsLoading.value) {
+        // Generate new run ID for whole dashboard refresh
+        generateNewDashboardRunId();
         dateTimePicker.value.refresh();
       }
     };
@@ -913,6 +925,7 @@ export default defineComponent({
 
     // whenever the refreshInterval is changed, update the query params
     watch([refreshInterval, selectedDate, selectedTabId], () => {
+      generateNewDashboardRunId();
       router.replace({
         query: {
           ...route.query, // used to keep current variables data as is
@@ -1128,6 +1141,10 @@ export default defineComponent({
       }
     };
 
+    const updateRunId = (newRunId) => {
+      runId.value = newRunId;
+    };
+
     // Add these new refs and methods
     const showJsonEditorDialog = ref(false);
 
@@ -1191,6 +1208,7 @@ export default defineComponent({
       openSettingsDialog,
       loadDashboard,
       refreshPanelRequest,
+      updateRunId,
       initialVariableValues,
       getQueryParamsForDuration,
       onDataZoom,
@@ -1226,6 +1244,7 @@ export default defineComponent({
       openJsonEditor,
       saveJsonDashboard,
       setTimeForVariables,
+      runId,
     };
   },
 });
