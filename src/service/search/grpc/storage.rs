@@ -53,7 +53,10 @@ use crate::service::{
     search::{
         datafusion::exec,
         generate_search_schema_diff,
-        grpc::utils::{self, TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
+        grpc::{
+            tantivy_result_cache,
+            utils::{self, TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
+        },
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
@@ -929,6 +932,17 @@ async fn search_tantivy_index(
     idx_optimize_rule: Option<IndexOptimizeMode>,
     parquet_file: &FileKey,
 ) -> anyhow::Result<(String, TantivyResult)> {
+    let cache_key = format!(
+        "{:?}-{:?}-{}",
+        index_condition, idx_optimize_rule, parquet_file.key
+    );
+    let cfg = get_config();
+    if cfg.common.inverted_index_result_cache_enabled
+        && let Some(result) = tantivy_result_cache::TANTIVY_RESULT_CACHE.get(&cache_key)
+    {
+        return Ok((parquet_file.key.to_string(), result));
+    }
+
     let file_account = parquet_file.account.clone();
     let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
         return Err(anyhow::anyhow!(
@@ -938,7 +952,6 @@ async fn search_tantivy_index(
     };
 
     // cache the indexer and reader
-    let cfg = get_config();
     let indexer = if cfg.common.inverted_index_cache_enabled {
         reader_cache::GLOBAL_CACHE.get(&ttv_file_name)
     } else {
@@ -1069,11 +1082,11 @@ async fn search_tantivy_index(
     .await??;
 
     let key = parquet_file.key.to_string();
-    match res {
-        TantivyResult::Count(count) => Ok((key, TantivyResult::Count(count))),
-        TantivyResult::Histogram(histogram) => Ok((key, TantivyResult::Histogram(histogram))),
-        TantivyResult::TopN(top_n) => Ok((key, TantivyResult::TopN(top_n))),
-        TantivyResult::Distinct(distinct) => Ok((key, TantivyResult::Distinct(distinct))),
+    let result = match res {
+        TantivyResult::Count(count) => TantivyResult::Count(count),
+        TantivyResult::Histogram(histogram) => TantivyResult::Histogram(histogram),
+        TantivyResult::TopN(top_n) => TantivyResult::TopN(top_n),
+        TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
         TantivyResult::RowIds(row_ids) => {
             if row_ids.is_empty() || parquet_file.meta.records == 0 {
                 return Ok((key, TantivyResult::RowIdsBitVec(0, BitVec::EMPTY)));
@@ -1101,12 +1114,16 @@ async fn search_tantivy_index(
             for id in row_ids {
                 res.set(id as usize, true);
             }
-            Ok((key, TantivyResult::RowIdsBitVec(num_rows, res)))
+            TantivyResult::RowIdsBitVec(num_rows, res)
         }
         TantivyResult::RowIdsBitVec(..) => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
+    };
+    if cfg.common.inverted_index_result_cache_enabled {
+        tantivy_result_cache::TANTIVY_RESULT_CACHE.put(cache_key, result.clone());
     }
+    Ok((key, result))
 }
 
 /// if simple distinct without filter, we need to warm up the field
