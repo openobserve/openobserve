@@ -651,7 +651,7 @@ pub async fn values_http2_stream(
     let reqs = match build_search_request_per_field(
         &values_req,
         &org_id,
-        values_req.stream_type,
+        stream_type,
         &values_req.stream_name,
         &keyword,
     )

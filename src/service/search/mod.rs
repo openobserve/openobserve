@@ -35,10 +35,7 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{
-            is_aggregate_query, is_eligible_for_histogram, is_simple_aggregate_query,
-            is_simple_distinct_query,
-        },
+        sql::{is_aggregate_query, is_eligible_for_histogram, is_simple_distinct_query},
         time::now_micros,
     },
 };
@@ -932,7 +929,7 @@ pub async fn search_partition(
         let hist_int = if let Some(hist_int) = sql.histogram_interval {
             hist_int
         } else {
-            let interval = generate_histogram_interval(Some((req.start_time, req.end_time)), 0);
+            let interval = generate_histogram_interval(Some((req.start_time, req.end_time)));
             match convert_histogram_interval_to_seconds(&interval) {
                 Ok(v) => v,
                 Err(e) => {
@@ -957,7 +954,7 @@ pub async fn search_partition(
             min_step = hist_int * 1_000_000;
         } else {
             let time_range = (req.start_time, req.end_time);
-            let interval = generate_histogram_interval(Some(time_range), 0);
+            let interval = generate_histogram_interval(Some(time_range));
             match convert_histogram_interval_to_seconds(&interval) {
                 Ok(v) => {
                     // convert seconds to microseconds

@@ -150,7 +150,7 @@ pub(crate) async fn create_context(
         trace_id,
         &files
             .iter()
-            .map(|f| (f.key.as_ref(), f.meta.compressed_size, f.meta.max_ts))
+            .map(|f| (&f.key, f.meta.compressed_size, f.meta.max_ts))
             .collect_vec(),
         &mut scan_stats,
         "parquet",

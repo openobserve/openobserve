@@ -21,7 +21,6 @@ use config::{
 };
 
 pub mod broadcast;
-mod idx;
 pub mod parquet;
 
 pub async fn run() -> Result<(), anyhow::Error> {

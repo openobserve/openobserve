@@ -262,7 +262,7 @@ mod tests {
     }
 
     #[test]
-    fn test_convert_parquet_idx_file_name_to_tantivy_file() {
+    fn test_convert_parquet_file_name_to_tantivy_file() {
         let test_cases = vec![
             (
                 "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet",
@@ -296,10 +296,7 @@ mod tests {
         ];
 
         for (input, expected) in test_cases {
-            assert_eq!(
-                convert_parquet_idx_file_name_to_tantivy_file(input),
-                expected
-            );
+            assert_eq!(convert_parquet_file_name_to_tantivy_file(input), expected);
         }
     }
 }

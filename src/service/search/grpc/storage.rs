@@ -265,15 +265,7 @@ pub async fn search(
         &query.trace_id,
         &files
             .iter()
-            .map(|f| {
-                (
-                    f.id,
-                    &f.account,
-                    &f.key,
-                    f.meta.compressed_size,
-                    f.meta.max_ts,
-                )
-            })
+            .map(|f| (&f.key, f.meta.compressed_size, f.meta.max_ts))
             .collect_vec(),
         &mut scan_stats,
         "parquet",
@@ -469,13 +461,13 @@ fn generate_add_filter_back_condition(
     // if have datafusion_condition, always add filter back
     if datafusion_condition.is_some() {
         let mut index_condition = datafusion_condition.clone();
-        if let Some(tantivy_cond) = tantivy_condition.as_ref()
-            && *is_add_filter_back
-        {
-            index_condition
-                .as_mut()
-                .unwrap()
-                .add_index_condition(tantivy_cond.clone());
+        if let Some(tantivy_cond) = tantivy_condition.as_ref() {
+            if *is_add_filter_back {
+                index_condition
+                    .as_mut()
+                    .unwrap()
+                    .add_index_condition(tantivy_cond.clone());
+            }
         }
         *is_add_filter_back = true;
         return index_condition;
@@ -491,7 +483,7 @@ fn generate_add_filter_back_condition(
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
 pub async fn cache_files(
     trace_id: &str,
-    files: &[(i64, &String, &String, i64, i64)],
+    files: &[(&String, i64, i64)],
     scan_stats: &mut ScanStats,
     file_type: &str,
 ) -> Result<(file_data::CacheType, u64, u64), Error> {
@@ -500,7 +492,7 @@ pub async fn cache_files(
     let (mut cache_hits, mut cache_misses) = (0, 0);
 
     let start = std::time::Instant::now();
-    for (_id, _account, file, _size, max_ts) in files.iter() {
+    for (file, _size, max_ts) in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
             cached_files.insert(file);
@@ -574,28 +566,19 @@ pub async fn cache_files(
     let trace_id = trace_id.to_string();
     let files = files
         .iter()
-        .filter_map(|(id, account, file, size, ts)| {
+        .filter_map(|(file, size, ts)| {
             if cached_files.contains(&file) {
                 None
             } else {
-                Some((*id, account.to_string(), file.to_string(), *size, *ts))
+                Some((file.to_string(), *size, *ts))
             }
         })
         .collect_vec();
     let file_type = file_type.to_string();
     tokio::spawn(async move {
         let files_num = files.len();
-        for (id, account, file, size, ts) in files {
-            if let Err(e) = crate::job::queue_download(
-                trace_id.clone(),
-                id,
-                account,
-                file.clone(),
-                size,
-                ts,
-                cache_type,
-            )
-            .await
+        for (file, size, ts) in files {
+            if let Err(e) = crate::job::queue_download(&trace_id, &file, size, ts, cache_type).await
             {
                 log::error!(
                     "[trace_id {trace_id}] error in queuing file {file} for background download: {e}"
@@ -654,7 +637,7 @@ pub async fn filter_file_list_by_tantivy_index(
         &query.trace_id,
         &index_file_names
             .iter()
-            .map(|(ttv_file, f)| (f.id, &f.account, ttv_file, f.meta.index_size, f.meta.max_ts))
+            .map(|(ttv_file, f)| (ttv_file, f.meta.index_size, f.meta.max_ts))
             .collect_vec(),
         &mut scan_stats,
         "index",
@@ -907,19 +890,17 @@ pub async fn filter_file_list_by_tantivy_index(
 
 pub async fn get_tantivy_directory(
     _trace_id: &str,
-    file_account: &str,
     file_name: &str,
     file_size: i64,
 ) -> anyhow::Result<PuffinDirReader> {
-    let file_account = file_account.to_string();
     let source = object_store::ObjectMeta {
         location: file_name.into(),
         last_modified: *BASE_TIME,
-        size: file_size as u64,
+        size: file_size as usize,
         e_tag: None,
         version: None,
     };
-    Ok(PuffinDirReader::from_path(file_account, source).await?)
+    Ok(PuffinDirReader::from_path(source).await?)
 }
 
 async fn search_tantivy_index(
@@ -929,7 +910,6 @@ async fn search_tantivy_index(
     idx_optimize_rule: Option<IndexOptimizeMode>,
     parquet_file: &FileKey,
 ) -> anyhow::Result<(String, TantivyResult)> {
-    let file_account = parquet_file.account.clone();
     let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
         return Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",
@@ -950,13 +930,8 @@ async fn search_tantivy_index(
             log::debug!("[trace_id {trace_id}] init cache for tantivy file: {ttv_file_name}");
 
             let puffin_dir = Arc::new(
-                get_tantivy_directory(
-                    trace_id,
-                    &file_account,
-                    &ttv_file_name,
-                    parquet_file.meta.index_size,
-                )
-                .await?,
+                get_tantivy_directory(trace_id, &ttv_file_name, parquet_file.meta.index_size)
+                    .await?,
             );
             let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
             let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
@@ -1125,17 +1100,21 @@ fn partition_tantivy_files(
     idx_optimize_mode: &Option<IndexOptimizeMode>,
     target_partitions: usize,
 ) -> (Vec<Vec<FileKey>>, usize) {
-    let (file_groups, limit) = if let Some(IndexOptimizeMode::SimpleSelect(limit, _ascend)) =
-        idx_optimize_mode
-        && *limit > 0
-    {
-        let file_groups = group_files_by_time_range(index_parquet_files, target_partitions);
-        (file_groups, *limit)
-    } else {
-        // splite the filter groups by target partitions
-        let file_groups = into_chunks(index_parquet_files, target_partitions);
-        (file_groups, 0)
-    };
+    let (file_groups, limit) =
+        if let Some(IndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_mode {
+            if *limit > 0 {
+                let file_groups = group_files_by_time_range(index_parquet_files, target_partitions);
+                (file_groups, *limit)
+            } else {
+                // splite the filter groups by target partitions
+                let file_groups = into_chunks(index_parquet_files, target_partitions);
+                (file_groups, 0)
+            }
+        } else {
+            // splite the filter groups by target partitions
+            let file_groups = into_chunks(index_parquet_files, target_partitions);
+            (file_groups, 0)
+        };
 
     if limit == 0 {
         (file_groups, limit)

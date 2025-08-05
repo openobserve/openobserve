@@ -118,7 +118,7 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
             Expr::ScalarFunction(ScalarFunction { func, args }) => {
                 let name = func.name();
                 if name == MATCH_ALL_UDF_NAME {
-                    let Expr::Literal(ScalarValue::Utf8(Some(item)), _) = args[0].clone() else {
+                    let Expr::Literal(ScalarValue::Utf8(Some(item))) = args[0].clone() else {
                         return Err(DataFusionError::Internal(format!(
                             "Unexpected argument type for match_all() keyword: {:?}",
                             args[0]
@@ -131,9 +131,9 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                         .trim_end_matches('*') // prefix or contains
                         .to_string(); // remove prefix and suffix *
                     let item = if get_config().common.utf8_view_enabled {
-                        Expr::Literal(ScalarValue::Utf8View(Some(format!("%{item}%"))), None)
+                        Expr::Literal(ScalarValue::Utf8View(Some(format!("%{item}%"))))
                     } else {
-                        Expr::Literal(ScalarValue::Utf8(Some(format!("%{item}%"))), None)
+                        Expr::Literal(ScalarValue::Utf8(Some(format!("%{item}%"))))
                     };
                     for field in self.fields.iter() {
                         let new_expr = create_like_expr_with_not_null(field, item.clone());
@@ -147,14 +147,13 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                     let new_expr = disjunction(expr_list).unwrap();
                     Ok(Transformed::yes(new_expr))
                 } else if name == FUZZY_MATCH_ALL_UDF_NAME {
-                    let Expr::Literal(ScalarValue::Utf8(Some(item)), _) = args[0].clone() else {
+                    let Expr::Literal(ScalarValue::Utf8(Some(item))) = args[0].clone() else {
                         return Err(DataFusionError::Internal(format!(
                             "Unexpected argument type for fuzzy_match_all() keyword: {:?}",
                             args[0]
                         )));
                     };
-                    let Expr::Literal(ScalarValue::Int64(Some(distance)), _) = args[1].clone()
-                    else {
+                    let Expr::Literal(ScalarValue::Int64(Some(distance))) = args[1].clone() else {
                         return Err(DataFusionError::Internal(format!(
                             "Unexpected argument type for fuzzy_match_all() distance: {:?}",
                             args[1]
@@ -162,11 +161,11 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                     };
                     let mut expr_list = Vec::with_capacity(self.fields.len());
                     let item = if get_config().common.utf8_view_enabled {
-                        Expr::Literal(ScalarValue::Utf8View(Some(item.to_string())), None)
+                        Expr::Literal(ScalarValue::Utf8View(Some(item.to_string())))
                     } else {
-                        Expr::Literal(ScalarValue::Utf8(Some(item.to_string())), None)
+                        Expr::Literal(ScalarValue::Utf8(Some(item.to_string())))
                     };
-                    let distance = Expr::Literal(ScalarValue::Int64(Some(distance)), None);
+                    let distance = Expr::Literal(ScalarValue::Int64(Some(distance)));
                     let fuzzy_expr = fuzzy_match_udf::FUZZY_MATCH_UDF.clone();
                     for field in self.fields.iter() {
                         let new_expr = fuzzy_expr.call(vec![
@@ -441,7 +440,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_like_expr_with_not_null() {
         let field = "name";
-        let item = Expr::Literal(ScalarValue::Utf8(Some("open".to_string())), None);
+        let item = Expr::Literal(ScalarValue::Utf8(Some("open".to_string())));
         let expr = create_like_expr_with_not_null(field, item.clone());
         assert_eq!(
             expr,

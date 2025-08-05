@@ -766,7 +766,7 @@ pub fn handle_histogram(
         format!("{histogram_interval} second")
     } else {
         args.get(1).map_or_else(
-            || generate_histogram_interval(q_time_range, 0),
+            || generate_histogram_interval(q_time_range).to_string(),
             |v| v.to_string(),
         )
     };

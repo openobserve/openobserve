@@ -44,14 +44,12 @@ use regex::Regex;
 use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
-        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, ObjectNamePart,
-        OrderByExpr, OrderByKind, OrderByOptions, Query, Select, SelectFlavor, SelectItem, SetExpr,
-        Statement, TableFactor, TableWithJoins, Value, ValueWithSpan, VisitMut, VisitorMut,
-        helpers::attached_token::AttachedToken,
+        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, OrderByExpr,
+        Query, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, Value,
+        VisitMut, VisitorMut, helpers::attached_token::AttachedToken,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
-    tokenizer::Span,
 };
 
 #[cfg(feature = "enterprise")]
@@ -75,6 +73,8 @@ use crate::service::search::{
     },
     utils::get_field_name,
 };
+
+pub mod histogram;
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
@@ -192,10 +192,10 @@ impl Sql {
             && order_by[0].1 == OrderBy::Desc;
 
         // check if need exact limit and offset
-        if (limit == -1 || limit == 0)
-            && let Some(n) = column_visitor.limit
-        {
-            limit = n;
+        if limit == -1 || limit == 0 {
+            if let Some(n) = column_visitor.limit {
+                limit = n;
+            }
         }
 
         // 5. get match_all() value
@@ -262,9 +262,6 @@ impl Sql {
         };
 
         //********************Change the sql start*********************************//
-        // 11. replace approx_percentile_cont to new format
-        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
-        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
 
         // 12. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
@@ -575,31 +572,31 @@ fn generate_quick_mode_fields(
     }
 
     // check _timestamp column
-    if !fields_name.contains(TIMESTAMP_COL_NAME)
-        && let Ok(field) = schema.field_with_name(TIMESTAMP_COL_NAME)
-    {
-        fields.push(Arc::new(field.clone()));
-        fields_name.insert(TIMESTAMP_COL_NAME.to_string());
+    if !fields_name.contains(TIMESTAMP_COL_NAME) {
+        if let Ok(field) = schema.field_with_name(TIMESTAMP_COL_NAME) {
+            fields.push(Arc::new(field.clone()));
+            fields_name.insert(TIMESTAMP_COL_NAME.to_string());
+        }
     }
     // add the selected columns
     if let Some(columns) = columns {
         for column in columns {
-            if !fields_name.contains(&column)
-                && let Ok(field) = schema.field_with_name(&column)
-            {
-                fields.push(Arc::new(field.clone()));
-                fields_name.insert(column.to_string());
+            if !fields_name.contains(&column) {
+                if let Ok(field) = schema.field_with_name(&column) {
+                    fields.push(Arc::new(field.clone()));
+                    fields_name.insert(column.to_string());
+                }
             }
         }
     }
     // check fts fields
     if need_fst_fields {
         for field in fts_fields {
-            if !fields_name.contains(field)
-                && let Ok(field) = schema.field_with_name(field)
-            {
-                fields.push(Arc::new(field.clone()));
-                fields_name.insert(field.to_string());
+            if !fields_name.contains(field) {
+                if let Ok(field) = schema.field_with_name(field) {
+                    fields.push(Arc::new(field.clone()));
+                    fields_name.insert(field.to_string());
+                }
             }
         }
     } else if fields_name.contains(ALL_VALUES_COL_NAME) {
@@ -608,11 +605,11 @@ fn generate_quick_mode_fields(
 
     // check quick mode fields
     for field in config::QUICK_MODEL_FIELDS.iter() {
-        if !fields_name.contains(field)
-            && let Ok(field) = schema.field_with_name(field)
-        {
-            fields.push(Arc::new(field.clone()));
-            fields_name.insert(field.to_string());
+        if !fields_name.contains(field) {
+            if let Ok(field) = schema.field_with_name(field) {
+                fields.push(Arc::new(field.clone()));
+                fields_name.insert(field.to_string());
+            }
         }
     }
     if !need_fst_fields && skip_original_column && fields_name.contains(ORIGINAL_DATA_COL_NAME) {
@@ -752,17 +749,15 @@ impl VisitorMut for ColumnVisitor<'_> {
     }
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let Some(order_by) = query.order_by.as_mut()
-            && let OrderByKind::Expressions(exprs) = &mut order_by.kind
-        {
-            for order in exprs.iter_mut() {
+        if let Some(order_by) = query.order_by.as_mut() {
+            for order in order_by.exprs.iter_mut() {
                 let mut name_visitor = FieldNameVisitor::new();
                 let _ = order.expr.visit(&mut name_visitor);
                 if name_visitor.field_names.len() == 1 {
                     let expr_name = name_visitor.field_names.iter().next().unwrap().to_string();
                     self.order_by.push((
                         expr_name,
-                        if order.options.asc.unwrap_or(true) {
+                        if order.asc.unwrap_or(true) {
                             OrderBy::Asc
                         } else {
                             OrderBy::Desc
@@ -798,19 +793,17 @@ impl VisitorMut for ColumnVisitor<'_> {
                 self.is_distinct = true;
             }
         }
-        if let Some(limit) = query.limit.as_ref()
-            && let Expr::Value(ValueWithSpan { value, span: _ }) = limit
-            && let Value::Number(n, _) = value
-            && let Ok(num) = n.to_string().parse::<i64>()
-        {
-            self.limit = Some(num);
+        if let Some(Expr::Value(Value::Number(n, _))) = query.limit.as_ref() {
+            if let Ok(num) = n.to_string().parse::<i64>() {
+                self.limit = Some(num);
+            }
         }
-        if let Some(offset) = query.offset.as_ref()
-            && let Expr::Value(ValueWithSpan { value, span: _ }) = &offset.value
-            && let Value::Number(n, _) = value
-            && let Ok(num) = n.to_string().parse::<i64>()
-        {
-            self.offset = Some(num);
+        if let Some(offset) = query.offset.as_ref() {
+            if let Expr::Value(Value::Number(n, _)) = &offset.value {
+                if let Ok(num) = n.to_string().parse::<i64>() {
+                    self.offset = Some(num);
+                }
+            }
         }
         ControlFlow::Continue(())
     }
@@ -896,26 +889,28 @@ impl VisitorMut for IndexVisitor {
                 // addational check for simple distinct query
                 // filter should all extract to index condition and index condition should have
                 // the same field as the distinct field
-                if can_remove_filter
-                    && let Some(distinct) = is_simple_distinct_query(query)
-                    && let Some(index) = self.index_condition.as_ref()
-                    && !index.is_simple_str_match(&distinct.0)
-                {
-                    self.can_optimize = false;
+                if can_remove_filter {
+                    if let Some(distinct) = is_simple_distinct_query(query) {
+                        if let Some(index) = self.index_condition.as_ref() {
+                            if !index.is_simple_str_match(&distinct.0) {
+                                self.can_optimize = false;
+                            }
+                        }
+                    }
                 }
             } else if is_simple_count_query(select) || is_simple_histogram_query(select) {
                 // if there is no filter, but have histogram or count, also can use index
                 self.can_optimize = true;
-            } else if let Some(topn) = is_simple_topn_query(query)
-                && self.index_fields.contains(&topn.0)
-            {
-                // if there is no filter, but have topn, also can use index
-                self.can_optimize = true;
-            } else if let Some(distinct) = is_simple_distinct_query(query)
-                && self.index_fields.contains(&distinct.0)
-            {
-                // if there is no filter, but have distinct, also can use index
-                self.can_optimize = true;
+            } else if let Some(topn) = is_simple_topn_query(query) {
+                if self.index_fields.contains(&topn.0) {
+                    // if there is no filter, but have topn, also can use index
+                    self.can_optimize = true;
+                }
+            } else if let Some(distinct) = is_simple_distinct_query(query) {
+                if self.index_fields.contains(&distinct.0) {
+                    // if there is no filter, but have distinct, also can use index
+                    self.can_optimize = true;
+                }
             }
         }
         ControlFlow::Continue(())
@@ -941,106 +936,106 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref()
-            && let Some(expr) = select.selection.as_ref()
-        {
-            let exprs = split_conjunction(expr);
-            for e in exprs {
-                match e {
-                    Expr::BinaryOp {
-                        left,
-                        op: BinaryOperator::Eq,
-                        right,
-                    } => {
-                        let (left, right) = if is_value(left) && is_field(right) {
-                            (right, left)
-                        } else if is_value(right) && is_field(left) {
-                            (left, right)
-                        } else {
-                            continue;
-                        };
-                        match left.as_ref() {
-                            Expr::Identifier(ident) => {
-                                let mut count = 0;
-                                let field_name = ident.value.clone();
-                                let mut table_name = "".to_string();
-                                for (name, schema) in self.schemas.iter() {
-                                    if schema.contains_field(&field_name) {
-                                        count += 1;
-                                        table_name = name.to_string();
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
+            if let Some(expr) = select.selection.as_ref() {
+                let exprs = split_conjunction(expr);
+                for e in exprs {
+                    match e {
+                        Expr::BinaryOp {
+                            left,
+                            op: BinaryOperator::Eq,
+                            right,
+                        } => {
+                            let (left, right) = if is_value(left) && is_field(right) {
+                                (right, left)
+                            } else if is_value(right) && is_field(left) {
+                                (left, right)
+                            } else {
+                                continue;
+                            };
+                            match left.as_ref() {
+                                Expr::Identifier(ident) => {
+                                    let mut count = 0;
+                                    let field_name = ident.value.clone();
+                                    let mut table_name = "".to_string();
+                                    for (name, schema) in self.schemas.iter() {
+                                        if schema.contains_field(&field_name) {
+                                            count += 1;
+                                            table_name = name.to_string();
+                                        }
+                                    }
+                                    if count == 1 {
+                                        self.equal_items
+                                            .entry(TableReference::from(table_name))
+                                            .or_default()
+                                            .push((
+                                                field_name,
+                                                trim_quotes(right.to_string().as_str()),
+                                            ));
                                     }
                                 }
-                                if count == 1 {
-                                    self.equal_items
-                                        .entry(TableReference::from(table_name))
-                                        .or_default()
-                                        .push((
+                                Expr::CompoundIdentifier(idents) => {
+                                    let (table_name, field_name) = generate_table_reference(idents);
+                                    // check if table_name is in schemas, otherwise the table_name
+                                    // maybe is a alias
+                                    if self.schemas.contains_key(&table_name) {
+                                        self.equal_items.entry(table_name).or_default().push((
                                             field_name,
                                             trim_quotes(right.to_string().as_str()),
                                         ));
+                                    }
                                 }
+                                _ => {}
                             }
-                            Expr::CompoundIdentifier(idents) => {
-                                let (table_name, field_name) = generate_table_reference(idents);
-                                // check if table_name is in schemas, otherwise the table_name
-                                // maybe is a alias
-                                if self.schemas.contains_key(&table_name) {
-                                    self.equal_items.entry(table_name).or_default().push((
-                                        field_name,
-                                        trim_quotes(right.to_string().as_str()),
-                                    ));
-                                }
-                            }
-                            _ => {}
                         }
-                    }
-                    Expr::InList {
-                        expr,
-                        list,
-                        negated: false,
-                    } => {
-                        match expr.as_ref() {
-                            Expr::Identifier(ident) => {
-                                let mut count = 0;
-                                let field_name = ident.value.clone();
-                                let mut table_name = "".to_string();
-                                for (name, schema) in self.schemas.iter() {
-                                    if schema.contains_field(&field_name) {
-                                        count += 1;
-                                        table_name = name.to_string();
+                        Expr::InList {
+                            expr,
+                            list,
+                            negated: false,
+                        } => {
+                            match expr.as_ref() {
+                                Expr::Identifier(ident) => {
+                                    let mut count = 0;
+                                    let field_name = ident.value.clone();
+                                    let mut table_name = "".to_string();
+                                    for (name, schema) in self.schemas.iter() {
+                                        if schema.contains_field(&field_name) {
+                                            count += 1;
+                                            table_name = name.to_string();
+                                        }
+                                    }
+                                    if count == 1 {
+                                        let entry = self
+                                            .equal_items
+                                            .entry(TableReference::from(table_name))
+                                            .or_default();
+                                        for val in list.iter() {
+                                            entry.push((
+                                                field_name.clone(),
+                                                trim_quotes(val.to_string().as_str()),
+                                            ));
+                                        }
                                     }
                                 }
-                                if count == 1 {
-                                    let entry = self
-                                        .equal_items
-                                        .entry(TableReference::from(table_name))
-                                        .or_default();
-                                    for val in list.iter() {
-                                        entry.push((
-                                            field_name.clone(),
-                                            trim_quotes(val.to_string().as_str()),
-                                        ));
+                                Expr::CompoundIdentifier(idents) => {
+                                    let (table_name, field_name) = generate_table_reference(idents);
+                                    // check if table_name is in schemas, otherwise the table_name
+                                    // maybe is a alias
+                                    if self.schemas.contains_key(&table_name) {
+                                        let entry = self.equal_items.entry(table_name).or_default();
+                                        for val in list.iter() {
+                                            entry.push((
+                                                field_name.clone(),
+                                                trim_quotes(val.to_string().as_str()),
+                                            ));
+                                        }
                                     }
                                 }
+                                _ => {}
                             }
-                            Expr::CompoundIdentifier(idents) => {
-                                let (table_name, field_name) = generate_table_reference(idents);
-                                // check if table_name is in schemas, otherwise the table_name
-                                // maybe is a alias
-                                if self.schemas.contains_key(&table_name) {
-                                    let entry = self.equal_items.entry(table_name).or_default();
-                                    for val in list.iter() {
-                                        entry.push((
-                                            field_name.clone(),
-                                            trim_quotes(val.to_string().as_str()),
-                                        ));
-                                    }
-                                }
-                            }
-                            _ => {}
                         }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
         }
@@ -1067,58 +1062,58 @@ impl VisitorMut for PrefixColumnVisitor<'_> {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref()
-            && let Some(expr) = select.selection.as_ref()
-        {
-            let exprs = split_conjunction(expr);
-            for e in exprs {
-                if let Expr::Like {
-                    negated: false,
-                    expr,
-                    pattern,
-                    escape_char: _,
-                    any: _,
-                } = e
-                {
-                    match expr.as_ref() {
-                        Expr::Identifier(ident) => {
-                            let mut count = 0;
-                            let field_name = ident.value.clone();
-                            let mut table_name = "".to_string();
-                            for (name, schema) in self.schemas.iter() {
-                                if schema.contains_field(&field_name) {
-                                    count += 1;
-                                    table_name = name.to_string();
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
+            if let Some(expr) = select.selection.as_ref() {
+                let exprs = split_conjunction(expr);
+                for e in exprs {
+                    if let Expr::Like {
+                        negated: false,
+                        expr,
+                        pattern,
+                        escape_char: _,
+                        any: _,
+                    } = e
+                    {
+                        match expr.as_ref() {
+                            Expr::Identifier(ident) => {
+                                let mut count = 0;
+                                let field_name = ident.value.clone();
+                                let mut table_name = "".to_string();
+                                for (name, schema) in self.schemas.iter() {
+                                    if schema.contains_field(&field_name) {
+                                        count += 1;
+                                        table_name = name.to_string();
+                                    }
+                                }
+                                if count == 1 {
+                                    let pattern = trim_quotes(pattern.to_string().as_str());
+                                    if !pattern.starts_with('%') && pattern.ends_with('%') {
+                                        self.prefix_items
+                                            .entry(TableReference::from(table_name))
+                                            .or_default()
+                                            .push((
+                                                field_name,
+                                                pattern.trim_end_matches('%').to_string(),
+                                            ));
+                                    }
                                 }
                             }
-                            if count == 1 {
-                                let pattern = trim_quotes(pattern.to_string().as_str());
-                                if !pattern.starts_with('%') && pattern.ends_with('%') {
-                                    self.prefix_items
-                                        .entry(TableReference::from(table_name))
-                                        .or_default()
-                                        .push((
+                            Expr::CompoundIdentifier(idents) => {
+                                let (table_name, field_name) = generate_table_reference(idents);
+                                // check if table_name is in schemas, otherwise the table_name
+                                // maybe is a alias
+                                if self.schemas.contains_key(&table_name) {
+                                    let pattern = trim_quotes(pattern.to_string().as_str());
+                                    if !pattern.starts_with('%') && pattern.ends_with('%') {
+                                        self.prefix_items.entry(table_name).or_default().push((
                                             field_name,
                                             pattern.trim_end_matches('%').to_string(),
                                         ));
+                                    }
                                 }
                             }
+                            _ => {}
                         }
-                        Expr::CompoundIdentifier(idents) => {
-                            let (table_name, field_name) = generate_table_reference(idents);
-                            // check if table_name is in schemas, otherwise the table_name
-                            // maybe is a alias
-                            if self.schemas.contains_key(&table_name) {
-                                let pattern = trim_quotes(pattern.to_string().as_str());
-                                if !pattern.starts_with('%') && pattern.ends_with('%') {
-                                    self.prefix_items.entry(table_name).or_default().push((
-                                        field_name,
-                                        pattern.trim_end_matches('%').to_string(),
-                                    ));
-                                }
-                            }
-                        }
-                        _ => {}
                     }
                 }
             }
@@ -1144,14 +1139,15 @@ impl VisitorMut for MatchVisitor {
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Function(func) = expr {
             let name = func.name.to_string().to_lowercase();
-            if (name == MATCH_ALL_UDF_NAME || name == FUZZY_MATCH_ALL_UDF_NAME)
-                && let FunctionArguments::List(list) = &func.args
-                && !list.args.is_empty()
-            {
-                let value = trim_quotes(list.args[0].to_string().as_str());
-                match &mut self.match_items {
-                    Some(items) => items.push(value),
-                    None => self.match_items = Some(vec![value]),
+            if name == MATCH_ALL_UDF_NAME || name == FUZZY_MATCH_ALL_UDF_NAME {
+                if let FunctionArguments::List(list) = &func.args {
+                    if !list.args.is_empty() {
+                        let value = trim_quotes(list.args[0].to_string().as_str());
+                        match &mut self.match_items {
+                            Some(items) => items.push(value),
+                            None => self.match_items = Some(vec![value]),
+                        }
+                    }
                 }
             }
         }
@@ -1360,14 +1356,14 @@ impl VisitorMut for IndexOptimizeModeVisitor {
                 self.is_simple_count = is_simple_count_query(select);
             } else if is_simple_histogram_query(select) {
                 self.is_simple_histogram = true;
-            } else if let Some(topn) = is_simple_topn_query(query)
-                && self.index_fields.contains(&topn.0)
-            {
-                self.simple_topn = Some(topn);
-            } else if let Some(distinct) = is_simple_distinct_query(query)
-                && self.index_fields.contains(&distinct.0)
-            {
-                self.simple_distinct = Some(distinct);
+            } else if let Some(topn) = is_simple_topn_query(query) {
+                if self.index_fields.contains(&topn.0) {
+                    self.simple_topn = Some(topn);
+                }
+            } else if let Some(distinct) = is_simple_distinct_query(query) {
+                if self.index_fields.contains(&distinct.0) {
+                    self.simple_distinct = Some(distinct);
+                }
             }
         }
         if self.is_simple_count
@@ -1452,42 +1448,39 @@ fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
     };
 
     let mut order_by_references_count = false;
-    if let Some(order_by) = &query.order_by
-        && let OrderByKind::Expressions(exprs) = &order_by.kind
-        && exprs.len() == 1
-    {
-        match &exprs[0].expr {
-            Expr::Identifier(ident) => {
-                // Check if it's the count alias
-                if let Some(alias) = &count_alias
-                    && ident.value == *alias
-                    && exprs[0].options.asc == Some(false)
-                {
-                    order_by_references_count = true;
+    if let Some(order_by) = &query.order_by {
+        if order_by.exprs.len() == 1 {
+            match &order_by.exprs[0].expr {
+                Expr::Identifier(ident) => {
+                    // Check if it's the count alias
+                    if let Some(alias) = &count_alias {
+                        if ident.value == *alias && order_by.exprs[0].asc == Some(false) {
+                            order_by_references_count = true;
+                        }
+                    }
                 }
-            }
-            Expr::Function(func) => {
-                // Check if it's count(*) function directly
-                let name = trim_quotes(&func.name.to_string().to_lowercase());
-                if name == "count"
-                    && let FunctionArguments::List(list) = &func.args
-                    && list.args.len() == 1
-                    && trim_quotes(&list.args[0].to_string()) == "*"
-                    && exprs[0].options.asc == Some(false)
-                {
-                    order_by_references_count = true;
+                Expr::Function(func) => {
+                    // Check if it's count(*) function directly
+                    let name = trim_quotes(&func.name.to_string().to_lowercase());
+                    if name == "count" {
+                        if let FunctionArguments::List(list) = &func.args {
+                            if list.args.len() == 1
+                                && trim_quotes(&list.args[0].to_string()) == "*"
+                                && order_by.exprs[0].asc == Some(false)
+                            {
+                                order_by_references_count = true;
+                            }
+                        }
+                    }
                 }
+                _ => {}
             }
-            _ => {}
         }
     }
 
     // check if limit is present
     let limit = match &query.limit {
-        Some(Expr::Value(ValueWithSpan {
-            value: Value::Number(v, _b),
-            ..
-        })) => {
+        Some(Expr::Value(Value::Number(v, _b))) => {
             let v: i64 = v.parse().unwrap_or(0);
             std::cmp::min(v, MAX_LIMIT) as usize
         }
@@ -1558,30 +1551,29 @@ fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> {
     // Check if ORDER BY references the same field
     let mut order_by_references_field = false;
     let mut is_asc = false;
-    if let Some(order_by) = &query.order_by
-        && let OrderByKind::Expressions(exprs) = &order_by.kind
-        && exprs.len() == 1
-    {
-        match &exprs[0].expr {
-            Expr::Identifier(ident) => {
-                if field_matches_with_alias(&field_name, field_alias.as_deref(), &ident.value) {
-                    order_by_references_field = true;
-                    is_asc = exprs[0].options.asc.unwrap_or(true);
+    if let Some(order_by) = &query.order_by {
+        if order_by.exprs.len() == 1 {
+            match &order_by.exprs[0].expr {
+                Expr::Identifier(ident) => {
+                    if field_matches_with_alias(&field_name, field_alias.as_deref(), &ident.value) {
+                        order_by_references_field = true;
+                        is_asc = order_by.exprs[0].asc.unwrap_or(true);
+                    }
                 }
-            }
-            Expr::CompoundIdentifier(idents) => {
-                if !idents.is_empty()
-                    && field_matches_with_alias(
-                        &field_name,
-                        field_alias.as_deref(),
-                        &idents.last().unwrap().value,
-                    )
-                {
-                    order_by_references_field = true;
-                    is_asc = exprs[0].options.asc.unwrap_or(true);
+                Expr::CompoundIdentifier(idents) => {
+                    if !idents.is_empty()
+                        && field_matches_with_alias(
+                            &field_name,
+                            field_alias.as_deref(),
+                            &idents.last().unwrap().value,
+                        )
+                    {
+                        order_by_references_field = true;
+                        is_asc = order_by.exprs[0].asc.unwrap_or(true);
+                    }
                 }
+                _ => {}
             }
-            _ => {}
         }
     }
 
@@ -1592,10 +1584,7 @@ fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> {
 
     // check if limit is present
     let limit = match &query.limit {
-        Some(Expr::Value(ValueWithSpan {
-            value: Value::Number(v, _b),
-            ..
-        })) => {
+        Some(Expr::Value(Value::Number(v, _b))) => {
             let v: i64 = v.parse().unwrap_or(0);
             std::cmp::min(v, MAX_LIMIT) as usize
         }
@@ -1733,31 +1722,31 @@ impl VisitorMut for HistogramIntervalVisitor {
     type Break = ();
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
-        if let Expr::Function(func) = expr
-            && func.name.to_string().eq_ignore_ascii_case("histogram")
-        {
-            if let FunctionArguments::List(list) = &func.args {
-                let mut args = list.args.iter();
-                // first is field
-                let _ = args.next();
-                // second is interval
-                let interval = if let Some(interval) = args.next() {
-                    interval
-                        .to_string()
-                        .trim_matches(|v| v == '\'' || v == '"')
-                        .to_string()
-                } else {
-                    generate_histogram_interval(self.time_range).to_string()
-                };
-                self.interval = match convert_histogram_interval_to_seconds(&interval) {
-                    Ok(v) => Some(v),
-                    Err(e) => {
-                        log::error!("{e:?}");
-                        Some(0)
-                    }
-                };
+        if let Expr::Function(func) = expr {
+            if func.name.to_string().to_lowercase() == "histogram" {
+                if let FunctionArguments::List(list) = &func.args {
+                    let mut args = list.args.iter();
+                    // first is field
+                    let _ = args.next();
+                    // second is interval
+                    let interval = if let Some(interval) = args.next() {
+                        interval
+                            .to_string()
+                            .trim_matches(|v| v == '\'' || v == '"')
+                            .to_string()
+                    } else {
+                        generate_histogram_interval(self.time_range).to_string()
+                    };
+                    self.interval = match convert_histogram_interval_to_seconds(&interval) {
+                        Ok(v) => Some(v),
+                        Err(e) => {
+                            log::error!("{e:?}");
+                            Some(0)
+                        }
+                    };
+                }
+                return ControlFlow::Break(());
             }
-            return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
     }
@@ -1798,7 +1787,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                 select.sort_by = vec![];
                 select.projection = vec![SelectItem::ExprWithAlias {
                     expr: Expr::Function(Function {
-                        name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("count"))]),
+                        name: ObjectName(vec![Ident::new("count")]),
                         parameters: FunctionArguments::None,
                         args: FunctionArguments::List(FunctionArgumentList {
                             args: vec![FunctionArg::Unnamed(field_expr)],
@@ -1824,7 +1813,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     top_before_distinct: false,
                     projection: vec![SelectItem::ExprWithAlias {
                         expr: Expr::Function(Function {
-                            name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("count"))]),
+                            name: ObjectName(vec![Ident::new("count")]),
                             parameters: FunctionArguments::None,
                             args: FunctionArguments::List(FunctionArgumentList {
                                 args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
@@ -1861,7 +1850,6 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     window_before_qualify: false,
                     connect_by: None,
                     value_table_mode: None,
-                    flavor: SelectFlavor::Standard,
                 })));
                 *query = Query {
                     with: None,
@@ -1883,65 +1871,6 @@ impl VisitorMut for TrackTotalHitsVisitor {
     }
 }
 
-struct ReplaceApproxPercentiletVisitor {}
-
-impl ReplaceApproxPercentiletVisitor {
-    fn new() -> Self {
-        Self {}
-    }
-}
-
-impl VisitorMut for ReplaceApproxPercentiletVisitor {
-    type Break = ();
-
-    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
-        if let Expr::Function(func) = expr {
-            if !func.within_group.is_empty() {
-                return ControlFlow::Continue(());
-            }
-            let name = func.name.to_string().to_lowercase();
-            if name == "approx_percentile_cont" {
-                let (first, others) = splite_function_args(&func.args);
-                *expr = Expr::Function(Function {
-                    name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new(
-                        "approx_percentile_cont",
-                    ))]),
-                    parameters: FunctionArguments::None,
-                    args: FunctionArguments::List(FunctionArgumentList {
-                        args: others,
-                        duplicate_treatment: None,
-                        clauses: vec![],
-                    }),
-                    filter: None,
-                    null_treatment: None,
-                    over: None,
-                    within_group: vec![convert_args_to_order_expr(first)],
-                    uses_odbc_syntax: false,
-                });
-            } else if name == "approx_percentile_cont_with_weight" {
-                let (first, others) = splite_function_args(&func.args);
-                *expr = Expr::Function(Function {
-                    name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new(
-                        "approx_percentile_cont_with_weight",
-                    ))]),
-                    parameters: FunctionArguments::None,
-                    args: FunctionArguments::List(FunctionArgumentList {
-                        args: others,
-                        duplicate_treatment: None,
-                        clauses: vec![],
-                    }),
-                    filter: None,
-                    null_treatment: None,
-                    over: None,
-                    within_group: vec![convert_args_to_order_expr(first)],
-                    uses_odbc_syntax: false,
-                });
-            }
-        }
-        ControlFlow::Continue(())
-    }
-}
-
 fn splite_function_args(args: &FunctionArguments) -> (FunctionArg, Vec<FunctionArg>) {
     match args {
         FunctionArguments::List(list) => {
@@ -1959,11 +1888,9 @@ fn convert_args_to_order_expr(args: FunctionArg) -> OrderByExpr {
     let expr = convert_function_args_to_expr(args);
     OrderByExpr {
         expr: expr.clone(),
-        options: OrderByOptions {
-            asc: None,
-            nulls_first: None,
-        },
         with_fill: None,
+        asc: None,
+        nulls_first: None,
     }
 }
 
@@ -2286,14 +2213,12 @@ impl VisitorMut for AddOrderingTermVisitor {
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         if query.order_by.is_none() {
             query.order_by = Some(sqlparser::ast::OrderBy {
-                kind: OrderByKind::Expressions(vec![OrderByExpr {
+                exprs: vec![OrderByExpr {
                     expr: Expr::Identifier(Ident::new(self.field.clone())),
+                    asc: Some(self.is_asc),
+                    nulls_first: None,
                     with_fill: None,
-                    options: sqlparser::ast::OrderByOptions {
-                        asc: Some(self.is_asc),
-                        nulls_first: None,
-                    },
-                }]),
+                }],
                 interpolate: None,
             });
         }
@@ -2342,10 +2267,7 @@ impl AddNewFiltersWithAndOperatorVisitor {
             exprs.push(Expr::BinaryOp {
                 left: Box::new(Expr::Identifier(Ident::new(key.to_string()))),
                 op: BinaryOperator::Eq,
-                right: Box::new(Expr::Value(ValueWithSpan {
-                    value: Value::SingleQuotedString(value.to_string()),
-                    span: Span::empty(),
-                })),
+                right: Box::new(Expr::Value(Value::SingleQuotedString(value.to_string()))),
             });
         }
         let exprs = exprs.iter().collect();
@@ -2485,16 +2407,18 @@ impl VisitorMut for RemoveDashboardAllVisitor {
             }
             Expr::Function(func) => {
                 let f = func.name.to_string().to_lowercase();
-                if (f == STR_MATCH_UDF_NAME
+                if f == STR_MATCH_UDF_NAME
                     || f == STR_MATCH_UDF_IGNORE_CASE_NAME
                     || f == MATCH_FIELD_UDF_NAME
-                    || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME)
-                    && let FunctionArguments::List(list) = &func.args
-                    && list.args.len() == 2
+                    || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME
                 {
-                    let value = trim_quotes(list.args[1].to_string().as_str());
-                    if *value == placeholder {
-                        *expr = expr_boolean(true);
+                    if let FunctionArguments::List(list) = &func.args {
+                        if list.args.len() == 2 {
+                            let value = trim_quotes(list.args[1].to_string().as_str());
+                            if *value == placeholder {
+                                *expr = Expr::Value(Value::Boolean(true));
+                            }
+                        }
                     }
                 }
             }
@@ -2523,20 +2447,12 @@ pub async fn get_group_by_fields(sql: &Sql) -> Result<Vec<String>, Error> {
 }
 
 fn expr_boolean(value: bool) -> Expr {
-    Expr::Value(ValueWithSpan {
-        value: Value::Boolean(value),
-        span: Span::empty(),
-    })
+    Expr::Value(Value::Boolean(value))
 }
 
 fn is_eq_placeholder(expr: &Expr, placeholder: &str) -> bool {
-    if let Expr::Value(ValueWithSpan {
-        value: Value::SingleQuotedString(value),
-        span: _,
-    }) = expr
-        && value == placeholder
-    {
-        true
+    if let Expr::Value(Value::SingleQuotedString(value)) = expr {
+        value == placeholder
     } else {
         false
     }
@@ -2551,13 +2467,11 @@ fn field_matches_with_alias(field_name: &str, alias: Option<&str>, target_field:
     }
 
     // Match with alias if present
-    if let Some(alias_name) = alias
-        && alias_name == target_field
-    {
-        return true;
+    if let Some(alias_name) = alias {
+        alias_name == target_field
+    } else {
+        false
     }
-
-    false
 }
 
 #[cfg(test)]
@@ -3818,81 +3732,6 @@ mod tests {
             .pop()
             .unwrap();
         assert!(is_simple_distinct_query(&mut statement));
-    }
-
-    #[test]
-    fn test_replace_approx_percentilet_visitor1() {
-        let sql = "select approx_percentile_cont(a, 0.5) from stream";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
-        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
-        assert_eq!(
-            statement.to_string(),
-            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY a) FROM stream"
-        );
-    }
-
-    #[test]
-    fn test_replace_approx_percentilet_visitor2() {
-        let sql = "select approx_percentile_cont(arrow_cast(a, 'int'), 0.5) from stream";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
-        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
-        assert_eq!(
-            statement.to_string(),
-            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY arrow_cast(a, 'int')) FROM stream"
-        );
-    }
-
-    #[test]
-    fn test_replace_approx_percentilet_visitor3() {
-        let sql = "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY a) FROM stream";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
-        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
-        assert_eq!(
-            statement.to_string(),
-            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY a) FROM stream"
-        );
-    }
-
-    #[test]
-    fn test_replace_approx_percentilet_visitor4() {
-        let sql = "select approx_percentile_cont(arrow_cast(a, 'int') / 1000, 0.5) from stream";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
-        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
-        assert_eq!(
-            statement.to_string(),
-            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY arrow_cast(a, 'int') / 1000) FROM stream"
-        );
-    }
-
-    #[test]
-    fn test_replace_approx_percentilet_visitor5() {
-        let sql = "select approx_percentile_cont(CAST(json_get_str(array_element(cast_to_arr(spath(log, 'error')), 1), 'code') AS INT), 0.5) from stream";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
-        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
-        assert_eq!(
-            statement.to_string(),
-            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY CAST(json_get_str(array_element(cast_to_arr(spath(log, 'error')), 1), 'code') AS INT)) FROM stream"
-        );
     }
 
     #[test]

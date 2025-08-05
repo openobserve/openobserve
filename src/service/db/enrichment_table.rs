@@ -57,7 +57,7 @@ pub async fn get_enrichment_table_data(
         timeout: 0,
         search_type: None,
         search_event_context: None,
-        use_cache: None,
+        use_cache: false,
         local_mode: Some(true),
     };
     log::info!(
