@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::VecDeque, sync::Arc};
+use std::{
+    collections::VecDeque,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+};
 
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
@@ -28,6 +34,8 @@ pub struct TantivyResultCache {
     readers: DashMap<String, TantivyResult>,
     cacher: parking_lot::Mutex<VecDeque<String>>,
     max_entries: usize,
+    // TODO: convert this to a metrics
+    total_memory_size: AtomicUsize,
 }
 
 impl TantivyResultCache {
@@ -36,6 +44,7 @@ impl TantivyResultCache {
             readers: DashMap::new(),
             cacher: parking_lot::Mutex::new(VecDeque::new()),
             max_entries,
+            total_memory_size: AtomicUsize::new(0),
         }
     }
 
@@ -57,7 +66,13 @@ impl TantivyResultCache {
         }
         w.push_back(key.clone());
         drop(w);
+        self.total_memory_size
+            .fetch_add(value.get_memory_size(), Ordering::Relaxed);
         self.readers.insert(key, value)
+    }
+
+    pub fn total_memory_size(&self) -> usize {
+        self.total_memory_size.load(Ordering::Relaxed)
     }
 }
 

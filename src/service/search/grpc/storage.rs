@@ -877,12 +877,13 @@ pub async fn filter_file_list_by_tantivy_index(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} , is_add_filter_back: {}, file_num: {}, took: {} ms",
+                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} , is_add_filter_back: {}, file_num: {}, tantivy result cache memory size: {} MB, took: {} ms",
                 query.trace_id,
                 index_condition,
                 tantivy_result,
                 is_add_filter_back,
                 file_list_map.len(),
+                tantivy_result_cache::TANTIVY_RESULT_CACHE.total_memory_size() / 1024 / 1024,
                 search_start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
