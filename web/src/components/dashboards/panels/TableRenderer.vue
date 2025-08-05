@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:body-cell="props">
       <q-td :props="props" :style="getStyle(props)">
-        {{ props.value }}
+        {{ props.value == 'undefined' || props.value === null ? '' : props.value }}
       </q-td>
     </template>
   </q-table>
