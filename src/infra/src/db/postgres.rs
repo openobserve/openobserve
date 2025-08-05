@@ -68,7 +68,7 @@ fn connect(readonly: bool, ddl: bool) -> Pool<Postgres> {
 async fn cache_indices() -> HashSet<DBIndex> {
     let client = CLIENT.clone();
     DB_QUERY_NUMS
-        .with_label_values(&["select", "pg_indexes", ""])
+        .with_label_values(&["select", "pg_indexes"])
         .inc();
     let sql = r#"SELECT indexname, tablename FROM pg_indexes;"#;
     let res = sqlx::query_as::<_, (String, String)>(sql)
@@ -104,9 +104,7 @@ impl super::Db for PostgresDb {
 
     async fn stats(&self) -> Result<super::Stats> {
         let pool = CLIENT_RO.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "meta", ""])
-            .inc();
+        DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let keys_count: i64 = sqlx::query_scalar(r#"SELECT COUNT(*)::BIGINT AS num FROM meta;"#)
             .fetch_one(&pool)
             .await
@@ -120,9 +118,7 @@ impl super::Db for PostgresDb {
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT_RO.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "meta", ""])
-            .inc();
+        DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let query = format!(
             "SELECT value FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}' ORDER BY start_dt DESC;",
             module, key1, key2
@@ -154,9 +150,7 @@ impl super::Db for PostgresDb {
         let pool = CLIENT.clone();
         let local_start_dt = start_dt.unwrap_or_default();
         let mut tx = pool.begin().await?;
-        DB_QUERY_NUMS
-            .with_label_values(&["insert", "meta", key])
-            .inc();
+        DB_QUERY_NUMS.with_label_values(&["insert", "meta"]).inc();
         let start = std::time::Instant::now();
         if let Err(e) = sqlx::query(
             r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, '') ON CONFLICT DO NOTHING;"#
@@ -179,9 +173,7 @@ impl super::Db for PostgresDb {
             return Err(e.into());
         }
 
-        DB_QUERY_NUMS
-            .with_label_values(&["update", "meta", key])
-            .inc();
+        DB_QUERY_NUMS.with_label_values(&["update", "meta"]).inc();
         let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
                 r#"UPDATE meta SET value = $1 WHERE module = $2 AND key1 = $3 AND key2 = $4 AND start_dt = $5;"#
@@ -237,7 +229,7 @@ impl super::Db for PostgresDb {
             lock_id as i64
         };
         let lock_sql = format!("SELECT pg_advisory_xact_lock({lock_id})");
-        DB_QUERY_NUMS.with_label_values(&["get_lock", "", ""]).inc();
+        DB_QUERY_NUMS.with_label_values(&["get_lock", ""]).inc();
         if let Err(e) = sqlx::query(&lock_sql).execute(&mut *tx).await {
             if let Err(e) = tx.rollback().await {
                 log::error!("[POSTGRES] rollback get_for_update error: {}", e);
@@ -246,9 +238,7 @@ impl super::Db for PostgresDb {
         };
         let mut need_watch_dt = 0;
         let row = if let Some(start_dt) = start_dt {
-            DB_QUERY_NUMS
-                .with_label_values(&["select", "meta", ""])
-                .inc();
+            DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
             match sqlx::query_as::<_,super::MetaRecord>(
                 r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4;"#
             )
@@ -272,9 +262,7 @@ impl super::Db for PostgresDb {
                 }
             }
         } else {
-            DB_QUERY_NUMS
-                .with_label_values(&["select", "meta", ""])
-                .inc();
+            DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
             match sqlx::query_as::<_,super::MetaRecord>(
                 r#"SELECT id, module, key1, key2, start_dt, value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC, id DESC;"#
             )
@@ -319,18 +307,14 @@ impl super::Db for PostgresDb {
         // update value
         if let Some(value) = value {
             let ret = if exist {
-                DB_QUERY_NUMS
-                    .with_label_values(&["update", "meta", ""])
-                    .inc();
+                DB_QUERY_NUMS.with_label_values(&["update", "meta"]).inc();
                 sqlx::query(r#"UPDATE meta SET value = $1 WHERE id = $2;"#)
                     .bind(String::from_utf8(value.to_vec()).unwrap_or_default())
                     .bind(row_id.unwrap())
                     .execute(&mut *tx)
                     .await
             } else {
-                DB_QUERY_NUMS
-                    .with_label_values(&["insert", "meta", ""])
-                    .inc();
+                DB_QUERY_NUMS.with_label_values(&["insert", "meta"]).inc();
                 sqlx::query(
                 r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, $5);"#
             )
@@ -354,9 +338,7 @@ impl super::Db for PostgresDb {
         if let Some((new_key, new_value, new_start_dt)) = new_value {
             need_watch_dt = new_start_dt.unwrap_or_default();
             let (module, key1, key2) = super::parse_key(&new_key);
-            DB_QUERY_NUMS
-                .with_label_values(&["insert", "meta", ""])
-                .inc();
+            DB_QUERY_NUMS.with_label_values(&["insert", "meta"]).inc();
             if let Err(e) = sqlx::query(
                 r#"INSERT INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, $5);"#
             )
@@ -455,9 +437,7 @@ impl super::Db for PostgresDb {
         };
 
         let pool = CLIENT.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["delete", "meta", key])
-            .inc();
+        DB_QUERY_NUMS.with_label_values(&["delete", "meta"]).inc();
         sqlx::query(&sql).execute(&pool).await?;
 
         Ok(())
@@ -478,9 +458,7 @@ impl super::Db for PostgresDb {
         sql = format!("{} ORDER BY start_dt ASC", sql);
 
         let pool = CLIENT_RO.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "meta", ""])
-            .inc();
+        DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
             .await?;
@@ -509,9 +487,7 @@ impl super::Db for PostgresDb {
         }
         sql = format!("{} ORDER BY start_dt ASC", sql);
         let pool = CLIENT_RO.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "meta", ""])
-            .inc();
+        DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
             .await?;
@@ -560,9 +536,7 @@ impl super::Db for PostgresDb {
         sql = format!("{} ORDER BY start_dt ASC", sql);
 
         let pool = CLIENT_RO.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "meta", ""])
-            .inc();
+        DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
             .await?;
@@ -585,9 +559,7 @@ impl super::Db for PostgresDb {
             sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
         }
         let pool = CLIENT_RO.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "meta", ""])
-            .inc();
+        DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
         let count: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
         Ok(count)
     }
@@ -610,9 +582,7 @@ impl super::Db for PostgresDb {
 pub async fn create_table() -> Result<()> {
     let pool = CLIENT_DDL.clone();
 
-    DB_QUERY_NUMS
-        .with_label_values(&["create", "meta", ""])
-        .inc();
+    DB_QUERY_NUMS.with_label_values(&["create", "meta"]).inc();
     // create table
     _ = sqlx::query(
         r#"
@@ -632,7 +602,7 @@ CREATE TABLE IF NOT EXISTS meta
 
     // create start_dt column for old version <= 0.9.2
     DB_QUERY_NUMS
-        .with_label_values(&["select", "information_schema.columns", ""])
+        .with_label_values(&["select", "information_schema.columns"])
         .inc();
     let has_start_dt = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='meta' AND column_name='start_dt';")
             .fetch_one(&pool)
@@ -670,9 +640,7 @@ CREATE TABLE IF NOT EXISTS meta
 async fn add_start_dt_column() -> Result<()> {
     let pool = CLIENT_DDL.clone();
     let mut tx = pool.begin().await?;
-    DB_QUERY_NUMS
-        .with_label_values(&["alter", "meta", ""])
-        .inc();
+    DB_QUERY_NUMS.with_label_values(&["alter", "meta"]).inc();
     if let Err(e) = sqlx::query(
         r#"ALTER TABLE meta ADD COLUMN IF NOT EXISTS start_dt BIGINT NOT NULL DEFAULT 0;"#,
     )
@@ -704,7 +672,7 @@ async fn create_meta_backup() -> Result<()> {
     let pool = CLIENT_DDL.clone();
     let mut tx = pool.begin().await?;
     DB_QUERY_NUMS
-        .with_label_values(&["create", "meta_backup_20240330", ""])
+        .with_label_values(&["create", "meta_backup_20240330"])
         .inc();
     if let Err(e) =
         sqlx::query(r#"CREATE TABLE IF NOT EXISTS meta_backup_20240330 AS SELECT * FROM meta;"#)
@@ -745,7 +713,7 @@ pub async fn create_index(index: IndexStatement<'_>) -> Result<()> {
         index.table
     );
     DB_QUERY_NUMS
-        .with_label_values(&["create", index.table, ""])
+        .with_label_values(&["create", index.table])
         .inc();
     let sql = format!(
         "CREATE {} INDEX IF NOT EXISTS {} ON {} ({});",
@@ -776,7 +744,7 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     }
     log::info!("[POSTGRES] deleting index {} on table {}", idx_name, table);
     let sql = format!("DROP INDEX IF EXISTS {};", idx_name);
-    DB_QUERY_NUMS.with_label_values(&["drop", table, ""]).inc();
+    DB_QUERY_NUMS.with_label_values(&["drop", table]).inc();
     let start = std::time::Instant::now();
     sqlx::query(&sql).execute(&client).await?;
     let time = start.elapsed().as_secs_f64();

@@ -53,7 +53,7 @@ impl super::Scheduler for MySqlScheduler {
     async fn create_table(&self) -> Result<()> {
         let pool = CLIENT_DDL.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["create", "scheduled_jobs", ""])
+            .with_label_values(&["create", "scheduled_jobs"])
             .inc();
         sqlx::query(
             r#"
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 
         // create data column for old version <= 0.10.9
         DB_QUERY_NUMS
-            .with_label_values(&["select", "information_schema.columns", ""])
+            .with_label_values(&["select", "information_schema.columns"])
             .inc();
         let has_data_column = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='scheduled_jobs' AND column_name='data';")
             .fetch_one(&pool)
@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     async fn len_module(&self, module: TriggerModule) -> usize {
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["select", "scheduled_jobs", ""])
+            .with_label_values(&["select", "scheduled_jobs"])
             .inc();
         let ret = match sqlx::query(
             r#"
@@ -149,7 +149,7 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs WHERE module = ?;"#,
         let mut tx = pool.begin().await?;
 
         DB_QUERY_NUMS
-            .with_label_values(&["insert", "scheduled_jobs", ""])
+            .with_label_values(&["insert", "scheduled_jobs"])
             .inc();
         if let Err(e) = sqlx::query(
             r#"
@@ -200,7 +200,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
     async fn delete(&self, org: &str, module: TriggerModule, key: &str) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["delete", "scheduled_jobs", key])
+            .with_label_values(&["delete", "scheduled_jobs"])
             .inc();
         sqlx::query(
             r#"DELETE FROM scheduled_jobs WHERE org = ? AND module = ? AND module_key = ?;"#,
@@ -235,7 +235,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
     ) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["update", "scheduled_jobs", key])
+            .with_label_values(&["update", "scheduled_jobs"])
             .inc();
         let query = match data {
             Some(data) => {
@@ -272,7 +272,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
     async fn update_trigger(&self, trigger: Trigger, clone: bool) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["update", "scheduled_jobs", &trigger.module_key])
+            .with_label_values(&["update", "scheduled_jobs"])
             .inc();
 
         let query = if clone {
@@ -395,7 +395,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_id);
         let mut lock_tx = lock_pool.begin().await?;
         DB_QUERY_NUMS
-            .with_label_values(&["get_lock", "scheduled_jobs", ""])
+            .with_label_values(&["get_lock", "scheduled_jobs"])
             .inc();
         match sqlx::query_scalar::<_, i64>(&lock_sql)
             .fetch_one(&mut *lock_tx)
@@ -444,7 +444,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
         };
 
         DB_QUERY_NUMS
-            .with_label_values(&["select", "scheduled_jobs", ""])
+            .with_label_values(&["select", "scheduled_jobs"])
             .inc();
         let job_ids: Vec<TriggerId> = match sqlx::query_as::<_, TriggerId>(
             r#"SELECT id
@@ -468,7 +468,7 @@ LIMIT ?;
                     log::error!("[SCHEDULER] rollback select jobs for update error: {}", e);
                 }
                 DB_QUERY_NUMS
-                    .with_label_values(&["release_lock", "scheduled_jobs", ""])
+                    .with_label_values(&["release_lock", "scheduled_jobs"])
                     .inc();
                 if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
                     log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
@@ -492,7 +492,7 @@ LIMIT ?;
                 log::error!("[SCHEDULER] rollback scheduler pull error: {}", e);
             }
             DB_QUERY_NUMS
-                .with_label_values(&["release_lock", "scheduled_jobs", ""])
+                .with_label_values(&["release_lock", "scheduled_jobs"])
                 .inc();
             if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
                 log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
@@ -508,7 +508,7 @@ LIMIT ?;
 
         let job_ids: Vec<String> = job_ids.into_iter().map(|id| id.id.to_string()).collect();
         DB_QUERY_NUMS
-            .with_label_values(&["update", "scheduled_jobs", ""])
+            .with_label_values(&["update", "scheduled_jobs"])
             .inc();
         let query = format!(
             "UPDATE scheduled_jobs
@@ -533,7 +533,7 @@ WHERE id IN ({});",
                 log::error!("[MYSQL] rollback update scheduled jobs status error: {}", e);
             }
             DB_QUERY_NUMS
-                .with_label_values(&["release_lock", "scheduled_jobs", ""])
+                .with_label_values(&["release_lock", "scheduled_jobs"])
                 .inc();
             if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
                 log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
@@ -551,7 +551,7 @@ WHERE id IN ({});",
         if let Err(e) = tx.commit().await {
             log::error!("[SCHEDULER] commit scheduler pull update error: {}", e);
             DB_QUERY_NUMS
-                .with_label_values(&["release_lock", "scheduled_jobs", ""])
+                .with_label_values(&["release_lock", "scheduled_jobs"])
                 .inc();
             if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
                 log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
@@ -566,7 +566,7 @@ WHERE id IN ({});",
         }
 
         DB_QUERY_NUMS
-            .with_label_values(&["release_lock", "scheduled_jobs", ""])
+            .with_label_values(&["release_lock", "scheduled_jobs"])
             .inc();
         if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
             log::error!("[SCHEDULER] unlock pull scheduled_jobs error: {}", e);
@@ -584,7 +584,7 @@ WHERE id IN ({});",
         );
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["select", "scheduled_jobs", ""])
+            .with_label_values(&["select", "scheduled_jobs"])
             .inc();
         let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query.as_str())
             .fetch_all(&pool)
@@ -596,7 +596,7 @@ WHERE id IN ({});",
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["select", "scheduled_jobs", ""])
+            .with_label_values(&["select", "scheduled_jobs"])
             .inc();
         let query =
             r#"SELECT * FROM scheduled_jobs WHERE org = ? AND module = ? AND module_key = ?;"#;
@@ -621,7 +621,7 @@ WHERE id IN ({});",
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["select", "scheduled_jobs", ""])
+            .with_label_values(&["select", "scheduled_jobs"])
             .inc();
         let jobs: Vec<Trigger> = if let Some(module) = module {
             let query = r#"SELECT * FROM scheduled_jobs WHERE module = ? ORDER BY id;"#;
@@ -640,7 +640,7 @@ WHERE id IN ({});",
     async fn list_by_org(&self, org: &str, module: Option<TriggerModule>) -> Result<Vec<Trigger>> {
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["select", "scheduled_jobs", ""])
+            .with_label_values(&["select", "scheduled_jobs"])
             .inc();
         let jobs: Vec<Trigger> = if let Some(module) = module {
             let query = r#"SELECT * FROM scheduled_jobs WHERE org = ? AND module = ? ORDER BY id;"#;
@@ -668,7 +668,7 @@ WHERE id IN ({});",
         }
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["delete", "scheduled_jobs", ""])
+            .with_label_values(&["delete", "scheduled_jobs"])
             .inc();
         // Since alert scheduled_jobs contain last_satisfied_at field, we should not delete them
         sqlx::query(
@@ -692,7 +692,7 @@ WHERE id IN ({});",
         let pool = CLIENT.clone();
         let now = now_micros();
         DB_QUERY_NUMS
-            .with_label_values(&["update", "scheduled_jobs", ""])
+            .with_label_values(&["update", "scheduled_jobs"])
             .inc();
         let res = sqlx::query(
             r#"UPDATE scheduled_jobs
@@ -715,7 +715,7 @@ WHERE status = ? AND end_time <= ?
     async fn len(&self) -> usize {
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["select", "scheduled_jobs", ""])
+            .with_label_values(&["select", "scheduled_jobs"])
             .inc();
         let ret = match sqlx::query(
             r#"
@@ -743,7 +743,7 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs;"#,
     async fn clear(&self) -> Result<()> {
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
-            .with_label_values(&["delete", "scheduled_jobs", ""])
+            .with_label_values(&["delete", "scheduled_jobs"])
             .inc();
         match sqlx::query(r#"DELETE FROM scheduled_jobs;"#)
             .execute(&pool)
@@ -761,7 +761,7 @@ async fn add_data_column() -> Result<()> {
     log::info!("[MYSQL] Adding data column to scheduled_jobs table");
     let pool = CLIENT_DDL.clone();
     DB_QUERY_NUMS
-        .with_label_values(&["alter", "scheduled_jobs", ""])
+        .with_label_values(&["alter", "scheduled_jobs"])
         .inc();
     if let Err(e) = sqlx::query(r#"ALTER TABLE scheduled_jobs ADD COLUMN data LONGTEXT NOT NULL;"#)
         .execute(&pool)
