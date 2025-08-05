@@ -56,7 +56,7 @@ import {
   arraysMatch,
   isWebSocketEnabled,
   isStreamingEnabled,
-  deepCopy
+  deepCopy,
   addSpacesToOperators
 } from "@/utils/zincutils";
 import {
@@ -7074,7 +7074,6 @@ const useLogs = () => {
     isActionsEnabled,
     sendCancelSearchMessage,
     isDistinctQuery,
-    isWithQuery,
     getStream,
     initialLogsState,
     clearSearchObj,
