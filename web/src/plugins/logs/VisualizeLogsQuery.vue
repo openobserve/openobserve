@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <ChartSelection
-          :allowedchartstype="['area', 'bar', 'h-bar', 'line', 'scatter', 'table']"
+          :allowedchartstype="['area','area-stacked','bar', 'h-bar', 'line', 'scatter','stacked', 'h-stacked', 'table', 'pie', 'donut', 'metric']"
           v-model:selectedChartType="dashboardPanelData.data.type"
           @update:selected-chart-type="resetAggregationFunction"
         />
@@ -749,9 +749,6 @@ export default defineComponent({
       if (resultMetaData?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
         dashboardPanelData.data.queries[0].query =
           resultMetaData?.[0]?.converted_histogram_query;
-
-        // assign to visualizeChartData as well
-        visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query
       }
     };
 

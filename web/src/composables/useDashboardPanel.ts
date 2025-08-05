@@ -3245,6 +3245,163 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     };
   };
 
+  const setFieldsBasedOnChartTypeValidation = (
+    fields: any,
+    chartType: string,
+  ) => {
+    // First reset all existing fields in dashboardPanelData
+    resetFields();
+
+    // For table chart type, merge breakdown fields into x fields
+    const fieldsToProcess = { ...fields };
+    if (chartType === "table") {
+      fieldsToProcess.x = [...(fields.x || []), ...(fields.breakdown || [])];
+      fieldsToProcess.breakdown = [];
+    }
+
+    // The add functions will automatically apply validation based on current chart type
+    // Add X-axis fields
+    fieldsToProcess.x?.forEach((field: any) => {
+      const fieldName =
+        typeof field === "string" ? field : field.name || field.column;
+      if (fieldName) {
+        addXAxisItem({ name: fieldName });
+      }
+    });
+
+    // Add Y-axis fields
+    fieldsToProcess.y?.forEach((field: any) => {
+      const fieldName =
+        typeof field === "string" ? field : field.name || field.column;
+      if (fieldName) {
+        addYAxisItem({ name: fieldName });
+      }
+    });
+
+    // Add Z-axis fields
+    fieldsToProcess.z?.forEach((field: any) => {
+      const fieldName =
+        typeof field === "string" ? field : field.name || field.column;
+      if (fieldName) {
+        addZAxisItem({ name: fieldName });
+      }
+    });
+
+    // Add breakdown fields
+    fieldsToProcess.breakdown?.forEach((field: any) => {
+      const fieldName =
+        typeof field === "string" ? field : field.name || field.column;
+      if (fieldName) {
+        addBreakDownAxisItem({ name: fieldName });
+      }
+    });
+  };
+
+  // Function to get result schema
+  const getResultSchema = async (
+    query: string,
+    abortSignal?: AbortSignal,
+    startISOTimestamp?: number,
+    endISOTimestamp?: number,
+  ): Promise<{
+    group_by: string[];
+    projections: string[];
+    timeseries_field: string | null;
+  }> => {
+    // get extracted fields from the query
+    const schemaRes = await queryService.result_schema(
+      {
+        org_identifier: store.state.selectedOrganization.identifier,
+        query: {
+          query: {
+            sql: store.state.zoConfig.sql_base64_enabled
+              ? b64EncodeUnicode(query)
+              : query,
+            query_fn: null,
+            start_time: startISOTimestamp,
+            end_time: endISOTimestamp,
+            size: -1,
+            histogram_interval: undefined,
+            streaming_output: false,
+            streaming_id: null,
+          },
+          ...(store.state.zoConfig.sql_base64_enabled
+            ? { encoding: "base64" }
+            : {}),
+        },
+        page_type: "dashboards",
+        is_streaming: isStreamingEnabled(),
+      },
+      "dashboards",
+    );
+
+    // if abort signal is received, throw an error
+    if (abortSignal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
+    return schemaRes.data;
+  };
+
+  // Function to determine chart type based on extracted fields
+  const determineChartType = (
+    extractedFields: {
+      group_by: string[];
+      projections: string[];
+      timeseries_field: string | null;
+    },
+    currentChartType?: string,
+  ): string => {
+    if (
+      extractedFields.timeseries_field &&
+      extractedFields.group_by.length <= 2 &&
+      !(extractedFields.group_by.length == 0 && currentChartType == "table")
+    ) {
+      return "line";
+    } else {
+      return "table";
+    }
+  };
+
+  // Function to convert result schema to x, y, breakdown fields
+  const convertSchemaToFields = (extractedFields: {
+    group_by: string[];
+    projections: string[];
+    timeseries_field: string | null;
+  }): {
+    x: string[];
+    y: string[];
+    breakdown: string[];
+  } => {
+    // remove group by and timeseries field from projections, while using it on y axis
+    const yAxisFields = extractedFields.projections.filter(
+      (field) =>
+        !extractedFields.group_by.includes(field) &&
+        field !== extractedFields.timeseries_field,
+    );
+
+    const fields = {
+      x: [] as string[],
+      y: yAxisFields,
+      breakdown: [] as string[],
+    };
+
+    // add timestamp as x axis
+    if (extractedFields.timeseries_field) {
+      fields.x.push(extractedFields.timeseries_field);
+    }
+
+    // here upto 1 group by will be available, add group by as breakdown
+    extractedFields.group_by.forEach((field: any) => {
+      // if field is not timeseries field, then add it as breakdown
+      if (field !== extractedFields.timeseries_field) {
+        fields.breakdown.push(field);
+      }
+    });
+
+    return fields;
+  };
+
   // For visualization, we need to set the custom query fields
   const setCustomQueryFields = async (
     extractedFieldsParam?: {
@@ -3252,16 +3409,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       projections: string[];
       timeseries_field: string | null;
     },
+    autoSelectChartType: boolean = true,
     abortSignal?: AbortSignal,
   ) => {
     resetFields();
 
     // Helper function to process extracted fields and populate axes
-    const processExtractedFields = (extractedFields: {
-      group_by: string[];
-      projections: string[];
-      timeseries_field: string | null;
-    }) => {
+    const processExtractedFields = (
+      extractedFields: {
+        group_by: string[];
+        projections: string[];
+        timeseries_field: string | null;
+      },
+      autoSelectChartType: boolean = true,
+    ) => {
       // remove all fields from custom query fields
       dashboardPanelData.meta.stream.customQueryFields = [];
 
@@ -3273,59 +3434,22 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         });
       });
 
-      // remove group by and timeseries field from projections, while using it on y axis
-      const yAxisFields = extractedFields.projections.filter(
-        (field) =>
-          !extractedFields.group_by.includes(field) &&
-          field !== extractedFields.timeseries_field,
-      );
+      // Determine chart type
+      const chartType = autoSelectChartType
+        ? determineChartType(extractedFields, dashboardPanelData.data.type)
+        : dashboardPanelData.data.type;
+      dashboardPanelData.data.type = chartType;
 
-      if (
-        extractedFields.timeseries_field &&
-        extractedFields.group_by.length <= 2
-      ) {
-        // select line chart as default
-        dashboardPanelData.data.type = "line";
+      // Convert schema to fields
+      const fields = convertSchemaToFields(extractedFields);
 
-        // add timestamp as x axis
-        addXAxisItem({ name: extractedFields.timeseries_field });
-        // here upto 1 group by will be available, add group by as breakdown
-        extractedFields.group_by.forEach((field: any) => {
-          // if field is not timeseries field, then add it as breakdown
-          if (field !== extractedFields.timeseries_field) {
-            addBreakDownAxisItem({ name: field });
-          }
-        });
-        // add all y axis fields
-        yAxisFields.forEach((field: any) => {
-          addYAxisItem({ name: field });
-        });
-      } else {
-        // select table chart as default
-        dashboardPanelData.data.type = "table";
-
-        // add timestamp as x axis if available
-        if (extractedFields.timeseries_field) {
-          addXAxisItem({ name: extractedFields.timeseries_field });
-        }
-
-        // add all group by fields as x axis
-        extractedFields.group_by.forEach((field: any) => {
-          if (field !== extractedFields.timeseries_field) {
-            addXAxisItem({ name: field });
-          }
-        });
-
-        // add all y axis fields
-        yAxisFields.forEach((field: any) => {
-          addYAxisItem({ name: field });
-        });
-      }
+      // Set fields using existing validation function
+      setFieldsBasedOnChartTypeValidation(fields, chartType);
     };
 
     // If extractedFieldsParam is provided, use it directly to avoid duplicate API call
     if (extractedFieldsParam) {
-      processExtractedFields(extractedFieldsParam);
+      processExtractedFields(extractedFieldsParam, autoSelectChartType);
       return;
     }
 
@@ -3346,56 +3470,18 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       return;
     }
 
-    // get extracted fields from the query
-    const searchRes = await queryService.result_schema(
-      {
-        org_identifier: store.state.selectedOrganization.identifier,
-        query: {
-          query: {
-            sql: store.state.zoConfig.sql_base64_enabled
-              ? b64EncodeUnicode(
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
-                  ].query,
-                )
-              : dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].query,
-            // query function will be null for now
-            query_fn: null,
-            // if i == 0 ? then do gap of 7 days
-            start_time: startISOTimestamp,
-            end_time: endISOTimestamp,
-            size: -1,
-            histogram_interval: undefined,
-            streaming_output: false,
-            streaming_id: null,
-          },
-          // pass encoding if enabled,
-          // make sure that `encoding: null` is not being passed, that's why used object extraction logic
-          ...(store.state.zoConfig.sql_base64_enabled
-            ? { encoding: "base64" }
-            : {}),
-        },
-        page_type: "dashboards",
-        is_streaming: isStreamingEnabled()
-      },
-      "dashboards",
+    const currentQuery =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].query;
+
+    const extractedFields = await getResultSchema(
+      currentQuery,
+      abortSignal,
+      startISOTimestamp,
+      endISOTimestamp,
     );
-
-    // if abort signal is received, throw an error
-    if (abortSignal?.aborted) {
-      throw new DOMException("Aborted", "AbortError");
-    }
-
-    const extractedFields: {
-      group_by: string[];
-      projections: string[];
-      timeseries_field: string | null;
-    } = searchRes.data;
-
-    // Use the helper function to process the extracted fields
-    processExtractedFields(extractedFields);
+    processExtractedFields(extractedFields, autoSelectChartType);
   };
 
   return {
@@ -3449,6 +3535,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     generateLabelFromName,
     selectedStreamFieldsBasedOnUserDefinedSchema,
     setCustomQueryFields,
+    getResultSchema,
+    determineChartType,
+    convertSchemaToFields,
+    setFieldsBasedOnChartTypeValidation,
   };
 };
 export default useDashboardPanelData;
