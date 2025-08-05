@@ -75,7 +75,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Setup cargo config
-        run: cargo --config net.git-fetch-with-cli=true clippy --all-targets --workspace -- -D warnings
+        run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
 
       - name: Run unit tests
         run: |
