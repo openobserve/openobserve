@@ -54,7 +54,9 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::{grpc::make_grpc_search_client, search::sql::get_group_by_fields},
+    crate::service::{
+        grpc::make_grpc_search_client, search::sql::visitor::group_by::get_group_by_fields,
+    },
     config::utils::sql::is_simple_aggregate_query,
     o2_enterprise::enterprise::{
         common::config::get_config as get_o2_config,

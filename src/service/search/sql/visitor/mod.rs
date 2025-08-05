@@ -18,7 +18,11 @@ pub mod add_o2_id;
 pub mod add_ordering_term;
 pub mod add_timestamp;
 pub mod approx_percentile;
+#[cfg(feature = "enterprise")]
+pub mod cipher_key;
 pub mod column;
+#[cfg(feature = "enterprise")]
+pub mod group_by;
 pub mod histogram_interval;
 pub mod index;
 pub mod index_optimize;

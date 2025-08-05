@@ -25,10 +25,7 @@ use config::{
         stream::StreamType,
     },
 };
-use datafusion::{
-    arrow::datatypes::Schema,
-    common::{TableReference, tree_node::TreeNode},
-};
+use datafusion::{arrow::datatypes::Schema, common::TableReference};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes},
@@ -39,28 +36,20 @@ use proto::cluster_rpc::SearchQuery;
 use regex::Regex;
 use sqlparser::{ast::VisitMut, dialect::PostgreSqlDialect, parser::Parser};
 
-#[cfg(feature = "enterprise")]
-use super::datafusion::udf::cipher_udf::{
-    DECRYPT_SLOW_UDF_NAME, DECRYPT_UDF_NAME, ENCRYPT_UDF_NAME,
-};
 use super::{
     index::{Condition, IndexCondition},
     request::Request,
 };
-use crate::service::search::{
-    cluster::flight::{generate_context, register_table},
-    datafusion::distributed_plan::rewrite::GroupByFieldVisitor,
-    sql::{
-        schema::{generate_schema_fields, generate_select_star_schema, has_original_column},
-        visitor::{
-            add_o2_id::AddO2IdVisitor, add_timestamp::AddTimestampVisitor,
-            approx_percentile::ReplaceApproxPercentiletVisitor, column::ColumnVisitor,
-            histogram_interval::HistogramIntervalVisitor, index::IndexVisitor,
-            index_optimize::IndexOptimizeModeVisitor, match_all::MatchVisitor,
-            partition_column::PartitionColumnVisitor, prefix_column::PrefixColumnVisitor,
-            remove_dashboard_placeholder::RemoveDashboardAllVisitor,
-            track_total_hits::TrackTotalHitsVisitor, utils::is_complex_query,
-        },
+use crate::service::search::sql::{
+    schema::{generate_schema_fields, generate_select_star_schema, has_original_column},
+    visitor::{
+        add_o2_id::AddO2IdVisitor, add_timestamp::AddTimestampVisitor,
+        approx_percentile::ReplaceApproxPercentiletVisitor, column::ColumnVisitor,
+        histogram_interval::HistogramIntervalVisitor, index::IndexVisitor,
+        index_optimize::IndexOptimizeModeVisitor, match_all::MatchVisitor,
+        partition_column::PartitionColumnVisitor, prefix_column::PrefixColumnVisitor,
+        remove_dashboard_placeholder::RemoveDashboardAllVisitor,
+        track_total_hits::TrackTotalHitsVisitor, utils::is_complex_query,
     },
 };
 
@@ -428,115 +417,4 @@ fn o2_id_is_needed(
             stream_setting
                 .is_some_and(|setting| setting.store_original_data || setting.index_original_data)
         })
-}
-
-#[cfg(feature = "enterprise")]
-struct ExtractKeyNamesVisitor {
-    keys: Vec<String>,
-    error: Option<Error>,
-}
-
-#[cfg(feature = "enterprise")]
-impl ExtractKeyNamesVisitor {
-    fn new() -> Self {
-        Self {
-            keys: Vec::new(),
-            error: None,
-        }
-    }
-}
-
-#[cfg(feature = "enterprise")]
-impl VisitorMut for ExtractKeyNamesVisitor {
-    type Break = ();
-
-    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
-        if let Expr::Function(Function {
-            name: ObjectName(names),
-            args,
-            ..
-        }) = expr
-        {
-            // cipher functions will always be 1-part names
-            if names.len() != 1 {
-                return ControlFlow::Continue(());
-            }
-            let fname = names.first().unwrap();
-            let fname = fname.as_ident().unwrap();
-            if fname.value == ENCRYPT_UDF_NAME
-                || fname.value == DECRYPT_UDF_NAME
-                || fname.value == DECRYPT_SLOW_UDF_NAME
-            {
-                let list = match args {
-                    FunctionArguments::List(list) => list,
-                    _ => {
-                        self.error = Some(Error::Message(
-                            "invalid arguments to cipher function".to_string(),
-                        ));
-                        return ControlFlow::Continue(());
-                    }
-                };
-                if list.args.len() < 2 {
-                    self.error = Some(Error::Message(
-                        "invalid number of arguments to cipher function, expected at least 2: column, key and optional path".to_string(),
-                    ));
-                    return ControlFlow::Continue(());
-                }
-                let arg = match &list.args[1] {
-                    FunctionArg::Named { arg, .. } => arg,
-                    FunctionArg::Unnamed(arg) => arg,
-                    FunctionArg::ExprNamed { arg, .. } => arg,
-                };
-                match arg {
-                    FunctionArgExpr::Expr(Expr::Value(ValueWithSpan {
-                        value: Value::SingleQuotedString(s),
-                        span: _,
-                    })) => {
-                        self.keys.push(s.to_owned());
-                    }
-                    _ => {
-                        self.error = Some(Error::Message(
-                            "key name must be a static string in cipher function".to_string(),
-                        ));
-                        return ControlFlow::Continue(());
-                    }
-                }
-            }
-        }
-        ControlFlow::Continue(())
-    }
-}
-
-#[cfg(feature = "enterprise")]
-pub fn get_cipher_key_names(sql: &str) -> Result<Vec<String>, Error> {
-    let dialect = &PostgreSqlDialect {};
-    let mut statement = Parser::parse_sql(dialect, sql)
-        .map_err(|e| Error::Message(e.to_string()))?
-        .pop()
-        .unwrap();
-    let mut visitor = ExtractKeyNamesVisitor::new();
-    let _ = statement.visit(&mut visitor);
-    if let Some(e) = visitor.error {
-        Err(e)
-    } else {
-        Ok(visitor.keys)
-    }
-}
-
-// get group by fields from sql, if sql is not a single table query, return empty vector
-#[allow(dead_code)]
-pub async fn get_group_by_fields(sql: &Sql) -> Result<Vec<String>, Error> {
-    if sql.schemas.len() != 1 {
-        return Ok(vec![]);
-    }
-    let sql_arc = Arc::new(sql.clone());
-    let ctx = generate_context(&Request::default(), &sql_arc, 0).await?;
-    register_table(&ctx, &sql_arc).await?;
-    let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;
-    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
-
-    // visit group by fields
-    let mut group_by_visitor = GroupByFieldVisitor::new();
-    physical_plan.visit(&mut group_by_visitor)?;
-    Ok(group_by_visitor.get_group_by_fields())
 }

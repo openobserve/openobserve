@@ -37,7 +37,7 @@ use utils::check_stream_permissions;
 use {crate::service::organization::is_org_in_free_trial_period, actix_web::http::StatusCode};
 
 #[cfg(feature = "enterprise")]
-use crate::service::search::sql::get_cipher_key_names;
+use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
