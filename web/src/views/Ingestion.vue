@@ -81,130 +81,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="confirmRUMUpdate"
       />
     </div>
-    <q-tabs v-model="ingestTabType" horizontal align="left">
-      <q-route-tab
-        default
-        name="recommended"
-        :to="{
-          name: 'recommended',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.recommendedLabel')"
-        content-class="tab_content"
-      />
-      <q-route-tab
-        name="custom"
-        :to="{
-          name: 'custom',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.customLabel')"
-        content-class="tab_content"
-      />
-      <q-route-tab
-        name="server"
-        :to="{
-          name: 'servers',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.serverLabel')"
-        content-class="tab_content"
-      />
-      <q-route-tab
-        name="database"
-        :to="{
-          name: 'databases',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.databaseLabel')"
-        content-class="tab_content"
-      />
-
-      <q-route-tab
-        name="security"
-        :to="{
-          name: 'security',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.securityLabel')"
-        content-class="tab_content"
-      />
-
-      <q-route-tab
-        name="devops"
-        :to="{
-          name: 'devops',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.devopsLabel')"
-        content-class="tab_content"
-      />
-
-      <q-route-tab
-        name="networking"
-        :to="{
-          name: 'networking',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.networkingLabel')"
-        content-class="tab_content"
-      />
-      <q-route-tab
-        name="message-queues"
-        :to="{
-          name: 'message-queues',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.messageQueuesLabel')"
-        content-class="tab_content"
-      />
-      <q-route-tab
-        name="languages"
-        :to="{
-          name: 'languages',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.languagesLabel')"
-        content-class="tab_content"
-      />
-      <q-route-tab
-        name="others"
-        :to="{
-          name: 'others',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        :label="t('ingestion.otherLabel')"
-        content-class="tab_content"
-      />
-    </q-tabs>
+    <o2RouteTabs
+      :model-value="ingestTabType"
+      @update:model-value="ingestTabType = $event"
+      :organization-identifier="store.state.selectedOrganization.identifier"
+      :tabs="ingestionTabs"
+    />
     <q-separator class="separator" />
-    <router-view
-      :title="ingestTabType"
-      :currOrgIdentifier="currentOrgIdentifier"
-      :currUserEmail="currentUserEmail"
-      @copy-to-clipboard-fn="copyToClipboardFn"
-    >
-    </router-view>
+        <router-view
+        :title="ingestTabType"
+        :currOrgIdentifier="currentOrgIdentifier"
+        :currUserEmail="currentUserEmail"
+        @copy-to-clipboard-fn="copyToClipboardFn"
+      >
+      </router-view>
   </q-page>
 </template>
 
@@ -221,10 +111,11 @@ import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import o2RouteTabs, { type Tab } from "@/components/common/o2RouteTabs.vue";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog },
+  components: { ConfirmDialog, o2RouteTabs },
   methods: {
     generateRUMToken() {
       apiKeysService
@@ -301,6 +192,54 @@ export default defineComponent({
       store.state.selectedOrganization.identifier
     );
     const ingestTabType = ref("recommended");
+    //we need to pass the tabs as an array of objects with name , label and default for only first tab
+    //and routeName for the rest of the tabs whose name and routeName are different 
+    //so that while mapping it would be easy to get the routeName and name for the tab
+    const ingestionTabs = [
+      {
+        name: "recommended",
+        label: t("ingestion.recommendedLabel"),
+        default: true
+      },
+      {
+        name: "custom",
+        label: t("ingestion.customLabel")
+      },
+      {
+        name: "server",
+        routeName: "servers",
+        label: t("ingestion.serverLabel")
+      },
+      {
+        name: "database",
+        routeName: "databases",
+        label: t("ingestion.databaseLabel")
+      },
+      {
+        name: "security",
+        label: t("ingestion.securityLabel")
+      },
+      {
+        name: "devops",
+        label: t("ingestion.devopsLabel")
+      },
+      {
+        name: "networking",
+        label: t("ingestion.networkingLabel")
+      },
+      {
+        name: "message-queues",
+        label: t("ingestion.messageQueuesLabel")
+      },
+      {
+        name: "languages",
+        label: t("ingestion.languagesLabel")
+      },
+      {
+        name: "others",
+        label: t("ingestion.otherLabel")
+      }
+    ];
 
     const activeTab = ref("recommended");
     const metricRoutes = [
@@ -485,6 +424,7 @@ export default defineComponent({
       activeTab,
       copyToClipboardFn,
       rumRoutes,
+      ingestionTabs,
     };
   },
 });
@@ -495,31 +435,6 @@ export default defineComponent({
   padding: 0.25rem 0 1.5rem 0;
   .head {
     padding-bottom: 1rem;
-  }
-  .q-tabs {
-    &--horizontal {
-      margin: 1.5rem 1rem 0 1rem;
-      .q-tab {
-        justify-content: flex-start;
-        padding: 0 0.6rem 0 0.6rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-        text-transform: capitalize;
-
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          color: black;
-          background-color: $accent;
-        }
-      }
-    }
   }
 }
 </style>
