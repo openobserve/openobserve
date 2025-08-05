@@ -901,13 +901,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 100%; height: 100%"
             >
               <template v-if="showFunctionEditor">
-                <code-query-editor
+                <div class="tw-relative tw-h-full tw-w-full">
+                  <code-query-editor
                   v-if="router.currentRoute.value.name === 'logs'"
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"
                   editor-id="fnEditor"
                   class="monaco-editor"
                   v-model:query="searchObj.data.tempFunctionContent"
+                  :class="
+                    searchObj.data.tempFunctionContent == '' &&
+                    searchObj.meta.functionEditorPlaceholderFlag
+                      ? 'empty-function'
+                      : ''
+                  "
+                  @keydown="handleKeyDown"
+                  language="vrl"
+                  @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
+                  @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
+                />
+                </div>
+                <div
+                  v-if="searchObj.meta.logsVisualizeToggle === 'visualize'"
                   :class="
                     store.state.theme == 'dark'
                       ? 'tw-bg-white tw-bg-opacity-10'
