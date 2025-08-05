@@ -581,7 +581,6 @@ export default defineComponent({
       initialLogsState,
       clearSearchObj,
       setCommunicationMethod,
-      getStream,
       loadVisualizeData,
       buildSearch,
       cancelQuery,
@@ -827,6 +826,7 @@ export default defineComponent({
         await importSqlParser();
       }
     }
+  }
 
     // Helper function to check if the current tab is "logs"
     function isLogsTab() {
@@ -2127,8 +2127,8 @@ export default defineComponent({
       searchResponseForVisualization,
       shouldUseHistogramQuery,
       processHttpHistogramResults,
-    };
-  },
+  };
+},
   computed: {
     showFields() {
       return this.searchObj.meta.showFields;
