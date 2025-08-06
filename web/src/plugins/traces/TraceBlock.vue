@@ -107,14 +107,8 @@ let moment: any;
 
 watch(
   () => props?.item?.trace_start_time,
-  (value) => {
-    console.log(
-      "watcher ------------- props.item.trace_start_time",
-      props.item.trace_start_time,
-    );
-    if (value) {
-      getFormattedDate();
-    }
+  () => {
+    getFormattedDate();
   },
 );
 
@@ -139,15 +133,11 @@ const formattedDate = ref({
 });
 
 const getFormattedDate = () => {
-  if (!props?.item?.trace_start_time) {
-    return;
-  }
-
   const format = "YYYY-MM-DD HH:mm:ss";
   const timezone = store.state.timezone;
 
   const date1 = moment
-    ?.tz(new Date(props.item["trace_start_time"] / 1000), timezone)
+    ?.tz(new Date((props.item["trace_start_time"] || 0) / 1000), timezone)
     .format(format);
 
   const date2 = moment?.tz(new Date(), timezone).format(format);
