@@ -910,11 +910,11 @@ pub static PIPELINE_WAL_INGESTION_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "pipeline_wal_ingestion_bytes",
-            "Bytes ingested across all pipelines",
+            "Bytes ingested per pipeline",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[],
+        &["pipeline_id"],
     )
     .expect("Metric created")
 });
@@ -923,11 +923,11 @@ pub static PIPELINE_EXPORTED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "pipeline_http_exported_bytes",
-            "Bytes exported across all pipelines",
+            "Bytes exported per destination",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[],
+        &["destination"],
     )
     .expect("Metric created")
 });
