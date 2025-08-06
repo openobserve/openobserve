@@ -18,18 +18,16 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
-    INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        bitvec::BitVec,
         cluster::{IntoArcVec, Node, Role, RoleGroup},
         search::{ScanStats, SearchEventType},
         sql::TableReferenceExt,
-        stream::{FileKey, QueryPartitionStrategy, StreamType},
+        stream::{QueryPartitionStrategy, StreamType},
     },
     metrics,
-    utils::{inverted_index::split_token, json, time::now_micros},
+    utils::{json, time::now_micros},
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
@@ -62,7 +60,6 @@ use crate::{
                 optimizer::{generate_analyzer_rules, generate_optimizer_rules},
                 table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
             },
-            generate_filter_from_equal_items,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
             request::Request,
             sql::Sql,
@@ -81,7 +78,7 @@ pub async fn search(
     trace_id: &str,
     sql: Arc<Sql>,
     mut req: Request,
-    query: SearchQuery,
+    _query: SearchQuery,
 ) -> Result<SearchResult> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -133,11 +130,6 @@ pub async fn search(
                 .build()
         )
     );
-    let mut scan_stats = ScanStats {
-        files: file_id_list_num as i64,
-        original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
-        ..Default::default()
-    };
 
     // 2. get nodes
     let get_node_start = std::time::Instant::now();
@@ -420,7 +412,7 @@ pub async fn run_datafusion(
 
     // 7. rewrite physical plan
     let match_all_keys = sql.match_items.clone().unwrap_or_default();
-    let mut equal_keys = sql
+    let equal_keys = sql
         .equal_items
         .iter()
         .map(|(stream_name, fields)| {

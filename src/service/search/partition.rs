@@ -46,6 +46,7 @@ impl PartitionGenerator {
     ///
     /// # Returns
     /// Vector of [start, end] time ranges in microseconds, in DESC order
+    #[allow(clippy::too_many_arguments)]
     pub fn generate_partitions(
         &self,
         start_time: i64,

@@ -29,7 +29,7 @@ use config::{
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
     utils::{
-        inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
+        inverted_index::convert_parquet_file_name_to_tantivy_file,
         size::bytes_to_human_readable,
         tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
         time::BASE_TIME,
@@ -127,7 +127,6 @@ pub async fn search(
     // Condition:All() means search tantivy without filter,
     // so we should not use inverted index in datafusion search
     // Condition:All() is used for TantivyOptimizeExec
-    let cfg = get_config();
     let (use_inverted_index, tantivy_condition, datafusion_condition) =
         check_inverted_index(query.clone(), index_condition);
     log::info!(
@@ -577,8 +576,7 @@ pub async fn cache_files(
         let start = std::time::Instant::now();
         let files_num = files.len();
         for (file, size, ts) in files {
-            if let Err(e) =
-                crate::job::queue_background_download(&trace_id, &file, size, ts, cache_type).await
+            if let Err(e) = crate::job::queue_download(&trace_id, &file, size, ts, cache_type).await
             {
                 log::error!(
                     "[trace_id {trace_id}] error in queuing file {file} for background download: {e}"
@@ -626,7 +624,7 @@ pub async fn filter_file_list_by_tantivy_index(
         .filter_map(|(_, f)| {
             scan_stats.compressed_size += f.meta.index_size;
             if f.meta.index_size > 0 {
-                convert_parquet_idx_file_name_to_tantivy_file(&f.key)
+                convert_parquet_file_name_to_tantivy_file(&f.key)
                     .map(|ttv_file| (ttv_file, f.clone()))
             } else {
                 None
@@ -913,8 +911,7 @@ async fn search_tantivy_index(
     idx_optimize_rule: Option<IndexOptimizeMode>,
     parquet_file: &FileKey,
 ) -> anyhow::Result<(String, TantivyResult)> {
-    let Some(ttv_file_name) = convert_parquet_idx_file_name_to_tantivy_file(&parquet_file.key)
-    else {
+    let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
         return Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",
             parquet_file.key.clone()

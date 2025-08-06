@@ -1872,50 +1872,6 @@ impl VisitorMut for TrackTotalHitsVisitor {
     }
 }
 
-fn splite_function_args(args: &FunctionArguments) -> (FunctionArg, Vec<FunctionArg>) {
-    match args {
-        FunctionArguments::List(list) => {
-            let (first, others) = list.args.split_first().unwrap();
-            (first.clone(), others.to_vec())
-        }
-        _ => {
-            log::error!("Unsupported function arguments: {:?}", args);
-            (FunctionArg::Unnamed(FunctionArgExpr::Wildcard), vec![])
-        }
-    }
-}
-
-fn convert_args_to_order_expr(args: FunctionArg) -> OrderByExpr {
-    let expr = convert_function_args_to_expr(args);
-    OrderByExpr {
-        expr: expr.clone(),
-        with_fill: None,
-        asc: None,
-        nulls_first: None,
-    }
-}
-
-fn convert_function_args_to_expr(args: FunctionArg) -> Expr {
-    match args {
-        FunctionArg::Named {
-            name: _,
-            arg: FunctionArgExpr::Expr(arg),
-            operator: _,
-        } => arg,
-        FunctionArg::Named {
-            name: _,
-            arg: FunctionArgExpr::Wildcard,
-            operator: _,
-        } => Expr::Wildcard(AttachedToken::empty()),
-        FunctionArg::Unnamed(FunctionArgExpr::Expr(arg)) => arg,
-        FunctionArg::Unnamed(FunctionArgExpr::Wildcard) => Expr::Wildcard(AttachedToken::empty()),
-        _ => {
-            log::error!("Unsupported function argument: {:?}", args);
-            Expr::Wildcard(AttachedToken::empty())
-        }
-    }
-}
-
 fn generate_table_reference(idents: &[Ident]) -> (TableReference, String) {
     if idents.len() == 2 {
         let table_name = idents[0].value.as_str();
