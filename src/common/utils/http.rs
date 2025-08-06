@@ -45,9 +45,9 @@ pub(crate) fn get_ts_from_request_with_key(
 ) -> Result<i64, String> {
     let value = query
         .get(key)
-        .ok_or_else(|| format!("{} parameter is missing", key))?
+        .ok_or_else(|| format!("{key} parameter is missing"))?
         .parse::<i64>()
-        .map_err(|_| format!("{} is not a valid timestamp", key))?;
+        .map_err(|_| format!("{key} is not a valid timestamp"))?;
     Ok(value)
 }
 

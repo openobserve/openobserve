@@ -665,14 +665,13 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
         if delete_ts > 0 {
             // Parse the start_time from filename:
             // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
-            if let Some(file_name) = file.split('/').next_back() {
-                if let Some(start_time_str) = file_name.split('_').next() {
-                    if let Ok(start_time) = start_time_str.parse::<i64>() {
-                        // Only delete if start_time > delete_ts (keep cache from delete_ts onwards)
-                        if start_time > delete_ts {
-                            continue; // Skip this file, keep it
-                        }
-                    }
+            if let Some(file_name) = file.split('/').next_back()
+                && let Some(start_time_str) = file_name.split('_').next()
+                && let Ok(start_time) = start_time_str.parse::<i64>()
+            {
+                // Only delete if start_time > delete_ts (keep cache from delete_ts onwards)
+                if start_time > delete_ts {
+                    continue; // Skip this file, keep it
                 }
             }
         }
@@ -697,15 +696,14 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
             if delete_ts > 0 {
                 // Parse the start_time from filename
                 // {start_time}_{end_time}.arrow
-                if let Some(file_name) = file.split('/').next_back() {
-                    if let Some(start_time_str) = file_name.split('_').next() {
-                        if let Ok(start_time) = start_time_str.parse::<i64>() {
-                            // Only delete if start_time > delete_ts (keep cache from delete_ts
-                            // onwards)
-                            if start_time > delete_ts {
-                                continue; // Skip this file, keep it
-                            }
-                        }
+                if let Some(file_name) = file.split('/').next_back()
+                    && let Some(start_time_str) = file_name.split('_').next()
+                    && let Ok(start_time) = start_time_str.parse::<i64>()
+                {
+                    // Only delete if start_time > delete_ts (keep cache from delete_ts
+                    // onwards)
+                    if start_time > delete_ts {
+                        continue; // Skip this file, keep it
                     }
                 }
             }

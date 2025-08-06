@@ -564,7 +564,7 @@ async fn delete_stream_cache(
     let path = if stream_name.eq("_all") {
         org_id
     } else {
-        format!("{}/{}/{}", org_id, stream_type, stream_name)
+        format!("{org_id}/{stream_type}/{stream_name}")
     };
 
     match crate::service::search::cluster::cacher::delete_cached_results(path, delete_ts).await {

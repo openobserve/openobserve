@@ -326,7 +326,7 @@ pub async fn delete_by_date(
 
     log::info!("delete_by_date date_range: {date_range:?}");
     let mut date_start = if date_range.0.ends_with("00Z") {
-        DateTime::parse_from_rfc3339(&format!("{}", date_range.0))?.with_timezone(&Utc)
+        DateTime::parse_from_rfc3339(date_range.0)?.with_timezone(&Utc)
     } else {
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.0))?.with_timezone(&Utc)
     };
@@ -335,7 +335,7 @@ pub async fn delete_by_date(
         date_start += Duration::try_milliseconds(1).unwrap();
     }
     let date_end = if date_range.1.ends_with("00Z") {
-        DateTime::parse_from_rfc3339(&format!("{}", date_range.1))?.with_timezone(&Utc)
+        DateTime::parse_from_rfc3339(date_range.1)?.with_timezone(&Utc)
     } else {
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.1))?.with_timezone(&Utc)
     };

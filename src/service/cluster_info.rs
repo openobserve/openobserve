@@ -83,7 +83,7 @@ impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for Clu
             }
             Err(e) => {
                 log::error!("get_delete_job_status {} error: {e}", req.ksuid);
-                Err(Status::internal(format!("Database error: {}", e)))
+                Err(Status::internal(format!("Database error: {e}")))
             }
         }
     }
