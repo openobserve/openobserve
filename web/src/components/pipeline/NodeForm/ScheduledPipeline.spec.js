@@ -203,6 +203,7 @@ describe("ScheduledPipeline Component", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    wrapper.vm.query = ""
   });
 
   describe("Component Initialization", () => {
