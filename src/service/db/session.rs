@@ -113,7 +113,6 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let json_val: String = match json::from_slice(&item_value) {
             Ok(val) => val,
             Err(e) => {
-                log::error!("Error deserializing session value: {e}");
                 continue;
             }
         };
