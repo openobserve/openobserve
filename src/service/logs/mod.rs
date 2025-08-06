@@ -55,7 +55,7 @@ use crate::{
     common::meta::{ingestion::IngestionStatus, stream::SchemaRecords},
     service::{
         alerts::alert::AlertExt, db, ingestion::get_write_partition_key, schema::check_for_schema,
-        self_reporting::report_request_usage_stats,
+        self_reporting::report_request_usage_stats, stream::get_stream,
     },
 };
 
@@ -217,6 +217,35 @@ async fn write_logs_by_stream(
         {
             log::warn!("stream [{stream_name}] is being deleted");
             continue; // skip
+        }
+
+        // for cloud, we want to sent event when user creates a new stream
+        #[cfg(feature = "cloud")]
+        if get_stream(org_id, &stream_name, StreamType::Logs)
+            .await
+            .is_none()
+        {
+            let org = match super::organization::get_org(&org_id).await {
+                None => {
+                    return Err(Error::Message(format!(
+                        "org with id {org_id} not found in db"
+                    )));
+                }
+                Some(org) => org,
+            };
+
+            super::self_reporting::cloud_events::enqueue_cloud_event(
+                super::self_reporting::cloud_events::CloudEvent {
+                    org_id: org.identifier.clone(),
+                    org_name: org.name.clone(),
+                    org_type: org.org_type.clone(),
+                    user: Some(user_email.to_string()),
+                    event: super::self_reporting::cloud_events::EventType::StreamCreated,
+                    subscription_type: None,
+                    stream_name: Some(stream_name.clone()),
+                },
+            )
+            .await;
         }
 
         // write json data by stream
