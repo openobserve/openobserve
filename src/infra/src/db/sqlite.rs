@@ -225,8 +225,7 @@ impl super::Db for SqliteDb {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT_RO.clone();
         let query = format!(
-            "SELECT value FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}' ORDER BY start_dt DESC;",
-            module, key1, key2
+            "SELECT value FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}' ORDER BY start_dt DESC;"
         );
         let value: String = match sqlx::query_scalar(&query).fetch_one(&pool).await {
             Ok(v) => v,
@@ -303,8 +302,8 @@ impl super::Db for SqliteDb {
         drop(client);
 
         // event watch
-        if need_watch {
-            if let Err(e) = CHANNEL
+        if need_watch
+            && let Err(e) = CHANNEL
                 .watch_tx
                 .clone()
                 .send(Event::Put(EventData {
@@ -316,7 +315,6 @@ impl super::Db for SqliteDb {
             {
                 log::error!("[SQLITE] send event error: {}", e);
             }
-        }
 
         Ok(())
     }
@@ -349,7 +347,7 @@ impl super::Db for SqliteDb {
                     if e.to_string().contains("no rows returned") {
                         None
                     } else {
-                        return Err(Error::Message(format!("[SQLITE] get_for_update error: {}", e))); 
+                        return Err(Error::Message(format!("[SQLITE] get_for_update error: {e}"))); 
                     }
                 }
             }
@@ -368,7 +366,7 @@ impl super::Db for SqliteDb {
                     if e.to_string().contains("no rows returned") {
                         None
                     } else {
-                        return Err(Error::Message(format!("[SQLITE] get_for_update error: {}", e))); 
+                        return Err(Error::Message(format!("[SQLITE] get_for_update error: {e}"))); 
                     }
                 }
             }
@@ -457,8 +455,8 @@ impl super::Db for SqliteDb {
             } else {
                 None
             };
-            if new_value.is_some() || value.is_some() {
-                if let Err(e) = CHANNEL
+            if (new_value.is_some() || value.is_some())
+                && let Err(e) = CHANNEL
                     .watch_tx
                     .clone()
                     .send(Event::Put(EventData {
@@ -470,7 +468,6 @@ impl super::Db for SqliteDb {
                 {
                     log::error!("[SQLITE] send event error: {}", e);
                 }
-            }
         }
 
         Ok(())
@@ -524,27 +521,24 @@ impl super::Db for SqliteDb {
         let (key1, key2) = (key1.replace("'", "''"), key2.replace("'", "''"));
         let sql = if with_prefix {
             if key1.is_empty() {
-                format!(r#"DELETE FROM meta WHERE module = '{}';"#, module)
+                format!(r#"DELETE FROM meta WHERE module = '{module}';"#)
             } else if key2.is_empty() {
                 format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}';"#,
-                    module, key1
+                    r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}';"#
                 )
             } else {
                 format!(
-                    r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND (key2 = '{}' OR key2 LIKE '{}/%');"#,
-                    module, key1, key2, key2
+                    r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND (key2 = '{key2}' OR key2 LIKE '{key2}/%');"#
                 )
             }
         } else {
             format!(
-                r#"DELETE FROM meta WHERE module = '{}' AND key1 = '{}' AND key2 = '{}';"#,
-                module, key1, key2
+                r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}';"#
             )
         };
 
         let sql = if let Some(start_dt) = start_dt {
-            sql.replace(';', &format!(" AND start_dt = {};", start_dt))
+            sql.replace(';', &format!(" AND start_dt = {start_dt};"))
         } else {
             sql
         };
@@ -559,15 +553,15 @@ impl super::Db for SqliteDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
-        sql = format!("{} ORDER BY start_dt ASC", sql);
+        sql = format!("{sql} ORDER BY start_dt ASC");
 
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
@@ -588,16 +582,16 @@ impl super::Db for SqliteDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
 
-        sql = format!("{} ORDER BY start_dt ASC", sql);
+        sql = format!("{sql} ORDER BY start_dt ASC");
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
             .fetch_all(&pool)
@@ -632,19 +626,18 @@ impl super::Db for SqliteDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
         sql = format!(
-            "{} AND start_dt >= {} AND start_dt <= {}",
-            sql, min_dt, max_dt
+            "{sql} AND start_dt >= {min_dt} AND start_dt <= {max_dt}"
         );
-        sql = format!("{} ORDER BY start_dt ASC", sql);
+        sql = format!("{sql} ORDER BY start_dt ASC");
 
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
@@ -660,13 +653,13 @@ impl super::Db for SqliteDb {
         let (module, key1, key2) = super::parse_key(prefix);
         let mut sql = "SELECT COUNT(*) AS num FROM meta".to_string();
         if !module.is_empty() {
-            sql = format!("{} WHERE module = '{}'", sql, module);
+            sql = format!("{sql} WHERE module = '{module}'");
         }
         if !key1.is_empty() {
-            sql = format!("{} AND key1 = '{}'", sql, key1);
+            sql = format!("{sql} AND key1 = '{key1}'");
         }
         if !key2.is_empty() {
-            sql = format!("{} AND (key2 = '{}' OR key2 LIKE '{}/%')", sql, key2, key2);
+            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
 
         let pool = CLIENT_RO.clone();
@@ -839,7 +832,7 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
         return Ok(());
     }
     log::info!("[SQLITE] deleting index {} on table {}", idx_name, table);
-    let sql = format!("DROP INDEX IF EXISTS {};", idx_name);
+    let sql = format!("DROP INDEX IF EXISTS {idx_name};");
     sqlx::query(&sql).execute(&*client).await?;
     log::info!("[SQLITE] index {} deleted successfully", idx_name);
     Ok(())

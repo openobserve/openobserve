@@ -105,7 +105,7 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
     let triggers_result = db
         .query_all(statement)
         .await
-        .map_err(|e| DbErr::Custom(format!("Failed to query scheduled jobs: {}", e)))?;
+        .map_err(|e| DbErr::Custom(format!("Failed to query scheduled jobs: {e}")))?;
 
     log::debug!(
         "[SCHEDULED_TRIGGERS_MIGRATION] triggers_result length: {}",
@@ -115,11 +115,11 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
     for trigger_row in triggers_result {
         let org = trigger_row
             .try_get::<String>("", "org")
-            .map_err(|e| DbErr::Custom(format!("Failed to get org: {}", e)))?;
+            .map_err(|e| DbErr::Custom(format!("Failed to get org: {e}")))?;
 
         let module_key = trigger_row
             .try_get::<String>("", "module_key")
-            .map_err(|e| DbErr::Custom(format!("Failed to get module_key: {}", e)))?;
+            .map_err(|e| DbErr::Custom(format!("Failed to get module_key: {e}")))?;
 
         // Skip if the module_key doesn't match the expected pattern
         let parts: Vec<&str> = module_key.split('/').collect();
@@ -155,7 +155,7 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
         let alert_result = db
             .query_one(statement)
             .await
-            .map_err(|e| DbErr::Custom(format!("Failed to query alert: {}", e)))?;
+            .map_err(|e| DbErr::Custom(format!("Failed to query alert: {e}")))?;
         log::debug!(
             "[SCHEDULED_TRIGGERS_MIGRATION] alert_result is found: {}",
             alert_result.is_some()
@@ -165,7 +165,7 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
         if let Some(alert_row) = alert_result {
             let alert_id = alert_row
                 .try_get::<String>("", "id")
-                .map_err(|e| DbErr::Custom(format!("Failed to get alert ID: {}", e)))?;
+                .map_err(|e| DbErr::Custom(format!("Failed to get alert ID: {e}")))?;
 
             log::debug!(
                 "[SCHEDULED_TRIGGERS_MIGRATION] alert_id to upgrade: {}",
@@ -191,7 +191,7 @@ async fn update_scheduled_triggers(manager: &SchemaManager<'_>) -> Result<(), Db
             );
             db.execute(statement)
                 .await
-                .map_err(|e| DbErr::Custom(format!("Failed to update scheduled job: {}", e)))?;
+                .map_err(|e| DbErr::Custom(format!("Failed to update scheduled job: {e}")))?;
         }
     }
 

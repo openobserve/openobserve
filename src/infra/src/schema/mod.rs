@@ -159,12 +159,11 @@ pub async fn get_versions(
         }
 
         if let Some(last_index) = last_schema_index {
-            if last_index > 0 {
-                if let Some((_, data)) = versions.get(last_index - 1) {
+            if last_index > 0
+                && let Some((_, data)) = versions.get(last_index - 1) {
                     // older version of schema before start_dt should be added in start
                     schemas.insert(0, data.clone());
                 }
-            }
         } else {
             // this is latest version of schema hence added in end
             schemas.push(versions.last().unwrap().1.clone());
@@ -201,7 +200,7 @@ pub async fn get_settings(
     stream_name: &str,
     stream_type: StreamType,
 ) -> Option<StreamSettings> {
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
 
     // Try to get from read lock first
     if let Some(settings) = get_stream_settings_atomic(&key) {
@@ -408,8 +407,7 @@ pub async fn merge(
                         Some(s) => s,
                         None => {
                             return Err(Error::Message(format!(
-                                "Error parsing latest schema for schema: {}",
-                                key
+                                "Error parsing latest schema for schema: {key}"
                             )));
                         }
                     };

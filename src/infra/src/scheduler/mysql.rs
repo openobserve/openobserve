@@ -216,7 +216,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
             // It will send event even if the alert is not realtime alert.
             // But that is okay, for non-realtime alerts, since the triggers are not
             // present in the cache at all, it will just do nothing.
-            let key = format!("{TRIGGERS_KEY}{}/{}/{}", module, org, key);
+            let key = format!("{TRIGGERS_KEY}{module}/{org}/{key}");
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator.delete(&key, false, true, None).await?;
         }
@@ -392,7 +392,7 @@ INSERT IGNORE INTO scheduled_jobs (org, module, module_key, is_realtime, is_sile
             lock_id,
             config::get_config().limit.meta_transaction_lock_timeout
         );
-        let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_id);
+        let unlock_sql = format!("SELECT RELEASE_LOCK('{lock_id}')");
         let mut lock_tx = lock_pool.begin().await?;
         DB_QUERY_NUMS
             .with_label_values(&["get_lock", "scheduled_jobs", ""])
@@ -610,8 +610,7 @@ WHERE id IN ({});",
             Ok(job) => job,
             Err(_) => {
                 return Err(Error::from(DbError::KeyNotExists(format!(
-                    "{org}/{}/{key}",
-                    module
+                    "{org}/{module}/{key}"
                 ))));
             }
         };
@@ -766,12 +765,10 @@ async fn add_data_column() -> Result<()> {
     if let Err(e) = sqlx::query(r#"ALTER TABLE scheduled_jobs ADD COLUMN data LONGTEXT NOT NULL;"#)
         .execute(&pool)
         .await
-    {
-        if !e.to_string().contains("Duplicate column name") {
+        && !e.to_string().contains("Duplicate column name") {
             // Check for the specific MySQL error code for duplicate column
             log::error!("[MYSQL] Unexpected error in adding column: {}", e);
             return Err(e.into());
         }
-    }
     Ok(())
 }

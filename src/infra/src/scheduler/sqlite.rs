@@ -204,7 +204,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             // For status update of triggers, we don't need to send put events
             // to cluster coordinator for now as it only changes the status and retries
             // fields of scheduled jobs and not anything else
-            let key = format!("{TRIGGERS_KEY}{}/{}/{}", module, org, key);
+            let key = format!("{TRIGGERS_KEY}{module}/{org}/{key}");
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator.delete(&key, false, true, None).await?;
         }
@@ -419,8 +419,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
             Ok(job) => job,
             Err(_) => {
                 return Err(Error::from(DbError::KeyNotExists(format!(
-                    "{org}/{}/{key}",
-                    module
+                    "{org}/{module}/{key}"
                 ))));
             }
         };

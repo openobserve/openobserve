@@ -82,7 +82,7 @@ async fn rename_duplicates<C: ConnectionTrait>(conn: &C) -> Result<(), DbErr> {
             let name = f.name.clone();
             let ksuid = svix_ksuid::Ksuid::new(None, None);
             let mut am = f.into_active_model();
-            am.name = Set(format!("{} {}", name, ksuid));
+            am.name = Set(format!("{name} {ksuid}"));
             am.update(conn).await?;
         }
     }
