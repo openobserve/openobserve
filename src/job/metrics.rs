@@ -70,7 +70,7 @@ pub static TRACE_METRICS_CHAN: Lazy<TraceMetricsChan> = Lazy::new(|| {
 pub static TRACE_METRICS_SPAN_HISTOGRAM: Lazy<Histogram<f64>> = Lazy::new(|| {
     let meter = opentelemetry::global::meter("o2");
     meter
-        .f64_histogram(format!("{}_span_duration_milliseconds", NAMESPACE))
+        .f64_histogram(format!("{NAMESPACE}_span_duration_milliseconds"))
         .with_unit("ms")
         .with_description("span duration milliseconds")
         .init()
@@ -319,7 +319,7 @@ pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
             "openobserve",
         )]))
         .with_view(new_view(
-            Instrument::new().name(format!("{}_span_duration_milliseconds", NAMESPACE)),
+            Instrument::new().name(format!("{NAMESPACE}_span_duration_milliseconds")),
             Stream::new().aggregation(Aggregation::ExplicitBucketHistogram {
                 boundaries: SPAN_METRICS_BUCKET.to_vec(),
                 record_min_max: false,

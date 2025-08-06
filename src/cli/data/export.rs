@@ -49,8 +49,7 @@ impl Context for Export {
             .and_then(|event_type| get_search_event_context_from_request(event_type, &query_map));
         let query = search::Query {
             sql: format!(
-                "select * from {} ORDER BY {} ASC",
-                table, TIMESTAMP_COL_NAME
+                "select * from {table} ORDER BY {TIMESTAMP_COL_NAME} ASC"
             ),
             from: 0,
             size: cfg.limit.query_default_limit,
@@ -90,7 +89,7 @@ impl Context for Export {
                 Ok(true)
             }
             Err(err) => {
-                eprintln!("search error: {:?}", err);
+                eprintln!("search error: {err:?}");
                 Ok(false)
             }
         }

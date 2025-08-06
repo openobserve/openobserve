@@ -234,9 +234,8 @@ pub async fn create_org(org: &Organization) -> Result<Organization, Error> {
         Ok(_) => Ok(org.clone()),
         Err(e) => {
             log::error!("Error creating org: {}", e);
-            Err(Error::new(
-                ErrorKind::Other,
-                format!("Error creating org: {}", e),
+            Err(Error::other(
+                format!("Error creating org: {e}"),
             ))
         }
     }

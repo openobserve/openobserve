@@ -101,11 +101,10 @@ async fn schema(
     }
 
     // filter by keyword
-    if let Some(keyword) = query.get("keyword") {
-        if !keyword.is_empty() {
+    if let Some(keyword) = query.get("keyword")
+        && !keyword.is_empty() {
             schema.schema.retain(|f| f.name.contains(keyword));
         }
-    }
 
     // set total fields
     schema.total_fields = schema.schema.len();
@@ -166,7 +165,7 @@ async fn settings(
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                format!("Stream type '{}' not allowed", stream_type),
+                format!("Stream type '{stream_type}' not allowed"),
             )),
         );
     }
@@ -211,7 +210,7 @@ async fn update_settings(
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                format!("Stream type '{}' not allowed", stream_type),
+                format!("Stream type '{stream_type}' not allowed"),
             )),
         );
     }
@@ -342,8 +341,7 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
             "true" => true,
             "false" => false,
             _ => {
-                return Err(Error::new(
-                    ErrorKind::Other,
+                return Err(Error::other(
                     " 'fetchSchema' query param with value 'true' or 'false' allowed",
                 ));
             }
@@ -391,11 +389,10 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     .await;
 
     // filter by keyword
-    if let Some(keyword) = query.get("keyword") {
-        if !keyword.is_empty() {
+    if let Some(keyword) = query.get("keyword")
+        && !keyword.is_empty() {
             indices.retain(|s| s.name.contains(keyword));
         }
-    }
 
     // sort by
     let mut sort = "name".to_string();
@@ -515,7 +512,7 @@ async fn delete_stream_cache(
     let path = if stream_name.eq("_all") {
         org_id
     } else {
-        format!("{}/{}/{}", org_id, stream_type, stream_name)
+        format!("{org_id}/{stream_type}/{stream_name}")
     };
 
     match crate::service::search::cluster::cacher::delete_cached_results(path, delete_ts).await {

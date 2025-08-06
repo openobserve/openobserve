@@ -51,7 +51,7 @@ pub async fn set_offset(
 ) -> Result<(), anyhow::Error> {
     let key = mk_key(org_id, module);
     let val = if let Some(node) = node {
-        format!("{};{}", offset, node)
+        format!("{offset};{node}")
     } else {
         offset.to_string()
     };

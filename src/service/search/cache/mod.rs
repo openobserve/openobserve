@@ -139,8 +139,7 @@ pub async fn search(
     let mut should_exec_query = true;
 
     let mut file_path = format!(
-        "{}/{}/{}/{}",
-        org_id, stream_type, stream_name, hashed_query
+        "{org_id}/{stream_type}/{stream_name}/{hashed_query}"
     );
     let mut c_resp: MultiCachedQueryResponse = if use_cache {
         // cache layer
@@ -215,15 +214,14 @@ pub async fn search(
             c_resp.order_by,
         )
     } else {
-        if let Some(vrl_function) = &query_fn {
-            if !vrl_function.trim().ends_with('.') {
-                query_fn = Some(format!("{} \n .", vrl_function));
+        if let Some(vrl_function) = &query_fn
+            && !vrl_function.trim().ends_with('.') {
+                query_fn = Some(format!("{vrl_function} \n ."));
             }
-        }
         req.query.query_fn = query_fn;
 
         for fn_name in functions::get_all_transform_keys(org_id).await {
-            if req.query.sql.contains(&format!("{}(", fn_name)) {
+            if req.query.sql.contains(&format!("{fn_name}(")) {
                 req.query.uses_zo_fn = true;
                 break;
             }
@@ -269,7 +267,7 @@ pub async fn search(
             let trace_id = if partition_num == 1 {
                 trace_id.to_string()
             } else {
-                format!("{}-{}", trace_id, i)
+                format!("{trace_id}-{i}")
             };
             let user_id = user_id.clone();
 
@@ -877,14 +875,13 @@ pub async fn write_results_v2(
                 // Retain only the hits that do NOT fall within the
                 // same date, hour, minute as the hit to remove
                 local_resp.hits.retain(|hit| {
-                    if let Some(hit_ts) = hit.get(ts_column) {
-                        if let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts) {
+                    if let Some(hit_ts) = hit.get(ts_column)
+                        && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts) {
                             // Extract the date, hour, minute, and second for the current hit
                             let hit_date_hour_minute_second =
                                 hit_ts_datetime.format("%Y-%m-%dT%H:%M:%S").to_string();
                             return hit_date_hour_minute_second != target_date_hour_minute_second;
                         }
-                    }
                     false
                 });
             }
@@ -1099,8 +1096,7 @@ pub async fn check_cache_v2(
     let mut should_exec_query = true;
 
     let mut file_path = format!(
-        "{}/{}/{}/{}",
-        org_id, stream_type, stream_name, hashed_query
+        "{org_id}/{stream_type}/{stream_name}/{hashed_query}"
     );
     Ok(if use_cache {
         let mut resp = check_cache(

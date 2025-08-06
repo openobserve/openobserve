@@ -133,8 +133,7 @@ impl Engine {
                 Ok(())
             }
             PromExpr::Extension(expr) => Err(DataFusionError::NotImplemented(format!(
-                "Unsupported Extension: {:?}",
-                expr
+                "Unsupported Extension: {expr:?}"
             ))),
             _ => Ok(()),
         }
@@ -187,7 +186,7 @@ impl Engine {
                                 labels: std::mem::take(&mut instant.labels),
                                 sample: Sample {
                                     timestamp: instant.sample.timestamp,
-                                    value: -1.0 * instant.sample.value,
+                                    value: -instant.sample.value,
                                 },
                             })
                             .collect();
@@ -198,15 +197,14 @@ impl Engine {
                             labels: Labels::default(),
                             sample: Sample {
                                 timestamp: self.time,
-                                value: -1.0 * f,
+                                value: -f,
                             },
                         };
                         Value::Vector(vec![v])
                     }
                     _ => {
                         return Err(DataFusionError::NotImplemented(format!(
-                            "Unsupported Unary: {:?}",
-                            expr
+                            "Unsupported Unary: {expr:?}"
                         )));
                     }
                 }
@@ -322,8 +320,7 @@ impl Engine {
             PromExpr::Call(Call { func, args }) => self.call_expr(func, args).await?,
             PromExpr::Extension(expr) => {
                 return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Extension: {:?}",
-                    expr
+                    "Unsupported Extension: {expr:?}"
                 )));
             }
         })
@@ -397,8 +394,8 @@ impl Engine {
             } else {
                 None
             };
-            if let Some(sample) = match_sample {
-                if sample.timestamp + offset_modifier <= eval_ts
+            if let Some(sample) = match_sample
+                && sample.timestamp + offset_modifier <= eval_ts
                     && sample.timestamp + offset_modifier > start
                 {
                     let last_value = sample.value;
@@ -410,7 +407,6 @@ impl Engine {
                         },
                     );
                 }
-            }
         }
         Ok(values)
     }
@@ -653,7 +649,7 @@ impl Engine {
         }
         let task_results = try_join_all(tasks)
             .await
-            .map_err(|e| DataFusionError::Plan(format!("task error: {:?}", e)))?;
+            .map_err(|e| DataFusionError::Plan(format!("task error: {e:?}")))?;
 
         let mut metrics: HashMap<HashLabelValue, RangeValue> = HashMap::default();
         let task_results_len = task_results.len();
@@ -722,8 +718,7 @@ impl Engine {
             }
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Aggregate: {:?}",
-                    op
+                    "Unsupported Aggregate: {op:?}"
                 )));
             }
         })
@@ -902,14 +897,12 @@ impl Engine {
             Func::Floor => functions::floor(input)?,
             Func::HistogramCount => {
                 return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
+                    "Unsupported Function: {func_name:?}"
                 )));
             }
             Func::HistogramFraction => {
                 return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
+                    "Unsupported Function: {func_name:?}"
                 )));
             }
             Func::HistogramQuantile => {
@@ -937,8 +930,7 @@ impl Engine {
             }
             Func::HistogramSum => {
                 return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
+                    "Unsupported Function: {func_name:?}"
                 )));
             }
             Func::HoltWinters => {
@@ -1050,22 +1042,19 @@ impl Engine {
                 Value::Float(_) => input,
                 _ => {
                     return Err(DataFusionError::NotImplemented(format!(
-                        "Invalid scalar value: {:?}",
-                        input
+                        "Invalid scalar value: {input:?}"
                     )));
                 }
             },
             Func::Sgn => functions::sgn(input)?,
             Func::Sort => {
                 return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
+                    "Unsupported Function: {func_name:?}"
                 )));
             }
             Func::SortDesc => {
                 return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Function: {:?}",
-                    func_name
+                    "Unsupported Function: {func_name:?}"
                 )));
             }
             Func::Sqrt => functions::sqrt(input)?,
@@ -1483,8 +1472,8 @@ async fn load_exemplars_from_datafusion(
                                 for i in 0..batch.num_rows() {
                                     let hash: HashLabelValue = hash_values.value(i).into();
                                     let exemplar = exemplars_values.value(i);
-                                    if let Some(range_val) = series.get_mut(&hash) {
-                                        if let Ok(exemplars) =
+                                    if let Some(range_val) = series.get_mut(&hash)
+                                        && let Ok(exemplars) =
                                             json::from_str::<Vec<json::Value>>(exemplar)
                                         {
                                             for exemplar in exemplars {
@@ -1500,7 +1489,6 @@ async fn load_exemplars_from_datafusion(
                                                 }
                                             }
                                         }
-                                    }
                                 }
                             } else {
                                 let hash_values = batch
@@ -1512,8 +1500,8 @@ async fn load_exemplars_from_datafusion(
                                 for i in 0..batch.num_rows() {
                                     let hash: HashLabelValue = hash_values.value(i).into();
                                     let exemplar = exemplars_values.value(i);
-                                    if let Some(range_val) = series.get_mut(&hash) {
-                                        if let Ok(exemplars) =
+                                    if let Some(range_val) = series.get_mut(&hash)
+                                        && let Ok(exemplars) =
                                             json::from_str::<Vec<json::Value>>(exemplar)
                                         {
                                             for exemplar in exemplars {
@@ -1529,7 +1517,6 @@ async fn load_exemplars_from_datafusion(
                                                 }
                                             }
                                         }
-                                    }
                                 }
                             }
                         }

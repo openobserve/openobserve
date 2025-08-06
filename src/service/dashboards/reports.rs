@@ -196,7 +196,7 @@ pub async fn list(
                     || permitted
                         .as_ref()
                         .unwrap()
-                        .contains(&format!("report:_all_{}", org_id))
+                        .contains(&format!("report:_all_{org_id}"))
                 {
                     let mut should_include = true;
                     if let Some(dashboard_id) = dashboard.as_ref() {

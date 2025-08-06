@@ -410,8 +410,8 @@ pub async fn process_search_stream_request(
         }
         // Step 3: Write to results cache
         // cache only if from is 0 and is not an aggregate_query
-        if req.query.from == 0 {
-            if let Err(e) =
+        if req.query.from == 0
+            && let Err(e) =
                 write_results_to_cache(c_resp, start_time, end_time, &mut accumulated_results)
                     .instrument(search_span.clone())
                     .await
@@ -460,7 +460,6 @@ pub async fn process_search_stream_request(
                 }
                 return;
             }
-        }
     } else {
         // Step 4: Search without cache for req with from > 0
         let size = req.query.size;
@@ -601,8 +600,7 @@ pub async fn do_partitioned_search(
             req.query.start_time
         );
         range_error = format!(
-            "Query duration is modified due to query range restriction of {} hours",
-            max_query_range
+            "Query duration is modified due to query range restriction of {max_query_range} hours"
         );
     }
     // for new_start_time & new_end_time
@@ -674,7 +672,7 @@ pub async fn do_partitioned_search(
         let trace_id = if partition_num == 1 {
             trace_id.to_string()
         } else {
-            format!("{}-{}", trace_id, idx)
+            format!("{trace_id}-{idx}")
         };
         let mut search_res =
             do_search(&trace_id, org_id, stream_type, &req, user_id, use_cache).await?;
@@ -1399,7 +1397,7 @@ async fn send_partial_search_resp(
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
     } else {
-        format!("{} \n {}", PARTIAL_ERROR_RESPONSE_MESSAGE, error)
+        format!("{PARTIAL_ERROR_RESPONSE_MESSAGE} \n {error}")
     };
     let mut s_resp = Response {
         is_partial: true,

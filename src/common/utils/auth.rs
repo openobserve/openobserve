@@ -179,13 +179,12 @@ impl FromRequest for UserEmail {
     type Future = Ready<Result<Self, Error>>;
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        if let Some(auth_header) = req.headers().get("user_id") {
-            if let Ok(user_str) = auth_header.to_str() {
+        if let Some(auth_header) = req.headers().get("user_id")
+            && let Ok(user_str) = auth_header.to_str() {
                 return ready(Ok(UserEmail {
                     user_id: user_str.to_owned(),
                 }));
             }
-        }
         ready(Err(actix_web::error::ErrorUnauthorized("No user found")))
     }
 }
@@ -743,7 +742,7 @@ impl FromRequest for AuthExtractor {
             if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token
             } else {
-                format!("Bearer {}", access_token)
+                format!("Bearer {access_token}")
             }
         } else if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
@@ -839,12 +838,11 @@ pub fn generate_presigned_url(
     let stage2 = get_hash(&format!("{}{}", &stage1, time), salt);
     let stage3 = get_hash(&format!("{}{}", &stage2, exp_in), salt);
 
-    let user_pass = format!("{}:{}", username, stage3);
+    let user_pass = format!("{username}:{stage3}");
     let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
 
     format!(
-        "{}/auth/login?request_time={}&exp_in={}&auth={}",
-        base_url, time, exp_in, auth
+        "{base_url}/auth/login?request_time={time}&exp_in={exp_in}&auth={auth}"
     )
 }
 

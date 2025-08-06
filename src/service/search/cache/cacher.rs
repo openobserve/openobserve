@@ -50,8 +50,7 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
     let components: Vec<&str> = file_path.split('/').collect();
     if components.len() < 3 {
         return Err(format!(
-            "File path does not contain sufficient components: {}",
-            file_path
+            "File path does not contain sufficient components: {file_path}"
         ));
     }
 
@@ -138,7 +137,7 @@ pub async fn check_cache(
         let cap_str = caps.get(1).unwrap().as_str();
         if !cap_str.contains(TIMESTAMP_COL_NAME) {
             *origin_sql =
-                origin_sql.replacen(cap_str, &format!("{}, {}", TIMESTAMP_COL_NAME, cap_str), 1);
+                origin_sql.replacen(cap_str, &format!("{TIMESTAMP_COL_NAME}, {cap_str}"), 1);
         }
         req.query.sql = origin_sql.clone();
         result_ts_col = Some(TIMESTAMP_COL_NAME.to_string());
@@ -150,7 +149,7 @@ pub async fn check_cache(
     let result_ts_col = result_ts_col.unwrap();
     let mut discard_interval = -1;
     if let Some(interval) = sql.histogram_interval {
-        *file_path = format!("{}_{}_{}", file_path, interval, result_ts_col);
+        *file_path = format!("{file_path}_{interval}_{result_ts_col}");
 
         let mut req_time_range = (req.query.start_time, req.query.end_time);
         if req_time_range.1 == 0 {
@@ -582,13 +581,12 @@ pub async fn cache_results_to_disk(
     file_name: &str,
     data: String,
 ) -> std::io::Result<()> {
-    let file = format!("results/{}/{}", file_path, file_name);
+    let file = format!("results/{file_path}/{file_name}");
     match disk::set(trace_id, &file, Bytes::from(data)).await {
         Ok(_) => (),
         Err(e) => {
             log::error!("Error caching results to disk: {:?}", e);
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 "Error caching results to disk",
             ));
         }
@@ -597,7 +595,7 @@ pub async fn cache_results_to_disk(
 }
 
 pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<String> {
-    let file = format!("results/{}/{}", file_path, file_name);
+    let file = format!("results/{file_path}/{file_name}");
     match disk::get(&file, None).await {
         Some(v) => Ok(String::from_utf8(v.to_vec()).unwrap()),
         None => Err(std::io::Error::new(
@@ -675,23 +673,20 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
         if delete_ts > 0 {
             // Parse the start_time from filename:
             // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
-            if let Some(file_name) = file.split('/').next_back() {
-                if let Some(start_time_str) = file_name.split('_').next() {
-                    if let Ok(start_time) = start_time_str.parse::<i64>() {
+            if let Some(file_name) = file.split('/').next_back()
+                && let Some(start_time_str) = file_name.split('_').next()
+                    && let Ok(start_time) = start_time_str.parse::<i64>() {
                         // Only delete if start_time < delete_ts (keep cache from delete_ts onwards)
                         if start_time > delete_ts {
                             continue; // Skip this file, keep it
                         }
                     }
-                }
-            }
         }
         match disk::remove("", file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
             Err(e) => {
                 log::error!("Error deleting cache: {:?}", e);
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
+                return Err(std::io::Error::other(
                     "Error deleting cache",
                 ));
             }

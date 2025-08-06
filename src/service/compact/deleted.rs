@@ -63,8 +63,8 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
             }
         })
         .collect::<Vec<_>>();
-    if !inverted_index_files.is_empty() {
-        if let Err(e) = storage::del(
+    if !inverted_index_files.is_empty()
+        && let Err(e) = storage::del(
             &inverted_index_files
                 .iter()
                 .map(|file| file.as_str())
@@ -79,7 +79,6 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
                 return Err(e.into());
             }
         }
-    }
 
     // delete flattened files from storage
     let flattened_files = files
@@ -96,8 +95,8 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
             }
         })
         .collect::<Vec<_>>();
-    if !flattened_files.is_empty() {
-        if let Err(e) = storage::del(
+    if !flattened_files.is_empty()
+        && let Err(e) = storage::del(
             &flattened_files
                 .iter()
                 .map(|file| file.as_str())
@@ -111,7 +110,6 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
                 return Err(e.into());
             }
         }
-    }
 
     // delete files from file_list_deleted table
     if let Err(e) = infra_file_list::batch_remove_deleted(

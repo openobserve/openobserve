@@ -575,7 +575,7 @@ async fn process_node(
                         ) {
                             Ok(flattened) => flattened,
                             Err(e) => {
-                                let err_msg = format!("LeafNode error with flattening: {}", e);
+                                let err_msg = format!("LeafNode error with flattening: {e}");
                                 if let Err(send_err) = error_sender
                                     .send((node.id.to_string(), node.node_type(), err_msg))
                                     .await
@@ -663,7 +663,7 @@ async fn process_node(
                     ) {
                         Ok(flattened) => flattened,
                         Err(e) => {
-                            let err_msg = format!("ConditionNode error with flattening: {}", e);
+                            let err_msg = format!("ConditionNode error with flattening: {e}");
                             if let Err(send_err) = error_sender
                                 .send((node.id.to_string(), node.node_type(), err_msg))
                                 .await
@@ -710,7 +710,7 @@ async fn process_node(
                         ) {
                             Ok(flattened) => flattened,
                             Err(e) => {
-                                let err_msg = format!("FunctionNode error with flattening: {}", e);
+                                let err_msg = format!("FunctionNode error with flattening: {e}");
                                 if let Err(send_err) = error_sender
                                     .send((node.id.to_string(), node.node_type(), err_msg))
                                     .await
@@ -735,7 +735,7 @@ async fn process_node(
                         ) {
                             (res, None) => res,
                             (res, Some(error)) => {
-                                let err_msg = format!("FunctionNode error: {}", error);
+                                let err_msg = format!("FunctionNode error: {error}");
                                 if let Err(send_err) = error_sender
                                     .send((node.id.to_string(), node.node_type(), err_msg))
                                     .await
@@ -762,8 +762,8 @@ async fn process_node(
                 }
                 count += 1;
             }
-            if !result_array_records.is_empty() {
-                if let Some((vrl_runtime, true)) = &vrl_runtime {
+            if !result_array_records.is_empty()
+                && let Some((vrl_runtime, true)) = &vrl_runtime {
                     let result = match apply_vrl_fn(
                         &mut runtime,
                         vrl_runtime,
@@ -773,7 +773,7 @@ async fn process_node(
                     ) {
                         (res, None) => res,
                         (res, Some(error)) => {
-                            let err_msg = format!("FunctionNode error: {}", error);
+                            let err_msg = format!("FunctionNode error: {error}");
                             if let Err(send_err) = error_sender
                                 .send((node.id.to_string(), node.node_type(), err_msg))
                                 .await
@@ -798,7 +798,6 @@ async fn process_node(
                         .await;
                     }
                 }
-            }
             log::debug!("[Pipeline]: func node {node_idx} done processing {count} records");
         }
         NodeData::Query(_) => {

@@ -234,8 +234,7 @@ async fn write_logs_by_stream(
                     s.items
                         .iter()
                         .map(|i| {
-                            i.iter()
-                                .map(|(_, res)| if res.error.is_some() { 1 } else { 0 })
+                            i.values().map(|res| if res.error.is_some() { 1 } else { 0 })
                                 .sum::<i64>()
                         })
                         .sum()
@@ -427,8 +426,8 @@ async fn write_logs(
         }
 
         // start check for alert trigger
-        if let Some(alerts) = cur_stream_alerts {
-            if triggers.len() < alerts.len() {
+        if let Some(alerts) = cur_stream_alerts
+            && triggers.len() < alerts.len() {
                 let end_time = now_micros();
                 for alert in alerts {
                     let key = format!(
@@ -455,7 +454,6 @@ async fn write_logs(
                     }
                 }
             }
-        }
         // end check for alert triggers
 
         // get distinct_value items
@@ -531,11 +529,10 @@ async fn write_logs(
     .await?;
 
     // send distinct_values
-    if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {
-        if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
+    if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
+        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
             log::error!("Error while writing distinct values: {}", e);
         }
-    }
 
     // only one trigger per request
     evaluate_trigger(triggers).await;

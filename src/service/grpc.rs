@@ -174,7 +174,7 @@ pub async fn make_grpc_metrics_client<T>(
     let cfg = get_config();
     let org_id: MetadataValue<_> = org_id
         .parse()
-        .map_err(|_| Error::Message(format!("invalid org_id: {}", org_id)))?;
+        .map_err(|_| Error::Message(format!("invalid org_id: {org_id}")))?;
     request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
 
     opentelemetry::global::get_text_map_propagator(|propagator| {

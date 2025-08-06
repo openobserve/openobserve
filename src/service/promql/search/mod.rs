@@ -354,9 +354,9 @@ async fn search_in_cluster(
     .await;
 
     // cache the result
-    if !cache_disabled {
-        if let Some(matrix) = values.get_ref_matrix_values() {
-            if let Err(err) = cache::set(
+    if !cache_disabled
+        && let Some(matrix) = values.get_ref_matrix_values()
+            && let Err(err) = cache::set(
                 trace_id,
                 &req.org_id,
                 query,
@@ -372,8 +372,6 @@ async fn search_in_cluster(
                     err
                 );
             }
-        }
-    }
 
     Ok(values)
 }

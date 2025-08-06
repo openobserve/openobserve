@@ -405,8 +405,8 @@ async fn prepare_alert(
             // SQL may contain multiple stream names, check for each stream
             // if the alert period is greater than the max query range
             for stream in stream_names.iter() {
-                if !stream.eq(stream_name) {
-                    if let Some(settings) =
+                if !stream.eq(stream_name)
+                    && let Some(settings) =
                         infra::schema::get_settings(org_id, stream, stream_type).await
                     {
                         let max_query_range = settings.max_query_range;
@@ -420,7 +420,6 @@ async fn prepare_alert(
                             });
                         }
                     }
-                }
             }
         }
         QueryType::PromQL => {
@@ -665,7 +664,7 @@ pub async fn list(
                     || permitted
                         .as_ref()
                         .unwrap()
-                        .contains(&format!("alert:_all_{}", org_id))
+                        .contains(&format!("alert:_all_{org_id}"))
                 {
                     if owner.is_some() && !owner.eq(&alert.owner) {
                         continue;
@@ -1079,7 +1078,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         ));
     }
 
-    Ok(format!("sent status: {}, body: {}", resp_status, resp_body))
+    Ok(format!("sent status: {resp_status}, body: {resp_body}"))
 }
 
 async fn send_email_notification(
@@ -1386,8 +1385,8 @@ async fn process_dest_template(
                 }
             }
             QueryType::Custom => {
-                if let Some(conditions) = &alert.query_condition.conditions {
-                    if let Ok(v) = build_sql(
+                if let Some(conditions) = &alert.query_condition.conditions
+                    && let Ok(v) = build_sql(
                         &alert.org_id,
                         &alert.stream_name,
                         alert.stream_type,
@@ -1398,7 +1397,6 @@ async fn process_dest_template(
                     {
                         alert_query = v;
                     }
-                }
             }
             _ => unreachable!(),
         };

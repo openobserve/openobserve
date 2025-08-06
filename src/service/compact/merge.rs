@@ -86,7 +86,7 @@ pub async fn generate_job_by_stream(
     }
 
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-        let lock_key = format!("/compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
+        let lock_key = format!("/compact/merge/{org_id}/{stream_type}/{stream_name}");
         let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
         let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
@@ -197,7 +197,7 @@ pub async fn generate_old_data_job_by_stream(
     }
 
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-        let lock_key = format!("/compact/merge/{}/{}/{}", org_id, stream_type, stream_name);
+        let lock_key = format!("/compact/merge/{org_id}/{stream_type}/{stream_name}");
         let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
         let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
@@ -951,7 +951,7 @@ pub async fn merge_files(
             }
 
             let id = ider::generate();
-            let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
+            let new_file_key = format!("{prefix}/{id}{FILE_EXT_PARQUET}");
             log::info!(
                 "[COMPACTOR:WORKER:{thread_id}] merged {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
@@ -993,7 +993,7 @@ pub async fn merge_files(
                 }
 
                 let id = ider::generate();
-                let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
+                let new_file_key = format!("{prefix}/{id}{FILE_EXT_PARQUET}");
 
                 // upload file to storage
                 let buf = Bytes::from(buf);
@@ -1095,8 +1095,8 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             continue;
         }
-        if !del_items.is_empty() {
-            if let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
+        if !del_items.is_empty()
+            && let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
             {
                 log::error!(
                     "[COMPACTOR] batch_add_deleted to db failed, retrying: {}",
@@ -1105,7 +1105,6 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
-        }
         success = true;
         break;
     }
@@ -1314,11 +1313,10 @@ fn generate_schema_diff(
     let mut diff_fields = HashMap::new();
 
     for field in schema.fields().iter() {
-        if let Some(latest_field) = latest_schema_map.get(field.name()) {
-            if field.data_type() != latest_field.data_type() {
+        if let Some(latest_field) = latest_schema_map.get(field.name())
+            && field.data_type() != latest_field.data_type() {
                 diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
             }
-        }
     }
 
     Ok(diff_fields)

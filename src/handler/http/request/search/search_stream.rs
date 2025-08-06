@@ -419,14 +419,13 @@ pub async fn search_http2_stream(
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
         let chunks_iter = match result {
             Ok(mut v) => {
-                if is_ui_histogram {
-                    if let StreamResponses::SearchResponse {
+                if is_ui_histogram
+                    && let StreamResponses::SearchResponse {
                         ref mut results, ..
                     } = v
                     {
                         results.converted_histogram_query = converted_histogram_query.clone();
                     }
-                }
                 v.to_chunks()
             }
             Err(err) => {

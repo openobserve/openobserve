@@ -45,14 +45,12 @@ impl PuffinDirReader {
     pub async fn from_path(source: object_store::ObjectMeta) -> io::Result<Self> {
         let mut source = PuffinBytesReader::new(source);
         let Some(metadata) = source.get_metadata().await.map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("Error reading metadata from puffin file: {:?}", e),
+            io::Error::other(
+                format!("Error reading metadata from puffin file: {e:?}"),
             )
         })?
         else {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 "Error reading metadata from puffin file",
             ));
         };
@@ -103,8 +101,7 @@ impl HasLen for PuffinSliceHandle {
 #[async_trait::async_trait]
 impl FileHandle for PuffinSliceHandle {
     fn read_bytes(&self, _byte_range: Range<usize>) -> io::Result<OwnedBytes> {
-        Err(io::Error::new(
-            io::ErrorKind::Other,
+        Err(io::Error::other(
             format!(
                 "Error read_bytes from blob: {:?}, Not supported with PuffinSliceHandle",
                 self.path
@@ -121,9 +118,8 @@ impl FileHandle for PuffinSliceHandle {
             .read_blob_bytes(&self.metadata, Some(byte_range.clone()))
             .await
             .map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Error reading bytes from blob: {:?}", e),
+                io::Error::other(
+                    format!("Error reading bytes from blob: {e:?}"),
                 )
             })?;
         Ok(OwnedBytes::new(data.to_vec()))

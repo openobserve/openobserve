@@ -76,11 +76,11 @@ pub mod tantivy_index {
         let key = "/tantivy/_timestamp/updated_at";
         match db::get(key).await {
             Ok(ret) if !ret.is_empty() => {
-                let timestamp = String::from_utf8_lossy(&ret)
+                
+                String::from_utf8_lossy(&ret)
                     .to_string()
                     .parse::<i64>()
-                    .unwrap();
-                timestamp
+                    .unwrap()
             }
             _ => {
                 let timestamp = config::utils::time::now_micros();

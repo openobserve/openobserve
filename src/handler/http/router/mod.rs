@@ -228,12 +228,12 @@ async fn proxy(
         .send()
         .await
         .map_err(|e| {
-            actix_web::error::ErrorInternalServerError(format!("Request failed: {}", e))
+            actix_web::error::ErrorInternalServerError(format!("Request failed: {e}"))
         })?;
 
     let status = forwarded_resp.status().as_u16();
     let body = forwarded_resp.bytes().await.map_err(|e| {
-        actix_web::error::ErrorInternalServerError(format!("Failed to read the response: {}", e))
+        actix_web::error::ErrorInternalServerError(format!("Failed to read the response: {e}"))
     })?;
 
     Ok(HttpResponse::build(actix_web::http::StatusCode::from_u16(status).unwrap()).body(body))

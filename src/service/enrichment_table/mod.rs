@@ -138,8 +138,7 @@ pub async fn save_enrichment_data(
             HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!(
-                    "enrichment table [{stream_name}] total expected storage size {} exceeds max storage size {}",
-                    total_expected_size_in_mb, enrichment_table_max_size
+                    "enrichment table [{stream_name}] total expected storage size {total_expected_size_in_mb} exceeds max storage size {enrichment_table_max_size}"
                 ),
             )),
         );
@@ -328,11 +327,10 @@ pub async fn save_enrichment_data(
         db::enrichment_table::update_meta_table_stats(org_id, stream_name, enrich_meta_stats).await;
 
     // notify update
-    if !schema.fields().is_empty() {
-        if let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await {
+    if !schema.fields().is_empty()
+        && let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await {
             log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
         };
-    }
 
     // req_stats.response_time = start.elapsed().as_secs_f64();
     log::info!("save enrichment data to: {org_id}/{table_name}/{append_data} success with stats");

@@ -170,7 +170,7 @@ impl DisplayAs for NewEmptyExec {
                 );
                 let limit_string = self
                     .limit
-                    .map_or_else(|| "".to_string(), |l| format!(", limit={}", l));
+                    .map_or_else(|| "".to_string(), |l| format!(", limit={l}"));
                 let sorted_by_time_string = if self.sorted_by_time {
                     ", sorted_by_time=true"
                 } else {
@@ -180,12 +180,7 @@ impl DisplayAs for NewEmptyExec {
                 write!(f, "NewEmptyExec: ")?;
                 write!(
                     f,
-                    "{}{}{}{}{}",
-                    name_string,
-                    projection_string,
-                    filters_string,
-                    limit_string,
-                    sorted_by_time_string
+                    "{name_string}{projection_string}{filters_string}{limit_string}{sorted_by_time_string}"
                 )
             }
         }

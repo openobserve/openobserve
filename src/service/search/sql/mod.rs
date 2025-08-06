@@ -192,11 +192,10 @@ impl Sql {
             && order_by[0].1 == OrderBy::Desc;
 
         // check if need exact limit and offset
-        if limit == -1 || limit == 0 {
-            if let Some(n) = column_visitor.limit {
+        if (limit == -1 || limit == 0)
+            && let Some(n) = column_visitor.limit {
                 limit = n;
             }
-        }
 
         // 5. get match_all() value
         let mut match_visitor = MatchVisitor::new();
@@ -573,32 +572,29 @@ fn generate_quick_mode_fields(
     }
 
     // check _timestamp column
-    if !fields_name.contains(TIMESTAMP_COL_NAME) {
-        if let Ok(field) = schema.field_with_name(TIMESTAMP_COL_NAME) {
+    if !fields_name.contains(TIMESTAMP_COL_NAME)
+        && let Ok(field) = schema.field_with_name(TIMESTAMP_COL_NAME) {
             fields.push(Arc::new(field.clone()));
             fields_name.insert(TIMESTAMP_COL_NAME.to_string());
         }
-    }
     // add the selected columns
     if let Some(columns) = columns {
         for column in columns {
-            if !fields_name.contains(&column) {
-                if let Ok(field) = schema.field_with_name(&column) {
+            if !fields_name.contains(&column)
+                && let Ok(field) = schema.field_with_name(&column) {
                     fields.push(Arc::new(field.clone()));
                     fields_name.insert(column.to_string());
                 }
-            }
         }
     }
     // check fts fields
     if need_fst_fields {
         for field in fts_fields {
-            if !fields_name.contains(field) {
-                if let Ok(field) = schema.field_with_name(field) {
+            if !fields_name.contains(field)
+                && let Ok(field) = schema.field_with_name(field) {
                     fields.push(Arc::new(field.clone()));
                     fields_name.insert(field.to_string());
                 }
-            }
         }
     } else if fields_name.contains(ALL_VALUES_COL_NAME) {
         fields.retain(|field| field.name() != ALL_VALUES_COL_NAME);
@@ -606,12 +602,11 @@ fn generate_quick_mode_fields(
 
     // check quick mode fields
     for field in config::QUICK_MODEL_FIELDS.iter() {
-        if !fields_name.contains(field) {
-            if let Ok(field) = schema.field_with_name(field) {
+        if !fields_name.contains(field)
+            && let Ok(field) = schema.field_with_name(field) {
                 fields.push(Arc::new(field.clone()));
                 fields_name.insert(field.to_string());
             }
-        }
     }
     if !need_fst_fields && skip_original_column && fields_name.contains(ORIGINAL_DATA_COL_NAME) {
         fields.retain(|field| field.name() != ORIGINAL_DATA_COL_NAME);
@@ -794,18 +789,15 @@ impl VisitorMut for ColumnVisitor<'_> {
                 self.is_distinct = true;
             }
         }
-        if let Some(Expr::Value(Value::Number(n, _))) = query.limit.as_ref() {
-            if let Ok(num) = n.to_string().parse::<i64>() {
+        if let Some(Expr::Value(Value::Number(n, _))) = query.limit.as_ref()
+            && let Ok(num) = n.to_string().parse::<i64>() {
                 self.limit = Some(num);
             }
-        }
-        if let Some(offset) = query.offset.as_ref() {
-            if let Expr::Value(Value::Number(n, _)) = &offset.value {
-                if let Ok(num) = n.to_string().parse::<i64>() {
+        if let Some(offset) = query.offset.as_ref()
+            && let Expr::Value(Value::Number(n, _)) = &offset.value
+                && let Ok(num) = n.to_string().parse::<i64>() {
                     self.offset = Some(num);
                 }
-            }
-        }
         ControlFlow::Continue(())
     }
 }
@@ -890,15 +882,12 @@ impl VisitorMut for IndexVisitor {
                 // addational check for simple distinct query
                 // filter should all extract to index condition and index condition should have
                 // the same field as the distinct field
-                if can_remove_filter {
-                    if let Some(distinct) = is_simple_distinct_query(query) {
-                        if let Some(index) = self.index_condition.as_ref() {
-                            if !index.is_simple_str_match(&distinct.0) {
+                if can_remove_filter
+                    && let Some(distinct) = is_simple_distinct_query(query)
+                        && let Some(index) = self.index_condition.as_ref()
+                            && !index.is_simple_str_match(&distinct.0) {
                                 self.can_optimize = false;
                             }
-                        }
-                    }
-                }
             } else if is_simple_count_query(select) || is_simple_histogram_query(select) {
                 // if there is no filter, but have histogram or count, also can use index
                 self.can_optimize = true;
@@ -907,12 +896,11 @@ impl VisitorMut for IndexVisitor {
                     // if there is no filter, but have topn, also can use index
                     self.can_optimize = true;
                 }
-            } else if let Some(distinct) = is_simple_distinct_query(query) {
-                if self.index_fields.contains(&distinct.0) {
+            } else if let Some(distinct) = is_simple_distinct_query(query)
+                && self.index_fields.contains(&distinct.0) {
                     // if there is no filter, but have distinct, also can use index
                     self.can_optimize = true;
                 }
-            }
         }
         ControlFlow::Continue(())
     }
@@ -937,8 +925,8 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
-            if let Some(expr) = select.selection.as_ref() {
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref()
+            && let Some(expr) = select.selection.as_ref() {
                 let exprs = split_conjunction(expr);
                 for e in exprs {
                     match e {
@@ -1039,7 +1027,6 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
                     }
                 }
             }
-        }
         ControlFlow::Continue(())
     }
 }
@@ -1063,8 +1050,8 @@ impl VisitorMut for PrefixColumnVisitor<'_> {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
-            if let Some(expr) = select.selection.as_ref() {
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref()
+            && let Some(expr) = select.selection.as_ref() {
                 let exprs = split_conjunction(expr);
                 for e in exprs {
                     if let Expr::Like {
@@ -1118,7 +1105,6 @@ impl VisitorMut for PrefixColumnVisitor<'_> {
                     }
                 }
             }
-        }
         ControlFlow::Continue(())
     }
 }
@@ -1140,17 +1126,15 @@ impl VisitorMut for MatchVisitor {
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Function(func) = expr {
             let name = func.name.to_string().to_lowercase();
-            if name == MATCH_ALL_UDF_NAME || name == FUZZY_MATCH_ALL_UDF_NAME {
-                if let FunctionArguments::List(list) = &func.args {
-                    if !list.args.is_empty() {
+            if (name == MATCH_ALL_UDF_NAME || name == FUZZY_MATCH_ALL_UDF_NAME)
+                && let FunctionArguments::List(list) = &func.args
+                    && !list.args.is_empty() {
                         let value = trim_quotes(list.args[0].to_string().as_str());
                         match &mut self.match_items {
                             Some(items) => items.push(value),
                             None => self.match_items = Some(vec![value]),
                         }
                     }
-                }
-            }
         }
         ControlFlow::Continue(())
     }
@@ -1361,11 +1345,10 @@ impl VisitorMut for IndexOptimizeModeVisitor {
                 if self.index_fields.contains(&topn.0) {
                     self.simple_topn = Some(topn);
                 }
-            } else if let Some(distinct) = is_simple_distinct_query(query) {
-                if self.index_fields.contains(&distinct.0) {
+            } else if let Some(distinct) = is_simple_distinct_query(query)
+                && self.index_fields.contains(&distinct.0) {
                     self.simple_distinct = Some(distinct);
                 }
-            }
         }
         if self.is_simple_count
             || self.is_simple_histogram
@@ -1451,35 +1434,31 @@ fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
     };
 
     let mut order_by_references_count = false;
-    if let Some(order_by) = &query.order_by {
-        if order_by.exprs.len() == 1 {
+    if let Some(order_by) = &query.order_by
+        && order_by.exprs.len() == 1 {
             match &order_by.exprs[0].expr {
                 Expr::Identifier(ident) => {
                     // Check if it's the count alias
-                    if let Some(alias) = &count_alias {
-                        if ident.value == *alias && order_by.exprs[0].asc == Some(false) {
+                    if let Some(alias) = &count_alias
+                        && ident.value == *alias && order_by.exprs[0].asc == Some(false) {
                             order_by_references_count = true;
                         }
-                    }
                 }
                 Expr::Function(func) => {
                     // Check if it's count(*) function directly
                     let name = trim_quotes(&func.name.to_string().to_lowercase());
-                    if name == "count" {
-                        if let FunctionArguments::List(list) = &func.args {
-                            if list.args.len() == 1
+                    if name == "count"
+                        && let FunctionArguments::List(list) = &func.args
+                            && list.args.len() == 1
                                 && trim_quotes(&list.args[0].to_string()) == "*"
                                 && order_by.exprs[0].asc == Some(false)
                             {
                                 order_by_references_count = true;
                             }
-                        }
-                    }
                 }
                 _ => {}
             }
         }
-    }
 
     // check if limit is present
     let limit = match &query.limit {
@@ -1554,8 +1533,8 @@ fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> {
     // Check if ORDER BY references the same field
     let mut order_by_references_field = false;
     let mut is_asc = false;
-    if let Some(order_by) = &query.order_by {
-        if order_by.exprs.len() == 1 {
+    if let Some(order_by) = &query.order_by
+        && order_by.exprs.len() == 1 {
             match &order_by.exprs[0].expr {
                 Expr::Identifier(ident) => {
                     if field_matches_with_alias(&field_name, field_alias.as_deref(), &ident.value) {
@@ -1578,7 +1557,6 @@ fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> {
                 _ => {}
             }
         }
-    }
 
     // ORDER BY field must match SELECT field
     if !order_by_references_field {
@@ -1725,8 +1703,8 @@ impl VisitorMut for HistogramIntervalVisitor {
     type Break = ();
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
-        if let Expr::Function(func) = expr {
-            if func.name.to_string().to_lowercase() == "histogram" {
+        if let Expr::Function(func) = expr
+            && func.name.to_string().to_lowercase() == "histogram" {
                 if let FunctionArguments::List(list) = &func.args {
                     let mut args = list.args.iter();
                     // first is field
@@ -1750,7 +1728,6 @@ impl VisitorMut for HistogramIntervalVisitor {
                 }
                 return ControlFlow::Break(());
             }
-        }
         ControlFlow::Continue(())
     }
 }
@@ -2466,20 +2443,17 @@ impl VisitorMut for RemoveDashboardAllVisitor {
             }
             Expr::Function(func) => {
                 let f = func.name.to_string().to_lowercase();
-                if f == STR_MATCH_UDF_NAME
+                if (f == STR_MATCH_UDF_NAME
                     || f == STR_MATCH_UDF_IGNORE_CASE_NAME
                     || f == MATCH_FIELD_UDF_NAME
-                    || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME
-                {
-                    if let FunctionArguments::List(list) = &func.args {
-                        if list.args.len() == 2 {
+                    || f == MATCH_FIELD_IGNORE_CASE_UDF_NAME)
+                    && let FunctionArguments::List(list) = &func.args
+                        && list.args.len() == 2 {
                             let value = trim_quotes(list.args[1].to_string().as_str());
                             if *value == placeholder {
                                 *expr = Expr::Value(Value::Boolean(true));
                             }
                         }
-                    }
-                }
             }
             _ => {}
         }

@@ -156,7 +156,7 @@ pub async fn logs_json_handler(
         Err(e) => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                format!("Invalid json: {}", e),
+                format!("Invalid json: {e}"),
             )));
         }
     };
@@ -457,7 +457,7 @@ pub async fn logs_json_handler(
                     e
                 );
                 stream_status.status.failed += records_count as u32;
-                stream_status.status.error = format!("Pipeline batch execution error: {}", e);
+                stream_status.status.error = format!("Pipeline batch execution error: {e}");
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,

@@ -143,11 +143,10 @@ pub async fn update_folder(
     }
 
     folder.folder_id = folder_id.to_string();
-    if let Ok(existing_folder) = get_folder_by_name(org_id, &folder.name, folder_type).await {
-        if existing_folder.folder_id != folder_id {
+    if let Ok(existing_folder) = get_folder_by_name(org_id, &folder.name, folder_type).await
+        && existing_folder.folder_id != folder_id {
             return Err(FolderError::FolderNameAlreadyExists);
         }
-    }
     let (_, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
 
     #[cfg(feature = "enterprise")]
@@ -186,7 +185,7 @@ pub async fn list_folders(
 
     let filtered = match permitted_folders {
         Some(permitted_folders) => {
-            if permitted_folders.contains(&format!("{}:_all_{}", folder_ofga_model, org_id)) {
+            if permitted_folders.contains(&format!("{folder_ofga_model}:_all_{org_id}")) {
                 folders
             } else {
                 folders

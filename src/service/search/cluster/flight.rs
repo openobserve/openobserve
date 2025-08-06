@@ -124,8 +124,7 @@ pub async fn search(
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
                 .desc(format!(
-                    "get files {} ids, records {}",
-                    file_id_list_num, file_id_list_records
+                    "get files {file_id_list_num} ids, records {file_id_list_records}"
                 ))
                 .build()
         )
@@ -630,7 +629,7 @@ pub async fn check_work_group(
     let cfg = get_config();
     let work_group_str = "global".to_string();
 
-    let locker_key = format!("/search/cluster_queue/{}", work_group_str);
+    let locker_key = format!("/search/cluster_queue/{work_group_str}");
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
@@ -968,13 +967,12 @@ pub async fn get_file_id_lists(
         let name = stream.stream_name();
         let stream_type = stream.get_stream_type(stream_type);
         // if stream is enrich, rewrite the time_range
-        if let Some(schema) = stream.schema() {
-            if schema == "enrich" || schema == "enrichment_tables" {
+        if let Some(schema) = stream.schema()
+            && (schema == "enrich" || schema == "enrichment_tables") {
                 let start = enrichment_table::get_start_time(org_id, &name).await;
                 let end = now_micros();
                 time_range = Some((start, end));
             }
-        }
         // get file list
         let file_id_list =
             crate::service::file_list::query_ids(org_id, stream_type, &name, time_range).await?;

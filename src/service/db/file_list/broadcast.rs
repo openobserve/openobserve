@@ -70,12 +70,10 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
                 Some(RoleGroup::Interactive),
             )
             .await
-            {
-                if node_name.eq(&node.name) {
+                && node_name.eq(&node.name) {
                     node_items.push(item.clone());
                     continue;
                 }
-            }
             // check if the item is for background node
             if let Some(node_name) = cluster::get_node_from_consistent_hash(
                 &item.id.to_string(),
@@ -83,12 +81,10 @@ pub async fn send(items: &[FileKey]) -> Result<(), anyhow::Error> {
                 Some(RoleGroup::Background),
             )
             .await
-            {
-                if node_name.eq(&node.name) {
+                && node_name.eq(&node.name) {
                     node_items.push(item.clone());
                     continue;
                 }
-            }
         }
         if node_items.is_empty() {
             continue;

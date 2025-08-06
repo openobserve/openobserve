@@ -142,8 +142,7 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
         Some(SHORT_URL_CACHE_LIMIT),
     )
     .await
-    {
-        if !expired_short_ids.is_empty() {
+        && !expired_short_ids.is_empty() {
             // delete from db
             short_urls::batch_remove(expired_short_ids.clone()).await?;
 
@@ -154,7 +153,6 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
                 super_cluster::emit_delete_event(&short_id).await?;
             }
         }
-    }
 
     log::info!(
         "[SHORT_URLS] Garbage collection end with cache size: {}",

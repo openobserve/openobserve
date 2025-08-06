@@ -595,7 +595,7 @@ async fn build_sql(
         String::new()
     };
     if query_condition.aggregation.is_none() {
-        return Ok(format!("SELECT * FROM \"{}\" {}", stream_name, where_sql));
+        return Ok(format!("SELECT * FROM \"{stream_name}\" {where_sql}"));
     }
 
     // handle aggregation
@@ -629,8 +629,8 @@ async fn build_sql(
         AggFunction::P99 => format!("approx_percentile_cont(\"{}\", 0.99)", agg.having.column),
     };
 
-    if let Some(group) = agg.group_by.as_ref() {
-        if !group.is_empty() {
+    if let Some(group) = agg.group_by.as_ref()
+        && !group.is_empty() {
             sql = format!(
                 "SELECT {}, {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
                 group.join(", "),
@@ -643,11 +643,9 @@ async fn build_sql(
                 having_expr
             );
         }
-    }
     if sql.is_empty() {
         sql = format!(
-            "SELECT {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} HAVING {}",
-            func_expr, TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME, stream_name, where_sql, having_expr
+            "SELECT {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\" {where_sql} HAVING {having_expr}"
         );
     }
     Ok(sql)
@@ -679,7 +677,7 @@ fn build_expr(
                 }
                 Operator::LessThan => format!("\"{}\" {} '{}'", field_alias, "<", val),
                 Operator::LessThanEquals => format!("\"{}\" {} '{}'", field_alias, "<=", val),
-                Operator::Contains => format!("str_match(\"{}\", '%{}%')", field_alias, val),
+                Operator::Contains => format!("str_match(\"{field_alias}\", '%{val}%')"),
                 Operator::NotContains => {
                     format!("\"{}\" {} '%{}%'", field_alias, "NOT LIKE", val)
                 }

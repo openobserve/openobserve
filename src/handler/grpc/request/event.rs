@@ -51,8 +51,8 @@ impl Event for Eventer {
         if cfg.cache_latest_files.enabled && LOCAL_NODE.is_querier() {
             for item in put_items.iter() {
                 // cache parquet
-                if cfg.cache_latest_files.cache_parquet {
-                    if let Err(e) = crate::job::queue_download(
+                if cfg.cache_latest_files.cache_parquet
+                    && let Err(e) = crate::job::queue_download(
                         TRACE_ID_FOR_CACHE_LATEST_FILE,
                         &item.key,
                         item.meta.compressed_size,
@@ -63,11 +63,10 @@ impl Event for Eventer {
                     {
                         log::error!("Failed to cache file data: {}", e);
                     }
-                }
                 // cache index for the parquet
-                if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
-                    if let Some(ttv_file) = convert_parquet_file_name_to_tantivy_file(&item.key) {
-                        if let Err(e) = crate::job::queue_download(
+                if cfg.cache_latest_files.cache_index && item.meta.index_size > 0
+                    && let Some(ttv_file) = convert_parquet_file_name_to_tantivy_file(&item.key)
+                        && let Err(e) = crate::job::queue_download(
                             TRACE_ID_FOR_CACHE_LATEST_FILE,
                             &ttv_file,
                             item.meta.index_size,
@@ -78,8 +77,6 @@ impl Event for Eventer {
                         {
                             log::error!("Failed to cache file data: {}", e);
                         }
-                    }
-                }
             }
 
             // delete merge files

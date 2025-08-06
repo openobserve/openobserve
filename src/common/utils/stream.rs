@@ -29,8 +29,7 @@ use crate::{
 
 #[inline(always)]
 pub fn stream_type_query_param_error() -> Result<HttpResponse, Error> {
-    Err(Error::new(
-        ErrorKind::Other,
+    Err(Error::other(
         "only 'type' query param with value 'logs' or 'metrics' allowed",
     ))
 }

@@ -117,15 +117,14 @@ pub async fn retrieve(
     let original_url = short_url::retrieve(&short_id).await;
 
     // Check if type=ui for JSON response
-    if let Some(ref type_param) = query.type_param {
-        if type_param == "ui" {
+    if let Some(ref type_param) = query.type_param
+        && type_param == "ui" {
             if let Some(url) = original_url {
                 return Ok(HttpResponse::Ok().json(url));
             } else {
                 return Ok(HttpResponse::NotFound().finish());
             }
         }
-    }
 
     // Here we redirect the legacy short urls to the new short url
     // the redirection then will be handled by the frontend using this flow

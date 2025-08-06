@@ -39,7 +39,7 @@ pub async fn run(from: &str, to: &str) -> Result<(), anyhow::Error> {
 }
 
 async fn migrate_meta(from: &str, to: &str) -> Result<(), anyhow::Error> {
-    println!("load meta from {}", from);
+    println!("load meta from {from}");
     let src: Box<dyn infra_db::Db> = match from.to_lowercase().as_str().trim() {
         "sqlite" => Box::<infra_db::sqlite::SqliteDb>::default(),
         "etcd" => Box::<infra_db::etcd::Etcd>::default(),
@@ -71,7 +71,7 @@ async fn migrate_meta(from: &str, to: &str) -> Result<(), anyhow::Error> {
                     count += 1;
                 }
                 Err(e) => {
-                    println!("error while migrating key {} from source {}", key, e);
+                    println!("error while migrating key {key} from source {e}");
                 }
             }
             if count % 100 == 0 {
@@ -95,7 +95,7 @@ async fn migrate_meta(from: &str, to: &str) -> Result<(), anyhow::Error> {
 
 async fn migrate_scheduler(from: &str, to: &str) -> Result<(), anyhow::Error> {
     let time = std::time::Instant::now();
-    println!("load scheduler from {}", from);
+    println!("load scheduler from {from}");
     let src: Box<dyn infra_scheduler::Scheduler> = match from.to_lowercase().as_str().trim() {
         "sqlite" => Box::<infra_scheduler::sqlite::SqliteScheduler>::default(),
         "mysql" => Box::<infra_scheduler::mysql::MySqlScheduler>::default(),

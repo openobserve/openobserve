@@ -52,11 +52,10 @@ pub async fn delete_stream(
     let db_key = format!("/compact/delete/{key}");
 
     // write in cache
-    if let Some(v) = CACHE.get(&key) {
-        if v.value() + hour_micros(1) > now_micros() {
+    if let Some(v) = CACHE.get(&key)
+        && v.value() + hour_micros(1) > now_micros() {
             return Ok(key); // already in cache, don't create same task in one hour
         }
-    }
 
     CACHE.insert(key.clone(), now_micros());
     db::put(&db_key, "OK".into(), db::NEED_WATCH, None).await?;

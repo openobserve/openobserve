@@ -156,8 +156,7 @@ pub async fn get_search_profile(
     let mut req: config::meta::search::Request = config::meta::search::Request {
         query: Query {
             sql: format!(
-                "SELECT _timestamp, events FROM default WHERE trace_id = '{}' ORDER BY start_time",
-                query_trace_id
+                "SELECT _timestamp, events FROM default WHERE trace_id = '{query_trace_id}' ORDER BY start_time"
             ),
             start_time,
             end_time,
@@ -183,8 +182,7 @@ pub async fn get_search_profile(
         {
             req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
             range_error = format!(
-                "Query duration is modified due to query range restriction of {} hours",
-                max_query_range
+                "Query duration is modified due to query range restriction of {max_query_range} hours"
             );
         }
     }
@@ -283,8 +281,8 @@ pub async fn get_search_profile(
             };
 
             for hit in res.hits {
-                if let Some(events_str) = hit.get("events") {
-                    if let Ok(parsed_events) = serde_json::from_str::<Vec<SearchInspectorEvent>>(
+                if let Some(events_str) = hit.get("events")
+                    && let Ok(parsed_events) = serde_json::from_str::<Vec<SearchInspectorEvent>>(
                         events_str.as_str().unwrap_or("[]"),
                     ) {
                         let mut inspectors = vec![];
@@ -310,7 +308,6 @@ pub async fn get_search_profile(
 
                         events.extend(inspectors);
                     }
-                }
             }
 
             si.events = events;

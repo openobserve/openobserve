@@ -239,28 +239,28 @@ async fn main() -> Result<(), anyhow::Error> {
             // it must be initialized before the server starts
             if let Err(e) = cluster::register_and_keep_alive().await {
                 job_init_tx.send(false).ok();
-                panic!("cluster init failed: {}", e);
+                panic!("cluster init failed: {e}");
             }
             // init config
             if let Err(e) = config::init().await {
                 job_init_tx.send(false).ok();
-                panic!("config init failed: {}", e);
+                panic!("config init failed: {e}");
             }
 
             // db related inits
             if let Err(e) = migration::init_db().await {
                 job_init_tx.send(false).ok();
-                panic!("db init failed: {}", e);
+                panic!("db init failed: {e}");
             }
 
             // init infra
             if let Err(e) = infra::init().await {
                 job_init_tx.send(false).ok();
-                panic!("infra init failed: {}", e);
+                panic!("infra init failed: {e}");
             }
             if let Err(e) = common_infra::init().await {
                 job_init_tx.send(false).ok();
-                panic!("common infra init failed: {}", e);
+                panic!("common infra init failed: {e}");
             }
 
             // init enterprise
@@ -273,13 +273,13 @@ async fn main() -> Result<(), anyhow::Error> {
             // ingester init
             if let Err(e) = ingester::init().await {
                 job_init_tx.send(false).ok();
-                panic!("ingester init failed: {}", e);
+                panic!("ingester init failed: {e}");
             }
 
             // init job
             if let Err(e) = job::init().await {
                 job_init_tx.send(false).ok();
-                panic!("job init failed: {}", e);
+                panic!("job init failed: {e}");
             }
 
             // init meter provider

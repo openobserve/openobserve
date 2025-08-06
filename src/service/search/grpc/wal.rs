@@ -125,8 +125,8 @@ pub async fn search_parquet(
             lock_files.retain(|f| f != &file.key);
             continue;
         }
-        if let Some((min_ts, max_ts)) = query.time_range {
-            if file.meta.min_ts > max_ts || file.meta.max_ts < min_ts {
+        if let Some((min_ts, max_ts)) = query.time_range
+            && (file.meta.min_ts > max_ts || file.meta.max_ts < min_ts) {
                 log::debug!(
                     "[trace_id {}] skip wal parquet file: {} time_range: [{},{})",
                     query.trace_id,
@@ -138,7 +138,6 @@ pub async fn search_parquet(
                 lock_files.retain(|f| f != &file.key);
                 continue;
             }
-        }
         new_files.push(file);
     }
     let files = new_files;

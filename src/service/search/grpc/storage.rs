@@ -291,7 +291,7 @@ pub async fn search(
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
-        format!(" downloading others into {:?} in background,", cache_type)
+        format!(" downloading others into {cache_type:?} in background,")
     };
     log::info!(
         "{}",
@@ -459,14 +459,13 @@ fn generate_add_filter_back_condition(
     // if have datafusion_condition, always add filter back
     if datafusion_condition.is_some() {
         let mut index_condition = datafusion_condition.clone();
-        if let Some(tantivy_cond) = tantivy_condition.as_ref() {
-            if *is_add_filter_back {
+        if let Some(tantivy_cond) = tantivy_condition.as_ref()
+            && *is_add_filter_back {
                 index_condition
                     .as_mut()
                     .unwrap()
                     .add_index_condition(tantivy_cond.clone());
             }
-        }
         *is_add_filter_back = true;
         return index_condition;
     }
@@ -658,7 +657,7 @@ pub async fn filter_file_list_by_tantivy_index(
     let download_msg = if cache_type == file_data::CacheType::None {
         "".to_string()
     } else {
-        format!(" downloading others into {:?} in background,", cache_type)
+        format!(" downloading others into {cache_type:?} in background,")
     };
     log::info!(
         "{}",

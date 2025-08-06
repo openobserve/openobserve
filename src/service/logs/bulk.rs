@@ -114,7 +114,7 @@ pub async fn ingest(
             (action, stream_name, doc_id) = ret.unwrap();
 
             if stream_name.is_empty() || stream_name == "_" || stream_name == "/" {
-                let err_msg = format!("Invalid stream name: {}", line);
+                let err_msg = format!("Invalid stream name: {line}");
                 log::warn!("{}", err_msg);
                 bulk_res.errors = true;
                 let err = BulkResponseError::new(

@@ -41,7 +41,7 @@ impl FromStr for MemoryPoolType {
             "greedy" => Ok(MemoryPoolType::Greedy),
             "fair" | "" => Ok(MemoryPoolType::Fair), // default is fair
             "none" | "off" => Ok(MemoryPoolType::None),
-            _ => Err(format!("Invalid memory pool type '{}'", s)),
+            _ => Err(format!("Invalid memory pool type '{s}'")),
         }
     }
 }

@@ -64,8 +64,8 @@ pub fn apply_label_selector(
     label_selectors: &Option<HashSet<String>>,
 ) -> Option<DataFrame> {
     let mut df = df;
-    if let Some(label_selector) = label_selectors {
-        if !label_selector.is_empty() {
+    if let Some(label_selector) = label_selectors
+        && !label_selector.is_empty() {
             let schema_fields = schema
                 .fields()
                 .iter()
@@ -102,6 +102,5 @@ pub fn apply_label_selector(
                 }
             };
         }
-    }
     Some(df)
 }

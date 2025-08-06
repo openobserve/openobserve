@@ -84,9 +84,9 @@ impl VisitorMut for HistogramIntervalVisitorMut {
     type Break = ();
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
-        if let Expr::Function(func) = expr {
-            if func.name.to_string().to_lowercase() == "histogram" {
-                if let FunctionArguments::List(list) = &mut func.args {
+        if let Expr::Function(func) = expr
+            && func.name.to_string().to_lowercase() == "histogram"
+                && let FunctionArguments::List(list) = &mut func.args {
                     let mut args = list.args.iter();
                     // first is field
                     let _ = args.next();
@@ -100,8 +100,6 @@ impl VisitorMut for HistogramIntervalVisitorMut {
                         ));
                     }
                 }
-            }
-        }
         ControlFlow::Continue(())
     }
 }
@@ -118,7 +116,7 @@ pub fn update_histogram_interval_in_query(
         .unwrap();
 
     let mut histogram_interval_visitor = HistogramIntervalVisitorMut::new(histogram_interval);
-    statement.visit(&mut histogram_interval_visitor);
+    let _ = statement.visit(&mut histogram_interval_visitor);
 
     Ok(statement.to_string())
 }
