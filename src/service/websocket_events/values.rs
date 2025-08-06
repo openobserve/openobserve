@@ -98,7 +98,7 @@ pub async fn handle_values_request(
     let top_k = payload.size.or(Some(cfg.limit.query_default_limit));
 
     // get values req query
-    let reqs = build_search_request_per_field(&payload, org_id, stream_type, &stream_name)
+    let reqs = build_search_request_per_field(&payload, org_id, stream_type, &stream_name, "")
         .instrument(ws_values_span.clone())
         .await?;
 
