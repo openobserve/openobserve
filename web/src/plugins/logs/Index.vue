@@ -1763,6 +1763,15 @@ export default defineComponent({
           return null;
         }
 
+        // if multiple sql, then do not allow to visualize
+        if(logsPageQuery && Array.isArray(logsPageQuery) && logsPageQuery.length > 1){
+          showErrorNotification(
+            "Multiple SQL queries are not allowed to visualize",
+          );
+          variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+          return null;
+        }
+
         /* ------------------------------------------------------------- */
         /* 1) Fetch schema for the user query                            */
         /* ------------------------------------------------------------- */

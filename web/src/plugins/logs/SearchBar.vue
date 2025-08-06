@@ -3360,7 +3360,7 @@ export default defineComponent({
           getQueryData();
           searchObj.meta.logsVisualizeDirtyFlag = false;
         }
-      } else {
+      } else if (value == "visualize" && searchObj.meta.logsVisualizeToggle == "logs") {
         // validate query
         // return if query is emptry and stream is not selected
         if (
@@ -3385,6 +3385,14 @@ export default defineComponent({
             const queryBuild = buildSearch();
             logsPageQuery = queryBuild?.query?.sql ?? "";
           }
+        }
+
+        // if multiple sql, then do not allow to visualize
+        if(logsPageQuery && Array.isArray(logsPageQuery) && logsPageQuery.length > 1){
+          showErrorNotification(
+            "Multiple SQL queries are not allowed to visualize",
+          );
+          return;
         }
 
         // validate sql query that all fields have alias
