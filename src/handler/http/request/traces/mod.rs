@@ -224,7 +224,7 @@ pub async fn get_latest_traces(
     }
 
     let max_query_range = crate::common::utils::stream::get_max_query_range(
-        &[stream_name.clone()],
+        std::slice::from_ref(&stream_name),
         org_id.as_str(),
         &user_id,
         StreamType::Traces,

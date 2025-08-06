@@ -731,7 +731,7 @@ async fn process_node(
                             vrl_runtime,
                             record,
                             &org_id,
-                            &[stream_name.clone()],
+                            std::slice::from_ref(&stream_name),
                         ) {
                             (res, None) => res,
                             (res, Some(error)) => {
@@ -770,7 +770,7 @@ async fn process_node(
                     vrl_runtime,
                     json::Value::Array(result_array_records),
                     &org_id,
-                    &[stream_name.clone()],
+                    std::slice::from_ref(&stream_name),
                 ) {
                     (res, None) => res,
                     (res, Some(error)) => {

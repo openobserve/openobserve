@@ -727,8 +727,10 @@ pub async fn _write_results(
         local_resp.hits.first()
     };
 
-    if !local_resp.hits.is_empty() && remove_hit.is_some() {
-        let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
+    if !local_resp.hits.is_empty()
+        && let Some(remove_hit) = remove_hit
+    {
+        let ts_value_to_remove = remove_hit.get(ts_column).cloned();
 
         if let Some(ts_value) = ts_value_to_remove {
             local_resp

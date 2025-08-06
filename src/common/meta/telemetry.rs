@@ -58,8 +58,8 @@ impl Telemetry {
         }
         log::info!("sending event {}", event);
         let mut props = self.base_info.clone();
-        if data.is_some() {
-            for item in data.unwrap() {
+        if let Some(data) = data {
+            for item in data {
                 props.insert(item.0, item.1);
             }
         }

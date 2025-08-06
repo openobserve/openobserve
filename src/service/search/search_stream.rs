@@ -1262,16 +1262,18 @@ async fn process_delta(
         // `result_cache_ratio` will be 0 for delta search
         let result_cache_ratio = search_res.result_cache_ratio;
 
-        if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
+        if req.search_type == Some(SearchEventType::Values)
+            && let Some(values_ctx) = &values_ctx
+        {
             let search_stream_span = tracing::info_span!(
                 "src::handler::http::request::search::process_stream::process_delta::get_top_k_values",
                 org_id = %org_id,
             );
 
             log::debug!("Getting top k values for partition {idx}");
-            let field = values_ctx.as_ref().unwrap().field.clone();
-            let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
-            let no_count = values_ctx.as_ref().unwrap().no_count;
+            let field = values_ctx.field.clone();
+            let top_k = values_ctx.top_k.unwrap_or(10);
+            let no_count = values_ctx.no_count;
             let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
                 get_top_k_values(&search_res.hits, &field, top_k, no_count)
             })

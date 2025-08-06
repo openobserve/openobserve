@@ -463,9 +463,11 @@ pub async fn search_multi(
     }
 
     let mut report_function_usage = false;
-    multi_res.hits = if query_fn.is_some() && per_query_resp {
+    multi_res.hits = if let Some(query_fn) = query_fn
+        && per_query_resp
+    {
         // compile vrl function & apply the same before returning the response
-        let mut input_fn = query_fn.unwrap().trim().to_string();
+        let mut input_fn = query_fn.trim().to_string();
 
         let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
         if apply_over_hits {

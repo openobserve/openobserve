@@ -170,8 +170,8 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     } else {
         metrics::META_NUM_NODES.reset();
         let nodes = get_cached_online_nodes().await;
-        if nodes.is_some() {
-            for node in nodes.unwrap() {
+        if let Some(nodes) = nodes {
+            for node in nodes {
                 if node.is_ingester() {
                     metrics::META_NUM_NODES
                         .with_label_values(&[Role::Ingester.to_string().as_str()])
