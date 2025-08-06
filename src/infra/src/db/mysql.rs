@@ -530,9 +530,7 @@ impl super::Db for MysqlDb {
             if key1.is_empty() {
                 format!(r#"DELETE FROM meta WHERE module = '{module}';"#)
             } else if key2.is_empty() {
-                format!(
-                    r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}';"#
-                )
+                format!(r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}';"#)
             } else {
                 format!(
                     r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND (key2 = '{key2}' OR key2 LIKE '{key2}/%');"#
@@ -651,9 +649,7 @@ impl super::Db for MysqlDb {
         if !key2.is_empty() {
             sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
-        sql = format!(
-            "{sql} AND start_dt >= {min_dt} AND start_dt <= {max_dt}"
-        );
+        sql = format!("{sql} AND start_dt >= {min_dt} AND start_dt <= {max_dt}");
         sql = format!("{sql} ORDER BY start_dt ASC");
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
@@ -772,14 +768,15 @@ async fn add_start_dt_column() -> Result<()> {
         sqlx::query(r#"ALTER TABLE meta ADD COLUMN start_dt BIGINT NOT NULL DEFAULT 0;"#)
             .execute(&mut *tx)
             .await
-        && !e.to_string().contains("Duplicate column name") {
-            // Check for the specific MySQL error code for duplicate column
-            log::error!("[MYSQL] Unexpected error in adding column: {}", e);
-            if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] Error in rolling back transaction: {}", e);
-            }
-            return Err(e.into());
+        && !e.to_string().contains("Duplicate column name")
+    {
+        // Check for the specific MySQL error code for duplicate column
+        log::error!("[MYSQL] Unexpected error in adding column: {}", e);
+        if let Err(e) = tx.rollback().await {
+            log::error!("[MYSQL] Error in rolling back transaction: {}", e);
         }
+        return Err(e.into());
+    }
     if let Err(e) = tx.commit().await {
         log::info!("[MYSQL] Error in committing transaction: {}", e);
         return Err(e.into());

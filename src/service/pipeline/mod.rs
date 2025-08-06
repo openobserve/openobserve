@@ -49,7 +49,7 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
         derived_stream.org_id = pipeline.org.clone();
         // save derived_stream to triggers table
         if let Err(e) = super::alerts::derived_streams::save(
-            derived_stream.clone(),
+            *derived_stream.clone(),
             &pipeline.name,
             &pipeline.id,
             true,
@@ -125,7 +125,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
     if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
         if let Err(e) = super::alerts::derived_streams::save(
-            derived_stream.clone(),
+            *derived_stream.clone(),
             &pipeline.name,
             &pipeline.id,
             true,
@@ -185,7 +185,7 @@ pub async fn enable_pipeline(
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
         if pipeline.enabled {
             super::alerts::derived_streams::save(
-                derived_stream.clone(),
+                *derived_stream.clone(),
                 &pipeline.name,
                 pipeline_id,
                 false,

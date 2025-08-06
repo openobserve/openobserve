@@ -37,11 +37,12 @@ impl StringMatchReplacer {
     /// Check if a value ends with "::_o2_custom" suffix
     fn has_o2_custom_suffix(value: &Value) -> Option<String> {
         if let Value::SingleQuotedString(s) = value
-            && s.ends_with(O2_CUSTOM_SUFFIX) {
-                // Extract the prefix before "::_o2_custom"
-                let prefix = s.trim_end_matches(O2_CUSTOM_SUFFIX);
-                return Some(prefix.to_string());
-            }
+            && s.ends_with(O2_CUSTOM_SUFFIX)
+        {
+            // Extract the prefix before "::_o2_custom"
+            let prefix = s.trim_end_matches(O2_CUSTOM_SUFFIX);
+            return Some(prefix.to_string());
+        }
         None
     }
 
@@ -91,13 +92,14 @@ impl StringMatchReplacer {
         }
 
         if let Expr::Value(value) = &list[0]
-            && let Some(match_value) = Self::has_o2_custom_suffix(value) {
-                self.replacements_made += 1;
-                return Some(Self::create_str_match_function(
-                    field_expr.clone(),
-                    match_value,
-                ));
-            }
+            && let Some(match_value) = Self::has_o2_custom_suffix(value)
+        {
+            self.replacements_made += 1;
+            return Some(Self::create_str_match_function(
+                field_expr.clone(),
+                match_value,
+            ));
+        }
 
         None
     }
@@ -106,17 +108,19 @@ impl StringMatchReplacer {
     fn process_equality_expression(&mut self, left: &Expr, right: &Expr) -> Option<Expr> {
         // Check if right side is a value with _o2_custom suffix
         if let Expr::Value(value) = right
-            && let Some(match_value) = Self::has_o2_custom_suffix(value) {
-                self.replacements_made += 1;
-                return Some(Self::create_str_match_function(left.clone(), match_value));
-            }
+            && let Some(match_value) = Self::has_o2_custom_suffix(value)
+        {
+            self.replacements_made += 1;
+            return Some(Self::create_str_match_function(left.clone(), match_value));
+        }
 
         // Check if left side is a value with _o2_custom suffix
         if let Expr::Value(value) = left
-            && let Some(match_value) = Self::has_o2_custom_suffix(value) {
-                self.replacements_made += 1;
-                return Some(Self::create_str_match_function(right.clone(), match_value));
-            }
+            && let Some(match_value) = Self::has_o2_custom_suffix(value)
+        {
+            self.replacements_made += 1;
+            return Some(Self::create_str_match_function(right.clone(), match_value));
+        }
 
         None
     }
@@ -144,10 +148,11 @@ impl VisitorMut for StringMatchReplacer {
             Expr::BinaryOp { left, right, op } => {
                 // Handle equality expressions
                 if matches!(op, sqlparser::ast::BinaryOperator::Eq)
-                    && let Some(replacement) = self.process_equality_expression(left, right) {
-                        *expr = replacement;
-                        return ControlFlow::Continue(());
-                    }
+                    && let Some(replacement) = self.process_equality_expression(left, right)
+                {
+                    *expr = replacement;
+                    return ControlFlow::Continue(());
+                }
                 // Continue with normal traversal
                 self.pre_visit_expr(left)?;
                 self.pre_visit_expr(right)?;

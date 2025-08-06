@@ -1392,25 +1392,30 @@ mod search_history_utils {
             let mut query = format!("SELECT * FROM {search_stream_name} WHERE event='Search'");
 
             if let Some(org_id) = self.org_id
-                && !org_id.is_empty() {
-                    query.push_str(&format!(" AND org_id = '{org_id}'"));
-                }
+                && !org_id.is_empty()
+            {
+                query.push_str(&format!(" AND org_id = '{org_id}'"));
+            }
             if let Some(stream_type) = self.stream_type
-                && !stream_type.is_empty() {
-                    query.push_str(&format!(" AND stream_type = '{stream_type}'"));
-                }
+                && !stream_type.is_empty()
+            {
+                query.push_str(&format!(" AND stream_type = '{stream_type}'"));
+            }
             if let Some(stream_name) = self.stream_name
-                && !stream_name.is_empty() {
-                    query.push_str(&format!(" AND stream_name = '{stream_name}'"));
-                }
+                && !stream_name.is_empty()
+            {
+                query.push_str(&format!(" AND stream_name = '{stream_name}'"));
+            }
             if let Some(user_email) = self.user_email
-                && !user_email.is_empty() {
-                    query.push_str(&format!(" AND user_email = '{user_email}'"));
-                }
+                && !user_email.is_empty()
+            {
+                query.push_str(&format!(" AND user_email = '{user_email}'"));
+            }
             if let Some(trace_id) = self.trace_id
-                && !trace_id.is_empty() {
-                    query.push_str(&format!(" AND trace_id = '{trace_id}'"));
-                }
+                && !trace_id.is_empty()
+            {
+                query.push_str(&format!(" AND trace_id = '{trace_id}'"));
+            }
 
             query
         }

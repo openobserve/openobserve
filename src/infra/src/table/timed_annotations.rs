@@ -176,9 +176,10 @@ pub async fn get(
     // Map all panels to their respective annotations
     for panel in all_panels {
         if let Some(annotation) = grouped_annotations.get_mut(&panel.timed_annotation_id)
-            && !annotation.panels.contains(&panel.panel_id) {
-                annotation.panels.push(panel.panel_id.clone());
-            }
+            && !annotation.panels.contains(&panel.panel_id)
+        {
+            annotation.panels.push(panel.panel_id.clone());
+        }
     }
 
     // Step 8: Convert grouped annotations back into a Vec

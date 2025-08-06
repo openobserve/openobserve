@@ -92,7 +92,7 @@ fn get_table_idx(thread_id: usize, stream_name: &str) -> usize {
     if let Some(idx) = MEM_TABLE_INDIVIDUAL_STREAMS.get(stream_name) {
         *idx
     } else {
-        let hash_key = format!("{}_{}", thread_id, stream_name);
+        let hash_key = format!("{thread_id}_{stream_name}");
         let hash_id = gxhash::new().sum64(&hash_key);
         hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
     }
@@ -164,10 +164,10 @@ pub async fn read_from_memtable(
         }
         visited.insert(idx);
         let w = WRITERS[idx].read().await;
-        if let Some(r) = w.get(&key) {
-            if let Ok(data) = r.read(stream_name, time_range, partition_filters).await {
-                batches.extend(data);
-            }
+        if let Some(r) = w.get(&key)
+            && let Ok(data) = r.read(stream_name, time_range, partition_filters).await
+        {
+            batches.extend(data);
         }
     }
     Ok(batches)

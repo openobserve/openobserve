@@ -356,14 +356,16 @@ pub async fn get_opts(
     let cfg = config::get_config();
     // get from memory cache
     if cfg.memory_cache.enabled
-        && let Some(v) = memory::get(file, range.clone()).await {
-            return Ok(v);
-        }
+        && let Some(v) = memory::get(file, range.clone()).await
+    {
+        return Ok(v);
+    }
     // get from disk cache
     if cfg.disk_cache.enabled
-        && let Some(v) = disk::get(file, range.clone()).await {
-            return Ok(v);
-        }
+        && let Some(v) = disk::get(file, range.clone()).await
+    {
+        return Ok(v);
+    }
     // get from storage
     if remote {
         return match range {
@@ -389,14 +391,16 @@ pub async fn get_size_opts(file: &str, remote: bool) -> object_store::Result<usi
     let cfg = config::get_config();
     // get from memory cache
     if cfg.memory_cache.enabled
-        && let Some(v) = memory::get_size(file).await {
-            return Ok(v);
-        }
+        && let Some(v) = memory::get_size(file).await
+    {
+        return Ok(v);
+    }
     // get from disk cache
     if cfg.disk_cache.enabled
-        && let Some(v) = disk::get_size(file).await {
-            return Ok(v);
-        }
+        && let Some(v) = disk::get_size(file).await
+    {
+        return Ok(v);
+    }
     // get from storage
     if remote {
         let meta = crate::storage::head(file).await?;

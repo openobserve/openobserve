@@ -216,13 +216,13 @@ pub async fn get_job(updated_at: i64) -> Result<Option<Model>, errors::Error> {
             .filter(Column::Id.eq(&model.id))
             .exec(&tx)
             .await
-        {
-            log::error!("get job update status error: {e}");
-            if let Err(e) = tx.rollback().await {
-                return orm_err!(format!("get job rollback update status error: {e}"));
-            }
-            return orm_err!(format!("get job update status error: {e}"));
+    {
+        log::error!("get job update status error: {e}");
+        if let Err(e) = tx.rollback().await {
+            return orm_err!(format!("get job rollback update status error: {e}"));
         }
+        return orm_err!(format!("get job update status error: {e}"));
+    }
 
     if let Err(e) = tx.commit().await {
         return orm_err!(format!("get job commit error: {e}"));

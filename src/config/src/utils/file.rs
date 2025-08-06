@@ -51,9 +51,7 @@ pub fn get_file_contents(
         if read != to_read {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
-                format!(
-                    "Expected to read {to_read} bytes, but read {read} bytes"
-                ),
+                format!("Expected to read {to_read} bytes, but read {read} bytes"),
             ));
         }
         buf
@@ -145,9 +143,9 @@ pub async fn scan_files_with_channel(
             if path_ext == ext {
                 files.push(path.to_str().unwrap().to_string());
                 if limit > 0 && files.len() >= limit {
-                    tx.send(files.clone()).await.map_err(|e| {
-                        std::io::Error::other(e.to_string())
-                    })?;
+                    tx.send(files.clone())
+                        .await
+                        .map_err(|e| std::io::Error::other(e.to_string()))?;
                     files.clear();
                 }
             }

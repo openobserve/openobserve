@@ -125,9 +125,9 @@ impl NatsDb {
         {
             return Ok((key.to_string(), v));
         }
-        let keys = keys(&bucket, new_key).await.map_err(|e| {
-            Error::Message(format!("[NATS:get_key_value] bucket.keys error: {e}"))
-        })?;
+        let keys = keys(&bucket, new_key)
+            .await
+            .map_err(|e| Error::Message(format!("[NATS:get_key_value] bucket.keys error: {e}")))?;
         if keys.is_empty() {
             return Err(Error::from(DbError::KeyNotExists(key.to_string())));
         }
@@ -252,24 +252,25 @@ impl super::Db for NatsDb {
             Ok(None) => Ok(()),
             Ok(Some((value, new_value))) => {
                 if let Some(value) = value
-                    && let Err(e) = self.put(&old_key.unwrap(), value, need_watch, None).await {
-                        if let Err(e) = dist_lock::unlock(&locker).await {
-                            log::error!("dist_lock unlock err: {}", e);
-                        }
-                        log::info!("Released lock for cluster key: {}", lock_key);
-                        return Err(e);
+                    && let Err(e) = self.put(&old_key.unwrap(), value, need_watch, None).await
+                {
+                    if let Err(e) = dist_lock::unlock(&locker).await {
+                        log::error!("dist_lock unlock err: {}", e);
                     }
+                    log::info!("Released lock for cluster key: {}", lock_key);
+                    return Err(e);
+                }
                 if let Some((new_key, new_value, new_start_dt)) = new_value
                     && let Err(e) = self
                         .put(&new_key, new_value, need_watch, new_start_dt)
                         .await
-                    {
-                        if let Err(e) = dist_lock::unlock(&locker).await {
-                            log::error!("dist_lock unlock err: {}", e);
-                        }
-                        log::info!("Released lock for cluster key: {}", lock_key);
-                        return Err(e);
+                {
+                    if let Err(e) = dist_lock::unlock(&locker).await {
+                        log::error!("dist_lock unlock err: {}", e);
                     }
+                    log::info!("Released lock for cluster key: {}", lock_key);
+                    return Err(e);
+                }
                 Ok(())
             }
         };
@@ -614,9 +615,10 @@ async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {
 
     let mut keys = Vec::new();
     if let Ok(info) = consumer.info().await
-        && info.num_pending == 0 {
-            return Ok(keys);
-        }
+        && info.num_pending == 0
+    {
+        return Ok(keys);
+    }
     let mut messages = consumer.messages().await?;
     while let Ok(Some(message)) = messages.try_next().await {
         let key = message
@@ -630,9 +632,10 @@ async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {
             keys.push(key);
         }
         if let Ok(info) = message.info()
-            && info.pending == 0 {
-                break;
-            }
+            && info.pending == 0
+        {
+            break;
+        }
     }
     keys.sort();
     keys.dedup();

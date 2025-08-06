@@ -765,10 +765,11 @@ async fn add_data_column() -> Result<()> {
     if let Err(e) = sqlx::query(r#"ALTER TABLE scheduled_jobs ADD COLUMN data LONGTEXT NOT NULL;"#)
         .execute(&pool)
         .await
-        && !e.to_string().contains("Duplicate column name") {
-            // Check for the specific MySQL error code for duplicate column
-            log::error!("[MYSQL] Unexpected error in adding column: {}", e);
-            return Err(e.into());
-        }
+        && !e.to_string().contains("Duplicate column name")
+    {
+        // Check for the specific MySQL error code for duplicate column
+        log::error!("[MYSQL] Unexpected error in adding column: {}", e);
+        return Err(e.into());
+    }
     Ok(())
 }

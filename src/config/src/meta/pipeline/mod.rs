@@ -72,7 +72,7 @@ impl Pipeline {
         }
     }
 
-    pub fn get_derived_stream(&self) -> Option<DerivedStream> {
+    pub fn get_derived_stream(&self) -> Option<Box<DerivedStream>> {
         match &self.source {
             PipelineSource::Scheduled(derived_stream) => Some(derived_stream.to_owned()),
             _ => None,
@@ -333,7 +333,7 @@ where
                 let derived_stream_raw: String = row.try_get("derived_stream")?;
                 let derived_stream: DerivedStream = json::from_str(&derived_stream_raw)
                     .expect("Deserializing DerivedStream from ROW error");
-                PipelineSource::Scheduled(derived_stream)
+                PipelineSource::Scheduled(Box::new(derived_stream))
             }
             _ => return Err(sqlx::Error::ColumnNotFound("Invalid source type".into())),
         };

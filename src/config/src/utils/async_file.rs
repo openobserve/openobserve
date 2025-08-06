@@ -52,9 +52,7 @@ pub async fn get_file_contents(
         if read != to_read {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
-                format!(
-                    "Expected to read {to_read} bytes, but read {read} bytes"
-                ),
+                format!("Expected to read {to_read} bytes, but read {read} bytes"),
             ));
         }
         buf
@@ -105,19 +103,21 @@ pub async fn clean_empty_dirs(
                     continue;
                 }
                 if let Ok(f) = entry.file_type().await
-                    && f.is_dir() {
-                        match last_updated {
-                            None => {
+                    && f.is_dir()
+                {
+                    match last_updated {
+                        None => {
+                            dirs.push(entry.path().to_str().unwrap().to_string());
+                        }
+                        Some(last_updated) => {
+                            if let Ok(meta) = entry.metadata().await
+                                && meta.modified().unwrap() < last_updated
+                            {
                                 dirs.push(entry.path().to_str().unwrap().to_string());
-                            }
-                            Some(last_updated) => {
-                                if let Ok(meta) = entry.metadata().await
-                                    && meta.modified().unwrap() < last_updated {
-                                        dirs.push(entry.path().to_str().unwrap().to_string());
-                                    }
                             }
                         }
                     }
+                }
             }
             Some(Err(e)) => {
                 log::error!("clean_empty_dirs, err: {}", e);
@@ -130,9 +130,10 @@ pub async fn clean_empty_dirs(
     for dir in dirs {
         if let Ok(mut entries) = read_dir(&dir).await
             && let Ok(None) = entries.next_entry().await
-                && let Err(e) = remove_dir(&dir).await {
-                    log::error!("Failed to remove empty dir: {}, err: {}", dir, e);
-                }
+            && let Err(e) = remove_dir(&dir).await
+        {
+            log::error!("Failed to remove empty dir: {}, err: {}", dir, e);
+        }
     }
     Ok(())
 }

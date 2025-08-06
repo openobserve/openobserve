@@ -309,9 +309,11 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         flattened: Option<bool>,
     ) -> Result<Vec<FileKey>> {
         if let Some((start, end)) = time_range
-            && start == 0 && end == 0 {
-                return Ok(Vec::new());
-            }
+            && start == 0
+            && end == 0
+        {
+            return Ok(Vec::new());
+        }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
@@ -367,9 +369,11 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
         date_range: Option<(String, String)>,
     ) -> Result<Vec<FileKey>> {
         if let Some((start, end)) = date_range.as_ref()
-            && start.is_empty() && end.is_empty() {
-                return Ok(Vec::new());
-            }
+            && start.is_empty()
+            && end.is_empty()
+        {
+            return Ok(Vec::new());
+        }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
@@ -445,9 +449,11 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<super::FileId>> {
         if let Some((start, end)) = time_range
-            && start == 0 && end == 0 {
-                return Ok(Vec::new());
-            }
+            && start == 0
+            && end == 0
+        {
+            return Ok(Vec::new());
+        }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
         let (time_start, time_end) = time_range.unwrap_or((0, 0));
@@ -560,9 +566,11 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<String>> {
         if let Some((start, end)) = time_range
-            && start == 0 && end == 0 {
-                return Ok(Vec::new());
-            }
+            && start == 0
+            && end == 0
+        {
+            return Ok(Vec::new());
+        }
 
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
 
@@ -1205,7 +1213,8 @@ UPDATE stream_stats
         // check job status
         let id = ret.try_get::<i64, &str>("id").unwrap_or_default();
         let status = ret.try_get::<i64, &str>("status").unwrap_or_default();
-        if id > 0 && super::FileListJobStatus::from(status) == super::FileListJobStatus::Done
+        if id > 0
+            && super::FileListJobStatus::from(status) == super::FileListJobStatus::Done
             && let Err(e) =
                 sqlx::query("UPDATE file_list_jobs SET status = ? WHERE status = ? AND id = ?;")
                     .bind(super::FileListJobStatus::Pending)
@@ -1213,12 +1222,12 @@ UPDATE stream_stats
                     .bind(id)
                     .execute(&mut *tx)
                     .await
-            {
-                if let Err(e) = tx.rollback().await {
-                    log::error!("[MYSQL] rollback update job status error: {e}");
-                }
-                return Err(e.into());
+        {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] rollback update job status error: {e}");
             }
+            return Err(e.into());
+        }
         if let Err(e) = tx.commit().await {
             log::error!("[MYSQL] commit add job error: {e}");
             return Err(e.into());
@@ -1959,14 +1968,15 @@ async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
     let alert_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
     let mut tx = pool.begin().await?;
     if let Err(e) = sqlx::query(&alert_sql).execute(&mut *tx).await
-        && !e.to_string().contains("Duplicate column name") {
-            // Check for the specific MySQL error code for duplicate column
-            log::error!("[MYSQL] Unexpected error in adding column {column}: {}", e);
-            if let Err(e) = tx.rollback().await {
-                log::error!("[MYSQL] Error in rolling back transaction: {}", e);
-            }
-            return Err(e.into());
+        && !e.to_string().contains("Duplicate column name")
+    {
+        // Check for the specific MySQL error code for duplicate column
+        log::error!("[MYSQL] Unexpected error in adding column {column}: {}", e);
+        if let Err(e) = tx.rollback().await {
+            log::error!("[MYSQL] Error in rolling back transaction: {}", e);
         }
+        return Err(e.into());
+    }
     if let Err(e) = tx.commit().await {
         log::info!("[MYSQL] Error in committing transaction: {}", e);
         return Err(e.into());

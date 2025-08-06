@@ -978,9 +978,12 @@ pub fn apply_vrl_to_response(
     let query_fn = backup_query_fn.clone();
     let mut local_res = res.clone();
 
-    local_res.hits = if query_fn.is_some() && !local_res.hits.is_empty() && !local_res.is_partial {
+    local_res.hits = if let Some(query_fn) = query_fn
+        && !local_res.hits.is_empty()
+        && !local_res.is_partial
+    {
         // compile vrl function & apply the same before returning the response
-        let mut input_fn = query_fn.unwrap().trim().to_string();
+        let mut input_fn = query_fn.trim().to_string();
 
         let apply_over_hits = RESULT_ARRAY_SKIP_VRL.is_match(&input_fn);
         if apply_over_hits {

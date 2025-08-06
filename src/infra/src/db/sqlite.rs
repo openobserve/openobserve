@@ -312,9 +312,9 @@ impl super::Db for SqliteDb {
                     start_dt,
                 }))
                 .await
-            {
-                log::error!("[SQLITE] send event error: {}", e);
-            }
+        {
+            log::error!("[SQLITE] send event error: {}", e);
+        }
 
         Ok(())
     }
@@ -465,9 +465,9 @@ impl super::Db for SqliteDb {
                         start_dt,
                     }))
                     .await
-                {
-                    log::error!("[SQLITE] send event error: {}", e);
-                }
+            {
+                log::error!("[SQLITE] send event error: {}", e);
+            }
         }
 
         Ok(())
@@ -523,9 +523,7 @@ impl super::Db for SqliteDb {
             if key1.is_empty() {
                 format!(r#"DELETE FROM meta WHERE module = '{module}';"#)
             } else if key2.is_empty() {
-                format!(
-                    r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}';"#
-                )
+                format!(r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}';"#)
             } else {
                 format!(
                     r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND (key2 = '{key2}' OR key2 LIKE '{key2}/%');"#
@@ -634,9 +632,7 @@ impl super::Db for SqliteDb {
         if !key2.is_empty() {
             sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
         }
-        sql = format!(
-            "{sql} AND start_dt >= {min_dt} AND start_dt <= {max_dt}"
-        );
+        sql = format!("{sql} AND start_dt >= {min_dt} AND start_dt <= {max_dt}");
         sql = format!("{sql} ORDER BY start_dt ASC");
 
         let pool = CLIENT_RO.clone();
