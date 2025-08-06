@@ -183,9 +183,9 @@ pub async fn update_action_details(
                 crate::handler::http::request::actions::action::validate_environment_variables(
                     env_vars,
                 )
-            {
-                return Ok(MetaHttpResponse::bad_request(e));
-            }
+        {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
 
         let sa = match req.service_account.clone() {
             None => {

@@ -39,9 +39,8 @@ pub(crate) async fn process_file_list_delete(msg: Message) -> Result<()> {
     )
     .await
     .map_err(|e| {
-        let err_msg = format!(
-            "[ENRICHMENT_TABLE] delete_from_file_list {org_id}/{stream_name} failed: {e}"
-        );
+        let err_msg =
+            format!("[ENRICHMENT_TABLE] delete_from_file_list {org_id}/{stream_name} failed: {e}");
         log::error!("{err_msg}");
         Error::Message(err_msg)
     })?;

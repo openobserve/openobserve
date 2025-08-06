@@ -92,11 +92,11 @@ pub async fn set(destination: Destination) -> Result<Destination, DestinationErr
             saved.clone(),
         )
         .await
-        {
-            log::error!(
-                "[Destination] error triggering super cluster event to add destination to cache: {e}"
-            );
-        }
+    {
+        log::error!(
+            "[Destination] error triggering super cluster event to add destination to cache: {e}"
+        );
+    }
 
     Ok(saved)
 }
@@ -120,11 +120,11 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
             &event_key, org_id, name,
         )
         .await
-        {
-            log::error!(
-                "[Destination] error triggering super cluster event to remove destination from cache: {e}"
-            );
-        }
+    {
+        log::error!(
+            "[Destination] error triggering super cluster event to remove destination from cache: {e}"
+        );
+    }
 
     Ok(())
 }

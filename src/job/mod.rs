@@ -115,9 +115,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         o2_openfga::authorizer::authz::init_open_fga().await;
         // RBAC model
         if get_openfga_config().enabled
-            && let Err(e) = crate::common::infra::ofga::init().await {
-                log::error!("OFGA init failed: {}", e);
-            }
+            && let Err(e) = crate::common::infra::ofga::init().await
+        {
+            log::error!("OFGA init failed: {}", e);
+        }
     }
 
     tokio::task::spawn(async move { promql_self_consume::run().await });

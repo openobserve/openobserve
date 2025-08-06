@@ -704,9 +704,7 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!("Error deleting cache: {:?}", e);
-                    return Err(std::io::Error::other(
-                        "Error deleting cache",
-                    ));
+                    return Err(std::io::Error::other("Error deleting cache"));
                 }
             }
         }

@@ -241,16 +241,17 @@ impl FromRequest for AuthExtractor {
         // permissions on the stream
         if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
             if let Some(auth_header) = req.headers().get("Authorization")
-                && let Ok(auth_str) = auth_header.to_str() {
-                    return ready(Ok(AuthExtractor {
-                        auth: auth_str.to_owned(),
-                        method,
-                        o2_type: format!("stream:{org_id}"),
-                        org_id,
-                        bypass_check: true,
-                        parent_id: folder,
-                    }));
-                }
+                && let Ok(auth_str) = auth_header.to_str()
+            {
+                return ready(Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method,
+                    o2_type: format!("stream:{org_id}"),
+                    org_id,
+                    bypass_check: true,
+                    parent_id: folder,
+                }));
+            }
             return ready(Err(actix_web::error::ErrorUnauthorized(
                 "Unauthorized Access",
             )));
@@ -588,22 +589,23 @@ impl FromRequest for AuthExtractor {
         };
 
         // Check if the ws request is using internal grpc token
-        if method.eq("GET") && path.contains("/ws")
+        if method.eq("GET")
+            && path.contains("/ws")
             && let Some(auth_header) = req.headers().get("Authorization")
-                && auth_header
-                    .to_str()
-                    .unwrap()
-                    .eq(&get_config().grpc.internal_grpc_token)
-                {
-                    return ready(Ok(AuthExtractor {
-                        auth: auth_header.to_str().unwrap().to_string(),
-                        method,
-                        o2_type: format!("stream:{org_id}"),
-                        org_id,
-                        bypass_check: true,
-                        parent_id: folder,
-                    }));
-                }
+            && auth_header
+                .to_str()
+                .unwrap()
+                .eq(&get_config().grpc.internal_grpc_token)
+        {
+            return ready(Ok(AuthExtractor {
+                auth: auth_header.to_str().unwrap().to_string(),
+                method,
+                o2_type: format!("stream:{org_id}"),
+                org_id,
+                bypass_check: true,
+                parent_id: folder,
+            }));
+        }
 
         let auth_str = extract_auth_str(req);
 

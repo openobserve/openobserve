@@ -738,9 +738,7 @@ pub async fn check_work_group(
     log::info!(
         "{}",
         search_inspector_fields(
-            format!(
-                "[trace_id {trace_id}] search: wait in queue took: {took_wait} ms"
-            ),
+            format!("[trace_id {trace_id}] search: wait in queue took: {took_wait} ms"),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:check_work_group".to_string())

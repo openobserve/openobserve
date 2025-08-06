@@ -67,7 +67,6 @@ use {
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
     },
-    std::io::ErrorKind,
 };
 
 use crate::{
@@ -561,10 +560,10 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                             .organizations
                             .iter()
                             .any(|org| org.role.eq(&UserRole::ServiceAccount))
-                        {
-                            return Ok(HttpResponse::Unauthorized()
-                                .json("Service accounts are not allowed to login".to_string()));
-                        }
+                    {
+                        return Ok(HttpResponse::Unauthorized()
+                            .json("Service accounts are not allowed to login".to_string()));
+                    }
                     // get domain from email
                     let domain = res.0.user_email.split('@').nth(1).unwrap_or_default();
                     if !get_dex_config().allowed_domains.is_empty()

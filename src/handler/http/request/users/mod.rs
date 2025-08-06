@@ -316,8 +316,8 @@ pub async fn authentication(
             #[cfg(feature = "enterprise")]
             {
                 let auth_header = _req.headers().get("Authorization");
-                if auth_header.is_some() {
-                    let auth_header = auth_header.unwrap().to_str().unwrap();
+                if let Some(auth_header) = auth_header {
+                    let auth_header = auth_header.to_str().unwrap();
                     if let Some((name, password)) =
                         o2_dex::service::auth::get_user_from_token(auth_header)
                     {

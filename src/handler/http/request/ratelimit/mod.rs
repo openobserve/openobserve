@@ -73,9 +73,7 @@ async fn validate_ratelimit_updater(
     update_type: &str,
     rules: &RatelimitRuleUpdater,
 ) -> Result<(), anyhow::Error> {
-    let global_default_rules = get_default_rules()
-        .await
-        .map_err(|e| std::io::Error::other(e))?;
+    let global_default_rules = get_default_rules().await.map_err(std::io::Error::other)?;
 
     // module-level is org-level
     let org_level_rules = infra::table::ratelimit::fetch_rules(
@@ -84,7 +82,7 @@ async fn validate_ratelimit_updater(
         Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string()),
     )
     .await
-    .map_err(|e| std::io::Error::other(e))?;
+    .map_err(std::io::Error::other)?;
 
     let org_level_thresholds: HashMap<(String, ApiGroupOperation), i32> = org_level_rules
         .into_iter()
@@ -128,8 +126,9 @@ async fn validate_ratelimit_updater(
             if update_type == "role" {
                 let compare_threshold =
                     org_level_thresholds.get(&(api_group_name.to_string(), operation));
-                if compare_threshold.is_some() && *compare_threshold.unwrap() < *threshold {
-                    let compare_threshold = compare_threshold.unwrap();
+                if let Some(compare_threshold) = compare_threshold
+                    && *compare_threshold < *threshold
+                {
                     return Err(anyhow::anyhow!(
                         "{}:{} threshold must be lower than or equal to {:?}, got {}, because module-level rule limit {}:{} is {:?}",
                         api_group_name,
@@ -246,9 +245,7 @@ pub async fn list_module_ratelimit(
                 .await;
         }
 
-        let global_default_rules = get_default_rules()
-            .await
-            .map_err(|e| std::io::Error::other(e))?;
+        let global_default_rules = get_default_rules().await.map_err(std::io::Error::other)?;
         // module-level is org-level
         let all_rules = infra::table::ratelimit::fetch_rules(
             global_default_rules.clone(),
@@ -256,7 +253,7 @@ pub async fn list_module_ratelimit(
             Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string()),
         )
         .await
-        .map_err(|e| std::io::Error::other(e))?;
+        .map_err(std::io::Error::other)?;
 
         let info = get_ratelimit_global_default_api_info().await;
         let api_group_info = info.api_groups(Some(org_id.as_str()), all_rules).await;
@@ -330,7 +327,7 @@ pub async fn list_role_ratelimit(
             Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER.to_string()),
         )
         .await
-        .map_err(|e| std::io::Error::other(e))?;
+        .map_err(std::io::Error::other)?;
 
         let role_level_rules = infra::table::ratelimit::fetch_rules(
             org_level_rules,
@@ -338,7 +335,7 @@ pub async fn list_role_ratelimit(
             Some(user_role),
         )
         .await
-        .map_err(|e| std::io::Error::other(e))?;
+        .map_err(std::io::Error::other)?;
 
         let info = get_ratelimit_global_default_api_info().await;
         let api_group_info = info
@@ -395,9 +392,7 @@ pub async fn update_ratelimit(
 
         let mut bytes = web::BytesMut::new();
         while let Some(item) = payload.next().await {
-            bytes.extend_from_slice(
-                &item.map_err(|e| std::io::Error::other(e))?,
-            );
+            bytes.extend_from_slice(&item.map_err(std::io::Error::other)?);
         }
 
         let updater = match parse_and_validate_ratelimit_payload(bytes).await {
@@ -485,9 +480,7 @@ async fn parse_and_validate_ratelimit_payload(
 
         for (inner_key, inner_value) in inner_obj {
             let number = inner_value.as_i64().ok_or_else(|| {
-                format!(
-                    "Value for key '{inner_key}' in group '{outer_key}' must be an i32"
-                )
+                format!("Value for key '{inner_key}' in group '{outer_key}' must be an i32")
             })?;
 
             if number > i32::MAX as i64 || number < 0 {

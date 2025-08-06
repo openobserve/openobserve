@@ -243,14 +243,14 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     {
         if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await
-            && let Some((_, stat)) = status.first() {
-                match stat.work_group.as_ref() {
-                    Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
-                    Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
-                    None => _work_group = None,
-                }
+            && let Some((_, stat)) = status.first()
+        {
+            match stat.work_group.as_ref() {
+                Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
+                Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
+                None => _work_group = None,
             }
-        ;
+        };
     }
 
     metrics::QUERY_RUNNING_NUMS

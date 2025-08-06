@@ -120,223 +120,225 @@ pub async fn process_token(
     }
 
     // Check if the user exists in the database
-    let db_user = db::user::get_user_by_email(&user_email).await;
+    match db::user::get_user_by_email(&user_email).await {
+        None => {
+            log::info!("User does not exist in the database");
 
-    if db_user.is_none() {
-        log::info!("User does not exist in the database");
-
-        if openfga_cfg.enabled {
-            for (index, org) in source_orgs.iter().enumerate() {
-                let mut tuples = vec![];
-                get_user_creation_tuples(
-                    &org.name,
-                    &user_email,
-                    &org.role.to_string(),
-                    &mut tuples,
-                );
-                get_org_creation_tuples(
-                    &org.name,
-                    &mut tuples,
-                    OFGA_MODELS.values().map(|fga_entity| fga_entity.key)
-                        .collect(),
-                    NON_OWNING_ORG.to_vec(),
-                )
-                .await;
-
-                if index == 0 {
-                    // this is to allow user call organization api with org
-                    tuples.push(get_user_org_tuple(
+            if openfga_cfg.enabled {
+                for (index, org) in source_orgs.iter().enumerate() {
+                    let mut tuples = vec![];
+                    get_user_creation_tuples(
+                        &org.name,
                         &user_email,
-                        &user_email,
-                        Some(&org.role.to_string()),
-                    ));
+                        &org.role.to_string(),
+                        &mut tuples,
+                    );
+                    get_org_creation_tuples(
+                        &org.name,
+                        &mut tuples,
+                        OFGA_MODELS
+                            .values()
+                            .map(|fga_entity| fga_entity.key)
+                            .collect(),
+                        NON_OWNING_ORG.to_vec(),
+                    )
+                    .await;
+
+                    if index == 0 {
+                        // this is to allow user call organization api with org
+                        tuples.push(get_user_org_tuple(
+                            &user_email,
+                            &user_email,
+                            Some(&org.role.to_string()),
+                        ));
+                    }
+
+                    tuples_to_add.insert(org.name.to_owned(), tuples);
                 }
-
-                tuples_to_add.insert(org.name.to_owned(), tuples);
             }
-        }
-        let updated_db_user = DBUser {
-            email: user_email.to_owned(),
-            first_name: name.to_owned(),
-            last_name: "".to_owned(),
-            password: "".to_owned(),
-            salt: "".to_owned(),
-            organizations: source_orgs,
-            is_external: true,
-            password_ext: Some("".to_owned()),
-        };
+            let updated_db_user = DBUser {
+                email: user_email.to_owned(),
+                first_name: name.to_owned(),
+                last_name: "".to_owned(),
+                password: "".to_owned(),
+                salt: "".to_owned(),
+                organizations: source_orgs,
+                is_external: true,
+                password_ext: Some("".to_owned()),
+            };
 
-        match users::update_db_user(updated_db_user).await {
-            Ok(_) => {
-                log::info!("User added to the database");
-                if openfga_cfg.enabled {
-                    for (_, tuples) in tuples_to_add {
-                        match update_tuples(tuples, vec![]).await {
-                            Ok(_) => {
-                                log::info!("User updated to the openfga");
-                            }
-                            Err(e) => {
-                                log::error!("Error updating user to the openfga: {}", e);
+            match users::update_db_user(updated_db_user).await {
+                Ok(_) => {
+                    log::info!("User added to the database");
+                    if openfga_cfg.enabled {
+                        for (_, tuples) in tuples_to_add {
+                            match update_tuples(tuples, vec![]).await {
+                                Ok(_) => {
+                                    log::info!("User updated to the openfga");
+                                }
+                                Err(e) => {
+                                    log::error!("Error updating user to the openfga: {}", e);
+                                }
                             }
                         }
                     }
                 }
-            }
-            Err(e) => {
-                log::error!("Error adding user to the database: {}", e);
-            }
-        }
-    } else {
-        // check if user is service account and skip the role update ,
-        // assumption is always a service account irrespective of the orgs it belongs to
-        if res.0.user_role.is_some() && res.0.user_role.unwrap().eq(&UserRole::ServiceAccount) {
-            log::info!("User is service account and skipping the role update");
-            return;
-        }
-
-        log::info!("User exists in the database perform check for role change");
-        let existing_db_user = db_user.unwrap();
-        let existing_orgs = existing_db_user.organizations;
-        let mut orgs_removed = Vec::new();
-        let mut orgs_role_changed = HashMap::new();
-        let mut orgs_added = Vec::new();
-
-        let mut write_tuples = Vec::new();
-        let mut delete_tuples = Vec::new();
-
-        // Check for newly added organizations
-        for source_org in &source_orgs {
-            if !existing_orgs
-                .iter()
-                .any(|existing_org| existing_org.name == source_org.name)
-            {
-                orgs_added.push(source_org);
+                Err(e) => {
+                    log::error!("Error adding user to the database: {}", e);
+                }
             }
         }
+        Some(existing_db_user) => {
+            // check if user is service account and skip the role update ,
+            // assumption is always a service account irrespective of the orgs it belongs to
+            if res.0.user_role.is_some() && res.0.user_role.unwrap().eq(&UserRole::ServiceAccount) {
+                log::info!("User is service account and skipping the role update");
+                return;
+            }
 
-        for existing_org in &existing_orgs {
-            match source_orgs
-                .iter()
-                .find(|&src_org| src_org.name == existing_org.name)
-            {
-                Some(src_org) => {
-                    if src_org.role != existing_org.role {
-                        // The role has changed for this organization
-                        orgs_role_changed.insert(existing_org.role.to_string(), src_org);
+            log::info!("User exists in the database perform check for role change");
+            let existing_orgs = existing_db_user.organizations;
+            let mut orgs_removed = Vec::new();
+            let mut orgs_role_changed = HashMap::new();
+            let mut orgs_added = Vec::new();
+
+            let mut write_tuples = Vec::new();
+            let mut delete_tuples = Vec::new();
+
+            // Check for newly added organizations
+            for source_org in &source_orgs {
+                if !existing_orgs
+                    .iter()
+                    .any(|existing_org| existing_org.name == source_org.name)
+                {
+                    orgs_added.push(source_org);
+                }
+            }
+
+            for existing_org in &existing_orgs {
+                match source_orgs
+                    .iter()
+                    .find(|&src_org| src_org.name == existing_org.name)
+                {
+                    Some(src_org) => {
+                        if src_org.role != existing_org.role {
+                            // The role has changed for this organization
+                            orgs_role_changed.insert(existing_org.role.to_string(), src_org);
+                        }
+                    }
+                    None => {
+                        // The organization is not found in source_orgs, hence removed
+                        orgs_removed.push(existing_org);
                     }
                 }
-                None => {
-                    // The organization is not found in source_orgs, hence removed
-                    orgs_removed.push(existing_org);
-                }
             }
-        }
 
-        // Add the user to the newly added organizations
-        for org in orgs_added {
-            match users::add_user_to_org(
-                &org.name,
-                &user_email,
-                org.role.clone(),
-                &get_config().auth.root_user_email,
-            )
-            .await
-            {
-                Ok(_) => {
-                    log::info!("User added to the organization {}", org.name);
-                    write_tuples.push(get_user_role_creation_tuple(
-                        &org.role.to_string(),
-                        &user_email,
-                        &org.name,
-                    ));
-                }
-                Err(e) => {
-                    log::error!("Error adding user to the organization {}: {}", org.name, e);
-                }
-            }
-        }
-
-        for org in orgs_removed {
-            match users::remove_user_from_org(
-                &org.name,
-                &user_email,
-                &get_config().auth.root_user_email,
-            )
-            .await
-            {
-                Ok(_) => {
-                    log::info!("User removed from the organization {}", org.name);
-                    delete_tuples.push(get_user_role_deletion_tuple(
-                        &org.role.to_string(),
-                        &user_email,
-                        &org.name,
-                    ));
-                }
-                Err(e) => {
-                    log::error!(
-                        "Error removing user to the organization {}: {}",
-                        org.name,
-                        e
-                    );
-                }
-            }
-        }
-        for (existing_role, org) in orgs_role_changed {
-            match users::update_user(
-                &org.name,
-                &user_email,
-                false,
-                &get_config().auth.root_user_email,
-                crate::common::meta::user::UpdateUser {
-                    role: Some(org.role.clone()),
-                    ..Default::default()
-                },
-            )
-            .await
-            {
-                Ok(_) => {
-                    log::info!("User update for the organization {}", org.name);
-                    delete_tuples.push(get_user_role_deletion_tuple(
-                        &existing_role,
-                        &user_email,
-                        &org.name,
-                    ));
-                    write_tuples.push(get_user_role_creation_tuple(
-                        &org.role.to_string(),
-                        &user_email,
-                        &org.name,
-                    ));
-                }
-                Err(e) => {
-                    log::error!(
-                        "Error updating user to the organization {}: {}",
-                        org.name,
-                        e
-                    );
-                }
-            }
-        }
-        if openfga_cfg.enabled {
-            if write_tuples.is_empty() && delete_tuples.is_empty() {
-                log::info!("No changes to the user information tuples");
-            } else {
-                log::info!(
-                    "openfga tuples: wt {:?} ,dt {:?} ",
-                    write_tuples,
-                    delete_tuples
-                );
-
-                match update_tuples(write_tuples, delete_tuples).await {
+            // Add the user to the newly added organizations
+            for org in orgs_added {
+                match users::add_user_to_org(
+                    &org.name,
+                    &user_email,
+                    org.role.clone(),
+                    &get_config().auth.root_user_email,
+                )
+                .await
+                {
                     Ok(_) => {
-                        log::info!("User updated to the openfga");
+                        log::info!("User added to the organization {}", org.name);
+                        write_tuples.push(get_user_role_creation_tuple(
+                            &org.role.to_string(),
+                            &user_email,
+                            &org.name,
+                        ));
                     }
-                    Err(_) => {
-                        log::error!("Error updating user to the openfga");
+                    Err(e) => {
+                        log::error!("Error adding user to the organization {}: {}", org.name, e);
+                    }
+                }
+            }
+
+            for org in orgs_removed {
+                match users::remove_user_from_org(
+                    &org.name,
+                    &user_email,
+                    &get_config().auth.root_user_email,
+                )
+                .await
+                {
+                    Ok(_) => {
+                        log::info!("User removed from the organization {}", org.name);
+                        delete_tuples.push(get_user_role_deletion_tuple(
+                            &org.role.to_string(),
+                            &user_email,
+                            &org.name,
+                        ));
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "Error removing user to the organization {}: {}",
+                            org.name,
+                            e
+                        );
+                    }
+                }
+            }
+            for (existing_role, org) in orgs_role_changed {
+                match users::update_user(
+                    &org.name,
+                    &user_email,
+                    false,
+                    &get_config().auth.root_user_email,
+                    crate::common::meta::user::UpdateUser {
+                        role: Some(org.role.clone()),
+                        ..Default::default()
+                    },
+                )
+                .await
+                {
+                    Ok(_) => {
+                        log::info!("User update for the organization {}", org.name);
+                        delete_tuples.push(get_user_role_deletion_tuple(
+                            &existing_role,
+                            &user_email,
+                            &org.name,
+                        ));
+                        write_tuples.push(get_user_role_creation_tuple(
+                            &org.role.to_string(),
+                            &user_email,
+                            &org.name,
+                        ));
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "Error updating user to the organization {}: {}",
+                            org.name,
+                            e
+                        );
+                    }
+                }
+            }
+            if openfga_cfg.enabled {
+                if write_tuples.is_empty() && delete_tuples.is_empty() {
+                    log::info!("No changes to the user information tuples");
+                } else {
+                    log::info!(
+                        "openfga tuples: wt {:?} ,dt {:?} ",
+                        write_tuples,
+                        delete_tuples
+                    );
+
+                    match update_tuples(write_tuples, delete_tuples).await {
+                        Ok(_) => {
+                            log::info!("User updated to the openfga");
+                        }
+                        Err(_) => {
+                            log::error!("Error updating user to the openfga");
+                        }
                     }
                 }
             }
         }
-    };
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -407,7 +409,9 @@ async fn map_group_to_custom_role(
             get_org_creation_tuples(
                 &dex_cfg.default_org,
                 &mut tuples,
-                OFGA_MODELS.values().map(|fga_entity| fga_entity.key)
+                OFGA_MODELS
+                    .values()
+                    .map(|fga_entity| fga_entity.key)
                     .collect(),
                 NON_OWNING_ORG.to_vec(),
             )

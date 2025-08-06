@@ -329,11 +329,12 @@ pub async fn get_file_id_lists(
     let stream_type = stream.get_stream_type(stream_type);
     // if stream is enrich, rewrite the time_range
     if let Some(schema) = stream.schema()
-        && (schema == "enrich" || schema == "enrichment_tables") {
-            let start = enrichment_table::get_start_time(org_id, &stream_name).await;
-            let end = config::utils::time::now_micros();
-            time_range = Some((start, end));
-        }
+        && (schema == "enrich" || schema == "enrichment_tables")
+    {
+        let start = enrichment_table::get_start_time(org_id, &stream_name).await;
+        let end = config::utils::time::now_micros();
+        time_range = Some((start, end));
+    }
     let file_id_list =
         crate::service::file_list::query_ids(org_id, stream_type, &stream_name, time_range).await?;
     Ok(file_id_list)

@@ -736,18 +736,19 @@ async fn get_cpu_and_mem_limit(
     mut memory_size: usize,
 ) -> Result<(usize, usize)> {
     if let Some(wg) = work_group.as_ref()
-        && let Ok(wg) = WorkGroup::from_str(wg) {
-            let (cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
-                DataFusionError::Execution(format!("Failed to get dynamic resource: {e}"))
-            })?;
-            if get_o2_config().search_group.cpu_limit_enabled {
-                target_partitions = std::cmp::max(
-                    get_config().limit.datafusion_min_partition_num,
-                    target_partitions * cpu as usize / 100,
-                );
-            }
-            memory_size = memory_size * mem as usize / 100;
+        && let Ok(wg) = WorkGroup::from_str(wg)
+    {
+        let (cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
+            DataFusionError::Execution(format!("Failed to get dynamic resource: {e}"))
+        })?;
+        if get_o2_config().search_group.cpu_limit_enabled {
+            target_partitions = std::cmp::max(
+                get_config().limit.datafusion_min_partition_num,
+                target_partitions * cpu as usize / 100,
+            );
         }
+        memory_size = memory_size * mem as usize / 100;
+    }
 
     let target_partitions = if target_partitions == 0 {
         DATAFUSION_MIN_PARTITION

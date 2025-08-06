@@ -292,14 +292,15 @@ async fn find_matching_rule(
             }
             Some(type_str) if type_str == RatelimitRuleType::Regex.to_string() => {
                 if let Ok(re) = Regex::new(&rule.get_resource())
-                    && re.is_match(resource) {
-                        log::debug!(
-                            "Matching resource: {} with regex rule: {}",
-                            resource,
-                            rule.get_resource()
-                        );
-                        return Some(rule);
-                    }
+                    && re.is_match(resource)
+                {
+                    log::debug!(
+                        "Matching resource: {} with regex rule: {}",
+                        resource,
+                        rule.get_resource()
+                    );
+                    return Some(rule);
+                }
             }
             _ => continue,
         }

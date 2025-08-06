@@ -134,7 +134,9 @@ pub async fn post_user(
                     get_org_creation_tuples(
                         &org_id,
                         &mut tuples,
-                        OFGA_MODELS.values().map(|fga_entity| fga_entity.key)
+                        OFGA_MODELS
+                            .values()
+                            .map(|fga_entity| fga_entity.key)
                             .collect(),
                         NON_OWNING_ORG.to_vec(),
                     )
@@ -356,28 +358,23 @@ pub async fn update_user(
                             use o2_openfga::authorizer::authz::update_user_role;
 
                             if get_openfga_config().enabled
-                                && old_role.is_some()
-                                && new_role.is_some()
+                                && let Some(old) = old_role
+                                && let Some(new) = new_role
+                                && !old.eq(&new)
                             {
-                                let old = old_role.unwrap();
-                                let new = new_role.unwrap();
-                                if !old.eq(&new) {
-                                    let mut old_str = old.to_string();
-                                    let mut new_str = new.to_string();
-                                    if old.eq(&UserRole::User) || old.eq(&UserRole::ServiceAccount)
-                                    {
-                                        old_str = "allowed_user".to_string();
-                                    }
-                                    if new.eq(&UserRole::User) || new.eq(&UserRole::ServiceAccount)
-                                    {
-                                        new_str = "allowed_user".to_string();
-                                    }
-                                    if old_str != new_str {
-                                        log::debug!(
-                                            "updating openfga role for {email} from {old_str} to {new_str}"
-                                        );
-                                        update_user_role(&old_str, &new_str, email, org_id).await;
-                                    }
+                                let mut old_str = old.to_string();
+                                let mut new_str = new.to_string();
+                                if old.eq(&UserRole::User) || old.eq(&UserRole::ServiceAccount) {
+                                    old_str = "allowed_user".to_string();
+                                }
+                                if new.eq(&UserRole::User) || new.eq(&UserRole::ServiceAccount) {
+                                    new_str = "allowed_user".to_string();
+                                }
+                                if old_str != new_str {
+                                    log::debug!(
+                                        "updating openfga role for {email} from {old_str} to {new_str}"
+                                    );
+                                    update_user_role(&old_str, &new_str, email, org_id).await;
                                 }
                             }
                         }
@@ -483,7 +480,9 @@ pub async fn add_user_to_org(
                     get_org_creation_tuples(
                         org_id,
                         &mut tuples,
-                        OFGA_MODELS.values().map(|fga_entity| fga_entity.key)
+                        OFGA_MODELS
+                            .values()
+                            .map(|fga_entity| fga_entity.key)
                             .collect(),
                         NON_OWNING_ORG.to_vec(),
                     )
@@ -736,13 +735,11 @@ pub async fn remove_user_from_org(
                                     "user_fga_role, multi org: {}",
                                     _user_fga_role.as_ref().unwrap()
                                 );
-                                if get_openfga_config().enabled && _user_fga_role.is_some() {
-                                    delete_user_from_org(
-                                        org_id,
-                                        email_id,
-                                        _user_fga_role.unwrap().as_str(),
-                                    )
-                                    .await;
+                                if get_openfga_config().enabled
+                                    && let Some(user_fga_role) = _user_fga_role
+                                {
+                                    delete_user_from_org(org_id, email_id, user_fga_role.as_str())
+                                        .await;
                                     if is_service_account {
                                         delete_service_account_from_org(org_id, email_id).await;
                                     }
@@ -858,9 +855,10 @@ fn get_user_roles_by_org_id(roles: Vec<String>, org_id: Option<&str>) -> Vec<Str
 async fn check_cache(user_email: &str) -> Option<Vec<String>> {
     let cache = USER_ROLES_CACHE.read().await;
     if let Some(cached) = cache.get(user_email)
-        && cached.expires_at > Instant::now() {
-            return Some(cached.roles.clone());
-        }
+        && cached.expires_at > Instant::now()
+    {
+        return Some(cached.roles.clone());
+    }
     None
 }
 #[cfg(feature = "enterprise")]

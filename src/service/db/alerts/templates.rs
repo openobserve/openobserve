@@ -87,11 +87,11 @@ pub async fn set(template: Template) -> Result<Template, TemplateError> {
             saved.clone(),
         )
         .await
-        {
-            log::error!(
-                "[Template] error triggering super cluster event to add template to cache: {e}"
-            );
-        }
+    {
+        log::error!(
+            "[Template] error triggering super cluster event to add template to cache: {e}"
+        );
+    }
 
     Ok(saved)
 }
@@ -124,11 +124,11 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
             &event_key, org_id, name,
         )
         .await
-        {
-            log::error!(
-                "[Template] error triggering super cluster event to remove template from cache: {e}"
-            );
-        }
+    {
+        log::error!(
+            "[Template] error triggering super cluster event to remove template from cache: {e}"
+        );
+    }
 
     Ok(())
 }
