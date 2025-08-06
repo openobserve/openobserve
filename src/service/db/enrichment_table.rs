@@ -213,7 +213,7 @@ pub async fn get_table_size(org_id: &str, name: &str) -> f64 {
                 let size = String::from_utf8_lossy(&size);
                 size.parse::<f64>().unwrap_or(0.0)
             }
-            Err(e) => {
+            Err(_) => {
                 stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables).storage_size
             }
         },
@@ -245,7 +245,7 @@ pub async fn get_meta_table_stats(
     .await
     {
         Ok(size) => size,
-        Err(e) => {
+        Err(_) => {
             return None;
         }
     };

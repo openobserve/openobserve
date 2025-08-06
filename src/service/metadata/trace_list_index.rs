@@ -25,7 +25,7 @@ use std::{
 use arrow_schema::{DataType, Field, Schema};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
-    meta::stream::{StreamPartition, StreamSettings, StreamType},
+    meta::stream::{StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
 use infra::schema::unwrap_partition_time_level;
@@ -95,7 +95,7 @@ impl Metadata for TraceListIndex {
             let data = data.as_object_mut().unwrap();
             let hour_key = ingestion::get_write_partition_key(
                 timestamp,
-                vec![],
+                &vec![],
                 unwrap_partition_time_level(None, StreamType::Metadata),
                 data,
                 Some(&schema_key),

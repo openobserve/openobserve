@@ -112,7 +112,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         let session_id = item_key.strip_prefix(key).unwrap();
         let json_val: String = match json::from_slice(&item_value) {
             Ok(val) => val,
-            Err(e) => {
+            Err(_) => {
                 continue;
             }
         };
