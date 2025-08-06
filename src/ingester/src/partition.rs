@@ -185,6 +185,7 @@ impl Partition {
                     arrow_size: 0,
                     file_num: 1,
                     batch_num: data.len(),
+                    records: file_meta.records as usize,
                 };
                 // write into parquet buf
                 let bloom_filter_fields =
