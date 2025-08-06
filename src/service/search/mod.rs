@@ -864,7 +864,6 @@ pub async fn search_partition(
         files.len(),
         file_list_took,
     );
-
     let (is_histogram_eligible, _) = is_eligible_for_histogram(&req.sql).unwrap_or((false, false));
 
     if skip_get_file_list {

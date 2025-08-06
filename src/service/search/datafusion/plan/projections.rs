@@ -206,10 +206,6 @@ pub async fn get_result_schema(
     is_streaming: bool,
     use_cache: bool,
 ) -> Result<ResultSchemaExtractor, anyhow::Error> {
-    if sql.schemas.len() != 1 {
-        return Ok(ResultSchemaExtractor::new());
-    }
-
     if !is_streaming && use_cache {
         if let Some(interval) = sql.histogram_interval {
             handle_histogram(&mut sql.sql, sql.time_range, interval);
@@ -255,7 +251,7 @@ mod tests {
         };
     }
 
-    fn get_fields() -> Vec<Field> {
+    fn get_fields_default() -> Vec<Field> {
         vec![
             Field::new("log", DataType::Utf8, true),
             Field::new("k8s_namespace_name", DataType::Utf8, false),
@@ -270,14 +266,38 @@ mod tests {
         ]
     }
 
+    fn get_fields_test() -> Vec<Field> {
+        vec![
+            Field::new("log", DataType::Utf8, true),
+            Field::new("kubernetes_namespace_name", DataType::Utf8, false),
+            Field::new("kubernetes_node_name", DataType::Utf8, false),
+            Field::new("kubernetes_container_name", DataType::Utf8, false),
+            Field::new("kubernetes_pod_uid", DataType::Utf8, false),
+            Field::new("kubernetes_pod_name", DataType::Utf8, false),
+            Field::new("kubernetes_container_restart_count", DataType::Int32, false),
+            Field::new("_timestamp", DataType::Int64, false),
+        ]
+    }
+
     async fn get_sql(sql: &str) -> Sql {
-        let schema = Schema::new(get_fields());
-        infra::init().await.unwrap();
+        let default_schema = Schema::new(get_fields_default());
+        let test_schema = Schema::new(get_fields_test());
+        infra::db_init().await.unwrap();
         infra::schema::merge(
             "parse_test",
             "default",
             StreamType::Logs,
-            &schema,
+            &default_schema,
+            Some(1752660674351000),
+        )
+        .await
+        .unwrap();
+
+        infra::schema::merge(
+            "parse_test",
+            "test",
+            StreamType::Logs,
+            &test_schema,
             Some(1752660674351000),
         )
         .await
@@ -639,5 +659,18 @@ mod tests {
         assert_eq!(extractor.timestamp_alias, None);
         assert_eq!(extractor.group_by, hashset!["container"]);
         assert_eq!(extractor.projections, hashset!["container", "error_count"]);
+
+        let sql = r#"SELECT 
+        a.k8s_namespace_name AS "a", b.kubernetes_namespace_name AS "b"
+        FROM "default" AS a
+        FULL OUTER JOIN "test" AS b
+        ON a.k8s_namespace_name = b.kubernetes_namespace_name"#;
+        let parsed = get_sql(sql).await;
+        let extractor = get_result_schema(parsed, false, false).await.unwrap();
+        assert_eq!(extractor.timeseries, None);
+        assert_eq!(extractor.ts_hist_alias, None);
+        assert_eq!(extractor.timestamp_alias, None);
+        assert!(extractor.group_by.is_empty());
+        assert_eq!(extractor.projections, hashset!["a", "b"]);
     }
 }
