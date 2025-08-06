@@ -128,10 +128,8 @@ pub async fn search(
     // so we should not use inverted index in datafusion search
     // Condition:All() is used for TantivyOptimizeExec
     let cfg = get_config();
-    #[allow(deprecated)]
-    let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let (use_inverted_index, tantivy_condition, datafusion_condition) =
-        check_inverted_index(query.clone(), index_condition, &inverted_index_type);
+        check_inverted_index(query.clone(), index_condition);
     log::info!(
         "[trace_id {}] flight->search: use_inverted_index {}, tantivy_condition {:?}, datafusion_condition {:?}",
         query.trace_id,
@@ -155,12 +153,11 @@ pub async fn search(
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {}] search->storage: stream {}/{}/{}, {} inverted index reduced file_list num to {} in {} ms",
+                    "[trace_id {}] search->storage: stream {}/{}/{}, inverted index reduced file_list num to {} in {} ms",
                     query.trace_id,
                     query.org_id,
                     query.stream_type,
                     query.stream_name,
-                    inverted_index_type,
                     files.len(),
                     idx_took
                 ),
@@ -424,9 +421,8 @@ pub async fn search(
 fn check_inverted_index(
     query: Arc<super::QueryParams>,
     index_condition: Option<IndexCondition>,
-    inverted_index_type: &str,
 ) -> (bool, Option<IndexCondition>, Option<IndexCondition>) {
-    if !query.use_inverted_index || index_condition.is_none() || inverted_index_type != "tantivy" {
+    if !query.use_inverted_index || index_condition.is_none() {
         return (false, None, None);
     }
 
