@@ -369,48 +369,9 @@ pub async fn search_http2_stream(
         }
     }
 
-    // create new sql query with histogram interval
-    let sql = match crate::service::search::sql::Sql::new(
-        &req.query.clone().into(),
-        &org_id,
-        stream_type,
-        req.search_type,
-    )
-    .await
-    {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("[trace_id: {}] Error parsing sql: {:?}", trace_id, e);
-
-            #[cfg(feature = "enterprise")]
-            let error_message = e.to_string();
-
-            let http_response = map_error_to_http_response(&e, Some(trace_id.clone()));
-
-            // Add audit before closing
-            #[cfg(feature = "enterprise")]
-            {
-                report_to_audit(
-                    user_id,
-                    org_id,
-                    trace_id,
-                    http_response.status().into(),
-                    Some(error_message),
-                    &in_req,
-                    body_bytes,
-                )
-                .await;
-            }
-            return http_response;
-        }
-    };
     // Hack for limit in query
     if sql.limit != 0 {
         req.query.size = sql.limit;
-    }
-
-    if let Some(interval) = sql.histogram_interval {
-        req.query.histogram_interval = interval;
     }
 
     let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
