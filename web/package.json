@@ -48,6 +48,7 @@
     "flag-icons": "^7.3.2",
     "highlight.js": "^11.11.1",
     "js-cookie": "^3.0.5",
+    "json-2-csv": "^5.5.9",
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "lodash-es": "^4.17.21",
