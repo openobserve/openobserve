@@ -283,16 +283,16 @@ pub fn format_duration(ms: u64) -> String {
     let remaining_hours = hours % 24;
     let mut parts = Vec::new();
     if days > 0 {
-        parts.push(format!("{}d", days));
+        parts.push(format!("{days}d"));
     }
     if remaining_hours > 0 {
-        parts.push(format!("{}h", remaining_hours));
+        parts.push(format!("{remaining_hours}h"));
     }
     if remaining_minutes > 0 {
-        parts.push(format!("{}m", remaining_minutes));
+        parts.push(format!("{remaining_minutes}m"));
     }
     if remaining_seconds > 0 {
-        parts.push(format!("{}s", remaining_seconds));
+        parts.push(format!("{remaining_seconds}s"));
     }
     parts.join("")
 }

@@ -422,8 +422,7 @@ pub async fn add_user_to_org(
 ) -> Result<HttpResponse, Error> {
     let existing_user = db::user::get_db_user(email).await;
     let root_user = ROOT_USER.clone();
-    if existing_user.is_ok() {
-        let mut db_user = existing_user.unwrap();
+    if let Ok(mut db_user) = existing_user {
         let local_org;
         let initiating_user = if is_root_user(initiator_id) {
             local_org = org_id.replace(' ', "_");

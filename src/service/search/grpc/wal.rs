@@ -649,14 +649,14 @@ async fn get_file_list_inner(
                     file_min_ts,
                     file_max_ts
                 );
-                wal::release_files(std::slice::from_ref(&file));
+                wal::release_files(std::slice::from_ref(file));
                 continue;
             }
         }
         if match_source(stream_params.clone(), time_range, &filters, &file_key).await {
             result.push(file_key);
         } else {
-            wal::release_files(std::slice::from_ref(&file));
+            wal::release_files(std::slice::from_ref(file));
         }
     }
     Ok(result)
