@@ -272,7 +272,7 @@ pub async fn search_multi(
             for key in keys_used {
                 if !is_root_user(user_id) {
                     let user: meta::user::User =
-                        USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+                        USERS.get(&format!("{org_id}/{user_id}")).unwrap().clone();
 
                     if !crate::handler::http::auth::validator::check_permissions(
                         user_id,

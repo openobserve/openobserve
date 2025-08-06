@@ -111,8 +111,7 @@ fn generate_cache_key(
     field_name: &str,
 ) -> String {
     format!(
-        "cardinality/{}/{}/{}/{}",
-        org_id, stream_type, stream_name, field_name
+        "cardinality/{org_id}/{stream_type}/{stream_name}/{field_name}"
     )
 }
 

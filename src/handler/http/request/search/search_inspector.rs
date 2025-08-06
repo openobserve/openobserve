@@ -221,7 +221,7 @@ pub async fn get_search_profile(
                 };
 
                 if !is_root_user(&user_id) {
-                    let user: meta::user::User = match USERS.get(&format!("{org_id}/{}", user_id)) {
+                    let user: meta::user::User = match USERS.get(&format!("{org_id}/{user_id}")) {
                         Some(u) => u.clone(),
                         None => return Ok(meta::http::HttpResponse::forbidden("User not found")),
                     };

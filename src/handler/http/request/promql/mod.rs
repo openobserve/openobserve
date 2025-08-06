@@ -170,7 +170,7 @@ async fn query(
             let stream_type_str = StreamType::Metrics.as_str();
             for name in visitor.name {
                 let user: crate::common::meta::user::User = USERS
-                    .get(&format!("{org_id}/{}", user_email))
+                    .get(&format!("{org_id}/{user_email}"))
                     .unwrap()
                     .clone();
                 if !crate::handler::http::auth::validator::check_permissions(
@@ -439,7 +439,7 @@ async fn query_range(
             let stream_type_str = StreamType::Metrics.as_str();
             for name in visitor.name {
                 let user: crate::common::meta::user::User = USERS
-                    .get(&format!("{org_id}/{}", user_email))
+                    .get(&format!("{org_id}/{user_email}"))
                     .unwrap()
                     .clone();
                 if user.is_external
@@ -691,7 +691,7 @@ async fn series(
 
         if !is_root_user(user_email) {
             let user: crate::common::meta::user::User = USERS
-                .get(&format!("{org_id}/{}", user_email))
+                .get(&format!("{org_id}/{user_email}"))
                 .unwrap()
                 .clone();
             let stream_type_str = StreamType::Metrics.as_str();

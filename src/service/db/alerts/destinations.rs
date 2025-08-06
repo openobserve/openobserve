@@ -87,8 +87,7 @@ pub async fn set(destination: Destination) -> Result<Destination, DestinationErr
     if o2_enterprise::enterprise::common::infra::config::get_config()
         .super_cluster
         .enabled
-    {
-        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::destinations_put(
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::destinations_put(
             &event_key,
             saved.clone(),
         )
@@ -98,7 +97,6 @@ pub async fn set(destination: Destination) -> Result<Destination, DestinationErr
                 "[Destination] error triggering super cluster event to add destination to cache: {e}"
             );
         }
-    }
 
     Ok(saved)
 }
@@ -118,8 +116,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     if o2_enterprise::enterprise::common::infra::config::get_config()
         .super_cluster
         .enabled
-    {
-        if let Err(e) = o2_enterprise::enterprise::super_cluster::queue::destinations_delete(
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::destinations_delete(
             &event_key, org_id, name,
         )
         .await
@@ -128,7 +125,6 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
                 "[Destination] error triggering super cluster event to remove destination from cache: {e}"
             );
         }
-    }
 
     Ok(())
 }

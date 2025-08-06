@@ -73,15 +73,13 @@ async fn handle_rule_operation(
     if o2_enterprise::enterprise::common::infra::config::get_config()
         .super_cluster
         .enabled
-    {
-        if let Err(e) = sync_to_super_cluster(&rule, &operation).await {
+        && let Err(e) = sync_to_super_cluster(&rule, &operation).await {
             log::error!(
                 "[Ratelimit] error triggering super cluster event to {} rule: {}",
                 operation.as_str(),
                 e
             );
         }
-    }
 
     Ok(())
 }

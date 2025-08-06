@@ -342,7 +342,7 @@ async fn permitted_folders(
                 continue;
             };
             log::info!("folder_id: {:?}", folder_id);
-            folder_list_with_roles.push(format!("{}:{}", folder_ofga_model, folder_id));
+            folder_list_with_roles.push(format!("{folder_ofga_model}:{folder_id}"));
         }
         if folder_list.is_some() {
             let folder_list = folder_list.as_mut().unwrap();

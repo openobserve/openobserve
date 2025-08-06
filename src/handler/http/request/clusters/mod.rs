@@ -46,7 +46,7 @@ pub async fn list_clusters() -> Result<HttpResponse, Error> {
             Some(RoleGroup::Interactive),
         )
         .await
-        .map_err(|e| Error::new(ErrorKind::Other, e))?;
+        .map_err(|e| Error::other(e))?;
         let mut regions = HashMap::with_capacity(clusters.len());
         for c in clusters {
             let region: &mut Vec<_> = regions.entry(c.region).or_insert_with(Vec::new);

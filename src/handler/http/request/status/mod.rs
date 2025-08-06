@@ -497,7 +497,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
     let code = match query.get("code") {
         Some(code) => code,
         None => {
-            return Err(Error::new(ErrorKind::Other, "no code in request"));
+            return Err(Error::other("no code in request"));
         }
     };
     let mut audit_message = AuditMessage {
@@ -525,7 +525,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 // Bad Request
                 audit_message.response_meta.http_response_code = 400;
                 audit(audit_message).await;
-                return Err(Error::new(ErrorKind::Other, "invalid state in request"));
+                return Err(Error::other("invalid state in request"));
             }
         },
 
@@ -533,7 +533,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             // Bad Request
             audit_message.response_meta.http_response_code = 400;
             audit(audit_message).await;
-            return Err(Error::new(ErrorKind::Other, "no state in request"));
+            return Err(Error::other("no state in request"));
         }
     };
 
@@ -556,8 +556,8 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             match token_ver {
                 Ok(res) => {
                     // check for service accounts , do not to allow login
-                    if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await {
-                        if db_user
+                    if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await
+                        && db_user
                             .organizations
                             .iter()
                             .any(|org| org.role.eq(&UserRole::ServiceAccount))
@@ -565,7 +565,6 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                             return Ok(HttpResponse::Unauthorized()
                                 .json("Service accounts are not allowed to login".to_string()));
                         }
-                    }
                     // get domain from email
                     let domain = res.0.user_email.split('@').nth(1).unwrap_or_default();
                     if !get_dex_config().allowed_domains.is_empty()
@@ -617,7 +616,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             // store session_id in cluster co-ordinator
             let _ = crate::service::session::set_session(&session_id, &access_token).await;
 
-            let access_token = format!("session {}", session_id);
+            let access_token = format!("session {session_id}");
 
             let tokens = json::to_string(&AuthTokens {
                 access_token,
@@ -719,7 +718,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
             // store session_id in cluster co-ordinator
             let _ = crate::service::session::set_session(&session_id, &access_token).await;
 
-            let access_token = format!("session {}", session_id);
+            let access_token = format!("session {session_id}");
 
             let tokens = json::to_string(&AuthTokens {
                 access_token,

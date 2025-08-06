@@ -134,9 +134,7 @@ pub async fn post_user(
                     get_org_creation_tuples(
                         &org_id,
                         &mut tuples,
-                        OFGA_MODELS
-                            .iter()
-                            .map(|(_, fga_entity)| fga_entity.key)
+                        OFGA_MODELS.values().map(|fga_entity| fga_entity.key)
                             .collect(),
                         NON_OWNING_ORG.to_vec(),
                     )
@@ -485,9 +483,7 @@ pub async fn add_user_to_org(
                     get_org_creation_tuples(
                         org_id,
                         &mut tuples,
-                        OFGA_MODELS
-                            .iter()
-                            .map(|(_, fga_entity)| fga_entity.key)
+                        OFGA_MODELS.values().map(|fga_entity| fga_entity.key)
                             .collect(),
                         NON_OWNING_ORG.to_vec(),
                     )
@@ -861,11 +857,10 @@ fn get_user_roles_by_org_id(roles: Vec<String>, org_id: Option<&str>) -> Vec<Str
 #[cfg(feature = "enterprise")]
 async fn check_cache(user_email: &str) -> Option<Vec<String>> {
     let cache = USER_ROLES_CACHE.read().await;
-    if let Some(cached) = cache.get(user_email) {
-        if cached.expires_at > Instant::now() {
+    if let Some(cached) = cache.get(user_email)
+        && cached.expires_at > Instant::now() {
             return Some(cached.roles.clone());
         }
-    }
     None
 }
 #[cfg(feature = "enterprise")]

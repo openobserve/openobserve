@@ -695,7 +695,7 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
     let mut aggs_remove_files: Vec<String> = vec![];
     #[cfg(feature = "enterprise")]
     {
-        let aggs_pattern = format!("{}/{}/{}", root_dir, STREAMING_AGGS_CACHE_DIR, path);
+        let aggs_pattern = format!("{root_dir}/{STREAMING_AGGS_CACHE_DIR}/{path}");
         let aggs_files = scan_files(&aggs_pattern, "arrow", None).unwrap_or_default();
         aggs_remove_files.extend(aggs_files);
 
@@ -704,8 +704,7 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
                 Ok(_) => {}
                 Err(e) => {
                     log::error!("Error deleting cache: {:?}", e);
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
+                    return Err(std::io::Error::other(
                         "Error deleting cache",
                     ));
                 }

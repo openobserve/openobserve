@@ -137,9 +137,7 @@ pub async fn process_token(
                 get_org_creation_tuples(
                     &org.name,
                     &mut tuples,
-                    OFGA_MODELS
-                        .iter()
-                        .map(|(_, fga_entity)| fga_entity.key)
+                    OFGA_MODELS.values().map(|fga_entity| fga_entity.key)
                         .collect(),
                     NON_OWNING_ORG.to_vec(),
                 )
@@ -409,9 +407,7 @@ async fn map_group_to_custom_role(
             get_org_creation_tuples(
                 &dex_cfg.default_org,
                 &mut tuples,
-                OFGA_MODELS
-                    .iter()
-                    .map(|(_, fga_entity)| fga_entity.key)
+                OFGA_MODELS.values().map(|fga_entity| fga_entity.key)
                     .collect(),
                 NON_OWNING_ORG.to_vec(),
             )

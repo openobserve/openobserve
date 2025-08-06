@@ -832,7 +832,7 @@ async fn process_node(
                     ) {
                         Ok(flattened) => flattened,
                         Err(e) => {
-                            let err_msg = format!("DestinationNode error with flattening: {}", e);
+                            let err_msg = format!("DestinationNode error with flattening: {e}");
                             if let Err(send_err) = error_sender
                                 .send((node.id.to_string(), node.node_type(), err_msg))
                                 .await
@@ -850,7 +850,7 @@ async fn process_node(
                 if let Err(e) =
                     crate::service::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts)
                 {
-                    let err_msg = format!("DestinationNode error handling timestamp: {}", e);
+                    let err_msg = format!("DestinationNode error handling timestamp: {e}");
                     if let Err(send_err) = error_sender
                         .send((node.id.to_string(), node.node_type(), err_msg))
                         .await
@@ -942,8 +942,7 @@ async fn process_node(
                             get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
                         if let Err(e) = writer.write_wal(records_to_write).await {
                             let err_msg = format!(
-                                "DestinationNode error persisting data for batch_key '{}' to be ingested externally: {}",
-                                batch_key, e
+                                "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
                             );
                             if let Err(send_err) = error_sender
                                 .send((node.id.to_string(), node.node_type(), err_msg))
@@ -1024,8 +1023,7 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
             let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
             if let Err(e) = writer.write_wal(records_to_write).await {
                 let err_msg = format!(
-                    "DestinationNode error persisting data for batch_key '{}' to be ingested externally: {}",
-                    batch_key, e
+                    "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
                 );
                 log::error!("{err_msg}");
             }
