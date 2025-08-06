@@ -2182,7 +2182,6 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                 return ControlFlow::Continue(());
             }
             let fname = names.first().unwrap();
-            let fname = fname.as_ident().unwrap();
             if fname.value == ENCRYPT_UDF_NAME
                 || fname.value == DECRYPT_UDF_NAME
                 || fname.value == DECRYPT_SLOW_UDF_NAME
