@@ -71,7 +71,7 @@
     "leaflet": "^1.9.4",
     "lodash-es": "^4.17.21",
     "luxon": "^3.5.0",
-    "marked": "^15.0.6",
+    "marked": "^15.0.11",
     "moment": "^2.30.1",
     "moment-timezone": "^0.5.46",
     "node-polyfill-webpack-plugin": "^4.1.0",

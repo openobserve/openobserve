@@ -206,6 +206,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :rules="[(val: any) => val.length > 0 || 'Required']"
                         />
                         <div
+                          v-if="dashboardPanelData.data.type === 'table'"
+                          class="q-mt-sm q-mb-sm"
+                        >
+                          <q-checkbox
+                            v-model="
+                              dashboardPanelData.data.queries[
+                                dashboardPanelData.layout.currentQueryIndex
+                              ].fields.x[index].treatAsNonTimestamp
+                            "
+                            :label="'Mark this field as non-timestamp'"
+                            dense
+                          />
+                        </div>
+
+                        <div
                           v-if="
                             !dashboardPanelData.data.queries[
                               dashboardPanelData.layout.currentQueryIndex
@@ -716,6 +731,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :rules="[(val: any) => val.length > 0 || 'Required']"
                     />
                     <div
+                      v-if="dashboardPanelData.data.type === 'table'"
+                      class="q-mt-sm q-mb-sm"
+                    >
+                      <q-checkbox
+                        v-model="
+                          dashboardPanelData.data.queries[
+                            dashboardPanelData.layout.currentQueryIndex
+                          ].fields.y[index].treatAsNonTimestamp
+                        "
+                        :label="'Mark this field as non-timestamp'"
+                        dense
+                      />
+                    </div>
+                    <div
                       style="width: 100%"
                       class="tw-mb-2"
                       v-if="dashboardPanelData.data.type != 'heatmap'"
@@ -1074,6 +1103,7 @@ import {
   computed,
   inject,
   nextTick,
+  onMounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
@@ -1087,6 +1117,7 @@ import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoCompl
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -1119,6 +1150,7 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "dashboard",
     );
+    const store = useStore();
     const {
       dashboardPanelData,
       addXAxisItem,
@@ -1139,6 +1171,68 @@ export default defineComponent({
       cleanupDraggingFields,
       selectedStreamFieldsBasedOnUserDefinedSchema,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
+
+    // Initialize treatAsNonTimestamp for existing fields (only for table charts)
+    const initializeTreatAsNonTimestamp = () => {
+      const currentQuery =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ];
+
+      // Check if this is a new panel (no ID means it's new)
+      const isNewPanel = !dashboardPanelData.data.id;
+
+      // Helper: set treatAsNonTimestamp for X/Y fields only
+      const setTreatAsNonTimestampForField = (field: any) => {
+        // Always ensure treatAsNonTimestamp is set for existing panels
+        if (isNewPanel) {
+          // For new panels: set based on field name
+          // For timestamp fields: treatAsNonTimestamp = false (unchecked)
+          // For non-timestamp fields: treatAsNonTimestamp = true (checked)
+          field.treatAsNonTimestamp =
+            field.column === store.state.zoConfig.timestamp_column
+              ? false
+              : true;
+        } else {
+          // For existing panels: only set if treatAsNonTimestamp is not already defined
+          // This preserves the saved values from the database
+          if (
+            field.treatAsNonTimestamp === undefined ||
+            field.treatAsNonTimestamp === null
+          ) {
+            field.treatAsNonTimestamp = false;
+          }
+        }
+      };
+
+      // Only X and Y axes for table charts
+      if (currentQuery?.fields?.x) {
+        currentQuery.fields.x.forEach((field: any) => {
+          setTreatAsNonTimestampForField(field);
+        });
+      }
+      if (currentQuery?.fields?.y) {
+        currentQuery.fields.y.forEach((field: any) => {
+          setTreatAsNonTimestampForField(field);
+        });
+      }
+    };
+
+    onMounted(() => {
+      nextTick(() => {
+        initializeTreatAsNonTimestamp();
+      });
+    });
+
+    watch(
+      () => dashboardPanelData.data.type,
+      (newType: string, oldType: string) => {
+        if (newType !== oldType) {
+          // Reset treatAsNonTimestamp when chart type changes
+          initializeTreatAsNonTimestamp();
+        }
+      },
+    );
 
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },

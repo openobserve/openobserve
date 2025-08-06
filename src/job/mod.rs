@@ -36,13 +36,15 @@ pub(crate) mod files;
 mod flatten_compactor;
 pub mod metrics;
 mod mmdb_downloader;
+#[cfg(feature = "enterprise")]
+pub(crate) mod pipeline;
 mod promql;
 mod promql_self_consume;
 mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
 
-pub use file_downloader::queue_background_download;
+pub use file_downloader::queue_download;
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -220,6 +222,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { promql::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
     tokio::task::spawn(async move { file_downloader::run().await });
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { pipeline::run().await });
 
     // load metrics disk cache
     tokio::task::spawn(async move { crate::service::promql::search::init().await });

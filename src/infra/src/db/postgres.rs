@@ -32,18 +32,22 @@ use tokio::sync::{OnceCell, mpsc};
 use super::{DBIndex, IndexStatement};
 use crate::errors::*;
 
-pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false));
-pub static CLIENT_RO: Lazy<Pool<Postgres>> = Lazy::new(|| connect(true));
+pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false, false));
+pub static CLIENT_RO: Lazy<Pool<Postgres>> = Lazy::new(|| connect(true, false));
+pub static CLIENT_DDL: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false, true));
 static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
-fn connect(readonly: bool) -> Pool<Postgres> {
+fn connect(readonly: bool, ddl: bool) -> Pool<Postgres> {
     let cfg = config::get_config();
-    let mut dsn = if readonly {
-        cfg.common.meta_postgres_ro_dsn.clone()
-    } else {
-        cfg.common.meta_postgres_dsn.clone()
+
+    let mut dsn = match (readonly, ddl) {
+        (true, false) => cfg.common.meta_postgres_ro_dsn.clone(),
+        (false, false) => cfg.common.meta_postgres_dsn.clone(),
+        (_, true) => cfg.common.meta_ddl_dsn.clone(),
     };
     if dsn.is_empty() {
+        // default fallback for any case is the original dsn, which is checked
+        // in config.rs to be  non-empty
         dsn = cfg.common.meta_postgres_dsn.clone();
     }
     let db_opts = PgConnectOptions::from_str(&dsn).expect("postgres connect options create failed");
@@ -604,7 +608,7 @@ impl super::Db for PostgresDb {
 }
 
 pub async fn create_table() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
 
     DB_QUERY_NUMS
         .with_label_values(&["create", "meta", ""])
@@ -664,7 +668,7 @@ CREATE TABLE IF NOT EXISTS meta
 }
 
 async fn add_start_dt_column() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     let mut tx = pool.begin().await?;
     DB_QUERY_NUMS
         .with_label_values(&["alter", "meta", ""])
@@ -697,7 +701,7 @@ async fn add_start_dt_column() -> Result<()> {
 }
 
 async fn create_meta_backup() -> Result<()> {
-    let pool = CLIENT.clone();
+    let pool = CLIENT_DDL.clone();
     let mut tx = pool.begin().await?;
     DB_QUERY_NUMS
         .with_label_values(&["create", "meta_backup_20240330", ""])
@@ -726,7 +730,7 @@ async fn create_meta_backup() -> Result<()> {
 }
 
 pub async fn create_index(index: IndexStatement<'_>) -> Result<()> {
-    let client = CLIENT.clone();
+    let client = CLIENT_DDL.clone();
     let indices = INDICES.get_or_init(cache_indices).await;
     if indices.contains(&DBIndex {
         name: index.idx_name.into(),
@@ -762,7 +766,7 @@ pub async fn create_index(index: IndexStatement<'_>) -> Result<()> {
 }
 
 pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
-    let client = CLIENT.clone();
+    let client = CLIENT_DDL.clone();
     let indices = INDICES.get_or_init(cache_indices).await;
     if !indices.contains(&DBIndex {
         name: idx_name.into(),

@@ -66,6 +66,8 @@ pub struct TriggerData {
     pub start_time: i64,
     pub end_time: i64,
     pub retries: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skipped_alerts_count: Option<i64>,
     pub error: Option<String>,
     pub success_response: Option<String>,
     pub is_partial: Option<bool>,
@@ -186,6 +188,8 @@ pub enum UsageType {
     Json,
     #[serde(rename = "/logs/_multi")]
     Multi,
+    #[serde(rename = "/logs/_hec")]
+    Hec,
     #[serde(rename = "/_kinesis_firehose")]
     KinesisFirehose,
     #[serde(rename = "/gcp/_sub")]
@@ -264,6 +268,7 @@ impl std::fmt::Display for UsageType {
             UsageType::Bulk => write!(f, "/logs/_bulk"),
             UsageType::Json => write!(f, "/logs/_json"),
             UsageType::Multi => write!(f, "/logs/_multi"),
+            UsageType::Hec => write!(f, "/logs/_hec"),
             UsageType::KinesisFirehose => write!(f, "/_kinesis_firehose"),
             UsageType::GCPSubscription => write!(f, "/gcp/_sub"),
             UsageType::Logs => write!(f, "/otlp/v1/logs"),

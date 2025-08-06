@@ -403,6 +403,7 @@ import { getFunctionErrorMessage } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import shortURL from "@/services/short_url";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -593,6 +594,12 @@ export default defineComponent({
     };
 
     const onLogPanel = async () => {
+      const showNotification = showPositiveNotification(
+        "Redirecting to logs page",
+        {
+          color: "warning",
+        },
+      );
       const queryDetails = props.data;
       if (!queryDetails) {
         console.error("Data is undefined.");
@@ -628,7 +635,23 @@ export default defineComponent({
         vrlFunctionQueryEncoded,
       );
 
-      window.open(logsUrl.toString(), "_blank");
+      // Use short_url service to shorten the URL and redirect
+      try {
+        const org_identifier = store.state.selectedOrganization.identifier;
+        const response = await shortURL.create(
+          org_identifier,
+          logsUrl.toString(),
+        );
+        const shortUrl = response?.data?.short_url;
+        if (shortUrl) {
+          window.open(shortUrl, "_blank");
+        } else {
+          window.open(logsUrl.toString(), "_blank");
+        }
+        showNotification();
+      } catch (error) {
+        window.open(logsUrl.toString(), "_blank");
+      }
     };
 
     //create a duplicate panel

@@ -36,6 +36,16 @@
         <NotEqualIcon></NotEqualIcon>
       </q-icon>
     </q-btn>
+    <!-- o2 ai context add button in the cell actions when user adds a interesting field to the table 
+     then we show some options there we need this  -->
+    <O2AIContextAddBtn
+      class="q-ml-xs"
+      @send-to-ai-chat="sendToAiChat(JSON.stringify(row[column.id]))"
+      :style="'border: 1px solid #fff;'"
+      :size="'6px'"
+      :imageHeight="'16px'"
+      :imageWidth="'16px'"
+    />
   </div>
 </template>
 
@@ -44,6 +54,8 @@ import { defineProps, defineEmits, computed } from "vue";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import { getImageURL } from "@/utils/zincutils";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 
 defineProps({
   column: {
@@ -58,7 +70,7 @@ defineProps({
 
 const store = useStore();
 
-const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable"]);
+const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable", "sendToAiChat"]);
 
 const copyLogToClipboard = (value: any) => {
   emit("copy", value, false);
@@ -74,4 +86,7 @@ const addSearchTerm = (
 const backgroundClass = computed(() =>
   store.state.theme === "dark" ? "tw-bg-black" : "tw-bg-white",
 );
+const sendToAiChat = (value: any) => {
+  emit("sendToAiChat", value);
+};
 </script>

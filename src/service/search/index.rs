@@ -1298,7 +1298,7 @@ mod tests {
             op: UnaryOperator::Not,
             expr: Box::new(Expr::BinaryOp {
                 left: Box::new(Expr::Function(Function {
-                    name: ObjectName(vec![Ident::new("match_all")]),
+                    name: ObjectName::from(vec![Ident::new("match_all")]),
                     uses_odbc_syntax: false,
                     parameters: FunctionArguments::None,
                     args: FunctionArguments::List(FunctionArgumentList {

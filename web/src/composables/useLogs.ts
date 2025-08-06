@@ -56,7 +56,8 @@ import {
   arraysMatch,
   isWebSocketEnabled,
   isStreamingEnabled,
-  deepCopy
+  deepCopy,
+  addSpacesToOperators
 } from "@/utils/zincutils";
 import {
   convertDateToTimestamp,
@@ -137,6 +138,7 @@ const defaultObject = {
       ? JSON.parse(useLocalWrapContent())
       : false,
     histogramDirtyFlag: false,
+    logsVisualizeDirtyFlag: false,
     sqlMode: false,
     sqlModeManualTrigger: false,
     quickMode: false,
@@ -709,6 +711,10 @@ const useLogs = () => {
       query["clusters"] = searchObj.meta.clusters.join(",");
     }
 
+    if(searchObj.meta.logsVisualizeToggle) {
+      query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
+    }
+
     return query;
   };
 
@@ -819,13 +825,7 @@ const useLogs = () => {
               (searchObj.data.resultGrid.currentPage - 1) || 0,
           size: searchObj.meta.resultGrid.rowsPerPage,
           quick_mode: searchObj.meta.quickMode,
-        },
-        aggs: {
-          histogram:
-            "select histogram(" +
-            store.state.zoConfig.timestamp_column +
-            ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from \"[INDEX_NAME]\" [WHERE_CLAUSE] GROUP BY zo_sql_key ORDER BY zo_sql_key",
-        },
+        }
       };
 
       if (
@@ -940,39 +940,16 @@ const useLogs = () => {
           searchObj.meta.resultGrid.chartInterval = "1 day";
           searchObj.meta.resultGrid.chartKeyFormat = "YYYY-MM-DD";
         }
-
-        req.aggs.histogram = req.aggs.histogram.replaceAll(
-          "[INTERVAL]",
-          searchObj.meta.resultGrid.chartInterval,
-        );
       } else {
         notificationMsg.value = "Invalid date format";
         return false;
       }
 
       if (searchObj.meta.sqlMode == true) {
-        req.aggs.histogram = req.aggs.histogram.replace(
-          "[INDEX_NAME]",
-          searchObj.data.stream.selectedStream[0],
-        );
-
-        req.aggs.histogram = req.aggs.histogram.replace("[WHERE_CLAUSE]", "");
-
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
         if (parsedSQL != undefined) {
-          const histogramParsedSQL: any = fnHistogramParsedSQL(
-            req.aggs.histogram,
-          );
-
-          histogramParsedSQL.where = parsedSQL.where;
-
-          let histogramQuery = fnUnparsedSQL(histogramParsedSQL);
-          histogramQuery = histogramQuery.replace(/`/g, '"');
-          req.aggs.histogram = histogramQuery;
-
           //check if query is valid or not , if the query is invalid --> empty query
-
           if(Array.isArray(parsedSQL) && parsedSQL.length == 0){
             notificationMsg.value = "SQL query is missing or invalid. Please submit a valid SQL statement.";
             return false;
@@ -1017,16 +994,8 @@ const useLogs = () => {
           .filter((line: string) => !line.trim().startsWith("--"))
           .join("\n");
         if (whereClause.trim() != "") {
-          whereClause = whereClause
-            .replace(/=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " =")
-            .replace(/>(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >")
-            .replace(/<(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <");
-
-          whereClause = whereClause
-            .replace(/!=(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-            .replace(/! =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " !=")
-            .replace(/< =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " <=")
-            .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
+          // Use efficient state-based approach to avoid regex backtracking
+          whereClause = addSpacesToOperators(whereClause);
 
           //remove everything after -- in where clause
           const parsedSQL = whereClause.split(" ");
@@ -1051,20 +1020,12 @@ const useLogs = () => {
 
           whereClause = parsedSQL.join(" ");
 
-          // req.query.sql = req.query.sql.replace(
-          //   "[WHERE_CLAUSE]",
-          //   " WHERE " + whereClause,
-          // );
-          req.query.sql = req.query.sql.split("[WHERE_CLAUSE]").join(" WHERE " + whereClause);
-
-          // req.aggs.histogram = req.aggs.histogram.replace(
-          //   "[WHERE_CLAUSE]",
-          //   " WHERE " + whereClause,
-          // );
-          req.aggs.histogram = req.aggs.histogram.split("[WHERE_CLAUSE]").join(" WHERE " + whereClause);
+          req.query.sql = req.query.sql.replace(
+            "[WHERE_CLAUSE]",
+            " WHERE " + whereClause,
+          );
         } else {
           req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
-          req.aggs.histogram = req.aggs.histogram.replace("[WHERE_CLAUSE]", "");
         }
 
         req.query.sql = req.query.sql.replace(
@@ -1099,7 +1060,6 @@ const useLogs = () => {
           }
 
           const preSQLQuery = req.query.sql;
-          const preHistogramSQLQuery = req.aggs.histogram;
           req.query.sql = [];
 
           streams
@@ -1154,11 +1114,6 @@ const useLogs = () => {
             "[INDEX_NAME]",
             searchObj.data.stream.selectedStream[0],
           );
-
-          req.aggs.histogram = req.aggs.histogram.replace(
-            "[INDEX_NAME]",
-            searchObj.data.stream.selectedStream[0],
-          );
         }
       }
 
@@ -1191,12 +1146,6 @@ const useLogs = () => {
       if (store.state.zoConfig.sql_base64_enabled) {
         req["encoding"] = "base64";
         req.query.sql = b64EncodeUnicode(req.query.sql);
-        //encode the histogram only if the current page is 1 
-        if (
-          searchObj.data.resultGrid.currentPage == 1
-        ) {
-          req.aggs.histogram = b64EncodeUnicode(req.aggs.histogram);
-        }
       }
 
       updateUrlQueryParams();
@@ -1215,10 +1164,6 @@ const useLogs = () => {
 
   const isDistinctQuery = (parsedSQL: any = null) => {
     return parsedSQL?.distinct?.type === "DISTINCT";
-  };
-
-  const isWithQuery = (parsedSQL: any = null) => {
-    return parsedSQL?.with && parsedSQL?.with?.length > 0;
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -1306,12 +1251,19 @@ const useLogs = () => {
 
           partitionQueryReq["streaming_output"] = true;
 
+          // searchObj.data.queryResults.histogram_interval = 0;
+          searchObj.data.queryResults.histogram_interval = null;
+
+          // for visualization, will require to set histogram interval to fill missing values
+          searchObj.data.queryResults.visualization_histogram_interval = null;
+
           await searchService
             .partition({
               org_identifier: searchObj.organizationIdentifier,
               query: partitionQueryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
+              searchType: "ui",
             })
             .then(async (res: any) => {
               searchObj.data.queryResults.partitionDetail = {
@@ -1319,8 +1271,19 @@ const useLogs = () => {
                 partitionTotal: [],
                 paginations: [],
               };
-
+              //here we need to get the histogram interval for the histogram query that needs to be called
               searchObj.data.queryResults.histogram_interval = res.data?.histogram_interval;
+              //we get is_histogram_eligible flag to check from the BE so that if it is false then we dont need to make histogram call
+              //this is coming as a part of partition response
+              searchObj.data.queryResults.is_histogram_eligible = res.data?.is_histogram_eligible;
+
+              // check if histogram interval is undefined, then set current response as histogram response
+              // for visualization, will require to set histogram interval to fill missing values
+              // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+              // created new attribute visualization_histogram_interval to avoid this issue
+              if(!searchObj.data.queryResults.visualization_histogram_interval && res.data?.histogram_interval) {
+                searchObj.data.queryResults.visualization_histogram_interval = res.data?.histogram_interval;
+              }
 
               if (typeof partitionQueryReq.sql != "string") {
                 const partitionSize = 0;
@@ -1505,7 +1468,7 @@ const useLogs = () => {
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
             (!searchObj.meta.sqlMode ||
-              (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL) && !isDistinctQuery(parsedSQL) && !isWithQuery(parsedSQL)))) ||
+              (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL) && !isDistinctQuery(parsedSQL) && searchObj.data.queryResults.is_histogram_eligible))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
@@ -1833,8 +1796,8 @@ const useLogs = () => {
         // copy query request for histogram query and same for customDownload
         searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
 
-        searchObj.data.histogramQuery.query.sql =
-          searchObj.data.histogramQuery.aggs.histogram;
+        //here we need to send the actual sql query for histogram 
+        searchObj.data.histogramQuery.query.sql = queryReq.query.sql;
         searchObj.data.histogramQuery.query.sql_mode = "full";
 
         // searchObj.data.histogramQuery.query.start_time =
@@ -1850,7 +1813,6 @@ const useLogs = () => {
         // Removing sql_mode from histogram query, as it is not required
         //delete searchObj.data.histogramQuery.query.sql_mode;
         delete searchObj.data.histogramQuery.aggs;
-        delete queryReq.aggs;
         searchObj.data.customDownloadQueryObj = JSON.parse(
           JSON.stringify(queryReq),
         );
@@ -1878,6 +1840,10 @@ const useLogs = () => {
         queryReq.query.streaming_id = searchObj.data.queryResults.partitionDetail.paginations[
           searchObj.data.resultGrid.currentPage - 1
         ][0].streaming_id;
+
+        // for custom download we need to set the streaming_output and streaming_id
+        searchObj.data.customDownloadQueryObj.query.streaming_output = queryReq.query.streaming_output;
+        searchObj.data.customDownloadQueryObj.query.streaming_id = queryReq.query.streaming_id;
 
         // setting subpage for pagination to handle below scenario
         // for one particular page, if we have to fetch data from multiple partitions in that case we need to set subpage
@@ -2013,7 +1979,7 @@ const useLogs = () => {
             -1
           );
           searchObj.meta.histogramDirtyFlag = false;
-        } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))) {
+        } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)) {
           let aggFlag = false;
           if (parsedSQL) {
             aggFlag = hasAggregation(parsedSQL?.columns);
@@ -2030,7 +1996,7 @@ const useLogs = () => {
               searchObjDebug["pagecountEndTime"] = performance.now();
             }, 0);
           }
-          if(isWithQuery(parsedSQL)){
+          if(!searchObj.data.queryResults.is_histogram_eligible){
             resetHistogramWithError(
               "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
               -1
@@ -2038,7 +2004,7 @@ const useLogs = () => {
           }
           else{
             resetHistogramWithError(
-              "Histogram unavailable for CTEs, DISTINCT and LIMIT queries",
+              "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
               -1
             );
 
@@ -2052,13 +2018,16 @@ const useLogs = () => {
           if (
             queryReq.query.from == 0 &&
             searchObj.data.queryResults.hits.length > 0 &&
-            !aggFlag
+            !aggFlag &&
+            searchObj.data.queryResults.aggs == undefined
           ) {
             setTimeout(async () => {
               searchObjDebug["pagecountStartTime"] = performance.now();
               await getPageCount(queryReq);
               searchObjDebug["pagecountEndTime"] = performance.now();
             }, 0);
+          } else {
+            await generateHistogramData();
           }
         }
       } else {
@@ -2076,6 +2045,87 @@ const useLogs = () => {
       notificationMsg.value = "";
     }
   };
+
+  const processHttpHistogramResults = async (queryReq: any) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        searchObj.meta.refreshHistogram = false;
+        if (searchObj.data.queryResults.hits.length > 0) {
+          if (searchObj.data.stream.selectedStream.length > 1) {
+            searchObj.data.histogram = {
+              xData: [],
+              yData: [],
+              chartParams: {
+                title: getHistogramTitle(),
+                unparsed_x_data: [],
+                timezone: "",
+              },
+              errorCode: 0,
+              errorMsg: "Histogram is not available for multi stream search.",
+              errorDetail: "",
+            };
+          } else {
+            searchObjDebug["histogramStartTime"] = performance.now();
+            searchObj.data.histogram.errorMsg = "";
+            searchObj.data.histogram.errorCode = 0;
+            searchObj.data.histogram.errorDetail = "";
+            searchObj.loadingHistogram = true;
+
+            const parsedSQL: any = fnParsedSQL();
+            searchObj.data.queryResults.aggs = [];
+
+            const partitions = JSON.parse(
+              JSON.stringify(
+                searchObj.data.queryResults.partitionDetail.partitions,
+              ),
+            );
+
+            // is _timestamp orderby ASC then reverse the partition array
+            if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
+              partitions.reverse();
+            }
+
+            await generateHistogramSkeleton();
+            for (const partition of partitions) {
+              searchObj.data.histogramQuery.query.start_time = partition[0];
+              searchObj.data.histogramQuery.query.end_time = partition[1];
+              //to improve the cancel query UI experience we add additional check here and further we need to remove it
+              if (searchObj.data.isOperationCancelled) {
+                searchObj.loadingHistogram = false;
+                searchObj.data.isOperationCancelled = false;
+
+                if (!searchObj.data.histogram?.xData?.length) {
+                  notificationMsg.value = "Search query was cancelled";
+                  searchObj.data.histogram.errorMsg =
+                    "Search query was cancelled";
+                  searchObj.data.histogram.errorDetail =
+                    "Search query was cancelled";
+                }
+
+                showCancelSearchNotification();
+                break;
+              }
+              await getHistogramQueryData(searchObj.data.histogramQuery);
+              if (partitions.length > 1) {
+                setTimeout(async () => {
+                  await generateHistogramData();
+                  if(!queryReq.query?.streaming_output)  refreshPartitionPagination(true);
+                }, 100);
+              }
+            }
+            searchObj.loadingHistogram = false;
+          }
+        }
+        await generateHistogramData();
+        if(!queryReq.query?.streaming_output) refreshPartitionPagination(true);
+        resolve(true);
+      } catch (error) {
+        console.info("Error while processing http histogram results", error);
+        resolve(true);
+      }
+    })
+  }
+
   const getJobData = async (isPagination = false) => {
     try {
       // get websocket enable config from store
@@ -2227,7 +2277,9 @@ const useLogs = () => {
       if (!intervalMs) {
         throw new Error("Invalid interval");
       }
-      searchObj.data.histogramInterval = intervalMs;
+
+      searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval ? searchObj.data.queryResults.histogram_interval * 1000000 : intervalMs;
+
       const date = new Date();
       const startTimeDate = new Date(
         searchObj.data.customDownloadQueryObj.query.start_time / 1000,
@@ -2526,6 +2578,11 @@ const useLogs = () => {
         searchObj.meta.resultGrid.showPagination = true;
       }
 
+      if(isInitialRequest) {
+        searchObj.meta.resultGrid.showPagination = true;
+      }
+
+
       if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
         // if query has aggregation or groupby then we need to set size to -1 to get all records
         // issue #5432
@@ -2544,17 +2601,25 @@ const useLogs = () => {
           delete queryReq.query.track_total_hits;
         }
 
-        if (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL)) {
+        if (isDistinctQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible) {
           delete queryReq.query.track_total_hits;
         }
       }
 
       const isAggregation = searchObj.meta.sqlMode && parsedSQL != undefined && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
 
-      if(!queryReq.query?.streaming_output && searchObj.data.queryResults.histogram_interval) {
+      if(searchObj.data.queryResults.histogram_interval) {
         queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
       }
 
+      // check if histogram interval is undefined, then set current response as histogram response
+      // for visualization, will require to set histogram interval to fill missing values
+      // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+      // created new attribute visualization_histogram_interval to avoid this issue
+      if(searchObj.data.queryResults.visualization_histogram_interval && searchObj?.data?.queryResults?.histogram_interval) {
+        searchObj.data.queryResults.visualization_histogram_interval = searchObj?.data?.queryResults?.histogram_interval;
+      }
+        
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
       const decideSearch = searchObj.meta.jobId
@@ -2570,7 +2635,7 @@ const useLogs = () => {
           },
           "ui",
         )
-        .then(async (res) => {
+        .then(async (res: any) => {
           if (
             res.data.hasOwnProperty("function_error") &&
             res.data.function_error != ""
@@ -2676,6 +2741,7 @@ const useLogs = () => {
             await processPostPaginationData();
             await fetchAllParitions(queryReq);
           } else if (res.data.from > 0 || searchObj.data.queryResults.subpage > 1) {
+
             if (appendResult && !queryReq.query?.streaming_output) {
               searchObj.data.queryResults.from += res.data.from;
               searchObj.data.queryResults.scan_size += res.data.scan_size;
@@ -2729,6 +2795,24 @@ const useLogs = () => {
             }
           }
 
+          // sort the hits based on timestamp column
+          if (
+            searchObj.data.queryResults.hits.length > 0 &&
+            store.state.zoConfig.timestamp_column != "" &&
+            res.data.hasOwnProperty("order_by_metadata") &&
+            res.data.order_by_metadata.length > 0 
+          ) {
+            sortResponse(
+              searchObj.data.queryResults.hits,
+              store.state.zoConfig.timestamp_column,
+              res.data.order_by_metadata
+            );
+          }
+
+          //here also we are getting the is_histogram_eligible flag from the BE
+          //so that we can use it whenever we might not send the partition call from here also it will get updated
+          //this is coming as a part of data api call which is search call
+          searchObj.data.queryResults.is_histogram_eligible = res.data.is_histogram_eligible;
           // check for pagination request for the partition and check for subpage if we have to pull data from multiple partitions
           // it will check for subpage and if subpage is present then it will send pagination request for next partition
           if (
@@ -2859,6 +2943,80 @@ const useLogs = () => {
     });
   };
 
+  // Convert timestamp to microseconds
+  interface RecordWithTimestamp {
+    [key: string]: any;
+  }
+
+  function getTsValue(tsColumn: string, record: RecordWithTimestamp): number {
+    const ts = record[tsColumn];
+
+    if (ts === undefined || ts === null) return 0;
+
+    if (typeof ts === 'string') {
+      const timestamp = Date.parse(ts);
+      return timestamp * 1000;
+    }
+
+    if (typeof ts === 'number') return ts;
+
+    return 0;
+  }
+
+  // Sorting function
+  interface OrderByField {
+    0: string;
+    1: "asc" | "desc" | "ASC" | "DESC";
+  }
+
+  type OrderByArray = OrderByField[];
+
+  interface RecordObject {
+    [key: string]: any;
+  }
+
+  function sortResponse(
+    responseObj: RecordObject[],
+    tsColumn: string,
+    orderBy: OrderByArray
+  ): void {
+    if (!Array.isArray(orderBy) || orderBy.length === 0) return;
+
+    responseObj.sort((a: RecordObject, b: RecordObject) => {
+      for (const entry of orderBy) {
+        if (!Array.isArray(entry) || entry.length !== 2) continue;
+        const [field, order] = entry;
+        let cmp = 0;
+
+        if (field === tsColumn) {
+          const aTs = getTsValue(tsColumn, a);
+          const bTs = getTsValue(tsColumn, b);
+          cmp = aTs - bTs;
+        } else {
+          const aVal = a[field] ?? null;
+          const bVal = b[field] ?? null;
+
+          if (typeof aVal === 'string' && typeof bVal === 'string') {
+            cmp = aVal.localeCompare(bVal);
+          } else if (typeof aVal === 'number' && typeof bVal === 'number') {
+            cmp = aVal - bVal;
+          } else if (typeof aVal === 'string' && typeof bVal === 'number') {
+            cmp = -1;
+          } else if (typeof aVal === 'number' && typeof bVal === 'string') {
+            cmp = 1;
+          } else {
+            cmp = 0;
+          }
+        }
+
+        const finalCmp = order === "desc" ? -cmp : cmp;
+        if (finalCmp !== 0) return finalCmp;
+      }
+      return 0;
+    });
+  }
+
+
   const filterHitsColumns = () => {
     searchObj.data.queryResults.filteredHit = [];
     let itemHits: any = {};
@@ -2908,7 +3066,23 @@ const useLogs = () => {
       }
 
       const dismiss = () => {};
+
       try {
+        // Set histogram interval
+        if(searchObj.data.queryResults.histogram_interval) {
+          searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
+          //1. here we need to send the histogram interval to the BE so that it will honor this we get this from the search partition response 
+          //2. if user passes the histogram interval in the query BE will honor that and give us histogram interval in the parition response
+          queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
+        }
+
+
+        if(!searchObj.data.histogramInterval) {
+          console.error("Error processing histogram data:", "histogramInterval is not set");
+          searchObj.loadingHistogram = false;
+          return;
+        }
+
         const { traceparent, traceId } = generateTraceContext();
         addTraceId(traceId);
         queryReq.query.size = -1;
@@ -2919,6 +3093,7 @@ const useLogs = () => {
               query: queryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
+              is_ui_histogram: true,
             },
             "ui",
           )
@@ -2930,6 +3105,9 @@ const useLogs = () => {
             if (searchObj.data.queryResults.aggs == null) {
               searchObj.data.queryResults.aggs = [];
             }
+
+            // copy converted_histogram_query to queryResults
+            searchObj.data.queryResults.converted_histogram_query = res?.data?.converted_histogram_query ?? "";
 
             const parsedSQL: any = fnParsedSQL();
             const partitions = JSON.parse(
@@ -3010,7 +3188,14 @@ const useLogs = () => {
               }
             }
 
-            searchObj.data.queryResults.aggs.push(...res.data.hits);
+            const order_by = res?.data?.order_by ?? "desc"
+
+            if (order_by?.toLowerCase() === "desc") {
+              searchObj.data.queryResults.aggs.push(...res.data.hits);
+            } else {
+              searchObj.data.queryResults.aggs.unshift(...res.data.hits);
+            }
+
             searchObj.data.queryResults.scan_size += res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
             searchObj.data.queryResults.result_cache_ratio +=
@@ -3045,6 +3230,15 @@ const useLogs = () => {
               searchObj.data.queryResults.partitionDetail.paginations[
                 searchObj.data.resultGrid.currentPage - 1
               ][0].endTime;
+
+
+            // check if histogram interval is undefined, then set current response as histogram response
+            // for visualization, will require to set histogram interval to fill missing values
+            // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+            // created new attribute visualization_histogram_interval to avoid this issue
+            if(!searchObj.data.queryResults.visualization_histogram_interval && res.data?.histogram_interval) {
+              searchObj.data.queryResults.visualization_histogram_interval = res.data?.histogram_interval;
+            }
 
             // if (hasAggregationFlag) {
             //   searchObj.data.queryResults.total = res.data.total;
@@ -4419,6 +4613,19 @@ const useLogs = () => {
       searchObj.loading = false;
     }
   };
+
+  const loadVisualizeData = async () => {
+    try {
+      resetFunctions();
+      await getStreamList();
+      await getFunctions();
+      if (isActionsEnabled.value) await getActions();
+      await extractFields();
+    } catch (e: any) {
+      searchObj.loading = false;
+    }
+  };
+
   const loadJobData = async () => {
     try {
       resetFunctions();
@@ -4613,6 +4820,10 @@ const useLogs = () => {
       searchObj.meta.clusters = queryParams.clusters.split(",");
     }
 
+    if(queryParams.hasOwnProperty("logs_visualize_toggle") && queryParams.logs_visualize_toggle != "") {
+      searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
+    }
+
     // TODO OK : Replace push with replace and test all scenarios
     router.push({
       query: {
@@ -4708,6 +4919,7 @@ const useLogs = () => {
     try {
       searchObj.loadingStream = true;
 
+      await cancelQuery();
       // Reset query results
       searchObj.data.queryResults = { hits: [] };
 
@@ -4866,11 +5078,14 @@ const useLogs = () => {
     }
   };
 
-  const cancelQuery = () => {
+  const cancelQuery = async () : Promise<boolean> => {
+    return new Promise((resolve, reject) => {
+      try {
     if (searchObj.communicationMethod === "ws") {
       sendCancelSearchMessage([
         ...searchObj.data.searchWebSocketTraceIds,
       ]);
+          resolve(true);
       return;
     }
 
@@ -4878,6 +5093,7 @@ const useLogs = () => {
 
     if (!searchObj.data.searchRequestTraceIds.length) {
       searchObj.data.isOperationCancelled = false;
+      resolve(true);
       return;
     }
 
@@ -4914,6 +5130,17 @@ const useLogs = () => {
           searchObj.data.searchRequestTraceIds.filter(
             (id: string) => !tracesIds.includes(id),
           );
+            resolve(true);
+          });
+      } catch (error) {
+        $q.notify({
+          message: "Failed to cancel running query",
+          color: "negative",
+          position: "bottom",
+          timeout: 1500,
+        });
+        resolve(true);
+      }
       });
   };
 
@@ -5349,9 +5576,7 @@ const useLogs = () => {
 
       // reset errorCode
       searchObj.data.errorCode = 0;
-
-      searchObj.data.histogramQuery.query.sql =
-        searchObj.data.histogramQuery.aggs.histogram;
+      searchObj.data.histogramQuery.query.sql = queryReq.query.sql;
       searchObj.data.histogramQuery.query.sql_mode = "full";
       searchObj.data.histogramQuery.query.size = -1;
       delete searchObj.data.histogramQuery.query.quick_mode;
@@ -5391,7 +5616,7 @@ const useLogs = () => {
           delete queryReq.query.track_total_hits;
         }
 
-        if (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL)) {
+        if (isDistinctQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible) {
           delete queryReq.query.track_total_hits;
         }
       }
@@ -5405,7 +5630,7 @@ const useLogs = () => {
 
       if(!queryReq) return;
       
-      if(!isPagination && searchObj.meta.refreshInterval === 0) {
+      if(!isPagination && searchObj.meta.refreshInterval == 0) {
         resetQueryData();
         histogramResults = [];
         searchObj.data.queryResults.hits = [];
@@ -5421,13 +5646,11 @@ const useLogs = () => {
           errorMsg: "",
           errorDetail: "",
         };
-
-        if(searchObj.meta.refreshInterval == 0) searchObj.meta.resetPlotChart = true;
       }
 
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
       
-      if(shouldGetPageCount(queryReq, fnParsedSQL()) && searchObj.meta.refreshInterval === 0) {
+      if(shouldGetPageCount(queryReq, fnParsedSQL()) && searchObj.meta.refreshInterval == 0) {
         queryReq.query.size = queryReq.query.size + 1;
       }
 
@@ -5660,7 +5883,7 @@ const useLogs = () => {
       );
     } 
     
-    if (searchObj.meta.refreshInterval === 0) {
+    if (searchObj.meta.refreshInterval == 0) {
       updatePageCountTotal(payload.queryReq, response.content.results.hits.length, searchObj.data.queryResults.hits.length);
       trimPageCountExtraHit(payload.queryReq, searchObj.data.queryResults.hits.length);
     }
@@ -5679,6 +5902,8 @@ const useLogs = () => {
     
     ////// Handle reset field values ///////
     resetFieldValues();
+
+
 
     // In page count we set track_total_hits
     if (!payload.queryReq.query.hasOwnProperty("track_total_hits")) {
@@ -5716,8 +5941,14 @@ const useLogs = () => {
         searchObj.data.queryResults = response.content.results;
       }
     }
+    //check if the histogram is 
+    //here we add the is_histogram_eligible flag to the query results so that we can use it in the FE side
+    //to decide whether to call histogram or not
+    if(response.content.results.hasOwnProperty("is_histogram_eligible")){
+      searchObj.data.queryResults.is_histogram_eligible = response.content.results.is_histogram_eligible;
+    }
 
-    if(searchObj.meta.refreshInterval === 0) {
+    if(searchObj.meta.refreshInterval == 0) {
       if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total === payload.queryReq.query.size)) {
         searchObj.data.queryResults.pageCountTotal = payload.queryReq.query.size * searchObj.data.resultGrid.currentPage;
       } else if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total != payload.queryReq.query.size)){
@@ -5812,6 +6043,13 @@ const useLogs = () => {
         time,
         "UTC",
       );
+
+      if(!searchObj.data.histogramInterval) {
+        console.error("Error processing histogram data:", "histogramInterval is not set");
+        searchObj.loadingHistogram = false;
+        return;
+      }
+
       for (
         let currentTime: any = currentTimeToBePassed.timestamp / 1000;
         currentTime < endDateTime;
@@ -5836,7 +6074,13 @@ const useLogs = () => {
       }
     }
     
-    searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+    // if order by is desc, append new partition response at end
+    if (searchObj.data.queryResults.order_by?.toLowerCase() === "desc") {
+      searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+    } else {
+      // else append new partition response at start
+      searchObj.data.queryResults.aggs.unshift(...response.content.results.hits);
+    }
 
     (async () => {
       try {
@@ -5876,6 +6120,25 @@ const useLogs = () => {
     searchObj.data.queryResults.took += response.content.results.took;
     searchObj.data.queryResults.result_cache_ratio +=
       response.content.results.result_cache_ratio;
+
+    searchObj.data.queryResults.histogram_interval = response.content.results.histogram_interval;
+    if(searchObj.data.queryResults.histogram_interval) searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
+    searchObj.data.queryResults.order_by = response?.content?.results?.order_by ?? "desc";
+
+    // copy converted_histogram_query to queryResults
+    searchObj.data.queryResults.converted_histogram_query = response?.content?.results?.converted_histogram_query ?? "";
+
+    // check if histogram interval is undefined, then set current response as histogram response
+    // for visualization, will require to set histogram interval to fill missing values
+    // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+    // created new attribute visualization_histogram_interval to avoid this issue
+    if (
+      !searchObj.data.queryResults.visualization_histogram_interval &&
+      response.content?.results?.histogram_interval
+    ) {
+      searchObj.data.queryResults.visualization_histogram_interval  =
+        response.content?.results?.histogram_interval;
+    }
   }
 
   const handlePageCountStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
@@ -6064,7 +6327,7 @@ const useLogs = () => {
       searchObj.data.queryResults.hits = response.content.results.hits;
     }
 
-    if (!searchObj.meta.refreshInterval) {
+    if (searchObj.meta.refreshInterval == 0) {
       // In page count we set track_total_hits
       if (!queryReq.query.hasOwnProperty("track_total_hits")) {
         delete response.content.total;
@@ -6316,6 +6579,8 @@ const useLogs = () => {
     const _shouldShowHistogram = shouldShowHistogram(parsedSQL);
 
     searchObj.data.queryResults.aggs = [];
+    searchObj.data.queryResults.histogram_interval = 0;
+
     if (_shouldShowHistogram) {
       searchObj.meta.refreshHistogram = false;
       if (searchObj.data.queryResults.hits?.length > 0) {
@@ -6344,6 +6609,7 @@ const useLogs = () => {
 
         payload.meta = {
           isHistogramOnly: searchObj.meta.histogramDirtyFlag,
+          is_ui_histogram: true,
         }
 
         const requestId = initializeSearchConnection(payload);
@@ -6353,7 +6619,7 @@ const useLogs = () => {
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
       resetHistogramWithError("Histogram unavailable for CTEs, DISTINCT and LIMIT queries.", -1);
       searchObj.meta.histogramDirtyFlag = false;
-    } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))) {
+    } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)) {
       if (shouldGetPageCount(queryReq, parsedSQL) && isFromZero) {
         setTimeout(async () => {
           searchObjDebug["pagecountStartTime"] = performance.now();
@@ -6361,9 +6627,9 @@ const useLogs = () => {
           searchObjDebug["pagecountEndTime"] = performance.now();
         }, 0);
       }
-      if(isWithQuery(parsedSQL)){
+      if(!searchObj.data.queryResults.is_histogram_eligible){
         resetHistogramWithError(
-          "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+          "Histogram unavailable for CTEs, DISTINCT and LIMIT queries..",
           -1
         );
         searchObj.meta.histogramDirtyFlag = false;
@@ -6401,7 +6667,7 @@ const useLogs = () => {
   function isNonAggregatedSQLMode(searchObj: any, parsedSQL: any) {
     return !(
       searchObj.meta.sqlMode &&
-      (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))
+      (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)
     );
   }
 
@@ -6451,6 +6717,10 @@ const useLogs = () => {
       searchObj.data.queryResults.hits = [];
     }
 
+    if(payload.type === "search" && !payload.isPagination && searchObj.meta.refreshInterval == 0) {
+      searchObj.meta.resetPlotChart = true;
+    }
+
     if (
       payload.type === "search" &&
       !payload.isPagination &&
@@ -6494,9 +6764,15 @@ const useLogs = () => {
       errorMsg = message;
     }
 
-    searchObj.data.errorDetail = error_detail || "";
-    searchObj.data.errorMsg = errorMsg;
-    notificationMsg.value = errorMsg;
+    if(request.type === 'pageCount') {
+      searchObj.data.countErrorMsg = "Error while retrieving total events: ";
+      if (trace_id) searchObj.data.countErrorMsg += " TraceID: " + trace_id;
+      notificationMsg.value = searchObj.data.countErrorMsg;
+    } else {
+      searchObj.data.errorDetail = error_detail || "";
+      searchObj.data.errorMsg = errorMsg;
+      notificationMsg.value = errorMsg;
+    }
   };
 
   const constructErrorMessage = ({
@@ -6798,14 +7074,15 @@ const useLogs = () => {
     isActionsEnabled,
     sendCancelSearchMessage,
     isDistinctQuery,
-    isWithQuery,
     getStream,
     initialLogsState,
     clearSearchObj,
     setCommunicationMethod,
     hasAggregation,
-    streamSchemaFieldsIndexMapping
-    };
+    streamSchemaFieldsIndexMapping,
+    loadVisualizeData,
+    processHttpHistogramResults
+  };
 };
 
 export default useLogs;

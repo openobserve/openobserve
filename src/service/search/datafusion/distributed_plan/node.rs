@@ -80,6 +80,7 @@ impl RemoteScanNodes {
             stream_type: table_name.get_stream_type(self.req.stream_type).to_string(),
             partition: 0,           // set in FlightSearchRequest
             job_id: "".to_string(), // set in FlightSearchRequest
+            enrich_mode: false,
         };
 
         let search_infos = SearchInfos {
