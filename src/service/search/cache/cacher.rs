@@ -741,11 +741,8 @@ fn handle_histogram(
             .collect::<Vec<&str>>();
 
         let interval = match attrs.get(1) {
-            Some(v) => match v.parse::<u16>() {
-                Ok(v) => generate_histogram_interval(q_time_range, v),
-                Err(_) => v.to_string(),
-            },
-            None => generate_histogram_interval(q_time_range, 0),
+            Some(v) => v.to_string(),
+            None => generate_histogram_interval(q_time_range).to_string(),
         };
         interval
     };

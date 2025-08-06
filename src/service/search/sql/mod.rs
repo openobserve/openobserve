@@ -16,7 +16,6 @@
 use std::{ops::ControlFlow, sync::Arc};
 
 use arrow_schema::{DataType, Field, FieldRef};
-use chrono::Duration;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -74,6 +73,8 @@ use crate::service::search::{
     },
     utils::get_field_name,
 };
+
+pub mod histogram;
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
@@ -151,7 +152,7 @@ impl Sql {
             .pop()
             .unwrap();
 
-        //********************Change the sql here*********************************//
+        //********************Change the sql start*********************************//
         // 2. rewrite track_total_hits
         if query.track_total_hits {
             let mut trace_total_hits_visitor = TrackTotalHitsVisitor::new();
@@ -160,8 +161,8 @@ impl Sql {
 
         // 3. rewrite all filter that include DASHBOARD_ALL with true
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
-        //********************Change the sql here*********************************//
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
+        //********************Change the sql end*********************************//
 
         // 4. get column name, alias, group by, order by
         let mut column_visitor = ColumnVisitor::new(&total_schemas);
@@ -253,14 +254,15 @@ impl Sql {
         // 10. pick up histogram interval
         let mut histogram_interval_visitor =
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
-        statement.visit(&mut histogram_interval_visitor);
+        let _ = statement.visit(&mut histogram_interval_visitor);
         let histogram_interval = if query.histogram_interval > 0 {
             Some(query.histogram_interval)
         } else {
             histogram_interval_visitor.interval
         };
 
-        //********************Change the sql here*********************************//
+        //********************Change the sql start*********************************//
+
         // 11. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
@@ -324,8 +326,8 @@ impl Sql {
                 let bucket_width = histogram_interval.unwrap() as u64 * 1_000_000;
                 // round the bucket edges to even start
                 let rounding_by = bucket_width as i64;
-                let min_value = (query.start_time / rounding_by) * rounding_by;
-                let max_value = (query.end_time / rounding_by) * rounding_by;
+                let min_value = query.start_time - query.start_time % rounding_by;
+                let max_value = query.end_time;
                 let num_buckets =
                     ((max_value - min_value) as f64 / bucket_width as f64).ceil() as usize;
                 index_optimize_mode = Some(IndexOptimizeMode::SimpleHistogram(
@@ -1729,19 +1731,20 @@ impl VisitorMut for HistogramIntervalVisitor {
                     let _ = args.next();
                     // second is interval
                     let interval = if let Some(interval) = args.next() {
-                        let interval = interval
+                        interval
                             .to_string()
                             .trim_matches(|v| v == '\'' || v == '"')
-                            .to_string();
-                        match interval.parse::<u16>() {
-                            Ok(v) => generate_histogram_interval(self.time_range, v),
-                            Err(_) => interval,
-                        }
+                            .to_string()
                     } else {
-                        generate_histogram_interval(self.time_range, 0)
+                        generate_histogram_interval(self.time_range).to_string()
                     };
-                    self.interval =
-                        Some(convert_histogram_interval_to_seconds(&interval).unwrap_or_default());
+                    self.interval = match convert_histogram_interval_to_seconds(&interval) {
+                        Ok(v) => Some(v),
+                        Err(e) => {
+                            log::error!("{e:?}");
+                            Some(0)
+                        }
+                    };
                 }
                 return ControlFlow::Break(());
             }
@@ -1869,83 +1872,132 @@ impl VisitorMut for TrackTotalHitsVisitor {
     }
 }
 
+fn splite_function_args(args: &FunctionArguments) -> (FunctionArg, Vec<FunctionArg>) {
+    match args {
+        FunctionArguments::List(list) => {
+            let (first, others) = list.args.split_first().unwrap();
+            (first.clone(), others.to_vec())
+        }
+        _ => {
+            log::error!("Unsupported function arguments: {:?}", args);
+            (FunctionArg::Unnamed(FunctionArgExpr::Wildcard), vec![])
+        }
+    }
+}
+
+fn convert_args_to_order_expr(args: FunctionArg) -> OrderByExpr {
+    let expr = convert_function_args_to_expr(args);
+    OrderByExpr {
+        expr: expr.clone(),
+        with_fill: None,
+        asc: None,
+        nulls_first: None,
+    }
+}
+
+fn convert_function_args_to_expr(args: FunctionArg) -> Expr {
+    match args {
+        FunctionArg::Named {
+            name: _,
+            arg: FunctionArgExpr::Expr(arg),
+            operator: _,
+        } => arg,
+        FunctionArg::Named {
+            name: _,
+            arg: FunctionArgExpr::Wildcard,
+            operator: _,
+        } => Expr::Wildcard(AttachedToken::empty()),
+        FunctionArg::Unnamed(FunctionArgExpr::Expr(arg)) => arg,
+        FunctionArg::Unnamed(FunctionArgExpr::Wildcard) => Expr::Wildcard(AttachedToken::empty()),
+        _ => {
+            log::error!("Unsupported function argument: {:?}", args);
+            Expr::Wildcard(AttachedToken::empty())
+        }
+    }
+}
+
 fn generate_table_reference(idents: &[Ident]) -> (TableReference, String) {
     if idents.len() == 2 {
-        let table_name = idents[0].value.clone();
+        let table_name = idents[0].value.as_str();
         let field_name = idents[1].value.clone();
         (TableReference::from(table_name), field_name)
     } else {
-        let stream_type = idents[0].value.clone();
-        let table_name = idents[1].value.clone();
+        let stream_type = idents[0].value.as_str();
+        let table_name = idents[1].value.as_str();
         let field_name = idents[2].value.clone();
         (TableReference::partial(stream_type, table_name), field_name)
     }
 }
 
-pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> String {
-    if time_range.is_none() || time_range.unwrap().eq(&(0, 0)) {
-        return "1 hour".to_string();
-    }
-    let time_range = time_range.unwrap();
-    if num > 0 {
-        return format!(
-            "{} second",
-            std::cmp::max(
-                (time_range.1 - time_range.0)
-                    / Duration::try_seconds(1)
-                        .unwrap()
-                        .num_microseconds()
-                        .unwrap()
-                    / num as i64,
-                1
-            )
-        );
-    }
+/// Utility macro to generate microsecond-duration pairs concisely
+macro_rules! intervals {
+    ($(($unit:tt, $amount:expr, $label:expr)),+ $(,)?) => {
+        [
+            $((intervals!(@unit $unit)($amount).num_microseconds().unwrap(), $label)),+
+        ]
+    };
 
-    let intervals = [
-        (Duration::try_hours(24 * 60), "1 day"),
-        (Duration::try_hours(24 * 30), "12 hour"),
-        (Duration::try_hours(24 * 28), "6 hour"),
-        (Duration::try_hours(24 * 21), "3 hour"),
-        (Duration::try_hours(24 * 15), "2 hour"),
-        (Duration::try_hours(6), "1 hour"),
-        (Duration::try_hours(2), "1 minute"),
-        (Duration::try_hours(1), "30 second"),
-        (Duration::try_minutes(30), "15 second"),
-        (Duration::try_minutes(15), "10 second"),
+    (@unit h) => { chrono::Duration::hours };
+    (@unit m) => { chrono::Duration::minutes };
+}
+
+pub fn generate_histogram_interval(time_range: Option<(i64, i64)>) -> &'static str {
+    let Some((start, end)) = time_range else {
+        return "1 hour";
+    };
+    if (start, end).eq(&(0, 0)) {
+        return "1 hour";
+    }
+    let duration = end - start;
+
+    const INTERVALS: [(i64, &str); 10] = intervals![
+        (h, 24 * 60, "1 day"),
+        (h, 24 * 30, "12 hour"),
+        (h, 24 * 28, "6 hour"),
+        (h, 24 * 21, "3 hour"),
+        (h, 24 * 15, "2 hour"),
+        (h, 6, "1 hour"),
+        (h, 2, "1 minute"),
+        (h, 1, "30 second"),
+        (m, 30, "15 second"),
+        (m, 15, "10 second"),
     ];
-    for (time, interval) in intervals.iter() {
-        let time = time.unwrap().num_microseconds().unwrap();
-        if (time_range.1 - time_range.0) >= time {
-            return interval.to_string();
+
+    for (time, interval) in INTERVALS.iter() {
+        if duration >= *time {
+            return interval;
         }
     }
-    "10 second".to_string()
+    "10 second"
 }
 
 pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
     let interval = interval.trim();
-    let (num, unit) = interval
+    let pos = interval
         .find(|c: char| !c.is_numeric())
-        .map(|pos| interval.split_at(pos))
-        .ok_or_else(|| Error::Message("Invalid interval format".to_string()))?;
+        .ok_or_else(|| Error::Message(format!("Invalid interval format: '{interval}'")))?;
 
-    let seconds = match unit.trim().to_lowercase().as_str() {
-        "second" | "seconds" | "s" | "secs" | "sec" => num.parse::<i64>(),
-        "minute" | "minutes" | "m" | "mins" | "min" => num.parse::<i64>().map(|n| n * 60),
-        "hour" | "hours" | "h" | "hrs" | "hr" => num.parse::<i64>().map(|n| n * 3600),
-        "day" | "days" | "d" => num.parse::<i64>().map(|n| n * 86400),
+    let (num_str, unit_str) = interval.split_at(pos);
+    let num = num_str.parse::<i64>().map_err(|_| {
+        Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+            "Invalid number format".to_string(),
+        ))
+    })?;
+
+    let unit = unit_str.trim().to_lowercase();
+    let seconds = match unit.as_str() {
+        "second" | "seconds" | "s" | "secs" | "sec" => num,
+        "minute" | "minutes" | "m" | "mins" | "min" => num * 60,
+        "hour" | "hours" | "h" | "hrs" | "hr" => num * 3600,
+        "day" | "days" | "d" => num * 86400,
         _ => {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
                 "Unsupported histogram interval unit".to_string(),
             )));
         }
     };
-    seconds.map_err(|_| {
-        Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-            "Invalid number format".to_string(),
-        ))
-    })
+
+    Ok(seconds)
 }
 
 pub fn pickup_where(sql: &str) -> Result<Option<String>, Error> {
@@ -2070,6 +2122,7 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                 return ControlFlow::Continue(());
             }
             let fname = names.first().unwrap();
+            let fname = fname.as_ident().unwrap();
             if fname.value == ENCRYPT_UDF_NAME
                 || fname.value == DECRYPT_UDF_NAME
                 || fname.value == DECRYPT_SLOW_UDF_NAME
@@ -2121,7 +2174,7 @@ pub fn get_cipher_key_names(sql: &str) -> Result<Vec<String>, Error> {
         .pop()
         .unwrap();
     let mut visitor = ExtractKeyNamesVisitor::new();
-    statement.visit(&mut visitor);
+    let _ = statement.visit(&mut visitor);
     if let Some(e) = visitor.error {
         Err(e)
     } else {
@@ -2286,14 +2339,10 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                     | BinaryOperator::Lt,
                 right,
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref() {
-                    if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(true));
-                    }
-                } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref() {
-                    if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(true));
-                    }
+                if is_eq_placeholder(left.as_ref(), &placeholder)
+                    || is_eq_placeholder(right.as_ref(), &placeholder)
+                {
+                    *expr = expr_boolean(true);
                 }
             }
             // Not equal
@@ -2302,14 +2351,10 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 op: BinaryOperator::NotEq,
                 right,
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = left.as_ref() {
-                    if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(false));
-                    }
-                } else if let Expr::Value(Value::SingleQuotedString(value)) = right.as_ref() {
-                    if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(false));
-                    }
+                if is_eq_placeholder(left.as_ref(), &placeholder)
+                    || is_eq_placeholder(right.as_ref(), &placeholder)
+                {
+                    *expr = expr_boolean(false);
                 }
             }
             // Like
@@ -2323,10 +2368,8 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 negated: false,
                 ..
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref() {
-                    if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(true));
-                    }
+                if is_eq_placeholder(pattern.as_ref(), &placeholder) {
+                    *expr = expr_boolean(true);
                 }
             }
             // Not Like
@@ -2340,31 +2383,25 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 negated: true,
                 ..
             } => {
-                if let Expr::Value(Value::SingleQuotedString(value)) = pattern.as_ref() {
-                    if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(false));
-                    }
+                if is_eq_placeholder(pattern.as_ref(), &placeholder) {
+                    *expr = expr_boolean(false);
                 }
             }
             // In list
             Expr::InList { list, negated, .. } if !(*negated) => {
                 for item in list.iter() {
-                    if let Expr::Value(Value::SingleQuotedString(value)) = item {
-                        if *value == placeholder {
-                            *expr = Expr::Value(Value::Boolean(true));
-                            break;
-                        }
+                    if is_eq_placeholder(item, &placeholder) {
+                        *expr = expr_boolean(true);
+                        break;
                     }
                 }
             }
             // Not in list
             Expr::InList { list, negated, .. } if *negated => {
                 for item in list.iter() {
-                    if let Expr::Value(Value::SingleQuotedString(value)) = item {
-                        if *value == placeholder {
-                            *expr = Expr::Value(Value::Boolean(false));
-                            break;
-                        }
+                    if is_eq_placeholder(item, &placeholder) {
+                        *expr = expr_boolean(false);
+                        break;
                     }
                 }
             }
@@ -2409,6 +2446,18 @@ pub async fn get_group_by_fields(sql: &Sql) -> Result<Vec<String>, Error> {
     Ok(group_by_visitor.get_group_by_fields())
 }
 
+fn expr_boolean(value: bool) -> Expr {
+    Expr::Value(Value::Boolean(value))
+}
+
+fn is_eq_placeholder(expr: &Expr, placeholder: &str) -> bool {
+    if let Expr::Value(Value::SingleQuotedString(value)) = expr {
+        value == placeholder
+    } else {
+        false
+    }
+}
+
 /// Helper function to resolve field names considering aliases
 /// Returns true if the given field_name matches either the actual field name or its alias
 fn field_matches_with_alias(field_name: &str, alias: Option<&str>, target_field: &str) -> bool {
@@ -2419,16 +2468,15 @@ fn field_matches_with_alias(field_name: &str, alias: Option<&str>, target_field:
 
     // Match with alias if present
     if let Some(alias_name) = alias {
-        if alias_name == target_field {
-            return true;
-        }
+        alias_name == target_field
+    } else {
+        false
     }
-
-    false
 }
 
 #[cfg(test)]
 mod tests {
+
     use arrow_schema::{DataType, Field};
     use sqlparser::dialect::GenericDialect;
 
@@ -2437,7 +2485,7 @@ mod tests {
     #[test]
     fn test_index_visitor1() {
         let sql = "SELECT * FROM t WHERE name = 'a' AND age = 1 AND (name = 'b' OR (match_all('good') AND match_all('bar'))) AND (match_all('foo') OR age = 2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2457,7 +2505,7 @@ mod tests {
     #[test]
     fn test_index_visitor2() {
         let sql = "SELECT * FROM t WHERE name is not null AND age > 1 AND (match_all('foo') OR abs(age) = 2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2481,7 +2529,7 @@ mod tests {
     #[test]
     fn test_index_visitor3() {
         let sql = "SELECT * FROM t WHERE (name = 'b' OR (match_all('good') AND match_all('bar'))) OR (match_all('foo') OR age = 2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2505,7 +2553,7 @@ mod tests {
     #[test]
     fn test_index_visitor4() {
         let sql = "SELECT * FROM t WHERE (name = 'b' OR (match_all('good') AND match_all('bar'))) OR (match_all('foo') AND name = 'c')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2525,7 +2573,7 @@ mod tests {
     #[test]
     fn test_index_visitor5() {
         let sql = "SELECT * FROM t WHERE (foo = 'b' OR foo = 'c') AND foo = 'd' AND ((match_all('good') AND match_all('bar')) OR (match_all('foo') AND name = 'c'))";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2542,11 +2590,10 @@ mod tests {
         assert_eq!(statement.to_string(), expected_sql);
     }
 
-    // test index_visitor for str_match
     #[test]
     fn test_index_visitor_str_match() {
         let sql = "SELECT * FROM t WHERE str_match(name, 'value')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2565,7 +2612,7 @@ mod tests {
     #[test]
     fn test_index_visitor_str_match_ignore_case() {
         let sql = "SELECT * FROM t WHERE str_match_ignore_case(name, 'value')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2583,7 +2630,7 @@ mod tests {
     #[test]
     fn test_track_total_hits1() {
         let sql = "SELECT * FROM t WHERE name = 'a'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2596,7 +2643,7 @@ mod tests {
     #[test]
     fn test_track_total_hits2() {
         let sql = "SELECT name, count(*) FROM t WHERE name = 'a' group by name order by name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2609,7 +2656,7 @@ mod tests {
     #[test]
     fn test_track_total_hits3() {
         let sql = "SELECT t1.name, t2.name from t1 join t2 on t1.name = t2.name where t1.name = 'openobserve' group by t1.name, t2.name order by t1.name, t2.name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2622,7 +2669,7 @@ mod tests {
     #[test]
     fn test_track_total_hits4() {
         let sql = "SELECT name from t1 where name not in (select name from t2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2636,7 +2683,7 @@ mod tests {
     #[test]
     fn test_track_total_hits5() {
         let sql = "SELECT name from t1 union select name from t2";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2650,7 +2697,7 @@ mod tests {
     #[test]
     fn test_track_total_hits6() {
         let sql = "(SELECT name from t1) union (select name from t2)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2663,7 +2710,7 @@ mod tests {
     #[test]
     fn test_track_total_hits7() {
         let sql = "SELECT name from t1 union select name from t2 union select name from t3";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -2683,61 +2730,61 @@ mod tests {
     #[test]
     fn test_is_simple_count_visit1() {
         let sql = "SELECT count(*) from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), true);
+        assert!(is_simple_count_query(&mut statement),);
     }
 
     #[test]
     fn test_is_simple_count_visit2() {
         let sql = "SELECT count(*) as cnt from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), true);
+        assert!(is_simple_count_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_count_visit3() {
         let sql = "SELECT count(*) as cnt from t where name = 'a'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), true);
+        assert!(is_simple_count_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_count_visit4() {
         let sql = "SELECT name, count(*) as cnt from t group by name order by name";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), false);
+        assert!(!is_simple_count_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_count_visit5() {
         let sql = "SELECT count(_timestamp) as cnt from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), false);
+        assert!(!is_simple_count_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_count_visit6() {
         let sql = "SELECT count(*) as cnt from (select * from t)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_count_query(&mut statement), false);
+        assert!(!is_simple_count_query(&mut statement));
     }
 
     fn is_simple_histogram_query(statement: &mut Statement) -> bool {
@@ -2750,66 +2797,66 @@ mod tests {
     #[test]
     fn test_is_simple_histogram_visit1() {
         let sql = "select histogram(_timestamp, '10 second') AS zo_sql_key, count(*) AS zo_sql_num from \"default\"  GROUP BY zo_sql_key ORDER BY zo_sql_key";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), true);
+        assert!(is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit2() {
         // Test with additional where clause
         let sql = "select histogram(_timestamp, '1m') as h, count(*) from t where name = 'test'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), true);
+        assert!(is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit3() {
         // Test with wrong order of projections (count before histogram)
         let sql = "select count(*), histogram(_timestamp, '1m') from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), false);
+        assert!(!is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit4() {
         // Test with subquery - should fail
         let sql = "select histogram(_timestamp, '1m'), count(*) from (select * from t)";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), false);
+        assert!(!is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit5() {
         // Test with additional projection - should fail
         let sql = "select histogram(_timestamp, '1m'), count(*), name from t";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), false);
+        assert!(!is_simple_histogram_query(&mut statement));
     }
 
     #[test]
     fn test_is_simple_histogram_visit6() {
         // Test with join - should fail
         let sql = "select histogram(_timestamp, '1m'), count(*) from t1 join t2";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
-        assert_eq!(is_simple_histogram_query(&mut statement), false);
+        assert!(!is_simple_histogram_query(&mut statement));
     }
 
     #[test]
@@ -3178,12 +3225,12 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor() {
         let sql = "select * from t where field1 = '_o2_all_'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true";
         assert_eq!(statement.to_string(), expected);
     }
@@ -3191,12 +3238,12 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_in_list() {
         let sql = "select * from t where field1 in ('_o2_all_')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true";
         assert_eq!(statement.to_string(), expected);
     }
@@ -3204,12 +3251,12 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_in_list_and_negated() {
         let sql = "select * from t where field1 not in ('_o2_all_')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE false";
         assert_eq!(statement.to_string(), expected);
     }
@@ -3217,12 +3264,12 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_in_list_and_negated_and_other_filter() {
         let sql = "select * from t where field1 not in ('_o2_all_') and field2 = 'value2'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE false AND field2 = 'value2'";
         assert_eq!(statement.to_string(), expected);
     }
@@ -3231,12 +3278,12 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_multi_and_or_with_o2_all() {
         let sql = "select * from t where field1 = '_o2_all_' and (field2 = '_o2_all_' or field3 = '_o2_all_')";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true AND (true OR true)";
         assert_eq!(statement.to_string(), expected);
     }
@@ -3245,12 +3292,12 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_like_and_not_like() {
         let sql = "select * from t where field1 like '_o2_all_' and field2 not like '_o2_all_'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true AND false";
         assert_eq!(statement.to_string(), expected);
     }
@@ -3259,12 +3306,12 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_like_and_not_like_and_other_filter() {
         let sql = "select * from t where field1 like '_o2_all_' and field2 not like '_o2_all_' and field3 = 'value3'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true AND false AND field3 = 'value3'";
         assert_eq!(statement.to_string(), expected);
     }
@@ -3272,12 +3319,12 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_str_match_and_other_filter() {
         let sql = "select * from t where str_match(field1, '_o2_all_') and field2 = 'value2'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true AND field2 = 'value2'";
         assert_eq!(statement.to_string(), expected);
     }
@@ -3285,197 +3332,14 @@ mod tests {
     #[test]
     fn test_remove_dashboard_all_visitor_with_match_field_and_other_filter() {
         let sql = "select * from t where match_field(field1, '_o2_all_') and field2 = 'value2'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
         let mut remove_dashboard_all_visitor = RemoveDashboardAllVisitor::new();
-        statement.visit(&mut remove_dashboard_all_visitor);
+        let _ = statement.visit(&mut remove_dashboard_all_visitor);
         let expected = "SELECT * FROM t WHERE true AND field2 = 'value2'";
         assert_eq!(statement.to_string(), expected);
-    }
-
-    #[test]
-    fn test_pickup_where_normal_sql() {
-        // Test normal SQL with WHERE clause
-        let sql = "SELECT * FROM logs WHERE level = 'error'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, Some("level = 'error'".to_string()));
-
-        // Test normal SQL with complex WHERE clause
-        let sql = "SELECT * FROM logs WHERE level = 'error' AND timestamp > 1234567890";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(
-            result,
-            Some("level = 'error' AND timestamp > 1234567890".to_string())
-        );
-
-        // Test normal SQL with OR condition
-        let sql = "SELECT * FROM logs WHERE level = 'error' OR level = 'warn'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(
-            result,
-            Some("level = 'error' OR level = 'warn'".to_string())
-        );
-
-        // Test normal SQL with IN clause
-        let sql = "SELECT * FROM logs WHERE level IN ('error', 'warn', 'info')";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(
-            result,
-            Some("level IN ('error', 'warn', 'info')".to_string())
-        );
-
-        // Test normal SQL with LIKE clause
-        let sql = "SELECT * FROM logs WHERE message LIKE '%error%'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, Some("message LIKE '%error%'".to_string()));
-    }
-
-    #[test]
-    fn test_pickup_where_no_where_clause() {
-        // Test SQL without WHERE clause
-        let sql = "SELECT * FROM logs";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-
-        // Test SQL with only SELECT and FROM
-        let sql = "SELECT id, name FROM users";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_pickup_where_with_joins() {
-        // Test SQL with JOIN - should return None
-        let sql = "SELECT * FROM logs l JOIN users u ON l.user_id = u.id WHERE l.level = 'error'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-
-        // Test SQL with multiple FROM tables - should return None
-        let sql = "SELECT * FROM logs, users WHERE logs.user_id = users.id";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-
-        // Test SQL with LEFT JOIN - should return None
-        let sql =
-            "SELECT * FROM logs l LEFT JOIN users u ON l.user_id = u.id WHERE l.level = 'error'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-
-        // Test SQL with INNER JOIN - should return None
-        let sql =
-            "SELECT * FROM logs l INNER JOIN users u ON l.user_id = u.id WHERE l.level = 'error'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_pickup_where_with_subqueries() {
-        // Test SQL with subquery in WHERE - should return None
-        let sql = "SELECT * FROM logs WHERE user_id IN (SELECT id FROM users WHERE active = true)";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-
-        // Test SQL with EXISTS subquery - should return None
-        let sql =
-            "SELECT * FROM logs WHERE EXISTS (SELECT 1 FROM users WHERE users.id = logs.user_id)";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-
-        // Test SQL with subquery in FROM - should return None
-        let sql = "SELECT * FROM (SELECT * FROM logs WHERE level = 'error') sub WHERE sub.timestamp > 1234567890";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-
-        let sql = "with t1 as (select log, message, kubernetes_namespace_name from default where kubernetes_namespace_name = 'ziox') select * from t1;";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-
-        let sql = "with t1 as (select log, message, kubernetes_namespace_name from default) select * from t1 where kubernetes_namespace_name = 'ziox';";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_pickup_where_with_union() {
-        // Test SQL with UNION - should return None
-        let sql = "SELECT * FROM logs WHERE level = 'error' UNION SELECT * FROM logs WHERE level = 'warn'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-
-        // Test SQL with UNION ALL - should return None
-        let sql = "SELECT * FROM logs WHERE level = 'error' UNION ALL SELECT * FROM logs WHERE level = 'warn'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-
-        // Test SQL with INTERSECT - should return None
-        let sql = "SELECT * FROM logs WHERE level = 'error' INTERSECT SELECT * FROM logs WHERE level = 'warn'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-
-        // Test SQL with EXCEPT - should return None
-        let sql = "SELECT * FROM logs WHERE level = 'error' EXCEPT SELECT * FROM logs WHERE level = 'warn'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_pickup_where_complex_where_clauses() {
-        // Test complex WHERE with parentheses
-        let sql = "SELECT * FROM logs WHERE (level = 'error' OR level = 'warn') AND timestamp > 1234567890";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(
-            result,
-            Some("(level = 'error' OR level = 'warn') AND timestamp > 1234567890".to_string())
-        );
-
-        // Test WHERE with function calls
-        let sql = "SELECT * FROM logs WHERE LENGTH(message) > 100 AND level = 'error'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(
-            result,
-            Some("LENGTH(message) > 100 AND level = 'error'".to_string())
-        );
-
-        // Test WHERE with BETWEEN
-        let sql = "SELECT * FROM logs WHERE timestamp BETWEEN 1234567890 AND 1234567999";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(
-            result,
-            Some("timestamp BETWEEN 1234567890 AND 1234567999".to_string())
-        );
-
-        // Test WHERE with IS NULL
-        let sql = "SELECT * FROM logs WHERE user_id IS NULL AND level = 'error'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(
-            result,
-            Some("user_id IS NULL AND level = 'error'".to_string())
-        );
-
-        // Test WHERE with IS NOT NULL
-        let sql = "SELECT * FROM logs WHERE user_id IS NOT NULL";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, Some("user_id IS NOT NULL".to_string()));
-    }
-
-    #[test]
-    fn test_pickup_where_edge_cases() {
-        // Test SQL with table alias but no joins
-        let sql = "SELECT * FROM logs l WHERE l.level = 'error'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, Some("l.level = 'error'".to_string()));
-
-        // Test SQL with quoted identifiers
-        let sql = "SELECT * FROM \"logs\" WHERE \"level\" = 'error'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, Some("\"level\" = 'error'".to_string()));
-
-        // Test SQL with schema prefix
-        let sql = "SELECT * FROM public.logs WHERE level = 'error'";
-        let result = pickup_where(sql).unwrap();
-        assert_eq!(result, Some("level = 'error'".to_string()));
     }
 
     #[test]
@@ -3868,5 +3732,188 @@ mod tests {
             .pop()
             .unwrap();
         assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_pickup_where_normal_sql() {
+        // Test normal SQL with WHERE clause
+        let sql = "SELECT * FROM logs WHERE level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("level = 'error'".to_string()));
+
+        // Test normal SQL with complex WHERE clause
+        let sql = "SELECT * FROM logs WHERE level = 'error' AND timestamp > 1234567890";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("level = 'error' AND timestamp > 1234567890".to_string())
+        );
+
+        // Test normal SQL with OR condition
+        let sql = "SELECT * FROM logs WHERE level = 'error' OR level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("level = 'error' OR level = 'warn'".to_string())
+        );
+
+        // Test normal SQL with IN clause
+        let sql = "SELECT * FROM logs WHERE level IN ('error', 'warn', 'info')";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("level IN ('error', 'warn', 'info')".to_string())
+        );
+
+        // Test normal SQL with LIKE clause
+        let sql = "SELECT * FROM logs WHERE message LIKE '%error%'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("message LIKE '%error%'".to_string()));
+    }
+
+    #[test]
+    fn test_pickup_where_no_where_clause() {
+        // Test SQL without WHERE clause
+        let sql = "SELECT * FROM logs";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with only SELECT and FROM
+        let sql = "SELECT id, name FROM users";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_pickup_where_with_joins() {
+        // Test SQL with JOIN - should return None
+        let sql = "SELECT * FROM logs l JOIN users u ON l.user_id = u.id WHERE l.level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with multiple FROM tables - should return None
+        let sql = "SELECT * FROM logs, users WHERE logs.user_id = users.id";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with LEFT JOIN - should return None
+        let sql =
+            "SELECT * FROM logs l LEFT JOIN users u ON l.user_id = u.id WHERE l.level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with INNER JOIN - should return None
+        let sql =
+            "SELECT * FROM logs l INNER JOIN users u ON l.user_id = u.id WHERE l.level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_pickup_where_with_subqueries() {
+        // Test SQL with subquery in WHERE - should return None
+        let sql = "SELECT * FROM logs WHERE user_id IN (SELECT id FROM users WHERE active = true)";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with EXISTS subquery - should return None
+        let sql =
+            "SELECT * FROM logs WHERE EXISTS (SELECT 1 FROM users WHERE users.id = logs.user_id)";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with subquery in FROM - should return None
+        let sql = "SELECT * FROM (SELECT * FROM logs WHERE level = 'error') sub WHERE sub.timestamp > 1234567890";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        let sql = "with t1 as (select log, message, kubernetes_namespace_name from default where kubernetes_namespace_name = 'ziox') select * from t1;";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        let sql = "with t1 as (select log, message, kubernetes_namespace_name from default) select * from t1 where kubernetes_namespace_name = 'ziox';";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_pickup_where_with_union() {
+        // Test SQL with UNION - should return None
+        let sql = "SELECT * FROM logs WHERE level = 'error' UNION SELECT * FROM logs WHERE level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with UNION ALL - should return None
+        let sql = "SELECT * FROM logs WHERE level = 'error' UNION ALL SELECT * FROM logs WHERE level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with INTERSECT - should return None
+        let sql = "SELECT * FROM logs WHERE level = 'error' INTERSECT SELECT * FROM logs WHERE level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+
+        // Test SQL with EXCEPT - should return None
+        let sql = "SELECT * FROM logs WHERE level = 'error' EXCEPT SELECT * FROM logs WHERE level = 'warn'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_pickup_where_complex_where_clauses() {
+        // Test complex WHERE with parentheses
+        let sql = "SELECT * FROM logs WHERE (level = 'error' OR level = 'warn') AND timestamp > 1234567890";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("(level = 'error' OR level = 'warn') AND timestamp > 1234567890".to_string())
+        );
+
+        // Test WHERE with function calls
+        let sql = "SELECT * FROM logs WHERE LENGTH(message) > 100 AND level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("LENGTH(message) > 100 AND level = 'error'".to_string())
+        );
+
+        // Test WHERE with BETWEEN
+        let sql = "SELECT * FROM logs WHERE timestamp BETWEEN 1234567890 AND 1234567999";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("timestamp BETWEEN 1234567890 AND 1234567999".to_string())
+        );
+
+        // Test WHERE with IS NULL
+        let sql = "SELECT * FROM logs WHERE user_id IS NULL AND level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(
+            result,
+            Some("user_id IS NULL AND level = 'error'".to_string())
+        );
+
+        // Test WHERE with IS NOT NULL
+        let sql = "SELECT * FROM logs WHERE user_id IS NOT NULL";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("user_id IS NOT NULL".to_string()));
+    }
+
+    #[test]
+    fn test_pickup_where_edge_cases() {
+        // Test SQL with table alias but no joins
+        let sql = "SELECT * FROM logs l WHERE l.level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("l.level = 'error'".to_string()));
+
+        // Test SQL with quoted identifiers
+        let sql = "SELECT * FROM \"logs\" WHERE \"level\" = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("\"level\" = 'error'".to_string()));
+
+        // Test SQL with schema prefix
+        let sql = "SELECT * FROM public.logs WHERE level = 'error'";
+        let result = pickup_where(sql).unwrap();
+        assert_eq!(result, Some("level = 'error'".to_string()));
     }
 }
