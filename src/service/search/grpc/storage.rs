@@ -1102,8 +1102,8 @@ async fn search_tantivy_index(
                     TantivyResult::RowIdsBitVec(row_ids_percent as usize, BitVec::EMPTY),
                 ));
             }
-            let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
             let max_doc_id = *row_ids.iter().max().unwrap_or(&0) as i64;
+            let mut res = BitVec::repeat(false, max_doc_id as usize + 1);
             if max_doc_id >= parquet_file.meta.records {
                 return Err(anyhow::anyhow!(
                     "doc_id {} is out of range, records {}",
