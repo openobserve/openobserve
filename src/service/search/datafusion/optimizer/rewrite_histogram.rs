@@ -128,23 +128,15 @@ impl TreeNodeRewriter for HistogramToDatebin {
                         let interval = if self.histogram_interval > 0 {
                             format!("{} second", self.histogram_interval)
                         } else {
-                            generate_histogram_interval(Some((self.start_time, self.end_time)), 0)
+                            generate_histogram_interval(Some((self.start_time, self.end_time)))
+                                .to_string()
                         };
                         cast(
                             Expr::Literal(ScalarValue::from(interval)),
                             DataType::Interval(IntervalUnit::MonthDayNano),
                         )
                     } else if args.len() == 2 {
-                        if let Expr::Literal(ScalarValue::Int64(Some(num))) = &args[1] {
-                            let interval = generate_histogram_interval(
-                                Some((self.start_time, self.end_time)),
-                                *num as u16,
-                            );
-                            cast(
-                                Expr::Literal(ScalarValue::from(interval)),
-                                DataType::Interval(IntervalUnit::MonthDayNano),
-                            )
-                        } else if let Expr::Literal(ScalarValue::Utf8(_)) = &args[1] {
+                        if let Expr::Literal(ScalarValue::Utf8(_)) = &args[1] {
                             cast(
                                 args[1].clone(),
                                 DataType::Interval(IntervalUnit::MonthDayNano),
