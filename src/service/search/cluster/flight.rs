@@ -131,6 +131,13 @@ pub async fn search(
         )
     );
 
+    #[cfg(feature = "enterprise")]
+    let scan_stats = ScanStats {
+        files: file_id_list_num as i64,
+        original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
+        ..Default::default()
+    };
+
     // 2. get nodes
     let get_node_start = std::time::Instant::now();
     let role_group = req
