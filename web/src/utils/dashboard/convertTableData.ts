@@ -21,7 +21,6 @@ import {
   getUnitValue,
   isTimeSeries,
   isTimeStamp,
-  convert16DigitTimestamp,
 } from "./convertDataIntoUnitValue";
 
 const applyValueMapping = (value: any, mappings: any) => {
@@ -226,17 +225,20 @@ export const convertTableData = (
             return valueMapping;
           }
 
-          // Check if the value is a 16-digit timestamp and convert it
-          const convertedVal = convert16DigitTimestamp(val);
+          // Handle 16-digit microsecond timestamps
+          let timestamp;
+          if (typeof val === "string" && /^\d{16}$/.test(val)) {
+            // 16-digit string represents microseconds, convert to milliseconds
+            timestamp = parseInt(val) / 1000;
+          } else if (typeof val === "string") {
+            // Regular ISO string, append Z if needed
+            timestamp = `${val}Z`;
+          } else {
+            // Number or Date object
+            timestamp = new Date(val)?.getTime() / 1000;
+          }
 
-          return formatDate(
-            toZonedTime(
-              typeof convertedVal === "string"
-                ? `${convertedVal}Z`
-                : new Date(convertedVal)?.getTime() / 1000,
-              store.state.timezone,
-            ),
-          );
+          return formatDate(toZonedTime(timestamp, store.state.timezone));
         };
       }
       return obj;
@@ -378,17 +380,20 @@ export const convertTableData = (
               return valueMapping;
             }
 
-            // Check if the value is a 16-digit timestamp and convert it
-            const convertedVal = convert16DigitTimestamp(val);
+            // Handle 16-digit microsecond timestamps
+            let timestamp;
+            if (typeof val === "string" && /^\d{16}$/.test(val)) {
+              // 16-digit string represents microseconds, convert to milliseconds
+              timestamp = parseInt(val) / 1000;
+            } else if (typeof val === "string") {
+              // Regular ISO string, append Z if needed
+              timestamp = `${val}Z`;
+            } else {
+              // Number or Date object
+              timestamp = new Date(val)?.getTime() / 1000;
+            }
 
-            return formatDate(
-              toZonedTime(
-                typeof convertedVal === "string"
-                  ? `${convertedVal}Z`
-                  : new Date(convertedVal)?.getTime() / 1000,
-                store.state.timezone,
-              ),
-            );
+            return formatDate(toZonedTime(timestamp, store.state.timezone));
           };
         }
 
@@ -402,14 +407,22 @@ export const convertTableData = (
         (acc: any, curr: any, reduceIndex: any) => {
           const value = searchQueryData[0][reduceIndex][it.alias] ?? "";
           acc[curr] = histogramFields.includes(it.alias)
-            ? formatDate(
-                toZonedTime(
-                  typeof convert16DigitTimestamp(value) === "string"
-                    ? `${convert16DigitTimestamp(value)}Z`
-                    : new Date(convert16DigitTimestamp(value))?.getTime() / 1000,
-                  store.state.timezone,
-                ),
-              )
+            ? (() => {
+                // Handle 16-digit microsecond timestamps
+                let timestamp;
+                if (typeof value === "string" && /^\d{16}$/.test(value)) {
+                  // 16-digit string represents microseconds, convert to milliseconds
+                  timestamp = parseInt(value) / 1000;
+                } else if (typeof value === "string") {
+                  // Regular ISO string, append Z if needed
+                  timestamp = `${value}Z`;
+                } else {
+                  // Number or Date object
+                  timestamp = new Date(value)?.getTime() / 1000;
+                }
+
+                return formatDate(toZonedTime(timestamp, store.state.timezone));
+              })()
             : value;
           return acc;
         },
