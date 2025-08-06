@@ -124,8 +124,7 @@ pub async fn search(
                 .search_role("leader".to_string())
                 .duration(file_id_list_took)
                 .desc(format!(
-                    "get files {} ids, records {}",
-                    file_id_list_num, file_id_list_records
+                    "get files {file_id_list_num} ids, records {file_id_list_records}"
                 ))
                 .build()
         )
@@ -630,7 +629,7 @@ pub async fn check_work_group(
     let cfg = get_config();
     let work_group_str = "global".to_string();
 
-    let locker_key = format!("/search/cluster_queue/{}", work_group_str);
+    let locker_key = format!("/search/cluster_queue/{work_group_str}");
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
     } else {
@@ -683,7 +682,7 @@ pub async fn check_work_group(
 
     let work_group_str = work_group.as_ref().unwrap().to_string();
 
-    let locker_key = format!("/search/cluster_queue/{}", work_group_str);
+    let locker_key = format!("/search/cluster_queue/{work_group_str}");
     // 2. get a cluster search queue lock
     let locker = if cfg.common.local_mode || !cfg.common.feature_query_queue_enabled {
         None
@@ -739,10 +738,7 @@ pub async fn check_work_group(
     log::info!(
         "{}",
         search_inspector_fields(
-            format!(
-                "[trace_id {trace_id}] search: wait in queue took: {} ms",
-                took_wait
-            ),
+            format!("[trace_id {trace_id}] search: wait in queue took: {took_wait} ms"),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:check_work_group".to_string())
@@ -968,12 +964,12 @@ pub async fn get_file_id_lists(
         let name = stream.stream_name();
         let stream_type = stream.get_stream_type(stream_type);
         // if stream is enrich, rewrite the time_range
-        if let Some(schema) = stream.schema() {
-            if schema == "enrich" || schema == "enrichment_tables" {
-                let start = enrichment_table::get_start_time(org_id, &name).await;
-                let end = now_micros();
-                time_range = Some((start, end));
-            }
+        if let Some(schema) = stream.schema()
+            && (schema == "enrich" || schema == "enrichment_tables")
+        {
+            let start = enrichment_table::get_start_time(org_id, &name).await;
+            let end = now_micros();
+            time_range = Some((start, end));
         }
         // get file list
         let file_id_list =

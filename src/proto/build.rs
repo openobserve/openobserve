@@ -74,7 +74,7 @@ fn main() -> Result<()> {
 
     let path = "src/generated/cluster.rs";
     let generated_source_path = out.join("cluster.rs");
-    println!("generated_source_path: {:?}", generated_source_path);
+    println!("generated_source_path: {generated_source_path:?}");
     let code = std::fs::read_to_string(generated_source_path).unwrap();
     let mut file = std::fs::OpenOptions::new()
         .write(true)

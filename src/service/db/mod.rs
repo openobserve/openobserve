@@ -160,16 +160,19 @@ pub(crate) async fn list_values_by_start_dt(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_check_if_compact_delete_node_value_updated() {
         let key = "/compact/delete/test/123";
         let value = Bytes::from("OK");
-        assert!(!check_if_compact_delete_node_value_updated(key, &value));
+        assert!(!super::check_if_compact_delete_node_value_updated(
+            key, &value
+        ));
 
         let value = Bytes::from("NOT_OK");
-        assert!(check_if_compact_delete_node_value_updated(key, &value));
+        assert!(super::check_if_compact_delete_node_value_updated(
+            key, &value
+        ));
     }
 }

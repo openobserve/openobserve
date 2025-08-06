@@ -349,19 +349,19 @@ fn init_client() -> Box<dyn object_store::ObjectStore> {
         "aws" | "s3" => match init_aws_config() {
             Ok(client) => Box::new(client),
             Err(e) => {
-                panic!("s3 init config error: {:?}", e);
+                panic!("s3 init config error: {e:?}");
             }
         },
         "azure" => match init_azure_config() {
             Ok(client) => Box::new(client),
             Err(e) => {
-                panic!("azure init config error: {:?}", e);
+                panic!("azure init config error: {e:?}");
             }
         },
         "gcs" | "gcp" => match init_gcp_config() {
             Ok(client) => Box::new(client),
             Err(e) => {
-                panic!("gcp init config error: {:?}", e);
+                panic!("gcp init config error: {e:?}");
             }
         },
         _ => match init_aws_config() {

@@ -210,10 +210,11 @@ pub async fn get_result_schema(
         return Ok(ResultSchemaExtractor::new());
     }
 
-    if !is_streaming && use_cache {
-        if let Some(interval) = sql.histogram_interval {
-            handle_histogram(&mut sql.sql, sql.time_range, interval);
-        }
+    if !is_streaming
+        && use_cache
+        && let Some(interval) = sql.histogram_interval
+    {
+        handle_histogram(&mut sql.sql, sql.time_range, interval);
     }
 
     let sql_arc = Arc::new(sql.clone());
@@ -233,10 +234,10 @@ pub async fn get_result_schema(
         if visitor.projections.contains(alias) {
             visitor.timeseries = Some(alias.clone());
         }
-    } else if let Some(alias) = visitor.timestamp_alias.as_ref() {
-        if visitor.projections.contains(alias) {
-            visitor.timeseries = Some(alias.clone());
-        }
+    } else if let Some(alias) = visitor.timestamp_alias.as_ref()
+        && visitor.projections.contains(alias)
+    {
+        visitor.timeseries = Some(alias.clone());
     }
     Ok(visitor)
 }

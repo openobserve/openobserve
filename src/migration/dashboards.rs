@@ -113,10 +113,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
         match db.put(&new_key, val, infra_db::NO_NEED_WATCH, None).await {
             Ok(_) => {
                 let _ = db.delete(&key, false, infra_db::NO_NEED_WATCH, None).await;
-                println!("Migrated dashboard: {} successfully", key);
+                println!("Migrated dashboard: {key} successfully");
             }
             Err(_) => {
-                println!("Failed to migrate dashboard: {}", new_key);
+                println!("Failed to migrate dashboard: {new_key}");
             }
         }
     }

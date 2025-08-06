@@ -131,7 +131,7 @@ pub async fn serve_action_zip(path: web::Path<(String, Ksuid)>) -> Result<HttpRe
                 let resp = HttpResponse::Ok()
                     .insert_header((
                         "Content-Disposition",
-                        format!("attachment; filename=\"{}\"", file_name),
+                        format!("attachment; filename=\"{file_name}\""),
                     ))
                     .content_type("application/zip")
                     .streaming(stream::once(async { Ok::<Bytes, actix_web::Error>(bytes) }));
@@ -178,14 +178,13 @@ pub async fn update_action_details(
         let mut req = req.into_inner();
 
         // Validate environment variables if they are being updated
-        if let Some(ref env_vars) = req.environment_variables {
-            if let Err(e) =
+        if let Some(ref env_vars) = req.environment_variables
+            && let Err(e) =
                 crate::handler::http::request::actions::action::validate_environment_variables(
                     env_vars,
                 )
-            {
-                return Ok(MetaHttpResponse::bad_request(e));
-            }
+        {
+            return Ok(MetaHttpResponse::bad_request(e));
         }
 
         let sa = match req.service_account.clone() {

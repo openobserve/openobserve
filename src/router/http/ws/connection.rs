@@ -373,11 +373,11 @@ impl QuerierConnection {
 
     pub async fn _send_ping(&self) -> WsResult<()> {
         let mut write_guard = self.write.write().await;
-        if let Some(write) = write_guard.as_mut() {
-            if let Err(e) = write.send(WsMessage::Ping(vec![])).await {
-                drop(write_guard);
-                return Err(WsError::ConnectionError(e.to_string()));
-            }
+        if let Some(write) = write_guard.as_mut()
+            && let Err(e) = write.send(WsMessage::Ping(vec![])).await
+        {
+            drop(write_guard);
+            return Err(WsError::ConnectionError(e.to_string()));
         }
         drop(write_guard);
         Ok(())
@@ -610,8 +610,7 @@ fn get_default_querier_request(
         }
         other_schema => {
             return Err(WsError::QuerierWSUrlError(format!(
-                "Unsupported URL scheme: {}",
-                other_schema
+                "Unsupported URL scheme: {other_schema}"
             )));
         }
     }

@@ -79,7 +79,7 @@ pub async fn list(org_id: web::Path<String>, user_email: UserEmail) -> Result<Ht
     // Check if user has access to get users
     if get_openfga_config().enabled
         && check_permissions(
-            Some(format!("_all_{}", org_id)),
+            Some(format!("_all_{org_id}")),
             &org_id,
             &user_email.user_id,
             "users",
@@ -316,8 +316,8 @@ pub async fn authentication(
             #[cfg(feature = "enterprise")]
             {
                 let auth_header = _req.headers().get("Authorization");
-                if auth_header.is_some() {
-                    let auth_header = auth_header.unwrap().to_str().unwrap();
+                if let Some(auth_header) = auth_header {
+                    let auth_header = auth_header.to_str().unwrap();
                     if let Some((name, password)) =
                         o2_dex::service::auth::get_user_from_token(auth_header)
                     {
@@ -533,7 +533,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     audit_unauthorized_error(audit_message).await;
                     return unauthorized_error(resp);
                 }
-                format!("q_auth {}", s)
+                format!("q_auth {s}")
             } else if let Some(auth_header) = _req.headers().get("Authorization") {
                 log::debug!("get_auth: auth header found: {:?}", auth_header);
                 match auth_header.to_str() {

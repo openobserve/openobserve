@@ -58,13 +58,13 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
         if !func.function.ends_with('.') {
             func.function = format!("{} \n .", func.function);
         }
-        if func.trans_type.unwrap() == 0 {
-            if let Err(e) = compile_vrl_function(func.function.as_str(), &org_id) {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )));
-            }
+        if func.trans_type.unwrap() == 0
+            && let Err(e) = compile_vrl_function(func.function.as_str(), &org_id)
+        {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )));
         }
         extract_num_args(&mut func);
         if let Err(error) = db::functions::set(&org_id, &func.name, &func).await {
@@ -88,7 +88,7 @@ pub async fn test_run_function(
 ) -> Result<HttpResponse, anyhow::Error> {
     // Append a dot at the end of the function if it doesn't exist
     if !function.ends_with('.') {
-        function = format!("{} \n .", function);
+        function = format!("{function} \n .");
     }
 
     let apply_over_hits = RESULT_ARRAY.is_match(&function);
@@ -211,13 +211,13 @@ pub async fn update_function(
     if !func.function.ends_with('.') {
         func.function = format!("{} \n .", func.function);
     }
-    if func.trans_type.unwrap() == 0 {
-        if let Err(e) = compile_vrl_function(&func.function, org_id) {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            )));
-        }
+    if func.trans_type.unwrap() == 0
+        && let Err(e) = compile_vrl_function(&func.function, org_id)
+    {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            StatusCode::BAD_REQUEST.into(),
+            e.to_string(),
+        )));
     }
     extract_num_args(&mut func);
 
@@ -228,18 +228,18 @@ pub async fn update_function(
     // update associated pipelines
     if let Ok(associated_pipelines) = db::pipeline::list_by_org(org_id).await {
         for pipeline in associated_pipelines {
-            if pipeline.contains_function(&func.name) {
-                if let Err(e) = db::pipeline::update(&pipeline, None).await {
-                    return Ok(HttpResponse::InternalServerError()
-                        .append_header((ERROR_HEADER, e.to_string()))
-                        .json(MetaHttpResponse::message(
-                            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                            format!(
-                                "Failed to update associated pipeline({}/{}): {}",
-                                pipeline.id, pipeline.name, e
-                            ),
-                        )));
-                }
+            if pipeline.contains_function(&func.name)
+                && let Err(e) = db::pipeline::update(&pipeline, None).await
+            {
+                return Ok(HttpResponse::InternalServerError()
+                    .append_header((ERROR_HEADER, e.to_string()))
+                    .json(MetaHttpResponse::message(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        format!(
+                            "Failed to update associated pipeline({}/{}): {}",
+                            pipeline.id, pipeline.name, e
+                        ),
+                    )));
             }
         }
     }
@@ -265,7 +265,7 @@ pub async fn list_functions(
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("function:_all_{}", org_id))
+                    .contains(&format!("function:_all_{org_id}"))
             {
                 result.push(function);
             }
@@ -289,25 +289,25 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
     };
     // TODO(taiming): Function Stream Association to be deprecated starting v0.13.1.
     // remove this check after migrating functions to its dedicated table
-    if let Some(val) = existing_fn.streams {
-        if !val.is_empty() {
-            let names = val
-                .iter()
-                .filter_map(|stream| {
-                    if !stream.is_removed {
-                        Some(stream.stream.to_owned())
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(", ");
-            if !names.is_empty() {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    StatusCode::BAD_REQUEST.into(),
-                    format!("{} {}", FN_IN_USE, names),
-                )));
-            }
+    if let Some(val) = existing_fn.streams
+        && !val.is_empty()
+    {
+        let names = val
+            .iter()
+            .filter_map(|stream| {
+                if !stream.is_removed {
+                    Some(stream.stream.to_owned())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        if !names.is_empty() {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                StatusCode::BAD_REQUEST.into(),
+                format!("{FN_IN_USE} {names}"),
+            )));
         }
     }
     let pipeline_dep = get_dependencies(&org_id, &fn_name).await;

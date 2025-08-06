@@ -53,7 +53,7 @@ pub mod enterprise_utils {
 
         // Get user details from the USERS cache
         let user: meta::user::User = USERS
-            .get(&format!("{}/{}", org_id, user_id))
+            .get(&format!("{org_id}/{user_id}"))
             .ok_or_else(|| "User not found".to_string())?
             .clone();
 

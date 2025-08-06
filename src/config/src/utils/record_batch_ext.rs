@@ -600,8 +600,7 @@ pub fn sort_record_batch_by_column(
     let indices = arrow::compute::sort_to_indices(
         batch.column_by_name(column_name).ok_or_else(|| {
             DataFusionError::Execution(format!(
-                "No {} column found in sort record batch",
-                column_name
+                "No {column_name} column found in sort record batch"
             ))
         })?,
         Some(sort_options),

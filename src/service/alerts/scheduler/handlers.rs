@@ -145,7 +145,7 @@ async fn handle_alert_triggers(
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     let query_trace_id = ider::generate_trace_id();
-    let scheduler_trace_id = format!("{}/{}", trace_id, query_trace_id);
+    let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_alert_triggers: processing trigger: {}",
@@ -449,14 +449,14 @@ async fn handle_alert_triggers(
             &new_trigger.module_key
         );
     }
-    if let Some(tolerance) = alert.trigger_condition.tolerance_in_secs {
+    if let Some(tolerance) = alert.trigger_condition.tolerance_in_secs
+        && tolerance > 0
+    {
+        let tolerance = Duration::seconds(get_rand_num_within(0, tolerance as u64) as i64)
+            .num_microseconds()
+            .unwrap();
         if tolerance > 0 {
-            let tolerance = Duration::seconds(get_rand_num_within(0, tolerance as u64) as i64)
-                .num_microseconds()
-                .unwrap();
-            if tolerance > 0 {
-                trigger_data.tolerance = tolerance;
-            }
+            trigger_data.tolerance = tolerance;
         }
     }
     if trigger_results.data.is_some() && alert.trigger_condition.silence > 0 {
@@ -841,7 +841,7 @@ async fn handle_derived_stream_triggers(
     let time_in_queue =
         Duration::microseconds(current_time - trigger.start_time.unwrap_or_default())
             .num_milliseconds();
-    let scheduler_trace_id = format!("{}/{}", trace_id, query_trace_id);
+    let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_derived_stream_triggers processing trigger: {}",
         trigger.module_key
@@ -879,8 +879,7 @@ async fn handle_derived_stream_triggers(
     };
     let Ok(pipeline) = db::pipeline::get_by_id(pipeline_id).await else {
         let err_msg = format!(
-            "Pipeline associated with trigger not found: {}/{}/{}/{}. Checking after 5 mins.",
-            org_id, stream_type, pipeline_name, pipeline_id
+            "Pipeline associated with trigger not found: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
         );
         // Check after 5 mins if the pipeline is created
         new_trigger.next_run_at += Duration::try_minutes(5)
@@ -925,8 +924,7 @@ async fn handle_derived_stream_triggers(
     if !pipeline.enabled {
         // Pipeline not enabled, check again in 5 mins
         let msg = format!(
-            "Pipeline associated with trigger not enabled: {}/{}/{}/{}. Checking after 5 mins.",
-            org_id, stream_type, pipeline_name, pipeline_id
+            "Pipeline associated with trigger not enabled: {org_id}/{stream_type}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
         );
         new_trigger.next_run_at += Duration::try_minutes(5)
             .unwrap()
@@ -965,8 +963,7 @@ async fn handle_derived_stream_triggers(
 
     let Some(derived_stream) = pipeline.get_derived_stream() else {
         let err_msg = format!(
-            "DerivedStream associated with the trigger not found in pipeline: {}/{}/{}. Checking after 5 mins.",
-            org_id, pipeline_name, pipeline_id
+            "DerivedStream associated with the trigger not found in pipeline: {org_id}/{pipeline_name}/{pipeline_id}. Checking after 5 mins."
         );
         new_trigger.next_run_at += Duration::try_minutes(5)
             .unwrap()
@@ -1161,8 +1158,7 @@ async fn handle_derived_stream_triggers(
     {
         Err(e) => {
             let err_msg = format!(
-                "Source node DerivedStream QueryCondition error during query evaluation, caused by {}",
-                e
+                "Source node DerivedStream QueryCondition error during query evaluation, caused by {e}"
             );
             log::error!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] pipeline org/name({}/{}): source node DerivedStream failed at QueryCondition evaluation with error: {}",
@@ -1221,8 +1217,7 @@ async fn handle_derived_stream_triggers(
                 match ExecutablePipeline::new(&pipeline).await {
                     Err(e) => {
                         let err_msg = format!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to initialize to ExecutablePipeline. Caused by: {}",
-                            org_id, pipeline_name, e
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({org_id}/{pipeline_name}) failed to initialize to ExecutablePipeline. Caused by: {e}"
                         );
                         log::error!("{err_msg}");
                         ingestion_error_msg = Some(err_msg);
@@ -1230,8 +1225,7 @@ async fn handle_derived_stream_triggers(
                     Ok(exec_pl) => match exec_pl.process_batch(org_id, local_val, None).await {
                         Err(e) => {
                             let err_msg = format!(
-                                "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({}/{}) failed to process DerivedStream query results. Caused by: {}",
-                                org_id, pipeline_name, e
+                                "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline org/name({org_id}/{pipeline_name}) failed to process DerivedStream query results. Caused by: {e}"
                             );
                             log::error!("{err_msg}");
                             ingestion_error_msg = Some(err_msg);

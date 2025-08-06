@@ -156,7 +156,7 @@ pub async fn logs_json_handler(
         Err(e) => {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
-                format!("Invalid json: {}", e),
+                format!("Invalid json: {e}"),
             )));
         }
     };
@@ -390,12 +390,9 @@ pub async fn logs_json_handler(
                     if streams_need_original_map
                         .get(&stream_name)
                         .is_some_and(|v| *v)
-                        && original_data.is_some()
+                        && let Some(original_data) = original_data
                     {
-                        local_val.insert(
-                            ORIGINAL_DATA_COL_NAME.to_string(),
-                            original_data.unwrap().into(),
-                        );
+                        local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
                         let record_id = crate::service::ingestion::generate_record_id(
                             org_id,
                             &stream_name,
@@ -457,7 +454,7 @@ pub async fn logs_json_handler(
                     e
                 );
                 stream_status.status.failed += records_count as u32;
-                stream_status.status.error = format!("Pipeline batch execution error: {}", e);
+                stream_status.status.error = format!("Pipeline batch execution error: {e}");
                 metrics::INGEST_ERRORS
                     .with_label_values(&[
                         org_id,

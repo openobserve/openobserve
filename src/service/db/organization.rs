@@ -32,7 +32,7 @@ pub const ORG_SETTINGS_KEY_PREFIX: &str = "/organization/setting";
 pub const ORG_KEY_PREFIX: &str = "/organization/org";
 
 pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> errors::Result<()> {
-    let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_name);
+    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_name}");
     db::put(
         &key,
         json::to_vec(&setting).unwrap().into(),
@@ -51,7 +51,7 @@ pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> e
 }
 
 pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error> {
-    let key = format!("{}/{}", ORG_SETTINGS_KEY_PREFIX, org_id);
+    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
     if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {
         return Ok(v.clone());
     }
@@ -141,12 +141,12 @@ pub async fn set(org: &Organization) -> Result<(), anyhow::Error> {
 }
 
 pub async fn get(org_id: &str) -> Result<Organization, anyhow::Error> {
-    let val = db::get(&format!("{ORG_KEY_PREFIX}/{}", org_id)).await?;
+    let val = db::get(&format!("{ORG_KEY_PREFIX}/{org_id}")).await?;
     Ok(json::from_slice(&val).unwrap())
 }
 
 pub async fn delete(org_id: &str) -> Result<(), anyhow::Error> {
-    let key = format!("{ORG_KEY_PREFIX}/{}", org_id);
+    let key = format!("{ORG_KEY_PREFIX}/{org_id}");
     match db::delete(&key, false, db::NEED_WATCH, None).await {
         Ok(_) => {}
         Err(e) => {

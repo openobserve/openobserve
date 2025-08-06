@@ -135,8 +135,8 @@ pub async fn post_user(
                         &org_id,
                         &mut tuples,
                         OFGA_MODELS
-                            .iter()
-                            .map(|(_, fga_entity)| fga_entity.key)
+                            .values()
+                            .map(|fga_entity| fga_entity.key)
                             .collect(),
                         NON_OWNING_ORG.to_vec(),
                     )
@@ -226,84 +226,84 @@ pub async fn update_user(
     let mut new_role = None;
     let conf = get_config();
     let password_ext_salt = conf.auth.ext_auth_salt.as_str();
-    if existing_user.is_ok() {
+    if let Ok(Some(local_user)) = existing_user {
         let mut new_user;
         let mut is_updated = false;
         let mut is_org_updated = false;
         let mut message = "";
-        match existing_user.unwrap() {
-            Some(local_user) => {
-                if local_user.is_external {
-                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        "Updates not allowed in OpenObserve, please update with source system"
-                            .to_string(),
-                    )));
-                }
-                if !self_update {
-                    if is_root_user(initiator_id) {
+        {
+            if local_user.is_external {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    "Updates not allowed in OpenObserve, please update with source system"
+                        .to_string(),
+                )));
+            }
+            if !self_update {
+                if is_root_user(initiator_id) {
+                    allow_password_update = true
+                } else {
+                    let initiating_user = db::user::get(Some(org_id), initiator_id)
+                        .await
+                        .unwrap()
+                        .unwrap();
+                    if (local_user.role.eq(&UserRole::Root)
+                        && initiating_user.role.eq(&UserRole::Root))
+                        || (!local_user.role.eq(&UserRole::Root)
+                            && (initiating_user.role.eq(&UserRole::Admin)
+                                || initiating_user.role.eq(&UserRole::Root)))
+                    {
                         allow_password_update = true
-                    } else {
-                        let initiating_user = db::user::get(Some(org_id), initiator_id)
-                            .await
-                            .unwrap()
-                            .unwrap();
-                        if (local_user.role.eq(&UserRole::Root)
-                            && initiating_user.role.eq(&UserRole::Root))
-                            || (!local_user.role.eq(&UserRole::Root)
-                                && (initiating_user.role.eq(&UserRole::Admin)
-                                    || initiating_user.role.eq(&UserRole::Root)))
-                        {
-                            allow_password_update = true
-                        }
                     }
                 }
+            }
 
-                new_user = local_user.clone();
-                if self_update && user.old_password.is_some() && user.new_password.is_some() {
-                    if local_user.password.eq(&get_hash(
-                        &user.clone().old_password.unwrap(),
-                        &local_user.salt,
-                    )) {
-                        let new_pass = user.new_password.unwrap();
-
-                        new_user.password = get_hash(&new_pass, &local_user.salt);
-                        new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
-                        log::info!("Password self updated for user: {}", email);
-                        is_updated = true;
-                    } else {
-                        message = "Existing/old password mismatch, please provide valid existing password";
-                        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                            http::StatusCode::BAD_REQUEST.into(),
-                            message.to_string(),
-                        )));
-                    }
-                } else if self_update && user.old_password.is_none() {
-                    message = "Please provide existing password"
-                } else if !self_update
-                    && allow_password_update
-                    && user.new_password.is_some()
-                    && !local_user.is_external
-                {
+            new_user = local_user.clone();
+            if self_update && user.old_password.is_some() && user.new_password.is_some() {
+                if local_user.password.eq(&get_hash(
+                    &user.clone().old_password.unwrap(),
+                    &local_user.salt,
+                )) {
                     let new_pass = user.new_password.unwrap();
 
                     new_user.password = get_hash(&new_pass, &local_user.salt);
                     new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
-                    log::info!("Password by root updated for user: {}", email);
-
+                    log::info!("Password self updated for user: {}", email);
                     is_updated = true;
                 } else {
-                    message = "You are not authorised to change the password"
+                    message =
+                        "Existing/old password mismatch, please provide valid existing password";
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        message.to_string(),
+                    )));
                 }
-                if user.first_name.is_some() && !local_user.is_external {
-                    new_user.first_name = user.first_name.unwrap();
-                    is_updated = true;
-                }
-                if user.last_name.is_some() && !local_user.is_external {
-                    new_user.last_name = user.last_name.unwrap();
-                    is_updated = true;
-                }
-                if user.role.is_some()
+            } else if self_update && user.old_password.is_none() {
+                message = "Please provide existing password"
+            } else if !self_update
+                && allow_password_update
+                && user.new_password.is_some()
+                && !local_user.is_external
+            {
+                let new_pass = user.new_password.unwrap();
+
+                new_user.password = get_hash(&new_pass, &local_user.salt);
+                new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
+                log::info!("Password by root updated for user: {}", email);
+
+                is_updated = true;
+            } else {
+                message = "You are not authorised to change the password"
+            }
+            if user.first_name.is_some() && !local_user.is_external {
+                new_user.first_name = user.first_name.unwrap();
+                is_updated = true;
+            }
+            if user.last_name.is_some() && !local_user.is_external {
+                new_user.last_name = user.last_name.unwrap();
+                is_updated = true;
+            }
+            if user.role.is_some()
                     && !local_user.is_external
                     && (!self_update
                         || (local_user.role.eq(&UserRole::Admin)
@@ -311,108 +311,95 @@ pub async fn update_user(
                     // if the User Role is Root, we do not change the Role
                     // Admins Role can still be mutable.
                     && !local_user.role.eq(&UserRole::Root)
-                {
-                    old_role = Some(new_user.role);
-                    new_user.role = user.role.unwrap();
-                    new_role = Some(new_user.role.clone());
-                    is_org_updated = true;
-                }
-                if user.token.is_some() {
-                    new_user.token = user.token.unwrap();
-                    is_org_updated = true;
-                }
-                if is_updated || is_org_updated {
-                    let user = db::user::get_db_user(email).await;
-                    match user {
-                        Ok(mut db_user) => {
-                            db_user.password = new_user.password;
-                            db_user.password_ext = new_user.password_ext;
-                            db_user.first_name = new_user.first_name;
-                            db_user.last_name = new_user.last_name;
-                            if is_org_updated {
-                                let mut orgs = db_user.clone().organizations;
-                                let new_orgs = if orgs.is_empty() {
-                                    vec![UserOrg {
-                                        name: org_id.to_string(),
-                                        token: new_user.token,
-                                        rum_token: new_user.rum_token,
-                                        role: new_user.role,
-                                    }]
-                                } else {
-                                    orgs.retain(|org| !org.name.eq(org_id));
-                                    orgs.push(UserOrg {
-                                        name: org_id.to_string(),
-                                        token: new_user.token,
-                                        rum_token: new_user.rum_token,
-                                        role: new_user.role,
-                                    });
-                                    orgs
-                                };
-                                db_user.organizations = new_orgs;
-                            }
+            {
+                old_role = Some(new_user.role);
+                new_user.role = user.role.unwrap();
+                new_role = Some(new_user.role.clone());
+                is_org_updated = true;
+            }
+            if user.token.is_some() {
+                new_user.token = user.token.unwrap();
+                is_org_updated = true;
+            }
+            if is_updated || is_org_updated {
+                let user = db::user::get_db_user(email).await;
+                match user {
+                    Ok(mut db_user) => {
+                        db_user.password = new_user.password;
+                        db_user.password_ext = new_user.password_ext;
+                        db_user.first_name = new_user.first_name;
+                        db_user.last_name = new_user.last_name;
+                        if is_org_updated {
+                            let mut orgs = db_user.clone().organizations;
+                            let new_orgs = if orgs.is_empty() {
+                                vec![UserOrg {
+                                    name: org_id.to_string(),
+                                    token: new_user.token,
+                                    rum_token: new_user.rum_token,
+                                    role: new_user.role,
+                                }]
+                            } else {
+                                orgs.retain(|org| !org.name.eq(org_id));
+                                orgs.push(UserOrg {
+                                    name: org_id.to_string(),
+                                    token: new_user.token,
+                                    rum_token: new_user.rum_token,
+                                    role: new_user.role,
+                                });
+                                orgs
+                            };
+                            db_user.organizations = new_orgs;
+                        }
 
-                            db::user::set(&db_user).await.unwrap();
+                        db::user::set(&db_user).await.unwrap();
 
-                            #[cfg(feature = "enterprise")]
+                        #[cfg(feature = "enterprise")]
+                        {
+                            use o2_openfga::authorizer::authz::update_user_role;
+
+                            if get_openfga_config().enabled
+                                && let Some(old) = old_role
+                                && let Some(new) = new_role
+                                && !old.eq(&new)
                             {
-                                use o2_openfga::authorizer::authz::update_user_role;
-
-                                if get_openfga_config().enabled
-                                    && old_role.is_some()
-                                    && new_role.is_some()
-                                {
-                                    let old = old_role.unwrap();
-                                    let new = new_role.unwrap();
-                                    if !old.eq(&new) {
-                                        let mut old_str = old.to_string();
-                                        let mut new_str = new.to_string();
-                                        if old.eq(&UserRole::User)
-                                            || old.eq(&UserRole::ServiceAccount)
-                                        {
-                                            old_str = "allowed_user".to_string();
-                                        }
-                                        if new.eq(&UserRole::User)
-                                            || new.eq(&UserRole::ServiceAccount)
-                                        {
-                                            new_str = "allowed_user".to_string();
-                                        }
-                                        if old_str != new_str {
-                                            log::debug!(
-                                                "updating openfga role for {email} from {old_str} to {new_str}"
-                                            );
-                                            update_user_role(&old_str, &new_str, email, org_id)
-                                                .await;
-                                        }
-                                    }
+                                let mut old_str = old.to_string();
+                                let mut new_str = new.to_string();
+                                if old.eq(&UserRole::User) || old.eq(&UserRole::ServiceAccount) {
+                                    old_str = "allowed_user".to_string();
+                                }
+                                if new.eq(&UserRole::User) || new.eq(&UserRole::ServiceAccount) {
+                                    new_str = "allowed_user".to_string();
+                                }
+                                if old_str != new_str {
+                                    log::debug!(
+                                        "updating openfga role for {email} from {old_str} to {new_str}"
+                                    );
+                                    update_user_role(&old_str, &new_str, email, org_id).await;
                                 }
                             }
-
-                            #[cfg(not(feature = "enterprise"))]
-                            log::debug!("Role changed from {:?} to {:?}", old_role, new_role);
-                            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                                http::StatusCode::OK.into(),
-                                "User updated successfully".to_string(),
-                            )))
                         }
-                        Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                            http::StatusCode::NOT_FOUND.into(),
-                            "User not found".to_string(),
-                        ))),
+
+                        #[cfg(not(feature = "enterprise"))]
+                        log::debug!("Role changed from {:?} to {:?}", old_role, new_role);
+                        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                            http::StatusCode::OK.into(),
+                            "User updated successfully".to_string(),
+                        )))
                     }
-                } else {
-                    if message.is_empty() {
-                        message = "Not allowed to update";
-                    }
-                    Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        message.to_string(),
-                    )))
+                    Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                        http::StatusCode::NOT_FOUND.into(),
+                        "User not found".to_string(),
+                    ))),
                 }
+            } else {
+                if message.is_empty() {
+                    message = "Not allowed to update";
+                }
+                Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    message.to_string(),
+                )))
             }
-            None => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                http::StatusCode::NOT_FOUND.into(),
-                "User not found".to_string(),
-            ))),
         }
     } else {
         Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
@@ -430,8 +417,7 @@ pub async fn add_user_to_org(
 ) -> Result<HttpResponse, Error> {
     let existing_user = db::user::get_db_user(email).await;
     let root_user = ROOT_USER.clone();
-    if existing_user.is_ok() {
-        let mut db_user = existing_user.unwrap();
+    if let Ok(mut db_user) = existing_user {
         let local_org;
         let initiating_user = if is_root_user(initiator_id) {
             local_org = org_id.replace(' ', "_");
@@ -495,8 +481,8 @@ pub async fn add_user_to_org(
                         org_id,
                         &mut tuples,
                         OFGA_MODELS
-                            .iter()
-                            .map(|(_, fga_entity)| fga_entity.key)
+                            .values()
+                            .map(|fga_entity| fga_entity.key)
                             .collect(),
                         NON_OWNING_ORG.to_vec(),
                     )
@@ -625,8 +611,9 @@ pub async fn list_users(
         .collect();
 
     user_list.retain(|user| {
-        if user.role.eq(&UserRole::ServiceAccount) && permitted.is_some() {
-            let permitted = permitted.as_ref().unwrap();
+        if user.role.eq(&UserRole::ServiceAccount)
+            && let Some(permitted) = &permitted
+        {
             permitted.contains(&format!("service_accounts:{}", user.email))
                 || permitted.contains(&format!("service_accounts:_all_{org_id}"))
         } else {
@@ -748,13 +735,11 @@ pub async fn remove_user_from_org(
                                     "user_fga_role, multi org: {}",
                                     _user_fga_role.as_ref().unwrap()
                                 );
-                                if get_openfga_config().enabled && _user_fga_role.is_some() {
-                                    delete_user_from_org(
-                                        org_id,
-                                        email_id,
-                                        _user_fga_role.unwrap().as_str(),
-                                    )
-                                    .await;
+                                if get_openfga_config().enabled
+                                    && let Some(user_fga_role) = _user_fga_role
+                                {
+                                    delete_user_from_org(org_id, email_id, user_fga_role.as_str())
+                                        .await;
                                     if is_service_account {
                                         delete_service_account_from_org(org_id, email_id).await;
                                     }
@@ -869,10 +854,10 @@ fn get_user_roles_by_org_id(roles: Vec<String>, org_id: Option<&str>) -> Vec<Str
 #[cfg(feature = "enterprise")]
 async fn check_cache(user_email: &str) -> Option<Vec<String>> {
     let cache = USER_ROLES_CACHE.read().await;
-    if let Some(cached) = cache.get(user_email) {
-        if cached.expires_at > Instant::now() {
-            return Some(cached.roles.clone());
-        }
+    if let Some(cached) = cache.get(user_email)
+        && cached.expires_at > Instant::now()
+    {
+        return Some(cached.roles.clone());
     }
     None
 }

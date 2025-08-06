@@ -208,8 +208,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             {
                 Err(e) => {
                     let err_msg = format!(
-                        "[Ingestion]: Stream {} pipeline batch processing failed: {}",
-                        stream_name, e,
+                        "[Ingestion]: Stream {stream_name} pipeline batch processing failed: {e}",
                     );
                     log::error!("{err_msg}");
                     // update status

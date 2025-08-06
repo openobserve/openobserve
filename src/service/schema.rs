@@ -104,7 +104,7 @@ pub async fn check_for_schema(
             ])
             .inc();
         return Err(get_request_columns_limit_error(
-            &format!("{}/{}/{}", org_id, stream_type, stream_name),
+            &format!("{org_id}/{stream_type}/{stream_name}"),
             inferred_schema.fields.len(),
         ));
     }
@@ -241,16 +241,16 @@ async fn handle_diff_schema(
     );
 
     // acquire a local_lock to ensure only one thread can update schema
-    let cache_key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let cache_key = format!("{org_id}/{stream_type}/{stream_name}");
     let local_lock = infra::local_lock::lock(&cache_key).await?;
     let _guard = local_lock.lock().await;
 
     // check if the schema has been updated by another thread
     let read_cache = STREAM_SCHEMAS_LATEST.read().await;
-    if let Some(updated_schema) = read_cache.get(&cache_key) {
-        if let (false, _) = get_schema_changes(updated_schema, inferred_schema) {
-            return Ok(None);
-        }
+    if let Some(updated_schema) = read_cache.get(&cache_key)
+        && let (false, _) = get_schema_changes(updated_schema, inferred_schema)
+    {
+        return Ok(None);
     }
     drop(read_cache);
 
@@ -427,10 +427,10 @@ async fn handle_diff_schema(
     let need_original = stream_setting.store_original_data;
     let index_original_data = stream_setting.index_original_data;
     let index_all_values = stream_setting.index_all_values;
-    if need_original || index_original_data {
-        if let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone()) {
-            entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
-        }
+    if (need_original || index_original_data)
+        && let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone())
+    {
+        entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
     }
     let mut w = STREAM_SETTINGS.write().await;
     w.insert(cache_key.clone(), stream_setting);
@@ -587,10 +587,10 @@ pub async fn stream_schema_exists(
     }
 
     let settings = unwrap_stream_settings(&schema);
-    if let Some(stream_setting) = settings {
-        if !stream_setting.partition_keys.is_empty() {
-            schema_chk.has_partition_keys = true;
-        }
+    if let Some(stream_setting) = settings
+        && !stream_setting.partition_keys.is_empty()
+    {
+        schema_chk.has_partition_keys = true;
     }
     if schema.metadata().contains_key(METADATA_LABEL) {
         schema_chk.has_metadata = true;

@@ -227,10 +227,10 @@ impl Manager {
             .parse()
             .unwrap_or_else(|_| panic!("need a thread id, but the file is: {file_name}"));
         let key = columns[1..columns.len() - 1].join("/");
-        if let Some(file) = self.get(thread_id, stream, &key).await {
-            if file.name() == file_name {
-                return true;
-            }
+        if let Some(file) = self.get(thread_id, stream, &key).await
+            && file.name() == file_name
+        {
+            return true;
         }
         false
     }
@@ -254,7 +254,7 @@ impl RwFile {
             dir_path = dir_path.replace(file_list_prefix, "/file_list/");
         }
         let id = ider::generate();
-        let file_name = format!("{thread_id}/{key}/{id}{}", FILE_EXT_JSON);
+        let file_name = format!("{thread_id}/{key}/{id}{FILE_EXT_JSON}");
         let file_path = format!("{dir_path}{file_name}");
         create_dir_all(Path::new(&file_path).parent().unwrap())
             .await

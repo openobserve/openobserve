@@ -48,8 +48,7 @@ pub async fn ingest(
                 err
             );
             return Err(Error::msg(format!(
-                "Ingest node {addr}, response error: {:?}",
-                err
+                "Ingest node {addr}, response error: {err:?}"
             )));
         }
     };

@@ -138,8 +138,7 @@ fn decrypt() -> ScalarFunctionImplementation {
                         None => &key,
                     };
                     return Err(DataFusionError::Execution(format!(
-                        "key with name {} not found",
-                        key_name
+                        "key with name {key_name} not found"
                     )));
                 }
                 Some(k) => k,
@@ -295,8 +294,7 @@ fn encrypt() -> ScalarFunctionImplementation {
                         None => &key,
                     };
                     return Err(DataFusionError::Execution(format!(
-                        "key with name {} not found",
-                        key_name
+                        "key with name {key_name} not found"
                     )));
                 }
                 Some(k) => k,

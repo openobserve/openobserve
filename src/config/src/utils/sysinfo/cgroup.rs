@@ -49,20 +49,22 @@ pub fn get_memory_limit() -> usize {
 }
 
 fn read_cpu_cgroup_v1() -> usize {
-    if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/cpu.max") {
-        if !val.is_empty() && !val.to_lowercase().starts_with("max") {
-            let columns = val.split(' ').collect::<Vec<&str>>();
-            return columns[0].parse::<usize>().unwrap_or_default();
-        }
+    if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/cpu.max")
+        && !val.is_empty()
+        && !val.to_lowercase().starts_with("max")
+    {
+        let columns = val.split(' ').collect::<Vec<&str>>();
+        return columns[0].parse::<usize>().unwrap_or_default();
     };
     0
 }
 
 fn read_memory_cgroup_v1() -> usize {
-    if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/memory.max") {
-        if !val.is_empty() && !val.to_lowercase().starts_with("max") {
-            return val.trim_end().parse::<usize>().unwrap_or_default();
-        }
+    if let Ok(val) = std::fs::read_to_string("/sys/fs/cgroup/memory.max")
+        && !val.is_empty()
+        && !val.to_lowercase().starts_with("max")
+    {
+        return val.trim_end().parse::<usize>().unwrap_or_default();
     };
     0
 }

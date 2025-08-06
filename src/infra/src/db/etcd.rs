@@ -163,8 +163,7 @@ impl super::Db for Etcd {
             Ok(v) => v,
             Err(e) => {
                 return Err(Error::Message(format!(
-                    "dist_lock key: {}, acquire error: {}",
-                    lock_key, e
+                    "dist_lock key: {lock_key}, acquire error: {e}"
                 )));
             }
         };
@@ -178,26 +177,25 @@ impl super::Db for Etcd {
             Err(e) => Err(e),
             Ok(None) => Ok(()),
             Ok(Some((value, new_value))) => {
-                if let Some(value) = value {
-                    if let Err(e) = self.put(&old_key.unwrap(), value, need_watch, None).await {
-                        if let Err(e) = dist_lock::unlock(&locker).await {
-                            log::error!("dist_lock unlock err: {}", e);
-                        }
-                        log::info!("Released lock for cluster key: {}", lock_key);
-                        return Err(e);
+                if let Some(value) = value
+                    && let Err(e) = self.put(&old_key.unwrap(), value, need_watch, None).await
+                {
+                    if let Err(e) = dist_lock::unlock(&locker).await {
+                        log::error!("dist_lock unlock err: {}", e);
                     }
+                    log::info!("Released lock for cluster key: {}", lock_key);
+                    return Err(e);
                 }
-                if let Some((new_key, new_value, new_start_dt)) = new_value {
-                    if let Err(e) = self
+                if let Some((new_key, new_value, new_start_dt)) = new_value
+                    && let Err(e) = self
                         .put(&new_key, new_value, need_watch, new_start_dt)
                         .await
-                    {
-                        if let Err(e) = dist_lock::unlock(&locker).await {
-                            log::error!("dist_lock unlock err: {}", e);
-                        }
-                        log::info!("Released lock for cluster key: {}", lock_key);
-                        return Err(e);
+                {
+                    if let Err(e) = dist_lock::unlock(&locker).await {
+                        log::error!("dist_lock unlock err: {}", e);
                     }
+                    log::info!("Released lock for cluster key: {}", lock_key);
+                    return Err(e);
                 }
                 Ok(())
             }

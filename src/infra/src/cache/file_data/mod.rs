@@ -250,7 +250,7 @@ async fn download_from_storage(
         // and retry
         if data_len != expected_blob_size {
             let msg = if i == DOWNLOAD_RETRY_TIMES - 1 {
-                format!("after {} retries", DOWNLOAD_RETRY_TIMES)
+                format!("after {DOWNLOAD_RETRY_TIMES} retries")
             } else {
                 "will retry".to_string()
             };
@@ -355,16 +355,16 @@ pub async fn get_opts(
 ) -> object_store::Result<bytes::Bytes> {
     let cfg = config::get_config();
     // get from memory cache
-    if cfg.memory_cache.enabled {
-        if let Some(v) = memory::get(file, range.clone()).await {
-            return Ok(v);
-        }
+    if cfg.memory_cache.enabled
+        && let Some(v) = memory::get(file, range.clone()).await
+    {
+        return Ok(v);
     }
     // get from disk cache
-    if cfg.disk_cache.enabled {
-        if let Some(v) = disk::get(file, range.clone()).await {
-            return Ok(v);
-        }
+    if cfg.disk_cache.enabled
+        && let Some(v) = disk::get(file, range.clone()).await
+    {
+        return Ok(v);
     }
     // get from storage
     if remote {
@@ -390,16 +390,16 @@ pub async fn get_size(file: &str) -> object_store::Result<usize> {
 pub async fn get_size_opts(file: &str, remote: bool) -> object_store::Result<usize> {
     let cfg = config::get_config();
     // get from memory cache
-    if cfg.memory_cache.enabled {
-        if let Some(v) = memory::get_size(file).await {
-            return Ok(v);
-        }
+    if cfg.memory_cache.enabled
+        && let Some(v) = memory::get_size(file).await
+    {
+        return Ok(v);
     }
     // get from disk cache
-    if cfg.disk_cache.enabled {
-        if let Some(v) = disk::get_size(file).await {
-            return Ok(v);
-        }
+    if cfg.disk_cache.enabled
+        && let Some(v) = disk::get_size(file).await
+    {
+        return Ok(v);
     }
     // get from storage
     if remote {

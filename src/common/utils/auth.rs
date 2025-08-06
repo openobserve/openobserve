@@ -179,12 +179,12 @@ impl FromRequest for UserEmail {
     type Future = Ready<Result<Self, Error>>;
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        if let Some(auth_header) = req.headers().get("user_id") {
-            if let Ok(user_str) = auth_header.to_str() {
-                return ready(Ok(UserEmail {
-                    user_id: user_str.to_owned(),
-                }));
-            }
+        if let Some(auth_header) = req.headers().get("user_id")
+            && let Ok(user_str) = auth_header.to_str()
+        {
+            return ready(Ok(UserEmail {
+                user_id: user_str.to_owned(),
+            }));
         }
         ready(Err(actix_web::error::ErrorUnauthorized("No user found")))
     }
@@ -240,17 +240,17 @@ impl FromRequest for AuthExtractor {
         // This is case for ingestion endpoints where we need to check
         // permissions on the stream
         if method.eq("POST") && INGESTION_EP.contains(&path_columns[url_len - 1]) {
-            if let Some(auth_header) = req.headers().get("Authorization") {
-                if let Ok(auth_str) = auth_header.to_str() {
-                    return ready(Ok(AuthExtractor {
-                        auth: auth_str.to_owned(),
-                        method,
-                        o2_type: format!("stream:{org_id}"),
-                        org_id,
-                        bypass_check: true,
-                        parent_id: folder,
-                    }));
-                }
+            if let Some(auth_header) = req.headers().get("Authorization")
+                && let Ok(auth_str) = auth_header.to_str()
+            {
+                return ready(Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method,
+                    o2_type: format!("stream:{org_id}"),
+                    org_id,
+                    bypass_check: true,
+                    parent_id: folder,
+                }));
             }
             return ready(Err(actix_web::error::ErrorUnauthorized(
                 "Unauthorized Access",
@@ -589,23 +589,22 @@ impl FromRequest for AuthExtractor {
         };
 
         // Check if the ws request is using internal grpc token
-        if method.eq("GET") && path.contains("/ws") {
-            if let Some(auth_header) = req.headers().get("Authorization") {
-                if auth_header
-                    .to_str()
-                    .unwrap()
-                    .eq(&get_config().grpc.internal_grpc_token)
-                {
-                    return ready(Ok(AuthExtractor {
-                        auth: auth_header.to_str().unwrap().to_string(),
-                        method,
-                        o2_type: format!("stream:{org_id}"),
-                        org_id,
-                        bypass_check: true,
-                        parent_id: folder,
-                    }));
-                }
-            }
+        if method.eq("GET")
+            && path.contains("/ws")
+            && let Some(auth_header) = req.headers().get("Authorization")
+            && auth_header
+                .to_str()
+                .unwrap()
+                .eq(&get_config().grpc.internal_grpc_token)
+        {
+            return ready(Ok(AuthExtractor {
+                auth: auth_header.to_str().unwrap().to_string(),
+                method,
+                o2_type: format!("stream:{org_id}"),
+                org_id,
+                bypass_check: true,
+                parent_id: folder,
+            }));
         }
 
         let auth_str = extract_auth_str(req);
@@ -655,7 +654,7 @@ impl FromRequest for AuthExtractor {
                                 .as_str(),
                             )
                         } else {
-                            object_type.replace("stream:", format!("{}:", stream_type).as_str())
+                            object_type.replace("stream:", format!("{stream_type}:").as_str())
                         }
                     }
                     None => object_type,
@@ -743,7 +742,7 @@ impl FromRequest for AuthExtractor {
             if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token
             } else {
-                format!("Bearer {}", access_token)
+                format!("Bearer {access_token}")
             }
         } else if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
@@ -799,7 +798,7 @@ pub fn extract_auth_str(req: &HttpRequest) -> String {
                 None => access_token,
             }
         } else {
-            format!("Bearer {}", access_token)
+            format!("Bearer {access_token}")
         }
     } else if let Some(cookie) = req.cookie("auth_ext") {
         cookie.value().to_string()
@@ -839,13 +838,10 @@ pub fn generate_presigned_url(
     let stage2 = get_hash(&format!("{}{}", &stage1, time), salt);
     let stage3 = get_hash(&format!("{}{}", &stage2, exp_in), salt);
 
-    let user_pass = format!("{}:{}", username, stage3);
+    let user_pass = format!("{username}:{stage3}");
     let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
 
-    format!(
-        "{}/auth/login?request_time={}&exp_in={}&auth={}",
-        base_url, time, exp_in, auth
-    )
+    format!("{base_url}/auth/login?request_time={time}&exp_in={exp_in}&auth={auth}")
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -870,7 +866,7 @@ pub async fn check_permissions(
     parent_id: &str,
 ) -> bool {
     if !is_root_user(user_id) {
-        let user: meta::user::User = match USERS.get(&format!("{org_id}/{}", user_id)) {
+        let user: meta::user::User = match USERS.get(&format!("{org_id}/{user_id}")) {
             Some(user) => user.clone(),
             None => return false,
         }
@@ -944,7 +940,7 @@ pub async fn extract_auth_expiry_and_user_id(
             }
         };
         let exp = decode(&stripped_bearer_token).await;
-        let bearer_full_token = format!("Bearer {}", stripped_bearer_token);
+        let bearer_full_token = format!("Bearer {stripped_bearer_token}");
         let user_id = get_user_email_from_auth_str(&bearer_full_token).await;
         return (exp, user_id);
     }

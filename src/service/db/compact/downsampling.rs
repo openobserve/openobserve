@@ -133,7 +133,7 @@ pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
     for (key, (offset, node)) in r.iter() {
         if *offset > 0 {
             let val = if !node.is_empty() {
-                format!("{};{}", offset, node)
+                format!("{offset};{node}")
             } else {
                 offset.to_string()
             };

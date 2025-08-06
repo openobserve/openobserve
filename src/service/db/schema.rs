@@ -353,12 +353,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
                 let latest_schema = latest_schema.pop().unwrap();
                 let settings = unwrap_stream_settings(&latest_schema).unwrap_or_default();
-                if settings.store_original_data || settings.index_original_data {
-                    if let dashmap::Entry::Vacant(entry) =
+                if (settings.store_original_data || settings.index_original_data)
+                    && let dashmap::Entry::Vacant(entry) =
                         STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
-                    {
-                        entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
-                    }
+                {
+                    entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
                 }
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
@@ -440,18 +439,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         get_config().common.data_wal_dir
                     );
                     let path = std::path::Path::new(&data_dir);
-                    if path.exists() {
-                        if let Err(e) = tokio::fs::remove_dir_all(path).await {
-                            log::error!("[Schema:watch] remove_dir_all: {}", e);
-                        };
-                    }
-                }
-                if stream_type.eq(&StreamType::EnrichmentTables) {
-                    if let Err(e) =
-                        config::utils::enrichment_local_cache::delete(org_id, stream_name).await
+                    if path.exists()
+                        && let Err(e) = tokio::fs::remove_dir_all(path).await
                     {
-                        log::error!("[Schema:watch] delete local enrichment file error: {}", e);
-                    }
+                        log::error!("[Schema:watch] remove_dir_all: {}", e);
+                    };
+                }
+                if stream_type.eq(&StreamType::EnrichmentTables)
+                    && let Err(e) =
+                        config::utils::enrichment_local_cache::delete(org_id, stream_name).await
+                {
+                    log::error!("[Schema:watch] delete local enrichment file error: {}", e);
                 }
             }
             db::Event::Empty => {}
@@ -499,12 +497,11 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         let latest_schema = latest_schema.last().unwrap();
         let settings = unwrap_stream_settings(latest_schema).unwrap_or_default();
-        if settings.store_original_data || settings.index_original_data {
-            if let dashmap::Entry::Vacant(entry) =
+        if (settings.store_original_data || settings.index_original_data)
+            && let dashmap::Entry::Vacant(entry) =
                 STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
-            {
-                entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
-            }
+        {
+            entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
         }
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key.to_string(), settings);

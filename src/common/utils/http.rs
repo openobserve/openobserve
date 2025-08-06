@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    io::{Error, ErrorKind},
+    io::Error,
     net::{AddrParseError, IpAddr, SocketAddr},
 };
 
@@ -44,9 +44,9 @@ pub(crate) fn get_ts_from_request_with_key(
 ) -> Result<i64, String> {
     let value = query
         .get(key)
-        .ok_or_else(|| format!("{} parameter is missing", key))?
+        .ok_or_else(|| format!("{key} parameter is missing"))?
         .parse::<i64>()
-        .map_err(|_| format!("{} is not a valid timestamp", key))?;
+        .map_err(|_| format!("{key} is not a valid timestamp"))?;
     Ok(value)
 }
 
@@ -65,8 +65,7 @@ pub(crate) fn get_search_type_from_request(
         Some(s) => match SearchEventType::try_from(s.as_str()) {
             Ok(search_type) => Some(search_type),
             _ => {
-                return Err(Error::new(
-                    ErrorKind::Other,
+                return Err(Error::other(
                     "'event_type' query param with value 'ui', 'dashboards', 'reports', 'alerts' , 'rum' or 'values' allowed",
                 ));
             }

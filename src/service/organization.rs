@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 use config::{
     meta::{
@@ -149,8 +149,8 @@ async fn update_passcode_inner(
         return Err(anyhow::Error::msg("User not found"));
     };
 
-    if org_id.is_some() {
-        local_org_id = org_id.unwrap();
+    if let Some(org_id) = org_id {
+        local_org_id = org_id;
     }
     let token = generate_random_string(16);
     let rum_token = format!("rum{}", generate_random_string(16));
@@ -234,10 +234,7 @@ pub async fn create_org(org: &Organization) -> Result<Organization, Error> {
         Ok(_) => Ok(org.clone()),
         Err(e) => {
             log::error!("Error creating org: {}", e);
-            Err(Error::new(
-                ErrorKind::Other,
-                format!("Error creating org: {}", e),
-            ))
+            Err(Error::other(format!("Error creating org: {e}")))
         }
     }
 }

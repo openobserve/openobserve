@@ -242,13 +242,13 @@ pub async fn search(
     let mut _work_group = None;
     #[cfg(feature = "enterprise")]
     {
-        if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await {
-            if let Some((_, stat)) = status.first() {
-                match stat.work_group.as_ref() {
-                    Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
-                    Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
-                    None => _work_group = None,
-                }
+        if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await
+            && let Some((_, stat)) = status.first()
+        {
+            match stat.work_group.as_ref() {
+                Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
+                Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
+                None => _work_group = None,
             }
         };
     }
@@ -383,7 +383,7 @@ pub async fn search_multi(
             per_query_resp = true;
         }
         if !vrl_function.trim().ends_with('.') {
-            query_fn = Some(format!("{} \n .", vrl_function));
+            query_fn = Some(format!("{vrl_function} \n ."));
         }
     }
 
@@ -397,7 +397,7 @@ pub async fn search_multi(
     // Before making any rpc requests, first check the sql expressions can be decoded correctly
     for req in queries.iter_mut() {
         if let Err(e) = req.decode() {
-            return Err(Error::Message(format!("decode sql error: {:?}", e)));
+            return Err(Error::Message(format!("decode sql error: {e:?}")));
         }
     }
     let queries_len = queries.len();
@@ -419,7 +419,7 @@ pub async fn search_multi(
         }
 
         for fn_name in get_all_transform_keys(org_id).await {
-            if req.query.sql.contains(&format!("{}(", fn_name)) {
+            if req.query.sql.contains(&format!("{fn_name}(")) {
                 req.query.uses_zo_fn = true;
                 break;
             }
@@ -1454,10 +1454,10 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
     /// Set a key and value in the MetadataMap.  Does nothing if the key or
     /// value are not valid inputs
     fn set(&mut self, key: &str, value: String) {
-        if let Ok(key) = tonic::metadata::MetadataKey::from_bytes(key.as_bytes()) {
-            if let Ok(val) = tonic::metadata::MetadataValue::try_from(&value) {
-                self.0.insert(key, val);
-            }
+        if let Ok(key) = tonic::metadata::MetadataKey::from_bytes(key.as_bytes())
+            && let Ok(val) = tonic::metadata::MetadataValue::try_from(&value)
+        {
+            self.0.insert(key, val);
         }
     }
 }
@@ -1471,10 +1471,10 @@ pub fn generate_search_schema_diff(
     let mut diff_fields = HashMap::new();
 
     for field in schema.fields().iter() {
-        if let Some(latest_field) = latest_schema_map.get(field.name()) {
-            if field.data_type() != latest_field.data_type() {
-                diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
-            }
+        if let Some(latest_field) = latest_schema_map.get(field.name())
+            && field.data_type() != latest_field.data_type()
+        {
+            diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
         }
     }
 

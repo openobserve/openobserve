@@ -186,10 +186,9 @@ async fn scan_wal_files(
             tx,
         )
         .await
+            && !e.to_string().contains("No such file or directory")
         {
-            if !e.to_string().contains("No such file or directory") {
-                log::error!("[INGESTER:JOB] Failed to scan files: {}", e);
-            }
+            log::error!("[INGESTER:JOB] Failed to scan files: {}", e);
         }
     });
     let mut files_num = 0;

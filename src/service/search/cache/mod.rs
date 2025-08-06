@@ -138,10 +138,7 @@ pub async fn search(
 
     let mut should_exec_query = true;
 
-    let mut file_path = format!(
-        "{}/{}/{}/{}",
-        org_id, stream_type, stream_name, hashed_query
-    );
+    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
     let mut c_resp: MultiCachedQueryResponse = if use_cache {
         // cache layer
         check_cache(
@@ -215,15 +212,15 @@ pub async fn search(
             c_resp.order_by,
         )
     } else {
-        if let Some(vrl_function) = &query_fn {
-            if !vrl_function.trim().ends_with('.') {
-                query_fn = Some(format!("{} \n .", vrl_function));
-            }
+        if let Some(vrl_function) = &query_fn
+            && !vrl_function.trim().ends_with('.')
+        {
+            query_fn = Some(format!("{vrl_function} \n ."));
         }
         req.query.query_fn = query_fn;
 
         for fn_name in functions::get_all_transform_keys(org_id).await {
-            if req.query.sql.contains(&format!("{}(", fn_name)) {
+            if req.query.sql.contains(&format!("{fn_name}(")) {
                 req.query.uses_zo_fn = true;
                 break;
             }
@@ -269,7 +266,7 @@ pub async fn search(
             let trace_id = if partition_num == 1 {
                 trace_id.to_string()
             } else {
-                format!("{}-{}", trace_id, i)
+                format!("{trace_id}-{i}")
             };
             let user_id = user_id.clone();
 
@@ -730,8 +727,10 @@ pub async fn _write_results(
         local_resp.hits.first()
     };
 
-    if !local_resp.hits.is_empty() && remove_hit.is_some() {
-        let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
+    if !local_resp.hits.is_empty()
+        && let Some(remove_hit) = remove_hit
+    {
+        let ts_value_to_remove = remove_hit.get(ts_column).cloned();
 
         if let Some(ts_value) = ts_value_to_remove {
             local_resp
@@ -877,13 +876,13 @@ pub async fn write_results_v2(
                 // Retain only the hits that do NOT fall within the
                 // same date, hour, minute as the hit to remove
                 local_resp.hits.retain(|hit| {
-                    if let Some(hit_ts) = hit.get(ts_column) {
-                        if let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts) {
-                            // Extract the date, hour, minute, and second for the current hit
-                            let hit_date_hour_minute_second =
-                                hit_ts_datetime.format("%Y-%m-%dT%H:%M:%S").to_string();
-                            return hit_date_hour_minute_second != target_date_hour_minute_second;
-                        }
+                    if let Some(hit_ts) = hit.get(ts_column)
+                        && let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts)
+                    {
+                        // Extract the date, hour, minute, and second for the current hit
+                        let hit_date_hour_minute_second =
+                            hit_ts_datetime.format("%Y-%m-%dT%H:%M:%S").to_string();
+                        return hit_date_hour_minute_second != target_date_hour_minute_second;
                     }
                     false
                 });
@@ -979,9 +978,12 @@ pub fn apply_vrl_to_response(
     let query_fn = backup_query_fn.clone();
     let mut local_res = res.clone();
 
-    local_res.hits = if query_fn.is_some() && !local_res.hits.is_empty() && !local_res.is_partial {
+    local_res.hits = if let Some(query_fn) = query_fn
+        && !local_res.hits.is_empty()
+        && !local_res.is_partial
+    {
         // compile vrl function & apply the same before returning the response
-        let mut input_fn = query_fn.unwrap().trim().to_string();
+        let mut input_fn = query_fn.trim().to_string();
 
         let apply_over_hits = RESULT_ARRAY_SKIP_VRL.is_match(&input_fn);
         if apply_over_hits {
@@ -1098,10 +1100,7 @@ pub async fn check_cache_v2(
 
     let mut should_exec_query = true;
 
-    let mut file_path = format!(
-        "{}/{}/{}/{}",
-        org_id, stream_type, stream_name, hashed_query
-    );
+    let mut file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
     Ok(if use_cache {
         let mut resp = check_cache(
             trace_id,

@@ -34,7 +34,7 @@ pub async fn get_offset() -> (i64, String) {
 pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::Error> {
     let key = "/compact/stream_stats/offset";
     let val = if let Some(node) = node {
-        format!("{};{}", offset, node)
+        format!("{offset};{node}")
     } else {
         offset.to_string()
     };

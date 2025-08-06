@@ -97,7 +97,7 @@ impl DisplayAs for NewEnrichExec {
                 );
 
                 write!(f, "NewEnrichExec: ")?;
-                write!(f, "{}{}", name_string, projection_string,)
+                write!(f, "{name_string}{projection_string}",)
             }
         }
     }

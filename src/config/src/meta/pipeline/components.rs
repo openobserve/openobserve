@@ -28,7 +28,7 @@ use crate::meta::{
 #[serde(rename_all = "snake_case")]
 pub enum PipelineSource {
     Realtime(StreamParams),
-    Scheduled(DerivedStream),
+    Scheduled(Box<DerivedStream>),
 }
 
 impl Default for PipelineSource {
@@ -124,7 +124,7 @@ impl Edge {
 pub enum NodeData {
     RemoteStream(RemoteStreamParams),
     Stream(StreamParams),
-    Query(DerivedStream),
+    Query(Box<DerivedStream>),
     Function(FunctionParams),
     Condition(ConditionParams),
 }
@@ -188,7 +188,7 @@ mod tests {
         let from_json: PipelineSource = json::from_value(data).unwrap();
         println!("result: {:?}", from_json);
         let stream_params = DerivedStream::default();
-        let source = PipelineSource::Scheduled(stream_params);
+        let source = PipelineSource::Scheduled(Box::new(stream_params));
         assert_eq!(from_json, source);
     }
 

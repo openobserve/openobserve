@@ -104,7 +104,7 @@ impl super::Queue for NatsQueue {
             let jetstream = jetstream::new(client);
             let stream = jetstream.get_stream(&stream_name).await.map_err(|e| {
                 log::error!("Failed to get nats stream {}: {}", stream_name, e);
-                Error::Message(format!("Failed to get nats stream {}: {}", stream_name, e))
+                Error::Message(format!("Failed to get nats stream {stream_name}: {e}"))
             })?;
             let config = jetstream::consumer::pull::Config {
                 name: Some(consumer_name.to_string()),
@@ -126,8 +126,7 @@ impl super::Queue for NatsQueue {
                         e
                     );
                     Error::Message(format!(
-                        "Failed to get_or_create nats for stream {}: {}",
-                        stream_name, e
+                        "Failed to get_or_create nats for stream {stream_name}: {e}"
                     ))
                 })?;
             // Consume messages from the consumer
@@ -138,8 +137,7 @@ impl super::Queue for NatsQueue {
                     e
                 );
                 Error::Message(format!(
-                    "Failed to get nats consumer messages for stream {}: {}",
-                    stream_name, e
+                    "Failed to get nats consumer messages for stream {stream_name}: {e}"
                 ))
             })?;
             while let Ok(Some(message)) = messages.try_next().await {
@@ -151,8 +149,7 @@ impl super::Queue for NatsQueue {
                         e
                     );
                     Error::Message(format!(
-                        "Failed to send nats message for stream {}: {}",
-                        stream_name, e
+                        "Failed to send nats message for stream {stream_name}: {e}"
                     ))
                 })?;
             }

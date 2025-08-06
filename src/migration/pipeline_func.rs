@@ -110,10 +110,11 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                     delay: None,
                 };
 
-                let pipeline_source = PipelineSource::Scheduled(new_derived_stream.clone());
+                let pipeline_source =
+                    PipelineSource::Scheduled(Box::new(new_derived_stream.clone()));
 
                 // construct the nodes and edges lists
-                let source_node_data = NodeData::Query(new_derived_stream);
+                let source_node_data = NodeData::Query(Box::new(new_derived_stream));
                 let dest_node_data = NodeData::Stream(old_derived_stream.destination);
                 let (pos_x, pos_y): (f32, f32) = (50.0, 50.0);
                 let pos_offset: f32 = 100.0;

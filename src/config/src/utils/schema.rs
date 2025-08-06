@@ -188,8 +188,7 @@ fn convert_data_type(
         }
         _ => {
             return Err(ArrowError::SchemaError(format!(
-                "Cannot infer schema from conflicting types: {:?} and {:?}",
-                f_type, data_type
+                "Cannot infer schema from conflicting types: {f_type:?} and {data_type:?}"
             )));
         }
     }

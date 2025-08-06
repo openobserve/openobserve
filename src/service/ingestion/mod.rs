@@ -67,10 +67,7 @@ pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "get_env_var is not supported",
-        ));
+        return Err(std::io::Error::other("get_env_var is not supported"));
     }
 
     let external = state::ExternalEnv::default();
@@ -90,8 +87,7 @@ pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig
             config,
             fields: vec![],
         }),
-        Err(e) => Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        Err(e) => Err(std::io::Error::other(
             vrl::diagnostic::Formatter::new(func, e).to_string(),
         )),
     }
@@ -134,13 +130,12 @@ pub fn apply_vrl_fn(
                     .with_label_values(&[
                         org_id,
                         StreamType::Logs.as_str(),
-                        &format!("{:?}", stream_name),
+                        &format!("{stream_name:?}"),
                         TRANSFORM_FAILED,
                     ])
                     .inc();
                 let err_msg = format!(
-                    "{}/{:?} vrl failed at processing result {:?} on record {:?}. Returning original row.",
-                    org_id, stream_name, err, row
+                    "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row."
                 );
                 log::warn!("{err_msg}");
                 (row, Some(err_msg))
@@ -151,13 +146,12 @@ pub fn apply_vrl_fn(
                 .with_label_values(&[
                     org_id,
                     StreamType::Logs.as_str(),
-                    &format!("{:?}", stream_name),
+                    &format!("{stream_name:?}"),
                     TRANSFORM_FAILED,
                 ])
                 .inc();
             let err_msg = format!(
-                "{}/{:?} vrl runtime failed at getting result {:?} on record {:?}. Returning original row.",
-                org_id, stream_name, err, row
+                "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row."
             );
             log::warn!("{err_msg}");
             (row, Some(err_msg))
@@ -423,10 +417,10 @@ pub fn check_ingestion_allowed(
     }
 
     // check if we are allowed to ingest
-    if let Some(stream_name) = stream_name {
-        if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
-            return Err(anyhow!("stream [{stream_name}] is being deleted"));
-        }
+    if let Some(stream_name) = stream_name
+        && db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None)
+    {
+        return Err(anyhow!("stream [{stream_name}] is being deleted"));
     };
 
     // check memory circuit breaker
@@ -557,7 +551,7 @@ pub async fn get_uds_and_original_data_streams(
 
 /// Calls the SnowflakeIdGenerator instance associated with this stream to generate a new i64 ID.
 pub fn generate_record_id(org_id: &str, stream_name: &str, stream_type: &StreamType) -> i64 {
-    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
     STREAM_RECORD_ID_GENERATOR
         .entry(key)
         .or_insert_with(|| SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }))

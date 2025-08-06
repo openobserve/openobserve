@@ -34,7 +34,7 @@ pub async fn check_stream_permissions(
     stream_type: &StreamType,
 ) -> Option<HttpResponse> {
     if !is_root_user(user_id) {
-        let user: meta::user::User = USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+        let user: meta::user::User = USERS.get(&format!("{org_id}/{user_id}")).unwrap().clone();
         let stream_type_str = stream_type.as_str();
 
         if !crate::handler::http::auth::validator::check_permissions(

@@ -21,7 +21,6 @@ use hashbrown::HashMap;
 use {
     config::meta::cluster::RoleGroup,
     o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
-    std::io::ErrorKind,
 };
 
 /// ListClusters
@@ -46,7 +45,7 @@ pub async fn list_clusters() -> Result<HttpResponse, Error> {
             Some(RoleGroup::Interactive),
         )
         .await
-        .map_err(|e| Error::new(ErrorKind::Other, e))?;
+        .map_err(Error::other)?;
         let mut regions = HashMap::with_capacity(clusters.len());
         for c in clusters {
             let region: &mut Vec<_> = regions.entry(c.region).or_insert_with(Vec::new);
