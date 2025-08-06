@@ -34,7 +34,7 @@ pub async fn download_file(client: &Client, url: &str, path: &str) -> Result<(),
     // download chunks
     let mut file = File::create(path)
         .await
-        .or(Err(format!("Failed to create file '{}'", path)))?;
+        .or(Err(format!("Failed to create file '{path}'")))?;
     let mut downloaded: u64 = 0;
     let mut stream = res.bytes_stream();
 

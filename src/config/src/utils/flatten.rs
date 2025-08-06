@@ -105,7 +105,7 @@ fn flatten_object(
     for (mut k, v) in current.into_iter() {
         format_key(&mut k);
         let parent_key = if depth > 0 {
-            format!("{}{}{}", parent_key, KEY_SEPARATOR, k)
+            format!("{parent_key}{KEY_SEPARATOR}{k}")
         } else {
             k
         };

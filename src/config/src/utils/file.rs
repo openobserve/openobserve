@@ -52,8 +52,7 @@ pub fn get_file_contents(
             return Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 format!(
-                    "Expected to read {} bytes, but read {} bytes",
-                    to_read, read
+                    "Expected to read {to_read} bytes, but read {read} bytes"
                 ),
             ));
         }
@@ -69,7 +68,7 @@ pub fn get_file_contents(
 #[inline(always)]
 pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Error> {
     // Create a temporary file in the same directory
-    let temp_file = format!("{}.tmp", file);
+    let temp_file = format!("{file}.tmp");
 
     // Write to temporary file first
     let mut file_handle = File::create(&temp_file)?;
@@ -147,7 +146,7 @@ pub async fn scan_files_with_channel(
                 files.push(path.to_str().unwrap().to_string());
                 if limit > 0 && files.len() >= limit {
                     tx.send(files.clone()).await.map_err(|e| {
-                        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+                        std::io::Error::other(e.to_string())
                     })?;
                     files.clear();
                 }
@@ -157,7 +156,7 @@ pub async fn scan_files_with_channel(
     if !files.is_empty() {
         tx.send(files)
             .await
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
     }
     Ok(())
 }

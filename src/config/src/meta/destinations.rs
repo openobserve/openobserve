@@ -52,7 +52,7 @@ impl std::fmt::Display for Module {
             Module::Alert { .. } => "alert",
             Module::Pipeline { .. } => "pipeline",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 

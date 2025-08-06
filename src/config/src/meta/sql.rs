@@ -591,8 +591,8 @@ fn parse_expr_for_field(
             }
         }
         SqlExpr::IsNull(expr) => {
-            if let SqlExpr::Identifier(ident) = expr.as_ref() {
-                if parse_expr_check_field_name(&ident.value, field) {
+            if let SqlExpr::Identifier(ident) = expr.as_ref()
+                && parse_expr_check_field_name(&ident.value, field) {
                     fields.push((
                         ident.value.to_string(),
                         SqlValue::String("".to_string()),
@@ -600,11 +600,10 @@ fn parse_expr_for_field(
                         *expr_op,
                     ));
                 }
-            }
         }
         SqlExpr::IsNotNull(expr) => {
-            if let SqlExpr::Identifier(ident) = expr.as_ref() {
-                if parse_expr_check_field_name(&ident.value, field) {
+            if let SqlExpr::Identifier(ident) = expr.as_ref()
+                && parse_expr_check_field_name(&ident.value, field) {
                     fields.push((
                         ident.value.to_string(),
                         SqlValue::String("".to_string()),
@@ -612,7 +611,6 @@ fn parse_expr_for_field(
                         *expr_op,
                     ));
                 }
-            }
         }
         _ => {}
     }
@@ -643,8 +641,8 @@ fn parse_expr_like(
     field: &str,
     fields: &mut Vec<(String, SqlValue, SqlOperator, SqlOperator)>,
 ) -> Result<(), anyhow::Error> {
-    if let SqlExpr::Identifier(ident) = expr {
-        if parse_expr_check_field_name(&ident.value, field) {
+    if let SqlExpr::Identifier(ident) = expr
+        && parse_expr_check_field_name(&ident.value, field) {
             let val = get_value_from_expr(pattern);
             if val.is_none() {
                 return Err(anyhow::anyhow!(
@@ -658,7 +656,6 @@ fn parse_expr_like(
                 *next_op,
             ));
         }
-    }
     Ok(())
 }
 
@@ -979,11 +976,10 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Result<Option<Vec<String>>, anyho
                     fields.extend(v);
                 }
             }
-            if let Some(expr) = else_result.as_ref() {
-                if let Some(v) = get_field_name_from_expr(expr)? {
+            if let Some(expr) = else_result.as_ref()
+                && let Some(v) = get_field_name_from_expr(expr)? {
                     fields.extend(v);
                 }
-            }
             Ok((!fields.is_empty()).then_some(fields))
         }
         SqlExpr::AtTimeZone { timestamp, .. } => get_field_name_from_expr(timestamp),
