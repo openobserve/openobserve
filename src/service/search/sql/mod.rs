@@ -43,10 +43,10 @@ use proto::cluster_rpc::SearchQuery;
 use regex::Regex;
 use sqlparser::{
     ast::{
-        BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
-        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, OrderByExpr,
-        Query, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, Value,
-        VisitMut, VisitorMut, helpers::attached_token::AttachedToken,
+        BinaryOperator, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList,
+        FunctionArguments, GroupByExpr, Ident, ObjectName, OrderByExpr, Query, Select, SelectItem,
+        SetExpr, Statement, TableFactor, TableWithJoins, Value, VisitMut, VisitorMut,
+        helpers::attached_token::AttachedToken,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -256,11 +256,13 @@ impl Sql {
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         let _ = statement.visit(&mut histogram_interval_visitor);
         let histogram_interval = if query.histogram_interval > 0 {
-            Some(query.histogram_interval)
+            Some(validate_and_adjust_histogram_interval(
+                query.histogram_interval,
+                Some((query.start_time, query.end_time)),
+            ))
         } else {
             histogram_interval_visitor.interval
         };
-
         //********************Change the sql start*********************************//
 
         // 11. add _timestamp and _o2_id if need
@@ -1738,13 +1740,13 @@ impl VisitorMut for HistogramIntervalVisitor {
                     } else {
                         generate_histogram_interval(self.time_range).to_string()
                     };
-                    self.interval = match convert_histogram_interval_to_seconds(&interval) {
-                        Ok(v) => Some(v),
-                        Err(e) => {
-                            log::error!("{e:?}");
-                            Some(0)
-                        }
-                    };
+                    let interval_seconds =
+                        convert_histogram_interval_to_seconds(&interval).unwrap_or_default();
+                    // Validate and adjust the histogram interval
+                    self.interval = Some(validate_and_adjust_histogram_interval(
+                        interval_seconds,
+                        self.time_range,
+                    ));
                 }
                 return ControlFlow::Break(());
             }
@@ -1767,44 +1769,93 @@ impl VisitorMut for TrackTotalHitsVisitor {
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         match query.body.as_mut() {
             SetExpr::Select(select) => {
-                let (field_expr, duplicate_treatment) = if select.distinct.is_some() {
-                    match select.projection.first() {
-                        Some(SelectItem::UnnamedExpr(expr)) => (
-                            FunctionArgExpr::Expr(expr.clone()),
-                            Some(DuplicateTreatment::Distinct),
-                        ),
-                        Some(SelectItem::ExprWithAlias { expr, alias: _ }) => (
-                            FunctionArgExpr::Expr(expr.clone()),
-                            Some(DuplicateTreatment::Distinct),
-                        ),
-                        _ => (FunctionArgExpr::Wildcard, None),
-                    }
+                if select.distinct.is_some() {
+                    // For DISTINCT queries, we need to wrap the query in a subquery
+                    // and count the results, since DataFusion doesn't support COUNT DISTINCT with
+                    // multiple arguments
+                    let original_query = query.clone();
+                    let subquery = Box::new(SetExpr::Select(Box::new(Select {
+                        select_token: AttachedToken::empty(),
+                        distinct: None,
+                        top: None,
+                        top_before_distinct: false,
+                        projection: vec![SelectItem::ExprWithAlias {
+                            expr: Expr::Function(Function {
+                                name: ObjectName(vec![Ident::new("count")]),
+                                parameters: FunctionArguments::None,
+                                args: FunctionArguments::List(FunctionArgumentList {
+                                    args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
+                                    duplicate_treatment: None,
+                                    clauses: vec![],
+                                }),
+                                filter: None,
+                                null_treatment: None,
+                                over: None,
+                                within_group: vec![],
+                                uses_odbc_syntax: false,
+                            }),
+                            alias: Ident::new("zo_sql_num"),
+                        }],
+                        into: None,
+                        from: vec![TableWithJoins {
+                            relation: TableFactor::Derived {
+                                lateral: false,
+                                subquery: Box::new(original_query),
+                                alias: None,
+                            },
+                            joins: vec![],
+                        }],
+                        lateral_views: vec![],
+                        selection: None,
+                        group_by: GroupByExpr::Expressions(vec![], vec![]),
+                        having: None,
+                        prewhere: None,
+                        sort_by: vec![],
+                        cluster_by: vec![],
+                        distribute_by: vec![],
+                        named_window: vec![],
+                        qualify: None,
+                        window_before_qualify: false,
+                        connect_by: None,
+                        value_table_mode: None,
+                    })));
+                    *query = Query {
+                        with: None,
+                        body: subquery,
+                        order_by: None,
+                        limit: None,
+                        offset: None,
+                        fetch: None,
+                        limit_by: vec![],
+                        for_clause: None,
+                        locks: vec![],
+                        settings: None,
+                        format_clause: None,
+                    };
                 } else {
-                    (FunctionArgExpr::Wildcard, None)
-                };
-
-                select.group_by = GroupByExpr::Expressions(vec![], vec![]);
-                select.having = None;
-                select.sort_by = vec![];
-                select.projection = vec![SelectItem::ExprWithAlias {
-                    expr: Expr::Function(Function {
-                        name: ObjectName(vec![Ident::new("count")]),
-                        parameters: FunctionArguments::None,
-                        args: FunctionArguments::List(FunctionArgumentList {
-                            args: vec![FunctionArg::Unnamed(field_expr)],
-                            duplicate_treatment,
-                            clauses: vec![],
+                    // For non-DISTINCT queries, use the original approach
+                    select.group_by = GroupByExpr::Expressions(vec![], vec![]);
+                    select.having = None;
+                    select.sort_by = vec![];
+                    select.projection = vec![SelectItem::ExprWithAlias {
+                        expr: Expr::Function(Function {
+                            name: ObjectName(vec![Ident::new("count")]),
+                            parameters: FunctionArguments::None,
+                            args: FunctionArguments::List(FunctionArgumentList {
+                                args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
+                                duplicate_treatment: None,
+                                clauses: vec![],
+                            }),
+                            filter: None,
+                            null_treatment: None,
+                            over: None,
+                            within_group: vec![],
+                            uses_odbc_syntax: false,
                         }),
-                        filter: None,
-                        null_treatment: None,
-                        over: None,
-                        within_group: vec![],
-                        uses_odbc_syntax: false,
-                    }),
-                    alias: Ident::new("zo_sql_num"),
-                }];
-                select.distinct = None;
-                query.order_by = None;
+                        alias: Ident::new("zo_sql_num"),
+                    }];
+                    query.order_by = None;
+                }
             }
             SetExpr::SetOperation { .. } => {
                 let select = Box::new(SetExpr::Select(Box::new(Select {
@@ -1925,6 +1976,59 @@ pub fn generate_histogram_interval(time_range: Option<(i64, i64)>) -> &'static s
         }
     }
     "10 second"
+}
+
+pub fn validate_and_adjust_histogram_interval(
+    interval_seconds: i64,
+    time_range: Option<(i64, i64)>,
+) -> i64 {
+    const TWENTY_FOUR_HOURS_SECONDS: i64 = 24 * 60 * 60; // 86400 seconds
+
+    // If the interval is 0 or negative, return a default value
+    if interval_seconds <= 0 {
+        // Default to 1 hour
+        let interval = generate_histogram_interval(time_range);
+        let interval_seconds = convert_histogram_interval_to_seconds(interval).unwrap_or(10);
+        return interval_seconds;
+    }
+
+    // Check if the interval can divide 24 hours evenly and is not a multiple of 24
+    if TWENTY_FOUR_HOURS_SECONDS % interval_seconds == 0 {
+        return interval_seconds;
+    }
+
+    // Find the next valid interval that can divide 24 hours evenly
+    // We'll try intervals that are factors of 24 hours (sorted in ascending order)
+    let valid_intervals = [
+        1,     // 1 second
+        5,     // 5 seconds
+        10,    // 10 seconds
+        15,    // 15 seconds
+        30,    // 30 seconds
+        60,    // 1 minute
+        300,   // 5 minutes
+        600,   // 10 minutes
+        900,   // 15 minutes
+        1800,  // 30 minutes
+        3600,  // 1 hour
+        7200,  // 2 hours
+        14400, // 4 hours
+        21600, // 6 hours
+        28800, // 8 hours
+        43200, // 12 hours
+        86400, // 1 day
+    ];
+
+    // Find the smallest valid interval that is >= the requested interval
+    for &valid_interval in &valid_intervals {
+        if valid_interval >= interval_seconds {
+            return valid_interval;
+        }
+    }
+
+    // If no valid interval found (requested interval is larger than max valid interval)
+    // Return the maximum valid interval (1 day)
+    *valid_intervals.last().unwrap()
 }
 
 pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
@@ -2675,6 +2779,50 @@ mod tests {
         assert_eq!(statement.to_string(), expected_sql);
     }
 
+    #[test]
+    fn test_track_total_hits_distinct_single_column() {
+        let sql = "SELECT DISTINCT name FROM t WHERE name = 'a'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        let _ = statement.visit(&mut track_total_hits_visitor);
+        // For DISTINCT queries, we wrap in a subquery to count results
+        let expected_sql =
+            "SELECT count(*) AS zo_sql_num FROM (SELECT DISTINCT name FROM t WHERE name = 'a')";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits_distinct_multiple_columns() {
+        let sql = "SELECT DISTINCT unique_id, continent FROM oly WHERE continent = 'ASI'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        let _ = statement.visit(&mut track_total_hits_visitor);
+        // For DISTINCT queries with multiple columns, we wrap in a subquery to count results
+        let expected_sql = "SELECT count(*) AS zo_sql_num FROM (SELECT DISTINCT unique_id, continent FROM oly WHERE continent = 'ASI')";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_track_total_hits_distinct_three_columns() {
+        let sql =
+            "SELECT DISTINCT unique_id, continent, bronze_medals FROM oly WHERE continent = 'ASI'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        let _ = statement.visit(&mut track_total_hits_visitor);
+        // For DISTINCT queries with multiple columns, we wrap in a subquery to count results
+        let expected_sql = "SELECT count(*) AS zo_sql_num FROM (SELECT DISTINCT unique_id, continent, bronze_medals FROM oly WHERE continent = 'ASI')";
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
     fn is_simple_count_query(statement: &mut Statement) -> bool {
         let index_fields = ["name".to_string()].into_iter().collect();
         let mut visitor = IndexOptimizeModeVisitor::new_from_index_fields(index_fields);
@@ -2986,6 +3134,65 @@ mod tests {
             convert_histogram_interval_to_seconds("1000000 seconds").unwrap(),
             1000000
         );
+    }
+
+    #[test]
+    fn test_validate_and_adjust_histogram_interval() {
+        // Test valid intervals that don't need adjustment
+        assert_eq!(validate_and_adjust_histogram_interval(3600, None), 3600); // 1 hour
+        assert_eq!(validate_and_adjust_histogram_interval(7200, None), 7200); // 2 hours
+        assert_eq!(validate_and_adjust_histogram_interval(21600, None), 21600); // 6 hours
+        assert_eq!(validate_and_adjust_histogram_interval(86400, None), 86400); // 1 day
+
+        // Test intervals that need adjustment (example from TODO: 5 hours -> 6 hours)
+        assert_eq!(validate_and_adjust_histogram_interval(18000, None), 21600); // 5 hours -> 6 hours
+        assert_eq!(validate_and_adjust_histogram_interval(10000, None), 14400); // ~2.8 hours -> 4 hours
+        assert_eq!(validate_and_adjust_histogram_interval(5000, None), 7200); // ~1.4 hours -> 2 hours
+
+        // Test edge cases
+        assert_eq!(validate_and_adjust_histogram_interval(0, None), 3600); // 0 -> default 1 hour
+        assert_eq!(validate_and_adjust_histogram_interval(-100, None), 3600); // negative -> default 1 hour
+        assert_eq!(validate_and_adjust_histogram_interval(1, None), 1); // 1 second is valid
+        assert_eq!(validate_and_adjust_histogram_interval(100000, None), 86400); // very large -> 1 day
+    }
+
+    #[test]
+    fn test_validate_and_adjust_histogram_interval_24_hour_division() {
+        // Test that all returned intervals can divide 24 hours evenly
+        let test_intervals = [
+            18000, // 5 hours (should become 6 hours)
+            10000, // ~2.8 hours (should become 4 hours)
+            5000,  // ~1.4 hours (should become 2 hours)
+            3000,  // 50 minutes (should become 1 hour)
+            1500,  // 25 minutes (should become 30 minutes)
+            700,   // ~11.7 minutes (should become 15 minutes)
+            400,   // ~6.7 minutes (should become 10 minutes)
+            200,   // ~3.3 minutes (should become 5 minutes)
+            45,    // 45 seconds (should become 1 minute)
+            25,    // 25 seconds (should become 30 seconds)
+            8,     // 8 seconds (should become 10 seconds)
+            3,     // 3 seconds (should become 5 seconds)
+        ];
+
+        const TWENTY_FOUR_HOURS: i64 = 24 * 60 * 60; // 86400 seconds
+
+        for &interval in &test_intervals {
+            let adjusted = validate_and_adjust_histogram_interval(interval, None);
+            // Verify that the adjusted interval can divide 24 hours evenly
+            assert_eq!(
+                TWENTY_FOUR_HOURS % adjusted,
+                0,
+                "Interval {} seconds cannot divide 24 hours evenly",
+                adjusted
+            );
+            // Verify that the adjusted interval is >= the original interval
+            assert!(
+                adjusted >= interval,
+                "Adjusted interval {} is less than original interval {}",
+                adjusted,
+                interval
+            );
+        }
     }
 
     #[test]
