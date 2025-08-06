@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
+                :disable="isVisualizeDisabled"
                 no-caps
                 size="sm"
                 style="height: 32px"
@@ -63,6 +64,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   alt="Visualize"
                   style="width: 20px; height: 20px"
                 />
+                <q-tooltip v-if="isVisualizeDisabled">
+                  {{ t("search.enableSqlModeOrSelectSingleStream") }}
+                </q-tooltip>
+                <q-tooltip v-else>
+                  {{ t("search.visualize") }}
+                </q-tooltip>
               </q-btn>
             </div>
           </div>
@@ -94,13 +101,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-toggle
             data-test="logs-search-bar-sql-mode-toggle-btn"
             v-model="searchObj.meta.sqlMode"
+            :disable="isSqlModeDisabled"
           >
             <img
               :src="sqlIcon"
               alt="SQL Mode"
               style="width: 20px; height: 20px"
             />
-            <q-tooltip>
+            <q-tooltip v-if="isSqlModeDisabled">
+              {{ t("search.sqlModeDisabledForVisualization") }}
+            </q-tooltip>
+            <q-tooltip v-else>
               {{ t("search.sqlModeLabel") }}
             </q-tooltip>
           </q-toggle>
@@ -3340,6 +3351,14 @@ export default defineComponent({
     };
 
     const onLogsVisualizeToggleUpdate = (value: any) => {
+      // prevent action if visualize is disabled (SQL mode disabled with multiple streams)
+      if (value === "visualize" && !searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1) {
+        showErrorNotification(
+          "Please enable SQL mode or select a single stream to visualize"
+        );
+        return;
+      }
+      
       // confirm with user on toggle from visualize to logs
       if (
         value == "logs" &&
@@ -3787,6 +3806,12 @@ export default defineComponent({
     };
   },
   computed: {
+    isVisualizeDisabled() {
+      return !this.searchObj.meta.sqlMode && this.searchObj.data.stream.selectedStream.length > 1;
+    },
+    isSqlModeDisabled() {
+      return this.searchObj.meta.logsVisualizeToggle === 'visualize' && this.searchObj.data.stream.selectedStream.length > 1;
+    },
     addSearchTerm() {
       return this.searchObj.data.stream.addToFilter;
     },
