@@ -1363,6 +1363,7 @@ import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { json2csv } from 'json-2-csv';
 import {
   mergeDeep,
   b64DecodeUnicode,
@@ -2101,35 +2102,35 @@ export default defineComponent({
         queryEditorRef.value.setValue(searchObj.data.query);
     };
 
-    const jsonToCsv = (jsonData) => {
-      const replacer = (key, value) => (value === null ? "" : value);
-      const header = Object.keys(jsonData[0]);
-      let csv = header.join(",") + "\r\n";
-
-      for (let i = 0; i < jsonData.length; i++) {
-        const row = header
-          .map((fieldName) => JSON.stringify(jsonData[i][fieldName], replacer))
-          .join(",");
-        csv += row + "\r\n";
+    const downloadLogs = async (data) => {
+      //here we are using a package json2csv which converts json to csv data
+      //why package because we faced one issue where user has , in some of the fields so
+      //it is treating it as seperate fields 
+      //eg: {body:"hey this is the email body , with some info in it "}
+      //after converting it will treat hey this is the email body this as the body and remaining will be the next column
+      //to solve this issue we are using json2csv package
+      try{
+        const convertedData = await json2csv(data)
+        const filename = "logs-data.csv";
+        const file = new File([convertedData], filename, {
+          type: "text/csv",
+        });
+        const url = URL.createObjectURL(file);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        $q.notify({
+          message: "Error downloading logs",
+          color: "negative",
+          position: "bottom",
+          timeout: 2000,
+        });
       }
-
-      return csv;
-    };
-
-    const downloadLogs = (data) => {
-      const filename = "logs-data.csv";
-      const dataobj = jsonToCsv(data);
-      const file = new File([dataobj], filename, {
-        type: "text/csv",
-      });
-      const url = URL.createObjectURL(file);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
     };
 
     onMounted(async () => {
