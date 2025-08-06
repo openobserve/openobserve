@@ -576,6 +576,25 @@ pub async fn update_stream_settings(
                 });
             }
 
+            if let Some(enable_distinct_fields) = new_settings.enable_distinct_fields {
+                // Only reset timestamps when transitioning from disabled to enabled
+                let was_enabled = settings.enable_distinct_fields;
+                settings.enable_distinct_fields = enable_distinct_fields;
+                if !was_enabled && enable_distinct_fields {
+                    let current_time = now_micros();
+                    settings.distinct_value_fields.iter_mut().for_each(|f| {
+                        f.added_ts = current_time;
+                    });
+                    log::info!(
+                        "Re-enabling distinct fields for stream {}/{}/{}. Resetting timestamps for {:?} fields.",
+                        org_id,
+                        stream_type,
+                        stream_name,
+                        settings.distinct_value_fields
+                    );
+                }
+            }
+
             if !new_settings.full_text_search_keys.add.is_empty() {
                 settings
                     .full_text_search_keys

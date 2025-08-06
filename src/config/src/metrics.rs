@@ -692,7 +692,7 @@ pub static DB_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
         Opts::new("db_query_nums", "db query number")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["operation", "table", "key"],
+        &["operation", "table"],
     )
     .expect("Metric created")
 });

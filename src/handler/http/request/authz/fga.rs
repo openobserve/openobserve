@@ -926,6 +926,8 @@ mod tests {
     async fn test_get_roles_enterprise() {
         #[cfg(feature = "enterprise")]
         {
+            use actix_http::header::HeaderName;
+
             let app = test::init_service(App::new().service(get_roles)).await;
             let mut req = test::TestRequest::get().uri("/test_org/roles").to_request();
 
@@ -1188,6 +1190,8 @@ mod tests {
     async fn test_get_groups_enterprise() {
         #[cfg(feature = "enterprise")]
         {
+            use actix_http::header::HeaderName;
+
             let app = test::init_service(App::new().service(get_groups)).await;
             let mut req = test::TestRequest::get()
                 .uri("/test_org/groups")

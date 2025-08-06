@@ -31,7 +31,7 @@ use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use crate::handler::http::request::search::utils::check_stream_permissions;
 #[cfg(feature = "enterprise")]
-use crate::service::search::sql::get_cipher_key_names;
+use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
     common::{
         meta,
@@ -271,6 +271,7 @@ pub async fn get_search_profile(
         &req,
         range_error,
         false,
+        None,
     )
     .instrument(http_span)
     .await;

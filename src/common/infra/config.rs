@@ -174,25 +174,26 @@ pub(crate) async fn update_cache(mut nats_event_rx: mpsc::Receiver<infra::db::na
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use tokio::time::{timeout, Duration};
     use infra::db::nats::NatsEvent;
+    use tokio::time::{Duration, timeout};
+
+    use super::*;
 
     #[tokio::test]
     async fn test_update_cache_first_connection() {
         let (tx, rx) = mpsc::channel(100);
-        
+
         let handle = tokio::spawn(update_cache(rx));
-        
+
         // Send first connection event - should be skipped
         tx.send(NatsEvent::Connected).await.unwrap();
-        
+
         // Give some time for processing
         tokio::time::sleep(Duration::from_millis(10)).await;
-        
+
         // Close the sender to stop the update_cache function
         drop(tx);
-        
+
         // Wait for the function to complete
         let result = timeout(Duration::from_secs(1), handle).await;
         assert!(result.is_ok(), "update_cache should complete gracefully");
@@ -201,21 +202,21 @@ mod tests {
     #[tokio::test]
     async fn test_update_cache_subsequent_connections() {
         let (tx, rx) = mpsc::channel(100);
-        
+
         let handle = tokio::spawn(update_cache(rx));
-        
+
         // Send first connection event - should be skipped
         tx.send(NatsEvent::Connected).await.unwrap();
-        
+
         // Send second connection event - should trigger cache refresh
         tx.send(NatsEvent::Connected).await.unwrap();
-        
+
         // Give some time for processing
         tokio::time::sleep(Duration::from_millis(50)).await;
-        
+
         // Close the sender to stop the update_cache function
         drop(tx);
-        
+
         // Wait for the function to complete
         let result = timeout(Duration::from_secs(2), handle).await;
         assert!(result.is_ok(), "update_cache should complete gracefully");
@@ -224,7 +225,7 @@ mod tests {
     #[test]
     fn test_static_variables_initialization() {
         // Test that all static variables can be accessed and are properly initialized
-        
+
         // Test RwHashMap variables
         assert_eq!(KVS.len(), 0);
         assert_eq!(QUERY_FUNCTIONS.len(), 0);
@@ -238,15 +239,15 @@ mod tests {
         assert_eq!(ENRICHMENT_TABLES.len(), 0);
         assert_eq!(USER_SESSIONS.len(), 0);
         assert_eq!(SHORT_URLS.len(), 0);
-        
+
         // Test Arc<RwLock> variables
         let users_rum_token = USERS_RUM_TOKEN.clone();
         assert_eq!(users_rum_token.len(), 0);
-        
+
         // Test syslog enabled flag
         let syslog_enabled = SYSLOG_ENABLED.clone();
         assert!(!*syslog_enabled.read());
-        
+
         // Test enrichment registry
         let registry = ENRICHMENT_REGISTRY.clone();
         assert!(!std::ptr::eq(registry.as_ref(), std::ptr::null()));
@@ -258,13 +259,13 @@ mod tests {
         let read_guard = org_settings.read().await;
         assert_eq!(read_guard.len(), 0);
         drop(read_guard);
-        
+
         // Test write access
         let mut write_guard = org_settings.write().await;
         write_guard.insert("test_org".to_string(), OrganizationSetting::default());
         assert_eq!(write_guard.len(), 1);
         drop(write_guard);
-        
+
         // Verify the write was successful
         let read_guard = org_settings.read().await;
         assert_eq!(read_guard.len(), 1);
@@ -277,7 +278,7 @@ mod tests {
         let read_guard = organizations.read().await;
         assert_eq!(read_guard.len(), 0);
         drop(read_guard);
-        
+
         // Test write access
         let mut write_guard = organizations.write().await;
         let org = Organization {
@@ -288,7 +289,7 @@ mod tests {
         write_guard.insert("test_org".to_string(), org);
         assert_eq!(write_guard.len(), 1);
         drop(write_guard);
-        
+
         // Verify the write was successful
         let read_guard = organizations.read().await;
         assert_eq!(read_guard.len(), 1);
@@ -301,13 +302,16 @@ mod tests {
         let read_guard = cluster_map.read().await;
         assert_eq!(read_guard.len(), 0);
         drop(read_guard);
-        
+
         // Test write access
         let mut write_guard = cluster_map.write().await;
-        write_guard.insert("test_metric".to_string(), vec!["node1".to_string(), "node2".to_string()]);
+        write_guard.insert(
+            "test_metric".to_string(),
+            vec!["node1".to_string(), "node2".to_string()],
+        );
         assert_eq!(write_guard.len(), 1);
         drop(write_guard);
-        
+
         // Verify the write was successful
         let read_guard = cluster_map.read().await;
         assert_eq!(read_guard.len(), 1);
@@ -325,7 +329,7 @@ mod tests {
         let read_guard = cluster_leader.read().await;
         assert_eq!(read_guard.len(), 0);
         drop(read_guard);
-        
+
         // Test write access
         let mut write_guard = cluster_leader.write().await;
         let leader = ClusterLeader {
@@ -336,7 +340,7 @@ mod tests {
         write_guard.insert("test_cluster".to_string(), leader);
         assert_eq!(write_guard.len(), 1);
         drop(write_guard);
-        
+
         // Verify the write was successful
         let read_guard = cluster_leader.read().await;
         assert_eq!(read_guard.len(), 1);
@@ -349,13 +353,13 @@ mod tests {
         let read_guard = maxmind_client.read().await;
         assert!(read_guard.is_none());
         drop(read_guard);
-        
+
         // Test write access - just test that we can write None/Some pattern
         let write_guard = maxmind_client.write().await;
         // We can't create a MaxmindClient without a database file, so just test the Option pattern
         assert!(write_guard.is_none());
         drop(write_guard);
-        
+
         // Verify the state
         let read_guard = maxmind_client.read().await;
         assert!(read_guard.is_none());
@@ -368,13 +372,13 @@ mod tests {
         let read_guard = city_table.read();
         assert!(read_guard.is_none());
         drop(read_guard);
-        
+
         // Test GEOIP_ASN_TABLE
         let asn_table = GEOIP_ASN_TABLE.clone();
         let read_guard = asn_table.read();
         assert!(read_guard.is_none());
         drop(read_guard);
-        
+
         #[cfg(feature = "enterprise")]
         {
             // Test GEOIP_ENT_TABLE (only available with enterprise feature)
@@ -387,14 +391,14 @@ mod tests {
     #[test]
     fn test_syslog_enabled() {
         let syslog_enabled = SYSLOG_ENABLED.clone();
-        
+
         // Test initial state
         assert!(!*syslog_enabled.read());
-        
+
         // Test write access
         *syslog_enabled.write() = true;
         assert!(*syslog_enabled.read());
-        
+
         // Reset to original state
         *syslog_enabled.write() = false;
         assert!(!*syslog_enabled.read());
@@ -405,21 +409,21 @@ mod tests {
         // Test basic DashMap operations on KVS
         let test_key = "test_key".to_string();
         let test_value = bytes::Bytes::from("test_value");
-        
+
         // Insert
         KVS.insert(test_key.clone(), test_value.clone());
         assert_eq!(KVS.len(), 1);
-        
+
         // Get
         let retrieved = KVS.get(&test_key);
         assert!(retrieved.is_some());
         assert_eq!(*retrieved.unwrap(), test_value);
-        
+
         // Remove
         KVS.remove(&test_key);
         assert_eq!(KVS.len(), 0);
     }
-    
+
     #[test]
     fn test_query_functions_cache() {
         let test_key = "test_function".to_string();
@@ -431,14 +435,14 @@ mod tests {
             trans_type: Some(0),
             streams: None,
         };
-        
+
         // Insert
         QUERY_FUNCTIONS.insert(test_key.clone(), test_transform.clone());
         assert_eq!(QUERY_FUNCTIONS.len(), 1);
-        
+
         // Verify existence
         assert!(QUERY_FUNCTIONS.contains_key(&test_key));
-        
+
         // Clean up
         QUERY_FUNCTIONS.remove(&test_key);
         assert_eq!(QUERY_FUNCTIONS.len(), 0);
@@ -447,7 +451,7 @@ mod tests {
     #[tokio::test]
     async fn test_cache_refresh_error_handling() {
         let (tx, mut rx) = mpsc::channel::<NatsEvent>(10);
-        
+
         // Create a mock receiver that will simulate the update_cache behavior
         tokio::spawn(async move {
             let mut first_connection = true;
@@ -463,16 +467,16 @@ mod tests {
                 }
             }
         });
-        
+
         // Send first connection (should be ignored)
         tx.send(NatsEvent::Connected).await.unwrap();
-        
+
         // Send second connection (should trigger refresh)
         tx.send(NatsEvent::Connected).await.unwrap();
-        
+
         // Give time for processing
         tokio::time::sleep(Duration::from_millis(10)).await;
-        
+
         // Test passes if no panic occurs
         assert!(true);
     }

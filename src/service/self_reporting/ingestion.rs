@@ -310,6 +310,7 @@ mod tests {
             is_partial: false,
             work_group: None,
             node_name: Some("test-node".to_string()),
+            dashboard_info: None,
         }
     }
 
