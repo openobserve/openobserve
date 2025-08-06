@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    io::{Error, ErrorKind},
-    sync::Arc,
-};
+use std::{collections::HashMap, io::Error, sync::Arc};
 
 use actix_web::{HttpResponse, http, web};
 use bytes::BytesMut;
@@ -257,13 +253,13 @@ pub async fn handle_otlp_request(
                         prom_meta,
                     )
                     .await
-                    {
-                        log::error!(
-                            "Failed to set metadata for metric: {} with error: {}",
-                            metric_name,
-                            e
-                        );
-                    }
+                {
+                    log::error!(
+                        "Failed to set metadata for metric: {} with error: {}",
+                        metric_name,
+                        e
+                    );
+                }
                 for mut rec in records {
                     // flattening
                     rec = flatten::flatten(rec)?;

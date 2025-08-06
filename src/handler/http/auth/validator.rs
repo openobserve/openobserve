@@ -132,9 +132,10 @@ pub async fn validate_credentials(
     let user;
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last()
-        && v.is_empty() {
-            path_columns.pop();
-        }
+        && v.is_empty()
+    {
+        path_columns.pop();
+    }
 
     // this is only applicable for super admin user
     if is_root_user(user_id) {

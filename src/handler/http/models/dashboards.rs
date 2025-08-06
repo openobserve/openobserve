@@ -214,9 +214,10 @@ impl ListDashboardsQuery {
         // dashboards that match the selected folder so we ignore the page_size
         // parameter.
         if self.title.is_some_and(|t| !t.is_empty())
-            && let Some(page_size) = self.page_size {
-                query = query.paginate(page_size, 0)
-            }
+            && let Some(page_size) = self.page_size
+        {
+            query = query.paginate(page_size, 0)
+        }
 
         query
     }

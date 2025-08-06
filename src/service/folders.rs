@@ -144,9 +144,10 @@ pub async fn update_folder(
 
     folder.folder_id = folder_id.to_string();
     if let Ok(existing_folder) = get_folder_by_name(org_id, &folder.name, folder_type).await
-        && existing_folder.folder_id != folder_id {
-            return Err(FolderError::FolderNameAlreadyExists);
-        }
+        && existing_folder.folder_id != folder_id
+    {
+        return Err(FolderError::FolderNameAlreadyExists);
+    }
     let (_, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
 
     #[cfg(feature = "enterprise")]

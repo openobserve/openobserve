@@ -586,9 +586,7 @@ pub async fn cache_results_to_disk(
         Ok(_) => (),
         Err(e) => {
             log::error!("Error caching results to disk: {:?}", e);
-            return Err(std::io::Error::other(
-                "Error caching results to disk",
-            ));
+            return Err(std::io::Error::other("Error caching results to disk"));
         }
     }
     Ok(())
@@ -675,20 +673,19 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
             // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
             if let Some(file_name) = file.split('/').next_back()
                 && let Some(start_time_str) = file_name.split('_').next()
-                    && let Ok(start_time) = start_time_str.parse::<i64>() {
-                        // Only delete if start_time < delete_ts (keep cache from delete_ts onwards)
-                        if start_time > delete_ts {
-                            continue; // Skip this file, keep it
-                        }
-                    }
+                && let Ok(start_time) = start_time_str.parse::<i64>()
+            {
+                // Only delete if start_time < delete_ts (keep cache from delete_ts onwards)
+                if start_time > delete_ts {
+                    continue; // Skip this file, keep it
+                }
+            }
         }
         match disk::remove("", file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
             Err(e) => {
                 log::error!("Error deleting cache: {:?}", e);
-                return Err(std::io::Error::other(
-                    "Error deleting cache",
-                ));
+                return Err(std::io::Error::other("Error deleting cache"));
             }
         }
     }

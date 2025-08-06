@@ -415,20 +415,22 @@ pub async fn update_stream_settings(
                     }
             }
             if !new_settings.defined_schema_fields.remove.is_empty()
-                && let Some(schema_fields) = settings.defined_schema_fields.as_mut() {
-                    schema_fields
-                        .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
-                }
+                && let Some(schema_fields) = settings.defined_schema_fields.as_mut()
+            {
+                schema_fields
+                    .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
+            }
             if let Some(schema_fields) = settings.defined_schema_fields.as_ref()
-                && schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
-                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        format!(
-                            "user defined schema fields count exceeds the limit: {}",
-                            cfg.limit.user_defined_schema_max_fields
-                        ),
-                    )));
-                }
+                && schema_fields.len() > cfg.limit.user_defined_schema_max_fields
+            {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST.into(),
+                    format!(
+                        "user defined schema fields count exceeds the limit: {}",
+                        cfg.limit.user_defined_schema_max_fields
+                    ),
+                )));
+            }
 
             // check for bloom filter fields
             if !new_settings.bloom_filter_fields.add.is_empty() {
@@ -539,14 +541,15 @@ pub async fn update_stream_settings(
                     }
                     // here we can be sure that usage is at most 1 record
                     if let Some(entry) = usage.first()
-                        && entry.origin != OriginType::Stream {
-                            return Ok(HttpResponse::BadRequest().json(
+                        && entry.origin != OriginType::Stream
+                    {
+                        return Ok(HttpResponse::BadRequest().json(
                                 MetaHttpResponse::error(
                                     http::StatusCode::BAD_REQUEST.into(),
                                     format!("error in removing distinct field : field {f} if used in dashboards/reports"),
                                 ),
                             ));
-                        }
+                    }
                 }
                 // here we are sure that all fields to be removed can be removed,
                 // so we bulk filter
@@ -624,23 +627,24 @@ pub async fn delete_stream(
     // delete associated pipelines
     if let Some(pipeline) =
         db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
-        && let Err(e) = db::pipeline::delete(&pipeline.id).await {
-            return Ok(HttpResponse::InternalServerError()
-                .append_header((
-                    ERROR_HEADER,
-                    format!(
-                        "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
-                        pipeline.name
-                    ),
-                ))
-                .json(MetaHttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    format!(
-                        "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
-                        pipeline.name
-                    ),
-                )));
-        }
+        && let Err(e) = db::pipeline::delete(&pipeline.id).await
+    {
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((
+                ERROR_HEADER,
+                format!(
+                    "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
+                    pipeline.name
+                ),
+            ))
+            .json(MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                format!(
+                    "Stream deletion fail: failed to delete the associated pipeline {}: {e}",
+                    pipeline.name
+                ),
+            )));
+    }
 
     // create delete for compactor
     if let Err(e) =
@@ -746,10 +750,11 @@ async fn transform_stats(
     stats.compressed_size /= SIZE_IN_MB;
     stats.index_size /= SIZE_IN_MB;
     if stream_type == StreamType::EnrichmentTables
-        && let Some(meta) = enrichment_table::get_meta_table_stats(org_id, stream_name).await {
-            stats.doc_time_min = meta.start_time;
-            stats.doc_time_max = meta.end_time;
-        }
+        && let Some(meta) = enrichment_table::get_meta_table_stats(org_id, stream_name).await
+    {
+        stats.doc_time_min = meta.start_time;
+        stats.doc_time_max = meta.end_time;
+    }
 }
 
 pub async fn delete_fields(

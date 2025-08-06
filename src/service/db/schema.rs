@@ -356,9 +356,9 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 if (settings.store_original_data || settings.index_original_data)
                     && let dashmap::Entry::Vacant(entry) =
                         STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
-                    {
-                        entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
-                    }
+                {
+                    entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
+                }
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
                 infra::schema::set_stream_settings_atomic(w.clone());
@@ -440,16 +440,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     );
                     let path = std::path::Path::new(&data_dir);
                     if path.exists()
-                        && let Err(e) = tokio::fs::remove_dir_all(path).await {
-                            log::error!("[Schema:watch] remove_dir_all: {}", e);
-                        };
+                        && let Err(e) = tokio::fs::remove_dir_all(path).await
+                    {
+                        log::error!("[Schema:watch] remove_dir_all: {}", e);
+                    };
                 }
                 if stream_type.eq(&StreamType::EnrichmentTables)
                     && let Err(e) =
                         config::utils::enrichment_local_cache::delete(org_id, stream_name).await
-                    {
-                        log::error!("[Schema:watch] delete local enrichment file error: {}", e);
-                    }
+                {
+                    log::error!("[Schema:watch] delete local enrichment file error: {}", e);
+                }
             }
             db::Event::Empty => {}
         }
@@ -499,9 +500,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         if (settings.store_original_data || settings.index_original_data)
             && let dashmap::Entry::Vacant(entry) =
                 STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
-            {
-                entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
-            }
+        {
+            entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
+        }
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key.to_string(), settings);
         infra::schema::set_stream_settings_atomic(w.clone());

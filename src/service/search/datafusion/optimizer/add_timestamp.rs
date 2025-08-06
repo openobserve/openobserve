@@ -65,9 +65,10 @@ impl OptimizerRule for AddTimestampRule {
             LogicalPlan::TableScan(ref scan) => {
                 let table_name = scan.table_name.clone();
                 if let Some(schema) = table_name.schema()
-                    && (schema == "enrich" || schema == "enrichment_tables") {
-                        return Ok(Transformed::no(plan));
-                    }
+                    && (schema == "enrich" || schema == "enrichment_tables")
+                {
+                    return Ok(Transformed::no(plan));
+                }
                 let filter_plan =
                     LogicalPlan::Filter(Filter::try_new(self.filter.clone(), Arc::new(plan))?);
                 Ok(Transformed::yes(filter_plan))

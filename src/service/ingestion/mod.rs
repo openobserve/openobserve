@@ -67,9 +67,7 @@ pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
 pub fn compile_vrl_function(func: &str, org_id: &str) -> Result<VRLRuntimeConfig, std::io::Error> {
     if func.contains("get_env_var") {
-        return Err(std::io::Error::other(
-            "get_env_var is not supported",
-        ));
+        return Err(std::io::Error::other("get_env_var is not supported"));
     }
 
     let external = state::ExternalEnv::default();
@@ -420,10 +418,10 @@ pub fn check_ingestion_allowed(
 
     // check if we are allowed to ingest
     if let Some(stream_name) = stream_name
-        && db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
-            return Err(anyhow!("stream [{stream_name}] is being deleted"));
-        }
-    ;
+        && db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None)
+    {
+        return Err(anyhow!("stream [{stream_name}] is being deleted"));
+    };
 
     // check memory circuit breaker
     ingester::check_memory_circuit_breaker()?;

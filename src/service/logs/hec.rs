@@ -77,11 +77,12 @@ pub async fn ingest(
             data["_timestamp"] = s.into();
         }
         if let Some(fields) = value.fields
-            && let Some(o) = fields.as_object() {
-                for (f, v) in o {
-                    data[f] = v.to_owned()
-                }
+            && let Some(o) = fields.as_object()
+        {
+            for (f, v) in o {
+                data[f] = v.to_owned()
             }
+        }
 
         let index = if let Some(idx) = value.index {
             idx

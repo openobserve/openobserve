@@ -423,43 +423,43 @@ pub async fn process_search_stream_request(
                         );
                         e
                     })
+        {
+            // send audit response first
+            #[cfg(feature = "enterprise")]
             {
-                // send audit response first
-                #[cfg(feature = "enterprise")]
-                {
-                    let resp = map_error_to_http_response(&e, None).status().into();
-                    if get_o2_config().common.audit_enabled {
-                        // Using spawn to handle the async call
-                        audit(AuditMessage {
-                            user_email: user_id,
-                            org_id,
-                            _timestamp: chrono::Utc::now().timestamp(),
-                            protocol: Protocol::Http,
-                            response_meta: ResponseMeta {
-                                http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
-                                http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
-                                http_query_params: _audit_ctx
-                                    .as_ref()
-                                    .unwrap()
-                                    .query_params
-                                    .to_string(),
-                                http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
-                                http_response_code: resp,
-                                error_msg: Some(e.to_string()),
-                                trace_id: Some(trace_id.to_string()),
-                            },
-                        })
-                        .await;
-                    }
+                let resp = map_error_to_http_response(&e, None).status().into();
+                if get_o2_config().common.audit_enabled {
+                    // Using spawn to handle the async call
+                    audit(AuditMessage {
+                        user_email: user_id,
+                        org_id,
+                        _timestamp: chrono::Utc::now().timestamp(),
+                        protocol: Protocol::Http,
+                        response_meta: ResponseMeta {
+                            http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
+                            http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
+                            http_query_params: _audit_ctx
+                                .as_ref()
+                                .unwrap()
+                                .query_params
+                                .to_string(),
+                            http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
+                            http_response_code: resp,
+                            error_msg: Some(e.to_string()),
+                            trace_id: Some(trace_id.to_string()),
+                        },
+                    })
+                    .await;
                 }
-
-                if sender.send(Err(e)).await.is_err() {
-                    log::warn!(
-                        "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stopping process_search_stream_request",
-                    );
-                }
-                return;
             }
+
+            if sender.send(Err(e)).await.is_err() {
+                log::warn!(
+                    "[HTTP2_STREAM trace_id {trace_id}] Sender is closed, stopping process_search_stream_request",
+                );
+            }
+            return;
+        }
     } else {
         // Step 4: Search without cache for req with from > 0
         let size = req.query.size;

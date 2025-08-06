@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 use config::{
     meta::{
@@ -234,9 +234,7 @@ pub async fn create_org(org: &Organization) -> Result<Organization, Error> {
         Ok(_) => Ok(org.clone()),
         Err(e) => {
             log::error!("Error creating org: {}", e);
-            Err(Error::other(
-                format!("Error creating org: {e}"),
-            ))
+            Err(Error::other(format!("Error creating org: {e}")))
         }
     }
 }

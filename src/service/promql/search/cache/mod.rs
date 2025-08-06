@@ -257,13 +257,12 @@ pub async fn set(
     let need_gc = r.cacher.len() >= r.max_entries - METRICS_INDEX_CACHE_GC_TRIGGER_NUM;
     drop(r);
 
-    if need_gc
-        && let Err(err) = gc(bucket_id).await {
-            log::error!(
-                "[trace_id {trace_id}] promql->search->cache: gc err: {:?}",
-                err
-            );
-        }
+    if need_gc && let Err(err) = gc(bucket_id).await {
+        log::error!(
+            "[trace_id {trace_id}] promql->search->cache: gc err: {:?}",
+            err
+        );
+    }
 
     // filter the samples
     if end >= max_ts {

@@ -328,9 +328,10 @@ pub async fn save_enrichment_data(
 
     // notify update
     if !schema.fields().is_empty()
-        && let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await {
-            log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
-        };
+        && let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await
+    {
+        log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
+    };
 
     // req_stats.response_time = start.elapsed().as_secs_f64();
     log::info!("save enrichment data to: {org_id}/{table_name}/{append_data} success with stats");

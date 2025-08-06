@@ -473,10 +473,11 @@ async fn write_file_list(
         for _ in 0..5 {
             // only store the file_list into history, don't delete files
             if cfg.compact.data_retention_history
-                && let Err(e) = infra_file_list::batch_add_history(events).await {
-                    log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
-                    return Err(e.into());
-                }
+                && let Err(e) = infra_file_list::batch_add_history(events).await
+            {
+                log::error!("[COMPACTOR] file_list batch_add_history failed: {}", e);
+                return Err(e.into());
+            }
             // delete from file_list table
             if let Err(e) = infra_file_list::batch_process(events).await {
                 log::error!("[COMPACTOR] batch_delete to db failed, retrying: {}", e);

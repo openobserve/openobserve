@@ -423,9 +423,9 @@ pub async fn search_http2_stream(
                     && let StreamResponses::SearchResponse {
                         ref mut results, ..
                     } = v
-                    {
-                        results.converted_histogram_query = converted_histogram_query.clone();
-                    }
+                {
+                    results.converted_histogram_query = converted_histogram_query.clone();
+                }
                 v.to_chunks()
             }
             Err(err) => {

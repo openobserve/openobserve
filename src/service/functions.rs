@@ -59,12 +59,13 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             func.function = format!("{} \n .", func.function);
         }
         if func.trans_type.unwrap() == 0
-            && let Err(e) = compile_vrl_function(func.function.as_str(), &org_id) {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    StatusCode::BAD_REQUEST.into(),
-                    e.to_string(),
-                )));
-            }
+            && let Err(e) = compile_vrl_function(func.function.as_str(), &org_id)
+        {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )));
+        }
         extract_num_args(&mut func);
         if let Err(error) = db::functions::set(&org_id, &func.name, &func).await {
             Ok(map_error_to_http_response(&error.into(), None))
@@ -211,12 +212,13 @@ pub async fn update_function(
         func.function = format!("{} \n .", func.function);
     }
     if func.trans_type.unwrap() == 0
-        && let Err(e) = compile_vrl_function(&func.function, org_id) {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                StatusCode::BAD_REQUEST.into(),
-                e.to_string(),
-            )));
-        }
+        && let Err(e) = compile_vrl_function(&func.function, org_id)
+    {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            StatusCode::BAD_REQUEST.into(),
+            e.to_string(),
+        )));
+    }
     extract_num_args(&mut func);
 
     if let Err(error) = db::functions::set(org_id, &func.name, &func).await {
@@ -227,17 +229,18 @@ pub async fn update_function(
     if let Ok(associated_pipelines) = db::pipeline::list_by_org(org_id).await {
         for pipeline in associated_pipelines {
             if pipeline.contains_function(&func.name)
-                && let Err(e) = db::pipeline::update(&pipeline, None).await {
-                    return Ok(HttpResponse::InternalServerError()
-                        .append_header((ERROR_HEADER, e.to_string()))
-                        .json(MetaHttpResponse::message(
-                            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                            format!(
-                                "Failed to update associated pipeline({}/{}): {}",
-                                pipeline.id, pipeline.name, e
-                            ),
-                        )));
-                }
+                && let Err(e) = db::pipeline::update(&pipeline, None).await
+            {
+                return Ok(HttpResponse::InternalServerError()
+                    .append_header((ERROR_HEADER, e.to_string()))
+                    .json(MetaHttpResponse::message(
+                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        format!(
+                            "Failed to update associated pipeline({}/{}): {}",
+                            pipeline.id, pipeline.name, e
+                        ),
+                    )));
+            }
         }
     }
 
@@ -287,25 +290,26 @@ pub async fn delete_function(org_id: String, fn_name: String) -> Result<HttpResp
     // TODO(taiming): Function Stream Association to be deprecated starting v0.13.1.
     // remove this check after migrating functions to its dedicated table
     if let Some(val) = existing_fn.streams
-        && !val.is_empty() {
-            let names = val
-                .iter()
-                .filter_map(|stream| {
-                    if !stream.is_removed {
-                        Some(stream.stream.to_owned())
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(", ");
-            if !names.is_empty() {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    StatusCode::BAD_REQUEST.into(),
-                    format!("{FN_IN_USE} {names}"),
-                )));
-            }
+        && !val.is_empty()
+    {
+        let names = val
+            .iter()
+            .filter_map(|stream| {
+                if !stream.is_removed {
+                    Some(stream.stream.to_owned())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        if !names.is_empty() {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                StatusCode::BAD_REQUEST.into(),
+                format!("{FN_IN_USE} {names}"),
+            )));
         }
+    }
     let pipeline_dep = get_dependencies(&org_id, &fn_name).await;
     if !pipeline_dep.is_empty() {
         let pipeline_data = serde_json::to_string(&pipeline_dep).unwrap_or("[]".to_string());

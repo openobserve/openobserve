@@ -65,9 +65,10 @@ pub async fn shorten(org_id: &str, original_url: &str) -> Result<String, anyhow:
     let mut short_id = generate_short_id(original_url, None);
 
     if let Ok(existing_url) = db::short_url::get(&short_id).await
-        && existing_url == original_url {
-            return Ok(construct_short_url(org_id, &short_id));
-        }
+        && existing_url == original_url
+    {
+        return Ok(construct_short_url(org_id, &short_id));
+    }
 
     let result = store_short_url(org_id, &short_id, original_url).await;
     match result {

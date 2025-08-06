@@ -449,11 +449,12 @@ async fn migrate_alert_destination_names() -> Result<(), anyhow::Error> {
                 Ok(_) => {
                     // New destination created, delete the old one
                     if create
-                        && let Err(e) = db::alerts::destinations::delete(keys[0], dest_name).await {
-                            log::error!(
-                                "Destination:Migration]: Error updating unsupported destination name {dest_name}: {e}"
-                            );
-                        }
+                        && let Err(e) = db::alerts::destinations::delete(keys[0], dest_name).await
+                    {
+                        log::error!(
+                            "Destination:Migration]: Error updating unsupported destination name {dest_name}: {e}"
+                        );
+                    }
                 }
                 Err(e) => {
                     log::error!(

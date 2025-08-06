@@ -162,9 +162,10 @@ pub async fn search_multi(
         .and_then(|v| base64::decode_url(v).ok());
 
     if let Some(vrl_function) = &query_fn
-        && !vrl_function.trim().ends_with('.') {
-            query_fn = Some(format!("{vrl_function} \n ."));
-        }
+        && !vrl_function.trim().ends_with('.')
+    {
+        query_fn = Some(format!("{vrl_function} \n ."));
+    }
 
     let mut range_error = String::new();
 
@@ -451,14 +452,12 @@ pub async fn search_multi(
                 multi_res.function_error =
                     vec![multi_res.function_error.join(", "), err.to_string()];
                 if let errors::Error::ErrorCode(code) = err
-                    && let errors::ErrorCodes::SearchCancelQuery(_) = code {
-                        return Ok(HttpResponse::TooManyRequests().json(
-                            meta::http::HttpResponse::error_code_with_trace_id(
-                                &code,
-                                Some(trace_id),
-                            ),
-                        ));
-                    }
+                    && let errors::ErrorCodes::SearchCancelQuery(_) = code
+                {
+                    return Ok(HttpResponse::TooManyRequests().json(
+                        meta::http::HttpResponse::error_code_with_trace_id(&code, Some(trace_id)),
+                    ));
+                }
             }
         }
     }

@@ -248,9 +248,10 @@ async fn handle_diff_schema(
     // check if the schema has been updated by another thread
     let read_cache = STREAM_SCHEMAS_LATEST.read().await;
     if let Some(updated_schema) = read_cache.get(&cache_key)
-        && let (false, _) = get_schema_changes(updated_schema, inferred_schema) {
-            return Ok(None);
-        }
+        && let (false, _) = get_schema_changes(updated_schema, inferred_schema)
+    {
+        return Ok(None);
+    }
     drop(read_cache);
 
     // first update thread cache
@@ -427,9 +428,10 @@ async fn handle_diff_schema(
     let index_original_data = stream_setting.index_original_data;
     let index_all_values = stream_setting.index_all_values;
     if (need_original || index_original_data)
-        && let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone()) {
-            entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
-        }
+        && let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone())
+    {
+        entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
+    }
     let mut w = STREAM_SETTINGS.write().await;
     w.insert(cache_key.clone(), stream_setting);
     infra::schema::set_stream_settings_atomic(w.clone());
@@ -586,9 +588,10 @@ pub async fn stream_schema_exists(
 
     let settings = unwrap_stream_settings(&schema);
     if let Some(stream_setting) = settings
-        && !stream_setting.partition_keys.is_empty() {
-            schema_chk.has_partition_keys = true;
-        }
+        && !stream_setting.partition_keys.is_empty()
+    {
+        schema_chk.has_partition_keys = true;
+    }
     if schema.metadata().contains_key(METADATA_LABEL) {
         schema_chk.has_metadata = true;
     }

@@ -988,14 +988,14 @@ async fn values_v1(
     };
 
     if let Some(v) = query.get("sql")
-        && let Ok(sql) = base64::decode_url(v) {
-            uses_fn = functions::get_all_transform_keys(org_id)
-                .await
-                .iter()
-                .any(|fn_name| sql.contains(&format!("{fn_name}(")));
-            query_sql = sql;
-        }
-    ;
+        && let Ok(sql) = base64::decode_url(v)
+    {
+        uses_fn = functions::get_all_transform_keys(org_id)
+            .await
+            .iter()
+            .any(|fn_name| sql.contains(&format!("{fn_name}(")));
+        query_sql = sql;
+    };
 
     // pick up where clause from sql
     let where_str = match SearchService::sql::pickup_where(&query_sql) {

@@ -284,30 +284,31 @@ pub async fn get_search_profile(
                 if let Some(events_str) = hit.get("events")
                     && let Ok(parsed_events) = serde_json::from_str::<Vec<SearchInspectorEvent>>(
                         events_str.as_str().unwrap_or("[]"),
-                    ) {
-                        let mut inspectors = vec![];
-                        let _: Vec<_> = parsed_events
-                            .into_iter()
-                            .map(|event| {
-                                if let Some(mut fields) =
-                                    extract_search_inspector_fields(event.name.as_str())
-                                {
-                                    if fields.component == Some("summary".to_string()) {
-                                        si.sql = fields.sql.unwrap();
-                                        let time_range = fields.time_range.unwrap_or_default();
-                                        si.start_time = time_range.0;
-                                        si.end_time = time_range.1;
-                                        si.total_duration = fields.duration.unwrap_or_default();
-                                    } else {
-                                        fields.timestamp = Some(event._timestamp.to_string());
-                                        inspectors.push(fields);
-                                    }
+                    )
+                {
+                    let mut inspectors = vec![];
+                    let _: Vec<_> = parsed_events
+                        .into_iter()
+                        .map(|event| {
+                            if let Some(mut fields) =
+                                extract_search_inspector_fields(event.name.as_str())
+                            {
+                                if fields.component == Some("summary".to_string()) {
+                                    si.sql = fields.sql.unwrap();
+                                    let time_range = fields.time_range.unwrap_or_default();
+                                    si.start_time = time_range.0;
+                                    si.end_time = time_range.1;
+                                    si.total_duration = fields.duration.unwrap_or_default();
+                                } else {
+                                    fields.timestamp = Some(event._timestamp.to_string());
+                                    inspectors.push(fields);
                                 }
-                            })
-                            .collect();
+                            }
+                        })
+                        .collect();
 
-                        events.extend(inspectors);
-                    }
+                    events.extend(inspectors);
+                }
             }
 
             si.events = events;

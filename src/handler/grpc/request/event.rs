@@ -60,23 +60,24 @@ impl Event for Eventer {
                         CacheType::Disk,
                     )
                     .await
-                    {
-                        log::error!("Failed to cache file data: {}", e);
-                    }
+                {
+                    log::error!("Failed to cache file data: {}", e);
+                }
                 // cache index for the parquet
-                if cfg.cache_latest_files.cache_index && item.meta.index_size > 0
+                if cfg.cache_latest_files.cache_index
+                    && item.meta.index_size > 0
                     && let Some(ttv_file) = convert_parquet_file_name_to_tantivy_file(&item.key)
-                        && let Err(e) = crate::job::queue_download(
-                            TRACE_ID_FOR_CACHE_LATEST_FILE,
-                            &ttv_file,
-                            item.meta.index_size,
-                            item.meta.max_ts,
-                            CacheType::Disk,
-                        )
-                        .await
-                        {
-                            log::error!("Failed to cache file data: {}", e);
-                        }
+                    && let Err(e) = crate::job::queue_download(
+                        TRACE_ID_FOR_CACHE_LATEST_FILE,
+                        &ttv_file,
+                        item.meta.index_size,
+                        item.meta.max_ts,
+                        CacheType::Disk,
+                    )
+                    .await
+                {
+                    log::error!("Failed to cache file data: {}", e);
+                }
             }
 
             // delete merge files

@@ -873,32 +873,33 @@ async fn write_traces(
 
         // Start check for alert trigger
         if let Some(alerts) = cur_stream_alerts
-            && triggers.len() < alerts.len() {
-                let alert_end_time = now_micros();
-                for alert in alerts {
-                    let key = format!(
-                        "{}/{}/{}/{}",
-                        org_id,
-                        StreamType::Traces,
-                        stream_name,
-                        alert.get_unique_key()
-                    );
-                    // check if alert already evaluated
-                    if evaluated_alerts.contains(&key) {
-                        continue;
+            && triggers.len() < alerts.len()
+        {
+            let alert_end_time = now_micros();
+            for alert in alerts {
+                let key = format!(
+                    "{}/{}/{}/{}",
+                    org_id,
+                    StreamType::Traces,
+                    stream_name,
+                    alert.get_unique_key()
+                );
+                // check if alert already evaluated
+                if evaluated_alerts.contains(&key) {
+                    continue;
+                }
+                match alert
+                    .evaluate(Some(&record_val), (None, alert_end_time), None)
+                    .await
+                {
+                    Ok(res) if res.data.is_some() => {
+                        triggers.push((alert.clone(), res.data.unwrap()));
+                        evaluated_alerts.insert(key);
                     }
-                    match alert
-                        .evaluate(Some(&record_val), (None, alert_end_time), None)
-                        .await
-                    {
-                        Ok(res) if res.data.is_some() => {
-                            triggers.push((alert.clone(), res.data.unwrap()));
-                            evaluated_alerts.insert(key);
-                        }
-                        _ => {}
-                    }
+                    _ => {}
                 }
             }
+        }
         // End check for alert trigger
 
         // get hour key
@@ -937,16 +938,19 @@ async fn write_traces(
     })?;
 
     // send distinct_values
-    if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
-        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
-            log::error!("Error while writing distinct values: {}", e);
-        }
+    if !distinct_values.is_empty()
+        && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
+        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
+    {
+        log::error!("Error while writing distinct values: {}", e);
+    }
 
     // send trace metadata
     if !trace_index_values.is_empty()
-        && let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await {
-            log::error!("Error while writing trace_index values: {}", e);
-        }
+        && let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await
+    {
+        log::error!("Error while writing trace_index values: {}", e);
+    }
 
     // only one trigger per request
     evaluate_trigger(triggers).await;

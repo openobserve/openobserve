@@ -86,20 +86,21 @@ impl VisitorMut for HistogramIntervalVisitorMut {
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Function(func) = expr
             && func.name.to_string().to_lowercase() == "histogram"
-                && let FunctionArguments::List(list) = &mut func.args {
-                    let mut args = list.args.iter();
-                    // first is field
-                    let _ = args.next();
-                    // second is interval
-                    if args.next().is_none() {
-                        let interval_value = format!("{} seconds", self.interval);
-                        list.args.push(sqlparser::ast::FunctionArg::Unnamed(
-                            sqlparser::ast::FunctionArgExpr::Expr(Expr::Value(
-                                sqlparser::ast::Value::SingleQuotedString(interval_value),
-                            )),
-                        ));
-                    }
-                }
+            && let FunctionArguments::List(list) = &mut func.args
+        {
+            let mut args = list.args.iter();
+            // first is field
+            let _ = args.next();
+            // second is interval
+            if args.next().is_none() {
+                let interval_value = format!("{} seconds", self.interval);
+                list.args.push(sqlparser::ast::FunctionArg::Unnamed(
+                    sqlparser::ast::FunctionArgExpr::Expr(Expr::Value(
+                        sqlparser::ast::Value::SingleQuotedString(interval_value),
+                    )),
+                ));
+            }
+        }
         ControlFlow::Continue(())
     }
 }

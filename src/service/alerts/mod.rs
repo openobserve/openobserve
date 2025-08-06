@@ -630,19 +630,20 @@ async fn build_sql(
     };
 
     if let Some(group) = agg.group_by.as_ref()
-        && !group.is_empty() {
-            sql = format!(
-                "SELECT {}, {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
-                group.join(", "),
-                func_expr,
-                TIMESTAMP_COL_NAME,
-                TIMESTAMP_COL_NAME,
-                stream_name,
-                where_sql,
-                group.join(", "),
-                having_expr
-            );
-        }
+        && !group.is_empty()
+    {
+        sql = format!(
+            "SELECT {}, {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
+            group.join(", "),
+            func_expr,
+            TIMESTAMP_COL_NAME,
+            TIMESTAMP_COL_NAME,
+            stream_name,
+            where_sql,
+            group.join(", "),
+            having_expr
+        );
+    }
     if sql.is_empty() {
         sql = format!(
             "SELECT {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\" {where_sql} HAVING {having_expr}"

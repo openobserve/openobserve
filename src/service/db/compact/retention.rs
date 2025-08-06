@@ -53,9 +53,10 @@ pub async fn delete_stream(
 
     // write in cache
     if let Some(v) = CACHE.get(&key)
-        && v.value() + hour_micros(1) > now_micros() {
-            return Ok(key); // already in cache, don't create same task in one hour
-        }
+        && v.value() + hour_micros(1) > now_micros()
+    {
+        return Ok(key); // already in cache, don't create same task in one hour
+    }
 
     CACHE.insert(key.clone(), now_micros());
     db::put(&db_key, "OK".into(), db::NEED_WATCH, None).await?;

@@ -1455,9 +1455,10 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
     /// value are not valid inputs
     fn set(&mut self, key: &str, value: String) {
         if let Ok(key) = tonic::metadata::MetadataKey::from_bytes(key.as_bytes())
-            && let Ok(val) = tonic::metadata::MetadataValue::try_from(&value) {
-                self.0.insert(key, val);
-            }
+            && let Ok(val) = tonic::metadata::MetadataValue::try_from(&value)
+        {
+            self.0.insert(key, val);
+        }
     }
 }
 
@@ -1471,9 +1472,10 @@ pub fn generate_search_schema_diff(
 
     for field in schema.fields().iter() {
         if let Some(latest_field) = latest_schema_map.get(field.name())
-            && field.data_type() != latest_field.data_type() {
-                diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
-            }
+            && field.data_type() != latest_field.data_type()
+        {
+            diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
+        }
     }
 
     diff_fields

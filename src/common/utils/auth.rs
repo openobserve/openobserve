@@ -180,11 +180,12 @@ impl FromRequest for UserEmail {
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         if let Some(auth_header) = req.headers().get("user_id")
-            && let Ok(user_str) = auth_header.to_str() {
-                return ready(Ok(UserEmail {
-                    user_id: user_str.to_owned(),
-                }));
-            }
+            && let Ok(user_str) = auth_header.to_str()
+        {
+            return ready(Ok(UserEmail {
+                user_id: user_str.to_owned(),
+            }));
+        }
         ready(Err(actix_web::error::ErrorUnauthorized("No user found")))
     }
 }
@@ -841,9 +842,7 @@ pub fn generate_presigned_url(
     let user_pass = format!("{username}:{stage3}");
     let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
 
-    format!(
-        "{base_url}/auth/login?request_time={time}&exp_in={exp_in}&auth={auth}"
-    )
+    format!("{base_url}/auth/login?request_time={time}&exp_in={exp_in}&auth={auth}")
 }
 
 #[cfg(not(feature = "enterprise"))]

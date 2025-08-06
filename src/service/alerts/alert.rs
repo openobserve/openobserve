@@ -408,18 +408,18 @@ async fn prepare_alert(
                 if !stream.eq(stream_name)
                     && let Some(settings) =
                         infra::schema::get_settings(org_id, stream, stream_type).await
+                {
+                    let max_query_range = settings.max_query_range;
+                    if max_query_range > 0
+                        && !alert.is_real_time
+                        && alert.trigger_condition.period > max_query_range * 60
                     {
-                        let max_query_range = settings.max_query_range;
-                        if max_query_range > 0
-                            && !alert.is_real_time
-                            && alert.trigger_condition.period > max_query_range * 60
-                        {
-                            return Err(AlertError::PeriodExceedsMaxQueryRange {
-                                max_query_range_hours: max_query_range,
-                                stream_name: stream_name.to_owned(),
-                            });
-                        }
+                        return Err(AlertError::PeriodExceedsMaxQueryRange {
+                            max_query_range_hours: max_query_range,
+                            stream_name: stream_name.to_owned(),
+                        });
                     }
+                }
             }
         }
         QueryType::PromQL => {
@@ -1394,9 +1394,9 @@ async fn process_dest_template(
                         conditions,
                     )
                     .await
-                    {
-                        alert_query = v;
-                    }
+                {
+                    alert_query = v;
+                }
             }
             _ => unreachable!(),
         };

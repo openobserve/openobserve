@@ -228,9 +228,10 @@ impl Manager {
             .unwrap_or_else(|_| panic!("need a thread id, but the file is: {file_name}"));
         let key = columns[1..columns.len() - 1].join("/");
         if let Some(file) = self.get(thread_id, stream, &key).await
-            && file.name() == file_name {
-                return true;
-            }
+            && file.name() == file_name
+        {
+            return true;
+        }
         false
     }
 }

@@ -227,9 +227,7 @@ async fn proxy(
         .request(method, &path.target_url)
         .send()
         .await
-        .map_err(|e| {
-            actix_web::error::ErrorInternalServerError(format!("Request failed: {e}"))
-        })?;
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Request failed: {e}")))?;
 
     let status = forwarded_resp.status().as_u16();
     let body = forwarded_resp.bytes().await.map_err(|e| {

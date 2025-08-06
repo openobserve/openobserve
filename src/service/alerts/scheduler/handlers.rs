@@ -450,14 +450,15 @@ async fn handle_alert_triggers(
         );
     }
     if let Some(tolerance) = alert.trigger_condition.tolerance_in_secs
-        && tolerance > 0 {
-            let tolerance = Duration::seconds(get_rand_num_within(0, tolerance as u64) as i64)
-                .num_microseconds()
-                .unwrap();
-            if tolerance > 0 {
-                trigger_data.tolerance = tolerance;
-            }
+        && tolerance > 0
+    {
+        let tolerance = Duration::seconds(get_rand_num_within(0, tolerance as u64) as i64)
+            .num_microseconds()
+            .unwrap();
+        if tolerance > 0 {
+            trigger_data.tolerance = tolerance;
         }
+    }
     if trigger_results.data.is_some() && alert.trigger_condition.silence > 0 {
         new_trigger.next_run_at = alert.trigger_condition.get_aligned_next_trigger_time(
             true,

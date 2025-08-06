@@ -374,10 +374,11 @@ impl QuerierConnection {
     pub async fn _send_ping(&self) -> WsResult<()> {
         let mut write_guard = self.write.write().await;
         if let Some(write) = write_guard.as_mut()
-            && let Err(e) = write.send(WsMessage::Ping(vec![])).await {
-                drop(write_guard);
-                return Err(WsError::ConnectionError(e.to_string()));
-            }
+            && let Err(e) = write.send(WsMessage::Ping(vec![])).await
+        {
+            drop(write_guard);
+            return Err(WsError::ConnectionError(e.to_string()));
+        }
         drop(write_guard);
         Ok(())
     }

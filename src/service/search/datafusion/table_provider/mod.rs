@@ -279,9 +279,10 @@ impl NewListingTable {
         // If disable pruning then set the predicate to None, thus readers
         // will not prune data based on the statistics.
         if parquet.enable_pruning()
-            && let Some(predicate) = filters.cloned() {
-                builder = builder.with_predicate(predicate);
-            }
+            && let Some(predicate) = filters.cloned()
+        {
+            builder = builder.with_predicate(predicate);
+        }
         if let Some(metadata_size_hint) = parquet.metadata_size_hint() {
             builder = builder.with_metadata_size_hint(metadata_size_hint);
         }

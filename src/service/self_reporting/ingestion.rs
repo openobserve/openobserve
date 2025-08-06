@@ -50,18 +50,17 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                     .search_event_context
                     .as_ref()
                     .map(|ctx| (&ctx.dashboard_id, &ctx.dashboard_name))
-                    && let Ok((folder, dashboard)) = service::dashboards::get_folder_and_dashboard(
-                        &usage_data.org_id,
-                        dashboard_id,
-                    )
-                    .await
-                        && let Some(ctx) = usage_data.search_event_context.as_mut() {
-                            ctx.enrich_for_dashboard(
-                                dashboard.title().unwrap().to_string(),
-                                folder.name,
-                                folder.folder_id,
-                            )
-                        };
+                && let Ok((folder, dashboard)) =
+                    service::dashboards::get_folder_and_dashboard(&usage_data.org_id, dashboard_id)
+                        .await
+                && let Some(ctx) = usage_data.search_event_context.as_mut()
+            {
+                ctx.enrich_for_dashboard(
+                    dashboard.title().unwrap().to_string(),
+                    folder.name,
+                    folder.folder_id,
+                )
+            };
             search_events.push(usage_data.clone());
             continue;
         }

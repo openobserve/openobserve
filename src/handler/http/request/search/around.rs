@@ -58,9 +58,10 @@ pub(crate) async fn around(
         .get("query_fn")
         .and_then(|v| base64::decode_url(v).ok());
     if let Some(vrl_function) = &query_fn
-        && !vrl_function.trim().ends_with('.') {
-            query_fn = Some(format!("{vrl_function} \n ."));
-        }
+        && !vrl_function.trim().ends_with('.')
+    {
+        query_fn = Some(format!("{vrl_function} \n ."));
+    }
 
     let default_sql = format!("SELECT * FROM \"{stream_name}\" ");
     let mut around_sql = if let Some(sql) = sql {
@@ -81,9 +82,10 @@ pub(crate) async fn around(
         let data: json::Value = json::from_slice(&body).unwrap_or_default();
         if let Some(data) = data.as_object() {
             if let Some(key) = data.get(TIMESTAMP_COL_NAME)
-                && let Some(ts) = key.as_i64() {
-                    around_key = ts;
-                }
+                && let Some(ts) = key.as_i64()
+            {
+                around_key = ts;
+            }
             for field in DEFAULT_SEARCH_AROUND_FIELDS.iter() {
                 if let Some(value) = data.get(field) {
                     if value.is_null() {

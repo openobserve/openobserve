@@ -71,14 +71,14 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
                 .collect::<Vec<_>>(),
         )
         .await
-        {
-            // maybe the file already deleted or there's not related index files,
-            // so we just skip the `not found` error
-            if !e.to_string().to_lowercase().contains("not found") {
-                log::error!("[COMPACTOR] delete files from storage failed: {e}");
-                return Err(e.into());
-            }
+    {
+        // maybe the file already deleted or there's not related index files,
+        // so we just skip the `not found` error
+        if !e.to_string().to_lowercase().contains("not found") {
+            log::error!("[COMPACTOR] delete files from storage failed: {e}");
+            return Err(e.into());
         }
+    }
 
     // delete flattened files from storage
     let flattened_files = files
@@ -103,13 +103,13 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
                 .collect::<Vec<_>>(),
         )
         .await
-        {
-            // maybe the file already deleted, so we just skip the `not found` error
-            if !e.to_string().to_lowercase().contains("not found") {
-                log::error!("[COMPACTOR] delete files from storage failed: {e}");
-                return Err(e.into());
-            }
+    {
+        // maybe the file already deleted, so we just skip the `not found` error
+        if !e.to_string().to_lowercase().contains("not found") {
+            log::error!("[COMPACTOR] delete files from storage failed: {e}");
+            return Err(e.into());
         }
+    }
 
     // delete files from file_list_deleted table
     if let Err(e) = infra_file_list::batch_remove_deleted(

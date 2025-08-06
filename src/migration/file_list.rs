@@ -75,10 +75,11 @@ pub async fn run(from: &str, to: &str) -> Result<(), anyhow::Error> {
             .await
             .expect("load file_list_deleted failed");
         if !files.is_empty()
-            && let Err(e) = dest.batch_add_deleted(org_id, end_time, &files).await {
-                log::error!("load file_list_deleted into db err: {}", e);
-                continue;
-            }
+            && let Err(e) = dest.batch_add_deleted(org_id, end_time, &files).await
+        {
+            log::error!("load file_list_deleted into db err: {}", e);
+            continue;
+        }
     }
 
     // update stream stats

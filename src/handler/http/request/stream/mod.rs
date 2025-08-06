@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    cmp::Ordering,
-    io::{Error, ErrorKind},
-};
+use std::{cmp::Ordering, io::Error};
 
 use actix_web::{
     HttpRequest, HttpResponse, Responder, delete, get, http, http::StatusCode, post, put, web,
@@ -102,9 +99,10 @@ async fn schema(
 
     // filter by keyword
     if let Some(keyword) = query.get("keyword")
-        && !keyword.is_empty() {
-            schema.schema.retain(|f| f.name.contains(keyword));
-        }
+        && !keyword.is_empty()
+    {
+        schema.schema.retain(|f| f.name.contains(keyword));
+    }
 
     // set total fields
     schema.total_fields = schema.schema.len();
@@ -390,9 +388,10 @@ async fn list(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
 
     // filter by keyword
     if let Some(keyword) = query.get("keyword")
-        && !keyword.is_empty() {
-            indices.retain(|s| s.name.contains(keyword));
-        }
+        && !keyword.is_empty()
+    {
+        indices.retain(|s| s.name.contains(keyword));
+    }
 
     // sort by
     let mut sort = "name".to_string();

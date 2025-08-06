@@ -674,9 +674,10 @@ impl Drop for FlightStream {
     fn drop(&mut self) {
         let cfg = config::get_config();
         if (cfg.common.tracing_enabled || cfg.common.tracing_search_enabled)
-            && let Err(e) = self.create_stream_end_span() {
-                log::error!("error creating stream span: {}", e);
-            }
+            && let Err(e) = self.create_stream_end_span()
+        {
+            log::error!("error creating stream span: {}", e);
+        }
         log::info!(
             "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",
             self.trace_id,

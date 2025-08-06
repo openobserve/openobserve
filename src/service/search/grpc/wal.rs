@@ -126,18 +126,19 @@ pub async fn search_parquet(
             continue;
         }
         if let Some((min_ts, max_ts)) = query.time_range
-            && (file.meta.min_ts > max_ts || file.meta.max_ts < min_ts) {
-                log::debug!(
-                    "[trace_id {}] skip wal parquet file: {} time_range: [{},{})",
-                    query.trace_id,
-                    &file.key,
-                    file.meta.min_ts,
-                    file.meta.max_ts
-                );
-                wal::release_files(&[file.key.clone()]);
-                lock_files.retain(|f| f != &file.key);
-                continue;
-            }
+            && (file.meta.min_ts > max_ts || file.meta.max_ts < min_ts)
+        {
+            log::debug!(
+                "[trace_id {}] skip wal parquet file: {} time_range: [{},{})",
+                query.trace_id,
+                &file.key,
+                file.meta.min_ts,
+                file.meta.max_ts
+            );
+            wal::release_files(&[file.key.clone()]);
+            lock_files.retain(|f| f != &file.key);
+            continue;
+        }
         new_files.push(file);
     }
     let files = new_files;

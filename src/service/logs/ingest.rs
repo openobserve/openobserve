@@ -697,9 +697,10 @@ pub fn get_size_of_var_int_header(bytes: &[u8]) -> Option<usize> {
 fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Vec<json::Value>> {
     // If it's a protobuf, process it as an OpenTelemetry 1.0 metric
     if let Some(header) = get_size_of_var_int_header(&data)
-        && let Ok(a) = ExportMetricsServiceRequest::decode(&mut Cursor::new(&data[header..])) {
-            return construct_values_from_open_telemetry_v1_metric(a);
-        }
+        && let Ok(a) = ExportMetricsServiceRequest::decode(&mut Cursor::new(&data[header..]))
+    {
+        return construct_values_from_open_telemetry_v1_metric(a);
+    }
 
     let mut events = vec![];
     let mut value;

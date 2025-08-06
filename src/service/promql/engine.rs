@@ -396,17 +396,17 @@ impl Engine {
             };
             if let Some(sample) = match_sample
                 && sample.timestamp + offset_modifier <= eval_ts
-                    && sample.timestamp + offset_modifier > start
-                {
-                    let last_value = sample.value;
-                    values.push(
-                        // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
-                        InstantValue {
-                            labels: metric.labels.clone(),
-                            sample: Sample::new(eval_ts, last_value),
-                        },
-                    );
-                }
+                && sample.timestamp + offset_modifier > start
+            {
+                let last_value = sample.value;
+                values.push(
+                    // See https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#instant-queries
+                    InstantValue {
+                        labels: metric.labels.clone(),
+                        sample: Sample::new(eval_ts, last_value),
+                    },
+                );
+            }
         }
         Ok(values)
     }
@@ -1475,20 +1475,20 @@ async fn load_exemplars_from_datafusion(
                                     if let Some(range_val) = series.get_mut(&hash)
                                         && let Ok(exemplars) =
                                             json::from_str::<Vec<json::Value>>(exemplar)
-                                        {
-                                            for exemplar in exemplars {
-                                                if let Some(exemplar) = exemplar.as_object() {
-                                                    if range_val.exemplars.is_none() {
-                                                        range_val.exemplars = Some(vec![]);
-                                                    }
-                                                    range_val
-                                                        .exemplars
-                                                        .as_mut()
-                                                        .unwrap()
-                                                        .push(Arc::new(Exemplar::from(exemplar)));
+                                    {
+                                        for exemplar in exemplars {
+                                            if let Some(exemplar) = exemplar.as_object() {
+                                                if range_val.exemplars.is_none() {
+                                                    range_val.exemplars = Some(vec![]);
                                                 }
+                                                range_val
+                                                    .exemplars
+                                                    .as_mut()
+                                                    .unwrap()
+                                                    .push(Arc::new(Exemplar::from(exemplar)));
                                             }
                                         }
+                                    }
                                 }
                             } else {
                                 let hash_values = batch
@@ -1503,20 +1503,20 @@ async fn load_exemplars_from_datafusion(
                                     if let Some(range_val) = series.get_mut(&hash)
                                         && let Ok(exemplars) =
                                             json::from_str::<Vec<json::Value>>(exemplar)
-                                        {
-                                            for exemplar in exemplars {
-                                                if let Some(exemplar) = exemplar.as_object() {
-                                                    if range_val.exemplars.is_none() {
-                                                        range_val.exemplars = Some(vec![]);
-                                                    }
-                                                    range_val
-                                                        .exemplars
-                                                        .as_mut()
-                                                        .unwrap()
-                                                        .push(Arc::new(Exemplar::from(exemplar)));
+                                    {
+                                        for exemplar in exemplars {
+                                            if let Some(exemplar) = exemplar.as_object() {
+                                                if range_val.exemplars.is_none() {
+                                                    range_val.exemplars = Some(vec![]);
                                                 }
+                                                range_val
+                                                    .exemplars
+                                                    .as_mut()
+                                                    .unwrap()
+                                                    .push(Arc::new(Exemplar::from(exemplar)));
                                             }
                                         }
+                                    }
                                 }
                             }
                         }

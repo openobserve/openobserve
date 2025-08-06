@@ -34,9 +34,9 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
         && pipeline::list_streams_with_pipeline(&pipeline.org)
             .await
             .is_ok_and(|list| list.iter().any(|existing| existing == stream))
-        {
-            return Err(PipelineError::StreamInUse);
-        }
+    {
+        return Err(PipelineError::StreamInUse);
+    }
 
     // validate pipeline
     if let Err(e) = pipeline.validate() {
@@ -217,9 +217,9 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
             &existing_pipeline.id,
         )
         .await
-        {
-            return Err(PipelineError::InvalidDerivedStream(error.to_string()));
-        }
+    {
+        return Err(PipelineError::InvalidDerivedStream(error.to_string()));
+    }
 
     pipeline::delete(pipeline_id).await?;
     remove_ownership(

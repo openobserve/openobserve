@@ -1097,14 +1097,14 @@ async fn write_file_list(org_id: &str, events: &[FileKey]) -> Result<(), anyhow:
         }
         if !del_items.is_empty()
             && let Err(e) = infra_file_list::batch_add_deleted(org_id, created_at, &del_items).await
-            {
-                log::error!(
-                    "[COMPACTOR] batch_add_deleted to db failed, retrying: {}",
-                    e
-                );
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                continue;
-            }
+        {
+            log::error!(
+                "[COMPACTOR] batch_add_deleted to db failed, retrying: {}",
+                e
+            );
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            continue;
+        }
         success = true;
         break;
     }
@@ -1314,9 +1314,10 @@ fn generate_schema_diff(
 
     for field in schema.fields().iter() {
         if let Some(latest_field) = latest_schema_map.get(field.name())
-            && field.data_type() != latest_field.data_type() {
-                diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
-            }
+            && field.data_type() != latest_field.data_type()
+        {
+            diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
+        }
     }
 
     Ok(diff_fields)

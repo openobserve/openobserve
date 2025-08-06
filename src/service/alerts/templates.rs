@@ -39,9 +39,10 @@ pub async fn save(name: &str, mut template: Template, create: bool) -> Result<()
         return Err(TemplateError::InvalidName);
     }
     if let TemplateType::Email { title } = &template.template_type
-        && title.is_empty() {
-            return Err(TemplateError::EmptyTitle);
-        }
+        && title.is_empty()
+    {
+        return Err(TemplateError::EmptyTitle);
+    }
 
     match db::alerts::templates::get(&template.org_id, &template.name).await {
         Ok(existing) => {

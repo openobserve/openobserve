@@ -763,41 +763,42 @@ async fn process_node(
                 count += 1;
             }
             if !result_array_records.is_empty()
-                && let Some((vrl_runtime, true)) = &vrl_runtime {
-                    let result = match apply_vrl_fn(
-                        &mut runtime,
-                        vrl_runtime,
-                        json::Value::Array(result_array_records),
-                        &org_id,
-                        &[stream_name.clone()],
-                    ) {
-                        (res, None) => res,
-                        (res, Some(error)) => {
-                            let err_msg = format!("FunctionNode error: {error}");
-                            if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg))
-                                .await
-                            {
-                                log::error!(
-                                    "[Pipeline] {} : FunctionNode failed sending errors for collection caused by: {send_err}",
-                                    pipeline_name
-                                );
-                                return Ok(());
-                            }
-                            res
+                && let Some((vrl_runtime, true)) = &vrl_runtime
+            {
+                let result = match apply_vrl_fn(
+                    &mut runtime,
+                    vrl_runtime,
+                    json::Value::Array(result_array_records),
+                    &org_id,
+                    &[stream_name.clone()],
+                ) {
+                    (res, None) => res,
+                    (res, Some(error)) => {
+                        let err_msg = format!("FunctionNode error: {error}");
+                        if let Err(send_err) = error_sender
+                            .send((node.id.to_string(), node.node_type(), err_msg))
+                            .await
+                        {
+                            log::error!(
+                                "[Pipeline] {} : FunctionNode failed sending errors for collection caused by: {send_err}",
+                                pipeline_name
+                            );
+                            return Ok(());
                         }
-                    };
-                    // since apply_vrl_fn can produce unflattened data
-                    for record in result.as_array().unwrap().iter() {
-                        // use usize::MAX as a flag to disregard original_value
-                        send_to_children(
-                            &mut child_senders,
-                            (usize::MAX, record.clone(), false),
-                            "FunctionNode",
-                        )
-                        .await;
+                        res
                     }
+                };
+                // since apply_vrl_fn can produce unflattened data
+                for record in result.as_array().unwrap().iter() {
+                    // use usize::MAX as a flag to disregard original_value
+                    send_to_children(
+                        &mut child_senders,
+                        (usize::MAX, record.clone(), false),
+                        "FunctionNode",
+                    )
+                    .await;
                 }
+            }
             log::debug!("[Pipeline]: func node {node_idx} done processing {count} records");
         }
         NodeData::Query(_) => {
