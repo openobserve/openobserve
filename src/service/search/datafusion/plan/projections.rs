@@ -206,7 +206,6 @@ pub async fn get_result_schema(
     is_streaming: bool,
     use_cache: bool,
 ) -> Result<ResultSchemaExtractor, anyhow::Error> {
-
     if !is_streaming && use_cache {
         if let Some(interval) = sql.histogram_interval {
             handle_histogram(&mut sql.sql, sql.time_range, interval);
