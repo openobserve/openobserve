@@ -11,6 +11,7 @@ import "cluster/common.proto";
 // Cluster Info Service
 service ClusterInfoService {
   rpc GetClusterInfo(EmptyRequest) returns (GetClusterInfoResponse) {}
+  rpc GetDeleteJobStatus(GetDeleteJobStatusRequest) returns (GetDeleteJobStatusResponse) {}
 }
 
 // Response message for Get Cluster Info
