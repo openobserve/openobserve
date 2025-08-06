@@ -139,18 +139,7 @@ pub async fn search(
         ..Default::default()
     };
 
-    // 2. get inverted index file list
-    let (use_ttv_inverted_index, idx_file_list, idx_scan_size, idx_took) =
-        get_inverted_index_file_lists(trace_id, &req, &sql, &query).await?;
-    scan_stats.idx_scan_size = idx_scan_size as i64;
-    req.set_use_inverted_index(use_ttv_inverted_index);
-    log::info!(
-        "[trace_id {trace_id}] flight->search: get get_inverted_index_file_lists idx_scan_size: {:?}, idx_took: {} ms",
-        idx_scan_size,
-        idx_took,
-    );
-
-    // 3. get nodes
+    // 2. get nodes
     let get_node_start = std::time::Instant::now();
     let role_group = req
         .search_event_type
@@ -343,16 +332,9 @@ pub async fn search(
 
     let trace_id_move = trace_id.to_string();
     let query_task = DATAFUSION_RUNTIME.spawn(async move {
-        run_datafusion(
-            trace_id_move,
-            req,
-            sql,
-            nodes,
-            partitioned_file_lists,
-            idx_file_list,
-        )
-        .instrument(datafusion_span)
-        .await
+        run_datafusion(trace_id_move, req, sql, nodes, partitioned_file_lists)
+            .instrument(datafusion_span)
+            .await
     });
     tokio::pin!(query_task);
 
@@ -397,7 +379,6 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] flight->search: search finished");
 
     scan_stats.format_to_mb();
-    scan_stats.idx_took += idx_took as i64;
     scan_stats.file_list_took += file_id_list_took as i64;
     Ok((
         data,
@@ -415,7 +396,6 @@ pub async fn run_datafusion(
     sql: Arc<Sql>,
     nodes: Vec<Node>,
     partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
-    idx_file_list: Vec<FileKey>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
     let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
@@ -454,19 +434,6 @@ pub async fn run_datafusion(
         })
         .collect::<HashMap<_, _>>();
 
-    // check inverted index prefix search
-    #[allow(deprecated)]
-    if sql.stream_type == StreamType::Index
-        && cfg.common.full_text_search_type.to_lowercase() != "contains"
-    {
-        for (stream, items) in sql.prefix_items.iter() {
-            equal_keys
-                .entry(stream.clone())
-                .or_insert_with(Vec::new)
-                .extend(items.iter().map(|(k, v)| cluster_rpc::KvItem::new(k, v)));
-        }
-    }
-
     #[cfg(feature = "enterprise")]
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
     #[cfg(feature = "enterprise")]
@@ -485,7 +452,6 @@ pub async fn run_datafusion(
         req,
         nodes.into_arc_vec(),
         partitioned_file_lists,
-        idx_file_list,
         equal_keys,
         match_all_keys,
         sql.index_condition.clone(),
@@ -1016,207 +982,4 @@ pub async fn get_file_id_lists(
         file_lists.insert(stream.clone(), file_id_list);
     }
     Ok(file_lists)
-}
-
-#[tracing::instrument(
-    name = "service:search:cluster:flight:get_inverted_index_file_list",
-    skip_all
-)]
-async fn get_inverted_index_file_lists(
-    trace_id: &str,
-    req: &Request,
-    sql: &Arc<Sql>,
-    query: &SearchQuery,
-) -> Result<(bool, Vec<FileKey>, usize, usize)> {
-    let cfg = get_config();
-    #[allow(deprecated)]
-    let inverted_index_type = cfg.common.inverted_index_search_format.clone();
-    let (use_inverted_index, index_terms) = super::super::is_use_inverted_index(sql);
-    let use_parquet_inverted_index = use_inverted_index && inverted_index_type == "parquet";
-    let use_ttv_inverted_index = use_inverted_index && inverted_index_type == "tantivy";
-    log::info!(
-        "[trace_id {trace_id}] flight->search: use_inverted_index with parquet format {}",
-        use_parquet_inverted_index
-    );
-
-    if !use_parquet_inverted_index {
-        return Ok((use_ttv_inverted_index, vec![], 0, 0));
-    }
-
-    let stream_name = sql.stream_names.first().unwrap().stream_name();
-    let match_terms = sql.match_items.clone().unwrap_or_default();
-    let index_terms = generate_filter_from_equal_items(&index_terms);
-    let (idx_file_list, idx_scan_size, idx_took) = get_inverted_index_file_list(
-        req.clone(),
-        query.clone(),
-        &stream_name, // for inverted index search, only have on stream
-        &match_terms,
-        &index_terms,
-    )
-    .await?;
-    log::info!(
-        "[trace_id {trace_id}] flight->search: get file_list from inverted index time_range: {:?}, files: {}, scan_size: {} mb, took: {} ms",
-        sql.time_range,
-        idx_file_list.len(),
-        idx_scan_size,
-        idx_took,
-    );
-
-    Ok((
-        use_ttv_inverted_index,
-        idx_file_list,
-        idx_scan_size,
-        idx_took,
-    ))
-}
-
-pub async fn get_inverted_index_file_list(
-    mut req: Request,
-    mut query: SearchQuery,
-    stream_name: &str,
-    match_terms: &[String],
-    index_terms: &[(String, Vec<String>)],
-) -> Result<(Vec<FileKey>, usize, usize)> {
-    let start = std::time::Instant::now();
-    let cfg = get_config();
-
-    let org_id = req.org_id.clone();
-    let stream_type = req.stream_type;
-
-    // Get all the unique terms which the user has searched.
-    let terms = match_terms
-        .iter()
-        .filter_map(|t| {
-            #[allow(deprecated)]
-            let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
-            if tokens.is_empty() {
-                None
-            } else {
-                Some(
-                    tokens
-                        .into_iter()
-                        .max_by_key(|key| key.len())
-                        .unwrap_or_default(),
-                )
-            }
-        })
-        .collect::<HashSet<String>>();
-
-    #[allow(deprecated)]
-    let fts_condition = terms
-        .iter()
-        .map(|x| match cfg.common.full_text_search_type.as_str() {
-            "eq" => format!("term = '{x}'"),
-            "contains" => format!("term LIKE '%{x}%'"),
-            _ => format!("term LIKE '{x}%'"),
-        })
-        .collect::<Vec<_>>()
-        .join(" OR ");
-    #[allow(deprecated)]
-    let fts_condition = if fts_condition.is_empty() {
-        fts_condition
-    } else if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
-        format!(
-            "((field = '{}' OR field IS NULL) AND ({}))",
-            INDEX_FIELD_NAME_FOR_ALL, fts_condition
-        )
-    } else {
-        format!(
-            "(field = '{}' AND ({}))",
-            INDEX_FIELD_NAME_FOR_ALL, fts_condition
-        )
-    };
-
-    // Process index terms
-    let index_terms = index_terms
-        .iter()
-        .map(|(field, values)| {
-            if values.len() > 1 {
-                format!("(field = '{field}' AND term IN ('{}'))", values.join("','"))
-            } else {
-                format!(
-                    "(field = '{field}' AND term = '{}')",
-                    values.first().unwrap()
-                )
-            }
-        })
-        .collect::<Vec<_>>();
-    let index_condition = index_terms.join(" OR ");
-    // If both empty return original file list with other params as 0
-    let search_condition = match (index_condition.is_empty(), fts_condition.is_empty()) {
-        (true, true) => {
-            return Ok((vec![], 0, 0));
-        }
-        (true, false) => fts_condition,
-        (false, true) => index_condition,
-        _ => {
-            format!("{} OR {}", fts_condition, index_condition)
-        }
-    };
-
-    #[allow(deprecated)]
-    let index_stream_name =
-        if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
-            stream_name.to_string()
-        } else {
-            format!("{}_{}", stream_name, stream_type)
-        };
-    let sql = format!(
-        "SELECT file_name, segment_ids FROM \"{}\" WHERE {}",
-        index_stream_name, search_condition
-    );
-
-    req.stream_type = StreamType::Index;
-    query.sql = sql;
-    query.from = 0;
-    query.size = QUERY_WITH_NO_LIMIT as i32;
-    query.track_total_hits = false;
-    query.uses_zo_fn = false;
-    query.query_fn = "".to_string();
-    let resp = super::http::search(req, query, vec![], vec![], false).await?;
-
-    // Merge bitmap segment_ids of the same file
-    let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();
-    for item in resp.hits.iter() {
-        let filename = match item.get("file_name") {
-            None => continue,
-            Some(v) => v.as_str().unwrap(),
-        };
-        let prefixed_filename = format!(
-            "files/{}/{}/{}/{}",
-            &org_id, stream_type, stream_name, filename
-        );
-        let segment_ids = match item.get("segment_ids") {
-            None => None,
-            Some(v) => hex::decode(v.as_str().unwrap()).ok(),
-        };
-        let entry = idx_file_list
-            .entry(prefixed_filename.clone())
-            .or_insert(FileKey {
-                key: prefixed_filename,
-                ..Default::default()
-            });
-        match (&entry.segment_ids, &segment_ids) {
-            (_, None) => {}
-            (Some(bin_data), Some(segment_ids)) => {
-                let mut bv = bin_data.clone();
-                bv |= BitVec::from_slice(segment_ids);
-                entry.segment_ids = Some(bv);
-            }
-            (None, Some(segment_ids)) => {
-                entry.segment_ids = Some(BitVec::from_slice(segment_ids));
-            }
-        }
-    }
-    let mut idx_file_list = idx_file_list
-        .into_iter()
-        .map(|(_, f)| f)
-        .collect::<Vec<_>>();
-    // sorted by _timestamp
-    idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
-    Ok((
-        idx_file_list,
-        resp.scan_size,
-        start.elapsed().as_millis() as usize,
-    ))
 }

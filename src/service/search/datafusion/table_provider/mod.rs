@@ -201,7 +201,7 @@ impl NewListingTable {
         for mut file in files.into_iter() {
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let task = tokio::task::spawn(async move {
-                let access_plan = generate_access_plan(&file);
+                let access_plan = generate_access_plan_row_level(&file);
                 if let Some(access_plan) = access_plan {
                     file.extensions = Some(access_plan as _);
                 }

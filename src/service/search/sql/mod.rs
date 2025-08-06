@@ -263,7 +263,7 @@ impl Sql {
 
         //********************Change the sql start*********************************//
 
-        // 12. add _timestamp and _o2_id if need
+        // 11. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
@@ -273,8 +273,7 @@ impl Sql {
             }
         }
 
-        // 13. generate tantivy query
-        // TODO: merge IndexVisitor and IndexOptimizeModeVisitor
+        // 12. generate tantivy query
         let mut index_condition = None;
         let mut can_optimize = false;
         if stream_names.len() == 1 && cfg.common.inverted_index_enabled {
@@ -299,7 +298,7 @@ impl Sql {
         // set use_inverted_index use index_condition
         let use_inverted_index = index_condition.is_some();
 
-        // 14. check `select * from table where match_all()` optimizer
+        // 13. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
             && order_by.len() == 1
@@ -312,7 +311,7 @@ impl Sql {
             ));
         }
 
-        // 15. check other inverted index optimize modes
+        // 14. check other inverted index optimize modes
         // `select count(*) from table where match_all` -> SimpleCount
         // or `select histogram(..), count(*) from table where match_all` -> SimpleHistogram
         // or `select id, count(*) from t group by id order by cnt desc limit 10` -> SimpleTopN
@@ -343,7 +342,7 @@ impl Sql {
             }
         }
 
-        // 16. replace the Utf8 to Utf8View type
+        // 15. replace the Utf8 to Utf8View type
         let final_schemas = if cfg.common.utf8_view_enabled {
             let mut final_schemas = HashMap::with_capacity(used_schemas.len());
             for (stream, schema) in used_schemas.iter() {
@@ -1383,6 +1382,8 @@ impl VisitorMut for IndexOptimizeModeVisitor {
         ) {
             self.is_simple_count = false;
             self.is_simple_histogram = false;
+            self.simple_topn = None;
+            self.simple_distinct = None;
             return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
@@ -2147,10 +2148,9 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                     FunctionArg::ExprNamed { arg, .. } => arg,
                 };
                 match arg {
-                    FunctionArgExpr::Expr(Expr::Value(ValueWithSpan {
-                        value: Value::SingleQuotedString(s),
-                        span: _,
-                    })) => {
+                    FunctionArgExpr::Expr(Expr::Value(
+                        sqlparser::ast::Value::SingleQuotedString(s),
+                    )) => {
                         self.keys.push(s.to_owned());
                     }
                     _ => {

@@ -56,9 +56,7 @@ impl TantivyResult {
             _ => 0,
         }
     }
-}
-
-impl TantivyResult {
+  
     pub fn handle_matched_docs(searcher: &Searcher, query: Box<dyn Query>) -> anyhow::Result<Self> {
         let res = searcher.search(&query, &tantivy::collector::DocSetCollector)?;
 

@@ -220,49 +220,6 @@ async fn update_settings(
         stream::update_stream_settings(&org_id, &stream_name, stream_type, stream_settings.clone())
             .await?;
 
-    // sync the data retention to index stream
-    if stream_type.is_basic_type() && stream_settings.data_retention.is_some() {
-        #[allow(deprecated)]
-        let index_stream_name =
-            if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
-                stream_name.to_string()
-            } else {
-                format!("{}_{}", stream_name, stream_type)
-            };
-        if infra::schema::get(&org_id, &index_stream_name, StreamType::Index)
-            .await
-            .is_ok()
-        {
-            let index_stream_settings = UpdateStreamSettings {
-                data_retention: stream_settings.data_retention,
-                ..Default::default()
-            };
-            match stream::update_stream_settings(
-                &org_id,
-                &index_stream_name,
-                StreamType::Index,
-                index_stream_settings,
-            )
-            .await
-            {
-                Ok(_) => {
-                    log::debug!(
-                        "Data retention settings for {} synced to index stream {}",
-                        stream_name,
-                        index_stream_name
-                    );
-                }
-                Err(e) => {
-                    log::error!(
-                        "Failed to sync data retention settings to index stream {}: {}",
-                        index_stream_name,
-                        e
-                    );
-                }
-            }
-        }
-    }
-
     Ok(main_stream_res)
 }
 

@@ -269,7 +269,6 @@ async fn run_datafusion(
         req,
         nodes,
         HashMap::new(),
-        Vec::new(),
         partition_keys,
         match_all_keys,
         sql.index_condition.clone(),
