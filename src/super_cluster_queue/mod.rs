@@ -16,6 +16,7 @@
 mod action_scripts;
 mod alerts;
 mod cipher_keys;
+mod compactor_manual_jobs;
 mod dashboards;
 mod destinations;
 mod distinct_values;
@@ -59,6 +60,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_rate_limit_msg: ratelimit::process,
         on_re_patterns_msg: re_pattern::process,
         on_domain_management_msg: domain_management::process,
+        on_compactor_manual_job_msg: compactor_manual_jobs::process,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,

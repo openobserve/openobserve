@@ -652,7 +652,7 @@ pub fn get_ts_col_order_by(
 }
 
 #[tracing::instrument]
-pub async fn delete_cache(path: &str, may_be_ts: Option<i64>) -> std::io::Result<bool> {
+pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
     let root_dir = disk::get_dir().await;
     // Part 1: delete the results cache
     let pattern = format!("{root_dir}/results/{path}");
@@ -662,16 +662,17 @@ pub async fn delete_cache(path: &str, may_be_ts: Option<i64>) -> std::io::Result
 
     for file in files {
         // If timestamp is provided, check if we should delete this file
-        if let Some(delete_ts) = may_be_ts {
+        if delete_ts > 0 {
             // Parse the start_time from filename:
             // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
-            if let Some(file_name) = file.split('/').next_back()
-                && let Some(start_time_str) = file_name.split('_').next()
-                && let Ok(start_time) = start_time_str.parse::<i64>()
-            {
-                // Only delete if start_time < delete_ts (keep cache from delete_ts onwards)
-                if start_time > delete_ts {
-                    continue; // Skip this file, keep it
+            if let Some(file_name) = file.split('/').next_back() {
+                if let Some(start_time_str) = file_name.split('_').next() {
+                    if let Ok(start_time) = start_time_str.parse::<i64>() {
+                        // Only delete if start_time > delete_ts (keep cache from delete_ts onwards)
+                        if start_time > delete_ts {
+                            continue; // Skip this file, keep it
+                        }
+                    }
                 }
             }
         }
@@ -693,16 +694,18 @@ pub async fn delete_cache(path: &str, may_be_ts: Option<i64>) -> std::io::Result
 
         for file in aggs_files {
             // If timestamp is provided, check if we should delete this file
-            if let Some(delete_ts) = may_be_ts {
-                // Parse the start_time from filename: {start_time}_{end_time}.arrow
-                if let Some(file_name) = file.split('/').next_back()
-                    && let Some(start_time_str) = file_name.split('_').next()
-                    && let Ok(start_time) = start_time_str.parse::<i64>()
-                {
-                    // Only delete if start_time < delete_ts (keep cache from delete_ts
-                    // onwards)
-                    if start_time > delete_ts {
-                        continue; // Skip this file, keep it
+            if delete_ts > 0 {
+                // Parse the start_time from filename
+                // {start_time}_{end_time}.arrow
+                if let Some(file_name) = file.split('/').next_back() {
+                    if let Some(start_time_str) = file_name.split('_').next() {
+                        if let Ok(start_time) = start_time_str.parse::<i64>() {
+                            // Only delete if start_time > delete_ts (keep cache from delete_ts
+                            // onwards)
+                            if start_time > delete_ts {
+                                continue; // Skip this file, keep it
+                            }
+                        }
                     }
                 }
             }

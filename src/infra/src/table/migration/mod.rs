@@ -62,6 +62,7 @@ mod m20250611_000003_populate_reports_scheduled_jobs;
 mod m20250612_000001_create_re_pattern_table;
 mod m20250612_000002_create_re_pattern_stream_map_table;
 mod m20250716_000001_create_enrichment_table;
+mod m20250731_000001_create_compactor_manual_jobs;
 
 pub struct Migrator;
 

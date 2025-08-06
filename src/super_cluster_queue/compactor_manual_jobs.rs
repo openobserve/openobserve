@@ -13,10 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod compactor_manual_jobs;
-pub mod downsampling;
-pub mod file_list;
-pub mod files;
-pub mod organization;
-pub mod retention;
-pub mod stats;
+use infra::{
+    errors::Result,
+    table::compactor_manual_jobs::{CompactorManualJob, add},
+};
+use o2_enterprise::enterprise::super_cluster::queue::Message;
+
+pub(crate) async fn process(msg: Message) -> Result<()> {
+    let job: CompactorManualJob = serde_json::from_slice(&msg.value.unwrap())?;
+    add(job).await?;
+    Ok(())
+}

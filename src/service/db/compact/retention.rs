@@ -27,7 +27,7 @@ use crate::service::db;
 static CACHE: Lazy<RwHashMap<String, i64>> = Lazy::new(Default::default);
 
 #[inline]
-fn mk_key(
+pub fn mk_key(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -126,16 +126,6 @@ pub async fn list() -> Result<Vec<String>, anyhow::Error> {
         items.push(item_key.to_string());
     }
     Ok(items)
-}
-
-pub async fn get_id(key: &str) -> Result<i64, anyhow::Error> {
-    let id = db::get_id(key).await?;
-    Ok(id)
-}
-
-pub async fn get_key_from_id(id: i64) -> Result<String, anyhow::Error> {
-    let key = db::get_key_from_id(id).await?;
-    Ok(key)
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
