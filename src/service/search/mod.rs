@@ -751,12 +751,14 @@ pub async fn search_partition(
         files.len(),
         file_list_took,
     );
+    let (is_histogram_eligible, _) = is_eligible_for_histogram(&req.sql).unwrap_or((false, false));
 
     if skip_get_file_list {
         let mut response = search::SearchPartitionResponse::default();
         response.partitions.push([req.start_time, req.end_time]);
         response.max_query_range = max_query_range_in_hour;
         response.histogram_interval = sql.histogram_interval;
+        response.is_histogram_eligible = is_histogram_eligible;
         log::info!("[trace_id {trace_id}] search_partition: returning single partition");
         return Ok(response);
     };
@@ -774,8 +776,6 @@ pub async fn search_partition(
     let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
         (records + f.records, original_size + f.original_size)
     });
-
-    let (is_histogram_eligible, _) = is_eligible_for_histogram(&req.sql).unwrap_or((false, false));
 
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
