@@ -724,7 +724,7 @@ pub struct StreamSettings {
     #[serde(default)]
     pub index_all_values: bool,
     #[serde(default)]
-    pub enable_distinct_fields: bool
+    pub enable_distinct_fields: bool,
 }
 
 impl Serialize for StreamSettings {
@@ -930,7 +930,7 @@ impl From<&str> for StreamSettings {
             extended_retention_days,
             index_original_data,
             index_all_values,
-            enable_distinct_fields
+            enable_distinct_fields,
         }
     }
 }
