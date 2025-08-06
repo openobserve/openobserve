@@ -63,7 +63,7 @@ pub async fn search(
 ) -> Result<SearchResult> {
     let _start = std::time::Instant::now();
     let cfg = get_config();
-    log::info!("[trace_id {trace_id}] super cluster leader: start {}", sql);
+    log::info!("[trace_id {trace_id}] super cluster leader: start {sql}");
 
     let timeout = if req.timeout > 0 {
         req.timeout as u64
@@ -80,7 +80,7 @@ pub async fn search(
         return Ok((vec![], ScanStats::new(), 0, false, "".to_string()));
     }
 
-    let (use_inverted_index, _) = super::super::is_use_inverted_index(&sql);
+    let use_inverted_index = super::super::is_use_inverted_index(&sql);
     req.set_use_inverted_index(use_inverted_index);
 
     // 2. get nodes
@@ -155,7 +155,7 @@ pub async fn search(
             match ret {
                 Ok(ret) => Ok(ret),
                 Err(err) => {
-                    log::error!("[trace_id {trace_id}] super cluster leader: datafusion execute error: {}", err);
+                    log::error!("[trace_id {trace_id}] super cluster leader: datafusion execute error: {err}");
                     Err(Error::Message(err.to_string()))
                 }
             }
@@ -294,7 +294,6 @@ async fn run_datafusion(
 
     // check for streaming aggregation query
     let mut aggs_cache_ratio = 0;
-
     if streaming_output {
         let Some(streaming_id) = streaming_id else {
             return Err(Error::Message(

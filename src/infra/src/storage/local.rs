@@ -21,7 +21,7 @@ use config::metrics;
 use futures::stream::BoxStream;
 use object_store::{
     Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
-    PutMultipartOpts, PutOptions, PutPayload, PutResult, Result, limit::LimitStore,
+    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore,
     local::LocalFileSystem, path::Path,
 };
 
@@ -111,7 +111,7 @@ impl ObjectStore for Local {
     async fn put_multipart_opts(
         &self,
         location: &Path,
-        opts: PutMultipartOpts,
+        opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
         self.client
             .put_multipart_opts(
@@ -183,7 +183,7 @@ impl ObjectStore for Local {
         Ok(result)
     }
 
-    async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
+    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
         let start = std::time::Instant::now();
         let file = location.to_string();
         let data = self
@@ -243,7 +243,7 @@ impl ObjectStore for Local {
         result
     }
 
-    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
+    fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         let key = prefix.map(|p| p.as_ref());
         let prefix = format_key(key.unwrap_or(""), self.with_prefix);
         self.client.list(Some(&prefix.into()))

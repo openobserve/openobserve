@@ -84,11 +84,18 @@
    LEFTANTI = 5;
    RIGHTSEMI = 6;
    RIGHTANTI = 7;
+   LEFTMARK = 8;
+   RIGHTMARK = 9;
  }
  
  enum JoinConstraint {
    ON = 0;
    USING = 1;
+ }
+ 
+ enum NullEquality {
+   NULL_EQUALS_NOTHING = 0;
+   NULL_EQUALS_NULL = 1;
  }
  
  message AvroOptions {}
@@ -107,8 +114,6 @@
    // for complex data types like structs, unions
    repeated Field children = 4;
    map<string, string> metadata = 5;
-   int64 dict_id = 6;
-   bool dict_ordered = 7;
  }
  
  message Timestamp{
@@ -413,22 +418,24 @@
    bytes quote = 3; // Quote character as a byte
    bytes escape = 4; // Optional escape character as a byte
    CompressionTypeVariant compression = 5; // Compression type
-   uint64 schema_infer_max_rec = 6; // Max records for schema inference
+   optional uint64 schema_infer_max_rec = 6; // Optional max records for schema inference
    string date_format = 7; // Optional date format
    string datetime_format = 8; // Optional datetime format
    string timestamp_format = 9; // Optional timestamp format
    string timestamp_tz_format = 10; // Optional timestamp with timezone format
    string time_format = 11; // Optional time format
    string null_value = 12; // Optional representation of null value
-   bytes comment = 13; // Optional comment character as a byte
-   bytes double_quote = 14; // Indicates if quotes are doubled
-   bytes newlines_in_values = 15; // Indicates if newlines are supported in values
+   string null_regex = 13; // Optional representation of null loading regex
+   bytes comment = 14; // Optional comment character as a byte
+   bytes double_quote = 15; // Indicates if quotes are doubled
+   bytes newlines_in_values = 16; // Indicates if newlines are supported in values
+   bytes terminator = 17; // Optional terminator character as a byte
  }
  
  // Options controlling CSV format
  message JsonOptions {
    CompressionTypeVariant compression = 1; // Compression type
-   uint64 schema_infer_max_rec = 2; // Max records for schema inference
+   optional uint64 schema_infer_max_rec = 2; // Optional max records for schema inference
  }
  
  message TableParquetOptions {
@@ -492,7 +499,9 @@
    uint64 maximum_buffered_record_batches_per_stream = 25; // default = 2
    bool bloom_filter_on_read = 26; // default = true
    bool bloom_filter_on_write = 27; // default = false
-   bool schema_force_string_view = 28; // default = false
+   bool schema_force_view_types = 28; // default = false
+   bool binary_as_string = 29; // default = false
+   bool skip_arrow_metadata = 30; // default = false
  
    oneof metadata_size_hint_opt {
      uint64 metadata_size_hint = 4;
@@ -518,6 +527,10 @@
      uint64 column_index_truncate_length = 17;
    }
  
+   oneof statistics_truncate_length_opt {
+     uint64 statistics_truncate_length = 31;
+   }
+ 
    oneof encoding_opt {
      string encoding = 19;
    }
@@ -537,11 +550,16 @@
    uint64 max_row_group_size = 15;
  
    string created_by = 16;
+ 
+   oneof coerce_int96_opt {
+     string coerce_int96 = 32;
+   }
  }
  
- enum JoinSide{
+ enum JoinSide {
    LEFT_SIDE = 0;
    RIGHT_SIDE = 1;
+   NONE = 2;
  }
  
  message Precision{
@@ -564,6 +582,7 @@
  message ColumnStats {
    Precision min_value = 1;
    Precision max_value = 2;
+   Precision sum_value = 5;
    Precision null_count = 3;
    Precision distinct_count = 4;
  }

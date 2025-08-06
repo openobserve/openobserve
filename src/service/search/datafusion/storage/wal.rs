@@ -20,8 +20,8 @@ use bytes::Bytes;
 use futures::{StreamExt, stream::BoxStream};
 use infra::storage;
 use object_store::{
-    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore, PutMultipartOpts,
-    PutOptions, PutPayload, PutResult, Result, path::Path,
+    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
+    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, path::Path,
 };
 
 /// File system for local wal
@@ -61,7 +61,7 @@ impl ObjectStore for FS {
         storage::LOCAL_WAL.get_opts(location, options).await
     }
 
-    async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
+    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
         let location = &self.format_location(location);
         storage::LOCAL_WAL.get_range(location, range).await
     }
@@ -72,7 +72,7 @@ impl ObjectStore for FS {
     }
 
     #[tracing::instrument(name = "datafusion::storage::local_wal::list", skip_all)]
-    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
+    fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         let key = prefix.unwrap().to_string();
         let objects = match super::file_list::get(&key) {
             Ok(objects) => objects,
@@ -111,7 +111,7 @@ impl ObjectStore for FS {
     async fn put_multipart_opts(
         &self,
         location: &Path,
-        _opts: PutMultipartOpts,
+        _opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
         log::error!("NotImplemented put_multipart_opts: {}", location);
         Err(object_store::Error::NotImplemented)

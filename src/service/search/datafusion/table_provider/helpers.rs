@@ -76,7 +76,7 @@ pub fn expr_applicable_for_cols(col_names: &[String], expr: &Expr) -> bool {
                     Ok(TreeNodeRecursion::Stop)
                 }
             }
-            Expr::Literal(_)
+            Expr::Literal(..)
             | Expr::Alias(_)
             | Expr::OuterReferenceColumn(..)
             | Expr::ScalarVariable(..)
@@ -122,11 +122,14 @@ pub fn expr_applicable_for_cols(col_names: &[String], expr: &Expr) -> bool {
             // - ScalarVariable could be `applicable`, but that would require access to the context
             Expr::AggregateFunction { .. }
             | Expr::WindowFunction { .. }
-            | Expr::Wildcard { .. }
             | Expr::Unnest { .. }
             | Expr::Placeholder(_) => {
                 is_applicable = false;
                 Ok(TreeNodeRecursion::Stop)
+            }
+            #[allow(deprecated)]
+            Expr::Wildcard { .. } => {
+                unreachable!("datafusion should not generate wildcard expression after v46");
             }
         }
     })
@@ -142,34 +145,12 @@ pub async fn list_files<'a>(
     Ok(Box::pin(
         store
             .list(Some(table_path.prefix()))
-            .map_err(DataFusionError::ObjectStore)
+            .map_err(|e| DataFusionError::ObjectStore(Box::new(e)))
             .map_ok(|object_meta| object_meta.into()),
     ))
 }
 
-/// Partition the list of files into `n` groups
-pub fn split_files(
-    mut partitioned_files: Vec<PartitionedFile>,
-    n: usize,
-) -> Vec<Vec<PartitionedFile>> {
-    if partitioned_files.is_empty() {
-        return vec![];
-    }
-
-    // ObjectStore::list does not guarantee any consistent order and for some
-    // implementations such as LocalFileSystem, it may be inconsistent. Thus
-    // Sort files by path to ensure consistent plans when run more than once.
-    partitioned_files.sort_by(|a, b| a.path().cmp(b.path()));
-
-    // effectively this is div with rounding up instead of truncating
-    let chunk_size = partitioned_files.len().div_ceil(n);
-    partitioned_files
-        .chunks(chunk_size)
-        .map(|c| c.to_vec())
-        .collect()
-}
-
-pub fn generate_access_plan_row_level(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
+pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
     let row_ids = storage::file_list::get_segment_ids(file.path().as_ref())?;
     let stats = file.statistics.as_ref()?;
     let Precision::Exact(num_rows) = stats.num_rows else {
@@ -289,46 +270,6 @@ mod tests {
     use datafusion::logical_expr::{case, col, lit};
 
     use super::*;
-
-    #[test]
-    fn test_split_files() {
-        let new_partitioned_file = |path: &str| PartitionedFile::new(path.to_owned(), 10);
-        let files = vec![
-            new_partitioned_file("a"),
-            new_partitioned_file("b"),
-            new_partitioned_file("c"),
-            new_partitioned_file("d"),
-            new_partitioned_file("e"),
-        ];
-
-        let chunks = split_files(files.clone(), 1);
-        assert_eq!(1, chunks.len());
-        assert_eq!(5, chunks[0].len());
-
-        let chunks = split_files(files.clone(), 2);
-        assert_eq!(2, chunks.len());
-        assert_eq!(3, chunks[0].len());
-        assert_eq!(2, chunks[1].len());
-
-        let chunks = split_files(files.clone(), 5);
-        assert_eq!(5, chunks.len());
-        assert_eq!(1, chunks[0].len());
-        assert_eq!(1, chunks[1].len());
-        assert_eq!(1, chunks[2].len());
-        assert_eq!(1, chunks[3].len());
-        assert_eq!(1, chunks[4].len());
-
-        let chunks = split_files(files, 123);
-        assert_eq!(5, chunks.len());
-        assert_eq!(1, chunks[0].len());
-        assert_eq!(1, chunks[1].len());
-        assert_eq!(1, chunks[2].len());
-        assert_eq!(1, chunks[3].len());
-        assert_eq!(1, chunks[4].len());
-
-        let chunks = split_files(vec![], 2);
-        assert_eq!(0, chunks.len());
-    }
 
     #[test]
     fn test_expr_applicable_for_cols() {

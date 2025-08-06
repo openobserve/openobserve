@@ -21,7 +21,7 @@ use config::{get_config, metrics};
 use futures::stream::BoxStream;
 use object_store::{
     Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
-    PutMultipartOpts, PutOptions, PutPayload, PutResult, Result, limit::LimitStore, path::Path,
+    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore, path::Path,
 };
 
 use crate::storage::{CONCURRENT_REQUESTS, format_key};
@@ -99,7 +99,7 @@ impl ObjectStore for Remote {
     async fn put_multipart_opts(
         &self,
         location: &Path,
-        opts: PutMultipartOpts,
+        opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
         let file = location.to_string();
         match self
@@ -184,7 +184,7 @@ impl ObjectStore for Remote {
         Ok(result)
     }
 
-    async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
+    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
         let start = std::time::Instant::now();
         let file = location.to_string();
         let data = self
@@ -240,7 +240,7 @@ impl ObjectStore for Remote {
         result
     }
 
-    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
+    fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         let key = prefix.map(|p| p.as_ref());
         let prefix = format_key(key.unwrap_or(""), true);
         self.client.list(Some(&prefix.into()))

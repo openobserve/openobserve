@@ -48,7 +48,9 @@ pub fn arr_count_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Colum
     log::debug!("Inside arrcount");
     if args.len() != 1 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError("UDF params should be: arrcount(arr_field)".to_string()),
+            Box::new(ParserError::ParserError(
+                "UDF params should be: arrcount(arr_field)".to_string(),
+            )),
             None,
         ));
     }

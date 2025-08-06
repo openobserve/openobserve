@@ -23,7 +23,6 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        bitvec::BitVec,
         inverted_index::IndexOptimizeMode,
         search::ScanStats,
         sql::TableReferenceExt,
@@ -42,7 +41,6 @@ use infra::{
     },
 };
 use itertools::Itertools;
-use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
 
 use crate::service::{
@@ -201,7 +199,6 @@ pub async fn search(
             query_params.time_range,
             &search_partition_keys,
             &req.search_info.file_id_list,
-            &req.search_info.idx_file_list,
         )
         .await?;
         log::info!(
@@ -254,9 +251,7 @@ pub async fn search(
                 // clear session data
                 super::super::datafusion::storage::file_list::clear(&trace_id);
                 log::error!(
-                    "[trace_id {}] flight->search: search storage parquet error: {}",
-                    trace_id,
-                    e
+                    "[trace_id {trace_id}] flight->search: search storage parquet error: {e}"
                 );
                 return Err(e);
             }
@@ -282,11 +277,7 @@ pub async fn search(
             Err(e) => {
                 // clear session data
                 super::super::datafusion::storage::file_list::clear(&trace_id);
-                log::error!(
-                    "[trace_id {}] flight->search: search wal parquet error: {}",
-                    trace_id,
-                    e
-                );
+                log::error!("[trace_id {trace_id}] flight->search: search wal parquet error: {e}");
                 return Err(e);
             }
         };
@@ -309,9 +300,7 @@ pub async fn search(
             Ok(v) => v,
             Err(e) => {
                 log::error!(
-                    "[trace_id {}] flight->search: search wal memtable error: {:?}",
-                    trace_id,
-                    e
+                    "[trace_id {trace_id}] flight->search: search wal memtable error: {e:?}"
                 );
                 return Err(e);
             }
@@ -319,22 +308,10 @@ pub async fn search(
         tables.extend(tbls);
         scan_stats.add(&stats);
     }
-    log::info!(
-        "stream_type: {:?} stream_name: {:?} empty_exec.name()={} ,enrich_mode {}",
-        stream_type,
-        stream_name,
-        empty_exec.name(),
-        req.query_identifier.enrich_mode
-    );
+
     // if the stream type is enrichment tables and the enrich mode is true, we need to load
     // enrichment data from db to datafusion tables
     if stream_type == StreamType::EnrichmentTables && req.query_identifier.enrich_mode {
-        log::debug!(
-            "Creating enrichment table for org_id={}, stream_name={}, empty_exec.name()={}",
-            org_id,
-            stream_name,
-            empty_exec.name()
-        );
         // get the enrichment table from db
         let enrichment_table =
             NewEnrichTable::new(&org_id, &stream_name, empty_exec.schema().clone());
@@ -397,35 +374,13 @@ async fn get_file_list_by_ids(
     time_range: Option<(i64, i64)>,
     equal_items: &[(String, String)],
     ids: &[i64],
-    idx_file_list: &[cluster_rpc::IdxFileName],
 ) -> Result<(Vec<FileKey>, usize), Error> {
     let start = std::time::Instant::now();
     let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
         .await
         .unwrap_or_default();
     let partition_keys = stream_settings.partition_keys;
-
     let file_list = crate::service::file_list::query_by_ids(trace_id, ids).await?;
-    // if there are any files in idx_files_list, use them to filter the files we got from ids,
-    // otherwise use all the files we got from ids
-    let file_list = if idx_file_list.is_empty() {
-        file_list
-    } else {
-        let mut files = Vec::with_capacity(idx_file_list.len());
-        let file_list_map: HashMap<_, _> =
-            file_list.into_iter().map(|f| (f.key.clone(), f)).collect();
-        for idx_file in idx_file_list.iter() {
-            if let Some(file) = file_list_map.get(&idx_file.key) {
-                let mut new_file = file.clone();
-                if let Some(segment_ids) = idx_file.segment_ids.as_ref() {
-                    let segment_ids = BitVec::from_slice(segment_ids);
-                    new_file.with_segment_ids(segment_ids);
-                }
-                files.push(new_file);
-            }
-        }
-        files
-    };
 
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {
@@ -454,7 +409,7 @@ fn generate_index_condition(index_condition: &str) -> Result<Option<IndexConditi
             Ok(cond) => cond,
             Err(e) => {
                 return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(format!(
-                    "Invalid index condition JSON: {e}"
+                    "Invalid index condition JSON: {e}",
                 ))));
             }
         };

@@ -21,7 +21,7 @@
  package datafusion;
  
  option java_multiple_files = true;
- option java_package = "org.apache.arrow.datafusion.protobuf";
+ option java_package = "org.apache.datafusion.protobuf";
  option java_outer_classname = "DatafusionProto";
  
  import "datafusion_common/datafusion_common.proto";
@@ -59,6 +59,9 @@
      DistinctOnNode distinct_on = 28;
      CopyToNode copy_to = 29;
      UnnestNode unnest = 30;
+     RecursiveQueryNode recursive_query = 31;
+     CteWorkTableScanNode cte_work_table_scan = 32;
+     DmlNode dml = 33;
    }
  }
  
@@ -75,6 +78,10 @@
    repeated LogicalExprNode logical_expr_nodes = 1;
  }
  
+ message SortExprNodeCollection {
+   repeated SortExprNode sort_expr_nodes = 1;
+ }
+ 
  message ListingTableScanNode {
    reserved 1; // was string table_name
    TableReference table_name = 14;
@@ -83,7 +90,7 @@
    ProjectionColumns projection = 4;
    datafusion_common.Schema schema = 5;
    repeated LogicalExprNode filters = 6;
-   repeated string table_partition_cols = 7;
+   repeated PartitionColumn table_partition_cols = 7;
    bool collect_stat = 8;
    uint32 target_partitions = 9;
    oneof FileFormatType {
@@ -92,7 +99,7 @@
      datafusion_common.AvroFormat avro = 12;
      datafusion_common.NdJsonFormat json = 15;
    }
-   repeated LogicalExprNodeCollection file_sort_order = 13;
+   repeated SortExprNodeCollection file_sort_order = 13;
  }
  
  message ViewTableScanNode {
@@ -129,7 +136,7 @@
  
  message SortNode {
    LogicalPlanNode input = 1;
-   repeated LogicalExprNode expr = 2;
+   repeated SortExprNode expr = 2;
    // Maximum number of highest/lowest rows to fetch; negative means no limit
    int64 fetch = 3;
  }
@@ -159,8 +166,9 @@
    datafusion_common.DfSchema schema = 4;
    repeated string table_partition_cols = 5;
    bool if_not_exists = 6;
+   bool temporary = 14;
    string definition = 7;
-   repeated LogicalExprNodeCollection order_exprs = 10;
+   repeated SortExprNodeCollection order_exprs = 10;
    bool unbounded = 11;
    map<string, string> options = 8;
    datafusion_common.Constraints constraints = 12;
@@ -196,6 +204,7 @@
    TableReference name = 5;
    LogicalPlanNode input = 2;
    bool or_replace = 3;
+   bool temporary = 6;
    string definition = 4;
  }
  
@@ -234,7 +243,7 @@
    datafusion_common.JoinConstraint join_constraint = 4;
    repeated LogicalExprNode left_join_key = 5;
    repeated LogicalExprNode right_join_key = 6;
-   bool null_equals_null = 7;
+   datafusion_common.NullEquality null_equality = 7;
    LogicalExprNode filter = 8;
  }
  
@@ -245,7 +254,7 @@
  message DistinctOnNode {
    repeated LogicalExprNode on_expr = 1;
    repeated LogicalExprNode select_expr = 2;
-   repeated LogicalExprNode sort_expr = 3;
+   repeated SortExprNode sort_expr = 3;
    LogicalPlanNode input = 4;
  }
  
@@ -256,18 +265,53 @@
    repeated string partition_by = 7;
  }
  
+ message DmlNode{
+    enum Type {
+     UPDATE = 0;
+     DELETE = 1;
+     CTAS = 2;
+     INSERT_APPEND = 3;
+     INSERT_OVERWRITE = 4;
+     INSERT_REPLACE = 5;
+   }
+   Type dml_type = 1;
+   LogicalPlanNode input = 2;
+   TableReference table_name = 3;
+   LogicalPlanNode target = 5;
+ }
+ 
  message UnnestNode {
    LogicalPlanNode input = 1;
    repeated datafusion_common.Column exec_columns = 2;
-   repeated uint64 list_type_columns = 3;
+   repeated ColumnUnnestListItem list_type_columns = 3;
    repeated uint64 struct_type_columns = 4;
    repeated uint64 dependency_indices = 5;
    datafusion_common.DfSchema schema = 6;
    UnnestOptions options = 7;
  }
+ message ColumnUnnestListItem {
+   uint32 input_index = 1;
+   ColumnUnnestListRecursion recursion = 2;
+ }
+ 
+ message ColumnUnnestListRecursions {
+   repeated ColumnUnnestListRecursion recursions = 2;
+ }
+ 
+ message ColumnUnnestListRecursion {
+   datafusion_common.Column output_column = 1;
+   uint32 depth = 2;
+ }
  
  message UnnestOptions {
    bool preserve_nulls = 1;
+   repeated RecursionUnnestOption recursions = 2;
+ }
+ 
+ message RecursionUnnestOption {
+   datafusion_common.Column output_column = 1;
+   datafusion_common.Column input_column = 2;
+   uint32 depth = 3;
  }
  
  message UnionNode {
@@ -320,7 +364,6 @@
      BetweenNode between = 9;
      CaseNode case_ = 10;
      CastNode cast = 11;
-     SortExprNode sort = 12;
      NegativeNode negative = 13;
      InListNode in_list = 14;
      Wildcard wildcard = 15;
@@ -440,6 +483,7 @@
    LogicalExprNode expr = 1;
    string alias = 2;
    repeated TableReference relation = 3;
+   map<string, string> metadata = 4;
  }
  
  message BinaryExprNode {
@@ -470,7 +514,7 @@
    repeated LogicalExprNode args = 2;
    bool distinct = 5;
    LogicalExprNode filter = 3;
-   repeated LogicalExprNode order_by = 4;
+   repeated SortExprNode order_by = 4;
    optional bytes fun_definition = 6;
  }
  
@@ -480,29 +524,15 @@
    optional bytes fun_definition = 3;
  }
  
- enum BuiltInWindowFunction {
-   ROW_NUMBER = 0;
-   RANK = 1;
-   DENSE_RANK = 2;
-   PERCENT_RANK = 3;
-   CUME_DIST = 4;
-   NTILE = 5;
-   LAG = 6;
-   LEAD = 7;
-   FIRST_VALUE = 8;
-   LAST_VALUE = 9;
-   NTH_VALUE = 10;
- }
- 
  message WindowExprNode {
    oneof window_function {
-     BuiltInWindowFunction built_in_function = 2;
+     // BuiltInWindowFunction built_in_function = 2;
      string udaf = 3;
      string udwf = 9;
    }
-   LogicalExprNode expr = 4;
+   repeated LogicalExprNode exprs = 4;
    repeated LogicalExprNode partition_by = 5;
-   repeated LogicalExprNode order_by = 6;
+   repeated SortExprNode order_by = 6;
    // repeated LogicalExprNode filter = 7;
    WindowFrame window_frame = 8;
    optional bytes fun_definition = 10;
@@ -629,6 +659,7 @@
      datafusion_common.EmptyMessage FinalPhysicalPlan = 6;
      datafusion_common.EmptyMessage FinalPhysicalPlanWithStats = 10;
      datafusion_common.EmptyMessage FinalPhysicalPlanWithSchema = 12;
+     datafusion_common.EmptyMessage PhysicalPlanError = 13;
    }
  }
  
@@ -689,10 +720,13 @@
      AnalyzeExecNode analyze = 23;
      JsonSinkExecNode json_sink = 24;
      SymmetricHashJoinExecNode symmetric_hash_join = 25;
-     InterleaveExecNode  interleave = 26;
+     InterleaveExecNode interleave = 26;
      PlaceholderRowExecNode placeholder_row = 27;
      CsvSinkExecNode csv_sink = 28;
      ParquetSinkExecNode parquet_sink = 29;
+     UnnestExecNode unnest = 30;
+     JsonScanExecNode json_scan = 31;
+     CooperativeExecNode cooperative = 32;
    }
  }
  
@@ -704,14 +738,22 @@
  
  message FileSinkConfig {
    reserved 6; // writer_mode
+   reserved 8; // was `overwrite` which has been superseded by `insert_op`
  
    string object_store_url = 1;
    repeated PartitionedFile file_groups = 2;
    repeated string table_paths = 3;
    datafusion_common.Schema output_schema = 4;
    repeated PartitionColumn table_partition_cols = 5;
-   bool overwrite = 8;
    bool keep_partition_by_columns = 9;
+   InsertOp insert_op = 10;
+   string file_extension = 11;
+ }
+ 
+ enum InsertOp {
+   Append = 0;
+   Overwrite = 1;
+   Replace = 2;
  }
  
  message JsonSink {
@@ -748,6 +790,19 @@
    ParquetSink sink = 2;
    datafusion_common.Schema sink_schema = 3;
    PhysicalSortExprNodeCollection sort_order = 4;
+ }
+ 
+ message UnnestExecNode {
+   PhysicalPlanNode input = 1;
+   datafusion_common.Schema schema = 2;
+   repeated ListUnnest list_type_columns = 3;
+   repeated uint64 struct_type_columns = 4;
+   UnnestOptions options = 5;
+ }
+ 
+ message ListUnnest {
+   uint32 index_in_input_schema = 1;
+   uint32 depth = 2;
  }
  
  message PhysicalExtensionNode {
@@ -793,6 +848,8 @@
      PhysicalLikeExprNode like_expr = 18;
  
      PhysicalExtensionExprNode extension = 19;
+ 
+     UnknownColumn unknown_column = 20;
    }
  }
  
@@ -801,6 +858,7 @@
    repeated PhysicalExprNode args = 2;
    optional bytes fun_definition = 3;
    datafusion_common.ArrowType return_type = 4;
+   bool nullable = 5;
  }
  
  message PhysicalAggregateExprNode {
@@ -816,8 +874,9 @@
  
  message PhysicalWindowExprNode {
    oneof window_function {
-     BuiltInWindowFunction built_in_function = 2;
+     // BuiltInWindowFunction built_in_function = 2;
      string user_defined_aggr_function = 3;
+     string user_defined_window_function = 10;
    }
    repeated PhysicalExprNode args = 4;
    repeated PhysicalExprNode partition_by = 5;
@@ -909,6 +968,7 @@
    PhysicalPlanNode input = 1;
    PhysicalExprNode expr = 2;
    uint32 default_filter_selectivity = 3;
+   repeated uint32 projection = 9;
  }
  
  message FileGroup {
@@ -925,9 +985,6 @@
  }
  
  message FileScanExecConf {
-   // Was repeated ConfigOption options = 10;
-   reserved 10;
- 
    repeated FileGroup file_groups = 1;
    datafusion_common.Schema schema = 2;
    repeated uint32 projection = 4;
@@ -936,6 +993,12 @@
    repeated string table_partition_cols = 7;
    string object_store_url = 8;
    repeated PhysicalSortExprNodeCollection output_ordering = 9;
+ 
+   // Was repeated ConfigOption options = 10;
+   reserved 10;
+ 
+   datafusion_common.Constraints constraints = 11;
+   optional uint64 batch_size = 12;
  }
  
  message ParquetScanExecNode {
@@ -945,6 +1008,8 @@
    reserved 2;
  
    PhysicalExprNode predicate = 3;
+ 
+   datafusion_common.TableParquetOptions parquet_options = 4;
  }
  
  message CsvScanExecNode {
@@ -961,8 +1026,16 @@
    bool newlines_in_values = 7;
  }
  
+ message JsonScanExecNode {
+   FileScanExecConf base_conf = 1;
+ }
+ 
  message AvroScanExecNode {
    FileScanExecConf base_conf = 1;
+ }
+ 
+ message CooperativeExecNode {
+   PhysicalPlanNode input = 1;
  }
  
  enum PartitionMode {
@@ -977,7 +1050,7 @@
    repeated JoinOn on = 3;
    datafusion_common.JoinType join_type = 4;
    PartitionMode partition_mode = 6;
-   bool null_equals_null = 7;
+   datafusion_common.NullEquality null_equality = 7;
    JoinFilter filter = 8;
    repeated uint32 projection = 9;
  }
@@ -993,7 +1066,7 @@
    repeated JoinOn on = 3;
    datafusion_common.JoinType join_type = 4;
    StreamPartitionMode partition_mode = 6;
-   bool null_equals_null = 7;
+   datafusion_common.NullEquality null_equality = 7;
    JoinFilter filter = 8;
    repeated PhysicalSortExprNode left_sort_exprs = 9;
    repeated PhysicalSortExprNode right_sort_exprs = 10;
@@ -1028,6 +1101,10 @@
  message PhysicalColumn {
    string name = 1;
    uint32 index = 2;
+ }
+ 
+ message UnknownColumn {
+   string name = 1;
  }
  
  message JoinOn {
@@ -1134,15 +1211,18 @@
    PhysicalPlanNode right = 2;
    datafusion_common.JoinType join_type = 3;
    JoinFilter filter = 4;
+   repeated uint32 projection = 5;
  }
  
  message CoalesceBatchesExecNode {
    PhysicalPlanNode input = 1;
    uint32 target_batch_size = 2;
+   optional uint32 fetch = 3;
  }
  
  message CoalescePartitionsExecNode {
    PhysicalPlanNode input = 1;
+   optional uint32 fetch = 2;
  }
  
  message PhysicalHashRepartition {
@@ -1198,5 +1278,17 @@
    int64 num_batches = 2;
    int64 num_bytes = 3;
    repeated datafusion_common.ColumnStats column_stats = 4;
+ }
+ 
+ message RecursiveQueryNode {
+   string name = 1;
+   LogicalPlanNode static_term = 2;
+   LogicalPlanNode recursive_term = 3;
+   bool is_distinct = 4;
+ }
+ 
+ message CteWorkTableScanNode {
+     string name = 1;
+     datafusion_common.Schema schema = 2;
  }
  

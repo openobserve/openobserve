@@ -325,9 +325,9 @@ impl Stream for FlightSenderStream {
                     e.to_string(),
                     self.start.elapsed().as_millis()
                 );
-                Poll::Ready(Some(Err(FlightError::Tonic(Status::internal(
-                    e.to_string(),
-                )))))
+                Poll::Ready(Some(Err(FlightError::Tonic(
+                    Status::internal(e.to_string()).into(),
+                ))))
             }
         }
     }

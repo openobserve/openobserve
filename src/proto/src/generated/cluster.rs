@@ -2776,6 +2776,26 @@ pub mod query_cache_server {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct PhysicalPlanNode {
+    #[prost(oneof = "physical_plan_node::Plan", tags = "1, 2, 3")]
+    pub plan: ::core::option::Option<physical_plan_node::Plan>,
+}
+/// Nested message and enum types in `PhysicalPlanNode`.
+pub mod physical_plan_node {
+    #[allow(clippy::large_enum_variant)]
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Plan {
+        #[prost(message, tag = "1")]
+        EmptyExec(super::NewEmptyExecNode),
+        #[prost(message, tag = "2")]
+        AggregateTopk(super::AggregateTopkExecNode),
+        #[prost(message, tag = "3")]
+        StreamingAggs(super::StreamingAggsExecNode),
+    }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NewEmptyExecNode {
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
@@ -2801,6 +2821,26 @@ pub struct AggregateTopkExecNode {
     pub descending: bool,
     #[prost(uint64, tag = "3")]
     pub limit: u64,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StreamingAggsExecNode {
+    #[prost(string, tag = "1")]
+    pub id: ::prost::alloc::string::String,
+    #[prost(int64, tag = "2")]
+    pub start_time: i64,
+    #[prost(int64, tag = "3")]
+    pub end_time: i64,
+    #[prost(uint64, tag = "4")]
+    pub target_partitions: u64,
+    #[prost(bool, tag = "5")]
+    pub is_complete_cache_hit: bool,
+    #[prost(string, repeated, tag = "6")]
+    pub cached_files: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(message, optional, tag = "7")]
+    pub aggregate_plan: ::core::option::Option<
+        ::datafusion_proto::protobuf::PhysicalPlanNode,
+    >,
 }
 /// Search request
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -2841,8 +2881,6 @@ pub struct SearchInfo {
     pub plan: ::prost::alloc::vec::Vec<u8>,
     #[prost(int64, repeated, tag = "2")]
     pub file_id_list: ::prost::alloc::vec::Vec<i64>,
-    #[prost(message, repeated, tag = "3")]
-    pub idx_file_list: ::prost::alloc::vec::Vec<IdxFileName>,
     #[prost(int64, tag = "4")]
     pub start_time: i64,
     #[prost(int64, tag = "5")]

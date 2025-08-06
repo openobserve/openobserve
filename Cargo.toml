@@ -163,6 +163,7 @@ utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 version-compare = "0.2.0"
 vector-enrichment.workspace = true
+x509-parser = "0.17.0"
 vrl.workspace = true
 zstd.workspace = true
 config.workspace = true
@@ -190,6 +191,7 @@ actix-service = "2.0.3"
 actix-utils = "3.0.1"
 derive_more = { version = "2.0.1", features = ["full"] }
 brotli = "8.0.1"
+tokio-rustls.workspace = true
 
 [dev-dependencies]
 async-walkdir.workspace = true
@@ -250,18 +252,18 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "45.0.0"
-datafusion-proto = "45.0.0"
-datafusion-functions-aggregate-common = "45.0.0"
-datafusion-functions-json = "0.45.0"
+datafusion = "49"
+datafusion-proto = "49"
+datafusion-functions-aggregate-common = "49"
+datafusion-functions-json = "0.49.0"
 expect-test = "1.4"
-arrow = { version = "54.1.0", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "54.1.0"
-arrow-json = "54.1.0"
-arrow-schema = { version = "54.1.0", features = ["serde"] }
-parquet = { version = "54.1.0", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.11.2", features = ["aws", "azure", "gcp"] }
-sqlparser = { version = "0.53.0", features = ["serde", "visitor"] }
+arrow = { version = "55.2.0", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "55.2.0"
+arrow-json = "55.2.0"
+arrow-schema = { version = "55.2.0", features = ["serde"] }
+parquet = { version = "55.2.0", features = ["arrow", "async", "object_store"] }
+object_store = { version = "0.12.3", features = ["aws", "azure", "gcp"] }
+sqlparser = { version = "0.55.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.2"
 dotenvy = "0.15.7"
 env_logger = "0.10"
@@ -343,6 +345,10 @@ tempfile = "3"
 thiserror = "1.0"
 time = "0.3"
 tokio = { version = "1", features = ["full"] }
+tokio-rustls = { version = "0.26", default-features = false, features = [
+    "logging",
+    "tls12",
+] }
 tokio-util = { version = "0.7.12", features = ["compat"] }
 tokio-stream = "0.1"
 tonic = { version = "0.12.3", features = ["gzip", "prost", "tls"] }

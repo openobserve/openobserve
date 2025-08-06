@@ -22,7 +22,9 @@ use datafusion::{
     },
     common::cast::as_string_array,
     error::{DataFusionError, Result},
-    logical_expr::{ColumnarValue, ScalarUDF, ScalarUDFImpl, Signature, Volatility},
+    logical_expr::{
+        ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature, Volatility,
+    },
     scalar::ScalarValue,
     sql::sqlparser::parser::ParserError,
 };
@@ -72,8 +74,8 @@ impl ScalarUDFImpl for StrMatchUdf {
         Ok(DataType::Boolean)
     }
 
-    fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue> {
-        str_match_impl(args, false)
+    fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {
+        str_match_impl(&args.args, false)
     }
 }
 
@@ -113,15 +115,17 @@ impl ScalarUDFImpl for StrMatchIgnoreCaseUdf {
         Ok(DataType::Boolean)
     }
 
-    fn invoke(&self, args: &[ColumnarValue]) -> Result<ColumnarValue> {
-        str_match_impl(args, true)
+    fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {
+        str_match_impl(&args.args, true)
     }
 }
 
 fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<ColumnarValue> {
     if args.len() != 2 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError("str_match UDF expects two string".to_string()),
+            Box::new(ParserError::ParserError(
+                "str_match UDF expects two string".to_string(),
+            )),
             None,
         ));
     }
@@ -129,47 +133,48 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
     // 1. cast both arguments to be aligned with the signature
     let ColumnarValue::Array(haystack) = &args[0] else {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError(
+            Box::new(ParserError::ParserError(
                 "Invalid argument types[haystack] to str_match function".to_string(),
-            ),
+            )),
             None,
         ));
     };
     let haystack = as_string_array(&haystack)?;
     let ColumnarValue::Scalar(needle) = &args[1] else {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError(
+            Box::new(ParserError::ParserError(
                 "Invalid argument types[needle] to str_match function".to_string(),
-            ),
+            )),
             None,
         ));
     };
-    let needle = match needle {
+    let mut needle = match needle {
         ScalarValue::Utf8(v) => v,
         ScalarValue::Utf8View(v) => v,
         ScalarValue::LargeUtf8(v) => v,
         _ => {
             return Err(DataFusionError::SQL(
-                ParserError::ParserError(
+                Box::new(ParserError::ParserError(
                     "Invalid argument types[needle] to str_match function".to_string(),
-                ),
+                )),
                 None,
             ));
         }
-    };
-    if needle.is_none() {
-        return Err(DataFusionError::SQL(
-            ParserError::ParserError(
-                "Invalid argument types[needle] to str_match function".to_string(),
-            ),
-            None,
-        ));
     }
+    .as_ref()
+    .ok_or_else(|| {
+        DataFusionError::SQL(
+            Box::new(ParserError::ParserError(
+                "Invalid argument types[needle] to str_match function".to_string(),
+            )),
+            None,
+        )
+    })?
+    .to_string();
+
     // pre-compute the needle
-    let needle = if case_insensitive {
-        needle.as_ref().unwrap().to_lowercase()
-    } else {
-        needle.as_ref().unwrap().to_string()
+    if case_insensitive {
+        needle.make_ascii_lowercase();
     };
 
     let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
@@ -178,19 +183,15 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
     let array = haystack
         .iter()
         .map(|haystack| {
-            match haystack {
-                // in arrow, any value can be null.
-                // Here we decide to make our UDF to return null when haystack is null.
-                Some(haystack) => match case_insensitive {
-                    true => Some(
-                        mem_finder
-                            .find(haystack.to_lowercase().as_bytes())
-                            .is_some(),
-                    ),
-                    false => Some(mem_finder.find(haystack.as_bytes()).is_some()),
-                },
-                _ => None,
-            }
+            haystack.map(|haystack| {
+                if case_insensitive {
+                    mem_finder
+                        .find(haystack.to_lowercase().as_bytes())
+                        .is_some()
+                } else {
+                    mem_finder.find(haystack.as_bytes()).is_some()
+                }
+            })
         })
         .collect::<BooleanArray>();
 

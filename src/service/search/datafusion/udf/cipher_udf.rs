@@ -86,10 +86,10 @@ fn decrypt() -> ScalarFunctionImplementation {
     Arc::new(move |args: &[ColumnarValue]| {
         if args.len() != 3 {
             return Err(DataFusionError::SQL(
-                ParserError::ParserError(
+                Box::new(ParserError::ParserError(
                     "decrypt requires three params : decrypt(field_name, key_name, path)"
                         .to_string(),
-                ),
+                )),
                 None,
             ));
         }
@@ -98,9 +98,9 @@ fn decrypt() -> ScalarFunctionImplementation {
             ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => s.to_owned(),
             _ => {
                 return Err(DataFusionError::SQL(
-                    ParserError::ParserError(
+                    Box::new(ParserError::ParserError(
                         "second argument to decrypt must be a key-name string".to_string(),
-                    ),
+                    )),
                     None,
                 ));
             }
@@ -109,9 +109,9 @@ fn decrypt() -> ScalarFunctionImplementation {
             ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => s.to_owned(),
             _ => {
                 return Err(DataFusionError::SQL(
-                    ParserError::ParserError(
+                    Box::new(ParserError::ParserError(
                         "third argument to decrypt must be a path string".to_string(),
-                    ),
+                    )),
                     None,
                 ));
             }
@@ -121,9 +121,9 @@ fn decrypt() -> ScalarFunctionImplementation {
 
         let values = as_string_array(&args[0]).map_err(|_| {
             DataFusionError::SQL(
-                ParserError::ParserError(
+                Box::new(ParserError::ParserError(
                     "first argument to decrypt must be a string type column".to_string(),
-                ),
+                )),
                 None,
             )
         })?;
@@ -241,10 +241,10 @@ fn encrypt() -> ScalarFunctionImplementation {
     Arc::new(move |args: &[ColumnarValue]| {
         if args.len() != 3 {
             return Err(DataFusionError::SQL(
-                ParserError::ParserError(
+                Box::new(ParserError::ParserError(
                     "encrypt requires three params : encrypt(field_name, key_name, path)"
                         .to_string(),
-                ),
+                )),
                 None,
             ));
         }
@@ -253,9 +253,9 @@ fn encrypt() -> ScalarFunctionImplementation {
             ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => s.to_owned(),
             _ => {
                 return Err(DataFusionError::SQL(
-                    ParserError::ParserError(
+                    Box::new(ParserError::ParserError(
                         "second argument to encrypt must be a key-name string".to_string(),
-                    ),
+                    )),
                     None,
                 ));
             }
@@ -265,9 +265,9 @@ fn encrypt() -> ScalarFunctionImplementation {
             ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => s.to_owned(),
             _ => {
                 return Err(DataFusionError::SQL(
-                    ParserError::ParserError(
+                    Box::new(ParserError::ParserError(
                         "third argument to encrypt must be a path string".to_string(),
-                    ),
+                    )),
                     None,
                 ));
             }
@@ -277,9 +277,9 @@ fn encrypt() -> ScalarFunctionImplementation {
 
         let values = as_string_array(&args[0]).map_err(|_| {
             DataFusionError::SQL(
-                ParserError::ParserError(
+                Box::new(ParserError::ParserError(
                     "first argument to encrypt must be a string type column".to_string(),
-                ),
+                )),
                 None,
             )
         })?;
@@ -460,9 +460,9 @@ fn decrypt_slow() -> ScalarFunctionImplementation {
     Arc::new(move |args: &[ColumnarValue]| {
         if args.len() != 2 {
             return Err(DataFusionError::SQL(
-                ParserError::ParserError(
+                Box::new(ParserError::ParserError(
                     "decrypt_slow requires two params : decrypt(field_name, key_name)".to_string(),
-                ),
+                )),
                 None,
             ));
         }
@@ -471,9 +471,9 @@ fn decrypt_slow() -> ScalarFunctionImplementation {
             ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => s.to_owned(),
             _ => {
                 return Err(DataFusionError::SQL(
-                    ParserError::ParserError(
+                    Box::new(ParserError::ParserError(
                         "second argument to decrypt must be a key-name string".to_string(),
-                    ),
+                    )),
                     None,
                 ));
             }
@@ -483,9 +483,9 @@ fn decrypt_slow() -> ScalarFunctionImplementation {
 
         let values = as_string_array(&args[0]).map_err(|_| {
             DataFusionError::SQL(
-                ParserError::ParserError(
+                Box::new(ParserError::ParserError(
                     "first argument to decrypt_slow must be a string type column".to_string(),
-                ),
+                )),
                 None,
             )
         })?;

@@ -41,7 +41,6 @@ pub struct TimeOffset {
 pub enum StorageType {
     Memory,
     Wal,
-    Tmpfs,
 }
 
 #[derive(Clone, Debug)]

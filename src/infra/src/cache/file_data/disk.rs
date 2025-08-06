@@ -182,7 +182,7 @@ impl FileData {
         format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file)
     }
 
-    async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+    async fn get(&self, file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
         let file_path = self.get_file_path(file);
         tokio::task::spawn_blocking(move || match get_file_contents(&file_path, range) {
             Ok(data) => Some(Bytes::from(data)),
@@ -501,7 +501,7 @@ fn get_file_reader(file: &str) -> Option<&FileData> {
 }
 
 #[inline]
-pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
+pub async fn get(file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
     let files = get_file_reader(file)?;
     files.get(file, range).await
 }

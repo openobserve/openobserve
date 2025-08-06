@@ -471,10 +471,9 @@ pub async fn search_memtable(
 
         tokio::task::coop::consume_budget().await;
 
+        // merge small batches into big batches
         let merge_start = std::time::Instant::now();
         let batch_num = record_batches.len();
-
-        // merge small batches into big batches
         let mut merge_groupes = Vec::new();
         let mut current_group = Vec::new();
         let group_limit = config::PARQUET_BATCH_SIZE;

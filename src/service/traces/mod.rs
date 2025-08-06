@@ -782,7 +782,7 @@ async fn write_traces(
         partition_time_level =
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Traces);
     }
-    
+
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
     crate::service::ingestion::get_stream_alerts(
