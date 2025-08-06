@@ -162,12 +162,13 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
         }
     };
     log::info!(
-        "[INGESTER:MEM:{idx}] finish persist file: {}, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}, took: {} ms",
+        "[INGESTER:MEM:{idx}] finish persist file: {}, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}, records: {}, took: {} ms",
         path.to_string_lossy(),
         stat.json_size,
         stat.arrow_size,
         stat.file_num,
         stat.batch_num,
+        stat.records,
         start.elapsed().as_millis(),
     );
 
