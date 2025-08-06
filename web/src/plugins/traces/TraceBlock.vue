@@ -8,8 +8,8 @@
       :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-indigo-1'"
     >
       <div class="trace-name text-body2 text-bold">
-        <span class="q-mr-xs"> {{ item.service_name }}:</span>
-        {{ item.operation_name }}
+        <span class="q-mr-xs"> {{ item?.service_name }}:</span>
+        {{ item?.operation_name }}
       </div>
       <div class="trace-duration">
         {{ getDuration }}
@@ -22,16 +22,17 @@
           :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-8'"
         >
           <span class="">Spans : </span>
-          <span>{{ item.spans }}</span>
+          <span>{{ item?.spans }}</span>
         </div>
-        <div v-if="item.errors" class="trace-errors q-px-sm">
+        <div v-if="item?.errors" class="trace-errors q-px-sm">
           <span class="">Errors : </span>
-          <span>{{ item.errors }}</span>
+          <span>{{ item?.errors }}</span>
         </div>
       </div>
       <div
         class="flex justify-start items-start q-px-md"
         style="width: calc(100% - 350px)"
+        v-if="item?.services"
       >
         <template v-for="(count, service) in item.services" :key="service">
           <div
@@ -51,7 +52,7 @@
       </div>
       <div class="trace-date-time" style="width: 175px">
         <div class="section-1 flex justify-end items-center">
-          <div style="font-size: 14px">
+          <div style="font-size: 14px" data-test="trace-block-trace-date-day">
             {{ formattedDate?.day }}
           </div>
           <div
@@ -59,7 +60,7 @@
             style="height: 16px; width: 2px"
             class="q-mx-sm bg-grey-4"
           />
-          <div style="font-size: 14px">
+          <div style="font-size: 14px" data-test="trace-block-trace-date-time">
             {{ formattedDate?.time }}
           </div>
         </div>
@@ -69,7 +70,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeMount, onMounted, ref, onBeforeUnmount } from "vue";
+import {
+  computed,
+  onBeforeMount,
+  onMounted,
+  ref,
+  onBeforeUnmount,
+  watch,
+  defineExpose,
+} from "vue";
 import { date as qDate } from "quasar";
 import {
   timestampToTimezoneDate,
@@ -82,7 +91,7 @@ import useTraces from "@/composables/useTraces";
 const props = defineProps({
   item: {
     type: Object,
-    default: () => {},
+    default: () => ({}),
   },
   index: {
     type: Number,
@@ -95,6 +104,19 @@ const { searchObj } = useTraces();
 const store = useStore();
 
 let moment: any;
+
+watch(
+  () => props?.item?.trace_start_time,
+  (value) => {
+    console.log(
+      "watcher ------------- props.item.trace_start_time",
+      props.item.trace_start_time,
+    );
+    if (value) {
+      getFormattedDate();
+    }
+  },
+);
 
 const importMoment = async () => {
   const momentModule: any = await import("moment-timezone");
@@ -117,14 +139,18 @@ const formattedDate = ref({
 });
 
 const getFormattedDate = () => {
+  if (!props?.item?.trace_start_time) {
+    return;
+  }
+
   const format = "YYYY-MM-DD HH:mm:ss";
   const timezone = store.state.timezone;
 
   const date1 = moment
-    .tz(new Date(props.item["trace_start_time"] / 1000), timezone)
+    ?.tz(new Date(props.item["trace_start_time"] / 1000), timezone)
     .format(format);
 
-  const date2 = moment.tz(new Date(), timezone).format(format);
+  const date2 = moment?.tz(new Date(), timezone).format(format);
 
   const difference = qDate.getDateDiff(date2, date1, "seconds");
   const minDiff = qDate.getDateDiff(date2, date1, "minutes");
@@ -188,7 +214,12 @@ function formatDateTo12Hour(date: any) {
 }
 
 const getDuration = computed(() => {
-  return formatTimeWithSuffix(props.item.duration);
+  return formatTimeWithSuffix(props?.item?.duration) || "0us";
+});
+
+defineExpose({
+  importMoment,
+  getFormattedDate,
 });
 </script>
 
