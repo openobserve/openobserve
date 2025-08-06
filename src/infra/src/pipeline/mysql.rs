@@ -23,7 +23,7 @@ use config::{
 };
 
 use crate::{
-    db::mysql::{CLIENT, CLIENT_RO},
+    db::mysql::{CLIENT, CLIENT_DDL, CLIENT_RO},
     errors::{DbError, Error, Result},
 };
 
@@ -44,7 +44,7 @@ impl Default for MySqlPipelineTable {
 #[async_trait]
 impl super::PipelineTable for MySqlPipelineTable {
     async fn create_table(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_DDL.clone();
 
         sqlx::query(
             r#"
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS pipeline
     }
 
     async fn create_table_index(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_DDL.clone();
 
         let queries = vec![
             "CREATE INDEX pipeline_org_idx ON pipeline (org);",
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS pipeline
     }
 
     async fn drop_table(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_DDL.clone();
 
         sqlx::query("DROP TABLE IF EXISTS pipeline;")
             .execute(&pool)

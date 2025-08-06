@@ -55,6 +55,13 @@ pub(crate) async fn get(key: &str) -> Result<Bytes> {
     db.get(key).await
 }
 
+#[cfg(feature = "enterprise")]
+// checks if the value of the given compact delete job is updated to a node id
+fn check_if_compact_delete_node_value_updated(key: &str, value: &Bytes) -> bool {
+    let value_str = String::from_utf8_lossy(value);
+    key.starts_with("/compact/delete") && value_str.ne("OK")
+}
+
 #[inline]
 pub(crate) async fn put(
     key: &str,
@@ -65,12 +72,21 @@ pub(crate) async fn put(
     let db = infra_db::get_db().await;
     db.put(key, value.clone(), need_watch, start_dt).await?;
 
+    // Hack: if the key starts with /compact/delete, and the value is not "OK",
+    // then we don't need to put it to super cluster. This is because compact/delete
+    // is a local cluster job, when we call process_stream, it will set the node id
+    // as the value
     // super cluster
     #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {
+    if get_o2_config().super_cluster.enabled
+        && !check_if_compact_delete_node_value_updated(key, &value)
+    {
         o2_enterprise::enterprise::super_cluster::queue::put(key, value, need_watch, start_dt)
             .await
-            .map_err(|e| Error::Message(e.to_string()))?;
+            .map_err(|e| {
+                log::error!("[COMPACTOR] put to super cluster failed: {key} - {e}");
+                Error::Message(e.to_string())
+            })?;
     }
 
     Ok(())
@@ -140,4 +156,20 @@ pub(crate) async fn list_values_by_start_dt(
 ) -> Result<Vec<(i64, Bytes)>> {
     let db = infra_db::get_db().await;
     db.list_values_by_start_dt(prefix, start_dt).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_check_if_compact_delete_node_value_updated() {
+        let key = "/compact/delete/test/123";
+        let value = Bytes::from("OK");
+        assert!(!check_if_compact_delete_node_value_updated(key, &value));
+
+        let value = Bytes::from("NOT_OK");
+        assert!(check_if_compact_delete_node_value_updated(key, &value));
+    }
 }

@@ -18,22 +18,20 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
-    INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        bitvec::BitVec,
         cluster::{IntoArcVec, Node, Role, RoleGroup},
         search::{ScanStats, SearchEventType},
         sql::TableReferenceExt,
-        stream::{FileKey, QueryPartitionStrategy, StreamType},
+        stream::{QueryPartitionStrategy, StreamType},
     },
     metrics,
-    utils::{inverted_index::split_token, json, time::now_micros},
+    utils::{json, time::now_micros},
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
-    physical_plan::{ExecutionPlan, visit_execution_plan},
+    physical_plan::visit_execution_plan,
     prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
@@ -62,7 +60,6 @@ use crate::{
                 optimizer::{generate_analyzer_rules, generate_optimizer_rules},
                 table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
             },
-            generate_filter_from_equal_items,
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
             request::Request,
             sql::Sql,
@@ -81,7 +78,7 @@ pub async fn search(
     trace_id: &str,
     sql: Arc<Sql>,
     mut req: Request,
-    query: SearchQuery,
+    _query: SearchQuery,
 ) -> Result<SearchResult> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -133,11 +130,6 @@ pub async fn search(
                 .build()
         )
     );
-    let mut scan_stats = ScanStats {
-        files: file_id_list_num as i64,
-        original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
-        ..Default::default()
-    };
 
     // 2. get nodes
     let get_node_start = std::time::Instant::now();
@@ -153,8 +145,16 @@ pub async fn search(
     let mut nodes = get_online_querier_nodes(trace_id, role_group).await?;
 
     // local mode, only use local node as querier node
-    if req.local_mode.unwrap_or_default() && LOCAL_NODE.is_querier() {
-        nodes.retain(|n| n.is_ingester() || n.name.eq(&LOCAL_NODE.name));
+    if req.local_mode.unwrap_or_default() {
+        if LOCAL_NODE.is_querier() {
+            nodes.retain(|n| n.name.eq(&LOCAL_NODE.name));
+        } else {
+            nodes = nodes
+                .into_iter()
+                .filter(|n| n.is_querier())
+                .take(1)
+                .collect();
+        }
     }
 
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
@@ -403,12 +403,16 @@ pub async fn run_datafusion(
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
-        print_plan(&trace_id, &physical_plan, "before");
+        log::info!("[trace_id {trace_id}] leader physical plan before rewrite");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+        );
     }
 
     // 7. rewrite physical plan
     let match_all_keys = sql.match_items.clone().unwrap_or_default();
-    let mut equal_keys = sql
+    let equal_keys = sql
         .equal_items
         .iter()
         .map(|(stream_name, fields)| {
@@ -540,7 +544,11 @@ pub async fn run_datafusion(
     }
 
     if cfg.common.print_key_sql {
-        print_plan(&trace_id, &physical_plan, "after");
+        log::info!("[trace_id {trace_id}] leader physical plan after rewrite");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+        );
     }
 
     // run datafusion
@@ -966,12 +974,4 @@ pub async fn get_file_id_lists(
         file_lists.insert(stream.clone(), file_id_list);
     }
     Ok(file_lists)
-}
-
-pub fn print_plan(trace_id: &str, physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
-    log::info!("[trace_id {trace_id}] leader physical plan {stage} rewrite");
-    log::info!(
-        "{}",
-        config::meta::plan::generate_plan_string(trace_id, physical_plan.as_ref())
-    );
 }

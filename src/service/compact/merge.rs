@@ -1046,7 +1046,6 @@ async fn generate_inverted_index(
     new_file_meta: &mut FileMeta,
     buf: &Bytes,
 ) -> Result<(), anyhow::Error> {
-    // generate parquet format inverted index
     let (schema, reader) = get_recordbatch_reader_from_bytes(buf).await?;
     let index_size = create_tantivy_index(
         "COMPACTOR",

@@ -15,7 +15,7 @@
 
 use config::{
     cluster::LOCAL_NODE, get_config, meta::stream::FileKey, metrics,
-    utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
+    utils::inverted_index::convert_parquet_file_name_to_tantivy_file,
 };
 use infra::cache::file_data::{CacheType, TRACE_ID_FOR_CACHE_LATEST_FILE};
 use opentelemetry::global;
@@ -52,7 +52,7 @@ impl Event for Eventer {
             for item in put_items.iter() {
                 // cache parquet
                 if cfg.cache_latest_files.cache_parquet {
-                    if let Err(e) = crate::job::queue_background_download(
+                    if let Err(e) = crate::job::queue_download(
                         TRACE_ID_FOR_CACHE_LATEST_FILE,
                         &item.key,
                         item.meta.compressed_size,
@@ -66,9 +66,8 @@ impl Event for Eventer {
                 }
                 // cache index for the parquet
                 if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
-                    if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
-                    {
-                        if let Err(e) = crate::job::queue_background_download(
+                    if let Some(ttv_file) = convert_parquet_file_name_to_tantivy_file(&item.key) {
+                        if let Err(e) = crate::job::queue_download(
                             TRACE_ID_FOR_CACHE_LATEST_FILE,
                             &ttv_file,
                             item.meta.index_size,
@@ -101,7 +100,7 @@ impl Event for Eventer {
                             if v.deleted {
                                 match v.meta.as_ref() {
                                     Some(m) if m.index_size > 0 => {
-                                        convert_parquet_idx_file_name_to_tantivy_file(&v.key)
+                                        convert_parquet_file_name_to_tantivy_file(&v.key)
                                     }
                                     _ => None,
                                 }

@@ -304,7 +304,7 @@ async fn download_file(
     ret
 }
 
-pub async fn queue_background_download(
+pub async fn queue_download(
     trace_id: &str,
     file: &str,
     size: i64,

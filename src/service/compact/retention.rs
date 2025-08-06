@@ -22,7 +22,10 @@ use config::{
     meta::stream::{FileKey, FileListDeleted, PartitionTimeLevel, StreamType, TimeRange},
     utils::time::{BASE_TIME, hour_micros},
 };
-use infra::{cache, dist_lock, file_list as infra_file_list};
+use infra::{
+    cache, dist_lock, file_list as infra_file_list,
+    table::compactor_manual_jobs::Status as CompactorManualJobStatus,
+};
 use itertools::Itertools;
 
 use crate::{
@@ -332,24 +335,23 @@ pub async fn delete_by_date(
 
     // same date, just mark delete done
     if date_range.0 == date_range.1 {
-        // mark delete done
-        return db::compact::retention::delete_stream_done(
-            org_id,
-            stream_type,
-            stream_name,
-            Some(date_range),
-        )
-        .await;
+        return handle_delete_by_date_done(org_id, stream_type, stream_name, date_range).await;
     }
 
-    let mut date_start =
-        DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.0))?.with_timezone(&Utc);
+    let mut date_start = if date_range.0.ends_with("00Z") {
+        DateTime::parse_from_rfc3339(date_range.0)?.with_timezone(&Utc)
+    } else {
+        DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.0))?.with_timezone(&Utc)
+    };
     // Hack for 1970-01-01
-    if date_range.0 == "1970-01-01" {
+    if date_range.0.starts_with("1970-01-01") {
         date_start += Duration::try_milliseconds(1).unwrap();
     }
-    let date_end =
-        DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.1))?.with_timezone(&Utc);
+    let date_end = if date_range.1.ends_with("00Z") {
+        DateTime::parse_from_rfc3339(date_range.1)?.with_timezone(&Utc)
+    } else {
+        DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.1))?.with_timezone(&Utc)
+    };
     let time_range = {
         (
             date_start.timestamp_micros(),
@@ -370,7 +372,15 @@ pub async fn delete_by_date(
     }
 
     // delete from file list
-    delete_from_file_list(org_id, stream_type, stream_name, time_range).await?;
+    delete_from_file_list(org_id, stream_type, stream_name, time_range)
+        .await
+        .map_err(|e| {
+            log::error!(
+                "[COMPACTOR] delete_by_date delete_from_file_list failed: {}",
+                e
+            );
+            e
+        })?;
 
     // archive old schema versions
     let mut schema_versions =
@@ -410,11 +420,10 @@ pub async fn delete_by_date(
     }
 
     // mark delete done
-    db::compact::retention::delete_stream_done(org_id, stream_type, stream_name, Some(date_range))
-        .await
+    handle_delete_by_date_done(org_id, stream_type, stream_name, date_range).await
 }
 
-async fn delete_from_file_list(
+pub async fn delete_from_file_list(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -598,6 +607,51 @@ fn generate_local_dirs(
     }
 
     dirs_to_delete
+}
+
+// helper to mark delete done and update job status
+async fn handle_delete_by_date_done(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date_range: (&str, &str),
+) -> Result<(), anyhow::Error> {
+    // mark delete done
+    db::compact::retention::delete_stream_done(org_id, stream_type, stream_name, Some(date_range))
+        .await
+        .map_err(|e| {
+            log::error!("[COMPACTOR] delete_by_date mark delete done failed: {}", e);
+            e
+        })?;
+
+    // Check if the key is also present in the `compactor_manual_jobs` table
+    // If it is, mark the job as completed
+    let mut jobs = db::compact::compactor_manual_jobs::list_jobs_by_key(
+        org_id,
+        stream_type,
+        stream_name,
+        Some(date_range),
+    )
+    .await;
+
+    jobs.iter_mut().for_each(|job| {
+        job.status = CompactorManualJobStatus::Completed;
+        job.ended_at = Utc::now().timestamp_micros();
+    });
+
+    // Note: Manual job operations are isolated - any errors are logged and ignored
+    // to prevent them from affecting the main compactor retention job
+    let _ = db::compact::compactor_manual_jobs::bulk_update_jobs(jobs)
+        .await
+        .map_err(|e| {
+            log::error!(
+                "[COMPACTOR] delete_by_date bulk update manual job failed: {}",
+                e
+            );
+            e
+        });
+
+    Ok(())
 }
 
 #[cfg(test)]

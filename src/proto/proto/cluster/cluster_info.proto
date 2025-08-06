@@ -11,6 +11,7 @@ import "cluster/common.proto";
 // Cluster Info Service
 service ClusterInfoService {
   rpc GetClusterInfo(EmptyRequest) returns (GetClusterInfoResponse) {}
+  rpc GetDeleteJobStatus(GetDeleteJobStatusRequest) returns (GetDeleteJobStatusResponse) {}
 }
 
 // Response message for Get Cluster Info
@@ -23,4 +24,18 @@ message CompactionInfo {
     uint64 pending_jobs = 1;
     uint64 completed_jobs = 2;
     uint64 in_progress_jobs = 3;
+}
+
+// Request message for Get Delete Job Status
+message GetDeleteJobStatusRequest {
+  string ksuid = 1;
+}
+
+// Response message for Get Delete Job Status
+message GetDeleteJobStatusResponse {
+  string id = 1;
+  string key = 2;
+  int64 created_at = 3;
+  int64 ended_at = 4;
+  int64 status = 5;
 }

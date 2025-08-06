@@ -144,14 +144,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="max-height: 100px"
           @updated:dataZoom="onChartUpdate"
         />
-
         <div
           style="height: 100px"
           v-else-if="
             searchObj.meta.showHistogram &&
-            Object.keys(plotChart)?.length == 0 &&
-            searchObj.loadingHistogram == false &&
-            searchObj.loading == false
+            !searchObj.loadingHistogram &&
+            !searchObj.loading
           "
         >
           <h3 class="text-center">
@@ -161,11 +159,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </h3>
         </div>
-
         <div
           style="height: 100px"
           v-else-if="
-            searchObj.meta.showHistogram && Object.keys(plotChart)?.length == 0
+            searchObj.meta.showHistogram && Object.keys(plotChart)?.length === 0
           "
         >
           <h3 class="text-center">
@@ -254,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close-column="closeColumn"
         @click:data-row="openLogDetails"
         @expand-row="expandLog"
+        @send-to-ai-chat="sendToAiChat"
         @view-trace="redirectToTraces"
       />
     </div>
@@ -296,6 +294,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ],
             )
           "
+          @sendToAiChat="sendToAiChat"
+          @closeTable="closeTable"
         />
       </q-dialog>
 </template>
@@ -341,6 +341,7 @@ export default defineComponent({
     "expandlog",
     "update:recordsPerPage",
     "update:columnSizes",
+    "sendToAiChat",
   ],
   props: {
     expandedLogs: {
@@ -706,6 +707,25 @@ export default defineComponent({
       return searchObj.meta.showHistogram && searchObj.loadingHistogram == true;
     });
 
+    const sendToAiChat = (value: any) => {
+      emit("sendToAiChat", value);
+    };
+
+    const closeTable = () => {
+      searchObj.meta.showDetailTab = false;
+    };
+
+    const resetPlotChart = computed(() => {
+      return searchObj.meta.resetPlotChart;
+    });
+
+    watch(resetPlotChart, (newVal) => {
+      if (newVal) {
+        plotChart.value = {};
+        searchObj.meta.resetPlotChart = false;
+      }
+    });
+
     return {
       t,
       store,
@@ -745,6 +765,8 @@ export default defineComponent({
       refreshPagination,
       refreshJobPagination,
       histogramLoader,
+      sendToAiChat,
+      closeTable,
     };
   },
   computed: {
@@ -760,9 +782,6 @@ export default defineComponent({
     reDrawChartData() {
       return this.searchObj.data.histogram;
     },
-    resetPlotChart() {
-      return this.searchObj.meta.resetPlotChart;
-    },
   },
   watch: {
     toggleWrapFlag() {
@@ -773,12 +792,6 @@ export default defineComponent({
     },
     updateTitle() {
       this.noOfRecordsTitle = this.searchObj.data.histogram.chartParams.title;
-    },
-    resetPlotChart(newVal: boolean) {
-      if (newVal) {
-        this.plotChart = {};
-        this.searchObj.meta.resetPlotChart = false;
-      }
     },
     reDrawChartData: {
       deep: true,

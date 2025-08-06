@@ -26,6 +26,7 @@ const search = {
       traceparent,
       dashboard_id,
       folder_id,
+      is_ui_histogram,
     }: {
       org_identifier: string;
       query: any;
@@ -33,6 +34,7 @@ const search = {
       traceparent?: string;
       dashboard_id?: string;
       folder_id?: string;
+      is_ui_histogram?: boolean;
     },
     search_type: string = "ui",
   ) => {
@@ -45,8 +47,52 @@ const search = {
     let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
     if (folder_id) url += `&folder_id=${folder_id}`;
+    if (is_ui_histogram) url += `&is_ui_histogram=${is_ui_histogram}`;
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
+      if (query.hasOwnProperty("aggs")) {
+        return http({ headers: { traceparent } }).post(url, {
+          ...query.query,
+          aggs: query.aggs,
+        });
+      } else {
+        return http({ headers: { traceparent } }).post(url, query.query);
+      }
+    }
+    return http({ headers: { traceparent } }).post(url, query);
+  },
+
+  result_schema: (
+    {
+      org_identifier,
+      query,
+      page_type = "logs",
+      traceparent,
+      dashboard_id,
+      folder_id,
+      is_streaming = false,
+    }: {
+      org_identifier: string;
+      query: any;
+      page_type: string;
+      traceparent?: string;
+      dashboard_id?: string;
+      folder_id?: string;
+      is_streaming?: boolean;
+    },
+    search_type: string = "ui",
+  ) => {
+    if (!traceparent) traceparent = generateTraceContext()?.traceparent;
+    const use_cache: boolean =
+      (window as any).use_cache !== undefined
+        ? (window as any).use_cache
+        : true;
+    // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
+    let url = `/api/${org_identifier}/result_schema?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&is_streaming=${is_streaming}`;
+    if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
+    if (folder_id) url += `&folder_id=${folder_id}`;
+    if (typeof query.query.sql != "string") {
+      url = `/api/${org_identifier}/result_schema_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
       if (query.hasOwnProperty("aggs")) {
         return http({ headers: { traceparent } }).post(url, {
           ...query.query,
@@ -184,17 +230,19 @@ const search = {
     query,
     page_type = "logs",
     traceparent,
+    searchType,
   }: {
     org_identifier: string;
     query: any;
     page_type: string;
     traceparent: string;
+    searchType: string;
   }) => {
     // const url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
 
-    let url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
+    let url = `/api/${org_identifier}/_search_partition?type=${page_type}&search_type=${searchType}`;
     if (typeof query.sql != "string") {
-      url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}`;
+      url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}&search_type=${searchType}`;
     }
 
     return http({

@@ -86,6 +86,7 @@ async fn audit_middleware(
     if get_o2_config().common.audit_enabled
         && !(path_columns.get(1).unwrap_or(&"").to_string().eq("ws")
         || path_columns.get(1).unwrap_or(&"").to_string().ends_with("_stream") // skip for http2 streams
+        || path.ends_with("ai/chat_stream") // skip for ai
         || (method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1])))
     {
         let query_params = req.query_string().to_string();
@@ -403,9 +404,12 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(stream::delete_fields)
         .service(stream::delete)
         .service(stream::list)
+        .service(stream::delete_stream_data_by_time_range)
+        .service(stream::get_delete_stream_data_status)
         .service(logs::ingest::bulk)
         .service(logs::ingest::multi)
         .service(logs::ingest::json)
+        .service(logs::ingest::hec)
         .service(logs::ingest::otlp_logs_write)
         .service(traces::traces_write)
         .service(traces::otlp_traces_write)
@@ -430,6 +434,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(enrichment_table::save_enrichment_table)
         .service(search::search)
         .service(search::search_partition)
+        .service(search::result_schema)
         .service(search::around_v1)
         .service(search::around_v2)
         .service(search_inspector::get_search_profile)
@@ -585,7 +590,9 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(ratelimit::list_role_ratelimit)
         .service(ratelimit::update_ratelimit)
         .service(ratelimit::api_modules)
-        .service(actions::operations::test_action);
+        .service(actions::operations::test_action)
+        .service(ai::chat)
+        .service(ai::chat_stream);
 
     svc.service(service);
 }
