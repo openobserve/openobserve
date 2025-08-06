@@ -1435,6 +1435,8 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
+import { json2csv } from 'json-2-csv';
+
 
 const defaultValue: any = () => {
   return {
@@ -2176,64 +2178,60 @@ export default defineComponent({
         queryEditorRef.value.setValue(searchObj.data.query);
     };
 
-    const jsonToCsv = (jsonData) => {
-      const replacer = (key, value) => (value === null ? "" : value);
-      // const header = Object.keys(jsonData[0]);
-      const headerSet = new Set();
-      jsonData.forEach((row) => {
-        Object.keys(row).forEach((key) => headerSet.add(key));
-      });
-      const header = Array.from(headerSet);
 
-      // 2. Start CSV with header row
-      let csv = header.join(",") + "\r\n";
-      // let csv = header.join(",") + "\r\n";
+    const downloadLogs = async (data, format) => {
+      //here we are using a package json2csv which converts json to csv data
+      //why package because we faced one issue where user has , in some of the fields so
+      //it is treating it as seperate fields 
+      //eg: {body:"hey this is the email body , with some info in it "}
+      //after converting it will treat hey this is the email body this as the body and remaining will be the next column
+      //to solve this issue we are using json2csv package
+      try {
+          let filename = "logs-data";
+          let dataobj;
+          const options = {
+            emptyFieldValue: "",
+          };
 
-      for (let i = 0; i < jsonData.length; i++) {
-        const row = header
-          .map((fieldName) => JSON.stringify(jsonData[i][fieldName], replacer))
-          .join(",");
-        csv += row + "\r\n";
-      }
-
-      return csv;
-    };
-
-    const downloadLogs = (data, format) => {
-      let filename = "logs-data";
-      let dataobj;
-
-      if (format === "csv") {
-        filename += ".csv";
-        dataobj = jsonToCsv(data);
-      } else {
-        filename += ".json";
-        dataobj = JSON.stringify(data, null, 2);
-      }
-      if (dataobj.length === 0) {
+        if (format === "csv") {
+          filename += ".csv";
+          dataobj = await json2csv(data, options);
+        } else {
+          filename += ".json";
+          dataobj = JSON.stringify(data, null, 2);
+        }
+        if (dataobj.length === 0) {
+          $q.notify({
+            type: "negative",
+            message: "No data available to download.",
+          });
+          return;
+        }
+        if (format === "csv") {
+          dataobj = new Blob([dataobj], { type: "text/csv" });
+        } else {
+          dataobj = new Blob([dataobj], { type: "application/json" });
+        }
+        const file = new File([dataobj], filename, {
+          type: format === "csv" ? "text/csv" : "application/json",
+        });
+        const url = URL.createObjectURL(file);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showDownloadMenu.value = false;
+      } catch (error) {
+        showDownloadMenu.value = false;
         $q.notify({
           type: "negative",
-          message: "No data available to download.",
+          message: "Error downloading logs",
+          timeout: 2000,
         });
-        return;
       }
-      if (format === "csv") {
-        dataobj = new Blob([dataobj], { type: "text/csv" });
-      } else {
-        dataobj = new Blob([dataobj], { type: "application/json" });
-      }
-      const file = new File([dataobj], filename, {
-        type: format === "csv" ? "text/csv" : "application/json",
-      });
-      const url = URL.createObjectURL(file);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      showDownloadMenu.value = false;
     };
 
     onMounted(async () => {
