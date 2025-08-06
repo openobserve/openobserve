@@ -5,7 +5,7 @@ FROM public.ecr.aws/docker/library/rust:buster
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     protobuf-compiler \
-    cmake \ 
+    cmake &&
     curl && \
     rustup toolchain install nightly-2025-05-20 && \
     rustup default nightly-2025-05-20 && \
