@@ -968,7 +968,7 @@ def test_streaming_histogram(create_session, base_url, test_name, hist_query, ex
     else:
         pytest.fail("No hits found in the response.")
 
-
+# TODO Uncomment the following test cases after the issue (https://github.com/openobserve/openobserve/issues/7858) is fixed
 # @pytest.mark.parametrize("test_name_sql, sql_query, sql_from, sql_size, total_exp", test_data_sql)
 # def test_streaming_sql(create_session, base_url, test_name_sql, sql_query, sql_from, sql_size, total_exp):
 #     """Running an E2E test for sql queries with Parameterized data when websocket is disabled."""
