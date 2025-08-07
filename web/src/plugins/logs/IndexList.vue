@@ -1675,6 +1675,8 @@ export default defineComponent({
       traceIdMapper,
       checkSelectedFields,
       resetSelectedFileds,
+      handleSearchResponse,
+      handleSearchReset
     };
   },
 });
