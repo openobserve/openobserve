@@ -22,6 +22,7 @@ mod dashboards;
 mod destinations;
 mod distinct_values;
 mod domain_management;
+mod enrichment_table;
 mod folders;
 mod meta;
 mod org_user;
@@ -62,6 +63,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_re_patterns_msg: re_pattern::process,
         on_domain_management_msg: domain_management::process,
         on_compactor_manual_job_msg: compactor_manual_jobs::process,
+        on_enrichment_file_list_delete_msg: enrichment_table::process_file_list_delete,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,

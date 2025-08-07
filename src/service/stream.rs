@@ -720,6 +720,25 @@ pub async fn delete_stream(
         }
     }
 
+    // create delete for compactor
+    if let Err(e) =
+        db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
+    {
+        log::error!(
+            "Failed to create retention job for stream: {}/{}/{}, error: {}",
+            org_id,
+            stream_type,
+            stream_name,
+            e
+        );
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((ERROR_HEADER, format!("failed to delete stream: {e}")))
+            .json(MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to delete stream: {e}"),
+            )));
+    }
+
     // delete related resource
     if let Err(e) = stream_delete_inner(org_id, stream_type, stream_name).await {
         return Ok(HttpResponse::InternalServerError()
@@ -761,16 +780,6 @@ pub async fn stream_delete_inner(
     {
         use super::db::re_pattern::remove_stream_associations_after_deletion;
         remove_stream_associations_after_deletion(org_id, stream_name, stream_type).await?;
-    }
-
-    // create delete for compactor
-    if let Err(e) =
-        db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
-    {
-        log::error!(
-            "Failed to create retention job for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
-        );
-        return Err(e);
     }
 
     // delete stream schema cache
