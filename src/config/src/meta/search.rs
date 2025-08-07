@@ -243,7 +243,6 @@ pub struct Response {
     pub order_by: Option<OrderBy>,
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
     pub order_by_metadata: Vec<(String, OrderBy)>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub converted_histogram_query: Option<String>,
