@@ -70,7 +70,7 @@ impl PuffinBytesReader {
             return Ok(());
         }
 
-        if (self.source.size as u64) < MIN_FILE_SIZE {
+        if self.source.size < MIN_FILE_SIZE {
             return Err(anyhow!(
                 "Unexpected bytes size: minimal size {} vs actual size {}",
                 MIN_FILE_SIZE,
@@ -79,8 +79,7 @@ impl PuffinBytesReader {
         }
 
         // check MAGIC
-        let magic =
-            infra::cache::storage::get_range(&self.source.location, 0..MAGIC_SIZE as u64).await?;
+        let magic = infra::cache::storage::get_range(&self.source.location, 0..MAGIC_SIZE).await?;
         ensure!(magic.to_vec() == MAGIC, anyhow!("Header MAGIC mismatch"));
 
         let puffin_meta = PuffinFooterBytesReader::new(self.source.clone())
@@ -210,7 +209,7 @@ impl PuffinFooterBytesReader {
             .map_or(MAGIC_SIZE, |blob| blob.offset + blob.length);
         let footer_size = MAGIC_SIZE + self.payload_size + FOOTER_SIZE;
         ensure!(
-            payload_ends_at == (self.source.size as u64 - footer_size),
+            payload_ends_at == (self.source.size - footer_size),
             anyhow!("Payload chunk offset mismatch")
         );
         Ok(())

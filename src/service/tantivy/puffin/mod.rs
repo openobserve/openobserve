@@ -89,7 +89,7 @@ impl BlobMetadata {
     pub fn get_offset(&self, range: Option<core::ops::Range<u64>>) -> core::ops::Range<u64> {
         match range {
             None => self.offset..(self.offset + self.length),
-            Some(v) => self.offset + v.start..(self.offset + v.start + (v.len() as u64)),
+            Some(v) => self.offset + v.start..(self.offset + v.end),
         }
     }
 }
