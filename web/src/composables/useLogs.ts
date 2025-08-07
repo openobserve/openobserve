@@ -637,7 +637,33 @@ const useLogs = () => {
     }
   };
 
-  const generateURLQuery = (isShareLink: boolean = false) => {
+  // Helper functions for visualization config sync
+  const getVisualizationConfig = (dashboardPanelData: any) => {
+    if (!dashboardPanelData?.data) {
+      return null;
+    }
+    return dashboardPanelData.data;
+  };
+
+  const encodeVisualizationConfig = (config: any) => {
+    try {
+      return b64EncodeUnicode(JSON.stringify(config));
+    } catch (error) {
+      console.error("Failed to encode visualization config:", error);
+      return null;
+    }
+  };
+
+  const decodeVisualizationConfig = (encodedConfig: string) => {
+    try {
+      return JSON.parse(b64DecodeUnicode(encodedConfig));
+    } catch (error) {
+      console.error("Failed to decode visualization config:", error);
+      return null;
+    }
+  };
+
+  const generateURLQuery = (isShareLink: boolean = false, dashboardPanelData: any = null) => {
     const date = searchObj.data.datetime;
 
     const query: any = {};
@@ -710,11 +736,22 @@ const useLogs = () => {
       query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
     }
 
+    // Add visualization data to URL if in visualize mode and dashboardPanelData is provided
+    if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
+      const visualizationConfig = getVisualizationConfig(dashboardPanelData);
+      if (visualizationConfig) {
+        const encodedConfig = encodeVisualizationConfig(visualizationConfig);
+        if (encodedConfig) {
+          query["visualization_data"] = encodedConfig;
+        }
+      }
+    }
+
     return query;
   };
 
-  const updateUrlQueryParams = () => {
-    const query = generateURLQuery(false);
+  const updateUrlQueryParams = (dashboardPanelData: any = null) => {
+    const query = generateURLQuery(false, dashboardPanelData);
     if (
       (Object.hasOwn(query, "type") &&
         query.type == "search_history_re_apply") ||
@@ -4483,7 +4520,7 @@ const useLogs = () => {
     return { from: fromTimestamp, to: toTimestamp };
   }
 
-  const restoreUrlQueryParams = async () => {
+  const restoreUrlQueryParams = async (dashboardPanelData: any = null) => {
     searchObj.shouldIgnoreWatcher = true;
     const queryParams: any = router.currentRoute.value.query;
     if (!queryParams.stream) {
@@ -4586,6 +4623,19 @@ const useLogs = () => {
 
     if(queryParams.hasOwnProperty("logs_visualize_toggle") && queryParams.logs_visualize_toggle != "") {
       searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
+    }
+
+    // Restore visualization data if available and in visualize mode
+    if (queryParams.visualization_data && 
+        searchObj.meta.logsVisualizeToggle === "visualize" && 
+        dashboardPanelData) {
+      const restoredData = decodeVisualizationConfig(queryParams.visualization_data);
+      if (restoredData && dashboardPanelData.data) {
+        dashboardPanelData.data = {
+          ...dashboardPanelData.data,
+          ...restoredData
+        };
+      }
     }
 
     // TODO OK : Replace push with replace and test all scenarios
@@ -6842,6 +6892,10 @@ const useLogs = () => {
     setCommunicationMethod,
     hasAggregation,
     loadVisualizeData,
+    processHttpHistogramResults,
+    getVisualizationConfig,
+    encodeVisualizationConfig,
+    decodeVisualizationConfig
   };
 };
 
