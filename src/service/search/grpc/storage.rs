@@ -1083,7 +1083,7 @@ async fn search_tantivy_index(
     .await??;
 
     let key = parquet_file.key.to_string();
-    let mut percent = 0;
+    let mut percent = 0.0;
     let result = match res {
         TantivyResult::Count(count) => TantivyResult::Count(count),
         TantivyResult::Histogram(histogram) => TantivyResult::Histogram(histogram),
@@ -1103,7 +1103,7 @@ async fn search_tantivy_index(
                     TantivyResult::RowIdsBitVec(row_ids_percent as usize, BitVec::EMPTY),
                 ));
             }
-            percent = row_ids_percent as usize;
+            percent = row_ids_percent;
             let max_doc_id = *row_ids.iter().max().unwrap_or(&0) as i64;
             let mut res = BitVec::repeat(false, max_doc_id as usize + 1);
             if max_doc_id >= parquet_file.meta.records {
@@ -1126,9 +1126,10 @@ async fn search_tantivy_index(
 
     // cache the result if the memory size is less than the limit
     if cfg.common.inverted_index_result_cache_enabled
-        && result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
+        && (result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
+            || percent < 1.0)
     {
-        let entry = get_cache_entry(result.clone(), percent as f64);
+        let entry = get_cache_entry(result.clone(), percent);
         tantivy_result_cache::TANTIVY_RESULT_CACHE.put(cache_key, entry);
     }
     Ok((key, result))
