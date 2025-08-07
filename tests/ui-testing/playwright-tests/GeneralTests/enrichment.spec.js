@@ -142,7 +142,7 @@ test.describe("Enrichment data testcases", () => {
     await page.getByText("Save").click({ force: true });
 
     // Wait for the process to complete
-    await page.reload();
+    // await page.reload();
     await page.waitForTimeout(3000);
     await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
     await page.waitForTimeout(3000);
@@ -182,7 +182,7 @@ test.describe("Enrichment data testcases", () => {
     await page.getByText("Save").click({ force: true });
 
     // Reload the page to ensure table is updated
-    await page.reload();
+    // await page.reload();
     await page.waitForTimeout(3000);
 
     // Search for the uploaded file name
@@ -280,7 +280,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     await page.getByText("Save").click({ force: true });
   
     // Wait for the process to complete
-    await page.reload();
+    // await page.reload();
     await page.waitForTimeout(3000);
     await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
     await page.waitForTimeout(3000);
