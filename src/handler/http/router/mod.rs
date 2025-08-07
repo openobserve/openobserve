@@ -408,6 +408,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(stream::delete_fields)
         .service(stream::delete)
         .service(stream::list)
+        .service(stream::delete_stream_data_by_time_range)
+        .service(stream::get_delete_stream_data_status)
         .service(logs::ingest::bulk)
         .service(logs::ingest::multi)
         .service(logs::ingest::json)
