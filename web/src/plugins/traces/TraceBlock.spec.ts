@@ -120,6 +120,9 @@ describe("TraceBlock", () => {
         },
       },
     });
+
+    await flushPromises();
+    await flushPromises();
   });
 
   afterEach(() => {
@@ -372,7 +375,6 @@ describe("TraceBlock", () => {
     });
 
     it("should format time in 12-hour format", async () => {
-      await flushPromises();
       await flushPromises();
       await flushPromises();
       
