@@ -991,7 +991,7 @@ fn _is_blank_or_alphanumeric(s: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use sqlparser::ast::{Function, FunctionArgumentList, Ident, ObjectName, Value};
+    use sqlparser::ast::{Function, FunctionArgumentList, Ident, ObjectName, ObjectNamePart, Value};
 
     use super::*;
 
@@ -1298,7 +1298,7 @@ mod tests {
             op: UnaryOperator::Not,
             expr: Box::new(Expr::BinaryOp {
                 left: Box::new(Expr::Function(Function {
-                    name: ObjectName(vec![Ident::new("match_all")]),
+                    name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("match_all"))]),
                     uses_odbc_syntax: false,
                     parameters: FunctionArguments::None,
                     args: FunctionArguments::List(FunctionArgumentList {
