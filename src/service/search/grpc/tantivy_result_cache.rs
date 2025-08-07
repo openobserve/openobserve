@@ -46,7 +46,7 @@ impl From<CacheEntry> for TantivyResult {
             }
             CacheEntry::RowIdsRoaring(num_rows, roaring) => {
                 let mut bitvec = BitVec::repeat(false, roaring.max().unwrap_or(0) as usize + 1);
-                for i in roaring.iter() {
+                for i in roaring.into_iter() {
                     bitvec.set(i as usize, true);
                 }
                 TantivyResult::RowIdsBitVec(num_rows, bitvec)
