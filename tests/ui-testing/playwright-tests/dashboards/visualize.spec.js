@@ -2,6 +2,9 @@ import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 
+const randomDashboardName =
+  "Dashboard_" + Math.random().toString(36).substr(2, 9);
+
 // Stream name used across tests
 const STREAM_NAME = "e2e_automate";
 
@@ -19,6 +22,8 @@ const largeDatasetSqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_i
   FROM "${STREAM_NAME}" 
   WHERE kubernetes_namespace_name IS NOT NULL 
   GROUP BY x_axis_1, breakdown_1`;
+
+const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1"  FROM "${STREAM_NAME}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`;
 
 test.describe.configure({ mode: "parallel" });
 
@@ -176,7 +181,7 @@ test.describe(" visualize UI testcases", () => {
 
     await expect(
       page.locator('[data-test="selected-chart-line-item"]').locator("..")
-    ).toHaveClass(/bg-grey-3|5/); //
+    ).toHaveClass(/bg-grey-[35]/); // Fixed regex pattern
   });
 
   test.skip("should adjust the displayed data effectively when editing the X-axis and Y-axis on the chart.", async ({
@@ -520,78 +525,6 @@ test.describe(" visualize UI testcases", () => {
       .click();
   });
 
-  test.skip("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
-    page,
-  }) => {
-    //Except :  Data should be vanished, and tab is changed from Visualize to Search.
-
-    // Perform the initial actions
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page
-      .locator('[data-test="index-field-search-input"]')
-      .fill("kubernetes_container_hash");
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]'
-      )
-      .click();
-    await page.locator('[data-test="index-field-search-input"]').fill("");
-    await page
-      .locator('[data-test="index-field-search-input"]')
-      .fill("kubernetes_container_name");
-    await page
-      .locator(
-        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
-      )
-      .click();
-    await page
-      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
-      .click();
-
-    // Reload the page
-    await page.reload();
-
-    // Verify the field is empty
-    await expect(page.locator(".view-line").first()).toBeEmpty();
-  });
-
-  test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
-    page,
-  }) => {
-    // Focus on the text editor and replace existing text with the SQL query
-    const textEditor = page.locator(".view-line").first();
-    await textEditor.click();
-
-    // Clear the existing text and input the new SQL query
-    // await textEditor.fill('');
-    await textEditor.type(largeDatasetSqlQuery);
-
-    // Apply the time filter and refresh the search
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-
-    // Switch to SQL mode, apply the query, and refresh the search
-    await page
-      .getByRole("switch", { name: "SQL Mode" })
-      .locator("div")
-      .nth(2)
-      .click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-
-    // Toggle visualization
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-
-    // Check for any error messages or indicators
-    const errorMessage = page.locator('[data-test="error-message"]'); // Update the selector based on your app's error message display
-    const errorCount = await errorMessage.count();
-
-    // Assert that no error messages are displayed
-    await expect(errorCount).toBe(0); // Fail the test if any error messages are present
-  });
-
   test.skip("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
     page,
   }) => {
@@ -631,21 +564,75 @@ test.describe(" visualize UI testcases", () => {
     await expect(row).toBeDefined();
   });
 
-  test.skip("should not blank the stream name list when switching between logs and visualization and back again.", async ({
+  test.skip("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
     page,
   }) => {
+    //Except :  Data should be vanished, and tab is changed from Visualize to Search.
+
+    // Perform the initial actions
     await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-4-d-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
     await page
-      .locator('[data-test="dashboard-y-item-_timestamp-remove"]')
+      .locator('[data-test="index-field-search-input"]')
+      .fill("kubernetes_container_hash");
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-y-data"]'
+      )
       .click();
-    await page.locator('[data-test="logs-logs-toggle"]').click();
-    await page.locator('[data-test="confirm-button"]').click();
-    await expect(
-      page.locator('[data-test="logs-search-result-bar-chart"]')
-    ).toBeVisible();
+    await page.locator('[data-test="index-field-search-input"]').fill("");
+    await page
+      .locator('[data-test="index-field-search-input"]')
+      .fill("kubernetes_container_name");
+    await page
+      .locator(
+        '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
+      )
+      .click();
+    await page
+      .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
+      .click();
+
+    // Reload the page
+    await page.reload();
+
+    // Verify the field is empty
+    await expect(page.locator(".view-line").first()).toBeEmpty();
+  });
+  test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
+    page,
+  }) => {
+    // Focus on the text editor and replace existing text with the SQL query
+    const textEditor = page.locator(".view-line").first();
+    await textEditor.click();
+
+    // Clear the existing text and input the new SQL query
+    // await textEditor.fill('');
+    await textEditor.type(largeDatasetSqlQuery);
+
+    // Apply the time filter and refresh the search
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+
+    // Switch to SQL mode, apply the query, and refresh the search
+    await page
+      .getByRole("switch", { name: "SQL Mode" })
+      .locator("div")
+      .nth(2)
+      .click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+
+    // Toggle visualization
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    // Check for any error messages or indicators
+    const errorMessage = page.locator('[data-test="error-message"]'); // Update the selector based on your app's error message display
+    const errorCount = await errorMessage.count();
+
+    // Assert that no error messages are displayed
+    await expect(errorCount).toBe(0); // Fail the test if any error messages are present
   });
   test("Stream should be correct on visualize page after switching between logs and visualize", async ({
     page,
@@ -717,5 +704,358 @@ test.describe(" visualize UI testcases", () => {
 
     // Assert that the stream value is specifically "e2e_automate"
     expect(streamValue).toBe("e2e_automate");
+  });
+  test("should redirect the correct chart type when added the aggregation query", async ({
+    page,
+  }) => {
+    // Extract stream name from the SQL query dynamically
+    const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
+    const expectedStreamName = streamNameMatch
+      ? streamNameMatch[1]
+      : STREAM_NAME;
+
+    // Focus on the text editor and paste the SQL query
+    const textEditor = page.locator(".view-line").first();
+    await textEditor.click();
+
+    // Clear any existing content and paste the complete SQL query
+    // await page.keyboard.press("Control+A"); // Select all existing content
+    await page.keyboard.type(largeDatasetSqlQuery); // Type the complete query
+
+    // Apply the time filter and refresh the search
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+
+    // Toggle visualization
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    // Wait for visualization to load
+    await page.waitForTimeout(2000);
+
+    // Multiple assertions to verify table chart is selected as default for aggregation queries
+
+    // Method 1: Check if table chart item has the selected background color class
+    await expect(
+      page.locator('[data-test="selected-chart-table-item"]').locator("..")
+    ).toHaveClass(/bg-grey-[35]/);
+
+    // Method 2: Alternative assertion - check if table panel is visible
+    await expect(
+      page.locator('[data-test="dashboard-panel-table"]')
+    ).toBeVisible();
+
+    // Method 3: Verify table-specific content is rendered (breakdown_1 column from the SQL query)
+    await expect(
+      page
+        .locator('[data-test="dashboard-panel-table"]')
+        .getByRole("cell", { name: "breakdown_1" })
+    ).toBeVisible();
+
+    // Method 4: Additional verification - check if other chart types are NOT selected
+    // Line chart should not have the selected class
+    await expect(
+      page.locator('[data-test="selected-chart-line-item"]').locator("..")
+    ).not.toHaveClass(/bg-grey-[35]/);
+  });
+  // Helper function to setup aggregation query test
+  async function setupAggregationQueryTest(page) {
+    const textEditor = page.locator(".view-line").first();
+    await textEditor.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type(largeDatasetSqlQuery);
+
+    // Apply time filter and search
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+
+    // Switch to SQL mode
+    await page
+      .getByRole("switch", { name: "SQL Mode" })
+      .locator("div")
+      .nth(2)
+      .click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+
+    // Switch to visualization
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    await page.waitForTimeout(3000);
+  }
+  // Helper function to check for dashboard errors
+  async function checkDashboardErrors(page, chartTypeName) {
+    const dashboardErrorContainer = page.locator(
+      '[data-test="dashboard-error"]'
+    );
+    const errorContainerExists = await dashboardErrorContainer.count();
+
+    if (errorContainerExists === 0) {
+      return { hasErrors: false, errors: [] };
+    }
+
+    const isErrorVisible = await dashboardErrorContainer.first().isVisible();
+    if (!isErrorVisible) {
+      return { hasErrors: false, errors: [] };
+    }
+
+    const errors = [];
+
+    // Check for error indicator text
+    const errorText = page
+      .locator('[data-test="dashboard-error"]')
+      .getByText(/Errors \(\d+\)/);
+    const errorTextCount = await errorText.count();
+
+    if (errorTextCount > 0) {
+      const errorTextContent = await errorText.first().textContent();
+      errors.push(`Error indicator: ${errorTextContent}`);
+    }
+
+    // Check for error list items
+    const errorListItems = page.locator('[data-test="dashboard-error"] ul li');
+    const errorListCount = await errorListItems.count();
+
+    if (errorListCount > 0) {
+      for (let i = 0; i < errorListCount; i++) {
+        const errorItem = errorListItems.nth(i);
+        const errorItemText = await errorItem.textContent();
+        if (errorItemText && errorItemText.trim().length > 0) {
+          errors.push(`Error ${i + 1}: ${errorItemText.trim()}`);
+        }
+      }
+    }
+
+    return {
+      hasErrors: errors.length > 0,
+      errors,
+      errorTextCount,
+      errorListCount,
+    };
+  }
+  // Helper function to verify chart renders successfully
+  async function verifyChartRenders(page) {
+    const chartRenderer = page.locator(
+      '[data-test="chart-renderer"], [data-test="dashboard-panel-table"]'
+    );
+    const chartExists = await chartRenderer.count();
+
+    if (chartExists > 0) {
+      await expect(chartRenderer.first()).toBeVisible();
+    }
+
+    return chartExists > 0;
+  }
+  // Helper function to verify chart type selection
+  async function verifyChartTypeSelected(
+    page,
+    chartType,
+    shouldBeSelected = true
+  ) {
+    const selector = `[data-test="selected-chart-${chartType}-item"]`;
+    const locator = page.locator(selector).locator("..");
+
+    if (shouldBeSelected) {
+      await expect(locator).toHaveClass(/bg-grey-[35]/);
+    } else {
+      await expect(locator).not.toHaveClass(/bg-grey-[35]/);
+    }
+  }
+  // Helper function to open query inspector and verify query
+  async function verifyQueryInInspector(page, expectedQuery) {
+    // Open query inspector
+    await page
+      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
+      .click();
+
+    // Clean up the expected query (normalize whitespace)
+    const normalizedQuery = expectedQuery.replace(/\s+/g, " ").trim();
+
+    // Verify the query is visible in the inspector
+    await expect(
+      page.getByRole("cell", {
+        name: normalizedQuery,
+        exact: true,
+      })
+    ).toBeVisible();
+  }
+  test("should not show dashboard errors when changing chart types with aggregation query", async ({
+    page,
+  }) => {
+    // Setup the test with aggregation query
+    await setupAggregationQueryTest(page);
+
+    // Define chart types to test
+    const chartTypes = [
+      { selector: '[data-test="selected-chart-table-item"]', name: "Table" },
+      { selector: '[data-test="selected-chart-line-item"]', name: "Line" },
+      { selector: '[data-test="selected-chart-bar-item"]', name: "Bar" },
+      { selector: '[data-test="selected-chart-area-item"]', name: "Area" },
+      {
+        selector: '[data-test="selected-chart-scatter-item"]',
+        name: "Scatter",
+      },
+      { selector: '[data-test="selected-chart-pie-item"]', name: "Pie" },
+    ];
+
+    // Test each chart type
+    for (const chartType of chartTypes) {
+      console.log(`Testing chart type: ${chartType.name}`);
+
+      // Select the chart type
+      await page.locator(chartType.selector).click();
+      await page.waitForTimeout(1000);
+
+      // Wait for chart to load
+      await page.waitForTimeout(3000);
+
+      // Check for dashboard errors
+      const errorResult = await checkDashboardErrors(page, chartType.name);
+
+      if (errorResult.hasErrors) {
+        console.log(`❌ Dashboard error found for ${chartType.name} chart:`);
+        errorResult.errors.forEach((error, index) => {
+          console.log(`  ${index + 1}. ${error}`);
+        });
+
+        // Fail the test with detailed error information
+        expect(errorResult.errorTextCount).toBe(0);
+        expect(errorResult.errorListCount).toBe(0);
+      } else {
+        console.log(`✅ ${chartType.name} chart: No dashboard errors found`);
+      }
+
+      // Verify the chart renders successfully
+      const chartRendered = await verifyChartRenders(page);
+      expect(chartRendered).toBe(true);
+    }
+
+    console.log(
+      "✅ All chart types tested successfully without dashboard errors"
+    );
+  });
+  test("should set line chart as default when using histogram query", async ({
+    page,
+  }) => {
+    // await setupHistogramQueryTest(page);
+    const textEditor = page.locator(".view-line").first();
+    await textEditor.click();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type(histogramQuery);
+
+    // Apply time filter and search
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+
+    // Switch to visualization
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+    await page.waitForTimeout(2000);
+
+    // Verify line chart is selected as default for histogram queries
+    await verifyChartTypeSelected(page, "line", true);
+
+    // Verify table chart is NOT selected for histogram queries
+    await verifyChartTypeSelected(page, "table", false);
+
+    // Verify chart canvas renders successfully
+    await expect(
+      page.locator('[data-test="chart-renderer"] canvas').last()
+    ).toBeVisible();
+
+    // Verify chart renders without errors
+    const chartRendered = await verifyChartRenders(page);
+    expect(chartRendered).toBe(true);
+  });
+  test("should preserve query from logs to dashboard and show in query inspector", async ({
+    page,
+  }) => {
+    // Setup aggregation query test (includes visualization)
+    await setupAggregationQueryTest(page);
+
+    // Add the visualization to dashboard
+    // await addVisualizationToDashboard(page, dashboardName);
+
+    await page.getByRole("button", { name: "Add To Dashboard" }).click();
+    await page
+      .locator('[data-test="metrics-new-dashboard-panel-title"]')
+      .fill(randomDashboardName);
+    await page
+      .locator('[data-test="metrics-schema-update-settings-button"]')
+      .click();
+
+    await page.waitForTimeout(5000);
+
+    await page
+      .locator(
+        '[data-test="dashboard-edit-panel-' +
+          randomDashboardName +
+          '-dropdown"]'
+      )
+      .click();
+
+    await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
+
+    // Navigate to dashboard and edit the panel
+    // Verify the original query is preserved in query inspector
+    await verifyQueryInInspector(page, largeDatasetSqlQuery);
+  });
+  test("Should display the correct query in the dashboard when saved from a Table chart.", async ({
+    page,
+  }) => {
+    // Extract stream name from the SQL query dynamically
+    const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
+    const expectedStreamName = streamNameMatch
+      ? streamNameMatch[1]
+      : STREAM_NAME;
+
+    // Focus on the text editor and paste the SQL query
+    const textEditor = page.locator(".view-line").first();
+    await textEditor.click();
+
+    await page.keyboard.type(largeDatasetSqlQuery);
+
+    // Apply the time filter and refresh the search
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+
+    // Toggle visualization
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    await page.waitForTimeout(4000);
+    await page.getByRole("button", { name: "Add To Dashboard" }).click();
+
+    await page.waitForTimeout(4000);
+
+    await page
+      .locator('[data-test="metrics-new-dashboard-panel-title"]')
+      .click();
+    await page
+      .locator('[data-test="metrics-new-dashboard-panel-title"]')
+      .fill(randomDashboardName);
+    await page
+      .locator('[data-test="metrics-schema-update-settings-button"]')
+      .click();
+
+    // Wait for visualization to load
+    await page.waitForTimeout(2000);
+
+    await page
+      .locator(
+        '[data-test="dashboard-edit-panel-' +
+          randomDashboardName +
+          '-dropdown"]'
+      )
+      .click();
+    await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
+
+    await page.waitForTimeout(2000);
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", count(kubernetes_container_hash) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", count(kubernetes_host) as "y_axis_3", count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", count(kubernetes_labels_prometheus) as "y_axis_8", kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1" FROM "e2e_automate" WHERE kubernetes_namespace_name IS NOT NULL GROUP BY x_axis_1, breakdown_1',
+        })
+        .first()
+    ).toBeVisible();
   });
 });
