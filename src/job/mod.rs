@@ -16,6 +16,8 @@
 use config::cluster::LOCAL_NODE;
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::config::get_config as get_enterprise_config;
+#[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
 use regex::Regex;
 
@@ -40,6 +42,8 @@ pub(crate) mod files;
 mod flatten_compactor;
 pub mod metrics;
 mod mmdb_downloader;
+#[cfg(feature = "enterprise")]
+pub(crate) mod pipeline;
 mod promql;
 mod promql_self_consume;
 mod stats;
@@ -177,6 +181,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(
         async move { o2_enterprise::enterprise::domain_management::db::watch().await },
     );
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { db::ai_prompts::watch().await });
 
     // pipeline not used on compactors
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
@@ -226,6 +232,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::domain_management::db::cache()
         .await
         .expect("domain management cache failed");
+    #[cfg(feature = "enterprise")]
+    db::ai_prompts::cache()
+        .await
+        .expect("ai prompts cache failed");
 
     infra_file_list::create_table_index().await?;
     infra_file_list::LOCAL_CACHE.create_table_index().await?;
@@ -245,6 +255,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_querier() && get_enterprise_config().ai.enabled {
+        tokio::task::spawn(async move {
+            o2_enterprise::enterprise::ai::prompt::prompts::load_system_prompt()
+                .await
+                .expect("load system prompt failed");
+        });
+    }
+
     tokio::task::spawn(files::run());
     tokio::task::spawn(stats::run());
     tokio::task::spawn(compactor::run());
@@ -253,6 +272,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(promql::run());
     tokio::task::spawn(alert_manager::run());
     tokio::task::spawn(file_downloader::run());
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { pipeline::run().await });
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());

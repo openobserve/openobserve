@@ -44,9 +44,9 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request, get_work_group,
+                get_dashboard_info_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
             },
             stream::get_settings_max_query_range,
         },
@@ -84,6 +84,10 @@ async fn can_use_distinct_stream(
     let stream_settings = infra::schema::get_settings(org, stream_name, stream_type)
         .await
         .unwrap_or_default();
+
+    if !stream_settings.enable_distinct_fields {
+        return false;
+    }
 
     // all fields which are requested must be in the distinct stream
     let all_fields_distinct = fields.iter().all(|f| {
@@ -245,6 +249,8 @@ pub async fn search(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
+    let dashboard_info = get_dashboard_info_from_request(&query);
+
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
@@ -374,6 +380,7 @@ pub async fn search(
         &req,
         range_error,
         false,
+        dashboard_info,
     )
     .instrument(http_span)
     .await;
@@ -1155,6 +1162,7 @@ async fn values_v1(
             &req,
             "".to_string(),
             false,
+            None,
         )
         .instrument(http_span)
         .await;

@@ -23,6 +23,7 @@ use actix_web::{
     web::Query,
 };
 use config::meta::{
+    dashboards::usage_report::DashboardInfo,
     search::{SearchEventContext, SearchEventType, default_use_cache},
     stream::StreamType,
 };
@@ -35,6 +36,19 @@ pub(crate) fn get_stream_type_from_request(
     query: &Query<HashMap<String, String>>,
 ) -> Option<StreamType> {
     query.get("type").map(|s| StreamType::from(s.as_str()))
+}
+
+#[inline(always)]
+pub(crate) fn get_ts_from_request_with_key(
+    query: &Query<HashMap<String, String>>,
+    key: &str,
+) -> Result<i64, String> {
+    let value = query
+        .get(key)
+        .ok_or_else(|| format!("{key} parameter is missing"))?
+        .parse::<i64>()
+        .map_err(|_| format!("{key} is not a valid timestamp"))?;
+    Ok(value)
 }
 
 #[inline(always)]
@@ -195,6 +209,19 @@ pub fn get_work_group(work_group_set: Vec<Option<String>>) -> Option<String> {
         return Some("short".to_string());
     }
     None
+}
+
+#[inline(always)]
+pub(crate) fn get_dashboard_info_from_request(
+    query: &Query<HashMap<String, String>>,
+) -> Option<DashboardInfo> {
+    Some(DashboardInfo {
+        run_id: query.get("run_id").map(|s| s.to_string())?,
+        panel_id: query.get("panel_id").map(|s| s.to_string())?,
+        panel_name: query.get("panel_name").map(|s| s.to_string())?,
+        tab_id: query.get("tab_id").map(|s| s.to_string())?,
+        tab_name: query.get("tab_name").map(|s| s.to_string())?,
+    })
 }
 
 #[cfg(test)]

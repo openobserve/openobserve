@@ -166,17 +166,6 @@ pub async fn save_enrichment_data(
             json::Value::Number(timestamp.into()),
         );
 
-        // if records.is_empty() {
-        // let schema = stream_schema_map.get(stream_name).unwrap();
-        // let schema_key = schema.hash_key();
-        // hour_key = super::ingestion::get_write_partition_key(
-        //     timestamp,
-        //     &vec![],
-        //     PartitionTimeLevel::Unset,
-        //     &json_record,
-        //     Some(schema_key),
-        // );
-        // }
         let record = json::Value::Object(json_record);
         let record_size = json::estimate_json_bytes(&record);
         records.push(record);
