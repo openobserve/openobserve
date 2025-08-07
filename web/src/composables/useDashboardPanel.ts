@@ -3349,13 +3349,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       group_by: string[];
       projections: string[];
       timeseries_field: string | null;
-    },
-    currentChartType?: string,
+    }
   ): string => {
     if (
       extractedFields.timeseries_field &&
-      extractedFields.group_by.length <= 2 &&
-      !(extractedFields.group_by.length == 0 && currentChartType == "table")
+      extractedFields.group_by.length <= 2
     ) {
       return "line";
     } else {
@@ -3439,7 +3437,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
       // Determine chart type
       const chartType = autoSelectChartType
-        ? determineChartType(extractedFields, dashboardPanelData.data.type)
+        ? determineChartType(extractedFields)
         : dashboardPanelData.data.type;
       dashboardPanelData.data.type = chartType;
 
