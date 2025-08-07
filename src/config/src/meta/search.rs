@@ -1339,6 +1339,248 @@ mod tests {
         req.decode().unwrap();
         assert_eq!(req.query.sql, "select * from test");
     }
+
+    #[test]
+    fn test_order_by_metadata_serialization_empty() {
+        let mut response = Response::default();
+        response.set_order_by_metadata(vec![]);
+
+        let serialized = serde_json::to_string(&response).unwrap();
+        let deserialized: Response = serde_json::from_str(&serialized).unwrap();
+
+        assert!(deserialized.order_by_metadata.is_empty());
+    }
+
+    #[test]
+    fn test_order_by_metadata_serialization_single_item() {
+        let mut response = Response::default();
+        let metadata = vec![("timestamp".to_string(), OrderBy::Desc)];
+        response.set_order_by_metadata(metadata.clone());
+
+        let serialized = serde_json::to_string(&response).unwrap();
+        let deserialized: Response = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.order_by_metadata.len(), 1);
+        assert_eq!(deserialized.order_by_metadata[0].0, "timestamp");
+        assert_eq!(deserialized.order_by_metadata[0].1, OrderBy::Desc);
+    }
+
+    #[test]
+    fn test_order_by_metadata_serialization_multiple_items() {
+        let mut response = Response::default();
+        let metadata = vec![
+            ("timestamp".to_string(), OrderBy::Desc),
+            ("level".to_string(), OrderBy::Asc),
+            ("message".to_string(), OrderBy::Desc),
+        ];
+        response.set_order_by_metadata(metadata.clone());
+
+        let serialized = serde_json::to_string(&response).unwrap();
+        let deserialized: Response = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.order_by_metadata.len(), 3);
+        assert_eq!(deserialized.order_by_metadata[0].0, "timestamp");
+        assert_eq!(deserialized.order_by_metadata[0].1, OrderBy::Desc);
+        assert_eq!(deserialized.order_by_metadata[1].0, "level");
+        assert_eq!(deserialized.order_by_metadata[1].1, OrderBy::Asc);
+        assert_eq!(deserialized.order_by_metadata[2].0, "message");
+        assert_eq!(deserialized.order_by_metadata[2].1, OrderBy::Desc);
+    }
+
+    #[test]
+    fn test_order_by_metadata_serialization_mixed_order() {
+        let mut response = Response::default();
+        let metadata = vec![
+            ("field1".to_string(), OrderBy::Asc),
+            ("field2".to_string(), OrderBy::Desc),
+            ("field3".to_string(), OrderBy::Asc),
+        ];
+        response.set_order_by_metadata(metadata.clone());
+
+        let serialized = serde_json::to_string(&response).unwrap();
+        let deserialized: Response = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.order_by_metadata.len(), 3);
+        assert_eq!(deserialized.order_by_metadata[0].1, OrderBy::Asc);
+        assert_eq!(deserialized.order_by_metadata[1].1, OrderBy::Desc);
+        assert_eq!(deserialized.order_by_metadata[2].1, OrderBy::Asc);
+    }
+
+    #[test]
+    fn test_order_by_metadata_serialization_special_characters() {
+        let mut response = Response::default();
+        let metadata = vec![
+            ("field_with_underscore".to_string(), OrderBy::Desc),
+            ("field-with-dash".to_string(), OrderBy::Asc),
+            ("field with space".to_string(), OrderBy::Desc),
+            ("field123".to_string(), OrderBy::Asc),
+        ];
+        response.set_order_by_metadata(metadata.clone());
+
+        let serialized = serde_json::to_string(&response).unwrap();
+        let deserialized: Response = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.order_by_metadata.len(), 4);
+        assert_eq!(deserialized.order_by_metadata[0].0, "field_with_underscore");
+        assert_eq!(deserialized.order_by_metadata[1].0, "field-with-dash");
+        assert_eq!(deserialized.order_by_metadata[2].0, "field with space");
+        assert_eq!(deserialized.order_by_metadata[3].0, "field123");
+    }
+
+    #[test]
+    fn test_order_by_metadata_serialization_empty_string_field() {
+        let mut response = Response::default();
+        let metadata = vec![("".to_string(), OrderBy::Desc)];
+        response.set_order_by_metadata(metadata.clone());
+
+        let serialized = serde_json::to_string(&response).unwrap();
+        let deserialized: Response = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.order_by_metadata.len(), 1);
+        assert_eq!(deserialized.order_by_metadata[0].0, "");
+        assert_eq!(deserialized.order_by_metadata[0].1, OrderBy::Desc);
+    }
+
+    #[test]
+    fn test_order_by_metadata_serialization_unicode_field() {
+        let mut response = Response::default();
+        let metadata = vec![
+            ("field_中文".to_string(), OrderBy::Asc),
+            ("field_русский".to_string(), OrderBy::Desc),
+            ("field_日本語".to_string(), OrderBy::Asc),
+        ];
+        response.set_order_by_metadata(metadata.clone());
+
+        let serialized = serde_json::to_string(&response).unwrap();
+        let deserialized: Response = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.order_by_metadata.len(), 3);
+        assert_eq!(deserialized.order_by_metadata[0].0, "field_中文");
+        assert_eq!(deserialized.order_by_metadata[1].0, "field_русский");
+        assert_eq!(deserialized.order_by_metadata[2].0, "field_日本語");
+    }
+
+    #[test]
+    fn test_order_by_metadata_skip_serialization_when_empty() {
+        let response = Response::default();
+        let serialized = serde_json::to_string(&response).unwrap();
+
+        // The order_by_metadata field should not appear in the JSON when empty
+        assert!(!serialized.contains("order_by_metadata"));
+    }
+
+    #[test]
+    fn test_order_by_metadata_include_serialization_when_not_empty() {
+        let mut response = Response::default();
+        let metadata = vec![("timestamp".to_string(), OrderBy::Desc)];
+        response.set_order_by_metadata(metadata);
+
+        let serialized = serde_json::to_string(&response).unwrap();
+
+        // The order_by_metadata field should appear in the JSON when not empty
+        assert!(serialized.contains("order_by_metadata"));
+    }
+
+    #[test]
+    fn test_order_by_metadata_deserialization_from_json() {
+        let json_str = r#"{
+            "took": 100,
+            "total": 10,
+            "from": 0,
+            "size": 10,
+            "cached_ratio": 0,
+            "scan_size": 1024,
+            "idx_scan_size": 512,
+            "scan_records": 100,
+            "result_cache_ratio": 0,
+            "order_by_metadata": [
+                ["timestamp", "desc"],
+                ["level", "asc"]
+            ],
+            "hits": []
+        }"#;
+
+        let deserialized: Response = serde_json::from_str(json_str).unwrap();
+
+        assert_eq!(deserialized.order_by_metadata.len(), 2);
+        assert_eq!(deserialized.order_by_metadata[0].0, "timestamp");
+        assert_eq!(deserialized.order_by_metadata[0].1, OrderBy::Desc);
+        assert_eq!(deserialized.order_by_metadata[1].0, "level");
+        assert_eq!(deserialized.order_by_metadata[1].1, OrderBy::Asc);
+    }
+
+    #[test]
+    fn test_order_by_metadata_deserialization_missing_field() {
+        let json_str = r#"{
+            "took": 100,
+            "total": 10,
+            "from": 0,
+            "size": 10,
+            "cached_ratio": 0,
+            "scan_size": 1024,
+            "idx_scan_size": 512,
+            "scan_records": 100,
+            "result_cache_ratio": 0,
+            "hits": []
+        }"#;
+
+        let deserialized: Response = serde_json::from_str(json_str).unwrap();
+
+        // Should default to empty vector when field is missing
+        assert!(deserialized.order_by_metadata.is_empty());
+    }
+
+    #[test]
+    fn test_order_by_metadata_setter_method() {
+        let mut response = Response::default();
+
+        // Initially should be empty
+        assert!(response.order_by_metadata.is_empty());
+
+        // Set metadata
+        let metadata = vec![
+            ("field1".to_string(), OrderBy::Asc),
+            ("field2".to_string(), OrderBy::Desc),
+        ];
+        response.set_order_by_metadata(metadata.clone());
+
+        // Verify it was set correctly
+        assert_eq!(response.order_by_metadata.len(), 2);
+        assert_eq!(response.order_by_metadata, metadata);
+
+        // Set to empty
+        response.set_order_by_metadata(vec![]);
+        assert!(response.order_by_metadata.is_empty());
+    }
+
+    #[test]
+    fn test_order_by_metadata_round_trip_complex() {
+        let mut response = Response::default();
+        let original_metadata = vec![
+            ("_timestamp".to_string(), OrderBy::Desc),
+            ("log_level".to_string(), OrderBy::Asc),
+            ("service_name".to_string(), OrderBy::Desc),
+            ("request_id".to_string(), OrderBy::Asc),
+            ("user_id".to_string(), OrderBy::Desc),
+        ];
+
+        response.set_order_by_metadata(original_metadata.clone());
+
+        // Serialize to JSON
+        let serialized = serde_json::to_string(&response).unwrap();
+
+        // Deserialize from JSON
+        let deserialized: Response = serde_json::from_str(&serialized).unwrap();
+
+        // Verify round trip
+        assert_eq!(deserialized.order_by_metadata, original_metadata);
+
+        // Verify individual elements
+        for (i, (field, order)) in original_metadata.iter().enumerate() {
+            assert_eq!(deserialized.order_by_metadata[i].0, *field);
+            assert_eq!(deserialized.order_by_metadata[i].1, *order);
+        }
+    }
 }
 
 mod search_history_utils {
