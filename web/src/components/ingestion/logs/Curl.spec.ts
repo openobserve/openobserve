@@ -13,52 +13,89 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { beforeEach, describe, expect, it } from "vitest";
-import { mount } from "@vue/test-utils";
+import { beforeEach, describe, expect, it, afterEach, vi } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { createStore } from "vuex";
+import {
+  createTestWrapper,
+  defaultTestProps,
+  mockZincUtils,
+  mockCopyContent,
+  mockExternalDependencies,
+  cleanupTest,
+  commonAssertions,
+  type TestProps
+} from "@/test/unit/helpers/ingestionTestUtils";
 import Curl from "@/components/ingestion/logs/Curl.vue";
 
 installQuasar();
-const store = createStore({
-  state: {  
-    organizationPasscode: 11,
-    API_ENDPOINT: "http://localhost:8080",
-  },
-});
-describe.skip("Curl", async () => {
+mockZincUtils();
+mockCopyContent();
+mockExternalDependencies();
+
+describe("Curl", () => {
   let wrapper: any;
+
   beforeEach(() => {
-    wrapper = mount(Curl, {
-      props: {
-        currOrgIdentifier: "zinc_next",
-        currUserEmail: "example@gmail.com",
-      },
-      global: {
-        provide: {
-          store: store,
-        },
-      },
-    });
-  });
-  it("should mount FluentBit", async () => {
-    expect(wrapper.vm.currOrgIdentifier).not.toBe("");
-    expect(wrapper.vm.currUserEmail).not.toBe("");
-    expect(wrapper.vm.orgAPIKey).not.toBe("");
+    wrapper = createTestWrapper(Curl, defaultTestProps);
   });
 
-  it("should render title", () => {
-    const title = wrapper.find('[data-test="curl-title-text"]');
-    expect(title.text()).toBe("CURL");
+  afterEach(() => {
+    cleanupTest(wrapper);
   });
 
-  it("should render content", () => {
-    const content = wrapper.find('[data-test="curl-content-text"]');
-    expect(content.text()).toMatchSnapshot();
+  it("should mount successfully", () => {
+    expect(wrapper.exists()).toBe(true);
   });
 
-  it("should render copy icon", () => {
-    const btn = wrapper.find('[data-test="curl-copy-btn"]');
-    expect(btn.exists()).toBeTruthy();
+  it("should render CopyContent component", () => {
+    const copyContent = wrapper.findComponent({ name: 'CopyContent' });
+    expect(copyContent.exists()).toBe(true);
+  });
+
+  it("should display curl command content", () => {
+    const copyContent = wrapper.findComponent({ name: 'CopyContent' });
+    const content = copyContent.props('content');
+    expect(content).toContain('curl');
+    expect(content).toContain('test_org');
+    expect(content).toContain('[EMAIL]:[PASSCODE]');
+  });
+
+  it("should handle props correctly", () => {
+    expect(wrapper.vm.currOrgIdentifier).toBe(defaultTestProps.currOrgIdentifier);
+    expect(wrapper.vm.currUserEmail).toBe(defaultTestProps.currUserEmail);
+  });
+
+  it("should generate content with organization identifier", () => {
+    const copyContent = wrapper.findComponent({ name: 'CopyContent' });
+    expect(copyContent.props('content')).toContain('test_org');
+  });
+
+  it("should handle different organization identifier", () => {
+    const customProps: TestProps = {
+      currOrgIdentifier: 'custom_org',
+      currUserEmail: 'custom@example.com'
+    };
+    
+    const customStoreState = {
+      selectedOrganization: {
+        identifier: 'custom_org'
+      }
+    };
+    
+    wrapper = createTestWrapper(Curl, customProps, customStoreState);
+    
+    const copyContent = wrapper.findComponent({ name: 'CopyContent' });
+    // The Curl component directly uses store.state.selectedOrganization.identifier
+    expect(copyContent.props('content')).toContain('custom_org');
+  });
+
+  it("should handle missing props gracefully", () => {
+    wrapper = createTestWrapper(Curl, {});
+    expect(wrapper.exists()).toBe(true);
+  });
+
+  it("should handle empty store state", () => {
+    wrapper = createTestWrapper(Curl, defaultTestProps, {});
+    expect(wrapper.exists()).toBe(true);
   });
 });
