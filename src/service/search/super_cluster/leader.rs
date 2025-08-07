@@ -44,7 +44,7 @@ use crate::service::search::{
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     request::Request,
     sql::Sql,
-    utils::ScanStatsVisitor,
+    utils::{AsyncDefer, ScanStatsVisitor},
 };
 
 #[async_recursion]
@@ -112,6 +112,15 @@ pub async fn search(
         .with_label_values(&[&sql.org_id])
         .inc();
 
+    let org_id_move = sql.org_id.clone();
+    let _defer = AsyncDefer::new({
+        async move {
+            metrics::QUERY_RUNNING_NUMS
+                .with_label_values(&[&org_id_move])
+                .dec();
+        }
+    });
+
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     if super::super::SEARCH_SERVER
         .insert_sender(trace_id, abort_sender, true)
@@ -171,6 +180,8 @@ pub async fn search(
             Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery("super cluster leader: search canceled".to_string())))
         }
     };
+
+    drop(_defer);
 
     let data = match task {
         Ok(Ok(data)) => Ok(data),
