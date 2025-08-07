@@ -1757,7 +1757,7 @@ pub async fn result_schema(
     };
 
     Ok(HttpResponse::Ok().json(ResultSchemaResponse {
-        projections: res_schema.projections.into_iter().collect(),
+        projections: res_schema.projections,
         group_by: res_schema.group_by.into_iter().collect(),
         timeseries_field: res_schema.timeseries,
     }))
