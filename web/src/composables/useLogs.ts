@@ -596,7 +596,7 @@ const useLogs = () => {
 
   const decodeVisualizationConfig = (encodedConfig: string) => {
     try {
-      return JSON.parse(b64DecodeUnicode(encodedConfig));
+      return JSON.parse(b64DecodeUnicode(encodedConfig) ?? "{}");
     } catch (error) {
       console.error("Failed to decode visualization config:", error);
       return null;
