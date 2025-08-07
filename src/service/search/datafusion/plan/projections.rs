@@ -87,22 +87,6 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                     // Then we process the cases where the timestamp field or
                     // histogram is present or aliased
                     match expr {
-                        Expr::Wildcard { .. } => {
-                            // for wildcard, this version of df gives * as name
-                            // so instead we remove the name, and set projections from input schema
-                            let name = get_col_name(expr);
-                            temp.remove(&name);
-                            temp.extend(
-                                proj.input
-                                    .schema()
-                                    .columns()
-                                    .into_iter()
-                                    .map(|c| c.name.clone()),
-                            );
-                            if self.timestamp_alias.is_none() && temp.contains("_timestamp") {
-                                self.timestamp_alias = Some("_timestamp".to_string());
-                            }
-                        }
                         Expr::Column(col) => {
                             // this can be the case when _timestamp field is not in group by or
                             // aliased, but is present, just as a
