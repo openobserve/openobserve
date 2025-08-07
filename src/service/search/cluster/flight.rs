@@ -31,7 +31,10 @@ use config::{
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
-    physical_plan::{ExecutionPlan, visit_execution_plan},
+    logical_expr::{PlanType, StringifiedPlan},
+    physical_plan::{
+        ExecutionPlan, analyze::AnalyzeExec, explain::ExplainExec, visit_execution_plan,
+    },
     prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
@@ -554,6 +557,41 @@ pub async fn run_datafusion(
 
     if cfg.common.print_key_sql {
         print_plan(&trace_id, &physical_plan, "after");
+    }
+
+    // wrap with EXPLAIN/ANALYZE if needed (after all OpenObserve rewrites are complete)
+    if sql.is_explain {
+        // For EXPLAIN ANALYZE, first wrap with AnalyzeExec to collect metrics
+        if sql.is_analyze {
+            let schema = physical_plan.schema();
+            physical_plan = Arc::new(AnalyzeExec::new(
+                sql.is_verbose,
+                false, // show_statistics
+                physical_plan,
+                schema,
+            ));
+        }
+
+        // For EXPLAIN (with or without ANALYZE), we need to create StringifiedPlan
+        // representing the plan structure for display
+        let stringified_plans = vec![StringifiedPlan::new(
+            PlanType::FinalPhysicalPlan,
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref()),
+        )];
+
+        physical_plan = Arc::new(ExplainExec::new(
+            physical_plan.schema(),
+            stringified_plans,
+            sql.is_verbose,
+        ));
+
+        if cfg.common.print_key_sql {
+            log::info!(
+                "[trace_id {trace_id}] physical plan wrapped with EXPLAIN (analyze={}, verbose={})",
+                sql.is_analyze,
+                sql.is_verbose
+            );
+        }
     }
 
     // run datafusion

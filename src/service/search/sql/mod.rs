@@ -43,8 +43,8 @@ use super::{
 use crate::service::search::sql::{
     rewriter::{
         add_o2_id::AddO2IdVisitor, add_timestamp::AddTimestampVisitor,
-        approx_percentile::ReplaceApproxPercentiletVisitor, index::IndexVisitor,
-        remove_dashboard_placeholder::RemoveDashboardAllVisitor,
+        approx_percentile::ReplaceApproxPercentiletVisitor, explain::ExplainVisitor,
+        index::IndexVisitor, remove_dashboard_placeholder::RemoveDashboardAllVisitor,
         track_total_hits::TrackTotalHitsVisitor,
     },
     schema::{generate_schema_fields, generate_select_star_schema, has_original_column},
@@ -90,6 +90,9 @@ pub struct Sql {
     pub use_inverted_index: bool, // if can use inverted index
     pub index_condition: Option<IndexCondition>, // use for tantivy index
     pub index_optimize_mode: Option<IndexOptimizeMode>,
+    pub is_explain: bool, // if query has EXPLAIN keyword
+    pub is_analyze: bool, // if query has ANALYZE keyword
+    pub is_verbose: bool, // if query has VERBOSE keyword
 }
 
 impl Sql {
@@ -135,6 +138,13 @@ impl Sql {
             .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?
             .pop()
             .unwrap();
+
+        // Check for EXPLAIN/ANALYZE/VERBOSE keywords and strip them
+        let mut explain_visitor = ExplainVisitor::new();
+        let _ = statement.visit(&mut explain_visitor);
+        let is_explain = explain_visitor.is_explain;
+        let is_analyze = explain_visitor.is_analyze;
+        let is_verbose = explain_visitor.is_verbose;
 
         //********************Change the sql start*********************************//
         // 2. rewrite track_total_hits
@@ -379,6 +389,9 @@ impl Sql {
             use_inverted_index,
             index_condition,
             index_optimize_mode,
+            is_explain,
+            is_analyze,
+            is_verbose,
         })
     }
 }
@@ -387,7 +400,7 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, index_optimize_mode: {:?}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, index_optimize_mode: {:?}, is_explain: {}, is_analyze: {}, is_verbose: {}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -406,6 +419,9 @@ impl std::fmt::Display for Sql {
             self.use_inverted_index,
             self.index_condition,
             self.index_optimize_mode,
+            self.is_explain,
+            self.is_analyze,
+            self.is_verbose,
         )
     }
 }
