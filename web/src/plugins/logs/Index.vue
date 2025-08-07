@@ -1412,7 +1412,7 @@ export default defineComponent({
             // reset old rendered chart
             visualizeChartData.value = {};
 
-            shouldUseHistogramQuery.value = await extractVisualizationFields(true, true);
+            shouldUseHistogramQuery.value = await extractVisualizationFields(true);
 
             // if not able to parse query, do not do anything
             if (shouldUseHistogramQuery.value === null) {
@@ -1515,7 +1515,7 @@ export default defineComponent({
     );
 
     // Create debounced function for visualization updates
-    const updateVisualization = async (allowToUseHistogramQuery: boolean = true, autoSelectChartType: boolean = true) => {
+    const updateVisualization = async (autoSelectChartType: boolean = true) => {
       try {
         if (searchObj?.meta?.logsVisualizeToggle == "visualize") {
           dashboardPanelData.data.queries[
@@ -1525,7 +1525,7 @@ export default defineComponent({
           // reset old rendered chart
           visualizeChartData.value = {};
 
-          shouldUseHistogramQuery.value = await extractVisualizationFields(allowToUseHistogramQuery, autoSelectChartType);
+          shouldUseHistogramQuery.value = await extractVisualizationFields(autoSelectChartType);
 
 
           // if not able to parse query, do not do anything
@@ -1556,8 +1556,7 @@ export default defineComponent({
         searchResponseForVisualization.value = {};
 
         // update visualization
-        // will not use histogram query if current chart type is table
-        await updateVisualization(dashboardPanelData.data.type != "table", false);
+        await updateVisualization(false);
 
         // check if query is assigned and not empty
         // this prevents hard refresh early validation before query is assigned
@@ -1596,7 +1595,7 @@ export default defineComponent({
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
-          const success = await updateVisualization(true, true);
+          const success = await updateVisualization(false);
           if (!success) {
             return;
           }
@@ -1696,7 +1695,7 @@ export default defineComponent({
       });
     };
 
-    const extractVisualizationFields = async (allowToUseHistogramQuery: boolean = true, autoSelectChartType: boolean = true) => {
+    const extractVisualizationFields = async (autoSelectChartType: boolean = true) => {
       // mark extraction as in-progress so that cancel button is shown
       variablesAndPanelsDataLoadingState.fieldsExtractionLoading = true;
 
@@ -1814,8 +1813,8 @@ export default defineComponent({
 
         checkAbort();
 
-        /* Decide whether to use histogram query */
-        shouldUseHistogramQuery.value = allowToUseHistogramQuery && !(
+        /* Decide whether to use histogram query - don't use for table charts or when there are group_by fields */
+        shouldUseHistogramQuery.value = dashboardPanelData.data.type !== "table" && !(
           extractedFields?.group_by && extractedFields.group_by.length
         );
 
