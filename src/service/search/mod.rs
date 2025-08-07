@@ -31,7 +31,6 @@ use config::{
         sql::{OrderBy, TableReferenceExt, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
-    metrics,
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
@@ -252,10 +251,6 @@ pub async fn search(
             }
         };
     }
-
-    metrics::QUERY_RUNNING_NUMS
-        .with_label_values(&[org_id])
-        .dec();
 
     // do this because of clippy warning
     match res {
