@@ -26,14 +26,14 @@ use crate::{common::meta::telemetry, service::stream::get_streams};
 /// This file has all odd-jobs that are specific to cloud installation,
 /// and do not fit specifically anywhere else
 
-// check and report no
+// interval for checking and reporting no ingestion events
 const NO_INGESTION_REPORT_INTERVAL: u64 = 3600;
 
 pub fn start() {
     tokio::spawn(async move { report_org_no_ingestion().await });
 }
 
-async fn report_no_ingestion(org_id: &str) {
+async fn report_no_ingestion_to_segment(org_id: &str) {
     // Send no ingestion in last 24 hours to ActiveCampaign via segment proxy
     log::info!("sending track event : no ingestion in last 24 hours for {org_id} to segment");
     let org_admin = match get_admin(org_id).await {
@@ -45,16 +45,12 @@ async fn report_no_ingestion(org_id: &str) {
     };
     let segment_event_data = HashMap::from([
         (
-            "email".to_string(),
+            "admin_email".to_string(),
             json::Value::String(org_admin.email.to_string()),
         ),
         (
-            "organization".to_string(),
+            "organization_id".to_string(),
             json::Value::String(org_id.to_string()),
-        ),
-        (
-            "created_at".to_string(),
-            json::Value::String(chrono::Local::now().format("%Y-%m-%d").to_string()),
         ),
     ]);
     telemetry::Telemetry::new()
@@ -76,27 +72,29 @@ pub async fn report_org_no_ingestion() {
     ));
     interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await;
         log::info!("checking no ingestion for orgs created in last 24 hours");
         let now = now_micros();
-        let all_orgs = match infra::table::organizations::list(None).await {
+
+        let filter = infra::table::organizations::ListFilter {
+            created_after: Some(now - h25_micro),
+            created_before: Some(now - h24_micro),
+            limit: None,
+        };
+
+        let orgs = match infra::table::organizations::list(filter).await {
             Ok(o) => o,
             Err(e) => {
                 log::error!("error in list all orgs for the no ingestion telemetry job {e}");
                 continue;
             }
         };
-        // TODO: extract the filter in sql query itself
-        let filtered = all_orgs
-            .into_iter()
-            .filter(|org| org.created_at > now - h25_micro && org.created_at <= now - h24_micro)
-            .collect::<Vec<_>>();
-        for org in filtered {
+        for org in orgs {
             let streams = get_streams(&org.identifier, None, false, None).await;
             if streams.is_empty() {
-                report_no_ingestion(&org.identifier).await;
+                report_no_ingestion_to_segment(&org.identifier).await;
             }
         }
         log::info!("check for no ingestion for orgs created in last 24 hours completed");
+        interval.tick().await;
     }
 }
