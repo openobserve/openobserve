@@ -1049,8 +1049,7 @@ async fn search_tantivy_index(
     // search the index
     let file_in_range =
         parquet_file.meta.min_ts >= time_range.0 && parquet_file.meta.max_ts < time_range.1;
-    let idx_optimize_rule_clone = idx_optimize_rule.clone();
-    let res = tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule_clone) {
+    let res = tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule) {
         (false, _) | (true, None) => TantivyResult::handle_matched_docs(&searcher, query),
         (true, Some(IndexOptimizeMode::SimpleSelect(limit, ascend))) => {
             TantivyResult::handle_simple_select(&searcher, query, limit, ascend)
