@@ -101,6 +101,9 @@ pub struct Sql {
     pub use_inverted_index: bool, // if can use inverted index
     pub index_condition: Option<IndexCondition>, // use for tantivy index
     pub index_optimize_mode: Option<IndexOptimizeMode>,
+    pub is_explain: bool, // if query has EXPLAIN keyword
+    pub is_analyze: bool, // if query has ANALYZE keyword
+    pub is_verbose: bool, // if query has VERBOSE keyword
 }
 
 impl Sql {
@@ -145,6 +148,13 @@ impl Sql {
             .map_err(|e| Error::ErrorCode(ErrorCodes::SearchSQLNotValid(e.to_string())))?
             .pop()
             .unwrap();
+
+        // Check for EXPLAIN/ANALYZE/VERBOSE keywords and strip them
+        let mut explain_visitor = ExplainVisitor::new();
+        let _ = statement.visit(&mut explain_visitor);
+        let is_explain = explain_visitor.is_explain;
+        let is_analyze = explain_visitor.is_analyze;
+        let is_verbose = explain_visitor.is_verbose;
 
         //********************Change the sql start*********************************//
         // 2. rewrite track_total_hits
@@ -359,6 +369,9 @@ impl Sql {
             use_inverted_index,
             index_condition,
             index_optimize_mode,
+            is_explain,
+            is_analyze,
+            is_verbose,
         })
     }
 }
@@ -367,7 +380,7 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, index_optimize_mode: {:?}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, index_optimize_mode: {:?}, is_explain: {}, is_analyze: {}, is_verbose: {}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -386,6 +399,9 @@ impl std::fmt::Display for Sql {
             self.use_inverted_index,
             self.index_condition,
             self.index_optimize_mode,
+            self.is_explain,
+            self.is_analyze,
+            self.is_verbose,
         )
     }
 }
@@ -1925,6 +1941,43 @@ impl VisitorMut for TrackTotalHitsVisitor {
             _ => {}
         }
         ControlFlow::Break(())
+    }
+}
+
+struct ExplainVisitor {
+    pub is_explain: bool,
+    pub is_analyze: bool,
+    pub is_verbose: bool,
+}
+impl ExplainVisitor {
+    fn new() -> Self {
+        Self {
+            is_explain: false,
+            is_analyze: false,
+            is_verbose: false,
+        }
+    }
+}
+impl VisitorMut for ExplainVisitor {
+    type Break = ();
+
+    fn pre_visit_statement(&mut self, statement: &mut Statement) -> ControlFlow<Self::Break> {
+        match statement {
+            Statement::Explain {
+                analyze,
+                verbose,
+                statement: inner_statement,
+                ..
+            } => {
+                self.is_explain = true;
+                self.is_analyze = *analyze;
+                self.is_verbose = *verbose;
+                // Replace the EXPLAIN statement with its inner statement
+                *statement = (**inner_statement).clone();
+                ControlFlow::Break(())
+            }
+            _ => ControlFlow::Continue(()),
+        }
     }
 }
 
@@ -3865,5 +3918,202 @@ mod tests {
         let sql = "SELECT * FROM public.logs WHERE level = 'error'";
         let result = pickup_where(sql).unwrap();
         assert_eq!(result, Some("level = 'error'".to_string()));
+    }
+
+    #[test]
+    fn test_explain_visitor() {
+        // Test EXPLAIN query
+        let sql = "EXPLAIN SELECT * FROM logs WHERE level = 'error'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&PostgreSqlDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut explain_visitor = ExplainVisitor::new();
+        let _ = statement.visit(&mut explain_visitor);
+
+        assert!(explain_visitor.is_explain);
+        assert!(!explain_visitor.is_analyze);
+        assert!(!explain_visitor.is_verbose);
+
+        // After visiting, the statement should be the inner SELECT
+        if let Statement::Query(query) = &statement {
+            if let SetExpr::Select(select) = query.body.as_ref() {
+                assert!(select.selection.is_some());
+            } else {
+                panic!("Expected Select statement");
+            }
+        } else {
+            panic!("Expected Query statement");
+        }
+    }
+
+    #[test]
+    fn test_explain_analyze_visitor() {
+        // Test EXPLAIN ANALYZE query
+        let sql = "EXPLAIN ANALYZE SELECT * FROM logs WHERE level = 'error'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&PostgreSqlDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut explain_visitor = ExplainVisitor::new();
+        let _ = statement.visit(&mut explain_visitor);
+
+        assert!(explain_visitor.is_explain);
+        assert!(explain_visitor.is_analyze);
+        assert!(!explain_visitor.is_verbose);
+    }
+
+    #[test]
+    fn test_explain_verbose_visitor() {
+        // Test EXPLAIN VERBOSE query
+        let sql = "EXPLAIN VERBOSE SELECT * FROM logs WHERE level = 'error'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&PostgreSqlDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut explain_visitor = ExplainVisitor::new();
+        let _ = statement.visit(&mut explain_visitor);
+
+        assert!(explain_visitor.is_explain);
+        assert!(!explain_visitor.is_analyze);
+        assert!(explain_visitor.is_verbose);
+    }
+
+    #[test]
+    fn test_explain_analyze_verbose_visitor() {
+        // Test EXPLAIN ANALYZE VERBOSE query (non-parenthesized syntax)
+        let sql = "EXPLAIN ANALYZE VERBOSE SELECT * FROM logs WHERE level = 'error'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&PostgreSqlDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut explain_visitor = ExplainVisitor::new();
+        let _ = statement.visit(&mut explain_visitor);
+
+        assert!(explain_visitor.is_explain);
+        assert!(explain_visitor.is_analyze);
+        assert!(explain_visitor.is_verbose);
+    }
+
+    #[test]
+    fn test_non_explain_query() {
+        // Test regular SELECT query
+        let sql = "SELECT * FROM logs WHERE level = 'error'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&PostgreSqlDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut explain_visitor = ExplainVisitor::new();
+        let _ = statement.visit(&mut explain_visitor);
+
+        assert!(!explain_visitor.is_explain);
+        assert!(!explain_visitor.is_analyze);
+        assert!(!explain_visitor.is_verbose);
+    }
+
+    #[test]
+    fn test_explain_sql_mutation() {
+        // Test that EXPLAIN is stripped from the SQL and converted to inner SELECT
+        let sql = "EXPLAIN SELECT * FROM logs WHERE level = 'error'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&PostgreSqlDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        // Verify it's initially an EXPLAIN statement
+        assert!(matches!(statement, Statement::Explain { .. }));
+
+        let mut explain_visitor = ExplainVisitor::new();
+        let _ = statement.visit(&mut explain_visitor);
+
+        // After visiting, the statement should be converted to the inner query
+        assert!(matches!(statement, Statement::Query(_)));
+
+        // The converted SQL should not contain EXPLAIN
+        let converted_sql = statement.to_string();
+        assert!(!converted_sql.to_uppercase().contains("EXPLAIN"));
+        assert!(converted_sql.to_uppercase().contains("SELECT"));
+        assert!(converted_sql.contains("logs"));
+        assert!(converted_sql.contains("level = 'error'"));
+    }
+
+    #[test]
+    fn test_explain_analyze_sql_mutation() {
+        // Test that EXPLAIN ANALYZE is stripped from the SQL
+        let sql = "EXPLAIN ANALYZE SELECT count(*) FROM logs";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&PostgreSqlDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        assert!(matches!(statement, Statement::Explain { .. }));
+
+        let mut explain_visitor = ExplainVisitor::new();
+        let _ = statement.visit(&mut explain_visitor);
+
+        assert!(explain_visitor.is_explain);
+        assert!(explain_visitor.is_analyze);
+
+        // The statement should be converted to the inner query
+        assert!(matches!(statement, Statement::Query(_)));
+
+        // The converted SQL should not contain EXPLAIN or ANALYZE
+        let converted_sql = statement.to_string();
+        assert!(!converted_sql.to_uppercase().contains("EXPLAIN"));
+        assert!(!converted_sql.to_uppercase().contains("ANALYZE"));
+        assert!(converted_sql.to_uppercase().contains("SELECT"));
+        assert!(converted_sql.contains("count(*)"));
+    }
+
+    #[test]
+    fn test_explain_verbose_sql_mutation() {
+        // Test that EXPLAIN VERBOSE is stripped from the SQL
+        let sql = "EXPLAIN VERBOSE SELECT name, age FROM users ORDER BY name";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&PostgreSqlDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut explain_visitor = ExplainVisitor::new();
+        let _ = statement.visit(&mut explain_visitor);
+
+        assert!(explain_visitor.is_explain);
+        assert!(!explain_visitor.is_analyze);
+        assert!(explain_visitor.is_verbose);
+
+        // The converted SQL should preserve the original query structure
+        let converted_sql = statement.to_string();
+        assert!(!converted_sql.to_uppercase().contains("EXPLAIN"));
+        assert!(!converted_sql.to_uppercase().contains("VERBOSE"));
+        assert!(converted_sql.contains("name, age"));
+        assert!(converted_sql.contains("users"));
+        assert!(converted_sql.to_uppercase().contains("ORDER BY"));
+    }
+
+    #[test]
+    fn test_explain_analyze_verbose_sql_mutation() {
+        // Test complex EXPLAIN ANALYZE VERBOSE syntax
+        let sql =
+            "EXPLAIN ANALYZE VERBOSE SELECT * FROM logs WHERE timestamp > 1000 GROUP BY level";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&PostgreSqlDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut explain_visitor = ExplainVisitor::new();
+        let _ = statement.visit(&mut explain_visitor);
+
+        assert!(explain_visitor.is_explain);
+        assert!(explain_visitor.is_analyze);
+        assert!(explain_visitor.is_verbose);
+
+        // Verify the inner query is preserved correctly
+        let converted_sql = statement.to_string();
+        assert!(!converted_sql.to_uppercase().contains("EXPLAIN"));
+        assert!(!converted_sql.to_uppercase().contains("ANALYZE"));
+        assert!(!converted_sql.to_uppercase().contains("VERBOSE"));
+        assert!(converted_sql.contains("timestamp > 1000"));
+        assert!(converted_sql.to_uppercase().contains("GROUP BY"));
+        assert!(converted_sql.contains("level"));
     }
 }
