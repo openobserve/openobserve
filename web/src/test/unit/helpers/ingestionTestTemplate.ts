@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import {
   createTestWrapper,
@@ -65,8 +65,8 @@ export const createSimpleIngestionComponentTest = (
       wrapper = createTestWrapper(Component, defaultTestProps);
     });
 
-    afterEach(async () => {
-      await cleanupTest(wrapper);
+    afterEach(() => {
+      cleanupTest(wrapper);
     });
 
     it('should mount successfully', () => {
@@ -170,8 +170,8 @@ export const createComplexIngestionComponentTest = (
       wrapper = createTestWrapper(Component, defaultTestProps);
     });
 
-    afterEach(async () => {
-      await cleanupTest(wrapper);
+    afterEach(() => {
+      cleanupTest(wrapper);
     });
 
     it('should mount successfully', () => {
