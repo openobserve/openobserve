@@ -40,7 +40,8 @@ import {
   onBeforeUnmount,
 } from "vue";
 
-import { EditorView, basicSetup, minimalSetup } from "codemirror";
+import { EditorView } from "@codemirror/view";
+import { basicSetup, minimalSetup } from "codemirror";
 import {
   EditorState,
   Compartment,

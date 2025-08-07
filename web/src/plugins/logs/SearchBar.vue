@@ -1425,7 +1425,7 @@ import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { json2csv } from 'json-2-csv';
+import { json2csv } from "json-2-csv";
 import {
   mergeDeep,
   b64DecodeUnicode,
