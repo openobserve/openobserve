@@ -585,6 +585,9 @@ export default defineComponent({
       buildSearch,
       cancelQuery,
       processHttpHistogramResults,
+      getVisualizationConfig,
+      encodeVisualizationConfig,
+      decodeVisualizationConfig,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -776,7 +779,7 @@ export default defineComponent({
           searchObj.data.queryResults.hits = [];
           searchObj.meta.searchApplied = false;
           resetStreamData();
-          restoreUrlQueryParams();
+          restoreUrlQueryParams(dashboardPanelData);
           // loadLogsData();
           //instead of loadLogsData so I have used all the functions that are used in that and removed getQuerydata from the list
           //of functions of loadLogsData to stop run query whenever this gets redirecited
@@ -808,7 +811,7 @@ export default defineComponent({
           searchObj.data.datetime.type = "absolute";
           searchObj.meta.searchApplied = false;
           resetStreamData();
-          await restoreUrlQueryParams();
+          await restoreUrlQueryParams(dashboardPanelData);
           await loadLogsData();
         }
       },
@@ -895,7 +898,7 @@ export default defineComponent({
         searchObj.meta.quickMode = isQuickModeEnabled();
         searchObj.meta.showHistogram = isHistogramEnabled();
 
-        restoreUrlQueryParams();
+        restoreUrlQueryParams(dashboardPanelData);
 
           searchObj.meta.showHistogram = isHistogramEnabled();
 
@@ -1026,7 +1029,7 @@ export default defineComponent({
       searchObj.data.stream.streamType = queryParams.stream_type;
       resetSearchObj();
       resetStreamData();
-      restoreUrlQueryParams();
+      restoreUrlQueryParams(dashboardPanelData);
       loadLogsData();
     }
 
@@ -1034,7 +1037,7 @@ export default defineComponent({
     function handleStreamExplorer() {
       resetSearchObj();
       resetStreamData();
-      restoreUrlQueryParams();
+      restoreUrlQueryParams(dashboardPanelData);
       loadLogsData();
     }
 
@@ -1463,60 +1466,73 @@ export default defineComponent({
               dashboardPanelData.layout.currentQueryIndex
             ].customQuery = true;
 
+            // Restore visualization data from URL parameters if available
+            const queryParams = router.currentRoute.value.query;
+            if (queryParams.visualization_data) {
+              const restoredData = decodeVisualizationConfig(queryParams.visualization_data);
+              if (restoredData && dashboardPanelData.data) {
+                dashboardPanelData.data = {
+                  ...dashboardPanelData.data,
+                  ...restoredData
+                };
+              }
+            } else {
+
+              shouldUseHistogramQuery.value = await extractVisualizationFields(true);
+
+              // if not able to parse query, do not do anything
+              if (shouldUseHistogramQuery.value === null) {
+                return;
+              }
+
+              // set logs page data to searchResponseForVisualization
+              if (shouldUseHistogramQuery.value === true) {
+
+                // only do it if is_histogram_eligible is true on logs page
+                // and showHistogram is true on logs page
+                if (searchObj?.data?.queryResults?.is_histogram_eligible === true && searchObj?.meta?.showHistogram === true) {
+
+                  // replace hits with histogram query data
+                  searchResponseForVisualization.value = {
+                    ...searchObj.data.queryResults,
+                    hits: searchObj.data.queryResults.aggs,
+                    histogram_interval:
+                      searchObj?.data?.queryResults
+                        ?.visualization_histogram_interval,
+                  };
+
+                  // assign converted_histogram_query to dashboardPanelData
+                  if (searchObj.data.queryResults.converted_histogram_query) {
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].query = searchObj.data.queryResults.converted_histogram_query;
+
+                    // assign to visualizeChartData as well
+                    visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query
+                  }
+                }
+
+              } else {
+                searchResponseForVisualization.value = {
+                  ...searchObj.data.queryResults,
+                  histogram_interval:
+                    searchObj?.data?.queryResults
+                      ?.visualization_histogram_interval,
+                };
+
+                // if hits is empty and filteredHit is present, then set hits to filteredHit
+                if (
+                  searchResponseForVisualization?.value?.hits?.length === 0 &&
+                  searchResponseForVisualization?.value?.filteredHit
+                ) {
+                  searchResponseForVisualization.value.hits =
+                    searchResponseForVisualization?.value?.filteredHit ?? [];
+                }
+              }
+            }
+
             // reset old rendered chart
             visualizeChartData.value = {};
-
-            shouldUseHistogramQuery.value = await extractVisualizationFields(true, true);
-
-            // if not able to parse query, do not do anything
-            if (shouldUseHistogramQuery.value === null) {
-              return;
-            }
-
-            // set logs page data to searchResponseForVisualization
-            if (shouldUseHistogramQuery.value === true) {
-
-              // only do it if is_histogram_eligible is true on logs page
-              // and showHistogram is true on logs page
-              if(searchObj?.data?.queryResults?.is_histogram_eligible === true && searchObj?.meta?.showHistogram === true){
-
-              // replace hits with histogram query data
-              searchResponseForVisualization.value = {
-                ...searchObj.data.queryResults,
-                hits: searchObj.data.queryResults.aggs,
-                histogram_interval:
-                  searchObj?.data?.queryResults
-                    ?.visualization_histogram_interval,
-              };
-
-              // assign converted_histogram_query to dashboardPanelData
-              if(searchObj.data.queryResults.converted_histogram_query){
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].query = searchObj.data.queryResults.converted_histogram_query;
-
-                // assign to visualizeChartData as well
-                visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query
-              }
-            }
-
-            } else {
-              searchResponseForVisualization.value = {
-                ...searchObj.data.queryResults,
-                histogram_interval:
-                  searchObj?.data?.queryResults
-                    ?.visualization_histogram_interval,
-              };
-
-              // if hits is empty and filteredHit is present, then set hits to filteredHit
-              if (
-                searchResponseForVisualization?.value?.hits?.length === 0 &&
-                searchResponseForVisualization?.value?.filteredHit
-              ) {
-                searchResponseForVisualization.value.hits =
-                  searchResponseForVisualization?.value?.filteredHit ?? [];
-              }
-            }
 
 
             if (searchObj?.data?.customDownloadQueryObj?.query?.end_time && searchObj?.data?.datetime?.startTime) {
@@ -1618,6 +1634,11 @@ export default defineComponent({
         if (currentQuery && currentQuery.trim() !== "") {
           isValid(true, true);
         }
+
+        // Sync visualization data to URL parameters when chart type changes
+        if (searchObj.meta.logsVisualizeToggle === "visualize") {
+          updateUrlQueryParams(dashboardPanelData);
+        }
       },
     );
 
@@ -1709,6 +1730,9 @@ export default defineComponent({
         visualizeChartData.value = JSON.parse(
           JSON.stringify(dashboardPanelData.data),
         );
+
+        // Sync visualization config to URL parameters
+        updateUrlQueryParams(dashboardPanelData);
       }
     };
 
