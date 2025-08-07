@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashSet, hash_map::DefaultHasher},
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 
 use anyhow::Context;
 use arrow_schema::Schema;
@@ -941,11 +945,8 @@ async fn search_tantivy_index(
         ));
     };
 
-    let cache_key = format!(
-        "{:?}-{:?}-{}",
-        index_condition, idx_optimize_rule, parquet_file.key
-    );
     let cfg = get_config();
+    let cache_key = generate_cache_key(&index_condition, &idx_optimize_rule, parquet_file);
     if cfg.common.inverted_index_result_cache_enabled
         && let Some(result) = tantivy_result_cache::TANTIVY_RESULT_CACHE.get(&cache_key)
     {
@@ -1299,6 +1300,18 @@ fn get_cache_entry(tantivy_result: TantivyResult, percent: f64) -> CacheEntry {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     }
+}
+
+fn generate_cache_key(
+    index_condition: &Option<IndexCondition>,
+    idx_optimize_rule: &Option<IndexOptimizeMode>,
+    parquet_file: &FileKey,
+) -> String {
+    let mut hasher = DefaultHasher::new();
+    index_condition.hash(&mut hasher);
+    idx_optimize_rule.hash(&mut hasher);
+    parquet_file.key.hash(&mut hasher);
+    format!("{:x}", hasher.finish())
 }
 
 #[cfg(test)]
