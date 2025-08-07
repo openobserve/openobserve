@@ -51,11 +51,13 @@ use super::{
     },
     schema::stream_schema_exists,
 };
+#[cfg(feature = "cloud")]
+use crate::service::stream::get_stream;
 use crate::{
     common::meta::{ingestion::IngestionStatus, stream::SchemaRecords},
     service::{
         alerts::alert::AlertExt, db, ingestion::get_write_partition_key, schema::check_for_schema,
-        self_reporting::report_request_usage_stats, stream::get_stream,
+        self_reporting::report_request_usage_stats,
     },
 };
 
