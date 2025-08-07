@@ -877,13 +877,12 @@ pub async fn filter_file_list_by_tantivy_index(
         "{}",
         search_inspector_fields(
             format!(
-                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} , is_add_filter_back: {}, file_num: {}, tantivy result cache memory size: {} MB, took: {} ms",
+                "[trace_id {}] search->tantivy: total hits for index_condition: {:?} found {} , is_add_filter_back: {}, file_num: {}, took: {} ms",
                 query.trace_id,
                 index_condition,
                 tantivy_result,
                 is_add_filter_back,
                 file_list_map.len(),
-                tantivy_result_cache::TANTIVY_RESULT_CACHE.total_memory_size() / 1024 / 1024,
                 search_start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
@@ -933,6 +932,14 @@ async fn search_tantivy_index(
     idx_optimize_rule: Option<IndexOptimizeMode>,
     parquet_file: &FileKey,
 ) -> anyhow::Result<(String, TantivyResult)> {
+    let file_account = parquet_file.account.clone();
+    let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
+        return Err(anyhow::anyhow!(
+            "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",
+            parquet_file.key.clone()
+        ));
+    };
+
     let cache_key = format!(
         "{:?}-{:?}-{}",
         index_condition, idx_optimize_rule, parquet_file.key
@@ -943,14 +950,6 @@ async fn search_tantivy_index(
     {
         return Ok((parquet_file.key.to_string(), result));
     }
-
-    let file_account = parquet_file.account.clone();
-    let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
-        return Err(anyhow::anyhow!(
-            "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",
-            parquet_file.key.clone()
-        ));
-    };
 
     // cache the indexer and reader
     let indexer = if cfg.common.inverted_index_cache_enabled {
@@ -1121,7 +1120,11 @@ async fn search_tantivy_index(
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     };
-    if cfg.common.inverted_index_result_cache_enabled {
+
+    // cache the result if the memory size is less than the limit
+    if cfg.common.inverted_index_result_cache_enabled
+        && result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
+    {
         tantivy_result_cache::TANTIVY_RESULT_CACHE.put(cache_key, result.clone());
     }
     Ok((key, result))

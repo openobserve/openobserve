@@ -13,13 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::VecDeque,
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
-};
+use std::{collections::VecDeque, sync::Arc};
 
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
@@ -34,8 +28,6 @@ pub struct TantivyResultCache {
     readers: DashMap<String, TantivyResult>,
     cacher: parking_lot::Mutex<VecDeque<String>>,
     max_entries: usize,
-    // TODO: convert this to a metrics
-    total_memory_size: AtomicUsize,
 }
 
 impl TantivyResultCache {
@@ -44,7 +36,6 @@ impl TantivyResultCache {
             readers: DashMap::new(),
             cacher: parking_lot::Mutex::new(VecDeque::new()),
             max_entries,
-            total_memory_size: AtomicUsize::new(0),
         }
     }
 
@@ -55,8 +46,8 @@ impl TantivyResultCache {
     pub fn put(&self, key: String, value: TantivyResult) -> Option<TantivyResult> {
         let mut w = self.cacher.lock();
         if w.len() >= self.max_entries {
-            // release 5% of the cache
-            for _ in 0..(std::cmp::max(1, self.max_entries / 20)) {
+            // release 10% of the cache
+            for _ in 0..(std::cmp::max(1, self.max_entries / 10)) {
                 if let Some(k) = w.pop_front() {
                     self.readers.remove(&k);
                 } else {
@@ -66,19 +57,17 @@ impl TantivyResultCache {
         }
         w.push_back(key.clone());
         drop(w);
-        self.total_memory_size
-            .fetch_add(value.get_memory_size(), Ordering::Relaxed);
         self.readers.insert(key, value)
-    }
-
-    pub fn total_memory_size(&self) -> usize {
-        self.total_memory_size.load(Ordering::Relaxed)
     }
 }
 
 impl Default for TantivyResultCache {
     fn default() -> Self {
-        Self::new(config::get_config().limit.inverted_index_cache_max_entries)
+        Self::new(
+            config::get_config()
+                .limit
+                .inverted_index_result_cache_max_entries,
+        )
     }
 }
 
