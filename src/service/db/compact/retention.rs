@@ -58,10 +58,9 @@ pub async fn delete_stream(
         return Ok(db_key); // already in cache, don't create same task in one hour
     }
 
-    CACHE.insert(key, now_micros());
+    CACHE.insert(key.clone(), now_micros());
     db::put(&db_key, "OK".into(), db::NEED_WATCH, None).await?;
-
-    Ok(db_key)
+    Ok(key) // return the key
 }
 
 // set the stream is processing by the node
