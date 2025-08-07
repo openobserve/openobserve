@@ -19,13 +19,13 @@ use arrow::array::{
     Array, AsArray, Float32Array, Int8Array, Int16Array, Int32Array, Int64Array, RecordBatch,
     UInt8Array, UInt16Array, UInt32Array, UInt64Array,
 };
-use arrow_schema::{Field, Schema};
+use arrow_schema::{Field, FieldRef, Schema};
 use datafusion::{
     arrow::{
         array::{ArrayRef, Float64Array},
         datatypes::DataType,
     },
-    common::{DataFusionError, downcast_value, internal_err, not_impl_err, plan_err},
+    common::{downcast_value, internal_err, not_impl_err, plan_err},
     error::Result,
     logical_expr::{
         Accumulator, AggregateUDFImpl, ColumnarValue, Signature, TypeSignature, Volatility,
@@ -89,15 +89,15 @@ impl AggregateUDFImpl for PercentileCont {
         Ok(arg_types[0].clone())
     }
 
-    fn state_fields(&self, args: StateFieldsArgs) -> Result<Vec<Field>> {
+    fn state_fields(&self, args: StateFieldsArgs) -> Result<Vec<FieldRef>> {
         // Intermediate state is a list of the elements we have collected so far
         let field = Field::new("item", DataType::Float64, true);
         let state_name = "percentile_cont";
-        Ok(vec![Field::new(
+        Ok(vec![Arc::new(Field::new(
             format_state_name(args.name, state_name),
             DataType::List(Arc::new(field)),
             true,
-        )])
+        ))])
     }
 
     fn accumulator(&self, args: AccumulatorArgs) -> Result<Box<dyn Accumulator>> {
@@ -422,9 +422,8 @@ mod test {
     async fn test_percentile_cont_udaf() {
         let ctx = create_context();
         let percentile = 0.75;
-        let sql_float_field =
-            &format!("select percentile_cont(value_float, {}) from t", percentile);
-        let sql_uint_field = &format!("select percentile_cont(value_uint, {}) from t", percentile);
+        let sql_float_field = &format!("select percentile_cont(value_float, {percentile}) from t");
+        let sql_uint_field = &format!("select percentile_cont(value_uint, {percentile}) from t");
         let acc_udaf = AggregateUDF::from(PercentileCont::new());
         ctx.register_udaf(acc_udaf);
 

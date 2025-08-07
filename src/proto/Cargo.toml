@@ -9,6 +9,7 @@ async-trait.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
 prost.workspace = true
+prost-wkt-types.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tonic.workspace = true
@@ -16,4 +17,4 @@ tokio.workspace = true
 
 [build-dependencies]
 tonic-build = { version = "0.11", features = ["prost"] }
-prost-build = "0.12"
+prost-build = "0.13"

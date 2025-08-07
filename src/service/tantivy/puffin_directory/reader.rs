@@ -107,6 +107,10 @@ impl FileHandle for PuffinSliceHandle {
         if byte_range.is_empty() {
             return Ok(OwnedBytes::empty());
         }
+        let byte_range = Range {
+            start: byte_range.start as u64,
+            end: byte_range.end as u64,
+        };
         let data = self
             .source
             .read_blob_bytes(&self.metadata, Some(byte_range.clone()))

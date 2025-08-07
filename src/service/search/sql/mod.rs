@@ -44,12 +44,14 @@ use regex::Regex;
 use sqlparser::{
     ast::{
         BinaryOperator, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList,
-        FunctionArguments, GroupByExpr, Ident, ObjectName, OrderByExpr, Query, Select, SelectItem,
-        SetExpr, Statement, TableFactor, TableWithJoins, Value, VisitMut, VisitorMut,
+        FunctionArguments, GroupByExpr, Ident, ObjectName, ObjectNamePart, OrderByExpr,
+        OrderByKind, OrderByOptions, Query, Select, SelectFlavor, SelectItem, SetExpr, Statement,
+        TableFactor, TableWithJoins, Value, ValueWithSpan, VisitMut, VisitorMut,
         helpers::attached_token::AttachedToken,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
+    tokenizer::Span,
 };
 
 #[cfg(feature = "enterprise")]
@@ -263,9 +265,13 @@ impl Sql {
         } else {
             histogram_interval_visitor.interval
         };
-        //********************Change the sql start*********************************//
 
-        // 11. add _timestamp and _o2_id if need
+        //********************Change the sql start*********************************//
+        // 11. replace approx_percentile_cont to new format
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+
+        // 12. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             let _ = statement.visit(&mut add_timestamp_visitor);
@@ -275,7 +281,8 @@ impl Sql {
             }
         }
 
-        // 12. generate tantivy query
+        // 13. generate tantivy query
+        // TODO: merge IndexVisitor and IndexOptimizeModeVisitor
         let mut index_condition = None;
         let mut can_optimize = false;
         if stream_names.len() == 1 && cfg.common.inverted_index_enabled {
@@ -300,7 +307,7 @@ impl Sql {
         // set use_inverted_index use index_condition
         let use_inverted_index = index_condition.is_some();
 
-        // 13. check `select * from table where match_all()` optimizer
+        // 14. check `select * from table where match_all()` optimizer
         let mut index_optimize_mode = None;
         if !is_complex_query(&mut statement)
             && order_by.len() == 1
@@ -313,7 +320,7 @@ impl Sql {
             ));
         }
 
-        // 14. check other inverted index optimize modes
+        // 15. check other inverted index optimize modes
         // `select count(*) from table where match_all` -> SimpleCount
         // or `select histogram(..), count(*) from table where match_all` -> SimpleHistogram
         // or `select id, count(*) from t group by id order by cnt desc limit 10` -> SimpleTopN
@@ -344,7 +351,7 @@ impl Sql {
             }
         }
 
-        // 15. replace the Utf8 to Utf8View type
+        // 16. replace the Utf8 to Utf8View type
         let final_schemas = if cfg.common.utf8_view_enabled {
             let mut final_schemas = HashMap::with_capacity(used_schemas.len());
             for (stream, schema) in used_schemas.iter() {
@@ -750,15 +757,17 @@ impl VisitorMut for ColumnVisitor<'_> {
     }
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let Some(order_by) = query.order_by.as_mut() {
-            for order in order_by.exprs.iter_mut() {
+        if let Some(order_by) = query.order_by.as_mut()
+            && let OrderByKind::Expressions(exprs) = &mut order_by.kind
+        {
+            for order in exprs.iter_mut() {
                 let mut name_visitor = FieldNameVisitor::new();
                 let _ = order.expr.visit(&mut name_visitor);
                 if name_visitor.field_names.len() == 1 {
                     let expr_name = name_visitor.field_names.iter().next().unwrap().to_string();
                     self.order_by.push((
                         expr_name,
-                        if order.asc.unwrap_or(true) {
+                        if order.options.asc.unwrap_or(true) {
                             OrderBy::Asc
                         } else {
                             OrderBy::Desc
@@ -794,13 +803,16 @@ impl VisitorMut for ColumnVisitor<'_> {
                 self.is_distinct = true;
             }
         }
-        if let Some(Expr::Value(Value::Number(n, _))) = query.limit.as_ref()
+        if let Some(limit) = query.limit.as_ref()
+            && let Expr::Value(ValueWithSpan { value, span: _ }) = limit
+            && let Value::Number(n, _) = value
             && let Ok(num) = n.to_string().parse::<i64>()
         {
             self.limit = Some(num);
         }
         if let Some(offset) = query.offset.as_ref()
-            && let Expr::Value(Value::Number(n, _)) = &offset.value
+            && let Expr::Value(ValueWithSpan { value, span: _ }) = &offset.value
+            && let Value::Number(n, _) = value
             && let Ok(num) = n.to_string().parse::<i64>()
         {
             self.offset = Some(num);
@@ -899,11 +911,11 @@ impl VisitorMut for IndexVisitor {
             } else if is_simple_count_query(select) || is_simple_histogram_query(select) {
                 // if there is no filter, but have histogram or count, also can use index
                 self.can_optimize = true;
-            } else if let Some(topn) = is_simple_topn_query(query) {
-                if self.index_fields.contains(&topn.0) {
-                    // if there is no filter, but have topn, also can use index
-                    self.can_optimize = true;
-                }
+            } else if let Some(topn) = is_simple_topn_query(query)
+                && self.index_fields.contains(&topn.0)
+            {
+                // if there is no filter, but have topn, also can use index
+                self.can_optimize = true;
             } else if let Some(distinct) = is_simple_distinct_query(query)
                 && self.index_fields.contains(&distinct.0)
             {
@@ -1353,10 +1365,10 @@ impl VisitorMut for IndexOptimizeModeVisitor {
                 self.is_simple_count = is_simple_count_query(select);
             } else if is_simple_histogram_query(select) {
                 self.is_simple_histogram = true;
-            } else if let Some(topn) = is_simple_topn_query(query) {
-                if self.index_fields.contains(&topn.0) {
-                    self.simple_topn = Some(topn);
-                }
+            } else if let Some(topn) = is_simple_topn_query(query)
+                && self.index_fields.contains(&topn.0)
+            {
+                self.simple_topn = Some(topn);
             } else if let Some(distinct) = is_simple_distinct_query(query)
                 && self.index_fields.contains(&distinct.0)
             {
@@ -1448,14 +1460,15 @@ fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
 
     let mut order_by_references_count = false;
     if let Some(order_by) = &query.order_by
-        && order_by.exprs.len() == 1
+        && let OrderByKind::Expressions(exprs) = &order_by.kind
+        && exprs.len() == 1
     {
-        match &order_by.exprs[0].expr {
+        match &exprs[0].expr {
             Expr::Identifier(ident) => {
                 // Check if it's the count alias
                 if let Some(alias) = &count_alias
                     && ident.value == *alias
-                    && order_by.exprs[0].asc == Some(false)
+                    && exprs[0].options.asc == Some(false)
                 {
                     order_by_references_count = true;
                 }
@@ -1467,7 +1480,7 @@ fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
                     && let FunctionArguments::List(list) = &func.args
                     && list.args.len() == 1
                     && trim_quotes(&list.args[0].to_string()) == "*"
-                    && order_by.exprs[0].asc == Some(false)
+                    && exprs[0].options.asc == Some(false)
                 {
                     order_by_references_count = true;
                 }
@@ -1478,7 +1491,10 @@ fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
 
     // check if limit is present
     let limit = match &query.limit {
-        Some(Expr::Value(Value::Number(v, _b))) => {
+        Some(Expr::Value(ValueWithSpan {
+            value: Value::Number(v, _b),
+            ..
+        })) => {
             let v: i64 = v.parse().unwrap_or(0);
             std::cmp::min(v, MAX_LIMIT) as usize
         }
@@ -1550,13 +1566,14 @@ fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> {
     let mut order_by_references_field = false;
     let mut is_asc = false;
     if let Some(order_by) = &query.order_by
-        && order_by.exprs.len() == 1
+        && let OrderByKind::Expressions(exprs) = &order_by.kind
+        && exprs.len() == 1
     {
-        match &order_by.exprs[0].expr {
+        match &exprs[0].expr {
             Expr::Identifier(ident) => {
                 if field_matches_with_alias(&field_name, field_alias.as_deref(), &ident.value) {
                     order_by_references_field = true;
-                    is_asc = order_by.exprs[0].asc.unwrap_or(true);
+                    is_asc = exprs[0].options.asc.unwrap_or(true);
                 }
             }
             Expr::CompoundIdentifier(idents) => {
@@ -1568,7 +1585,7 @@ fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> {
                     )
                 {
                     order_by_references_field = true;
-                    is_asc = order_by.exprs[0].asc.unwrap_or(true);
+                    is_asc = exprs[0].options.asc.unwrap_or(true);
                 }
             }
             _ => {}
@@ -1582,7 +1599,10 @@ fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> {
 
     // check if limit is present
     let limit = match &query.limit {
-        Some(Expr::Value(Value::Number(v, _b))) => {
+        Some(Expr::Value(ValueWithSpan {
+            value: Value::Number(v, _b),
+            ..
+        })) => {
             let v: i64 = v.parse().unwrap_or(0);
             std::cmp::min(v, MAX_LIMIT) as usize
         }
@@ -1721,7 +1741,7 @@ impl VisitorMut for HistogramIntervalVisitor {
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Function(func) = expr
-            && func.name.to_string().to_lowercase() == "histogram"
+            && func.name.to_string().eq_ignore_ascii_case("histogram")
         {
             if let FunctionArguments::List(list) = &func.args {
                 let mut args = list.args.iter();
@@ -1776,7 +1796,9 @@ impl VisitorMut for TrackTotalHitsVisitor {
                         top_before_distinct: false,
                         projection: vec![SelectItem::ExprWithAlias {
                             expr: Expr::Function(Function {
-                                name: ObjectName(vec![Ident::new("count")]),
+                                name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new(
+                                    "count",
+                                ))]),
                                 parameters: FunctionArguments::None,
                                 args: FunctionArguments::List(FunctionArgumentList {
                                     args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
@@ -1813,6 +1835,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                         window_before_qualify: false,
                         connect_by: None,
                         value_table_mode: None,
+                        flavor: SelectFlavor::Standard,
                     })));
                     *query = Query {
                         with: None,
@@ -1834,7 +1857,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     select.sort_by = vec![];
                     select.projection = vec![SelectItem::ExprWithAlias {
                         expr: Expr::Function(Function {
-                            name: ObjectName(vec![Ident::new("count")]),
+                            name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("count"))]),
                             parameters: FunctionArguments::None,
                             args: FunctionArguments::List(FunctionArgumentList {
                                 args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
@@ -1849,6 +1872,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                         }),
                         alias: Ident::new("zo_sql_num"),
                     }];
+                    select.distinct = None;
                     query.order_by = None;
                 }
             }
@@ -1860,7 +1884,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     top_before_distinct: false,
                     projection: vec![SelectItem::ExprWithAlias {
                         expr: Expr::Function(Function {
-                            name: ObjectName(vec![Ident::new("count")]),
+                            name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("count"))]),
                             parameters: FunctionArguments::None,
                             args: FunctionArguments::List(FunctionArgumentList {
                                 args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
@@ -1897,6 +1921,7 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     window_before_qualify: false,
                     connect_by: None,
                     value_table_mode: None,
+                    flavor: SelectFlavor::Standard,
                 })));
                 *query = Query {
                     with: None,
@@ -1915,6 +1940,111 @@ impl VisitorMut for TrackTotalHitsVisitor {
             _ => {}
         }
         ControlFlow::Break(())
+    }
+}
+
+struct ReplaceApproxPercentiletVisitor {}
+
+impl ReplaceApproxPercentiletVisitor {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VisitorMut for ReplaceApproxPercentiletVisitor {
+    type Break = ();
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        if let Expr::Function(func) = expr {
+            if !func.within_group.is_empty() {
+                return ControlFlow::Continue(());
+            }
+            let name = func.name.to_string().to_lowercase();
+            if name == "approx_percentile_cont" {
+                let (first, others) = splite_function_args(&func.args);
+                *expr = Expr::Function(Function {
+                    name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new(
+                        "approx_percentile_cont",
+                    ))]),
+                    parameters: FunctionArguments::None,
+                    args: FunctionArguments::List(FunctionArgumentList {
+                        args: others,
+                        duplicate_treatment: None,
+                        clauses: vec![],
+                    }),
+                    filter: None,
+                    null_treatment: None,
+                    over: None,
+                    within_group: vec![convert_args_to_order_expr(first)],
+                    uses_odbc_syntax: false,
+                });
+            } else if name == "approx_percentile_cont_with_weight" {
+                let (first, others) = splite_function_args(&func.args);
+                *expr = Expr::Function(Function {
+                    name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new(
+                        "approx_percentile_cont_with_weight",
+                    ))]),
+                    parameters: FunctionArguments::None,
+                    args: FunctionArguments::List(FunctionArgumentList {
+                        args: others,
+                        duplicate_treatment: None,
+                        clauses: vec![],
+                    }),
+                    filter: None,
+                    null_treatment: None,
+                    over: None,
+                    within_group: vec![convert_args_to_order_expr(first)],
+                    uses_odbc_syntax: false,
+                });
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+fn splite_function_args(args: &FunctionArguments) -> (FunctionArg, Vec<FunctionArg>) {
+    match args {
+        FunctionArguments::List(list) => {
+            let (first, others) = list.args.split_first().unwrap();
+            (first.clone(), others.to_vec())
+        }
+        _ => {
+            log::error!("Unsupported function arguments: {:?}", args);
+            (FunctionArg::Unnamed(FunctionArgExpr::Wildcard), vec![])
+        }
+    }
+}
+
+fn convert_args_to_order_expr(args: FunctionArg) -> OrderByExpr {
+    let expr = convert_function_args_to_expr(args);
+    OrderByExpr {
+        expr: expr.clone(),
+        options: OrderByOptions {
+            asc: None,
+            nulls_first: None,
+        },
+        with_fill: None,
+    }
+}
+
+fn convert_function_args_to_expr(args: FunctionArg) -> Expr {
+    match args {
+        FunctionArg::Named {
+            name: _,
+            arg: FunctionArgExpr::Expr(arg),
+            operator: _,
+        } => arg,
+        FunctionArg::Named {
+            name: _,
+            arg: FunctionArgExpr::Wildcard,
+            operator: _,
+        } => Expr::Wildcard(AttachedToken::empty()),
+        FunctionArg::Unnamed(FunctionArgExpr::Expr(arg)) => arg,
+        FunctionArg::Unnamed(FunctionArgExpr::Wildcard) => Expr::Wildcard(AttachedToken::empty()),
+        _ => {
+            log::error!("Unsupported function argument: {:?}", args);
+            Expr::Wildcard(AttachedToken::empty())
+        }
     }
 }
 
@@ -2177,6 +2307,7 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                 return ControlFlow::Continue(());
             }
             let fname = names.first().unwrap();
+            let fname = fname.as_ident().unwrap();
             if fname.value == ENCRYPT_UDF_NAME
                 || fname.value == DECRYPT_UDF_NAME
                 || fname.value == DECRYPT_SLOW_UDF_NAME
@@ -2202,9 +2333,10 @@ impl VisitorMut for ExtractKeyNamesVisitor {
                     FunctionArg::ExprNamed { arg, .. } => arg,
                 };
                 match arg {
-                    FunctionArgExpr::Expr(Expr::Value(
-                        sqlparser::ast::Value::SingleQuotedString(s),
-                    )) => {
+                    FunctionArgExpr::Expr(Expr::Value(ValueWithSpan {
+                        value: Value::SingleQuotedString(s),
+                        span: _,
+                    })) => {
                         self.keys.push(s.to_owned());
                     }
                     _ => {
@@ -2267,12 +2399,14 @@ impl VisitorMut for AddOrderingTermVisitor {
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         if query.order_by.is_none() {
             query.order_by = Some(sqlparser::ast::OrderBy {
-                exprs: vec![OrderByExpr {
+                kind: OrderByKind::Expressions(vec![OrderByExpr {
                     expr: Expr::Identifier(Ident::new(self.field.clone())),
-                    asc: Some(self.is_asc),
-                    nulls_first: None,
                     with_fill: None,
-                }],
+                    options: sqlparser::ast::OrderByOptions {
+                        asc: Some(self.is_asc),
+                        nulls_first: None,
+                    },
+                }]),
                 interpolate: None,
             });
         }
@@ -2321,7 +2455,10 @@ impl AddNewFiltersWithAndOperatorVisitor {
             exprs.push(Expr::BinaryOp {
                 left: Box::new(Expr::Identifier(Ident::new(key.to_string()))),
                 op: BinaryOperator::Eq,
-                right: Box::new(Expr::Value(Value::SingleQuotedString(value.to_string()))),
+                right: Box::new(Expr::Value(ValueWithSpan {
+                    value: Value::SingleQuotedString(value.to_string()),
+                    span: Span::empty(),
+                })),
             });
         }
         let exprs = exprs.iter().collect();
@@ -2470,7 +2607,7 @@ impl VisitorMut for RemoveDashboardAllVisitor {
                 {
                     let value = trim_quotes(list.args[1].to_string().as_str());
                     if *value == placeholder {
-                        *expr = Expr::Value(Value::Boolean(true));
+                        *expr = expr_boolean(true);
                     }
                 }
             }
@@ -2499,12 +2636,20 @@ pub async fn get_group_by_fields(sql: &Sql) -> Result<Vec<String>, Error> {
 }
 
 fn expr_boolean(value: bool) -> Expr {
-    Expr::Value(Value::Boolean(value))
+    Expr::Value(ValueWithSpan {
+        value: Value::Boolean(value),
+        span: Span::empty(),
+    })
 }
 
 fn is_eq_placeholder(expr: &Expr, placeholder: &str) -> bool {
-    if let Expr::Value(Value::SingleQuotedString(value)) = expr {
-        value == placeholder
+    if let Expr::Value(ValueWithSpan {
+        value: Value::SingleQuotedString(value),
+        span: _,
+    }) = expr
+        && value == placeholder
+    {
+        true
     } else {
         false
     }
@@ -2519,11 +2664,13 @@ fn field_matches_with_alias(field_name: &str, alias: Option<&str>, target_field:
     }
 
     // Match with alias if present
-    if let Some(alias_name) = alias {
-        alias_name == target_field
-    } else {
-        false
+    if let Some(alias_name) = alias
+        && alias_name == target_field
+    {
+        return true;
     }
+
+    false
 }
 
 #[cfg(test)]
@@ -2769,50 +2916,6 @@ mod tests {
         let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
         let _ = statement.visit(&mut track_total_hits_visitor);
         let expected_sql = "SELECT count(*) AS zo_sql_num FROM (SELECT name FROM t1 UNION SELECT name FROM t2 UNION SELECT name FROM t3)";
-        assert_eq!(statement.to_string(), expected_sql);
-    }
-
-    #[test]
-    fn test_track_total_hits_distinct_single_column() {
-        let sql = "SELECT DISTINCT name FROM t WHERE name = 'a'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
-        let _ = statement.visit(&mut track_total_hits_visitor);
-        // For DISTINCT queries, we wrap in a subquery to count results
-        let expected_sql =
-            "SELECT count(*) AS zo_sql_num FROM (SELECT DISTINCT name FROM t WHERE name = 'a')";
-        assert_eq!(statement.to_string(), expected_sql);
-    }
-
-    #[test]
-    fn test_track_total_hits_distinct_multiple_columns() {
-        let sql = "SELECT DISTINCT unique_id, continent FROM oly WHERE continent = 'ASI'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
-        let _ = statement.visit(&mut track_total_hits_visitor);
-        // For DISTINCT queries with multiple columns, we wrap in a subquery to count results
-        let expected_sql = "SELECT count(*) AS zo_sql_num FROM (SELECT DISTINCT unique_id, continent FROM oly WHERE continent = 'ASI')";
-        assert_eq!(statement.to_string(), expected_sql);
-    }
-
-    #[test]
-    fn test_track_total_hits_distinct_three_columns() {
-        let sql =
-            "SELECT DISTINCT unique_id, continent, bronze_medals FROM oly WHERE continent = 'ASI'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
-        let _ = statement.visit(&mut track_total_hits_visitor);
-        // For DISTINCT queries with multiple columns, we wrap in a subquery to count results
-        let expected_sql = "SELECT count(*) AS zo_sql_num FROM (SELECT DISTINCT unique_id, continent, bronze_medals FROM oly WHERE continent = 'ASI')";
         assert_eq!(statement.to_string(), expected_sql);
     }
 
@@ -3887,6 +3990,81 @@ mod tests {
             .pop()
             .unwrap();
         assert!(is_simple_distinct_query(&mut statement));
+    }
+
+    #[test]
+    fn test_replace_approx_percentilet_visitor1() {
+        let sql = "select approx_percentile_cont(a, 0.5) from stream";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+        assert_eq!(
+            statement.to_string(),
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY a) FROM stream"
+        );
+    }
+
+    #[test]
+    fn test_replace_approx_percentilet_visitor2() {
+        let sql = "select approx_percentile_cont(arrow_cast(a, 'int'), 0.5) from stream";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+        assert_eq!(
+            statement.to_string(),
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY arrow_cast(a, 'int')) FROM stream"
+        );
+    }
+
+    #[test]
+    fn test_replace_approx_percentilet_visitor3() {
+        let sql = "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY a) FROM stream";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+        assert_eq!(
+            statement.to_string(),
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY a) FROM stream"
+        );
+    }
+
+    #[test]
+    fn test_replace_approx_percentilet_visitor4() {
+        let sql = "select approx_percentile_cont(arrow_cast(a, 'int') / 1000, 0.5) from stream";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+        assert_eq!(
+            statement.to_string(),
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY arrow_cast(a, 'int') / 1000) FROM stream"
+        );
+    }
+
+    #[test]
+    fn test_replace_approx_percentilet_visitor5() {
+        let sql = "select approx_percentile_cont(CAST(json_get_str(array_element(cast_to_arr(spath(log, 'error')), 1), 'code') AS INT), 0.5) from stream";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut replace_approx_percentilet_visitor = ReplaceApproxPercentiletVisitor::new();
+        let _ = statement.visit(&mut replace_approx_percentilet_visitor);
+        assert_eq!(
+            statement.to_string(),
+            "SELECT approx_percentile_cont(0.5) WITHIN GROUP (ORDER BY CAST(json_get_str(array_element(cast_to_arr(spath(log, 'error')), 1), 'code') AS INT)) FROM stream"
+        );
     }
 
     #[test]

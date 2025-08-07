@@ -20,12 +20,13 @@ use bytes::Bytes;
 use config::utils::time::BASE_TIME;
 use futures::{StreamExt, stream::BoxStream};
 use object_store::{
-    Attributes, GetOptions, GetResult, GetResultPayload, ListResult, MultipartUpload, ObjectMeta,
-    ObjectStore, PutMultipartOpts, PutOptions, PutPayload, PutResult, Result, path::Path,
+    Attributes, Error, GetOptions, GetResult, GetResultPayload, ListResult, MultipartUpload,
+    OBJECT_STORE_COALESCE_DEFAULT, ObjectMeta, ObjectStore, PutMultipartOptions, PutOptions,
+    PutPayload, PutResult, Result, coalesce_ranges, path::Path,
 };
 use once_cell::sync::Lazy;
 
-use crate::{cache::file_data, storage, storage::GetRangeExt};
+use crate::{cache::file_data, storage};
 
 /// File system with cache
 #[derive(Debug, Default)]
@@ -53,13 +54,13 @@ impl ObjectStore for CacheFS {
             let meta = ObjectMeta {
                 location: location.clone(),
                 last_modified: *BASE_TIME,
-                size: data.len(),
+                size: data.len() as u64,
                 e_tag: None,
                 version: None,
             };
             let range = Range {
                 start: 0,
-                end: data.len(),
+                end: data.len() as u64,
             };
             return Ok(GetResult {
                 payload: GetResultPayload::Stream(
@@ -75,24 +76,23 @@ impl ObjectStore for CacheFS {
     }
 
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
-        log::warn!("OOPS: please check cache:storage:get_opts: {:?}", location);
         let path = location.to_string();
         if let Ok(data) = file_data::get_opts(&path, None, false).await {
             let meta = ObjectMeta {
                 location: location.clone(),
                 last_modified: *BASE_TIME,
-                size: data.len(),
+                size: data.len() as u64,
                 e_tag: None,
                 version: None,
             };
             let (range, data) = match options.range {
                 Some(range) => {
                     let r = range
-                        .as_range(data.len())
+                        .as_range(data.len() as u64)
                         .map_err(|e| crate::storage::Error::BadRange(e.to_string()))?;
-                    (r.clone(), data.slice(r))
+                    (r.clone(), data.slice(r.start as usize..r.end as usize))
                 }
-                None => (0..data.len(), data),
+                None => (0..data.len() as u64, data),
             };
             return Ok(GetResult {
                 payload: GetResultPayload::Stream(
@@ -107,7 +107,7 @@ impl ObjectStore for CacheFS {
         storage::DEFAULT.get_opts(location, options).await
     }
 
-    async fn get_range(&self, location: &Path, range: Range<usize>) -> Result<Bytes> {
+    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
         if range.start > range.end {
             return Err(crate::storage::Error::BadRange(location.to_string()).into());
         }
@@ -116,13 +116,22 @@ impl ObjectStore for CacheFS {
         Ok(data)
     }
 
+    async fn get_ranges(&self, location: &Path, ranges: &[Range<u64>]) -> Result<Vec<Bytes>> {
+        coalesce_ranges(
+            ranges,
+            |range| self.get_range(location, range),
+            OBJECT_STORE_COALESCE_DEFAULT,
+        )
+        .await
+    }
+
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
         let path = location.to_string();
         if let Ok(size) = file_data::get_size_opts(&path, false).await {
             return Ok(ObjectMeta {
                 location: location.clone(),
                 last_modified: *BASE_TIME,
-                size,
+                size: size as u64,
                 e_tag: None,
                 version: None,
             });
@@ -131,15 +140,31 @@ impl ObjectStore for CacheFS {
         storage::DEFAULT.head(location).await
     }
 
-    #[tracing::instrument(name = "datafusion::storage::memory::list", skip_all)]
-    fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
-        log::error!("NotImplemented list_with_delimiter: {:?}", prefix);
+    async fn delete(&self, _location: &Path) -> Result<()> {
+        Err(Error::NotImplemented)
+    }
+
+    fn delete_stream<'a>(
+        &'a self,
+        _locations: BoxStream<'a, Result<Path>>,
+    ) -> BoxStream<'a, Result<Path>> {
         futures::stream::once(async { Err(object_store::Error::NotImplemented {}) }).boxed()
     }
 
-    async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
-        log::error!("NotImplemented list_with_delimiter: {:?}", prefix);
-        Err(object_store::Error::NotImplemented {})
+    fn list(&self, _prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
+        futures::stream::once(async { Err(object_store::Error::NotImplemented {}) }).boxed()
+    }
+
+    fn list_with_offset(
+        &self,
+        _prefix: Option<&Path>,
+        _offset: &Path,
+    ) -> BoxStream<'static, Result<ObjectMeta>> {
+        futures::stream::once(async { Err(object_store::Error::NotImplemented {}) }).boxed()
+    }
+
+    async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {
+        Err(Error::NotImplemented)
     }
 
     async fn put_opts(
@@ -159,34 +184,40 @@ impl ObjectStore for CacheFS {
     async fn put_multipart_opts(
         &self,
         _location: &Path,
-        _opts: PutMultipartOpts,
+        _opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>> {
         Err(object_store::Error::NotImplemented)
     }
 
-    async fn delete(&self, location: &Path) -> Result<()> {
-        log::error!("NotImplemented delete: {}", location);
-        Err(object_store::Error::NotImplemented {})
+    async fn copy(&self, _from: &Path, _to: &Path) -> Result<()> {
+        Err(Error::NotImplemented)
     }
 
-    async fn copy(&self, from: &Path, to: &Path) -> Result<()> {
-        log::error!("NotImplemented copy: from {} to {}", from, to);
-        Err(object_store::Error::NotImplemented {})
+    async fn rename(&self, _from: &Path, _to: &Path) -> Result<()> {
+        Err(Error::NotImplemented)
     }
 
-    async fn copy_if_not_exists(&self, from: &Path, to: &Path) -> Result<()> {
-        log::error!("NotImplemented copy_if_not_exists: from {} to {}", from, to);
-        Err(object_store::Error::NotImplemented {})
+    async fn copy_if_not_exists(&self, _from: &Path, _to: &Path) -> Result<()> {
+        Err(Error::NotImplemented)
+    }
+
+    async fn rename_if_not_exists(&self, _from: &Path, _to: &Path) -> Result<()> {
+        Err(Error::NotImplemented)
     }
 }
 
-pub async fn get(location: &Path) -> object_store::Result<bytes::Bytes> {
-    let data = DEFAULT.get(location).await?;
-    let data = data.bytes().await?;
-    Ok(data)
+pub async fn get(path: &Path) -> Result<GetResult> {
+    DEFAULT.get(path).await
 }
 
-pub async fn get_range(location: &Path, range: Range<usize>) -> object_store::Result<bytes::Bytes> {
-    let data = DEFAULT.get_range(location, range).await?;
-    Ok(data)
+pub async fn get_opts(path: &Path, options: GetOptions) -> Result<GetResult> {
+    DEFAULT.get_opts(path, options).await
+}
+
+pub async fn get_range(location: &Path, range: Range<u64>) -> Result<bytes::Bytes> {
+    DEFAULT.get_range(location, range).await
+}
+
+pub async fn head(location: &Path) -> Result<ObjectMeta> {
+    DEFAULT.head(location).await
 }

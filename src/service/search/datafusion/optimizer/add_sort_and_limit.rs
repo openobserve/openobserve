@@ -55,7 +55,7 @@ impl OptimizerRule for AddSortAndLimitRule {
         plan: LogicalPlan,
         _config: &dyn OptimizerConfig,
     ) -> Result<Transformed<LogicalPlan>> {
-        if is_empty_relation(&plan) {
+        if self.limit == 0 || is_empty_relation(&plan) {
             return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
         }
         let mut plan = plan.rewrite(&mut AddSortAndLimit::new(self.limit, self.offset))?;

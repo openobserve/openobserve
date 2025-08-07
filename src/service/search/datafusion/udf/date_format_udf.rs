@@ -50,9 +50,9 @@ pub(crate) static DATE_FORMAT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
 pub fn date_format_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarValue> {
     if args.len() != 3 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError(
+            Box::new(ParserError::ParserError(
                 "UDF params should be: date_format(field, format, zone)".to_string(),
-            ),
+            )),
             None,
         ));
     }

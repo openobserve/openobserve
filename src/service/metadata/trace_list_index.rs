@@ -25,7 +25,7 @@ use std::{
 use arrow_schema::{DataType, Field, Schema};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
-    meta::stream::{StreamPartition, StreamSettings, StreamType},
+    meta::stream::{StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
 use infra::schema::unwrap_partition_time_level;

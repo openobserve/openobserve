@@ -39,7 +39,7 @@ impl PuffinBytesReader {
     pub async fn read_blob_bytes(
         &self,
         blob_metadata: &BlobMetadata,
-        range: Option<core::ops::Range<usize>>,
+        range: Option<core::ops::Range<u64>>,
     ) -> Result<bytes::Bytes> {
         let raw_data = infra::cache::storage::get_range(
             &self.source.location,
@@ -70,7 +70,7 @@ impl PuffinBytesReader {
             return Ok(());
         }
 
-        if (self.source.size as u64) < MIN_FILE_SIZE {
+        if self.source.size < MIN_FILE_SIZE {
             return Err(anyhow!(
                 "Unexpected bytes size: minimal size {} vs actual size {}",
                 MIN_FILE_SIZE,
@@ -79,8 +79,7 @@ impl PuffinBytesReader {
         }
 
         // check MAGIC
-        let magic =
-            infra::cache::storage::get_range(&self.source.location, 0..MAGIC_SIZE as usize).await?;
+        let magic = infra::cache::storage::get_range(&self.source.location, 0..MAGIC_SIZE).await?;
         ensure!(magic.to_vec() == MAGIC, anyhow!("Header MAGIC mismatch"));
 
         let puffin_meta = PuffinFooterBytesReader::new(self.source.clone())
@@ -114,7 +113,7 @@ impl PuffinFooterBytesReader {
 impl PuffinFooterBytesReader {
     async fn parse(mut self) -> Result<PuffinMeta> {
         // read footer
-        if self.source.size < FOOTER_SIZE as usize {
+        if self.source.size < FOOTER_SIZE {
             return Err(anyhow!(
                 "Unexpected footer size: expected size {} vs actual size {}",
                 FOOTER_SIZE,
@@ -123,7 +122,7 @@ impl PuffinFooterBytesReader {
         }
         let footer = infra::cache::storage::get_range(
             &self.source.location,
-            (self.source.size - FOOTER_SIZE as usize)..self.source.size,
+            (self.source.size - FOOTER_SIZE)..self.source.size,
         )
         .await?;
 
@@ -155,7 +154,7 @@ impl PuffinFooterBytesReader {
         self.payload_size = i32::from_le_bytes(payload_size) as u64;
 
         // read the payload
-        if self.source.size < FOOTER_SIZE as usize + self.payload_size as usize {
+        if self.source.size < FOOTER_SIZE + self.payload_size {
             return Err(anyhow!(
                 "Unexpected payload size: expected size {} vs actual size {}",
                 FOOTER_SIZE + self.payload_size,
@@ -164,10 +163,8 @@ impl PuffinFooterBytesReader {
         }
         let payload = infra::cache::storage::get_range(
             &self.source.location,
-            (self.source.size
-                - FOOTER_SIZE as usize
-                - self.payload_size as usize
-                - MAGIC_SIZE as usize)..(self.source.size - FOOTER_SIZE as usize),
+            (self.source.size - FOOTER_SIZE - self.payload_size - MAGIC_SIZE)
+                ..(self.source.size - FOOTER_SIZE),
         )
         .await?;
 
@@ -212,7 +209,7 @@ impl PuffinFooterBytesReader {
             .map_or(MAGIC_SIZE, |blob| blob.offset + blob.length);
         let footer_size = MAGIC_SIZE + self.payload_size + FOOTER_SIZE;
         ensure!(
-            payload_ends_at == (self.source.size as u64 - footer_size),
+            payload_ends_at == (self.source.size - footer_size),
             anyhow!("Payload chunk offset mismatch")
         );
         Ok(())

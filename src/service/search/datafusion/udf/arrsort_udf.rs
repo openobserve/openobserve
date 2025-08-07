@@ -50,7 +50,9 @@ pub fn arr_sort_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
     log::debug!("Inside arrsort");
     if args.len() != 1 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError("UDF params should be: arrsort(field)".to_string()),
+            Box::new(ParserError::ParserError(
+                "UDF params should be: arrsort(field)".to_string(),
+            )),
             None,
         ));
     }

@@ -38,17 +38,14 @@ pub fn is_exists(file: &str) -> bool {
 }
 
 #[inline(always)]
-pub fn get_file_contents(
-    file: &str,
-    range: Option<Range<usize>>,
-) -> Result<Vec<u8>, std::io::Error> {
+pub fn get_file_contents(file: &str, range: Option<Range<u64>>) -> Result<Vec<u8>, std::io::Error> {
     let mut file = File::open(file)?;
     let data = if let Some(range) = range {
         let to_read = range.end - range.start;
-        let mut buf = Vec::with_capacity(to_read);
-        file.seek(std::io::SeekFrom::Start(range.start as u64))?;
-        let read = file.take(to_read as u64).read_to_end(&mut buf)?;
-        if read != to_read {
+        let mut buf = Vec::with_capacity(to_read as usize);
+        file.seek(std::io::SeekFrom::Start(range.start))?;
+        let read = file.take(to_read).read_to_end(&mut buf)?;
+        if read != to_read as usize {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 format!("Expected to read {to_read} bytes, but read {read} bytes"),

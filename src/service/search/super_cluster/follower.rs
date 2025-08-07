@@ -122,7 +122,6 @@ pub async fn search(
 
     // 1. get file id list
     let file_id_list = get_file_id_lists(&req.org_id, stream_type, &stream, req.time_range).await?;
-
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_num = file_id_list_vec.len();
     let file_id_list_took = start.elapsed().as_millis() as usize;
@@ -277,7 +276,6 @@ pub async fn search(
     let search_infos = SearchInfos {
         plan: vec![],
         file_id_list: partition_file_lists.clone(),
-        idx_file_list: vec![],
         start_time: req.time_range.as_ref().map(|x| x.0).unwrap_or(0),
         end_time: req.time_range.as_ref().map(|x| x.1).unwrap_or(0),
         timeout: req.timeout as u64,

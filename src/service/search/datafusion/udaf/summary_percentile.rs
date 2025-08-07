@@ -19,13 +19,13 @@ use arrow::array::{
     Array, AsArray, Float32Array, Int8Array, Int16Array, Int32Array, Int64Array, RecordBatch,
     UInt8Array, UInt16Array, UInt32Array, UInt64Array,
 };
-use arrow_schema::{Field, Schema};
+use arrow_schema::{Field, FieldRef, Schema};
 use datafusion::{
     arrow::{
         array::{ArrayRef, Float64Array},
         datatypes::DataType,
     },
-    common::{DataFusionError, downcast_value, internal_err, not_impl_err, plan_err},
+    common::{downcast_value, internal_err, not_impl_err, plan_err},
     error::Result,
     logical_expr::{
         Accumulator, AggregateUDFImpl, ColumnarValue, Signature, TypeSignature, Volatility,
@@ -109,18 +109,18 @@ impl AggregateUDFImpl for SummaryPercentile {
         Ok(arg_types[0].clone())
     }
 
-    fn state_fields(&self, args: StateFieldsArgs) -> Result<Vec<Field>> {
+    fn state_fields(&self, args: StateFieldsArgs) -> Result<Vec<FieldRef>> {
         Ok(vec![
-            Field::new(
+            Arc::new(Field::new(
                 format_state_name(args.name, "value"),
                 DataType::List(Arc::new(Field::new("item", DataType::Float64, true))),
                 true,
-            ),
-            Field::new(
+            )),
+            Arc::new(Field::new(
                 format_state_name(args.name, "count"),
                 DataType::List(Arc::new(Field::new("item", DataType::Int64, true))),
                 true,
-            ),
+            )),
         ])
     }
 
@@ -478,24 +478,20 @@ mod test {
     async fn test_summary_percentile_udaf() {
         let ctx = create_context();
         let percentile = 0.75;
-        let sql_float_field = &format!(
-            "select summary_percentile(value_float, total_count, {}) from t",
-            percentile
-        );
-        let sql_uint_field = &format!(
-            "select summary_percentile(value_uint, total_count, {}) from t",
-            percentile
-        );
+        let sql_float_field =
+            format!("select summary_percentile(value_float, total_count, {percentile}) from t");
+        let sql_uint_field =
+            format!("select summary_percentile(value_uint, total_count, {percentile}) from t");
         let acc_udaf = AggregateUDF::from(SummaryPercentile::new());
         ctx.register_udaf(acc_udaf);
 
-        let df = ctx.sql(sql_float_field).await.unwrap();
+        let df = ctx.sql(&sql_float_field).await.unwrap();
         let results = df.collect().await.unwrap();
         // downcast the array to the expected type
         let result = as_float64_array(results[0].column(0)).unwrap();
         assert_eq!(result.value(0), 2433.0);
 
-        let df = ctx.sql(sql_uint_field).await.unwrap();
+        let df = ctx.sql(&sql_uint_field).await.unwrap();
         let results = df.collect().await.unwrap();
         // downcast the array to the expected type
         let result = as_uint32_array(results[0].column(0)).unwrap();
@@ -527,14 +523,13 @@ mod test {
         ctx.register_table("t", Arc::new(table)).unwrap();
 
         let percentile = 0.75;
-        let sql = &format!(
-            "select summary_percentile(f1, total_count, {}), summary_percentile(f2, total_count, {}) from t",
-            percentile, percentile
+        let sql = format!(
+            "select summary_percentile(f1, total_count, {percentile}), summary_percentile(f2, total_count, {percentile}) from t"
         );
         let acc_udaf = AggregateUDF::from(SummaryPercentile::new());
         ctx.register_udaf(acc_udaf);
 
-        let df = ctx.sql(sql).await.unwrap();
+        let df = ctx.sql(&sql).await.unwrap();
         let results = df.collect().await.unwrap();
         // downcast the array to the expected type
         let result1 = as_float64_array(results[0].column(0)).unwrap();

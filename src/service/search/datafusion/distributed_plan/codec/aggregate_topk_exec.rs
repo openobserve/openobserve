@@ -21,51 +21,44 @@ use datafusion::{
     execution::FunctionRegistry,
     physical_plan::ExecutionPlan,
 };
-use datafusion_proto::physical_plan::PhysicalExtensionCodec;
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::datafusion::distributed_plan::aggregate_topk_exec::AggregateTopkExec;
 use prost::Message;
 use proto::cluster_rpc;
 
-/// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
-#[derive(Debug)]
-pub struct AggregateTopkExecPhysicalExtensionCodec;
+pub(crate) fn try_decode(
+    node: cluster_rpc::AggregateTopkExecNode,
+    inputs: &[Arc<dyn ExecutionPlan>],
+    _registry: &dyn FunctionRegistry,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    Ok(Arc::new(AggregateTopkExec::new(
+        inputs[0].clone(),
+        &node.sort_field,
+        node.descending,
+        node.limit,
+    )))
+}
 
-impl PhysicalExtensionCodec for AggregateTopkExecPhysicalExtensionCodec {
-    fn try_decode(
-        &self,
-        buf: &[u8],
-        inputs: &[Arc<dyn ExecutionPlan>],
-        _registry: &dyn FunctionRegistry,
-    ) -> Result<Arc<dyn ExecutionPlan>> {
-        let proto = cluster_rpc::AggregateTopkExecNode::decode(buf).map_err(|e| {
-            DataFusionError::Internal(format!(
-                "failed to decode AggregateTopkExecNode writer execution plan: {e:?}"
-            ))
-        })?;
-        Ok(Arc::new(AggregateTopkExec::new(
-            inputs[0].clone(),
-            &proto.sort_field,
-            proto.descending,
-            proto.limit,
-        )))
-    }
-
-    fn try_encode(&self, node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
-        let Some(node) = node.as_any().downcast_ref::<AggregateTopkExec>() else {
-            return internal_err!("Not supported");
-        };
-        let proto = cluster_rpc::AggregateTopkExecNode {
-            sort_field: node.sort_field().to_string(),
-            descending: node.descending(),
-            limit: node.limit(),
-        };
-        proto.encode(buf).map_err(|e| {
-            DataFusionError::Internal(format!(
-                "failed to encode AggregateTopkExecNode writer execution plan: {e:?}"
-            ))
-        })?;
-        Ok(())
-    }
+pub(crate) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
+    let Some(node) = node.as_any().downcast_ref::<AggregateTopkExec>() else {
+        return internal_err!("Not supported");
+    };
+    let plan_node = cluster_rpc::AggregateTopkExecNode {
+        sort_field: node.sort_field().to_string(),
+        descending: node.descending(),
+        limit: node.limit(),
+    };
+    let proto = cluster_rpc::PhysicalPlanNode {
+        plan: Some(cluster_rpc::physical_plan_node::Plan::AggregateTopk(
+            plan_node,
+        )),
+    };
+    proto.encode(buf).map_err(|e| {
+        DataFusionError::Internal(format!(
+            "failed to encode AggregateTopkExecNode writer execution plan: {e:?}"
+        ))
+    })?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -76,9 +69,9 @@ mod tests {
         physical_expr::aggregate::AggregateExprBuilder,
         physical_plan::{
             aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
+            empty::EmptyExec,
             expressions::{col, lit},
         },
-        scalar::ScalarValue,
     };
     use datafusion_proto::bytes::{
         physical_plan_from_bytes_with_extension_codec, physical_plan_to_bytes_with_extension_codec,
@@ -91,23 +84,13 @@ mod tests {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
 
         let grouping_set = PhysicalGroupBy::new(
-            vec![
-                (col("a", &schema)?, "a".to_string()),
-                (col("b", &schema)?, "b".to_string()),
-            ],
-            vec![
-                (lit(ScalarValue::UInt32(None)), "a".to_string()),
-                (lit(ScalarValue::Float64(None)), "b".to_string()),
-            ],
-            vec![
-                vec![false, true],  // (a, NULL)
-                vec![true, false],  // (NULL, b)
-                vec![false, false], // (a,b)
-            ],
+            vec![(col("a", &schema)?, "a".to_string())],
+            vec![],
+            vec![vec![false]],
         );
 
         let aggregates = vec![Arc::new(
-            AggregateExprBuilder::new(count_udaf(), vec![lit(1i8)])
+            AggregateExprBuilder::new(count_udaf(), vec![lit(1i32)])
                 .schema(Arc::clone(&schema))
                 .alias("COUNT(1)")
                 .build()?,
@@ -118,28 +101,18 @@ mod tests {
             grouping_set.clone(),
             aggregates.clone(),
             vec![None],
-            Arc::new(super::super::super::empty_exec::NewEmptyExec::new(
-                "test",
-                Arc::clone(&schema),
-                Some(&vec![0]),
-                &[],
-                Some(10),
-                false,
-                Arc::clone(&schema),
-            )),
+            Arc::new(EmptyExec::new(Arc::clone(&schema))),
             Arc::clone(&schema),
         )?;
         let plan: Arc<dyn ExecutionPlan> = Arc::new(AggregateTopkExec::new(
             Arc::new(agg_plan) as Arc<dyn ExecutionPlan>,
-            "a",
+            "COUNT(1)",
             false,
             10,
         ));
 
         // encode
-        let proto = super::super::ComposedPhysicalExtensionCodec {
-            codecs: vec![Arc::new(AggregateTopkExecPhysicalExtensionCodec {})],
-        };
+        let proto = super::super::get_physical_extension_codec();
         let plan_bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &proto).unwrap();
 
         // decode

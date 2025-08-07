@@ -49,7 +49,9 @@ pub fn cast_to_arr_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Col
     log::debug!("Inside cast_to_arr_impl");
     if args.len() != 1 {
         return Err(DataFusionError::SQL(
-            ParserError::ParserError("UDF params should be: cast_to_arr(field)".to_string()),
+            Box::new(ParserError::ParserError(
+                "UDF params should be: cast_to_arr(field)".to_string(),
+            )),
             None,
         ));
     }

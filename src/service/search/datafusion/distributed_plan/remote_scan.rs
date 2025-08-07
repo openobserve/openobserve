@@ -57,11 +57,12 @@ use tonic::{
     metadata::{MetadataKey, MetadataValue},
 };
 
+use super::node::RemoteScanNode;
 use crate::service::{
     grpc::get_cached_channel,
     search::{
         MetadataMap,
-        datafusion::distributed_plan::{codec::get_physical_extension_codec, node::RemoteScanNode},
+        datafusion::distributed_plan::codec::get_physical_extension_codec,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
 };
@@ -136,16 +137,12 @@ impl RemoteScanExec {
 }
 
 impl DisplayAs for RemoteScanExec {
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match t {
-            DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                write!(
-                    f,
-                    "RemoteScanExec: input_partitions=output_partitions={}",
-                    self.partitions,
-                )
-            }
-        }
+    fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "RemoteScanExec: input_partitions=output_partitions={}",
+            self.partitions,
+        )
     }
 }
 
@@ -266,7 +263,7 @@ async fn get_remote_batch(
     request.query_identifier.enrich_mode = enrich_mode;
 
     log::info!(
-        "[trace_id {}] flight->search: request node: {}, query_type: {}, is_super: {}, is_querier: {}, timeout: {}, files: {}, idx_files: {}",
+        "[trace_id {}] flight->search: request node: {}, query_type: {}, is_super: {}, is_querier: {}, timeout: {}, files: {}",
         trace_id,
         &node.get_grpc_addr(),
         search_type.unwrap_or(SearchEventType::UI),
@@ -274,7 +271,6 @@ async fn get_remote_batch(
         is_querier,
         timeout,
         request.search_info.file_id_list.len(),
-        request.search_info.idx_file_list.len(),
     );
 
     let request: cluster_rpc::FlightSearchRequest = request.into();
@@ -594,6 +590,8 @@ impl FlightStream {
                     ),
                     SearchInspectorFieldsBuilder::new()
                         .node_name(self.node.get_name())
+                        .region(self.node.get_region())
+                        .cluster(self.node.get_cluster())
                         .component("remote scan streaming".to_string())
                         .search_role(search_role)
                         .duration(self.start.elapsed().as_millis() as usize)
@@ -676,7 +674,7 @@ impl Drop for FlightStream {
         if (cfg.common.tracing_enabled || cfg.common.tracing_search_enabled)
             && let Err(e) = self.create_stream_end_span()
         {
-            log::error!("error creating stream span: {}", e);
+            log::error!("error creating stream span: {e}");
         }
         log::info!(
             "[trace_id {}] flight->search: response node: {}, is_super: {}, is_querier: {}, files: {}, scan_size: {} mb, num_rows: {}, took: {} ms",

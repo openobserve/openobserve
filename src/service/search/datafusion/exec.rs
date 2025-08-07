@@ -135,7 +135,7 @@ pub async fn merge_parquet_files(
     } else {
         format!("SELECT * FROM tbl ORDER BY {TIMESTAMP_COL_NAME} DESC")
     };
-    log::debug!("merge_parquet_files sql: {}", sql);
+    log::debug!("merge_parquet_files sql: {sql}");
 
     // create datafusion context
     let sort_by_timestamp_desc = true;
@@ -188,12 +188,12 @@ pub async fn merge_parquet_files(
                 }
                 Ok(Some(batch)) => {
                     if let Err(e) = tx.send(batch).await {
-                        log::error!("merge_parquet_files write to channel error: {}", e);
+                        log::error!("merge_parquet_files write to channel error: {e}");
                         return Err(DataFusionError::External(Box::new(e)));
                     }
                 }
                 Err(e) => {
-                    log::error!("merge_parquet_files execute stream error: {}", e);
+                    log::error!("merge_parquet_files execute stream error: {e}");
                     return Err(e);
                 }
             }
@@ -203,7 +203,7 @@ pub async fn merge_parquet_files(
     while let Some(batch) = rx.recv().await {
         new_file_meta.records += batch.num_rows() as i64;
         if let Err(e) = writer.write(&batch).await {
-            log::error!("merge_parquet_files write error: {}", e);
+            log::error!("merge_parquet_files write error: {e}");
             return Err(e.into());
         }
     }
@@ -241,7 +241,7 @@ pub async fn merge_parquet_files_with_downsampling(
 
     let sql = generate_downsampling_sql(&schema, rule);
 
-    log::debug!("merge_parquet_files_with_downsampling sql: {}", sql);
+    log::debug!("merge_parquet_files_with_downsampling sql: {sql}");
 
     // create datafusion context
     let sort_by_timestamp_desc = true;
@@ -289,17 +289,13 @@ pub async fn merge_parquet_files_with_downsampling(
                 Ok(Some(batch)) => {
                     if let Err(e) = tx.send(batch).await {
                         log::error!(
-                            "merge_parquet_files_with_downsampling write to channel error: {}",
-                            e
+                            "merge_parquet_files_with_downsampling write to channel error: {e}"
                         );
                         return Err(DataFusionError::External(Box::new(e)));
                     }
                 }
                 Err(e) => {
-                    log::error!(
-                        "merge_parquet_files_with_downsampling execute stream error: {}",
-                        e
-                    );
+                    log::error!("merge_parquet_files_with_downsampling execute stream error: {e}");
                     return Err(e);
                 }
             }
@@ -333,7 +329,7 @@ pub async fn merge_parquet_files_with_downsampling(
             );
         }
         if let Err(e) = writer.write(&batch).await {
-            log::error!("merge_parquet_files_with_downsampling write Error: {}", e);
+            log::error!("merge_parquet_files_with_downsampling write Error: {e}");
             return Err(e.into());
         }
     }
@@ -441,10 +437,6 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
     let wal_url = url::Url::parse("wal:///").unwrap();
     object_store_registry.register_store(&wal_url, Arc::new(wal));
 
-    let tmpfs = super::storage::tmpfs::Tmpfs::new();
-    let tmpfs_url = url::Url::parse("tmpfs:///").unwrap();
-    object_store_registry.register_store(&tmpfs_url, Arc::new(tmpfs));
-
     let cfg = get_config();
     let mut builder =
         RuntimeEnvBuilder::new().with_object_store_registry(Arc::new(object_store_registry));
@@ -477,7 +469,7 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
             let track_memory_pool = TrackConsumersPool::new(pool, NonZero::new(20).unwrap());
             builder = builder.with_memory_pool(Arc::new(track_memory_pool));
         }
-    }
+    };
     builder.build()
 }
 
@@ -543,12 +535,6 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::to_arr_string_udf::TO_ARR_STRING.clone());
     ctx.register_udf(super::udf::histogram_udf::HISTOGRAM_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
-    #[cfg(feature = "enterprise")]
-    ctx.register_udf(super::udf::cipher_udf::DECRYPT_UDF.clone());
-    #[cfg(feature = "enterprise")]
-    ctx.register_udf(super::udf::cipher_udf::ENCRYPT_UDF.clone());
-    #[cfg(feature = "enterprise")]
-    ctx.register_udf(super::udf::cipher_udf::DECRYPT_SLOW_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::percentile_cont::PercentileCont::new(),
@@ -565,8 +551,8 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     #[cfg(feature = "enterprise")]
     {
         ctx.register_udf(super::udf::cipher_udf::DECRYPT_UDF.clone());
-        ctx.register_udf(super::udf::cipher_udf::ENCRYPT_UDF.clone());
         ctx.register_udf(super::udf::cipher_udf::DECRYPT_SLOW_UDF.clone());
+        ctx.register_udf(super::udf::cipher_udf::ENCRYPT_UDF.clone());
         ctx.register_udaf(AggregateUDF::from(
             o2_enterprise::enterprise::search::datafusion::udaf::approx_topk::ApproxTopK::new(),
         ));
@@ -656,7 +642,7 @@ pub async fn create_parquet_table(
     let mut listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
         .with_target_partitions(target_partitions)
-        .with_collect_stat(true);
+        .with_collect_stat(true); // current is default to true
 
     if sorted_by_time {
         // specify sort columns for parquet file
@@ -675,8 +661,6 @@ pub async fn create_parquet_table(
     } else if session.storage_type == StorageType::Wal {
         file_list::set(&session.id, &schema_key, files).await;
         format!("wal:///{}/schema={}/", session.id, schema_key)
-    } else if session.storage_type == StorageType::Tmpfs {
-        format!("tmpfs:///{}/", session.id)
     } else {
         return Err(DataFusionError::Execution(format!(
             "Unsupported storage_type {:?}",
@@ -722,7 +706,7 @@ pub async fn create_parquet_table(
         fst_fields,
         need_optimize_partition,
     )?;
-    if session.storage_type != StorageType::Tmpfs && file_stat_cache.is_some() {
+    if file_stat_cache.is_some() {
         table = table.with_cache(file_stat_cache);
     }
     Ok(Arc::new(table))
@@ -757,11 +741,7 @@ async fn get_cpu_and_mem_limit(
     };
 
     log::info!(
-        "[trace_id: {}] work_group: {:?}, target_partitions: {}, memory_size: {}",
-        trace_id,
-        work_group,
-        target_partitions,
-        memory_size
+        "[trace_id: {trace_id}] work_group: {work_group:?}, target_partitions: {target_partitions}, memory_size: {memory_size}"
     );
 
     Ok((target_partitions, memory_size))

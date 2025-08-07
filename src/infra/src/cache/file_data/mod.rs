@@ -248,7 +248,7 @@ async fn download_from_storage(
         // if the downloaded length is not equal to what the blog store
         // sent in headers, we might have a partial download, so we log
         // and retry
-        if data_len != expected_blob_size {
+        if data_len != expected_blob_size as usize {
             let msg = if i == DOWNLOAD_RETRY_TIMES - 1 {
                 format!("after {DOWNLOAD_RETRY_TIMES} retries")
             } else {
@@ -271,7 +271,7 @@ async fn download_from_storage(
     }
     // if even after retries, the download size does not match, we skip it
     // no point in validating or setting the value
-    if data_len != expected_blob_size {
+    if data_len != expected_blob_size as usize {
         return Err(anyhow::anyhow!(
             "file {file} could not be downloaded completely: expected {expected_blob_size}, got {data_len} skipping"
         ));
@@ -344,13 +344,13 @@ pub async fn set(trace_id: &str, key: &str, data: bytes::Bytes) -> Result<(), an
     }
 }
 
-pub async fn get(file: &str, range: Option<Range<usize>>) -> object_store::Result<bytes::Bytes> {
+pub async fn get(file: &str, range: Option<Range<u64>>) -> object_store::Result<bytes::Bytes> {
     get_opts(file, range, true).await
 }
 
 pub async fn get_opts(
     file: &str,
-    range: Option<Range<usize>>,
+    range: Option<Range<u64>>,
     remote: bool,
 ) -> object_store::Result<bytes::Bytes> {
     let cfg = config::get_config();
@@ -404,7 +404,7 @@ pub async fn get_size_opts(file: &str, remote: bool) -> object_store::Result<usi
     // get from storage
     if remote {
         let meta = crate::storage::head(file).await?;
-        return Ok(meta.size);
+        return Ok(meta.size as usize);
     }
 
     Err(object_store::Error::NotFound {

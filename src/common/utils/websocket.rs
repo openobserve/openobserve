@@ -25,9 +25,10 @@ use config::{
 use infra::errors::Error;
 use rand::Rng;
 use sqlparser::{
-    ast::{Expr, FunctionArguments, VisitMut, VisitorMut},
+    ast::{Expr, FunctionArguments, Value, ValueWithSpan, VisitMut, VisitorMut},
     dialect::PostgreSqlDialect,
     parser::Parser,
+    tokenizer::Span,
 };
 
 #[inline(always)]
@@ -95,9 +96,10 @@ impl VisitorMut for HistogramIntervalVisitorMut {
             if args.next().is_none() {
                 let interval_value = format!("{} seconds", self.interval);
                 list.args.push(sqlparser::ast::FunctionArg::Unnamed(
-                    sqlparser::ast::FunctionArgExpr::Expr(Expr::Value(
-                        sqlparser::ast::Value::SingleQuotedString(interval_value),
-                    )),
+                    sqlparser::ast::FunctionArgExpr::Expr(Expr::Value(ValueWithSpan {
+                        value: Value::SingleQuotedString(interval_value),
+                        span: Span::empty(),
+                    })),
                 ));
             }
         }
