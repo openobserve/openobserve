@@ -18,7 +18,7 @@ use std::{
     sync::Arc,
 };
 
-use config::meta::bitvec::BitVec;
+use config::{meta::bitvec::BitVec, metrics};
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use roaring::RoaringBitmap;
@@ -58,6 +58,35 @@ impl From<CacheEntry> for TantivyResult {
         }
     }
 }
+
+impl CacheEntry {
+    pub fn get_memory_size(&self) -> usize {
+        match self {
+            CacheEntry::RowIdsBitVec(_, bitvec) => {
+                bitvec.capacity().div_ceil(8) + std::mem::size_of::<BitVec>()
+            }
+            CacheEntry::RowIdsRoaring(_, roaring) => {
+                roaring.serialized_size() + std::mem::size_of::<RoaringBitmap>()
+            }
+            CacheEntry::Count(_) => std::mem::size_of::<usize>(),
+            CacheEntry::Histogram(histogram) => {
+                histogram.capacity() * std::mem::size_of::<u64>() + std::mem::size_of::<Vec<u64>>()
+            }
+            CacheEntry::TopN(top_n) => {
+                top_n
+                    .iter()
+                    .map(|(s, _)| s.capacity() + std::mem::size_of::<u64>())
+                    .sum::<usize>()
+                    + std::mem::size_of::<Vec<(String, u64)>>()
+            }
+            CacheEntry::Distinct(distinct) => {
+                distinct.iter().map(|s| s.capacity()).sum::<usize>()
+                    + std::mem::size_of::<HashSet<String>>()
+            }
+        }
+    }
+}
+
 /// Cache created for storing the tantivy result
 pub struct TantivyResultCache {
     readers: DashMap<String, CacheEntry>,
@@ -83,17 +112,31 @@ impl TantivyResultCache {
     pub fn put(&self, key: String, value: CacheEntry) -> Option<CacheEntry> {
         let mut w = self.cacher.lock();
         if w.len() >= self.max_entries {
+            metrics::TANTIVY_RESULT_CACHE_GC_TOTAL
+                .with_label_values(&[])
+                .inc();
+            let mut memory_usage = 0;
             // release 10% of the cache
             for _ in 0..(std::cmp::max(1, self.max_entries / 10)) {
                 if let Some(k) = w.pop_front() {
-                    self.readers.remove(&k);
+                    if let Some((_, entry)) = self.readers.remove(&k) {
+                        memory_usage += entry.get_memory_size();
+                    }
                 } else {
                     break;
                 }
             }
+            metrics::TANTIVY_RESULT_CACHE_MEMORY_USAGE
+                .with_label_values(&[])
+                .sub(memory_usage as i64);
         }
         w.push_back(key.clone());
         drop(w);
+        // update metrics
+        let memory_usage = value.get_memory_size();
+        metrics::TANTIVY_RESULT_CACHE_MEMORY_USAGE
+            .with_label_values(&[])
+            .add(memory_usage as i64);
         self.readers.insert(key, value)
     }
 }

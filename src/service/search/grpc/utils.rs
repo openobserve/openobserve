@@ -63,7 +63,9 @@ impl TantivyResult {
                 row_ids.capacity() * std::mem::size_of::<u32>()
                     + std::mem::size_of::<HashSet<u32>>()
             }
-            Self::RowIdsBitVec(_, bitvec) => bitvec.capacity() / 8 + std::mem::size_of::<BitVec>(),
+            Self::RowIdsBitVec(_, bitvec) => {
+                bitvec.capacity().div_ceil(8) + std::mem::size_of::<BitVec>()
+            }
             Self::Count(_) => std::mem::size_of::<usize>(),
             Self::Histogram(histogram) => {
                 histogram.capacity() * std::mem::size_of::<u64>() + std::mem::size_of::<Vec<u64>>()

@@ -947,10 +947,16 @@ async fn search_tantivy_index(
 
     let cfg = get_config();
     let cache_key = generate_cache_key(&index_condition, &idx_optimize_rule, parquet_file);
-    if cfg.common.inverted_index_result_cache_enabled
-        && let Some(result) = tantivy_result_cache::TANTIVY_RESULT_CACHE.get(&cache_key)
-    {
-        return Ok((parquet_file.key.to_string(), result));
+    if cfg.common.inverted_index_result_cache_enabled {
+        metrics::TANTIVY_RESULT_CACHE_REQUESTS_TOTAL
+            .with_label_values(&[])
+            .inc();
+        if let Some(result) = tantivy_result_cache::TANTIVY_RESULT_CACHE.get(&cache_key) {
+            metrics::TANTIVY_RESULT_CACHE_HITS_TOTAL
+                .with_label_values(&[])
+                .inc();
+            return Ok((parquet_file.key.to_string(), result));
+        }
     }
 
     // cache the indexer and reader
@@ -1106,7 +1112,6 @@ async fn search_tantivy_index(
             }
             percent = row_ids_percent;
             let max_doc_id = *row_ids.iter().max().unwrap_or(&0) as i64;
-            let mut res = BitVec::repeat(false, max_doc_id as usize + 1);
             if max_doc_id >= parquet_file.meta.records {
                 return Err(anyhow::anyhow!(
                     "doc_id {} is out of range, records {}",
@@ -1114,6 +1119,7 @@ async fn search_tantivy_index(
                     parquet_file.meta.records,
                 ));
             }
+            let mut res = BitVec::repeat(false, max_doc_id as usize + 1);
             let num_rows = row_ids.len();
             for id in row_ids {
                 res.set(id as usize, true);
