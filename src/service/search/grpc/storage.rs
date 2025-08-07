@@ -43,6 +43,7 @@ use infra::{
     errors::{Error, ErrorCodes},
 };
 use itertools::Itertools;
+use roaring::RoaringBitmap;
 use tantivy::Directory;
 use tokio::sync::Semaphore;
 use tokio_stream::StreamExt as _;
@@ -54,7 +55,7 @@ use crate::service::{
         datafusion::exec,
         generate_search_schema_diff,
         grpc::{
-            tantivy_result_cache,
+            tantivy_result_cache::{self, CacheEntry},
             utils::{self, TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
         },
         index::IndexCondition,
@@ -1082,6 +1083,7 @@ async fn search_tantivy_index(
     .await??;
 
     let key = parquet_file.key.to_string();
+    let mut percent = 0;
     let result = match res {
         TantivyResult::Count(count) => TantivyResult::Count(count),
         TantivyResult::Histogram(histogram) => TantivyResult::Histogram(histogram),
@@ -1101,6 +1103,7 @@ async fn search_tantivy_index(
                     TantivyResult::RowIdsBitVec(row_ids_percent as usize, BitVec::EMPTY),
                 ));
             }
+            percent = row_ids_percent as usize;
             let max_doc_id = *row_ids.iter().max().unwrap_or(&0) as i64;
             let mut res = BitVec::repeat(false, max_doc_id as usize + 1);
             if max_doc_id >= parquet_file.meta.records {
@@ -1125,7 +1128,8 @@ async fn search_tantivy_index(
     if cfg.common.inverted_index_result_cache_enabled
         && result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
     {
-        tantivy_result_cache::TANTIVY_RESULT_CACHE.put(cache_key, result.clone());
+        let entry = get_cache_entry(result.clone(), percent as f64);
+        tantivy_result_cache::TANTIVY_RESULT_CACHE.put(cache_key, entry);
     }
     Ok((key, result))
 }
@@ -1265,6 +1269,35 @@ fn repartition_sorted_groups(
     }
 
     groups
+}
+
+fn get_cache_entry(tantivy_result: TantivyResult, percent: f64) -> CacheEntry {
+    match tantivy_result {
+        TantivyResult::RowIdsBitVec(num_rows, bitvec) => {
+            // if the percent is less than 1.0, we use roaring bitmap to store the row ids
+            // otherwise, we use bitvec to store the row ids.
+            // because the bitvec is not efficient for small percent, and the roaring bitmap is not
+            // efficient for large percent.
+            if percent < 1.0 {
+                let mut roaring = RoaringBitmap::new();
+                for (i, bit) in bitvec.into_iter().enumerate() {
+                    if bit {
+                        roaring.insert(i as u32);
+                    }
+                }
+                CacheEntry::RowIdsRoaring(num_rows, roaring)
+            } else {
+                CacheEntry::RowIdsBitVec(num_rows, bitvec)
+            }
+        }
+        TantivyResult::Count(count) => CacheEntry::Count(count),
+        TantivyResult::Histogram(histogram) => CacheEntry::Histogram(histogram),
+        TantivyResult::TopN(top_n) => CacheEntry::TopN(top_n),
+        TantivyResult::Distinct(distinct) => CacheEntry::Distinct(distinct),
+        TantivyResult::RowIds(_) => {
+            unreachable!("unsupported tantivy search result in search_tantivy_index")
+        }
+    }
 }
 
 #[cfg(test)]

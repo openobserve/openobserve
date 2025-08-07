@@ -13,19 +13,54 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::VecDeque, sync::Arc};
+use std::{
+    collections::{HashSet, VecDeque},
+    sync::Arc,
+};
 
+use config::meta::bitvec::BitVec;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
+use roaring::RoaringBitmap;
 
 use crate::service::search::grpc::utils::TantivyResult;
 
 pub static TANTIVY_RESULT_CACHE: Lazy<Arc<TantivyResultCache>> =
     Lazy::new(|| Arc::new(TantivyResultCache::default()));
 
+#[derive(Debug, Clone)]
+pub enum CacheEntry {
+    RowIdsBitVec(usize, BitVec),
+    RowIdsRoaring(usize, RoaringBitmap),
+    Count(usize),              // simple count optimization
+    Histogram(Vec<u64>),       // simple histogram optimization
+    TopN(Vec<(String, u64)>),  // simple top n optimization
+    Distinct(HashSet<String>), // simple distinct optimization
+}
+
+impl From<CacheEntry> for TantivyResult {
+    fn from(entry: CacheEntry) -> Self {
+        match entry {
+            CacheEntry::RowIdsBitVec(num_rows, bitvec) => {
+                TantivyResult::RowIdsBitVec(num_rows, bitvec)
+            }
+            CacheEntry::RowIdsRoaring(num_rows, roaring) => {
+                let mut bitvec = BitVec::repeat(false, roaring.max().unwrap_or(0) as usize + 1);
+                for i in roaring.iter() {
+                    bitvec.set(i as usize, true);
+                }
+                TantivyResult::RowIdsBitVec(num_rows, bitvec)
+            }
+            CacheEntry::Count(count) => TantivyResult::Count(count),
+            CacheEntry::Histogram(histogram) => TantivyResult::Histogram(histogram),
+            CacheEntry::TopN(top_n) => TantivyResult::TopN(top_n),
+            CacheEntry::Distinct(distinct) => TantivyResult::Distinct(distinct),
+        }
+    }
+}
 /// Cache created for storing the tantivy result
 pub struct TantivyResultCache {
-    readers: DashMap<String, TantivyResult>,
+    readers: DashMap<String, CacheEntry>,
     cacher: parking_lot::Mutex<VecDeque<String>>,
     max_entries: usize,
 }
@@ -40,10 +75,12 @@ impl TantivyResultCache {
     }
 
     pub fn get(&self, key: &str) -> Option<TantivyResult> {
-        self.readers.get(key).map(|r| r.value().clone())
+        let entry = { self.readers.get(key).map(|r| r.value().clone()) };
+
+        entry.map(TantivyResult::from)
     }
 
-    pub fn put(&self, key: String, value: TantivyResult) -> Option<TantivyResult> {
+    pub fn put(&self, key: String, value: CacheEntry) -> Option<CacheEntry> {
         let mut w = self.cacher.lock();
         if w.len() >= self.max_entries {
             // release 10% of the cache
@@ -79,44 +116,44 @@ mod tests {
 
     use super::*;
 
-    fn create_test_tantivy_result() -> TantivyResult {
-        let mut row_ids = HashSet::new();
-        row_ids.insert(1);
-        row_ids.insert(3);
-        row_ids.insert(5);
-        TantivyResult::RowIds(row_ids)
+    fn create_test_tantivy_result() -> CacheEntry {
+        let mut bitvec = BitVec::repeat(false, 100);
+        bitvec.set(10, true);
+        bitvec.set(20, true);
+        bitvec.set(30, true);
+        CacheEntry::RowIdsBitVec(3, bitvec)
     }
 
-    fn create_test_count_result() -> TantivyResult {
-        TantivyResult::Count(42)
+    fn create_test_count_result() -> CacheEntry {
+        CacheEntry::Count(42)
     }
 
-    fn create_test_histogram_result() -> TantivyResult {
-        TantivyResult::Histogram(vec![10, 20, 30, 40])
+    fn create_test_histogram_result() -> CacheEntry {
+        CacheEntry::Histogram(vec![10, 20, 30, 40])
     }
 
-    fn create_test_top_n_result() -> TantivyResult {
-        TantivyResult::TopN(vec![
+    fn create_test_top_n_result() -> CacheEntry {
+        CacheEntry::TopN(vec![
             ("key1".to_string(), 100),
             ("key2".to_string(), 200),
             ("key3".to_string(), 300),
         ])
     }
 
-    fn create_test_distinct_result() -> TantivyResult {
+    fn create_test_distinct_result() -> CacheEntry {
         let mut distinct = HashSet::new();
         distinct.insert("value1".to_string());
         distinct.insert("value2".to_string());
         distinct.insert("value3".to_string());
-        TantivyResult::Distinct(distinct)
+        CacheEntry::Distinct(distinct)
     }
 
-    fn create_test_bitvec_result() -> TantivyResult {
+    fn create_test_bitvec_result() -> CacheEntry {
         let mut bitvec = BitVec::repeat(false, 100);
         bitvec.set(10, true);
         bitvec.set(20, true);
         bitvec.set(30, true);
-        TantivyResult::RowIdsBitVec(3, bitvec)
+        CacheEntry::RowIdsBitVec(3, bitvec)
     }
 
     #[test]
@@ -135,7 +172,10 @@ mod tests {
         cache.put(key.clone(), result.clone());
         let retrieved = cache.get(&key);
         assert!(retrieved.is_some());
-        assert!(matches!(retrieved.unwrap(), TantivyResult::RowIds(_)));
+        assert!(matches!(
+            retrieved.unwrap(),
+            TantivyResult::RowIdsBitVec(_, _)
+        ));
     }
 
     #[test]
@@ -199,7 +239,7 @@ mod tests {
         let old_entry = cache.put(key.clone(), result2.clone());
 
         assert!(old_entry.is_some());
-        if let Some(TantivyResult::Count(count)) = old_entry {
+        if let Some(CacheEntry::Count(count)) = old_entry {
             assert_eq!(count, 42);
         } else {
             panic!("Expected Count result");
@@ -308,28 +348,6 @@ mod tests {
     fn test_tantivy_result_cache_different_result_types() {
         let cache = TantivyResultCache::new(10);
 
-        let mut row_ids = HashSet::new();
-        row_ids.insert(1);
-        row_ids.insert(2);
-        let row_ids_result = TantivyResult::RowIds(row_ids.clone());
-        cache.put("row_ids_key".to_string(), row_ids_result.clone());
-
-        if let Some(TantivyResult::RowIds(retrieved_row_ids)) = cache.get("row_ids_key") {
-            assert_eq!(retrieved_row_ids, row_ids);
-        } else {
-            panic!("Expected RowIds result");
-        }
-
-        let bitvec_result = create_test_bitvec_result();
-        cache.put("bitvec_key".to_string(), bitvec_result.clone());
-
-        if let Some(TantivyResult::RowIdsBitVec(percent, bitvec)) = cache.get("bitvec_key") {
-            assert_eq!(percent, 3);
-            assert_eq!(bitvec.len(), 100);
-        } else {
-            panic!("Expected RowIdsBitVec result");
-        }
-
         let distinct_result = create_test_distinct_result();
         cache.put("distinct_key".to_string(), distinct_result.clone());
 
@@ -379,7 +397,7 @@ mod tests {
         let mut bitvec = BitVec::repeat(false, 100);
         bitvec.set(10, true);
         bitvec.set(20, true);
-        let bitvec_result = TantivyResult::RowIdsBitVec(25, bitvec);
+        let bitvec_result = CacheEntry::RowIdsBitVec(25, bitvec);
 
         cache.put("percent_key".to_string(), bitvec_result);
 
