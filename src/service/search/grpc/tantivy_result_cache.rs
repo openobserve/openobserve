@@ -119,8 +119,8 @@ impl TantivyResultCache {
             // release 10% of the cache
             for _ in 0..(std::cmp::max(1, self.max_entries / 10)) {
                 if let Some(k) = w.pop_front() {
-                    if let Some((_, entry)) = self.readers.remove(&k) {
-                        memory_usage += entry.get_memory_size();
+                    if let Some((key, entry)) = self.readers.remove(&k) {
+                        memory_usage += entry.get_memory_size() + 2 * key.capacity();
                     }
                 } else {
                     break;
@@ -133,7 +133,7 @@ impl TantivyResultCache {
         w.push_back(key.clone());
         drop(w);
         // update metrics
-        let memory_usage = value.get_memory_size();
+        let memory_usage = value.get_memory_size() + 2 * key.capacity();
         metrics::TANTIVY_RESULT_CACHE_MEMORY_USAGE
             .with_label_values(&[])
             .add(memory_usage as i64);

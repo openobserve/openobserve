@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashSet, hash_map::DefaultHasher},
-    hash::{Hash, Hasher},
-    sync::Arc,
-};
+use std::{collections::HashSet, sync::Arc};
 
 use anyhow::Context;
 use arrow_schema::Schema;
@@ -946,11 +942,12 @@ async fn search_tantivy_index(
     };
 
     let cfg = get_config();
-    let cache_key = generate_cache_key(&index_condition, &idx_optimize_rule, parquet_file);
+    let mut cache_key = String::new();
     if cfg.common.inverted_index_result_cache_enabled {
         metrics::TANTIVY_RESULT_CACHE_REQUESTS_TOTAL
             .with_label_values(&[])
             .inc();
+        cache_key = generate_cache_key(&index_condition, &idx_optimize_rule, parquet_file);
         if let Some(result) = tantivy_result_cache::TANTIVY_RESULT_CACHE.get(&cache_key) {
             metrics::TANTIVY_RESULT_CACHE_HITS_TOTAL
                 .with_label_values(&[])
@@ -1133,6 +1130,7 @@ async fn search_tantivy_index(
 
     // cache the result if the memory size is less than the limit
     if cfg.common.inverted_index_result_cache_enabled
+        && !cache_key.is_empty()
         && (result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
             || percent < 1.0)
     {
@@ -1313,11 +1311,15 @@ fn generate_cache_key(
     idx_optimize_rule: &Option<IndexOptimizeMode>,
     parquet_file: &FileKey,
 ) -> String {
-    let mut hasher = DefaultHasher::new();
-    index_condition.hash(&mut hasher);
-    idx_optimize_rule.hash(&mut hasher);
-    parquet_file.key.hash(&mut hasher);
-    format!("{:x}", hasher.finish())
+    let condition = match index_condition {
+        Some(condition) => condition.to_query(),
+        None => return String::new(),
+    };
+    let rule = match idx_optimize_rule {
+        Some(rule) => rule.to_rule_string(),
+        None => return String::new(),
+    };
+    format!("{}_{}_{}", condition, rule, parquet_file.key)
 }
 
 #[cfg(test)]
