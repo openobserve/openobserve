@@ -285,6 +285,21 @@ export const cleanupTest = (wrapper: any) => {
     wrapper.unmount();
   }
   vi.clearAllMocks();
+  
+  // Clear any pending timers that Quasar might have set
+  vi.clearAllTimers();
+  
+  // Ensure any pending DOM operations are completed
+  if (typeof global !== 'undefined' && global.document) {
+    // Clear any pending timeouts/intervals that might be left by Quasar
+    const timeoutId = setTimeout(() => {}, 0);
+    clearTimeout(timeoutId);
+    
+    // Force cleanup of any pending microtasks
+    return Promise.resolve().then(() => {
+      // Additional cleanup if needed
+    });
+  }
 };
 
 // Common test assertions - these are just helper functions, expect should be imported in test files
