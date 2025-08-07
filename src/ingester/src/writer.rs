@@ -204,6 +204,44 @@ pub async fn flush_all() -> Result<()> {
     Ok(())
 }
 
+/// Collect WAL file metrics from in-memory structures
+/// Counts both active WAL files (in WRITERS) and rotated WAL files (in IMMUTABLES)
+pub async fn collect_wal_metrics() -> Result<()> {
+    use config::metrics;
+    use hashbrown::HashMap;
+
+    // Count WAL files by org_id and stream_type
+    let mut wal_counts: HashMap<(Arc<str>, Arc<str>), i64> = HashMap::new();
+
+    // Count active WAL files from WRITERS
+    for w in WRITERS.iter() {
+        let w = w.read().await;
+        for writer in w.values() {
+            let key = (writer.key.org_id.clone(), writer.key.stream_type.clone());
+            *wal_counts.entry(key).or_insert(0) += 1;
+        }
+    }
+
+    // Count rotated WAL files from IMMUTABLES
+    {
+        let immutables = IMMUTABLES.read().await;
+        for immutable in immutables.values() {
+            let writer_key = immutable.get_key();
+            let key = (writer_key.org_id.clone(), writer_key.stream_type.clone());
+            *wal_counts.entry(key).or_insert(0) += 1;
+        }
+    }
+
+    // Update metrics with current counts
+    for ((org_id, stream_type), count) in wal_counts {
+        metrics::INGEST_WAL_FILES
+            .with_label_values(&[&org_id, &stream_type])
+            .set(count);
+    }
+
+    Ok(())
+}
+
 impl Writer {
     pub(crate) fn new(idx: usize, key: WriterKey) -> Arc<Writer> {
         let now = Utc::now().timestamp_micros();

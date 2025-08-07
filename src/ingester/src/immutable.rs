@@ -71,6 +71,10 @@ impl Immutable {
         Self { idx, key, memtable }
     }
 
+    pub(crate) fn get_key(&self) -> &WriterKey {
+        &self.key
+    }
+
     pub(crate) async fn persist(&self, wal_path: &PathBuf) -> Result<PersistStat> {
         let mut persist_stat = PersistStat::default();
         // 1. dump memtable to disk
