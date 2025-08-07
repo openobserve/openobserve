@@ -13,29 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod actions;
-pub mod ai;
-pub mod alerts;
-pub mod bitvec;
-pub mod cluster;
-pub mod dashboards;
-pub mod destinations;
-pub mod folder;
-pub mod function;
-pub mod inverted_index;
-pub mod logger;
-pub mod meta_store;
-pub mod organization;
-pub mod otlp;
-pub mod pipeline;
-pub mod plan;
-pub mod promql;
-pub mod ratelimit;
-pub mod search;
-pub mod self_reporting;
-pub mod short_url;
-pub mod sql;
-pub mod stream;
-pub mod timed_annotations;
-pub mod triggers;
-pub mod user;
+use sea_orm::entity::prelude::*;
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[sea_orm(table_name = "system_prompts")]
+pub struct Model {
+    #[sea_orm(
+        primary_key,
+        column_type = "String(StringLen::N(27))",
+        unique,
+        not_null
+    )]
+    pub r#type: String,
+    #[sea_orm(column_type = "Text", not_null)]
+    pub content: String,
+    pub updated_at: i64,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
+
+impl ActiveModelBehavior for ActiveModel {}

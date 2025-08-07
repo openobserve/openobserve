@@ -16,6 +16,8 @@
 use config::cluster::LOCAL_NODE;
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::common::config::get_config as get_enterprise_config;
+#[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
 use regex::Regex;
 
@@ -181,6 +183,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(
         async move { o2_enterprise::enterprise::domain_management::db::watch().await },
     );
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { db::ai_prompts::watch().await });
 
     // pipeline not used on compactors
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
@@ -230,6 +234,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::domain_management::db::cache()
         .await
         .expect("domain management cache failed");
+    #[cfg(feature = "enterprise")]
+    db::ai_prompts::cache()
+        .await
+        .expect("ai prompts cache failed");
 
     infra_file_list::create_table_index().await?;
     infra_file_list::LOCAL_CACHE.create_table_index().await?;
@@ -247,6 +255,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         if let Err(e) = std::fs::create_dir_all(&cfg.common.data_wal_dir) {
             log::error!("Failed to create wal dir: {e}");
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_querier() && get_enterprise_config().ai.enabled {
+        tokio::task::spawn(async move {
+            o2_enterprise::enterprise::ai::prompt::prompts::load_system_prompt()
+                .await
+                .expect("load system prompt failed");
+        });
     }
 
     tokio::task::spawn(files::run());
