@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod action_scripts;
+mod ai_prompt;
 mod alerts;
 mod cipher_keys;
 mod compactor_manual_jobs;
@@ -38,9 +39,9 @@ mod user;
 
 use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
-    ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, FoldersQueue, MetaQueue,
-    OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue,
-    SuperClusterQueueTrait, TemplatesQueue,
+    ActionScriptsQueue, AiSystemPromptQueue, AlertsQueue, DashboardsQueue, DestinationsQueue,
+    FoldersQueue, MetaQueue, OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue,
+    SearchJobsQueue, SuperClusterQueueTrait, TemplatesQueue,
 };
 
 /// Creates a super cluster queue for each super cluster topic and begins
@@ -100,6 +101,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_meta_msg: meta::process,
         on_orgs_msg: organization::process,
     };
+    let ai_prompt_queue = AiSystemPromptQueue {
+        on_prompt_update_msg: ai_prompt::process,
+    };
 
     let queues: Vec<Box<dyn SuperClusterQueueTrait + Sync + Send>> = vec![
         Box::new(meta_queue),
@@ -114,6 +118,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(action_scripts_queue),
         Box::new(scheduler_queue),
         Box::new(org_users_queue),
+        Box::new(ai_prompt_queue),
     ];
 
     for queue in queues {
