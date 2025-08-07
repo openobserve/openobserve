@@ -224,9 +224,13 @@ pub async fn search(
 
     // release lock when search done or get error
     let trace_id_move = trace_id.to_string();
+    let org_id_move = sql.org_id.clone();
     #[cfg(not(feature = "enterprise"))]
     let _defer = AsyncDefer::new({
         async move {
+            metrics::QUERY_RUNNING_NUMS
+                .with_label_values(&[&org_id_move])
+                .dec();
             // search done, release lock
             let _ = dist_lock::unlock_with_trace_id(&trace_id_move, &locker)
                 .await
@@ -245,6 +249,9 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     let _defer = AsyncDefer::new({
         async move {
+            metrics::QUERY_RUNNING_NUMS
+                .with_label_values(&[&org_id_move])
+                .dec();
             // search done, release lock
             let _ = work_group
                 .as_ref()
