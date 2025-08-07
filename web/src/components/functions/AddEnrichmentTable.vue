@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="col-12 q-py-md showLabelOnTop lookup-table-file-uploader"
             stack-label
             outlined
+            accept=".csv"
             dense
             :rules="[(val: any) => !!val || 'CSV File is required!']"
           >
