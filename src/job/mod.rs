@@ -42,6 +42,8 @@ pub(crate) mod files;
 mod flatten_compactor;
 pub mod metrics;
 mod mmdb_downloader;
+#[cfg(feature = "enterprise")]
+pub(crate) mod pipeline;
 mod promql;
 mod promql_self_consume;
 mod stats;
@@ -255,6 +257,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(promql::run());
     tokio::task::spawn(alert_manager::run());
     tokio::task::spawn(file_downloader::run());
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { pipeline::run().await });
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());
