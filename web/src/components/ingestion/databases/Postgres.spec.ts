@@ -39,8 +39,8 @@ describe("Postgres", () => {
     wrapper = createTestWrapper(Postgres, defaultTestProps);
   });
 
-  afterEach(() => {
-    cleanupTest(wrapper);
+  afterEach(async () => {
+    await cleanupTest(wrapper);
   });
 
   it("should mount successfully", () => {
