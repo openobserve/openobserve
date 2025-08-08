@@ -609,6 +609,7 @@ export default defineComponent({
       showEnrichmentSchema,
       listSchema,
       selectedEnrichmentTable,
+      getTimeRange,
     };
   },
   computed: {
