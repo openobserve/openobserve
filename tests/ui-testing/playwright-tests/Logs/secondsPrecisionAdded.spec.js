@@ -1,6 +1,7 @@
 // Implementation test.spec.js
 import { test, expect } from "../baseFixtures.js";
-import PageManager from '../../pages/page-manager.js';
+// (duplicate import removed)
+import PageManager from "../../pages/page-manager.js";
 
 import { startTimeValue, endTimeValue } from '../../pages/commonActions.js';
 
@@ -20,6 +21,8 @@ test('Relative Seconds on Logs page', async ({ page }) => {
   await pageManager.logsPage.verifyTimeSetTo30Seconds();
   await pageManager.logsPage.signOut();
 });
+
+// no afterEach hook
 
 
 

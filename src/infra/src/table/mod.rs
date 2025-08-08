@@ -25,6 +25,7 @@ use crate::{
 pub mod action_scripts;
 pub mod alerts;
 pub mod cipher;
+pub mod compactor_manual_jobs;
 pub mod dashboards;
 pub mod destinations;
 pub mod distinct_values;
@@ -41,6 +42,7 @@ pub mod reports;
 pub mod search_job;
 pub mod search_queue;
 pub mod short_urls;
+pub mod system_prompts;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
