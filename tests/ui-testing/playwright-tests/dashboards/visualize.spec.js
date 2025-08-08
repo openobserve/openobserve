@@ -585,13 +585,10 @@ test.describe(" visualize UI testcases", () => {
   test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
     page,
   }) => {
-    // Focus on the text editor and replace existing text with the SQL query
-    const textEditor = page.locator(".view-line").first();
-    await textEditor.click();
-
-    // Clear the existing text and input the new SQL query
-    // await textEditor.fill('');
-    await textEditor.type(largeDatasetSqlQuery);
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(largeDatasetSqlQuery);
 
     // Apply the time filter and refresh the search
     await page.locator('[data-test="date-time-btn"]').click();
@@ -625,10 +622,10 @@ test.describe(" visualize UI testcases", () => {
       ? streamNameMatch[1]
       : STREAM_NAME;
 
-    // Focus on the text editor and input the SQL query
-    const textEditor = page.locator(".view-line").first();
-    await textEditor.click();
-    await textEditor.type(largeDatasetSqlQuery);
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(largeDatasetSqlQuery);
 
     // Apply the time filter and refresh the search
     await page.locator('[data-test="date-time-btn"]').click();
@@ -696,13 +693,10 @@ test.describe(" visualize UI testcases", () => {
       ? streamNameMatch[1]
       : STREAM_NAME;
 
-    // Focus on the text editor and paste the SQL query
-    const textEditor = page.locator(".view-line").first();
-    await textEditor.click();
-
-    // Clear any existing content and paste the complete SQL query
-    // await page.keyboard.press("Control+A"); // Select all existing content
-    await page.keyboard.type(largeDatasetSqlQuery); // Type the complete query
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(largeDatasetSqlQuery);
 
     // Apply the time filter and refresh the search
     await page.locator('[data-test="date-time-btn"]').click();
@@ -742,10 +736,10 @@ test.describe(" visualize UI testcases", () => {
   });
   // Helper function to setup aggregation query test
   async function setupAggregationQueryTest(page) {
-    const textEditor = page.locator(".view-line").first();
-    await textEditor.click();
-    await page.keyboard.press("Control+A");
-    await page.keyboard.type(largeDatasetSqlQuery);
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(largeDatasetSqlQuery);
 
     // Apply time filter and search
     await page.locator('[data-test="date-time-btn"]').click();
@@ -902,10 +896,10 @@ test.describe(" visualize UI testcases", () => {
     page,
   }) => {
     // await setupHistogramQueryTest(page);
-    const textEditor = page.locator(".view-line").first();
-    await textEditor.click();
-    await page.keyboard.press("Control+A");
-    await page.keyboard.type(histogramQuery);
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(histogramQuery);
 
     // Apply time filter and search
     await page.locator('[data-test="date-time-btn"]').click();
@@ -940,11 +934,10 @@ test.describe(" visualize UI testcases", () => {
       ? streamNameMatch[1]
       : STREAM_NAME;
 
-    // Focus on the text editor and paste the SQL query
-    const textEditor = page.locator(".view-line").first();
-    await textEditor.click();
-
-    await page.keyboard.type(largeDatasetSqlQuery);
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(largeDatasetSqlQuery);
 
     // Apply the time filter and refresh the search
     await page.locator('[data-test="date-time-btn"]').click();
@@ -999,11 +992,10 @@ test.describe(" visualize UI testcases", () => {
       ? streamNameMatch[1]
       : STREAM_NAME;
 
-    // Focus on the text editor and paste the SQL query
-    const textEditor = page.locator(".view-line").first();
-    await textEditor.click();
-
-    await page.keyboard.type(histogramQuery);
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(histogramQuery);
 
     // Apply the time filter and refresh the search
     await page.locator('[data-test="date-time-btn"]').click();
