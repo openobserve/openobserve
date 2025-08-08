@@ -88,7 +88,7 @@ pub fn get_index_condition_from_expr(
 }
 
 // note the condition in IndexCondition is connection by AND operator
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize, Hash)]
 pub struct IndexCondition {
     pub conditions: Vec<Condition>,
 }
@@ -268,7 +268,7 @@ impl IndexCondition {
 }
 
 // single condition
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum Condition {
     // field, value
     Equal(String, String),
