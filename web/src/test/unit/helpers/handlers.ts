@@ -36,11 +36,11 @@ export const restHandlers = [
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/functions`,
     ({ request }) => {
       const url = new URL(request.url);
-      const pageNum = url.searchParams.get("page_num");
-      const pageSize = url.searchParams.get("page_size");
-      const sortBy = url.searchParams.get("sort_by");
-      const desc = url.searchParams.get("desc");
-      const name = url.searchParams.get("name");
+      const pageNum = url.searchParams.get('page_num');
+      const pageSize = url.searchParams.get('page_size');
+      const sortBy = url.searchParams.get('sort_by');
+      const desc = url.searchParams.get('desc');
+      const name = url.searchParams.get('name');
       
       return HttpResponse.json({
         list: [
