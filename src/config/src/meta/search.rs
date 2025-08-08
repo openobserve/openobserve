@@ -230,6 +230,10 @@ pub struct Response {
     pub work_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_by: Option<OrderBy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub converted_histogram_query: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_histogram_eligible: Option<bool>,
 }
 
 /// Iterator for Streaming response of search `Response`
@@ -394,6 +398,8 @@ impl Response {
             result_cache_ratio: 0,
             work_group: None,
             order_by: None,
+            converted_histogram_query: None,
+            is_histogram_eligible: None,
         }
     }
 
@@ -513,6 +519,8 @@ pub struct SearchPartitionRequest {
     pub streaming_output: bool,
     #[serde(default)]
     pub histogram_interval: i64,
+    #[serde(default)]
+    pub search_type: Option<SearchEventType>,
 }
 
 impl SearchPartitionRequest {
@@ -546,6 +554,7 @@ impl From<&Request> for SearchPartitionRequest {
             query_fn: req.query.query_fn.clone(),
             streaming_output: req.query.streaming_output,
             histogram_interval: req.query.histogram_interval,
+            search_type: req.search_type,
         }
     }
 }
@@ -566,6 +575,8 @@ pub struct SearchPartitionResponse {
     pub streaming_output: bool,
     pub streaming_aggs: bool,
     pub streaming_id: Option<String>,
+    #[serde(default)]
+    pub is_histogram_eligible: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]

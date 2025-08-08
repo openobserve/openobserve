@@ -26,7 +26,7 @@ use config::{
     meta::{
         cluster::RoleGroup,
         function::RESULT_ARRAY,
-        search,
+        search::{self, SearchEventType},
         self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, TableReferenceExt, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
@@ -34,7 +34,7 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_distinct_query},
+        sql::{is_aggregate_query, is_eligible_for_histogram, is_simple_distinct_query},
         time::now_micros,
     },
 };
@@ -86,7 +86,12 @@ use crate::{
         },
     },
     handler::grpc::request::search::Searcher,
-    service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    service::search::{
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        sql::visitor::histogram_interval::{
+            convert_histogram_interval_to_seconds, generate_histogram_interval,
+        },
+    },
 };
 
 pub(crate) mod cache;
@@ -846,6 +851,8 @@ pub async fn search_partition(
     );
 
     let file_list_took = start.elapsed().as_millis() as usize;
+    let (is_histogram_eligible, _) = is_eligible_for_histogram(&req.sql).unwrap_or((false, false));
+
     log::info!(
         "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, took: {} ms",
         (req.start_time, req.end_time),
@@ -858,6 +865,7 @@ pub async fn search_partition(
         response.partitions.push([req.start_time, req.end_time]);
         response.max_query_range = max_query_range_in_hour;
         response.histogram_interval = sql.histogram_interval;
+        response.is_histogram_eligible = is_histogram_eligible;
         log::info!("[trace_id {trace_id}] search_partition: returning single partition");
         return Ok(response);
     };
@@ -904,6 +912,7 @@ pub async fn search_partition(
         streaming_aggs,
         #[cfg(feature = "enterprise")]
         streaming_id: streaming_id.clone(),
+        is_histogram_eligible,
     };
 
     let mut min_step = Duration::try_seconds(1)
@@ -911,10 +920,47 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        let hist_int = sql.histogram_interval.unwrap_or(0);
+        let hist_int = if let Some(hist_int) = sql.histogram_interval {
+            hist_int
+        } else {
+            let interval = generate_histogram_interval(Some((req.start_time, req.end_time)));
+            match convert_histogram_interval_to_seconds(&interval) {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "[trace_id {trace_id}] search_partition:
+        convert_histogram_interval_to_seconds error: {:?}",
+                        e
+                    );
+                    10
+                }
+            }
+        };
         // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
         if hist_int > 0 {
             min_step *= hist_int;
+        }
+    }
+    // Only for UI search, we need to generate histogram interval
+    else if req.search_type.eq(&Some(SearchEventType::UI)) {
+        if let Some(hist_int) = sql.histogram_interval {
+            // convert seconds to microseconds
+            min_step = hist_int * 1_000_000;
+        } else {
+            let time_range = (req.start_time, req.end_time);
+            let interval = generate_histogram_interval(Some(time_range));
+            match convert_histogram_interval_to_seconds(&interval) {
+                Ok(v) => {
+                    // convert seconds to microseconds
+                    min_step = v * 1_000_000
+                }
+                Err(e) => {
+                    log::error!(
+                        "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {:?}",
+                        e
+                    );
+                }
+            }
         }
     }
 
@@ -964,7 +1010,17 @@ pub async fn search_partition(
         };
     }
 
-    let is_histogram = sql.histogram_interval.is_some();
+    let mut is_histogram = sql.histogram_interval.is_some();
+    let mut add_mini_partition = false;
+    // Set this to true to generate partitions aligned with interval
+    // only for logs page when query is non-histogram, so that logs can reuse the same partitions
+    // for histogram query
+    if !is_histogram && req.search_type.eq(&Some(SearchEventType::UI)) {
+        is_histogram = true;
+        // add mini partition for the histogram aligned partitions in the UI search
+        add_mini_partition = true;
+    }
+
     let sql_order_by = sql
         .order_by
         .first()
@@ -1004,6 +1060,7 @@ pub async fn search_partition(
         sql_order_by,
         is_streaming_aggregate,
         streaming_interval_micros,
+        add_mini_partition,
     );
 
     if sql_order_by == OrderBy::Asc {
@@ -1011,6 +1068,11 @@ pub async fn search_partition(
     }
 
     resp.partitions = partitions;
+    // Return histogram interval for UI search
+    if req.search_type.eq(&Some(SearchEventType::UI)) {
+        let min_step_secs = min_step / 1_000_000;
+        resp.histogram_interval = Some(min_step_secs);
+    }
     Ok(resp)
 }
 
@@ -1335,6 +1397,7 @@ pub async fn search_partition_multi(
     org_id: &str,
     user_id: &str,
     stream_type: StreamType,
+    search_type: SearchEventType,
     req: &search::MultiSearchPartitionRequest,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let mut res = search::SearchPartitionResponse::default();
@@ -1355,6 +1418,7 @@ pub async fn search_partition_multi(
                 query_fn: req.query_fn.clone(),
                 streaming_output: req.streaming_output,
                 histogram_interval: req.histogram_interval,
+                search_type: Some(search_type),
             },
             false,
             true,
@@ -1373,6 +1437,8 @@ pub async fn search_partition_multi(
         };
     }
     res.records = total_rec;
+    // Histogram is not eligible for multi-stream search
+    res.is_histogram_eligible = false;
     Ok(res)
 }
 
