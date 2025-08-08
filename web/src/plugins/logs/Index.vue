@@ -1317,6 +1317,20 @@ export default defineComponent({
       return parsedSQL;
     };
 
+    // Helper function to check if the query is a simple "SELECT * FROM stream_name" query
+    const isSimpleSelectAllQuery = (query: string): boolean => {
+      if (!query || typeof query !== 'string') return false;
+      
+      // Normalize the query by removing extra whitespace and converting to lowercase
+      const normalizedQuery = query.trim().toLowerCase().replace(/\s+/g, ' ');
+      
+      // Pattern to match: SELECT * FROM "stream_name" or SELECT * FROM stream_name
+      // Also handles UNION queries and optional WHERE clauses
+      const selectAllPattern = /^select\s+\*\s+from\s+["`]?[\w.-]+["`]?(\s+(where\s+.+|union\s+select\s+\*\s+from\s+["`]?[\w.-]+["`]?.*)?)?$/;
+      
+      return selectAllPattern.test(normalizedQuery);
+    };
+
     const handleQuickModeChange = () => {
       if (searchObj.meta.quickMode == true) {
         let field_list: string = "*";
@@ -1404,6 +1418,20 @@ export default defineComponent({
       async () => {
         try {
           if (searchObj.meta.logsVisualizeToggle == "visualize") {
+            // Enable quick mode automatically when switching to visualization if:
+            // 1. SQL mode is disabled OR 
+            // 2. Query is "SELECT * FROM some_stream" (simple select all query)
+            const shouldEnableQuickMode = 
+              !searchObj.meta.sqlMode || 
+              isSimpleSelectAllQuery(searchObj.data.query);
+            
+            if (shouldEnableQuickMode && !searchObj.meta.quickMode) {
+              searchObj.meta.quickMode = true;
+
+              // handle quick mode change
+              handleQuickModeChange();
+            }
+
             // close field list and splitter
             dashboardPanelData.layout.splitter = 0;
             dashboardPanelData.layout.showFieldList = false;
