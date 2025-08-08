@@ -26,12 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="top: 0; z-index: 1999; position: sticky"
     class="flex justify-start items-center header-bg bg-grey-2"
     :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
+    data-test="trace-header"
   >
     <div
       class="tw-relative flex justify-start items-center no-wrap row q-px-sm"
       :style="{
         width: splitterWidth + 'px',
       }"
+      data-test="trace-header-operation-name"
     >
       Operation Name
       <q-avatar
@@ -41,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon="drag_indicator"
         class="resize-btn"
         @mousedown="handleMouseDown"
+        data-test="trace-header-resize-btn"
       />
     </div>
     <div
@@ -48,19 +51,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{
         width: `calc(100% - ${splitterWidth}px)`,
       }"
+      data-test="trace-header-tics"
+      v-if="baseTracePosition && baseTracePosition.tics?.length"
     >
-      <div class="col-3 text-caption q-pl-md">
-        {{ baseTracePosition.tics[0].label }}
+      <div
+        class="col-3 text-caption q-pl-md"
+        data-test="trace-header-tic-label-0"
+      >
+        {{ baseTracePosition.tics?.[0]?.label || "" }}
       </div>
-      <div class="col-3 text-caption q-pl-xs">
-        {{ baseTracePosition.tics[1].label }}
+      <div
+        class="col-3 text-caption q-pl-xs"
+        data-test="trace-header-tic-label-1"
+      >
+        {{ baseTracePosition.tics?.[1]?.label || "" }}
       </div>
-      <div class="col-3 text-caption q-pl-xs">
-        {{ baseTracePosition.tics[2].label }}
+      <div
+        class="col-3 text-caption q-pl-xs"
+        data-test="trace-header-tic-label-2"
+      >
+        {{ baseTracePosition.tics?.[2]?.label || "" }}
       </div>
-      <div class="col-3 text-caption flex justify-between items-center q-px-xs">
-        <div>{{ baseTracePosition.tics[3].label }}</div>
-        <div>{{ baseTracePosition.tics[4].label }}</div>
+      <div
+        class="col-3 text-caption flex justify-between items-center q-px-xs"
+        data-test="trace-header-tic-label-3"
+      >
+        <div>{{ baseTracePosition.tics?.[3]?.label || "" }}</div>
+        <div>{{ baseTracePosition.tics?.[4]?.label || "" }}</div>
       </div>
       <div
         v-for="(tick, index) in baseTracePosition['tics']"
@@ -75,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           zIndex: index === 0 ? '5' : '1',
           height: '26px',
         }"
+        :data-test="`trace-header-tic-line-${index}`"
       ></div>
     </div>
   </div>
@@ -101,7 +119,7 @@ export default defineComponent({
     },
   },
   methods: {
-    handleMouseDown(event:any) {
+    handleMouseDown(event: any) {
       this.$emit("resize-start", event); // Pass the MouseEvent to the parent
     },
   },
@@ -135,7 +153,7 @@ $traceChartHeight: 250px;
 .header-bg {
   background-color: color-mix(in srgb, currentColor 5%, transparent);
 }
-.resize-btn{
+.resize-btn {
   position: absolute;
   right: -10px;
   top: -2px;
