@@ -1482,6 +1482,7 @@ mod tests {
             query_fn: Some("fn1".to_string()),
             streaming_output: false,
             histogram_interval: 0,
+            search_type: SearchEventType::UI,
         };
 
         req.decode().unwrap();
@@ -2091,6 +2092,7 @@ mod tests {
             streaming_output: true,
             streaming_aggs: false,
             streaming_id: Some("stream123".to_string()),
+            is_histogram_eligible: false,
         };
 
         response
