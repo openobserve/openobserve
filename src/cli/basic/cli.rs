@@ -149,6 +149,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 clap::Command::new("offline").about("offline node"),
                 clap::Command::new("online").about("online node"),
                 clap::Command::new("flush").about("flush memtable to disk"),
+                clap::Command::new("status").about("show node status"),
                 clap::Command::new("list").about("list cached nodes").args([
                     clap::Arg::new("metrics")
                         .short('m')
@@ -476,6 +477,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 }
                 Some(("flush", _)) => {
                     super::http::node_flush().await?;
+                }
+                Some(("status", _)) => {
+                    super::http::node_status().await?;
                 }
                 Some(("list", args)) => {
                     let metrics = args.get_flag("metrics");
