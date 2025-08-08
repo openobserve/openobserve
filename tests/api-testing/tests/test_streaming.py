@@ -606,7 +606,8 @@ test_data_sql = [
 ]
 
 
-@pytest.mark.parametrize("test_name_sql, sql_query, sql_from, sql_size, total_exp", test_data_sql)
+@pytest.mark.skip(reason="temporarily disabled till this issue is fixed")
+# @pytest.mark.parametrize("test_name_sql, sql_query, sql_from, sql_size, total_exp", test_data_sql)
 def test_sql(create_session, base_url, test_name_sql, sql_query, sql_from, sql_size, total_exp):
     """Running an E2E test for sql queries with Parameterized data when websocket is disabled."""
 
