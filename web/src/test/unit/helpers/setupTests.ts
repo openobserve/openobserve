@@ -62,6 +62,10 @@ vi.stubGlobal("server", server);
 
 global.document.queryCommandSupported = vi.fn().mockReturnValue(true);
 
+// Mock URL.createObjectURL and URL.revokeObjectURL for file download tests
+global.URL.createObjectURL = vi.fn().mockReturnValue('mock-object-url');
+global.URL.revokeObjectURL = vi.fn();
+
 beforeAll(() => server.listen())
 
 // Reset any request handlers after each test (for test isolation)
