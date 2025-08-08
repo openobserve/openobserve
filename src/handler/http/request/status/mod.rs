@@ -399,13 +399,13 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     stats.insert(
         "DATAFUSION",
         json::json!({"file_stat_cache": {
-            "file_num": file_statistics_cache::GLOBAL_CACHE.clone().len(),
-            "mem_size": file_statistics_cache::GLOBAL_CACHE.clone().memory_size()
+            "file_num": file_statistics_cache::GLOBAL_CACHE.len(),
+            "mem_size": file_statistics_cache::GLOBAL_CACHE.memory_size()
         }}),
     );
     stats.insert(
         "INVERTED_INDEX",
-        json::json!({"reader_cache": reader_cache::GLOBAL_CACHE.clone().len()}),
+        json::json!({"reader_cache": reader_cache::GLOBAL_CACHE.len()}),
     );
 
     #[cfg(feature = "enterprise")]

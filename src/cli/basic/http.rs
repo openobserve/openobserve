@@ -127,11 +127,14 @@ pub async fn node_status() -> Result<(), anyhow::Error> {
     };
     let response: serde_json::Value = serde_json::from_str(&body)?;
     let response = config::utils::flatten::flatten(response)?;
+    let Some(response) = response.as_object() else {
+        return Err(anyhow::anyhow!("node status failed"));
+    };
 
     // Create header row with all column names
     let mut table = Table::new();
     table.add_row(Row::new(vec![Cell::new("KEY"), Cell::new("VALUE")]));
-    for (key, value) in response.as_object().unwrap().iter() {
+    for (key, value) in response.iter() {
         table.add_row(Row::new(vec![
             Cell::new(key),
             Cell::new(&value.to_string()),

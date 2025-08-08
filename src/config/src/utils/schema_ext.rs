@@ -80,7 +80,7 @@ impl SchemaExt for Schema {
     }
 
     fn size(&self) -> usize {
-        let mut size = std::mem::size_of::<&arrow_schema::Fields>();
+        let mut size = std::mem::size_of::<arrow_schema::Fields>();
         size += self.fields.iter().fold(0, |acc, field| acc + field.size());
         size += std::mem::size_of::<HashMap<String, String>>();
         for (key, val) in self.metadata.iter() {
