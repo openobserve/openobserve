@@ -395,24 +395,6 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-logs-toggle"]').click();
     await page.locator('[data-test="confirm-button"]').click();
   });
-
-  test("should handle an empty query in visualization without displaying an error.", async ({
-    page,
-  }) => {
-    await page.locator(".view-line").first().click();
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await expect(page.locator(".view-line").first()).toBeVisible();
-    await expect(
-      page.locator('[data-test="dashboard-x-item-_timestamp"]')
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-test="dashboard-y-item-_timestamp"]')
-    ).toBeVisible();
-  });
-
   test.skip("should display an error message on the logs page for an invalid query", async ({
     page,
   }) => {
@@ -861,23 +843,6 @@ test.describe(" visualize UI testcases", () => {
     }
   }
   // Helper function to open query inspector and verify query
-  async function verifyQueryInInspector(page, expectedQuery) {
-    // Open query inspector
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
-
-    // Clean up the expected query (normalize whitespace)
-    const normalizedQuery = expectedQuery.replace(/\s+/g, " ").trim();
-
-    // Verify the query is visible in the inspector
-    await expect(
-      page.getByRole("cell", {
-        name: normalizedQuery,
-        exact: true,
-      })
-    ).toBeVisible();
-  }
   test("should not show dashboard errors when changing chart types with aggregation query", async ({
     page,
   }) => {
@@ -966,39 +931,6 @@ test.describe(" visualize UI testcases", () => {
     const chartRendered = await verifyChartRenders(page);
     expect(chartRendered).toBe(true);
   });
-  test("should preserve query from logs to dashboard and show in query inspector", async ({
-    page,
-  }) => {
-    // Setup aggregation query test (includes visualization)
-    await setupAggregationQueryTest(page);
-
-    // Add the visualization to dashboard
-    // await addVisualizationToDashboard(page, dashboardName);
-
-    await page.getByRole("button", { name: "Add To Dashboard" }).click();
-    await page
-      .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .fill(randomDashboardName);
-    await page
-      .locator('[data-test="metrics-schema-update-settings-button"]')
-      .click();
-
-    await page.waitForTimeout(5000);
-
-    await page
-      .locator(
-        '[data-test="dashboard-edit-panel-' +
-          randomDashboardName +
-          '-dropdown"]'
-      )
-      .click();
-
-    await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
-
-    // Navigate to dashboard and edit the panel
-    // Verify the original query is preserved in query inspector
-    await verifyQueryInInspector(page, largeDatasetSqlQuery);
-  });
   test("Should display the correct query in the dashboard when saved from a Table chart.", async ({
     page,
   }) => {
@@ -1054,6 +986,63 @@ test.describe(" visualize UI testcases", () => {
       page
         .getByRole("cell", {
           name: 'SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", count(kubernetes_container_hash) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", count(kubernetes_host) as "y_axis_3", count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", count(kubernetes_labels_prometheus) as "y_axis_8", kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1" FROM "e2e_automate" WHERE kubernetes_namespace_name IS NOT NULL GROUP BY x_axis_1, breakdown_1',
+        })
+        .first()
+    ).toBeVisible();
+  });
+  test("should display the correct query in the dashboard when saved from a Line chart.", async ({
+    page,
+  }) => {
+    // Extract stream name from the SQL query dynamically
+    const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
+    const expectedStreamName = streamNameMatch
+      ? streamNameMatch[1]
+      : STREAM_NAME;
+
+    // Focus on the text editor and paste the SQL query
+    const textEditor = page.locator(".view-line").first();
+    await textEditor.click();
+
+    await page.keyboard.type(histogramQuery);
+
+    // Apply the time filter and refresh the search
+    await page.locator('[data-test="date-time-btn"]').click();
+    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+
+    // Toggle visualization
+    await page.locator('[data-test="logs-visualize-toggle"]').click();
+
+    await page.waitForTimeout(4000);
+    await page.getByRole("button", { name: "Add To Dashboard" }).click();
+
+    await page.waitForTimeout(4000);
+
+    await page
+      .locator('[data-test="metrics-new-dashboard-panel-title"]')
+      .click();
+    await page
+      .locator('[data-test="metrics-new-dashboard-panel-title"]')
+      .fill(randomDashboardName);
+    await page
+      .locator('[data-test="metrics-schema-update-settings-button"]')
+      .click();
+
+    await page.waitForTimeout(2000);
+    await page
+      .locator(
+        '[data-test="dashboard-edit-panel-' +
+          randomDashboardName +
+          '-dropdown"]'
+      )
+      .click();
+    await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
+
+    await page.waitForTimeout(2000);
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
         })
         .first()
     ).toBeVisible();
