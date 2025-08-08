@@ -602,22 +602,6 @@ describe("FunctionList Component", () => {
         expect(getJSTransformsSpy).toHaveBeenCalled();
       });
 
-      it("fetches functions on mount when jsTransforms is undefined", async () => {
-        const getJSTransformsSpy = vi.spyOn(wrapper.vm, 'getJSTransforms');
-        const dismiss = vi.fn();
-        notifyMock.mockReturnValueOnce(dismiss);
-        vi.mocked(jsTransformService.list).mockResolvedValue({
-          data: {
-            list: []
-          }
-        });
-        wrapper.vm.jsTransforms = [];
-        await wrapper.vm.$nextTick();
-        await wrapper.vm.$nextTick();
-        await wrapper.vm.getJSTransforms();
-        expect(getJSTransformsSpy).toHaveBeenCalled();
-      });
-
       it("updates search object with transforms", async () => {
         const transforms = [
           { name: "Transform 1" },

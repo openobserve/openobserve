@@ -274,7 +274,7 @@ describe('EnrichmentTableList Component', () => {
 
     it('deletes table successfully', async () => {
       const mockDelete = vi.fn().mockResolvedValue({ data: { code: 200 } });
-      vi.mocked(streamService.delete).mockImplementation(mockDelete);
+      vi.mocked(streamService.delete).mockImplementationOnce(mockDelete);
 
       await wrapper.vm.deleteLookupTable();
       await flushPromises();

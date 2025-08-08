@@ -39,8 +39,13 @@ vi.mock("@/services/jstransform", () => ({
 // Mock the search service
 vi.mock("@/services/search", () => ({
   default: {
-    search: vi.fn(() => Promise.reject({
-      response: { data: { message: "Invalid SQL Query" } }
+    search: vi.fn(() => Promise.resolve({
+      data: {
+        hits: [
+          { field1: "value1" },
+          { field2: "value2" }
+        ]
+      }
     }))
   }
 }));
@@ -267,6 +272,10 @@ describe("TestFunction Component", () => {
     it("validates query before execution", async () => {
       wrapper.vm.inputQuery = "";
       wrapper.vm.loading.events = false;
+      // Force server-side validation error to match component behavior
+      searchService.search.mockRejectedValueOnce({
+        response: { data: { message: "Invalid SQL Query" } }
+      });
       await wrapper.vm.getResults();
       await flushPromises();
       await nextTick();
@@ -329,6 +338,10 @@ describe("TestFunction Component", () => {
       wrapper.vm.selectedStream.name = "";
       wrapper.vm.inputQuery = 'SELECT * FROM "test_stream"';
       wrapper.vm.loading.events = false;
+      // Force server-side validation error to match component behavior
+      searchService.search.mockRejectedValueOnce({
+        response: { data: { message: "Invalid SQL Query" } }
+      });
       await wrapper.vm.getResults();
       await flushPromises();
       await nextTick();
@@ -340,6 +353,10 @@ describe("TestFunction Component", () => {
       wrapper.vm.selectedStream.type = "";
       wrapper.vm.inputQuery = 'SELECT * FROM "test_stream"';
       wrapper.vm.loading.events = false;
+      // Force server-side validation error to match component behavior
+      searchService.search.mockRejectedValueOnce({
+        response: { data: { message: "Invalid SQL Query" } }
+      });
       await wrapper.vm.getResults();
       await flushPromises();
       await nextTick();

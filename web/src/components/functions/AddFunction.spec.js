@@ -5,9 +5,7 @@ import { Dialog, Notify } from "quasar";
 import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
-import AddFunction from "./AddFunction.vue";
-import jsTransformService from "@/services/jstransform";
-import { nextTick, ref } from 'vue';
+import { nextTick } from 'vue';
 import * as vueRouter from 'vue-router';
 
 // Mock the jsTransform service
