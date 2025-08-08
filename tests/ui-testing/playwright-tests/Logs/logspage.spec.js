@@ -129,8 +129,31 @@ test.describe("Logs Page testcases", () => {
     return ariaChecked === 'true';
   }
 
+  // Best-effort dismissal of any modal/backdrop that may intercept clicks
+  async function dismissBlockingOverlays(page) {
+    // Try a few times: press Escape, then wait for backdrop to disappear
+    for (let i = 0; i < 3; i += 1) {
+      const backdrop = page.locator('.q-dialog__backdrop');
+      const hasBackdrop = (await backdrop.count()) > 0;
+      const visible = hasBackdrop ? await backdrop.first().isVisible().catch(() => false) : false;
+      if (!visible) break;
+      await page.keyboard.press('Escape').catch(() => {});
+      await backdrop.first().waitFor({ state: 'hidden', timeout: 1000 }).catch(() => {});
+      await page.waitForTimeout(150);
+    }
+  }
+
   async function flipStreaming(page) {
-    await page.locator('[data-test="menu-link-settings-item"]').click();
+    await dismissBlockingOverlays(page);
+    try {
+      await page.locator('[data-test="menu-link-settings-item"]').click();
+    } catch (e) {
+      // If something still blocked the click, reload once and retry
+      await page.reload().catch(() => {});
+      await page.waitForTimeout(300);
+      await dismissBlockingOverlays(page);
+      await page.locator('[data-test="menu-link-settings-item"]').click();
+    }
     const isOn = await getStreamingState(page);
     await page.locator('[data-test="general-settings-enable-streaming"] div').nth(2).click();
     await page.locator('[data-test="dashboard-add-submit"]').click();
