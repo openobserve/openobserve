@@ -123,137 +123,182 @@ pub async fn search(
     if !merge_batches.is_empty() {
         let schema = merge_batches[0].schema();
         let batches_query_ref: Vec<&RecordBatch> = merge_batches.iter().collect();
+
         let json_rows = record_batches_to_json_rows(&batches_query_ref)
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
-        let mut sources: Vec<json::Value> = if query_fn.is_empty() {
-            json_rows
-                .into_iter()
-                .filter(|v| !v.is_empty())
-                .map(json::Value::Object)
-                .collect()
-        } else {
-            // compile vrl function & apply the same before returning the response
-            let input_fn = query_fn.trim();
 
-            let apply_over_hits = super::super::RESULT_ARRAY.is_match(input_fn);
-            if apply_over_hits {
-                query_fn = super::super::RESULT_ARRAY.replace(input_fn, "").to_string();
-            }
-            let mut runtime = crate::common::utils::functions::init_vrl_runtime();
-            let program =
-                match crate::service::ingestion::compile_vrl_function(&query_fn, &sql.org_id) {
-                    Ok(program) => {
-                        let registry = program.config.get_custom::<TableRegistry>().unwrap();
-                        registry.finish_load();
-                        Some(program)
-                    }
-                    Err(err) => {
-                        log::error!("[trace_id {trace_id}] search->vrl: compile err: {err:?}");
-                        result.function_error = vec![err.to_string()];
-                        None
-                    }
-                };
-            let stream_names = sql
-                .stream_names
-                .iter()
-                .map(|s| s.stream_name())
-                .collect_vec();
-            match program {
-                Some(program) => {
-                    if apply_over_hits {
-                        let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
-                            &mut runtime,
-                            &VRLResultResolver {
-                                program: program.program.clone(),
-                                fields: program.fields.clone(),
-                            },
-                            json::Value::Array(
-                                json_rows
-                                    .into_iter()
-                                    .filter(|v| !v.is_empty())
-                                    .map(json::Value::Object)
-                                    .collect(),
-                            ),
-                            &sql.org_id,
-                            &stream_names,
-                        );
-                        ret_val
-                            .as_array()
+        // Handle EXPLAIN output
+        if sql.is_explain {
+            // Convert EXPLAIN results to structured JSON
+            let mut explain_data = json::json!({
+                "plan": [],
+                "metrics": null
+            });
+
+            // Extract plan information from DataFusion's EXPLAIN output
+            for row in &json_rows {
+                if let Some(plan_value) = row.get("plan") {
+                    if let Some(plan_str) = plan_value.as_str() {
+                        explain_data["plan"]
+                            .as_array_mut()
                             .unwrap()
-                            .iter()
-                            .filter_map(|v| {
-                                (!v.is_null()).then_some(flatten::flatten(v.clone()).unwrap())
-                            })
-                            .collect()
-                    } else {
-                        json_rows
-                            .into_iter()
-                            .filter(|v| !v.is_empty())
-                            .filter_map(|hit| {
-                                let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
-                                    &mut runtime,
-                                    &VRLResultResolver {
-                                        program: program.program.clone(),
-                                        fields: program.fields.clone(),
-                                    },
-                                    json::Value::Object(hit),
-                                    &sql.org_id,
-                                    &stream_names,
-                                );
-                                (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
-                            })
-                            .collect()
+                            .push(json::Value::String(plan_str.to_string()));
                     }
                 }
-                None => json_rows
+
+                // For EXPLAIN ANALYZE, also extract metrics if present
+                if sql.is_analyze {
+                    if let Some(metrics_value) = row.get("metrics") {
+                        explain_data["metrics"] = metrics_value.clone();
+                    }
+                    // Check for timing information columns
+                    if let Some(execution_time) = row.get("execution_time_ms") {
+                        if explain_data["metrics"].is_null() {
+                            explain_data["metrics"] = json::json!({});
+                        }
+                        explain_data["metrics"]["execution_time_ms"] = execution_time.clone();
+                    }
+                }
+            }
+
+            result.explain_output = Some(explain_data);
+        }
+
+        // For EXPLAIN ANALYZE, we still process the actual query results
+        // For plain EXPLAIN, we skip processing hits since there are no actual results
+        if !sql.is_explain || sql.is_analyze {
+            let mut sources: Vec<json::Value> = if query_fn.is_empty() {
+                json_rows
                     .into_iter()
                     .filter(|v| !v.is_empty())
                     .map(json::Value::Object)
-                    .collect(),
-            }
-        };
+                    .collect()
+            } else {
+                // compile vrl function & apply the same before returning the response
+                let input_fn = query_fn.trim();
 
-        #[cfg(feature = "enterprise")]
-        if !action_id.is_empty() {
-            let resp = trigger_action(
-                &trace_id,
-                &sql.org_id,
-                &action_id,
-                sources,
-                TriggerSource::Search,
-            )
-            .await
-            .map_err(|err| Error::Message(err.to_string()))?;
-            match resp.result {
-                ActionTriggerResult::Success(new_sources) => {
-                    sources = new_sources;
+                let apply_over_hits = super::super::RESULT_ARRAY.is_match(input_fn);
+                if apply_over_hits {
+                    query_fn = super::super::RESULT_ARRAY.replace(input_fn, "").to_string();
                 }
-                ActionTriggerResult::Failure(err_msg) => {
-                    log::error!(
-                        "[trace_id {trace_id}] search->action: action_id: {action_id}, err: {err_msg}"
+                let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+                let program =
+                    match crate::service::ingestion::compile_vrl_function(&query_fn, &sql.org_id) {
+                        Ok(program) => {
+                            let registry = program.config.get_custom::<TableRegistry>().unwrap();
+                            registry.finish_load();
+                            Some(program)
+                        }
+                        Err(err) => {
+                            log::error!("[trace_id {trace_id}] search->vrl: compile err: {err:?}");
+                            result.function_error = vec![err.to_string()];
+                            None
+                        }
+                    };
+                let stream_names = sql
+                    .stream_names
+                    .iter()
+                    .map(|s| s.stream_name())
+                    .collect_vec();
+                match program {
+                    Some(program) => {
+                        if apply_over_hits {
+                            let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                                &mut runtime,
+                                &VRLResultResolver {
+                                    program: program.program.clone(),
+                                    fields: program.fields.clone(),
+                                },
+                                json::Value::Array(
+                                    json_rows
+                                        .into_iter()
+                                        .filter(|v| !v.is_empty())
+                                        .map(json::Value::Object)
+                                        .collect(),
+                                ),
+                                &sql.org_id,
+                                &stream_names,
+                            );
+                            ret_val
+                                .as_array()
+                                .unwrap()
+                                .iter()
+                                .filter_map(|v| {
+                                    (!v.is_null()).then_some(flatten::flatten(v.clone()).unwrap())
+                                })
+                                .collect()
+                        } else {
+                            json_rows
+                                .into_iter()
+                                .filter(|v| !v.is_empty())
+                                .filter_map(|hit| {
+                                    let (ret_val, _) = crate::service::ingestion::apply_vrl_fn(
+                                        &mut runtime,
+                                        &VRLResultResolver {
+                                            program: program.program.clone(),
+                                            fields: program.fields.clone(),
+                                        },
+                                        json::Value::Object(hit),
+                                        &sql.org_id,
+                                        &stream_names,
+                                    );
+                                    (!ret_val.is_null())
+                                        .then_some(flatten::flatten(ret_val).unwrap())
+                                })
+                                .collect()
+                        }
+                    }
+                    None => json_rows
+                        .into_iter()
+                        .filter(|v| !v.is_empty())
+                        .map(json::Value::Object)
+                        .collect(),
+                }
+            };
+
+            #[cfg(feature = "enterprise")]
+            if !action_id.is_empty() {
+                let resp = trigger_action(
+                    &trace_id,
+                    &sql.org_id,
+                    &action_id,
+                    sources,
+                    TriggerSource::Search,
+                )
+                .await
+                .map_err(|err| Error::Message(err.to_string()))?;
+                match resp.result {
+                    ActionTriggerResult::Success(new_sources) => {
+                        sources = new_sources;
+                    }
+                    ActionTriggerResult::Failure(err_msg) => {
+                        log::error!(
+                            "[trace_id {trace_id}] search->action: action_id: {action_id}, err: {err_msg}"
+                        );
+                        return Err(Error::Message(err_msg));
+                    }
+                }
+            }
+
+            // handle query type: json, metrics, table
+            if query_type == "table" {
+                (result.columns, sources) = super::handle_table_response(schema, sources);
+            } else if query_type == "metrics" {
+                sources = super::handle_metrics_response(sources);
+            }
+
+            if use_query_fn {
+                for source in sources {
+                    result.add_hit(
+                        &flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?,
                     );
-                    return Err(Error::Message(err_msg));
+                }
+            } else {
+                for source in sources {
+                    result.add_hit(&source);
                 }
             }
-        }
-
-        // handle query type: json, metrics, table
-        if query_type == "table" {
-            (result.columns, sources) = super::handle_table_response(schema, sources);
-        } else if query_type == "metrics" {
-            sources = super::handle_metrics_response(sources);
-        }
-
-        if use_query_fn {
-            for source in sources {
-                result
-                    .add_hit(&flatten::flatten(source).map_err(|e| Error::Message(e.to_string()))?);
-            }
-        } else {
-            for source in sources {
-                result.add_hit(&source);
-            }
-        }
+        } // end of if !sql.is_explain || sql.is_analyze block
     }
 
     let total = if !track_total_hits {

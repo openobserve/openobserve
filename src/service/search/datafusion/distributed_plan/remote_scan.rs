@@ -204,6 +204,55 @@ impl ExecutionPlan for RemoteScanExec {
     fn statistics(&self) -> Result<Statistics> {
         Ok(Statistics::new_unknown(&self.schema()))
     }
+
+    fn metrics(&self) -> Option<datafusion::physical_plan::metrics::MetricsSet> {
+        use datafusion::physical_plan::metrics::{ExecutionPlanMetricsSet, MetricBuilder};
+
+        let scan_stats = self.scan_stats.lock();
+        let execution_metrics = ExecutionPlanMetricsSet::new();
+
+        // Add file scanning metrics
+        if scan_stats.files > 0 {
+            MetricBuilder::new(&execution_metrics)
+                .counter("files_scanned", 0)
+                .add(scan_stats.files as usize);
+        }
+
+        // Add data size metrics
+        if scan_stats.original_size > 0 {
+            MetricBuilder::new(&execution_metrics)
+                .gauge("original_size_bytes", 0)
+                .add(scan_stats.original_size as usize);
+
+            MetricBuilder::new(&execution_metrics)
+                .gauge("compressed_size_bytes", 0)
+                .add(scan_stats.compressed_size as usize);
+        }
+
+        // Add record count metrics
+        if scan_stats.records > 0 {
+            MetricBuilder::new(&execution_metrics)
+                .counter("records_scanned", 0)
+                .add(scan_stats.records as usize);
+        }
+
+        // Add timing metrics
+        if scan_stats.idx_took > 0 {
+            MetricBuilder::new(&execution_metrics)
+                .elapsed_compute(0)
+                .add_duration(std::time::Duration::from_millis(scan_stats.idx_took as u64));
+        }
+
+        if scan_stats.file_list_took > 0 {
+            MetricBuilder::new(&execution_metrics)
+                .elapsed_compute(0)
+                .add_duration(std::time::Duration::from_millis(
+                    scan_stats.file_list_took as u64,
+                ));
+        }
+
+        Some(execution_metrics.clone_inner())
+    }
 }
 
 async fn get_remote_batch(
