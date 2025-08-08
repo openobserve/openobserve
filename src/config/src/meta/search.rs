@@ -230,6 +230,7 @@ pub struct Response {
     pub work_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_by: Option<OrderBy>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub order_by_metadata: Vec<(String, OrderBy)>,
 }
