@@ -22,10 +22,7 @@ test('Relative Seconds on Logs page', async ({ page }) => {
   await pageManager.logsPage.signOut();
 });
 
-test.afterEach(async ({ page }) => {
-  const pageManager = new PageManager(page);
-  await pageManager.commonActions.flipStreaming();
-});
+// no afterEach hook
 
 
 
