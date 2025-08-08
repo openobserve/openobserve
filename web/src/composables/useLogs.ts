@@ -2057,7 +2057,7 @@ const useLogs = () => {
           if(!queryReq.query?.streaming_output) refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
           resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
             -1
           );
           searchObj.meta.histogramDirtyFlag = false;
@@ -2080,13 +2080,13 @@ const useLogs = () => {
           }
           if(isWithQuery(parsedSQL)){
             resetHistogramWithError(
-              "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+              "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
               -1
             );
           }
           else{
             resetHistogramWithError(
-              "Histogram unavailable for CTEs, DISTINCT and LIMIT queries",
+              "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries",
               -1
             );
 
@@ -6374,7 +6374,7 @@ const useLogs = () => {
         addTraceId(payload.traceId);
       }
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
-      resetHistogramWithError("Histogram unavailable for CTEs, DISTINCT and LIMIT queries.", -1);
+      resetHistogramWithError("Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.", -1);
       searchObj.meta.histogramDirtyFlag = false;
     } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL))) {
       if (shouldGetPageCount(queryReq, parsedSQL) && isFromZero) {
@@ -6386,14 +6386,14 @@ const useLogs = () => {
       }
       if(isWithQuery(parsedSQL)){
         resetHistogramWithError(
-          "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+          "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
           -1
         );
         searchObj.meta.histogramDirtyFlag = false;
       }
       else{
         resetHistogramWithError(
-          "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+          "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
           -1
         );
       }
