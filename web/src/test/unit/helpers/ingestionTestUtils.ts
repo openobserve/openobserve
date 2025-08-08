@@ -280,7 +280,7 @@ export const componentCategories = {
 };
 
 // Test cleanup utility
-export const cleanupTest = (wrapper: any) => {
+export const cleanupTest = async (wrapper: any) => {
   if (wrapper) {
     wrapper.unmount();
   }
@@ -296,9 +296,7 @@ export const cleanupTest = (wrapper: any) => {
     clearTimeout(timeoutId);
     
     // Force cleanup of any pending microtasks
-    return Promise.resolve().then(() => {
-      // Additional cleanup if needed
-    });
+    await Promise.resolve();
   }
 };
 
