@@ -52,14 +52,13 @@ pub fn convert_to_histogram_query(
 
     // Build histogram query
     let mut histogram_query = format!(
-        "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"{}\"",
-        stream_name
+        "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"{stream_name}\"",
     );
 
     // Add WHERE clause if it exists
     // skip where clause for sub query
     if !where_clause.is_empty() && !is_sub_query {
-        histogram_query.push_str(&format!(" WHERE {}", where_clause));
+        histogram_query.push_str(&format!(" WHERE {where_clause}"));
     }
 
     // Add GROUP BY and ORDER BY
