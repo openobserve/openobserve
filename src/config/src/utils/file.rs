@@ -14,10 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    collections::HashMap,
     fs::{File, Metadata, metadata},
     io::{Read, Seek, Write},
     ops::Range,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use async_recursion::async_recursion;
@@ -74,6 +75,65 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
     std::fs::rename(temp_file, file)?;
 
     Ok(())
+}
+
+#[allow(dead_code)]
+struct FilteredDirWalker {
+    backlog: Vec<(usize, PathBuf)>,
+    depth_filters: HashMap<usize, fn(&PathBuf) -> bool>,
+}
+
+impl FilteredDirWalker {
+    fn new(mut root: Vec<PathBuf>) -> Self {
+        root.sort();
+        Self {
+            backlog: root.into_iter().map(|i| (0, i)).collect(),
+            depth_filters: HashMap::new(),
+        }
+    }
+
+    fn add_depth_filter(&mut self, depth: usize, filter: fn(&PathBuf) -> bool) {
+        self.depth_filters.insert(depth, filter);
+    }
+}
+
+impl Iterator for FilteredDirWalker {
+    type Item = PathBuf;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Assuming there won't be random special non-file paths here
+        while let Some((depth, latest)) = self.backlog.pop() {
+            if !self
+                .depth_filters
+                .get(&depth)
+                .map(|filter| filter(&latest))
+                .unwrap_or(true)
+            {
+                continue;
+            }
+
+            if latest.is_dir() {
+                if let Ok(dir_contents) = std::fs::read_dir(latest) {
+                    let mut dir_paths = dir_contents
+                        .filter_map(|entry| entry.ok())
+                        .filter_map(|entry| entry.path().canonicalize().ok())
+                        .map(|entry| entry)
+                        .collect::<Vec<PathBuf>>();
+
+                    // Sorted in ascending order - Gets latest first
+                    dir_paths.sort();
+
+                    self.backlog.extend(dir_paths.into_iter().map(|entry| (depth + 1, entry)));
+                }
+            } else if latest.is_file() {
+                return Some(latest);
+            } else {
+                continue
+            }
+        }
+
+        None
+    }
 }
 
 #[inline(always)]
@@ -213,5 +273,75 @@ mod tests {
         assert!(get_file_contents(file_name, Some(0..100)).is_err());
 
         std::fs::remove_file(file_name).unwrap();
+    }
+
+    #[test]
+    fn test_sorted_deep_file_walker() {
+        for day in 28..=31 {
+            for hour in 22..24 {
+                std::fs::create_dir_all(format!("./test_path/2025/12/{day}/{hour}")).unwrap();
+                std::fs::create_dir_all(format!("./test_path/2025/12/{day}/{hour}/ignored")).unwrap();
+                for file in 1..5 {
+                    std::fs::File::create(format!("./test_path/2025/12/{day}/{hour}/{file}"))
+                        .unwrap();
+                }
+            }
+        }
+
+        let mut walker = FilteredDirWalker::new(vec![PathBuf::from("./test_path")]);
+        walker.add_depth_filter(2, |path| path.ends_with("12"));
+        walker.add_depth_filter(3, |path| path.ends_with("28") || path.ends_with("30"));
+        walker.add_depth_filter(5, |path| path.ends_with("3") || path.ends_with("2"));
+
+        assert!(std::path::Path::new("./test_path/2025/12/31/23/4").exists());
+        assert!(std::path::Path::new("./test_path/2025/12/31/23/3").exists());
+        assert!(std::path::Path::new("./test_path/2025/12/31/22/4").exists());
+        assert!(std::path::Path::new("./test_path/2025/12/31/22/3").exists());
+
+
+        assert!(std::path::Path::new("./test_path/2025/12/30/23/4").exists());
+        assert_eq!(
+            walker.next(),
+            PathBuf::from("./test_path/2025/12/30/23/3")
+                .canonicalize()
+                .ok()
+        );
+        assert_eq!(
+            walker.next(),
+            PathBuf::from("./test_path/2025/12/30/23/2")
+                .canonicalize()
+                .ok()
+        );
+        assert!(std::path::Path::new("./test_path/2025/12/30/23/1").exists());
+
+        assert!(std::path::Path::new("./test_path/2025/12/30/22/4").exists());
+        assert_eq!(
+            walker.next(),
+            PathBuf::from("./test_path/2025/12/30/22/3")
+                .canonicalize()
+                .ok()
+        );
+        assert_eq!(
+            walker.next(),
+            PathBuf::from("./test_path/2025/12/30/22/2")
+                .canonicalize()
+                .ok()
+        );
+        assert!(std::path::Path::new("./test_path/2025/12/30/22/1").exists());
+
+        assert_eq!(
+            walker.next(),
+            PathBuf::from("./test_path/2025/12/28/23/3")
+                .canonicalize()
+                .ok()
+        );
+        assert_eq!(
+            walker.next(),
+            PathBuf::from("./test_path/2025/12/28/23/2")
+                .canonicalize()
+                .ok()
+        );
+
+        std::fs::remove_dir_all("./test_path").unwrap();
     }
 }
