@@ -78,13 +78,14 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
 }
 
 #[allow(dead_code)]
-struct FilteredDirWalker {
-    backlog: Vec<(usize, PathBuf)>,
-    depth_filters: HashMap<usize, fn(&PathBuf) -> bool>,
+pub struct FilteredDirWalker
+{
+    backlog: Vec<(isize, PathBuf)>, // Stack
+    depth_filters: HashMap<isize, Box<dyn Fn(&PathBuf) -> bool + Send + 'static>>,
 }
 
 impl FilteredDirWalker {
-    fn new(mut root: Vec<PathBuf>) -> Self {
+    pub fn new(mut root: Vec<PathBuf>) -> Self {
         root.sort();
         Self {
             backlog: root.into_iter().map(|i| (0, i)).collect(),
@@ -92,8 +93,8 @@ impl FilteredDirWalker {
         }
     }
 
-    fn add_depth_filter(&mut self, depth: usize, filter: fn(&PathBuf) -> bool) {
-        self.depth_filters.insert(depth, filter);
+    pub fn add_depth_filter(&mut self, depth: isize, predicate: impl Fn(&PathBuf) -> bool + Send + 'static) {
+        self.depth_filters.insert(depth, Box::new(predicate));
     }
 }
 
@@ -126,6 +127,16 @@ impl Iterator for FilteredDirWalker {
                     self.backlog.extend(dir_paths.into_iter().map(|entry| (depth + 1, entry)));
                 }
             } else if latest.is_file() {
+                let tail_key = -1;
+                if !self
+                    .depth_filters
+                    .get(&tail_key)
+                    .map(|filter| filter(&latest))
+                    .unwrap_or(true)
+                {
+                    continue;
+                }
+
                 return Some(latest);
             } else {
                 continue
