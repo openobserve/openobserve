@@ -70,13 +70,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Cache web deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            web/node_modules
+          key: ${{ runner.os }}-web-npm-${{ hashFiles('web/package-lock.json') }}
 
       - name: Build frontend code
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
           VITE_COVERAGE: "true"
           COVERAGE: "true"
-        run: cd web && npm install && npm run build
+        run: cd web && npm ci && npm run build
 
       - name: Build and run binary
         run: cargo build --release --target x86_64-unknown-linux-gnu
@@ -162,12 +169,21 @@ jobs:
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
+        with:
+          name: debug-binary
 
       - name: Start OpenObserve
         run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
-        run: sleep 15
+        run: |
+          for i in {1..120}; do
+            if curl -fsS http://localhost:5080/web/login >/dev/null; then
+              echo "Server is up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "Server did not start in time"; exit 1
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
@@ -175,9 +191,13 @@ jobs:
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
 
-      - uses: actions/setup-node@v4
+      - name: Cache ui-testing deps
+        uses: actions/cache@v4
         with:
-          node-version: lts/*
+          path: |
+            ~/.npm
+            tests/ui-testing/node_modules
+          key: ${{ runner.os }}-uitest-npm-${{ hashFiles('tests/ui-testing/package-lock.json') }}
       - name: Install dependencies and run ui-tests
         run: |
           touch .env
@@ -210,8 +230,7 @@ jobs:
           path: tests/ui-testing/.nyc_output
           include-hidden-files: true
 
-      - name: Generate Coverage Report
-        run: cd tests/ui-testing && npx nyc report
+
 
       - uses: actions/upload-artifact@v4
         if: always()
