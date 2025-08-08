@@ -91,6 +91,10 @@ pub const MESSAGE_COL_NAME: &str = "message";
 pub const STREAM_NAME_LABEL: &str = "o2_stream_name";
 pub const DEFAULT_STREAM_NAME: &str = "default";
 
+// Supported dispatch strategies
+pub const ROUTE_DISPATCH_STRATEGY_WORKLOAD: &str = "workload"; // Uses select_best_node()
+pub const ROUTE_DISPATCH_STRATEGY_RANDOM: &str = "random";     // Uses get_rand_element()
+
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "body", "json"];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
@@ -665,6 +669,8 @@ pub struct Route {
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
+    #[env_config(name="ZO_ROUTE_STRATEGY", default = "workload")]
+    pub dispatch_strategy: String,
 }
 
 #[derive(EnvConfig, Default)]

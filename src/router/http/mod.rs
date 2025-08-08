@@ -15,8 +15,9 @@
 
 use ::config::{
     META_ORG_ID, get_config,
+    ROUTE_DISPATCH_STRATEGY_RANDOM,
     meta::{
-        cluster::{Role, RoleGroup},
+        cluster::{Node, Role, RoleGroup},
         promql::RequestRangeQuery,
         search::{Request as SearchRequest, SearchPartitionRequest, ValuesRequest},
     },
@@ -226,7 +227,7 @@ async fn get_url(path: &str) -> URLDetails {
     }
 
     let nodes = nodes.unwrap();
-    let node = cluster::select_best_node(&nodes).unwrap_or(get_rand_element(&nodes));
+    let node = select_node(&nodes);
     URLDetails {
         is_error: false,
         error: None,
@@ -563,6 +564,14 @@ pub fn create_http_client() -> Result<awc::Client, anyhow::Error> {
         client_builder = client_builder.connector(awc::Connector::new().rustls_0_23(tls_config));
     }
     Ok(client_builder.finish())
+}
+
+// allows deciding which strategy to choose based on the user-given env
+fn select_node(nodes: &[Node]) -> &Node {
+    match get_config().route.dispatch_strategy.as_str() {
+        ROUTE_DISPATCH_STRATEGY_RANDOM => get_rand_element(nodes),
+        _ => cluster::select_best_node(nodes).unwrap_or_else(|| get_rand_element(nodes)), // ROUTE_DISPATCH_STRATEGY_WORKLOAD and default
+    }
 }
 
 #[cfg(test)]
