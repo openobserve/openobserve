@@ -3349,13 +3349,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       group_by: string[];
       projections: string[];
       timeseries_field: string | null;
-    },
-    currentChartType?: string,
+    }
   ): string => {
     if (
       extractedFields.timeseries_field &&
-      extractedFields.group_by.length <= 2 &&
-      !(extractedFields.group_by.length == 0 && currentChartType == "table")
+      extractedFields.group_by.length <= 2
     ) {
       return "line";
     } else {
@@ -3368,11 +3366,21 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     group_by: string[];
     projections: string[];
     timeseries_field: string | null;
-  }): {
+  }, chartType: string): {
     x: string[];
     y: string[];
     breakdown: string[];
   } => {
+    // For table charts, add all projections to x-axis since tables display all fields as columns
+    if (chartType === "table") {
+      return {
+        x: [...extractedFields.projections],
+        y: [],
+        breakdown: [],
+      };
+    }
+
+    // For non-table charts, use the original logic
     // remove group by and timeseries field from projections, while using it on y axis
     const yAxisFields = extractedFields.projections.filter(
       (field) =>
@@ -3439,12 +3447,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
       // Determine chart type
       const chartType = autoSelectChartType
-        ? determineChartType(extractedFields, dashboardPanelData.data.type)
+        ? determineChartType(extractedFields)
         : dashboardPanelData.data.type;
       dashboardPanelData.data.type = chartType;
 
       // Convert schema to fields
-      const fields = convertSchemaToFields(extractedFields);
+      const fields = convertSchemaToFields(extractedFields, chartType);
 
       // Set fields using existing validation function
       setFieldsBasedOnChartTypeValidation(fields, chartType);
