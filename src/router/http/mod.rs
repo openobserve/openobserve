@@ -15,7 +15,7 @@
 
 use ::config::{
     META_ORG_ID, get_config,
-    ROUTE_DISPATCH_STRATEGY_RANDOM,
+    RouteDispatchStrategy,
     meta::{
         cluster::{Node, Role, RoleGroup},
         promql::RequestRangeQuery,
@@ -568,9 +568,9 @@ pub fn create_http_client() -> Result<awc::Client, anyhow::Error> {
 
 // allows deciding which strategy to choose based on the user-given env
 fn select_node(nodes: &[Node]) -> &Node {
-    match get_config().route.dispatch_strategy.as_str() {
-        ROUTE_DISPATCH_STRATEGY_RANDOM => get_rand_element(nodes),
-        _ => cluster::select_best_node(nodes).unwrap_or_else(|| get_rand_element(nodes)), // ROUTE_DISPATCH_STRATEGY_WORKLOAD and default
+    match get_config().route.dispatch_strategy {
+        RouteDispatchStrategy::Random => get_rand_element(nodes),
+        _ => cluster::select_best_node(nodes).unwrap_or_else(|| get_rand_element(nodes)),
     }
 }
 
