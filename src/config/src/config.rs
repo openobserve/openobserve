@@ -1405,7 +1405,7 @@ pub struct Limit {
     pub inverted_index_result_cache_max_entries: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRY_SIZE",
-        default = 20 * 1024, // bytes, default is 20KB
+        default = 20480, // bytes, default is 20KB
         help = "Maximum size of a single entry in the inverted index result cache. Higher values increase memory usage but may improve query performance."
     )]
     pub inverted_index_result_cache_max_entry_size: usize,
