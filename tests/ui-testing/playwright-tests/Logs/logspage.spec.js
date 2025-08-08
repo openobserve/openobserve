@@ -55,6 +55,8 @@ async function ingestion(page) {
 
 test.describe("Logs Page testcases", () => {
   let pageManager;
+  let streamingEnabled = false;
+  
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -73,6 +75,7 @@ test.describe("Logs Page testcases", () => {
     await expect.poll(async () => (await search).status()).toBe(200);
     // await search.hits.FIXME_should("be.an", "array");
   }
+  
   // tebefore(async function () {
   //   // logData("log");
   //   // const data = page;
@@ -80,6 +83,7 @@ test.describe("Logs Page testcases", () => {
 
   //   console.log("--logData--", logData);
   // });
+  
   test.beforeEach(async ({ page }) => {
     await login(page);
     pageManager = new PageManager(page);
@@ -94,6 +98,33 @@ test.describe("Logs Page testcases", () => {
     await pageManager.logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
+  });
+
+  test.afterEach(async ({ page }, testInfo) => {
+    // Only enable streaming after the first run of each test
+    if (!streamingEnabled) {
+      try {
+        console.log(`Enabling streaming mode for test: ${testInfo.title}`);
+        await page.locator('[data-test="menu-link-settings-item"]').click();
+        await page.waitForTimeout(2000);
+        await page.locator('[data-test="general-settings-enable-streaming"] div').nth(2).click();
+        await page.waitForTimeout(1000);
+        await page.locator('[data-test="dashboard-add-submit"]').click();
+        await page.waitForTimeout(2000);
+        
+        // Validate the popup text
+        const notification = await page.locator('text=Organization settings updated').first();
+        await expect(notification).toBeVisible();
+        console.log("Streaming mode enabled successfully");
+        streamingEnabled = true;
+        
+        // Re-run the same test with streaming enabled
+        console.log(`Re-running test with streaming ON: ${testInfo.title}`);
+        await testInfo.retry();
+      } catch (error) {
+        console.log("Error enabling streaming mode:", error.message);
+      }
+    }
   });
 
   test("should click run query after SQL toggle on but without any query", {
@@ -244,6 +275,7 @@ test.describe("Logs Page testcases", () => {
     await pageManager.logsPage.waitForTimeout(2000);
     await pageManager.logsPage.expectQueryEditorContainsSelectFrom();
   });
+  
   test("should display ingested logs - search logs, navigate on another tab, revisit logs page", {
     tag: ['@ingestedLogsPersistence', '@all', '@logs']
   }, async ({

@@ -7,7 +7,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.50.0",
+    "@playwright/test": "^1.54.2",
     "@types/node": "^20.12.2",
     "cypress": "^13.6.1",
     "cypress-file-upload": "^5.0.8",
@@ -24,10 +24,10 @@
     "dotenv": "^16.4.5",
     "googleapis": "^105.0.0",
     "pixelmatch": "^5.3.0",
-    "playwright": "^1.50.0",
-    "playwright-core": "^1.50.0",
-    "playwright-firefox": "^1.50.0",
-    "playwright-webkit": "^1.50.0",
+    "playwright": "^1.54.2",
+    "playwright-core": "^1.54.2",
+    "playwright-firefox": "^1.54.2",
+    "playwright-webkit": "^1.54.2",
     "pngjs": "^7.0.0"
   }
 }
