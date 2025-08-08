@@ -1881,7 +1881,7 @@ export default defineComponent({
           this.resetHistogramWithError(
             "Histogram is not available for multi stream search.",
           );
-        } else if(!this.searchObj.data.queryResults.is_histogram_eligible){
+        } else if(this.searchObj.data.queryResults.is_histogram_eligible == false){
           this.resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
             -1,
