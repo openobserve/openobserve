@@ -50,9 +50,12 @@ use crate::service::search::sql::{
     },
     schema::{generate_schema_fields, generate_select_star_schema, has_original_column},
     visitor::{
-        column::ColumnVisitor, histogram_interval::HistogramIntervalVisitor,
-        index_optimize::IndexOptimizeModeVisitor, match_all::MatchVisitor,
-        partition_column::PartitionColumnVisitor, prefix_column::PrefixColumnVisitor,
+        column::ColumnVisitor,
+        histogram_interval::{HistogramIntervalVisitor, validate_and_adjust_histogram_interval},
+        index_optimize::IndexOptimizeModeVisitor,
+        match_all::MatchVisitor,
+        partition_column::PartitionColumnVisitor,
+        prefix_column::PrefixColumnVisitor,
         utils::is_complex_query,
     },
 };
@@ -241,7 +244,10 @@ impl Sql {
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         let _ = statement.visit(&mut histogram_interval_visitor);
         let histogram_interval = if query.histogram_interval > 0 {
-            Some(query.histogram_interval)
+            Some(validate_and_adjust_histogram_interval(
+                query.histogram_interval,
+                Some((query.start_time, query.end_time)),
+            ))
         } else {
             histogram_interval_visitor.interval
         };
