@@ -176,9 +176,10 @@ jobs:
         run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
+        shell: bash
         run: |
           for i in {1..120}; do
-            if curl -fsS http://localhost:5080/web/login >/dev/null; then
+            if curl -fsS http://localhost:5080/web/login >/dev/null 2>&1; then
               echo "Server is up"; exit 0
             fi
             sleep 1
