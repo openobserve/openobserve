@@ -101,70 +101,7 @@ test.describe("Logs Page testcases", () => {
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
 
-  // Enable streaming via Settings and verify success toast
-  async function enableStreamingMode(page) {
-    await page.locator('[data-test="menu-link-settings-item"]').click();
-    await page.waitForTimeout(2000);
-    await page.locator('[data-test="general-settings-enable-streaming"] div').nth(2).click();
-    await page.waitForTimeout(1000);
-    await page.locator('[data-test="dashboard-add-submit"]').click();
-    await page.waitForTimeout(2000);
-    await expect(page.locator('text=Organization settings updated').first()).toBeVisible();
-    // Refresh to ensure state is persisted and not stale
-    await page.reload();
-    await getStreamingState(page);
-  }
-
-  // Return to Logs page, select stream, and apply query so tests have a clean start
-  async function prepareLogsPage(page) {
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await pageManager.logsPage.selectStream("e2e_automate");
-    await applyQueryButton(page);
-  }
-
-  async function getStreamingState(page) {
-    const root = page.locator('[data-test="general-settings-enable-streaming"]').first();
-    await root.waitFor({ state: 'visible', timeout: 10000 });
-    const ariaChecked = await root.getAttribute('aria-checked');
-    return ariaChecked === 'true';
-  }
-
-  // Best-effort dismissal of any modal/backdrop that may intercept clicks
-  async function dismissBlockingOverlays(page) {
-    // Try a few times: press Escape, then wait for backdrop to disappear
-    for (let i = 0; i < 3; i += 1) {
-      const backdrop = page.locator('.q-dialog__backdrop');
-      const hasBackdrop = (await backdrop.count()) > 0;
-      const visible = hasBackdrop ? await backdrop.first().isVisible().catch(() => false) : false;
-      if (!visible) break;
-      await page.keyboard.press('Escape').catch(() => {});
-      await backdrop.first().waitFor({ state: 'hidden', timeout: 1000 }).catch(() => {});
-      await page.waitForTimeout(150);
-    }
-  }
-
-  async function flipStreaming(page) {
-    await dismissBlockingOverlays(page);
-    try {
-      await page.locator('[data-test="menu-link-settings-item"]').click();
-    } catch (e) {
-      // If something still blocked the click, reload once and retry
-      await page.reload().catch(() => {});
-      await page.waitForTimeout(300);
-      await dismissBlockingOverlays(page);
-      await page.locator('[data-test="menu-link-settings-item"]').click();
-    }
-    const isOn = await getStreamingState(page);
-    await page.locator('[data-test="general-settings-enable-streaming"] div').nth(2).click();
-    await page.locator('[data-test="dashboard-add-submit"]').click();
-    await page.getByText('Organization settings updated', { exact: false }).waitFor({ timeout: 15000 });
-    // Refresh to ensure state is persisted and not stale
-    await page.reload();
-    const newState = await getStreamingState(page);
-    console.log(`[Streaming Toggle] ${isOn ? 'ON' : 'OFF'} -> ${newState ? 'ON' : 'OFF'}`);
-  }
-
-  // No per-test wrapper needed under multi-project config
+  // No per-test wrapper needed
 
   test("should click run query after SQL toggle on but without any query", {
     tag: ['@sqlQueryLogs', '@all', '@logs']
@@ -180,10 +117,7 @@ test.describe("Logs Page testcases", () => {
     await pageManager.logsPage.expectSQLQueryMissingError();
   });
 
-  test.afterEach(async ({ page }, testInfo) => {
-    testIndex += 1;
-    await pageManager.commonActions.flipStreaming();
-  });
+  // (no afterEach streaming flip)
 
   test("should be able to enter valid text in VRL and run query", {
     tag: ['@vrlQueryLogs', '@all', '@logs']
