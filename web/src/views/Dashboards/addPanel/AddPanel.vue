@@ -256,6 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @updated:vrlFunctionFieldList="updateVrlFunctionFieldList"
                       @last-triggered-at-update="handleLastTriggeredAtUpdate"
                       searchType="dashboards"
+                      @series-data-update="seriesDataUpdate"
                     />
                     <q-dialog v-model="showViewPanel">
                       <QueryInspector
@@ -283,6 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ConfigPanel
                     :dashboardPanelData="dashboardPanelData"
                     :variablesData="updatedVariablesData"
+                    :panelData="seriesData"
                   />
                 </PanelSidebar>
               </div>
@@ -438,6 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         @last-triggered-at-update="handleLastTriggeredAtUpdate"
                         searchType="dashboards"
+                        @series-data-update="seriesDataUpdate"
                       />
                     </template>
                   </q-splitter>
@@ -460,6 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ConfigPanel
                     :dashboardPanelData="dashboardPanelData"
                     :variablesData="updatedVariablesData"
+                    :panelData="seriesData"
                   />
                 </PanelSidebar>
               </div>
@@ -588,6 +592,11 @@ export default defineComponent({
     let variablesData: any = reactive({});
     const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
     const { getStream } = useStreams();
+    const seriesData = ref([]);
+
+    const seriesDataUpdate = (data: any) => {
+      seriesData.value = data;
+    };
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
@@ -1658,6 +1667,8 @@ export default defineComponent({
       inputStyle,
       setTimeForVariables,
       dateTimeForVariables,
+      seriesDataUpdate,
+      seriesData
     };
   },
   methods: {
