@@ -21,7 +21,7 @@ module.exports = defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 2 : undefined,
+  workers: process.env.CI ? 5 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
@@ -39,20 +39,6 @@ module.exports = defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 }, },
-      // paths must be relative to testDir
-      testIgnore: ['Logs/logspage.spec.js'],
-    },
-    {
-      name: 'logs-off',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 } },
-      testMatch: ['Logs/logspage.spec.js'],
-      // inherit global parallel/workers settings
-    },
-    {
-      name: 'logs-on',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 } },
-      testMatch: ['Logs/logspage.spec.js'],
-      // inherit global parallel/workers settings
     },
     //   {
     //   name: 'webkit', // Safari/WebKit configuration

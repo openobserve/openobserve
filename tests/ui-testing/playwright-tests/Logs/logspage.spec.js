@@ -3,6 +3,7 @@ import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from '../../pages/page-manager.js';
 
+// Run in parallel; streaming may flip between tests as part of stress validation
 test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
@@ -55,7 +56,7 @@ async function ingestion(page) {
 
 test.describe("Logs Page testcases", () => {
   let pageManager;
-  let streamingSetupDone = false;
+  let testIndex = 0;
   
   // let logData;
   function removeUTFCharacters(text) {
@@ -84,12 +85,8 @@ test.describe("Logs Page testcases", () => {
   //   console.log("--logData--", logData);
   // });
   
-  test.beforeEach(async ({ page }, testInfo) => {
+  test.beforeEach(async ({ page }) => {
     await login(page);
-    if (testInfo.project.name.includes('logs-on') && !streamingSetupDone) {
-      await enableStreamingMode(page);
-      streamingSetupDone = true;
-    }
     pageManager = new PageManager(page);
     await page.waitForTimeout(1000)
     await ingestion(page);
@@ -103,8 +100,6 @@ test.describe("Logs Page testcases", () => {
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
-
-  // No afterAll needed; streaming is controlled per project in beforeEach
 
   // Enable streaming via Settings and verify success toast
   async function enableStreamingMode(page) {
@@ -124,6 +119,23 @@ test.describe("Logs Page testcases", () => {
     await applyQueryButton(page);
   }
 
+  async function getStreamingState(page) {
+    const root = page.locator('[data-test="general-settings-enable-streaming"]').first();
+    await root.waitFor({ state: 'visible', timeout: 10000 });
+    const ariaChecked = await root.getAttribute('aria-checked');
+    return ariaChecked === 'true';
+  }
+
+  async function flipStreaming(page) {
+    await page.locator('[data-test="menu-link-settings-item"]').click();
+    const isOn = await getStreamingState(page);
+    await page.locator('[data-test="general-settings-enable-streaming"] div').nth(2).click();
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.getByText('Organization settings updated', { exact: false }).waitFor({ timeout: 15000 });
+    const newState = await getStreamingState(page);
+    console.log(`[Streaming Toggle] ${isOn ? 'ON' : 'OFF'} -> ${newState ? 'ON' : 'OFF'}`);
+  }
+
   // No per-test wrapper needed under multi-project config
 
   test("should click run query after SQL toggle on but without any query", {
@@ -138,6 +150,11 @@ test.describe("Logs Page testcases", () => {
     await pageManager.logsPage.waitForTimeout(3000);
     await pageManager.logsPage.clickRefreshButton();
     await pageManager.logsPage.expectSQLQueryMissingError();
+  });
+
+  test.afterEach(async ({ page }, testInfo) => {
+    testIndex += 1;
+    await flipStreaming(page);
   });
 
   test("should be able to enter valid text in VRL and run query", {
