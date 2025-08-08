@@ -22,7 +22,7 @@ use config::{
     meta::{
         promql,
         stream::{
-            DistinctField, StreamParams, StreamSettings, StreamStats, StreamType,
+            DataField, DistinctField, StreamParams, StreamSettings, StreamStats, StreamType,
             UpdateStreamSettings,
         },
     },
@@ -67,6 +67,32 @@ fn is_valid_field_name(field_name: &str) -> bool {
     static FIELD_NAME_REGEX: Lazy<Regex> =
         Lazy::new(|| Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_]*$").unwrap());
     FIELD_NAME_REGEX.is_match(field_name)
+}
+
+/// Convert Arrow data type to our DataType enum
+fn arrow_to_data_type(arrow_type: &arrow_schema::DataType) -> config::meta::stream::DataType {
+    match arrow_type {
+        arrow_schema::DataType::Utf8 => config::meta::stream::DataType::Utf8,
+        arrow_schema::DataType::Int64 => config::meta::stream::DataType::Int64,
+        arrow_schema::DataType::UInt64 => config::meta::stream::DataType::Uint64,
+        arrow_schema::DataType::Float64 => config::meta::stream::DataType::Float64,
+        arrow_schema::DataType::Boolean => config::meta::stream::DataType::Boolean,
+        // For unsupported types, default to Utf8
+        _ => config::meta::stream::DataType::Utf8,
+    }
+}
+
+/// Resolve field types from schema for defined_schema_fields that have default Utf8 type
+fn resolve_field_types(settings: &mut StreamSettings, schema: &Schema) {
+    for field in &mut settings.defined_schema_fields {
+        // Only update fields that have the default Utf8 type (indicating they were loaded from
+        // string format)
+        if field.r#type == config::meta::stream::DataType::Utf8
+            && let Ok(schema_field) = schema.field_with_name(&field.name)
+        {
+            field.r#type = arrow_to_data_type(schema_field.data_type());
+        }
+    }
 }
 
 pub async fn get_stream(
@@ -209,6 +235,9 @@ pub fn stream_res(
         settings.approx_partition = get_config()
             .common
             .use_stream_settings_for_partitions_enabled;
+    } else {
+        // Resolve field types for defined_schema_fields that were loaded with default Utf8 type
+        resolve_field_types(&mut settings, &schema);
     }
 
     settings.partition_time_level = Some(unwrap_partition_time_level(
@@ -452,20 +481,53 @@ pub async fn update_stream_settings(
                 }
 
                 for schema_field in &new_settings.defined_schema_fields.add {
-                    if !is_valid_field_name(&schema_field.name) {
+                    if !is_valid_field_name(schema_field) {
                         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                             http::StatusCode::BAD_REQUEST,
                             format!(
-                                "Field name '{}' is invalid. Field names must start with a letter or underscore and contain only alphanumeric characters and underscores.",
-                                schema_field.name
+                                "Field name '{schema_field}' is invalid. Field names must start with a letter or underscore and contain only alphanumeric characters and underscores.",
                             ),
                         )));
                     }
                 }
 
-                settings
-                    .defined_schema_fields
-                    .extend(new_settings.defined_schema_fields.add);
+                // Get the current schema to fetch field types
+                let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
+                    Ok(schema) => schema,
+                    Err(e) => {
+                        return Ok(HttpResponse::InternalServerError()
+                            .append_header((ERROR_HEADER, format!("error in getting schema : {e}")))
+                            .json(MetaHttpResponse::error(
+                                http::StatusCode::INTERNAL_SERVER_ERROR,
+                                format!("error in getting schema : {e}"),
+                            )));
+                    }
+                };
+
+                // Convert string field names to DataField objects with types from existing schema
+                let mut new_data_fields = Vec::new();
+                for field_name in &new_settings.defined_schema_fields.add {
+                    // Check if field already exists in defined_schema_fields
+                    if settings
+                        .defined_schema_fields
+                        .iter()
+                        .any(|f| f.name == *field_name)
+                    {
+                        continue;
+                    }
+
+                    // Try to find the field in the existing schema
+                    let data_type = if let Ok(field) = schema.field_with_name(field_name) {
+                        arrow_to_data_type(field.data_type())
+                    } else {
+                        // If field doesn't exist in schema, default to Utf8
+                        config::meta::stream::DataType::Utf8
+                    };
+
+                    new_data_fields.push(DataField::new(field_name, data_type));
+                }
+
+                settings.defined_schema_fields.extend(new_data_fields);
             }
             if !new_settings.defined_schema_fields.remove.is_empty() {
                 new_settings
@@ -473,9 +535,7 @@ pub async fn update_stream_settings(
                     .remove
                     .iter()
                     .for_each(|field| {
-                        settings
-                            .defined_schema_fields
-                            .retain(|f| f.name != field.name);
+                        settings.defined_schema_fields.retain(|f| *field != f.name);
                     });
             }
             if settings.defined_schema_fields.len() > cfg.limit.user_defined_schema_max_fields {

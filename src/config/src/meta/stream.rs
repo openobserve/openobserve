@@ -650,7 +650,7 @@ pub struct UpdateStreamSettings {
     #[serde(skip_serializing_if = "Option::None", default)]
     pub flatten_level: Option<i64>,
     #[serde(default)]
-    pub defined_schema_fields: UpdateSettingsWrapper<DataField>,
+    pub defined_schema_fields: UpdateSettingsWrapper<String>,
     #[serde(default)]
     pub distinct_value_fields: UpdateSettingsWrapper<String>,
     #[serde(default)]
@@ -918,14 +918,25 @@ impl From<&str> for StreamSettings {
                 .as_array()
                 .unwrap()
                 .iter()
-                .map(|v| {
-                    let name = v.get("name").unwrap().as_str().unwrap().to_string();
-                    let r#type = v
-                        .get("type")
-                        .and_then(Value::as_str)
-                        .and_then(|v| DataType::from_str(v).ok())
-                        .unwrap();
-                    DataField { name, r#type }
+                .filter_map(|v| {
+                    // Handle different formats for backward compatibility
+                    match v {
+                        // Object format: {"name": "field1", "type": "Utf8"}
+                        Value::Object(obj) => {
+                            let name = obj.get("name")?.as_str()?.to_string();
+                            let r#type = obj
+                                .get("type")
+                                .and_then(Value::as_str)
+                                .and_then(|v| DataType::from_str(v).ok())
+                                .unwrap_or(DataType::Utf8); // Default to Utf8 for now, will be updated later
+                            Some(DataField { name, r#type })
+                        }
+                        // String format: "field1" - preserve the field name, default to Utf8 for
+                        // now
+                        Value::String(name) => Some(DataField::new(name, DataType::Utf8)),
+                        // Skip invalid formats
+                        _ => None,
+                    }
                 })
                 .collect::<Vec<_>>();
         }

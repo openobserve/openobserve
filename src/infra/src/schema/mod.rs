@@ -209,10 +209,11 @@ pub async fn get_settings(
     }
 
     // Get from DB without holding any locks
-    let settings = match get(org_id, stream_name, stream_type).await {
-        Ok(schema) => unwrap_stream_settings(&schema),
-        Err(_) => None,
-    };
+    let settings = get(org_id, stream_name, stream_type)
+        .await
+        .ok()
+        .as_ref()
+        .and_then(unwrap_stream_settings);
 
     // Only acquire write lock if we have settings to update
     if let Some(ref s) = settings {
