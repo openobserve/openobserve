@@ -182,7 +182,7 @@ test.describe("Logs Page testcases", () => {
 
   test.afterEach(async ({ page }, testInfo) => {
     testIndex += 1;
-    await flipStreaming(page);
+    await pageManager.commonActions.flipStreaming();
   });
 
   test("should be able to enter valid text in VRL and run query", {
