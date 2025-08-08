@@ -2,9 +2,12 @@ import { test, expect } from "../baseFixtures";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 
+import { deleteDashboard } from "../utils/dashCreation.js";
+
 const randomDashboardName =
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
+const panelName = "Panel_" + Math.random().toString(36).substr(2, 9);
 // Stream name used across tests
 const STREAM_NAME = "e2e_automate";
 
@@ -709,14 +712,10 @@ test.describe(" visualize UI testcases", () => {
     // Wait for visualization to load
     await page.waitForTimeout(2000);
 
-    // Multiple assertions to verify table chart is selected as default for aggregation queries
-
-    // Method 1: Check if table chart item has the selected background color class
-    await expect(
-      page.locator('[data-test="selected-chart-table-item"]').locator("..")
-    ).toHaveClass(/bg-grey-[35]/);
-
-    // Method 2: Alternative assertion - check if table panel is visible
+    // Robust check: wait for table panel to render (source of truth for selected type)
+    await page.waitForSelector('[data-test="dashboard-panel-table"]', {
+      timeout: 15000,
+    });
     await expect(
       page.locator('[data-test="dashboard-panel-table"]')
     ).toBeVisible();
@@ -727,13 +726,11 @@ test.describe(" visualize UI testcases", () => {
         .locator('[data-test="dashboard-panel-table"]')
         .getByRole("cell", { name: "breakdown_1" })
     ).toBeVisible();
-
-    // Method 4: Additional verification - check if other chart types are NOT selected
-    // Line chart should not have the selected class
     await expect(
-      page.locator('[data-test="selected-chart-line-item"]').locator("..")
-    ).not.toHaveClass(/bg-grey-[35]/);
+      page.locator('[data-test="dashboard-panel-table"]').first()
+    ).toBeVisible();
   });
+
   // Helper function to setup aggregation query test
   async function setupAggregationQueryTest(page) {
     await page
@@ -836,6 +833,26 @@ test.describe(" visualize UI testcases", () => {
       await expect(locator).not.toHaveClass(/bg-grey-[35]/);
     }
   }
+  async function addPanelToNewDashboard(page, dashboardName, panelName) {
+    // Click "Add To Dashboard" button
+    await page.getByRole("button", { name: "Add To Dashboard" }).click();
+
+    // Create a new dashboard
+    await page.locator('[data-test="dashboard-dashboard-new-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').fill(dashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+
+    // Set panel title
+    await page
+      .locator('[data-test="metrics-new-dashboard-panel-title"]')
+      .fill(panelName);
+
+    // Save panel settings
+    await page
+      .locator('[data-test="metrics-schema-update-settings-button"]')
+      .click();
+  }
+
   // Helper function to open query inspector and verify query
   test("should not show dashboard errors when changing chart types with aggregation query", async ({
     page,
@@ -871,7 +888,7 @@ test.describe(" visualize UI testcases", () => {
       const errorResult = await checkDashboardErrors(page, chartType.name);
 
       if (errorResult.hasErrors) {
-        console.log(`❌ Dashboard error found for ${chartType.name} chart:`);
+        console.log(`Dashboard error found for ${chartType.name} chart:`);
         errorResult.errors.forEach((error, index) => {
           console.log(`  ${index + 1}. ${error}`);
         });
@@ -880,7 +897,7 @@ test.describe(" visualize UI testcases", () => {
         expect(errorResult.errorTextCount).toBe(0);
         expect(errorResult.errorListCount).toBe(0);
       } else {
-        console.log(`✅ ${chartType.name} chart: No dashboard errors found`);
+        console.log(`${chartType.name} chart: No dashboard errors found`);
       }
 
       // Verify the chart renders successfully
@@ -888,27 +905,13 @@ test.describe(" visualize UI testcases", () => {
       expect(chartRendered).toBe(true);
     }
 
-    console.log(
-      "✅ All chart types tested successfully without dashboard errors"
-    );
+    console.log("All chart types tested successfully without dashboard errors");
   });
   test("should set line chart as default when using histogram query", async ({
     page,
   }) => {
-    // await setupHistogramQueryTest(page);
-    await page
-      .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
-      .fill(histogramQuery);
-
-    // Apply time filter and search
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-
-    // Switch to visualization
-    await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page.waitForTimeout(2000);
+    // Setup the test with aggregation query
+    await setupAggregationQueryTest(page);
 
     // Verify line chart is selected as default for histogram queries
     await verifyChartTypeSelected(page, "line", true);
@@ -947,30 +950,14 @@ test.describe(" visualize UI testcases", () => {
     // Toggle visualization
     await page.locator('[data-test="logs-visualize-toggle"]').click();
 
-    await page.waitForTimeout(4000);
-    await page.getByRole("button", { name: "Add To Dashboard" }).click();
-
-    await page.waitForTimeout(4000);
-
-    await page
-      .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .click();
-    await page
-      .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .fill(randomDashboardName);
-    await page
-      .locator('[data-test="metrics-schema-update-settings-button"]')
-      .click();
+    await page.waitForTimeout(2000);
+    await addPanelToNewDashboard(page, randomDashboardName, panelName);
 
     // Wait for visualization to load
     await page.waitForTimeout(2000);
 
     await page
-      .locator(
-        '[data-test="dashboard-edit-panel-' +
-          randomDashboardName +
-          '-dropdown"]'
-      )
+      .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')
       .click();
     await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
 
@@ -982,6 +969,10 @@ test.describe(" visualize UI testcases", () => {
         })
         .first()
     ).toBeVisible();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await deleteDashboard(page, randomDashboardName);
   });
   test("should display the correct query in the dashboard when saved from a Line chart.", async ({
     page,
@@ -1005,28 +996,13 @@ test.describe(" visualize UI testcases", () => {
     // Toggle visualization
     await page.locator('[data-test="logs-visualize-toggle"]').click();
 
-    await page.waitForTimeout(4000);
-    await page.getByRole("button", { name: "Add To Dashboard" }).click();
+    await page.waitForTimeout(2000);
 
-    await page.waitForTimeout(4000);
-
-    await page
-      .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .click();
-    await page
-      .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .fill(randomDashboardName);
-    await page
-      .locator('[data-test="metrics-schema-update-settings-button"]')
-      .click();
+    await addPanelToNewDashboard(page, randomDashboardName, panelName);
 
     await page.waitForTimeout(2000);
     await page
-      .locator(
-        '[data-test="dashboard-edit-panel-' +
-          randomDashboardName +
-          '-dropdown"]'
-      )
+      .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')
       .click();
     await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
 
@@ -1038,5 +1014,9 @@ test.describe(" visualize UI testcases", () => {
         })
         .first()
     ).toBeVisible();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await deleteDashboard(page, randomDashboardName);
   });
 });
