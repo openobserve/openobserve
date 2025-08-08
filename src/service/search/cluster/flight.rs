@@ -15,7 +15,10 @@
 
 use std::sync::Arc;
 
-use arrow::array::RecordBatch;
+use arrow::{
+    array::RecordBatch,
+    datatypes::{DataType, Field, Schema as ArrowSchema},
+};
 use async_recursion::async_recursion;
 use config::{
     cluster::LOCAL_NODE,
@@ -555,10 +558,6 @@ pub async fn run_datafusion(
         }
     }
 
-    if cfg.common.print_key_sql {
-        print_plan(&trace_id, &physical_plan, "after");
-    }
-
     // wrap with EXPLAIN/ANALYZE if needed (after all OpenObserve rewrites are complete)
     if sql.is_explain {
         // For EXPLAIN ANALYZE, first wrap with AnalyzeExec to collect metrics
@@ -579,19 +578,20 @@ pub async fn run_datafusion(
             config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref()),
         )];
 
+        // Create the correct EXPLAIN output schema (plan_type, plan columns)
+        let explain_schema = Arc::new(ArrowSchema::new(vec![
+            Field::new("plan_type", DataType::Utf8, false),
+            Field::new("plan", DataType::Utf8, false),
+        ]));
         physical_plan = Arc::new(ExplainExec::new(
-            physical_plan.schema(),
+            explain_schema,
             stringified_plans,
             sql.is_verbose,
         ));
+    }
 
-        if cfg.common.print_key_sql {
-            log::info!(
-                "[trace_id {trace_id}] physical plan wrapped with EXPLAIN (analyze={}, verbose={})",
-                sql.is_analyze,
-                sql.is_verbose
-            );
-        }
+    if cfg.common.print_key_sql {
+        print_plan(&trace_id, &physical_plan, "after");
     }
 
     // run datafusion

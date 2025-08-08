@@ -161,7 +161,7 @@ pub async fn search(
                 }
             }
 
-            result.explain_output = Some(explain_data);
+            result.explain_output = dbg!(Some(explain_data));
         }
 
         // For EXPLAIN ANALYZE, we still process the actual query results
