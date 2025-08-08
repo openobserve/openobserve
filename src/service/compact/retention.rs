@@ -421,7 +421,7 @@ pub async fn delete_by_date(
     handle_delete_by_date_done(org_id, stream_type, stream_name, date_range).await
 }
 
-async fn delete_from_file_list(
+pub async fn delete_from_file_list(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
