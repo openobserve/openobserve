@@ -19,17 +19,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::meta::stream::StreamParams;
 
+const PIPELINE_ERROR_MAX_SIZE: usize = 1024;
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct ErrorData {
     pub _timestamp: i64,
     #[serde(flatten)]
     pub stream_params: StreamParams,
-    #[serde(flatten)]
     pub error_source: ErrorSource,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(tag = "error_source")]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorSource {
@@ -39,6 +40,30 @@ pub enum ErrorSource {
     Pipeline(PipelineError),
     Search,
     Other,
+}
+
+impl Serialize for ErrorSource {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            ErrorSource::Alert => serializer.serialize_str("alert"),
+            ErrorSource::Dashboard => serializer.serialize_str("dashboard"),
+            ErrorSource::Ingestion => serializer.serialize_str("ingestion"),
+            ErrorSource::Pipeline(pipeline_error) => {
+                // limit the size of the pipeline error to 1k characters
+                let err_str = serde_json::to_string(pipeline_error).unwrap();
+                if err_str.len() > PIPELINE_ERROR_MAX_SIZE {
+                    serializer.serialize_str(&err_str[..PIPELINE_ERROR_MAX_SIZE])
+                } else {
+                    serializer.serialize_str(&err_str)
+                }
+            }
+            ErrorSource::Search => serializer.serialize_str("search"),
+            ErrorSource::Other => serializer.serialize_str("other"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -143,5 +168,16 @@ mod tests {
         let val_str = json::to_string(&val.unwrap());
         assert!(val_str.is_ok());
         println!("val: {}", val_str.unwrap());
+    }
+
+    #[test]
+    fn test_error_data_serialization() {
+        let error_data = ErrorData {
+            _timestamp: 10,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Pipeline(PipelineError::new("pipeline_id", "pipeline_name")),
+        };
+        let val = json::to_string(&error_data);
+        assert!(val.is_ok());
     }
 }

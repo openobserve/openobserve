@@ -200,7 +200,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         }
     }
 
-    if !errors.is_empty() {
+    if cfg.common.usage_reporting_errors_enabled && !errors.is_empty() {
         let error_stream = StreamParams::new(META_ORG_ID, ERROR_STREAM, StreamType::Logs);
         if super::ingestion::ingest_reporting_data(errors.clone(), error_stream)
             .await
@@ -209,7 +209,13 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         {
             // on error in ingesting usage data, push back the data
             for error_json in errors {
-                let error: ErrorData = json::from_value(error_json).unwrap();
+                let error: ErrorData = match json::from_value(error_json) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!("[SELF-REPORTING] Error in parsing ErrorData: {e}");
+                        continue;
+                    }
+                };
                 if let Err(e) = ERROR_QUEUE
                     .enqueue(ReportingData::Error(Box::new(error)))
                     .await
