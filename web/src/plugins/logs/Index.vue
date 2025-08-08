@@ -1317,16 +1317,15 @@ export default defineComponent({
       return parsedSQL;
     };
 
-    // Helper function to check if the query is a simple "SELECT * FROM stream_name" query
+    // Helper function to check if the query is a simple "SELECT * FROM....." query
     const isSimpleSelectAllQuery = (query: string): boolean => {
       if (!query || typeof query !== 'string') return false;
       
-      // Normalize the query by removing extra whitespace and converting to lowercase
-      const normalizedQuery = query.trim().toLowerCase().replace(/\s+/g, ' ');
+      // Normalize the query by removing extra whitespace
+      const normalizedQuery = query.trim().replace(/\s+/g, ' ');
       
-      // Pattern to match: SELECT * FROM "stream_name" or SELECT * FROM stream_name
-      // Also handles UNION queries and optional WHERE clauses
-      const selectAllPattern = /^select\s+\*\s+from\s+["`]?[\w.-]+["`]?(\s+(where\s+.+|union\s+select\s+\*\s+from\s+["`]?[\w.-]+["`]?.*)?)?$/;
+      // Pattern to match: SELECT * FROM followed by anything (case insensitive)
+      const selectAllPattern = /^select\s+\*\s+from\s+/i;
       
       return selectAllPattern.test(normalizedQuery);
     };
