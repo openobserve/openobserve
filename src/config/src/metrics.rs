@@ -392,7 +392,7 @@ pub static QUERY_METRICS_CACHE_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-// query parquet metadta cache stats
+// query parquet metadata cache stats
 pub static QUERY_PARQUET_METADATA_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
