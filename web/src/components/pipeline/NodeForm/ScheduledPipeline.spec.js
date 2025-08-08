@@ -54,6 +54,43 @@ vi.mock("@/composables/useStreams", () => ({
     }),
   }),
 }));
+vi.mock('@/composables/useParser', () => {
+  return {
+    default: () => ({
+      sqlParser: async () => ({
+        astify: vi.fn((query) => {
+          const lowerQuery = query.toLowerCase();
+        
+          if (lowerQuery.includes("select *")) {
+            return {
+              columns: [
+                { expr: { column: "*" } }
+              ]
+            };
+          }
+          if (lowerQuery.includes("valid_column")) {
+            return {
+              columns: [
+                { expr: { column: "valid_column" } }
+              ]
+            };
+          }
+          if (lowerQuery.includes("default")) {
+            throw new Error("Syntax error near 'default'");
+          }
+          return { columns: [] };
+        }),
+        sqlify: vi.fn(),
+        columnList: vi.fn(),
+        tableList: vi.fn(),
+        whiteListCheck: vi.fn(),
+        exprToSQL: vi.fn(),
+        parse: vi.fn(),
+      })
+    })
+  };
+});
+
 
 vi.mock("@/composables/useLogs", () => ({
   default: () => ({
@@ -166,6 +203,7 @@ describe("ScheduledPipeline Component", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    wrapper.vm.query = ""
   });
 
   describe("Component Initialization", () => {
@@ -201,6 +239,7 @@ describe("ScheduledPipeline Component", () => {
 
     it("updates stream fields when stream is selected", async () => {
       await wrapper.vm.getStreamFields();
+      await flushPromises();
       expect(wrapper.vm.streamFields.length).toBe(2);
       expect(wrapper.vm.streamFields[0].name).toBe("timestamp");
     });
@@ -208,6 +247,7 @@ describe("ScheduledPipeline Component", () => {
     it("updates query when stream is selected", async () => {
       wrapper.vm.selectedStreamName = "test_stream";
       await wrapper.vm.getStreamFields();
+      await flushPromises();
       expect(wrapper.vm.query).toContain("test_stream");
     });
   });

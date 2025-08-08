@@ -46,7 +46,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 6;
+pub const DB_SCHEMA_VERSION: u64 = 7;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -936,6 +936,12 @@ pub struct Common {
     )]
     pub inverted_index_cache_enabled: bool,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
+        default = false,
+        help = "Toggle tantivy result cache."
+    )]
+    pub inverted_index_result_cache_enabled: bool,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_OLD_FORMAT",
         default = false,
         help = "Use old format for inverted index, it will generate same stream name for index."
@@ -1414,6 +1420,18 @@ pub struct Limit {
         help = "Maximum number of entries in the inverted index cache. Higher values increase memory usage but may improve query performance."
     )]
     pub inverted_index_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
+        default = 10000,
+        help = "Maximum number of entries in the inverted index result cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub inverted_index_result_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRY_SIZE",
+        default = 20 * 1024, // bytes, default is 20KB
+        help = "Maximum size of a single entry in the inverted index result cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub inverted_index_result_cache_max_entry_size: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
         default = 35,
@@ -1922,6 +1940,18 @@ pub struct Pipeline {
         help = "pipeline exporter client max retry time in hours"
     )]
     pub max_retry_time_in_hours: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_FILE_SIZE_ON_DISK_MB",
+        default = 128,
+        help = "pipeline max file size on disk in MB"
+    )]
+    pub pipeline_max_file_size_on_disk_mb: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_FILE_RETENTION_TIME_SECONDS",
+        default = 600,
+        help = "pipeline max file retention time in seconds"
+    )]
+    pub pipeline_max_file_retention_time_seconds: u64,
 }
 
 #[derive(EnvConfig, Default)]

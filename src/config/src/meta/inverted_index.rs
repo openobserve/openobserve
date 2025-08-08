@@ -15,13 +15,31 @@
 
 use proto::cluster_rpc;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum IndexOptimizeMode {
     SimpleSelect(usize, bool),
     SimpleCount,
     SimpleHistogram(i64, u64, usize),
     SimpleTopN(String, usize, bool),
     SimpleDistinct(String, usize, bool),
+}
+
+impl IndexOptimizeMode {
+    pub fn to_rule_string(&self) -> String {
+        match self {
+            IndexOptimizeMode::SimpleSelect(limit, ascend) => format!("s(l:{limit},a:{ascend})"),
+            IndexOptimizeMode::SimpleCount => "c".to_string(),
+            IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
+                format!("h(m:{min_value},b:{bucket_width},n:{num_buckets})")
+            }
+            IndexOptimizeMode::SimpleTopN(field, limit, ascend) => {
+                format!("t(f{field},l:{limit},a:{ascend})")
+            }
+            IndexOptimizeMode::SimpleDistinct(field, limit, ascend) => {
+                format!("d(f:{field},l:{limit},a:{ascend})")
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for IndexOptimizeMode {

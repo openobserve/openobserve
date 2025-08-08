@@ -25,7 +25,7 @@ use std::{
 use arrow_schema::{DataType, Field, Schema};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
-    meta::stream::{StreamPartition, StreamSettings, StreamType},
+    meta::stream::{StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
 use infra::schema::unwrap_partition_time_level;
@@ -42,9 +42,6 @@ use crate::{
 };
 
 const STREAM_NAME: &str = "trace_list_index";
-
-static PARTITION_KEYS: Lazy<[StreamPartition; 1]> =
-    Lazy::new(|| [StreamPartition::new("service_name")]);
 
 pub(crate) static INSTANCE: Lazy<TraceListIndex> = Lazy::new(TraceListIndex::new);
 
@@ -98,7 +95,7 @@ impl Metadata for TraceListIndex {
             let data = data.as_object_mut().unwrap();
             let hour_key = ingestion::get_write_partition_key(
                 timestamp,
-                PARTITION_KEYS.to_vec().as_ref(),
+                &vec![],
                 unwrap_partition_time_level(None, StreamType::Metadata),
                 data,
                 Some(&schema_key),
@@ -201,7 +198,7 @@ impl TraceListIndex {
 
             let settings = StreamSettings {
                 partition_time_level: None,
-                partition_keys: PARTITION_KEYS.to_vec(),
+                partition_keys: vec![],
                 full_text_search_keys: vec![],
                 index_fields: vec![],
                 bloom_filter_fields: vec!["trace_id".to_string()],
@@ -216,6 +213,7 @@ impl TraceListIndex {
                 extended_retention_days: vec![],
                 index_all_values: false,
                 index_original_data: false,
+                enable_distinct_fields: true,
             };
 
             stream::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)

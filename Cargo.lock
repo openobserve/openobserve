@@ -2535,6 +2535,7 @@ dependencies = [
  "rand 0.8.5",
  "regex",
  "reqwest",
+ "roaring",
  "sea-orm",
  "segment",
  "serde",
@@ -6532,6 +6533,7 @@ dependencies = [
  "regex-syntax 0.8.5",
  "report_server",
  "reqwest",
+ "roaring",
  "rust-embed-for-web",
  "rustls 0.23.20",
  "rustls-pemfile 2.2.0",
@@ -8280,6 +8282,16 @@ name = "rle-decode-fast"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3582f63211428f83597b51b2ddb88e2a91a9d52d12831f9d08f5e624e8977422"
+
+[[package]]
+name = "roaring"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f08d6a905edb32d74a5d5737a0c9d7e950c312f3c46cb0ca0a2ca09ea11878a0"
+dependencies = [
+ "bytemuck",
+ "byteorder",
+]
 
 [[package]]
 name = "roxmltree"

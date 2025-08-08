@@ -796,9 +796,6 @@ async fn write_traces(
         partition_time_level =
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Traces);
     }
-    if partition_keys.is_empty() {
-        partition_keys.push(StreamPartition::new("service_name"));
-    }
 
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
@@ -853,23 +850,25 @@ async fn write_traces(
         // get service_name
         let service_name = json::get_string_value(record_val.get("service_name").unwrap());
         // get distinct_value item
-        let mut map = Map::new();
-        for field in DISTINCT_FIELDS.iter().chain(
-            stream_settings
-                .distinct_value_fields
-                .iter()
-                .map(|f| &f.name),
-        ) {
-            if let Some(val) = record_val.get(field) {
-                map.insert(field.clone(), val.clone());
+        if stream_settings.enable_distinct_fields {
+            let mut map = Map::new();
+            for field in DISTINCT_FIELDS.iter().chain(
+                stream_settings
+                    .distinct_value_fields
+                    .iter()
+                    .map(|f| &f.name),
+            ) {
+                if let Some(val) = record_val.get(field) {
+                    map.insert(field.clone(), val.clone());
+                }
             }
-        }
-        if !map.is_empty() {
-            distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                stream_type: StreamType::Traces,
-                stream_name: stream_name.to_string(),
-                value: map,
-            }));
+            if !map.is_empty() {
+                distinct_values.push(MetadataItem::DistinctValues(DvItem {
+                    stream_type: StreamType::Traces,
+                    stream_name: stream_name.to_string(),
+                    value: map,
+                }));
+            }
         }
 
         // build trace metadata
@@ -954,6 +953,7 @@ async fn write_traces(
     // send distinct_values
     if !distinct_values.is_empty()
         && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
+        && stream_settings.enable_distinct_fields
         && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
     {
         log::error!("Error while writing distinct values: {e}");

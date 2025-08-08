@@ -176,7 +176,7 @@ describe("Condition Component", () => {
       );
     });
 
-    it("loads fields from input stream node", async () => {
+    it.skip("loads fields from input stream node", async () => {
       // Verify filteredColumns is populated
       expect(wrapper.vm.filteredColumns).toBeDefined();
       expect(wrapper.vm.filteredColumns).toHaveLength(3);

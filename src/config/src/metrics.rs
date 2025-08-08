@@ -692,7 +692,7 @@ pub static DB_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
         Opts::new("db_query_nums", "db query number")
             .namespace(NAMESPACE)
             .const_labels(create_const_labels()),
-        &["operation", "table", "key"],
+        &["operation", "table"],
     )
     .expect("Metric created")
 });
@@ -910,11 +910,11 @@ pub static PIPELINE_WAL_INGESTION_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "pipeline_wal_ingestion_bytes",
-            "Bytes ingested across all pipelines",
+            "Bytes ingested per pipeline",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[],
+        &["pipeline_id"],
     )
     .expect("Metric created")
 });
@@ -923,11 +923,11 @@ pub static PIPELINE_EXPORTED_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "pipeline_http_exported_bytes",
-            "Bytes exported across all pipelines",
+            "Bytes exported per destination",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &[],
+        &["destination"],
     )
     .expect("Metric created")
 });
@@ -937,6 +937,59 @@ pub static QUERY_AGGREGATION_CACHE_ITEMS: Lazy<IntGaugeVec> = Lazy::new(|| {
         Opts::new(
             "query_aggregation_cache_items",
             "Total number of aggregation cache items",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+// metrics for tantivy result cache
+pub static TANTIVY_RESULT_CACHE_MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "tantivy_result_cache_memory_usage",
+            "Total memory usage (bytes) of tantivy result cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static TANTIVY_RESULT_CACHE_GC_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "tantivy_result_cache_gc_total",
+            "Total number of GC of tantivy result cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static TANTIVY_RESULT_CACHE_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "tantivy_result_cache_requests_total",
+            "Total number of search of tantivy result cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static TANTIVY_RESULT_CACHE_HITS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "tantivy_result_cache_hits_total",
+            "Total number of hit of tantivy result cache",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -1209,6 +1262,20 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_AGGREGATION_CACHE_BYTES.clone()))
+        .expect("Metric registered");
+
+    // metrics for tantivy result cache
+    registry
+        .register(Box::new(TANTIVY_RESULT_CACHE_MEMORY_USAGE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TANTIVY_RESULT_CACHE_GC_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TANTIVY_RESULT_CACHE_REQUESTS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(TANTIVY_RESULT_CACHE_HITS_TOTAL.clone()))
         .expect("Metric registered");
 }
 
