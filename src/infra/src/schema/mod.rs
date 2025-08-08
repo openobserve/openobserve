@@ -727,6 +727,17 @@ impl SchemaCache {
             .get(field_name)
             .and_then(|i| self.schema.fields().get(*i))
     }
+
+    pub fn size(&self) -> usize {
+        let mut size = std::mem::size_of::<&Schema>() + self.schema.size();
+        size += std::mem::size_of::<&HashMap<String, usize>>();
+        for (key, _val) in self.fields_map.iter() {
+            size += std::mem::size_of::<String>() + key.len();
+            size += std::mem::size_of::<usize>();
+        }
+        size += std::mem::size_of::<String>() + self.hash_key.len();
+        size
+    }
 }
 
 pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {

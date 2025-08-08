@@ -21,8 +21,6 @@ use std::{
 use arrow_schema::{Field, Schema};
 use hashbrown::HashSet;
 
-const HASH_MAP_SIZE: usize = std::mem::size_of::<HashMap<String, String>>();
-
 /// SchemaExt helper...
 pub trait SchemaExt {
     fn to_cloned_fields(&self) -> Vec<Field>;
@@ -82,7 +80,8 @@ impl SchemaExt for Schema {
     }
 
     fn size(&self) -> usize {
-        let mut size = self.fields.iter().fold(0, |acc, field| acc + field.size()) + HASH_MAP_SIZE;
+        let mut size = std::mem::size_of::<&arrow_schema::Fields>();
+        size += self.fields.iter().fold(0, |acc, field| acc + field.size());
         size += std::mem::size_of::<HashMap<String, String>>();
         for (key, val) in self.metadata.iter() {
             size += std::mem::size_of::<String>() * 2;

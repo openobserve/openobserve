@@ -256,6 +256,9 @@ pub mod remote {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(merge_interval)).await;
             let org_table_pairs = database::list().await?;
+            if org_table_pairs.is_empty() {
+                continue;
+            }
             log::info!(
                 "[ENRICHMENT::STORAGE] Found {} enrichment tables, {:?}",
                 org_table_pairs.len(),
