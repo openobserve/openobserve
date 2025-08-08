@@ -91,8 +91,9 @@ pub const ALL_VALUES_COL_NAME: &str = "_all_values";
 pub const DB_SCHEMA_VERSION: u64 = 2;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
-const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
-    ["log", "message", "msg", "content", "data", "body", "json"];
+const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 9] = [
+    "log", "message", "msg", "content", "data", "body", "json", "error", "errors",
+];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
         _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS
@@ -882,6 +883,8 @@ pub struct Common {
     pub usage_reporting_url: String,
     #[env_config(name = "ZO_USAGE_REPORTING_CREDS", default = "")]
     pub usage_reporting_creds: String,
+    #[env_config(name = "ZO_USAGE_REPORTING_ERRORS_ENABLED", default = true)]
+    pub usage_reporting_errors_enabled: bool,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
     #[env_config(
