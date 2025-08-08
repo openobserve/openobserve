@@ -49,9 +49,9 @@ fn create_system_prompts_table_statement() -> TableCreateStatement {
         .col(ColumnDef::new(SystemPrompts::Content).text().not_null())
         .col(
             ColumnDef::new(SystemPrompts::UpdatedAt)
-                .timestamp()
-                .default(Expr::current_timestamp())
-                .not_null(),
+                .big_integer()
+                .not_null()
+                .default(0),
         )
         .to_owned()
 }
@@ -79,7 +79,7 @@ mod tests {
                 CREATE TABLE IF NOT EXISTS "system_prompts" (
                 "type" varchar(27) NOT NULL PRIMARY KEY,
                 "content" text NOT NULL,
-                "updated_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
+                "updated_at" bigint NOT NULL DEFAULT 0
             )"#
         );
     }
@@ -92,7 +92,7 @@ mod tests {
                 CREATE TABLE IF NOT EXISTS `system_prompts` (
                 `type` varchar(27) NOT NULL PRIMARY KEY,
                 `content` text NOT NULL,
-                `updated_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
+                `updated_at` bigint NOT NULL DEFAULT 0
             )"#
         );
     }
@@ -105,7 +105,7 @@ mod tests {
                 CREATE TABLE IF NOT EXISTS "system_prompts" (
                 "type" varchar(27) NOT NULL PRIMARY KEY,
                 "content" text NOT NULL,
-                "updated_at" timestamp_text DEFAULT CURRENT_TIMESTAMP NOT NULL
+                "updated_at" bigint NOT NULL DEFAULT 0
             )"#
         );
     }
