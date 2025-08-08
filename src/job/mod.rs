@@ -51,6 +51,9 @@ pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 #[cfg(feature = "marketplace")]
 async fn get_metering_lock() -> Result<(), Error> {
+    if !LOCAL_NODE.is_alert_manager() {
+        return Ok(());
+    }
     use infra::dist_lock;
     use o2_enterprise::enterprise::metering::METERING_NATS_LOCK_KEY;
 
@@ -288,13 +291,34 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     #[cfg(any(feature = "marketplace"))]
     {
-        use crate::service::self_reporting::search::get_usage;
+        use crate::{
+            common::infra::cluster::get_cached_nodes, service::self_reporting::search::get_usage,
+        };
+
         tokio::spawn(async move {
             // try checking the lock every 15 minutes, so we can be fairly sure that
             // when we report metering, there is an alive node holding the lock
             let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60 * 15));
             interval.tick().await; // first tick is instant
+            // we start off with false, so at startup alert manager must be up and running
+            let mut last_check = false;
             loop {
+                let nodes = get_cached_nodes(|n| n.is_alert_manager())
+                    .await
+                    .unwrap_or_default();
+                if nodes.is_empty() {
+                    if !last_check {
+                        log::info!(
+                            "[O2::ENT] No online alert manager node found in two consecutive checks, exiting"
+                        );
+                        std::process::exit(-1);
+                    } else {
+                        last_check = false;
+                    }
+                } else {
+                    last_check = true;
+                }
+
                 get_metering_lock().await.unwrap();
                 interval.tick().await;
             }
