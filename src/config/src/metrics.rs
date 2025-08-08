@@ -158,7 +158,8 @@ pub static INGEST_PARQUET_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
             "ingest_parquet_files",
-            "Number of parquet files in the ingester pending upload to object store.".to_owned() + HELP_SUFFIX,
+            "Number of parquet files in the ingester pending upload to object store.".to_owned()
+                + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
