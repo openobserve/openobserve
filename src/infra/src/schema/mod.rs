@@ -729,8 +729,8 @@ impl SchemaCache {
     }
 
     pub fn size(&self) -> usize {
-        let mut size = std::mem::size_of::<&Schema>() + self.schema.size();
-        size += std::mem::size_of::<&HashMap<String, usize>>();
+        let mut size = std::mem::size_of::<SchemaRef>() + self.schema.size();
+        size += std::mem::size_of::<HashMap<String, usize>>();
         for (key, _val) in self.fields_map.iter() {
             size += std::mem::size_of::<String>() + key.len();
             size += std::mem::size_of::<usize>();
