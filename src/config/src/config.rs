@@ -669,7 +669,7 @@ pub struct Route {
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
-    #[env_config(name="ZO_ROUTE_STRATEGY", default = "workload")]
+    #[env_config(name = "ZO_ROUTE_STRATEGY", default = "workload")]
     pub dispatch_strategy: String,
 }
 
