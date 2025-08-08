@@ -110,6 +110,9 @@ test.describe("Logs Page testcases", () => {
     await page.locator('[data-test="dashboard-add-submit"]').click();
     await page.waitForTimeout(2000);
     await expect(page.locator('text=Organization settings updated').first()).toBeVisible();
+    // Refresh to ensure state is persisted and not stale
+    await page.reload();
+    await getStreamingState(page);
   }
 
   // Return to Logs page, select stream, and apply query so tests have a clean start
@@ -132,6 +135,8 @@ test.describe("Logs Page testcases", () => {
     await page.locator('[data-test="general-settings-enable-streaming"] div').nth(2).click();
     await page.locator('[data-test="dashboard-add-submit"]').click();
     await page.getByText('Organization settings updated', { exact: false }).waitFor({ timeout: 15000 });
+    // Refresh to ensure state is persisted and not stale
+    await page.reload();
     const newState = await getStreamingState(page);
     console.log(`[Streaming Toggle] ${isOn ? 'ON' : 'OFF'} -> ${newState ? 'ON' : 'OFF'}`);
   }
