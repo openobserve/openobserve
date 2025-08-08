@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::cluster::LOCAL_NODE;
+#[cfg(feature = "marketplace")]
+use infra::errors::Error;
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
@@ -49,6 +51,57 @@ mod telemetry;
 pub use file_downloader::{download_from_node, queue_download};
 pub use file_list_dump::FILE_LIST_SCHEMA;
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
+
+#[cfg(feature = "marketplace")]
+async fn get_metering_lock() -> Result<(), Error> {
+    use infra::dist_lock;
+    use o2_enterprise::enterprise::metering::METERING_NATS_LOCK_KEY;
+
+    use crate::common::infra::cluster::get_node_by_uuid;
+
+    let db = infra::db::get_db().await;
+    let node = db
+        .get("/marketplace/metering/node")
+        .await
+        .ok()
+        .unwrap_or_default();
+    let node = String::from_utf8_lossy(&node);
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+        log::info!("[o2::ENT] metering is locked by node {node}");
+        return Ok(()); // other node is processing
+    }
+
+    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
+        let locker = infra::dist_lock::lock(METERING_NATS_LOCK_KEY, 0).await?;
+        // check the working node again, maybe other node locked it first
+        let node = db
+            .get("/marketplace/metering/node")
+            .await
+            .ok()
+            .unwrap_or_default();
+        let node = String::from_utf8_lossy(&node);
+        if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
+        {
+            dist_lock::unlock(&locker).await?;
+            return Ok(()); // other node is processing
+        }
+        // set to current node
+        let ret = db
+            .put(
+                "/marketplace/metering/node",
+                LOCAL_NODE.uuid.clone().into(),
+                infra::db::NO_NEED_WATCH,
+                None,
+            )
+            .await;
+        dist_lock::unlock(&locker).await?;
+        log::info!("[o2::ENT] Metering lock acquired");
+        drop(locker);
+        ret?;
+    }
+
+    Ok(())
+}
 
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
@@ -289,6 +342,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(any(feature = "cloud", feature = "marketplace"))]
     {
         use crate::service::self_reporting::search::get_usage;
+        tokio::spawn(async move {
+            // try checking the lock every 15 minutes, so we can be fairly sure that
+            // when we report metering, there is an alive node holding the lock
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60 * 15));
+            interval.tick().await; // first tick is instant
+            loop {
+                get_metering_lock().await.unwrap();
+                interval.tick().await;
+            }
+        });
         o2_enterprise::enterprise::metering::init(get_usage)
             .await
             .expect("cloud usage metering job init failed");
