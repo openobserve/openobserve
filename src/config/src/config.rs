@@ -1879,7 +1879,7 @@ pub struct Pipeline {
     pub max_connections: usize,
     #[env_config(
         name = "ZO_PIPELINE_BATCH_ENABLED",
-        default = true,
+        default = false,
         help = "Enable batching of entries before sending HTTP requests"
     )]
     pub batch_enabled: bool,

@@ -101,6 +101,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if let Err(e) = update_storage_metrics().await {
             log::error!("Error update storage metrics: {e}");
         }
+        if config::cluster::LOCAL_NODE.is_ingester()
+            && let Err(e) = update_parquet_metrics().await
+        {
+            log::error!("Error update parquet metrics: {e}");
+        }
         interval.tick().await;
     }
 }
@@ -302,6 +307,14 @@ async fn update_storage_metrics() -> Result<(), anyhow::Error> {
             .with_label_values(&[columns[0], columns[1]])
             .set(cur_val + stat.doc_num);
     }
+    Ok(())
+}
+
+async fn update_parquet_metrics() -> Result<(), anyhow::Error> {
+    // Call the ingester's parquet metrics collection function
+    ingester::collect_parquet_metrics()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to collect parquet metrics: {}", e))?;
     Ok(())
 }
 
