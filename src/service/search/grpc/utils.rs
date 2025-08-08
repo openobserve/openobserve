@@ -56,6 +56,33 @@ impl TantivyResult {
             _ => 0,
         }
     }
+
+    pub fn get_memory_size(&self) -> usize {
+        match self {
+            Self::RowIds(row_ids) => {
+                row_ids.capacity() * std::mem::size_of::<u32>()
+                    + std::mem::size_of::<HashSet<u32>>()
+            }
+            Self::RowIdsBitVec(_, bitvec) => {
+                bitvec.capacity().div_ceil(8) + std::mem::size_of::<BitVec>()
+            }
+            Self::Count(_) => std::mem::size_of::<usize>(),
+            Self::Histogram(histogram) => {
+                histogram.capacity() * std::mem::size_of::<u64>() + std::mem::size_of::<Vec<u64>>()
+            }
+            Self::TopN(top_n) => {
+                top_n
+                    .iter()
+                    .map(|(s, _)| s.capacity() + std::mem::size_of::<u64>())
+                    .sum::<usize>()
+                    + std::mem::size_of::<Vec<(String, u64)>>()
+            }
+            Self::Distinct(distinct) => {
+                distinct.iter().map(|s| s.capacity()).sum::<usize>()
+                    + std::mem::size_of::<HashSet<String>>()
+            }
+        }
+    }
 }
 
 impl TantivyResult {

@@ -991,7 +991,9 @@ fn _is_blank_or_alphanumeric(s: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use sqlparser::ast::{Function, FunctionArgumentList, Ident, ObjectName, ObjectNamePart, Value};
+    use sqlparser::ast::{
+        Function, FunctionArgumentList, Ident, ObjectName, ObjectNamePart, Value,
+    };
 
     use super::*;
 
