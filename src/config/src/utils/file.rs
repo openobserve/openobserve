@@ -78,8 +78,7 @@ pub fn put_file_contents(file: &str, contents: &[u8]) -> Result<(), std::io::Err
 }
 
 #[allow(dead_code)]
-pub struct FilteredDirWalker
-{
+pub struct FilteredDirWalker {
     backlog: Vec<(isize, PathBuf)>, // Stack
     depth_filters: HashMap<isize, Box<dyn Fn(&PathBuf) -> bool + Send + 'static>>,
 }
@@ -93,7 +92,11 @@ impl FilteredDirWalker {
         }
     }
 
-    pub fn add_depth_filter(&mut self, depth: isize, predicate: impl Fn(&PathBuf) -> bool + Send + 'static) {
+    pub fn add_depth_filter(
+        &mut self,
+        depth: isize,
+        predicate: impl Fn(&PathBuf) -> bool + Send + 'static,
+    ) {
         self.depth_filters.insert(depth, Box::new(predicate));
     }
 }
@@ -124,7 +127,8 @@ impl Iterator for FilteredDirWalker {
                     // Sorted in ascending order - Gets latest first
                     dir_paths.sort();
 
-                    self.backlog.extend(dir_paths.into_iter().map(|entry| (depth + 1, entry)));
+                    self.backlog
+                        .extend(dir_paths.into_iter().map(|entry| (depth + 1, entry)));
                 }
             } else if latest.is_file() {
                 let tail_key = -1;
@@ -139,7 +143,7 @@ impl Iterator for FilteredDirWalker {
 
                 return Some(latest);
             } else {
-                continue
+                continue;
             }
         }
 
@@ -291,7 +295,8 @@ mod tests {
         for day in 28..=31 {
             for hour in 22..24 {
                 std::fs::create_dir_all(format!("./test_path/2025/12/{day}/{hour}")).unwrap();
-                std::fs::create_dir_all(format!("./test_path/2025/12/{day}/{hour}/ignored")).unwrap();
+                std::fs::create_dir_all(format!("./test_path/2025/12/{day}/{hour}/ignored"))
+                    .unwrap();
                 for file in 1..5 {
                     std::fs::File::create(format!("./test_path/2025/12/{day}/{hour}/{file}"))
                         .unwrap();
@@ -308,7 +313,6 @@ mod tests {
         assert!(std::path::Path::new("./test_path/2025/12/31/23/3").exists());
         assert!(std::path::Path::new("./test_path/2025/12/31/22/4").exists());
         assert!(std::path::Path::new("./test_path/2025/12/31/22/3").exists());
-
 
         assert!(std::path::Path::new("./test_path/2025/12/30/23/4").exists());
         assert_eq!(

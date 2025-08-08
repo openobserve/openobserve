@@ -13,10 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{path::Path, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use arrow::array::{ArrayRef, new_null_array};
 use arrow_schema::{DataType, Field};
+use chrono::{DateTime, Datelike, Timelike};
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -25,7 +29,7 @@ use config::{
         stream::{FileKey, StreamParams, StreamPartition},
     },
     utils::{
-        file::{is_exists, scan_files},
+        file::{FilteredDirWalker, is_exists},
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
         record_batch_ext::concat_batches,
         size::bytes_to_human_readable,
@@ -578,9 +582,65 @@ async fn get_file_list_inner(
         "{}/files/{}/{}/{}/",
         wal_dir, query.org_id, query.stream_type, query.stream_name
     );
-    let files = scan_files(&pattern, file_ext, None).unwrap_or_default();
-    let files = files
-        .iter()
+
+    let mut files = FilteredDirWalker::new(vec![PathBuf::from(&pattern)]);
+
+    if let Some((start_us, end_us)) = time_range {
+        if let Some((start_time, end_time)) =
+            DateTime::from_timestamp_micros(start_us).zip(DateTime::from_timestamp_micros(end_us))
+        {
+            let start_year = start_time.year();
+            let end_year = end_time.year();
+
+            files.add_depth_filter(2, move |path| {
+                path.components()
+                    .last()
+                    .and_then(|segment| segment.as_os_str().to_str())
+                    .and_then(|year_str| year_str.parse::<i32>().ok())
+                    .is_some_and(|year| year >= start_year && year <= end_year)
+            });
+
+            let start_month = start_time.month();
+            let end_month = end_time.month();
+            files.add_depth_filter(3, move |path| {
+                path.components()
+                    .last()
+                    .and_then(|segment| segment.as_os_str().to_str())
+                    .and_then(|month_str| month_str.parse::<u32>().ok())
+                    .is_some_and(|month| month >= start_month && month <= end_month)
+            });
+
+            let start_day = start_time.day();
+            let end_day = end_time.day();
+            files.add_depth_filter(4, move |path| {
+                path.components()
+                    .last()
+                    .and_then(|segment| segment.as_os_str().to_str())
+                    .and_then(|day_str| day_str.parse::<u32>().ok())
+                    .is_some_and(|day| day >= start_day && day <= end_day)
+            });
+
+            let start_hour = start_time.hour();
+            let end_hour = end_time.hour();
+            files.add_depth_filter(5, move |path| {
+                path.components()
+                    .last()
+                    .and_then(|segment| segment.as_os_str().to_str())
+                    .and_then(|hour_str| hour_str.parse::<u32>().ok())
+                    .is_some_and(|hour| hour >= start_hour && hour <= end_hour)
+            });
+
+            let file_ext_clone = file_ext.to_string();
+            files.add_depth_filter(-1, move |path| {
+                path.extension()
+                    .and_then(|ext| ext.to_str())
+                    .is_some_and(|pext| pext == file_ext_clone)
+            });
+        }
+    }
+
+    let files: Vec<String> = files
+        .filter_map(|p| p.to_str().map(String::from))
         .map(|f| {
             f.strip_prefix(&wal_dir)
                 .unwrap()
@@ -589,7 +649,7 @@ async fn get_file_list_inner(
                 .trim_start_matches('/')
                 .to_string()
         })
-        .collect::<Vec<_>>();
+        .collect();
 
     if files.is_empty() {
         return Ok(vec![]);
