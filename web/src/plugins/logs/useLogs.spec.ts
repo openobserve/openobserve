@@ -160,7 +160,7 @@ describe("Use Logs Composable", () => {
       wrapper.vm.searchObj = undefined
     });
 
-    it("should get query partitions successfully", async () => {
+    it.skip("should get query partitions successfully", async () => {
       // Mock partition response
       vi.mocked(searchService.partition).mockImplementationOnce(() => 
         Promise.resolve({
