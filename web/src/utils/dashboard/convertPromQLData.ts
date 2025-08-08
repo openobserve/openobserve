@@ -511,6 +511,7 @@ export const convertPromQLData = async (
                         chartMin,
                         chartMax,
                         store.state.theme,
+                        panelSchema?.config?.color?.colorBySeries,
                       );
                     } catch (error) {
                       console.warn("Failed to get series color:", error);
@@ -614,15 +615,16 @@ export const convertPromQLData = async (
                     const defaultColor = null;
                     if (!values?.[0]?.[1]) return defaultColor;
                     return (
-                      getSeriesColor(
-                        panelSchema?.config?.color,
-                        seriesName,
-                        values[0][1],
-                        chartMin,
-                        chartMax,
-                        store.state.theme,
-                      ) ?? defaultColor
-                    );
+                     getSeriesColor(
+                      panelSchema?.config?.color,
+                      seriesName,
+                      values[0][1],
+                      chartMin,
+                      chartMax,
+                      store.state.theme,
+                      panelSchema?.config?.color?.colorBySeries,
+                    ) ?? defaultColor
+                  );
                   })(),
                 },
               },
