@@ -937,6 +937,12 @@ pub struct Common {
     )]
     pub inverted_index_enabled: bool,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
+        default = false,
+        help = "Toggle tantivy result cache."
+    )]
+    pub inverted_index_result_cache_enabled: bool,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_CACHE_ENABLED",
         default = false,
         help = "Toggle inverted index cache."
@@ -1392,8 +1398,20 @@ pub struct Limit {
     )]
     pub inverted_index_cache_max_entries: usize,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
+        default = 10000,
+        help = "Maximum number of entries in the inverted index result cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub inverted_index_result_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRY_SIZE",
+        default = 20480, // bytes, default is 20KB
+        help = "Maximum size of a single entry in the inverted index result cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub inverted_index_result_cache_max_entry_size: usize,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
-        default = 0,
+        default = 35,
         help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
     )]
     pub inverted_index_skip_threshold: usize,

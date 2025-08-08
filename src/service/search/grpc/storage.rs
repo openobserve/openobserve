@@ -43,6 +43,7 @@ use infra::{
     errors::{Error, ErrorCodes},
 };
 use itertools::Itertools;
+use roaring::RoaringBitmap;
 use tantivy::Directory;
 use tokio::sync::Semaphore;
 use tokio_stream::StreamExt as _;
@@ -53,7 +54,10 @@ use crate::service::{
     search::{
         datafusion::exec,
         generate_search_schema_diff,
-        grpc::utils::{self, TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
+        grpc::{
+            tantivy_result_cache::{self, CacheEntry},
+            utils::{self, TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
+        },
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
@@ -917,8 +921,22 @@ async fn search_tantivy_index(
         ));
     };
 
-    // cache the indexer and reader
     let cfg = get_config();
+    let mut cache_key = String::new();
+    if cfg.common.inverted_index_result_cache_enabled {
+        metrics::TANTIVY_RESULT_CACHE_REQUESTS_TOTAL
+            .with_label_values(&[])
+            .inc();
+        cache_key = generate_cache_key(&index_condition, &idx_optimize_rule, parquet_file);
+        if let Some(result) = tantivy_result_cache::TANTIVY_RESULT_CACHE.get(&cache_key) {
+            metrics::TANTIVY_RESULT_CACHE_HITS_TOTAL
+                .with_label_values(&[])
+                .inc();
+            return Ok((parquet_file.key.to_string(), result));
+        }
+    }
+
+    // cache the indexer and reader
     let indexer = if cfg.common.inverted_index_cache_enabled {
         reader_cache::GLOBAL_CACHE.get(&ttv_file_name)
     } else {
@@ -1044,11 +1062,12 @@ async fn search_tantivy_index(
     .await??;
 
     let key = parquet_file.key.to_string();
-    match res {
-        TantivyResult::Count(count) => Ok((key, TantivyResult::Count(count))),
-        TantivyResult::Histogram(histogram) => Ok((key, TantivyResult::Histogram(histogram))),
-        TantivyResult::TopN(top_n) => Ok((key, TantivyResult::TopN(top_n))),
-        TantivyResult::Distinct(distinct) => Ok((key, TantivyResult::Distinct(distinct))),
+    let mut percent = 0.0;
+    let result = match res {
+        TantivyResult::Count(count) => TantivyResult::Count(count),
+        TantivyResult::Histogram(histogram) => TantivyResult::Histogram(histogram),
+        TantivyResult::TopN(top_n) => TantivyResult::TopN(top_n),
+        TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
         TantivyResult::RowIds(row_ids) => {
             if row_ids.is_empty() || parquet_file.meta.records == 0 {
                 return Ok((key, TantivyResult::RowIdsBitVec(0, BitVec::EMPTY)));
@@ -1063,7 +1082,7 @@ async fn search_tantivy_index(
                     TantivyResult::RowIdsBitVec(row_ids_percent as usize, BitVec::EMPTY),
                 ));
             }
-            let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
+            percent = row_ids_percent;
             let max_doc_id = *row_ids.iter().max().unwrap_or(&0) as i64;
             if max_doc_id >= parquet_file.meta.records {
                 return Err(anyhow::anyhow!(
@@ -1072,16 +1091,28 @@ async fn search_tantivy_index(
                     parquet_file.meta.records,
                 ));
             }
+            let mut res = BitVec::repeat(false, max_doc_id as usize + 1);
             let num_rows = row_ids.len();
             for id in row_ids {
                 res.set(id as usize, true);
             }
-            Ok((key, TantivyResult::RowIdsBitVec(num_rows, res)))
+            TantivyResult::RowIdsBitVec(num_rows, res)
         }
         TantivyResult::RowIdsBitVec(..) => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
+    };
+
+    // cache the result if the memory size is less than the limit
+    if cfg.common.inverted_index_result_cache_enabled
+        && !cache_key.is_empty()
+        && (result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
+            || percent < 1.0)
+    {
+        let entry = get_cache_entry(result.clone(), percent);
+        tantivy_result_cache::TANTIVY_RESULT_CACHE.put(cache_key, entry);
     }
+    Ok((key, result))
 }
 
 /// if simple distinct without filter, we need to warm up the field
@@ -1219,6 +1250,51 @@ fn repartition_sorted_groups(
     }
 
     groups
+}
+
+fn get_cache_entry(tantivy_result: TantivyResult, percent: f64) -> CacheEntry {
+    match tantivy_result {
+        TantivyResult::RowIdsBitVec(num_rows, bitvec) => {
+            // if the percent is less than 1.0, we use roaring bitmap to store the row ids
+            // otherwise, we use bitvec to store the row ids.
+            // because the bitvec is not efficient for small percent, and the roaring bitmap is not
+            // efficient for large percent.
+            if percent < 1.0 {
+                let mut roaring = RoaringBitmap::new();
+                for (i, bit) in bitvec.into_iter().enumerate() {
+                    if bit {
+                        roaring.insert(i as u32);
+                    }
+                }
+                CacheEntry::RowIdsRoaring(num_rows, roaring)
+            } else {
+                CacheEntry::RowIdsBitVec(num_rows, bitvec)
+            }
+        }
+        TantivyResult::Count(count) => CacheEntry::Count(count),
+        TantivyResult::Histogram(histogram) => CacheEntry::Histogram(histogram),
+        TantivyResult::TopN(top_n) => CacheEntry::TopN(top_n),
+        TantivyResult::Distinct(distinct) => CacheEntry::Distinct(distinct),
+        TantivyResult::RowIds(_) => {
+            unreachable!("unsupported tantivy search result in search_tantivy_index")
+        }
+    }
+}
+
+fn generate_cache_key(
+    index_condition: &Option<IndexCondition>,
+    idx_optimize_rule: &Option<IndexOptimizeMode>,
+    parquet_file: &FileKey,
+) -> String {
+    let condition = match index_condition {
+        Some(condition) => condition.to_query(),
+        None => return String::new(),
+    };
+    let rule = match idx_optimize_rule {
+        Some(rule) => rule.to_rule_string(),
+        None => return String::new(),
+    };
+    format!("{}_{}_{}", condition, rule, parquet_file.key)
 }
 
 #[cfg(test)]
