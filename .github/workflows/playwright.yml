@@ -237,11 +237,18 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
+          if-no-files-found: ignore
           retention-days: 30
 
       - name: Check OpenObserve logs
         if: always()
-        run: cat o2.log
+        run: |
+          if [ -f o2.log ]; then
+            echo "==== o2.log ===="
+            cat o2.log
+          else
+            echo "o2.log not found; skipping"
+          fi
 
   generate_coverage_report:
     name: Generate Coverage Report
