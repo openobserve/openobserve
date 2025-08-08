@@ -74,8 +74,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    println!("infra init");
-
     // if we have skipped db migrations (because version is up-to-date),
     // for non-stateful set components this dir will be absent, so we create it anyways
     std::fs::create_dir_all(&config::get_config().common.data_db_dir)?;
