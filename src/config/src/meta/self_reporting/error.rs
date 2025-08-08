@@ -17,7 +17,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize, ser::SerializeStruct};
 
-use crate::meta::stream::StreamParams;
+use crate::{meta::stream::StreamParams, utils::str::StringExt};
 
 const PIPELINE_ERROR_MAX_SIZE: usize = 1024;
 
@@ -60,21 +60,14 @@ impl Serialize for ErrorSource {
                 state.serialize_field("pipeline_name", &pe.pipeline_name)?;
                 if !pe.node_errors.is_empty() {
                     let node_errors = serde_json::to_string(&pe.node_errors).unwrap_or_default();
-                    if node_errors.len() > PIPELINE_ERROR_MAX_SIZE {
-                        state.serialize_field(
-                            "pipeline_node_errors",
-                            &node_errors[..PIPELINE_ERROR_MAX_SIZE],
-                        )?;
-                    } else {
-                        state.serialize_field("pipeline_node_errors", &node_errors)?;
-                    }
+                    state.serialize_field(
+                        "pipeline_node_errors",
+                        &node_errors.truncate_utf8(PIPELINE_ERROR_MAX_SIZE),
+                    )?;
                 }
                 if let Some(error) = &pe.error {
-                    if error.len() > PIPELINE_ERROR_MAX_SIZE {
-                        state.serialize_field("error", &error[..PIPELINE_ERROR_MAX_SIZE])?;
-                    } else {
-                        state.serialize_field("error", &error)?;
-                    }
+                    state
+                        .serialize_field("error", &error.truncate_utf8(PIPELINE_ERROR_MAX_SIZE))?;
                 }
             }
         }
