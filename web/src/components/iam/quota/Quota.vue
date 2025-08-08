@@ -1611,6 +1611,12 @@ export default defineComponent({
       qTable,
       organizationToDisplay,
       filterModulesBasedOnCategory,
+      // Expose internals for unit tests
+      apiCategories,
+      validateChanges,
+      transformData,
+      convertUploadRulesToJson,
+      jsonDiff,
     };
   },
 });
