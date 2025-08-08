@@ -15,11 +15,13 @@
 
 use std::collections::{HashMap, HashSet};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, ser::SerializeStruct};
 
-use crate::meta::stream::StreamParams;
+use crate::{meta::stream::StreamParams, utils::str::StringExt};
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+const PIPELINE_ERROR_MAX_SIZE: usize = 1024;
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub struct ErrorData {
     pub _timestamp: i64,
@@ -29,9 +31,7 @@ pub struct ErrorData {
     pub error_source: ErrorSource,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "error_source")]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ErrorSource {
     Alert,
     Dashboard,
@@ -41,17 +41,45 @@ pub enum ErrorSource {
     Other,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+impl Serialize for ErrorSource {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("error_source", 4)?;
+        match self {
+            ErrorSource::Alert => state.serialize_field("error_source", &"alert")?,
+            ErrorSource::Dashboard => state.serialize_field("error_source", &"dashboard")?,
+            ErrorSource::Ingestion => state.serialize_field("error_source", &"ingestion")?,
+            ErrorSource::Search => state.serialize_field("error_source", &"search")?,
+            ErrorSource::Other => state.serialize_field("error_source", &"other")?,
+            ErrorSource::Pipeline(pe) => {
+                // limit the size of the pipeline error to 1k characters
+                state.serialize_field("error_source", &"pipeline")?;
+                state.serialize_field("pipeline_id", &pe.pipeline_id)?;
+                state.serialize_field("pipeline_name", &pe.pipeline_name)?;
+                if !pe.node_errors.is_empty() {
+                    let node_errors = serde_json::to_string(&pe.node_errors).unwrap_or_default();
+                    state.serialize_field(
+                        "pipeline_node_errors",
+                        &node_errors.truncate_utf8(PIPELINE_ERROR_MAX_SIZE),
+                    )?;
+                }
+                if let Some(error) = &pe.error {
+                    state
+                        .serialize_field("error", &error.truncate_utf8(PIPELINE_ERROR_MAX_SIZE))?;
+                }
+            }
+        }
+        state.end()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct PipelineError {
     pub pipeline_id: String,
     pub pipeline_name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
-    #[serde(
-        skip_serializing_if = "HashMap::is_empty",
-        serialize_with = "serialize_values_only"
-    )]
     pub node_errors: HashMap<String, NodeErrors>,
 }
 
@@ -98,22 +126,6 @@ impl NodeErrors {
     }
 }
 
-// Custom serializer for HashMap to serialize values only
-fn serialize_values_only<S>(
-    map: &HashMap<String, NodeErrors>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    use serde::ser::SerializeSeq;
-    let mut seq = serializer.serialize_seq(Some(map.len()))?;
-    for value in map.values() {
-        seq.serialize_element(value)?;
-    }
-    seq.end()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,5 +157,16 @@ mod tests {
         let val_str = json::to_string(&val.unwrap());
         assert!(val_str.is_ok());
         println!("val: {}", val_str.unwrap());
+    }
+
+    #[test]
+    fn test_error_data_serialization() {
+        let error_data = ErrorData {
+            _timestamp: 10,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Pipeline(PipelineError::new("pipeline_id", "pipeline_name")),
+        };
+        let val = json::to_string(&error_data);
+        assert!(val.is_ok());
     }
 }
