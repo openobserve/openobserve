@@ -3277,7 +3277,11 @@ export default defineComponent({
         cancelVisualizeQueries();
         if(searchObj.meta.logsVisualizeDirtyFlag === true || !Object.hasOwn(searchObj.data?.queryResults, "hits") || searchObj.data?.queryResults?.hits?.length == 0) {
           searchObj.loading = true;
+          if(searchObj.meta.sqlMode) {
+            searchObj.data.queryResults.aggs = undefined;
+          }
           getQueryData();
+          searchObj.meta.logsVisualizeDirtyFlag = false;
         }
       } else {
         // cancel all the logs queries
