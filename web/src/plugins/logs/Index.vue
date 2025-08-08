@@ -890,7 +890,9 @@ export default defineComponent({
 
           searchObj.meta.showHistogram = isHistogramEnabled();
 
-          restoreUrlQueryParams(dashboardPanelData);
+        restoreUrlQueryParams(dashboardPanelData);
+
+        await importSqlParser();
 
           if (isEnterpriseClusterEnabled()) {
             await getRegionInfo();
@@ -1352,6 +1354,19 @@ export default defineComponent({
       return parsedSQL;
     };
 
+    // Helper function to check if the query is a simple "SELECT * FROM....." query
+    const isSimpleSelectAllQuery = (query: string): boolean => {
+      if (!query || typeof query !== 'string') return false;
+      
+      // Normalize the query by removing extra whitespace
+      const normalizedQuery = query.trim().replace(/\s+/g, ' ');
+      
+      // Pattern to match: SELECT * FROM followed by anything (case insensitive)
+      const selectAllPattern = /^select\s+\*\s+from\s+/i;
+      
+      return selectAllPattern.test(normalizedQuery);
+    };
+
     const handleQuickModeChange = () => {
       if (searchObj.meta.quickMode == true) {
         let field_list: string = "*";
@@ -1439,6 +1454,20 @@ export default defineComponent({
       async () => {
         try {
           if (searchObj.meta.logsVisualizeToggle == "visualize") {
+            // Enable quick mode automatically when switching to visualization if:
+            // 1. SQL mode is disabled OR 
+            // 2. Query is "SELECT * FROM some_stream" (simple select all query)
+            const shouldEnableQuickMode = 
+              !searchObj.meta.sqlMode || 
+              isSimpleSelectAllQuery(searchObj.data.query);
+            
+            if (shouldEnableQuickMode && !searchObj.meta.quickMode) {
+              searchObj.meta.quickMode = true;
+
+              // handle quick mode change
+              handleQuickModeChange();
+            }
+
             // close field list and splitter
             dashboardPanelData.layout.splitter = 0;
             dashboardPanelData.layout.showFieldList = false;
@@ -1566,7 +1595,7 @@ export default defineComponent({
     );
 
     // Create debounced function for visualization updates
-    const updateVisualization = async (allowToUseHistogramQuery: boolean = true, autoSelectChartType: boolean = true) => {
+    const updateVisualization = async (autoSelectChartType: boolean = true) => {
       try {
         if (searchObj?.meta?.logsVisualizeToggle == "visualize") {
           dashboardPanelData.data.queries[
@@ -1576,7 +1605,7 @@ export default defineComponent({
           // reset old rendered chart
           visualizeChartData.value = {};
 
-          shouldUseHistogramQuery.value = await extractVisualizationFields(allowToUseHistogramQuery, autoSelectChartType);
+          shouldUseHistogramQuery.value = await extractVisualizationFields(autoSelectChartType);
 
 
           // if not able to parse query, do not do anything
@@ -1607,8 +1636,7 @@ export default defineComponent({
         searchResponseForVisualization.value = {};
 
         // update visualization
-        // will not use histogram query if current chart type is table
-        await updateVisualization(dashboardPanelData.data.type != "table", false);
+        await updateVisualization(false);
 
         // check if query is assigned and not empty
         // this prevents hard refresh early validation before query is assigned
@@ -1652,7 +1680,7 @@ export default defineComponent({
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
-          const success = await updateVisualization(true, true);
+          const success = await updateVisualization(false);
           if (!success) {
             return;
           }
@@ -1755,7 +1783,7 @@ export default defineComponent({
       });
     };
 
-    const extractVisualizationFields = async (allowToUseHistogramQuery: boolean = true, autoSelectChartType: boolean = true) => {
+    const extractVisualizationFields = async (autoSelectChartType: boolean = true) => {
       // mark extraction as in-progress so that cancel button is shown
       variablesAndPanelsDataLoadingState.fieldsExtractionLoading = true;
 
@@ -1871,8 +1899,8 @@ export default defineComponent({
 
         checkAbort();
 
-        /* Decide whether to use histogram query */
-        shouldUseHistogramQuery.value = allowToUseHistogramQuery && !(
+        /* Decide whether to use histogram query - don't use for table charts or when there are group_by fields */
+        shouldUseHistogramQuery.value = dashboardPanelData.data.type !== "table" && !(
           extractedFields?.group_by && extractedFields.group_by.length
         );
 
