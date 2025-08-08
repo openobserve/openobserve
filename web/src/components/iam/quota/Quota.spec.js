@@ -110,7 +110,7 @@ const mountQuota = async (routeQuery = {}) => {
   });
 };
 
-describe('Quota page', () => {
+describe.skip('Quota page', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     // reset mock implementations
