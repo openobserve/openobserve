@@ -148,7 +148,7 @@ pub fn validate_and_adjust_histogram_interval(
     if interval_seconds <= 0 {
         // Default to 1 hour
         let interval = generate_histogram_interval(time_range);
-        let interval_seconds = convert_histogram_interval_to_seconds(&interval).unwrap_or(10);
+        let interval_seconds = convert_histogram_interval_to_seconds(interval).unwrap_or(10);
         return interval_seconds;
     }
 
