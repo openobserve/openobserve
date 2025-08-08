@@ -39,18 +39,19 @@ module.exports = defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 }, },
-      testIgnore: ['playwright-tests/Logs/logspage.spec.js'],
+      // paths must be relative to testDir
+      testIgnore: ['Logs/logspage.spec.js'],
     },
     {
       name: 'logs-off',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 } },
-      testMatch: ['playwright-tests/Logs/logspage.spec.js'],
+      testMatch: ['Logs/logspage.spec.js'],
       // inherit global parallel/workers settings
     },
     {
       name: 'logs-on',
       use: { ...devices['Desktop Chrome'], viewport: { width: 1500, height: 1024 } },
-      testMatch: ['playwright-tests/Logs/logspage.spec.js'],
+      testMatch: ['Logs/logspage.spec.js'],
       // inherit global parallel/workers settings
     },
     //   {
