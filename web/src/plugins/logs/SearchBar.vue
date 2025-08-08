@@ -3112,7 +3112,7 @@ export default defineComponent({
     };
 
     const shareLink = useLoading(async () => {
-      const queryObj = generateURLQuery(true);
+      const queryObj = generateURLQuery(true, dashboardPanelData);
       const queryString = Object.entries(queryObj)
         .map(
           ([key, value]) =>

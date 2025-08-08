@@ -18,7 +18,7 @@ use crate::service::search::{
 #[derive(Debug)]
 pub struct ResultSchemaExtractor {
     /// field/alias present in top level projection
-    pub projections: HashSet<String>,
+    pub projections: Vec<String>,
     /// fields/alias used in group by clause.
     /// this will correspond to the same alias (if present)
     /// in the projections
@@ -36,7 +36,7 @@ pub struct ResultSchemaExtractor {
 impl ResultSchemaExtractor {
     fn new() -> Self {
         Self {
-            projections: HashSet::new(),
+            projections: Vec::new(),
             group_by: HashSet::new(),
             timestamp_alias: None,
             ts_hist_alias: None,
@@ -79,11 +79,11 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
     ) -> Result<TreeNodeRecursion, datafusion::error::DataFusionError> {
         match node {
             LogicalPlan::Projection(proj) => {
-                let mut temp = HashSet::new();
+                let mut temp = Vec::new();
                 for expr in &proj.expr {
                     // we first add the name of this in fields
                     let name = get_col_name(expr);
-                    temp.insert(name);
+                    temp.push(name);
                     // Then we process the cases where the timestamp field or
                     // histogram is present or aliased
                     match expr {
@@ -206,6 +206,16 @@ pub async fn get_result_schema(
     let mut visitor = ResultSchemaExtractor::new();
     plan.visit(&mut visitor)?;
 
+    let mut temp = HashSet::new();
+    // filter out duplicates, while retaining the order
+    visitor.projections.retain(|f| {
+        let t = temp.contains(f);
+        temp.insert(f.to_owned());
+        // if we have seen this elem already,
+        // this instance is duplicate
+        !t
+    });
+
     // this is the final timeseries field decision -
     // 1. we should give preference to histogram(_timestamp) when present
     // 2. then we should check if _timestamp is present
@@ -322,7 +332,7 @@ mod tests {
         assert!(extractor.group_by.is_empty());
         assert_eq!(
             extractor.projections,
-            hashset![
+            vec![
                 "_timestamp",
                 "k8s_namespace_name",
                 "regexp_match(filteredlogs.log,Utf8(\"took: ([0-9]+) ms\"))[Int64(1)]"
@@ -339,7 +349,7 @@ mod tests {
         assert!(extractor.group_by.is_empty());
         assert_eq!(
             extractor.projections,
-            hashset![
+            vec![
                 "log",
                 "k8s_namespace_name",
                 "k8s_node_name",
@@ -374,7 +384,7 @@ mod tests {
         );
         assert_eq!(
             extractor.projections,
-            hashset!["histogram(default._timestamp)", "k8s_namespace_name"]
+            vec!["histogram(default._timestamp)", "k8s_namespace_name"]
         );
 
         let sql = r#"select str_match(log,'test') from "default" group by str_match(log,'test')"#;
@@ -389,7 +399,7 @@ mod tests {
         );
         assert_eq!(
             extractor.projections,
-            hashset!["str_match(default.log,Utf8(\"test\"))"]
+            vec!["str_match(default.log,Utf8(\"test\"))"]
         );
 
         let sql = r#"SELECT histogram(_timestamp), count(_timestamp), k8s_node_name,
@@ -421,7 +431,7 @@ mod tests {
         );
         assert_eq!(
             extractor.projections,
-            hashset![
+            vec![
                 "histogram(default._timestamp)",
                 "count(default._timestamp)",
                 "k8s_node_name",
@@ -445,7 +455,7 @@ mod tests {
         );
         assert_eq!(
             extractor.projections,
-            hashset![
+            vec![
                 "Utf8(\"a+b\")",
                 "_timestamp",
                 "count(CASE WHEN default.log = Utf8(\"error\") THEN Int64(1) END)",
@@ -464,7 +474,7 @@ mod tests {
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("ts".to_string()));
         assert!(extractor.group_by.is_empty(),);
-        assert_eq!(extractor.projections, hashset!["namespace", "ts"]);
+        assert_eq!(extractor.projections, vec!["namespace", "ts"]);
 
         let sql = r#"WITH FilteredLogs AS (
                     SELECT k8s_namespace_name as namespace, _timestamp FROM "default")
@@ -476,7 +486,7 @@ mod tests {
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("tts".to_string()));
         assert!(extractor.group_by.is_empty(),);
-        assert_eq!(extractor.projections, hashset!["ns", "tts"]);
+        assert_eq!(extractor.projections, vec!["ns", "tts"]);
 
         let sql = r#"SELECT histogram(_timestamp) as "x_axis_1", k8s_namespace_name as "x_axis_2", 
         count(k8s_namespace_name) as "y_axis_1" 
@@ -491,7 +501,7 @@ mod tests {
         assert_eq!(extractor.group_by, hashset!["x_axis_1", "x_axis_2"]);
         assert_eq!(
             extractor.projections,
-            hashset!["x_axis_1", "x_axis_2", "y_axis_1"]
+            vec!["x_axis_1", "x_axis_2", "y_axis_1"]
         );
     }
 
@@ -508,7 +518,7 @@ mod tests {
         assert!(extractor.group_by.is_empty());
         assert_eq!(
             extractor.projections,
-            hashset![
+            vec![
                 "log",
                 "k8s_namespace_name",
                 "k8s_node_name",
@@ -546,7 +556,7 @@ mod tests {
         assert_eq!(extractor.group_by, hashset!["k8s_pod_uid", "k8s_pod_name"]);
         assert_eq!(
             extractor.projections,
-            hashset![
+            vec![
                 "k8s_pod_uid",
                 "k8s_pod_name",
                 "count(t1.k8s_node_name)",
@@ -578,7 +588,7 @@ mod tests {
         assert_eq!(extractor.group_by, hashset!["k8s_pod_name", "code"]);
         assert_eq!(
             extractor.projections,
-            hashset!["k8s_pod_name", "code", "log_count", "avg_floatvalue",]
+            vec!["k8s_pod_name", "code", "log_count", "avg_floatvalue",]
         );
 
         let sql = r#"with test as (SELECT histogram(_timestamp) as h,
@@ -595,7 +605,7 @@ mod tests {
         assert_eq!(extractor.ts_hist_alias, Some("h".to_string()));
         assert_eq!(extractor.timestamp_alias, Some("tts".to_string()));
         assert_eq!(extractor.group_by, hashset!["tts", "k"]);
-        assert_eq!(extractor.projections, hashset!["h", "k", "c", "tts"]);
+        assert_eq!(extractor.projections, vec!["h", "c", "k", "tts"]);
 
         let sql = r#"WITH pulled_jobs_logs AS (
                 SELECT 
@@ -624,7 +634,7 @@ mod tests {
         );
         assert_eq!(
             extractor.projections,
-            hashset!["time_bucket", "logs_count", "node_name", "pulled_jobs"]
+            vec!["time_bucket", "logs_count", "node_name", "pulled_jobs"]
         );
 
         let sql = r#"WITH ErrorLogs AS (
@@ -643,7 +653,7 @@ mod tests {
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, None);
         assert_eq!(extractor.group_by, hashset!["container"]);
-        assert_eq!(extractor.projections, hashset!["container", "error_count"]);
+        assert_eq!(extractor.projections, vec!["container", "error_count"]);
 
         let sql = r#"SELECT 
         a.k8s_namespace_name AS "a", b.kubernetes_namespace_name AS "b"
@@ -656,6 +666,6 @@ mod tests {
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, None);
         assert!(extractor.group_by.is_empty());
-        assert_eq!(extractor.projections, hashset!["a", "b"]);
+        assert_eq!(extractor.projections, vec!["a", "b"]);
     }
 }

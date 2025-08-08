@@ -160,6 +160,8 @@ pub(crate) async fn list_values_by_start_dt(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "enterprise")]
+    use super::*;
 
     #[cfg(feature = "enterprise")]
     #[test]
