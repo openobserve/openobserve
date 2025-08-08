@@ -1094,7 +1094,8 @@ export default defineComponent({
         // Safety check to ensure trace chart data exists
         newEnd =
           traceChart.value.data && traceChart.value.data.length > 0
-            ? traceChart.value.data[traceChart.value.data.length - 1].x1
+            ? (traceChart.value.data[traceChart.value.data.length - 1] as any)
+                .x1
             : 0;
       } else {
         newStart = data.start || 0;
