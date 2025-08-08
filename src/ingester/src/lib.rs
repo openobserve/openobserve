@@ -33,7 +33,7 @@ use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
 pub use writer::{
-    Writer, check_memory_circuit_breaker, check_memtable_size, collect_wal_metrics, flush_all,
+    Writer, check_memory_circuit_breaker, check_memtable_size, collect_parquet_metrics, flush_all,
     get_writer, read_from_memtable,
 };
 
