@@ -197,7 +197,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("syslog settings cache failed");
 
     infra_file_list::create_table_index().await?;
-    infra_file_list::LOCAL_CACHE.create_table_index().await?;
+    if !LOCAL_NODE.is_alert_manager() {
+        infra_file_list::LOCAL_CACHE.create_table_index().await?;
+    }
 
     #[cfg(feature = "enterprise")]
     if !LOCAL_NODE.is_compactor() {
