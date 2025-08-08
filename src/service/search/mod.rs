@@ -149,8 +149,6 @@ pub async fn search(
         trace_id.to_string()
     };
 
-
-
     #[cfg(not(feature = "enterprise"))]
     let req_regions = vec![];
     #[cfg(not(feature = "enterprise"))]

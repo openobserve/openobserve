@@ -91,8 +91,9 @@ pub const ALL_VALUES_COL_NAME: &str = "_all_values";
 pub const DB_SCHEMA_VERSION: u64 = 2;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
-const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
-    ["log", "message", "msg", "content", "data", "body", "json"];
+const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 9] = [
+    "log", "message", "msg", "content", "data", "body", "json", "error", "errors",
+];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
         _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS

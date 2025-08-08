@@ -20,7 +20,6 @@ use config::{
     meta::{
         self_reporting::{
             ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
-            error::ErrorData,
             usage::{ERROR_STREAM, TRIGGERS_USAGE_STREAM, TriggerData},
         },
         stream::{StreamParams, StreamType},
@@ -202,29 +201,8 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
 
     if cfg.common.usage_reporting_errors_enabled && !errors.is_empty() {
         let error_stream = StreamParams::new(META_ORG_ID, ERROR_STREAM, StreamType::Logs);
-        if super::ingestion::ingest_reporting_data(errors.clone(), error_stream)
-            .await
-            .is_err()
-            && &cfg.common.usage_reporting_mode != "both"
-        {
-            // on error in ingesting usage data, push back the data
-            for error_json in errors {
-                let error: ErrorData = match json::from_value(error_json) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!("[SELF-REPORTING] Error in parsing ErrorData: {e}");
-                        continue;
-                    }
-                };
-                if let Err(e) = ERROR_QUEUE
-                    .enqueue(ReportingData::Error(Box::new(error)))
-                    .await
-                {
-                    log::error!(
-                        "[SELF-REPORTING] Error in pushing back un-ingested ErrorData to ErrorQueue: {e}"
-                    );
-                }
-            }
+        if let Err(e) = super::ingestion::ingest_reporting_data(errors, error_stream).await {
+            log::error!("[SELF-REPORTING] Error in ingesting ErrorData: {e}");
         }
     }
 }
