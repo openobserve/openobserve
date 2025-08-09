@@ -209,10 +209,11 @@ pub async fn get_settings(
     }
 
     // Get from DB without holding any locks
-    let settings = match get(org_id, stream_name, stream_type).await {
-        Ok(schema) => unwrap_stream_settings(&schema),
-        Err(_) => None,
-    };
+    let settings = get(org_id, stream_name, stream_type)
+        .await
+        .ok()
+        .as_ref()
+        .and_then(unwrap_stream_settings);
 
     // Only acquire write lock if we have settings to update
     if let Some(ref s) = settings {
@@ -277,7 +278,13 @@ pub fn unwrap_partition_time_level(
 pub fn get_stream_setting_defined_schema_fields(settings: &Option<StreamSettings>) -> Vec<String> {
     settings
         .as_ref()
-        .map(|settings| settings.defined_schema_fields.clone())
+        .map(|settings| {
+            settings
+                .defined_schema_fields
+                .iter()
+                .map(|f| f.name.clone())
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -584,7 +591,7 @@ pub async fn delete_fields(
 
             settings
                 .defined_schema_fields
-                .retain(|f| !deleted_fields.contains(f));
+                .retain(|field| !deleted_fields.contains(&field.name));
 
             new_metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
             let new_schema = vec![Schema::new_with_metadata(fields, new_metadata)];
