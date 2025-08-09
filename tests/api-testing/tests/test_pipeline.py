@@ -240,7 +240,6 @@ def test_pipeline_creation_and_action_with_schedule(create_session, base_url, pi
     print(f"Pipeline {pipeline_id} deleted successfully.")
 
 
-
 @pytest.mark.parametrize(
     "pipeline_name, stream_name, action, expected_status, schedule_enabled",
     [

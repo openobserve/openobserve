@@ -60,11 +60,12 @@ class PipelinePage:
         return response
 
 
-    def create_scheduled_pipeline(self, session, base_url, user_email, user_password, org_id, stream_name, scheduled_pipeline_name):
+    def create_scheduled_pipeline(self, session, base_url, user_email, user_password, org_id, stream_name, scheduled_pipeline_name, schedule_enabled):
         """Create a scheduled pipeline."""
         headers = {"Content-Type": "application/json", "Custom-Header": "value"}
         session.auth = HTTPBasicAuth(user_email, user_password)
 
+        # Payload for scheduled pipeline creation
         payload = {
             "name": scheduled_pipeline_name,
             "description": "",
@@ -88,7 +89,7 @@ class PipelinePage:
                         "query_condition": {
                             "type": "sql",
                             "conditions": None,
-                            "sql": f"select * from {stream_name}",
+                            "sql": "select * from default",
                             "promql": None,
                             "promql_condition": None,
                             "aggregation": None,
@@ -121,7 +122,7 @@ class PipelinePage:
                         "label": "cfa476a0-24f3-4ca3-a14f-b56b04729922",
                         "node_type": "stream",
                         "stream_type": "logs",
-                        "stream_name": stream_name,
+                        "stream_name": "stream_pytest_data",
                         "org_id": org_id
                     },
                     "io_type": "output"
@@ -141,7 +142,7 @@ class PipelinePage:
             ],
             "org": org_id,
             "schedule": {
-                "enabled": True,
+                "enabled": schedule_enabled,
                 "frequency": "daily",  # Example frequency, adjust as needed
                 "time": "02:00",       # Example time, adjust as needed
             }
