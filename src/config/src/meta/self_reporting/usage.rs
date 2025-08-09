@@ -39,6 +39,8 @@ pub enum TriggerDataStatus {
     ConditionNotSatisfied,
     #[serde(rename = "skipped")]
     Skipped,
+    #[serde(rename = "partially_complete")]
+    PartiallyComplete,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

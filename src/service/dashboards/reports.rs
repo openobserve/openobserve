@@ -340,13 +340,13 @@ pub enum SendReportError {
 #[async_trait]
 pub trait SendReport {
     /// Sends the report to subscribers
-    async fn send_subscribers(&self) -> Result<(), SendReportError>;
+    async fn send_subscribers(&self) -> Result<bool, SendReportError>;
 }
 
 #[async_trait]
 impl SendReport for Report {
     /// Sends the report to subscribers
-    async fn send_subscribers(&self) -> Result<(), SendReportError> {
+    async fn send_subscribers(&self) -> Result<bool, SendReportError> {
         if self.dashboards.is_empty() {
             return Err(SendReportError::NoDashboards);
         }
@@ -394,12 +394,23 @@ impl SendReport for Report {
                             resp.bytes().await,
                         ));
                     }
+                    let resp = resp.json::<serde_json::Value>().await;
+                    if let Ok(resp) = resp {
+                        log::info!("report sent successfully for the report {}", &self.name);
+                        if let Some(partially_complete) = resp.get("partially_complete") {
+                            if let Some(partially_complete) = partially_complete.as_bool() {
+                                return Ok(partially_complete);
+                            }
+                        }
+                    } else {
+                        log::error!("error sending report for the report {}", &self.name);
+                    }
                 }
                 Err(e) => {
                     return Err(SendReportError::ReportServerClientError(e));
                 }
             }
-            Ok(())
+            Ok(false)
         } else {
             // Currently only one `ReportDashboard` can be captured and sent
             let dashboard = &self.dashboards[0];
@@ -413,7 +424,8 @@ impl SendReport for Report {
                 &self.name,
             )
             .await?;
-            send_email(self, &report.0, report.1).await
+            send_email(self, &report.0, report.1).await?;
+            Ok(false)
         }
     }
 }
