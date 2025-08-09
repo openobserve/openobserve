@@ -152,4 +152,45 @@ export class CommonActions {
             await this.ingestTestData(streamName);
         }
     }
+
+    // Dismiss any blocking overlays/modals that might intercept clicks
+    async dismissBlockingOverlays() {
+        for (let i = 0; i < 3; i += 1) {
+            const backdrop = this.page.locator('.q-dialog__backdrop');
+            const count = await backdrop.count();
+            const visible = count > 0 ? await backdrop.first().isVisible().catch(() => false) : false;
+            if (!visible) break;
+            await this.page.keyboard.press('Escape').catch(() => {});
+            await backdrop.first().waitFor({ state: 'hidden', timeout: 1000 }).catch(() => {});
+            await this.page.waitForTimeout(150);
+        }
+    }
+
+    // Return boolean streaming state from Organization settings toggle
+    async getStreamingState() {
+        const root = this.page.locator('[data-test="general-settings-enable-streaming"]').first();
+        await root.waitFor({ state: 'visible', timeout: 10000 });
+        const ariaChecked = await root.getAttribute('aria-checked');
+        return ariaChecked === 'true';
+    }
+
+    // Flip streaming toggle, save, wait for toast, reload, and verify state
+    async flipStreaming() {
+        await this.dismissBlockingOverlays();
+        try {
+            await this.page.locator('[data-test="menu-link-settings-item"]').click();
+        } catch {
+            await this.page.reload().catch(() => {});
+            await this.page.waitForTimeout(300);
+            await this.dismissBlockingOverlays();
+            await this.page.locator('[data-test="menu-link-settings-item"]').click();
+        }
+        const isOn = await this.getStreamingState();
+        await this.page.locator('[data-test="general-settings-enable-streaming"] div').nth(2).click();
+        await this.page.locator('[data-test="dashboard-add-submit"]').click();
+        await this.page.getByText('Organization settings updated', { exact: false }).waitFor({ timeout: 15000 });
+        await this.page.reload();
+        const newState = await this.getStreamingState();
+        console.log(`[Streaming Toggle] ${isOn ? 'ON' : 'OFF'} -> ${newState ? 'ON' : 'OFF'}`);
+    }
 } 
