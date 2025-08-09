@@ -34,7 +34,7 @@ use opentelemetry_sdk::{
     },
     runtime,
 };
-use tokio::{sync::Mutex, time};
+use tokio::sync::Mutex;
 
 use crate::{
     common::infra::{
@@ -92,8 +92,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     // update metrics every 60 seconds
-    let mut interval = time::interval(time::Duration::from_secs(60));
-    interval.tick().await; // trigger the first run
     loop {
         if let Err(e) = update_metadata_metrics().await {
             log::error!("Error update metadata metrics: {e}");
@@ -106,7 +104,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         {
             log::error!("Error update parquet metrics: {e}");
         }
-        interval.tick().await;
+        tokio::time::sleep(Duration::from_secs(60));
     }
 }
 
