@@ -225,12 +225,11 @@ const useTraces = () => {
       queryParams.to = customTimeRange.to;
     }
 
-    const queryString = Object.entries(queryParams)
-      .map(
-        ([key, value]: any) =>
-          `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
-      )
-      .join("&");
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(queryParams)) {
+      searchParams.append(key, value);
+    }
+    const queryString = searchParams.toString();
 
     let shareURL = window.location.origin + window.location.pathname;
 
