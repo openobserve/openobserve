@@ -593,7 +593,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
         .await
         {
             Ok(_) => {
-                let tuples = vec![get_user_org_tuple(user_email, user_email)];
+                let tuples = vec![get_user_org_tuple(user_email, user_email, None)];
                 tuples_to_add.insert(user_email.to_string(), tuples);
                 log::info!("User added to the database");
             }
@@ -640,6 +640,7 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
                         user: Some(user_email.to_string()),
                         event: EventType::OrgCreated,
                         subscription_type: None,
+                        stream_name: None,
                     })
                     .await;
                 }

@@ -275,6 +275,7 @@ pub async fn create_org(
                 user: Some(user_email.to_string()),
                 event: EventType::OrgCreated,
                 subscription_type: None,
+                stream_name: None,
             })
             .await;
             Ok(org.clone())
@@ -314,6 +315,7 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
                 user: None,
                 subscription_type: None,
                 event: EventType::OrgCreated,
+                stream_name: None,
             })
             .await;
             Ok(org.clone())
@@ -403,6 +405,7 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
                     user: None,
                     subscription_type: None,
                     event: EventType::OrgDeleted,
+                    stream_name: None,
                 })
                 .await;
             }
@@ -566,6 +569,7 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
         user: Some(user_email.to_string()),
         event: EventType::UserJoined,
         subscription_type: None,
+        stream_name: None,
     })
     .await;
     Ok(())
