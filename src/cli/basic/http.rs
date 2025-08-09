@@ -119,6 +119,32 @@ pub async fn node_flush() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn node_status() -> Result<(), anyhow::Error> {
+    let url = "/node/status";
+    let response = request(url, None, reqwest::Method::GET).await?;
+    let Some(body) = response else {
+        return Err(anyhow::anyhow!("node status failed"));
+    };
+    let response: serde_json::Value = serde_json::from_str(&body)?;
+    let response = config::utils::flatten::flatten(response)?;
+    let Some(response) = response.as_object() else {
+        return Err(anyhow::anyhow!("node status failed"));
+    };
+
+    // Create header row with all column names
+    let mut table = Table::new();
+    table.add_row(Row::new(vec![Cell::new("KEY"), Cell::new("VALUE")]));
+    for (key, value) in response.iter() {
+        table.add_row(Row::new(vec![
+            Cell::new(key),
+            Cell::new(&value.to_string()),
+        ]));
+    }
+
+    table.printstd();
+    Ok(())
+}
+
 pub async fn node_list() -> Result<(), anyhow::Error> {
     let url = "/node/list";
     let response = request(url, None, reqwest::Method::GET).await?;

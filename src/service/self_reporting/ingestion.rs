@@ -217,7 +217,7 @@ pub(super) async fn ingest_reporting_data(
         let req = ingestion::IngestionRequest::Usage(&bytes);
         match service::logs::ingest::ingest(0, &org_id, &stream_name, req, "", None).await {
             Ok(resp) if resp.code == 200 => {
-                log::info!(
+                log::debug!(
                     "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"
                 );
                 Ok(())
@@ -250,7 +250,7 @@ pub(super) async fn ingest_reporting_data(
 
         match service::ingestion::ingestion_service::ingest(req).await {
             Ok(resp) if resp.status_code == 200 => {
-                log::info!(
+                log::debug!(
                     "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"
                 );
                 Ok(())
