@@ -577,6 +577,7 @@ export default defineComponent({
       clearSearchObj,
       setCommunicationMethod,
       cancelQuery,
+      processHttpHistogramResults,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -588,6 +589,8 @@ export default defineComponent({
 
     const expandedLogs = ref([]);
     const splitterModel = ref(10);
+    const chartRedrawTimeout = ref(null);
+    const updateColumnsTimeout = ref(null);
 
     const { showErrorNotification } = useNotifications();
 
@@ -676,6 +679,8 @@ export default defineComponent({
 
       removeAiContextHandler();
 
+    // Clear any pending timeouts
+    clearAllTimeouts();
       try {
         if (searchObj)
           await store.dispatch(
@@ -1693,6 +1698,17 @@ export default defineComponent({
       emit("sendToAiChat", value);
     };
 
+    const clearAllTimeouts = () => {
+      if (chartRedrawTimeout.value) {
+        clearTimeout(chartRedrawTimeout.value);
+        chartRedrawTimeout.value = null;
+      }
+      if (updateColumnsTimeout.value) {
+        clearTimeout(updateColumnsTimeout.value);
+        updateColumnsTimeout.value = null;
+      }
+    };
+
     return {
       t,
       store,
@@ -1754,7 +1770,8 @@ export default defineComponent({
       processInterestingFiledInSQLQuery,
       removeFieldByName,
       setFieldsAndConditions,
-      dashboardPanelData
+      dashboardPanelData,
+      processHttpHistogramResults
     };
   },
   computed: {
@@ -1807,7 +1824,11 @@ export default defineComponent({
         this.searchObj.meta.showHistogram == true &&
         this.searchObj.meta.sqlMode == false
       ) {
-        setTimeout(() => {
+          // Clear any existing timeout
+        if (this.chartRedrawTimeout) {
+          clearTimeout(this.chartRedrawTimeout);
+        }
+        this.chartRedrawTimeout = setTimeout(() => {
           if (this.searchResultRef) this.searchResultRef.reDrawChart();
         }, 100);
       }
@@ -1856,10 +1877,16 @@ export default defineComponent({
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
-        } else if (this.searchObj.data.stream.selectedStream.length > 1 && this.searchObj.meta.sqlMode == true) {
+        }else if (this.searchObj.data.stream.selectedStream.length > 1 && this.searchObj.meta.sqlMode == true) {
           this.resetHistogramWithError(
             "Histogram is not available for multi stream search.",
           );
+        } else if(this.searchObj.data.queryResults.is_histogram_eligible == false){
+          this.resetHistogramWithError(
+            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            -1,
+          );
+          this.searchObj.meta.histogramDirtyFlag = false;
         } else if (
           this.searchObj.meta.histogramDirtyFlag == true &&
           this.searchObj.meta.jobId == ""
@@ -1885,6 +1912,7 @@ export default defineComponent({
               "histogram",
               {
                 isHistogramOnly: this.searchObj.meta.histogramDirtyFlag,
+                is_ui_histogram: true,
               },
             );
             const requestId = this.initializeSearchConnection(payload);
@@ -1896,21 +1924,22 @@ export default defineComponent({
             return;
           }
 
-          this.getHistogramQueryData(this.searchObj.data.histogramQuery)
+          this.processHttpHistogramResults(
+            this.searchObj.data.customDownloadQueryObj,
+          )
             .then((res: any) => {
               this.refreshTimezone();
-              this.searchResultRef.reDrawChart();
-            })
-            .catch((err: any) => {
-              console.log(err, "err in updating chart");
+              const timeout = setTimeout(() => {
+                if (this.searchResultRef) this.searchResultRef.reDrawChart();
+              }, 100);
+
+              // Store timeout reference for cleanup
+              this.chartRedrawTimeout = timeout;
             })
             .finally(() => {
               this.searchObj.loadingHistogram = false;
             });
 
-          setTimeout(() => {
-            if (this.searchResultRef) this.searchResultRef.reDrawChart();
-          }, 100);
         }
       }
 
@@ -1942,7 +1971,11 @@ export default defineComponent({
     // },
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
-      setTimeout(() => {
+      // Clear any existing timeout
+      if (updateColumnsTimeout.value) {
+        clearTimeout(updateColumnsTimeout.value);
+      }
+      updateColumnsTimeout.value = setTimeout(() => {
         this.updateGridColumns();
       }, 50);
     },

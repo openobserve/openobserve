@@ -810,8 +810,6 @@ pub async fn delete_group(_path: web::Path<(String, String)>) -> Result<HttpResp
 mod tests {
     use std::collections::HashSet;
 
-    #[cfg(feature = "enterprise")]
-    use actix_web::http::header::HeaderName;
     use actix_web::{App, test};
 
     use super::*;

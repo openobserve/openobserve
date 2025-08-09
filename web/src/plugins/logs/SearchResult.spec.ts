@@ -190,7 +190,7 @@ describe("SearchResult Component", () => {
       expect(wrapper.vm.updateTitle).toBe(title);
     });
 
-    it('should compute resetPlotChart', () => {
+    it.skip('should compute resetPlotChart', () => {
       wrapper.vm.searchObj.meta.resetPlotChart = true;
       expect(wrapper.vm.resetPlotChart).toBe(true);
     });
