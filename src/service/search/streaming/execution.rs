@@ -173,84 +173,82 @@ pub async fn do_partitioned_search(
             search_res.hits.truncate(req_size as usize);
         }
 
-        if !search_res.hits.is_empty() {
-            search_res = order_search_results(search_res, fallback_order_by_col.clone());
+        search_res = order_search_results(search_res, fallback_order_by_col.clone());
 
-            // set took
-            search_res.set_took(start_timer.elapsed().as_millis() as usize);
-            // reset start time
-            *start_timer = Instant::now();
+        // set took
+        search_res.set_took(start_timer.elapsed().as_millis() as usize);
+        // reset start time
+        *start_timer = Instant::now();
 
-            // check range error
-            if !range_error.is_empty() {
-                search_res.is_partial = true;
-                search_res.function_error = if search_res.function_error.is_empty() {
-                    vec![range_error.clone()]
-                } else {
-                    search_res.function_error.push(range_error.clone());
-                    search_res.function_error
-                };
-                search_res.new_start_time = Some(modified_start_time);
-                search_res.new_end_time = Some(modified_end_time);
-            }
-
-            // Accumulate the result
-            if is_streaming_aggs {
-                // Only accumulate the results of the last partition
-                if idx == partitions.len() - 1 {
-                    accumulated_results.push(SearchResultType::Search(search_res.clone()));
-                }
+        // check range error
+        if !range_error.is_empty() {
+            search_res.is_partial = true;
+            search_res.function_error = if search_res.function_error.is_empty() {
+                vec![range_error.clone()]
             } else {
+                search_res.function_error.push(range_error.clone());
+                search_res.function_error
+            };
+            search_res.new_start_time = Some(modified_start_time);
+            search_res.new_end_time = Some(modified_end_time);
+        }
+
+        // Accumulate the result
+        if is_streaming_aggs {
+            // Only accumulate the results of the last partition
+            if idx == partitions.len() - 1 {
                 accumulated_results.push(SearchResultType::Search(search_res.clone()));
             }
+        } else {
+            accumulated_results.push(SearchResultType::Search(search_res.clone()));
+        }
 
-            // add top k values for values search
-            if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
-                let search_stream_span = tracing::info_span!(
-                    "src::service::search::stream_execution::do_partitioned_search::get_top_k_values",
-                    org_id = %org_id,
-                );
-                let instant = Instant::now();
-                let field = values_ctx.as_ref().unwrap().field.clone();
-                let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
-                let no_count = values_ctx.as_ref().unwrap().no_count;
-                let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
-                    get_top_k_values(&search_res.hits, &field, top_k, no_count)
-                })
-                .instrument(search_stream_span.clone())
-                .await
-                .unwrap()?;
-                search_res.total = hit_count as usize;
-                search_res.hits = top_k_values;
-                let duration = instant.elapsed();
-                log::debug!("Top k values for partition {idx} took {duration:?}");
-            }
+        // add top k values for values search
+        if req.search_type == Some(SearchEventType::Values) && values_ctx.is_some() {
+            let search_stream_span = tracing::info_span!(
+                "src::service::search::stream_execution::do_partitioned_search::get_top_k_values",
+                org_id = %org_id,
+            );
+            let instant = Instant::now();
+            let field = values_ctx.as_ref().unwrap().field.clone();
+            let top_k = values_ctx.as_ref().unwrap().top_k.unwrap_or(10);
+            let no_count = values_ctx.as_ref().unwrap().no_count;
+            let (top_k_values, hit_count) = tokio::task::spawn_blocking(move || {
+                get_top_k_values(&search_res.hits, &field, top_k, no_count)
+            })
+            .instrument(search_stream_span.clone())
+            .await
+            .unwrap()?;
+            search_res.total = hit_count as usize;
+            search_res.hits = top_k_values;
+            let duration = instant.elapsed();
+            log::debug!("Top k values for partition {idx} took {duration:?}");
+        }
 
-            if is_result_array_skip_vrl {
-                search_res.hits = crate::service::search::cache::apply_vrl_to_response(
-                    backup_query_fn.clone(),
-                    &mut search_res,
-                    org_id,
-                    stream_name,
-                    &trace_id,
-                );
-            }
+        if is_result_array_skip_vrl {
+            search_res.hits = crate::service::search::cache::apply_vrl_to_response(
+                backup_query_fn.clone(),
+                &mut search_res,
+                org_id,
+                stream_name,
+                &trace_id,
+            );
+        }
 
-            // Send the cached response
-            let response = StreamResponses::SearchResponse {
-                results: search_res.clone(),
-                streaming_aggs: is_streaming_aggs,
-                streaming_id: partition_resp.streaming_id.clone(),
-                time_offset: TimeOffset {
-                    start_time,
-                    end_time,
-                },
-            };
+        // Send the cached response
+        let response = StreamResponses::SearchResponse {
+            results: search_res.clone(),
+            streaming_aggs: is_streaming_aggs,
+            streaming_id: partition_resp.streaming_id.clone(),
+            time_offset: TimeOffset {
+                start_time,
+                end_time,
+            },
+        };
 
-            if sender.send(Ok(response)).await.is_err() {
-                log::warn!("[trace_id {trace_id}] Sender is closed, stop sending response");
-                return Ok(());
-            }
+        if sender.send(Ok(response)).await.is_err() {
+            log::warn!("[trace_id {trace_id}] Sender is closed, stop sending response");
+            return Ok(());
         }
 
         // Send progress update

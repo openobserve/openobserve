@@ -1,0 +1,36 @@
+{
+  "results": {
+    "took": 39,
+    "took_detail": {
+      "total": 39,
+      "cache_took": 0,
+      "file_list_took": 4,
+      "wait_in_queue": 0,
+      "idx_took": 0,
+      "search_took": 17
+    },
+    "hits": [],
+    "total": 0,
+    "from": 0,
+    "size": 10000,
+    "cached_ratio": 0,
+    "scan_size": 0,
+    "idx_scan_size": 0,
+    "scan_records": 0,
+    "trace_id": "a926656288afef5d475eff1219e68210-0",
+    "is_partial": false,
+    "result_cache_ratio": 0,
+    "order_by": "desc",
+    "explain_output": {
+      "metrics": null,
+      "plan": [
+        "[trace_id a926656288afef5d475eff1219e68210-0] \nRemoteScanExec: input_partitions=output_partitions=1\n  SortPreservingMergeExec: [_timestamp@0 DESC NULLS LAST], fetch=5\n    CoalesceBatchesExec: target_batch_size=8192, fetch=5\n      FilterExec: _timestamp@0 >= 1754719749420000 AND _timestamp@0 < 1754719809420000\n        CooperativeExec\n          NewEmptyExec: name=\"default22\", projection=[\"_timestamp\", \"code\", \"distinct_field_hc_0\", \"kubernetes_annotations_kubectl_kubernetes_io_default_container\", \"kubernetes_annotations_kubernetes_io_psp\", \"kubernetes_annotations_prometheus_io_path\", \"kubernetes_annotations_prometheus_io_port\", \"kubernetes_annotations_prometheus_io_scrape\", \"kubernetes_container_hash\", \"kubernetes_container_image\", \"kubernetes_container_name\", \"kubernetes_docker_id\", \"kubernetes_host\", \"kubernetes_labels_app\", \"kubernetes_labels_app_kubernetes_io_component\", \"kubernetes_labels_app_kubernetes_io_instance\", \"kubernetes_labels_app_kubernetes_io_managed_by\", \"kubernetes_labels_app_kubernetes_io_name\", \"kubernetes_labels_app_kubernetes_io_part_of\", \"kubernetes_labels_app_kubernetes_io_version\", \"kubernetes_labels_component\", \"kubernetes_labels_controller_revision_hash\", \"kubernetes_labels_deploy\", \"kubernetes_labels_name\", \"kubernetes_labels_operator_prometheus_io_name\", \"kubernetes_labels_operator_prometheus_io_shard\", \"kubernetes_labels_pod_template_hash\", \"kubernetes_labels_prometheus\", \"kubernetes_labels_role\", \"kubernetes_labels_statefulset_kubernetes_io_pod_name\", \"kubernetes_namespace_name\", \"kubernetes_pod_id\", \"kubernetes_pod_name\", \"level\", \"log\", \"message\", \"method\", \"stream\", \"test1234\", \"took\"], filters=[\"_timestamp >= Int64(1754719749420000)\", \"_timestamp < Int64(1754719809420000)\"], sorted_by_time=true\n"
+      ]
+    }
+  },
+  "streaming_aggs": false,
+  "time_offset": {
+    "start_time": 1754719749420000,
+    "end_time": 1754719809420000
+  }
+}
