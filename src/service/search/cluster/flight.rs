@@ -560,34 +560,34 @@ pub async fn run_datafusion(
 
     // wrap with EXPLAIN/ANALYZE if needed (after all OpenObserve rewrites are complete)
     if sql.is_explain {
-        // For EXPLAIN ANALYZE, first wrap with AnalyzeExec to collect metrics
-        if sql.is_analyze {
-            let schema = physical_plan.schema();
-            physical_plan = Arc::new(AnalyzeExec::new(
-                sql.is_verbose,
-                false, // show_statistics
-                physical_plan,
-                schema,
-            ));
-        }
-
-        // For EXPLAIN (with or without ANALYZE), we need to create StringifiedPlan
-        // representing the plan structure for display
-        let stringified_plans = vec![StringifiedPlan::new(
-            PlanType::FinalPhysicalPlan,
-            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref()),
-        )];
-
-        // Create the correct EXPLAIN output schema (plan_type, plan columns)
+        // Both EXPLAIN and ANALYZE use the same output schema structure
         let explain_schema = Arc::new(ArrowSchema::new(vec![
             Field::new("plan_type", DataType::Utf8, false),
             Field::new("plan", DataType::Utf8, false),
         ]));
-        physical_plan = Arc::new(ExplainExec::new(
-            explain_schema,
-            stringified_plans,
-            sql.is_verbose,
-        ));
+
+        if sql.is_analyze {
+            // For EXPLAIN ANALYZE: Use AnalyzeExec only (executes + collects metrics)
+            physical_plan = Arc::new(AnalyzeExec::new(
+                sql.is_verbose,
+                false, // show_statistics
+                physical_plan,
+                explain_schema,
+            ));
+            // Note: We'll extract metrics after execution and format them in http.rs
+        } else {
+            // For plain EXPLAIN: Use ExplainExec only (shows plan without execution)
+            let stringified_plans = vec![StringifiedPlan::new(
+                PlanType::FinalPhysicalPlan,
+                config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref()),
+            )];
+
+            physical_plan = Arc::new(ExplainExec::new(
+                explain_schema,
+                stringified_plans,
+                sql.is_verbose,
+            ));
+        }
     }
 
     if cfg.common.print_key_sql {
