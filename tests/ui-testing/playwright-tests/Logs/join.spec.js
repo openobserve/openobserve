@@ -1,5 +1,5 @@
 import { test, expect } from "../baseFixtures.js";
-import PageManager from '../../pages/page-manager.js';
+import PageManager from "../../pages/page-manager.js";
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -121,5 +121,9 @@ test.describe("Join for logs", () => {
         await pageManager.logsPage.selectRunQuery();
         await pageManager.logsPage.clickInterestingFields();
         await pageManager.logsPage.addRemoveInteresting();
+    });
+
+    test.afterEach(async ({ page }) => {
+        await pageManager.commonActions.flipStreaming();
     });
 });

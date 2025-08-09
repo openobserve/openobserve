@@ -362,7 +362,7 @@ describe('AddEnrichmentTable.vue', () => {
       };
       
       // Mock the service to reject
-      const createSpy = vi.spyOn(jsTransformService.default, 'create_enrichment_table')
+      vi.spyOn(jsTransformService.default, 'create_enrichment_table')
         .mockRejectedValueOnce(error);
       
       // Set form data
@@ -372,13 +372,50 @@ describe('AddEnrichmentTable.vue', () => {
         append: false,
       };
       
-      try {
-        await (wrapper.vm as any).onSubmit();
-      } catch (e) {
-        // Expected to fail
-      }
+      await (wrapper.vm as any).onSubmit();
+      await wrapper.vm.$nextTick();
       
-      expect(createSpy).toHaveBeenCalled();
+      expect((wrapper.vm as any).compilationErr).toBe('Invalid CSV format');
+    });
+
+    it('should set compilationErr from error message when response data is missing', async () => {
+      const jsTransformService = await import('@/services/jstransform');
+      const error = new Error('Direct error message');
+      
+      vi.spyOn(jsTransformService.default, 'create_enrichment_table')
+        .mockRejectedValueOnce(error);
+      
+      // Set form data
+      (wrapper.vm as any).formData = {
+        name: 'test-table',
+        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
+        append: false,
+      };
+      
+      await (wrapper.vm as any).onSubmit();
+      await wrapper.vm.$nextTick();
+      
+      expect((wrapper.vm as any).compilationErr).toBe('Direct error message');
+    });
+
+    it('should set compilationErr to "Unknown error" when no error details available', async () => {
+      const jsTransformService = await import('@/services/jstransform');
+      const error = {};
+      
+      vi.spyOn(jsTransformService.default, 'create_enrichment_table')
+        .mockRejectedValueOnce(error);
+      
+      // Set form data
+      (wrapper.vm as any).formData = {
+        name: 'test-table',
+        file: new File(['test'], 'test.csv', { type: 'text/csv' }),
+        append: false,
+      };
+      
+      await (wrapper.vm as any).onSubmit();
+      await wrapper.vm.$nextTick();
+      
+      expect((wrapper.vm as any).compilationErr).toBe('Unknown error');
     });
 
     it('should handle 403 errors without showing notification', async () => {
@@ -600,6 +637,72 @@ describe('AddEnrichmentTable.vue', () => {
       wrapper = createWrapper({ isUpdating: true });
       
       expect((wrapper.vm as any).disableColor).toBe('grey-5');
+    });
+  });
+
+  describe('Editor Functionality', () => {
+    beforeEach(() => {
+      wrapper = createWrapper();
+    });
+
+    it('should update formData.function when editor content changes', async () => {
+      // Initialize formData.function if it doesn't exist
+      if (!(wrapper.vm as any).formData.function) {
+        (wrapper.vm as any).formData.function = '';
+      }
+
+      const mockEvent = {
+        target: {
+          value: 'new function content'
+        }
+      };
+
+      // Call editorUpdate
+      await (wrapper.vm as any).editorUpdate(mockEvent);
+      await wrapper.vm.$nextTick();
+      
+      // Verify the function was updated
+      expect((wrapper.vm as any).formData.function).toBe('new function content');
+    });
+
+    it('should handle empty editor content', async () => {
+      // Initialize formData.function if it doesn't exist
+      if (!(wrapper.vm as any).formData.function) {
+        (wrapper.vm as any).formData.function = 'initial content';
+      }
+
+      const mockEvent = {
+        target: {
+          value: ''
+        }
+      };
+
+      // Call editorUpdate
+      await (wrapper.vm as any).editorUpdate(mockEvent);
+      await wrapper.vm.$nextTick();
+      
+      // Verify the function was updated to empty string
+      expect((wrapper.vm as any).formData.function).toBe('');
+    });
+
+    it('should handle null event value', async () => {
+      // Initialize formData.function if it doesn't exist
+      if (!(wrapper.vm as any).formData.function) {
+        (wrapper.vm as any).formData.function = 'initial content';
+      }
+
+      const mockEvent = {
+        target: {
+          value: null
+        }
+      };
+
+      // Call editorUpdate
+      await (wrapper.vm as any).editorUpdate(mockEvent);
+      await wrapper.vm.$nextTick();
+      
+      // Verify the function was updated to null
+      expect((wrapper.vm as any).formData.function).toBe(null);
     });
   });
 });
