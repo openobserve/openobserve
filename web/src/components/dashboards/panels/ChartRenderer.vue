@@ -69,7 +69,7 @@ function findNearestIndex(sortedArray: any, target: any) {
   return nearestIndex; // Return the index of the nearest value
 }
 
-import { throttle } from 'lodash-es';
+import { throttle } from "lodash-es";
 import {
   defineComponent,
   ref,
@@ -258,9 +258,12 @@ export default defineComponent({
     }, DEBOUNCE_TIMEOUT);
 
     // Create a stable throttled function that persists between renders
-    const throttledSetHoveredSeriesIndex = throttle((arg1, arg2, arg3, arg4) => {
-      hoveredSeriesState?.value?.setIndex(arg1, arg2, arg3, arg4);
-    }, DEBOUNCE_TIMEOUT);
+    const throttledSetHoveredSeriesIndex = throttle(
+      (arg1, arg2, arg3, arg4) => {
+        hoveredSeriesState?.value?.setIndex(arg1, arg2, arg3, arg4);
+      },
+      DEBOUNCE_TIMEOUT,
+    );
 
     const mouseHoverEffectFn = (params: any) => {
       // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
@@ -351,8 +354,8 @@ export default defineComponent({
       chart?.on("mouseout", (params: any) => {
         emit("mouseout", params);
         mouseOutEffectFn();
-      });      
-      
+      });
+
       chart?.on("globalout", () => {
         mouseOutEffectFn();
         // flush any pending throttled calls to ensure immediate reset
@@ -374,7 +377,7 @@ export default defineComponent({
           const seriesIndex = params?.batch?.[0]?.seriesIndex;
           const dataIndex = Math.max(params?.batch?.[0]?.dataIndex, 0);
 
-          // set current hovered series name in state          
+          // set current hovered series name in state
           if (chart?.getOption()?.series[seriesIndex]?.data[dataIndex]) {
             throttledSetHoveredSeriesIndex(
               dataIndex,
@@ -384,10 +387,6 @@ export default defineComponent({
             );
           }
         }
-      });
-      emit("updated:chart", {
-        start: chart?.getOption()?.dataZoom[0]?.startValue || 0,
-        end: chart?.getOption()?.dataZoom[0]?.endValue || 0,
       });
 
       //on dataZoom emit an event of start x and end x
@@ -547,7 +546,10 @@ export default defineComponent({
             renderer: props.renderType,
           });
         }
-        chart?.setOption(props?.data?.options || {}, { lazyUpdate: true, notMerge: true });
+        chart?.setOption(props?.data?.options || {}, {
+          lazyUpdate: true,
+          notMerge: true,
+        });
         chartInitialSetUp();
       } catch (e: any) {
         emit("error", {
@@ -559,11 +561,11 @@ export default defineComponent({
     onUnmounted(() => {
       // Clean up event listeners
       window.removeEventListener("resize", windowResizeEventCallback);
-      
+
       // Cancel throttled functions
       throttledSetHoveredSeriesName.cancel();
       throttledSetHoveredSeriesIndex.cancel();
-      
+
       // Clean up chart instance
       chart?.dispose();
       chart = null;
@@ -574,7 +576,7 @@ export default defineComponent({
         isChartVisibleObserver.disconnect();
         isChartVisibleObserver = null;
       }
-      
+
       // Clear chart reference
       if (chartRef.value) {
         chartRef.value = null;
@@ -605,7 +607,6 @@ export default defineComponent({
         // observe chart
         isChartVisibleObserver.observe(chartRef.value);
       }
-
     });
 
     onUnmounted(() => {
@@ -635,7 +636,10 @@ export default defineComponent({
             renderer: props.renderType,
           });
         }
-        chart?.setOption(props?.data?.options || {}, { lazyUpdate: true, notMerge: true });
+        chart?.setOption(props?.data?.options || {}, {
+          lazyUpdate: true,
+          notMerge: true,
+        });
         chartInitialSetUp();
         windowResizeEventCallback();
 
@@ -677,7 +681,10 @@ export default defineComponent({
           await nextTick();
           chart?.resize();
           try {
-            chart?.setOption(props?.data?.options || {}, { lazyUpdate: true, notMerge: true });
+            chart?.setOption(props?.data?.options || {}, {
+              lazyUpdate: true,
+              notMerge: true,
+            });
           } catch (error) {
             console.error("Error during setOption", error);
           }
