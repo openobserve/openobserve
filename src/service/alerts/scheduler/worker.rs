@@ -96,6 +96,13 @@ impl SchedulerWorker {
 
                     // Process the trigger
                     let ret = self.handle_trigger(&job.trace_id, job.trigger).await;
+                    log::debug!(
+                        "[SCHEDULER][Worker-{}] trace_id: {} Job[{}], trigger: {} done",
+                        self.id,
+                        job.trace_id,
+                        job_id,
+                        job_key
+                    );
                     // Stop the keep alive for the job
                     if let Err(e) = job.stop_keep_alive_tx.send(()).await {
                         log::error!(
@@ -265,6 +272,9 @@ impl SchedulerJobPuller {
                                 e
                             );
                         }
+                        log::debug!(
+                            "[SCHEDULER][JobPuller-{trace_id_keep_alive}] keep_alive extended for job[{job_id}] trigger[{job_key}]"
+                        );
                     }
                 });
             }

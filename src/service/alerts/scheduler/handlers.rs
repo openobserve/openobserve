@@ -32,7 +32,7 @@ use config::{
     utils::{
         json,
         rand::get_rand_num_within,
-        time::{hour_micros, second_micros},
+        time::{hour_micros, now_micros, second_micros},
     },
 };
 use cron::Schedule;
@@ -151,6 +151,17 @@ async fn handle_alert_triggers(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_alert_triggers: processing trigger: {}",
         &trigger.module_key
     );
+    let now = Utc::now().timestamp_micros();
+    let triggered_at = trigger.start_time.unwrap_or_default();
+    let time_in_queue = Duration::microseconds(now - triggered_at).num_milliseconds();
+    let source_node = LOCAL_NODE.name.clone();
+    let mut new_trigger = db::scheduler::Trigger {
+        next_run_at: now,
+        is_silenced: false,
+        status: db::scheduler::TriggerStatus::Waiting,
+        retries: 0,
+        ..trigger.clone()
+    };
 
     // here it can be alert id or alert name
     let alert = if let Ok(alert_id) = svix_ksuid::Ksuid::from_str(&trigger.module_key) {
@@ -162,13 +173,89 @@ async fn handle_alert_triggers(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Alert not found for module_key: {}",
                     trigger.module_key
                 );
+                if let Err(e) = db::scheduler::delete(
+                    &trigger.org,
+                    db::scheduler::TriggerModule::Alert,
+                    &trigger.module_key,
+                )
+                .await
+                {
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error deleting trigger job: {e}"
+                    );
+                }
+                publish_triggers_usage(TriggerData {
+                    _timestamp: now,
+                    org: trigger.org.clone(),
+                    module: TriggerDataType::Alert,
+                    key: format!("/{}", trigger.module_key),
+                    status: TriggerDataStatus::Failed,
+                    scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                    error: Some("Alert not found. Deleting trigger job.".to_string()),
+                    time_in_queue_ms: Some(time_in_queue),
+                    source_node: Some(source_node.clone()),
+                    retries: trigger.retries,
+                    is_realtime: trigger.is_realtime,
+                    is_silenced: trigger.is_silenced,
+                    start_time: now,
+                    end_time: now,
+                    next_run_at: now,
+                    skipped_alerts_count: None,
+                    delay_in_secs: None,
+                    evaluation_took_in_secs: None,
+                    query_took: None,
+                    success_response: None,
+                    is_partial: None,
+                })
+                .await;
                 return Err(anyhow::anyhow!("Alert not found"));
             }
             Err(e) => {
                 log::error!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] Error getting alert by id: {}",
-                    e
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Error getting alert by id: {e}"
                 );
+                // if trigger max retries is reached, update the next run at
+                if trigger.retries + 1 >= max_retries {
+                    // next run at is after 5mins
+                    let next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
+                    new_trigger.next_run_at = next_run_at;
+                    db::scheduler::update_trigger(new_trigger).await?;
+                } else {
+                    // Mark the trigger as failed
+                    db::scheduler::update_status(
+                        &trigger.org,
+                        db::scheduler::TriggerModule::Alert,
+                        &trigger.module_key,
+                        db::scheduler::TriggerStatus::Waiting,
+                        trigger.retries + 1,
+                        None,
+                    )
+                    .await?;
+                }
+                publish_triggers_usage(TriggerData {
+                    _timestamp: now,
+                    org: trigger.org.clone(),
+                    module: TriggerDataType::Alert,
+                    key: format!("/{}", trigger.module_key),
+                    status: TriggerDataStatus::Failed,
+                    scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                    error: Some(format!("Error getting alert by id: {e}")),
+                    time_in_queue_ms: Some(time_in_queue),
+                    source_node: Some(source_node.clone()),
+                    retries: trigger.retries,
+                    is_realtime: trigger.is_realtime,
+                    is_silenced: trigger.is_silenced,
+                    start_time: now,
+                    end_time: now,
+                    next_run_at: now,
+                    skipped_alerts_count: None,
+                    delay_in_secs: None,
+                    evaluation_took_in_secs: None,
+                    query_took: None,
+                    success_response: None,
+                    is_partial: None,
+                })
+                .await;
                 return Err(anyhow::anyhow!("Error getting alert by id: {}", e));
             }
         }
@@ -177,19 +264,29 @@ async fn handle_alert_triggers(
             "[SCHEDULER trace_id {scheduler_trace_id}] Alert id is not a valid ksuid: {}",
             trigger.module_key
         );
+        // Module key is not a valid ksuid, delete the trigger job
+        if let Err(e) = db::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::Alert,
+            &trigger.module_key,
+        )
+        .await
+        {
+            log::error!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] Error deleting trigger job: {e}"
+            );
+        }
         return Err(anyhow::anyhow!(
             "Alert id is not a valid ksuid: {}",
             trigger.module_key
         ));
     };
+    // Set the is_realtime field according to the alert
+    new_trigger.is_realtime = alert.is_real_time;
 
-    let is_realtime = trigger.is_realtime;
+    let is_realtime = new_trigger.is_realtime;
     let is_silenced = trigger.is_silenced;
-    let now = Utc::now().timestamp_micros();
     let mut final_end_time = trigger.next_run_at;
-    let triggered_at = trigger.start_time.unwrap_or_default();
-    let time_in_queue = Duration::microseconds(now - triggered_at).num_milliseconds();
-    let source_node = LOCAL_NODE.name.clone();
 
     if is_realtime && is_silenced {
         log::debug!(
@@ -198,25 +295,9 @@ async fn handle_alert_triggers(
             &trigger.module_key
         );
         // wakeup the trigger
-        let new_trigger = db::scheduler::Trigger {
-            next_run_at: Utc::now().timestamp_micros(),
-            is_realtime: true,
-            is_silenced: false,
-            status: db::scheduler::TriggerStatus::Waiting,
-            ..trigger.clone()
-        };
         db::scheduler::update_trigger(new_trigger).await?;
         return Ok(());
     }
-
-    let mut new_trigger = db::scheduler::Trigger {
-        next_run_at: now,
-        is_realtime: alert.is_real_time,
-        is_silenced: false,
-        status: db::scheduler::TriggerStatus::Waiting,
-        retries: 0,
-        ..trigger.clone()
-    };
 
     if !alert.enabled {
         // update trigger, check on next week
@@ -632,15 +713,71 @@ async fn handle_report_triggers(
     let org_id = &trigger.org;
     // For report, trigger.module_key is the report name
     let report_name = &trigger.module_key;
+    let now = now_micros();
+    let triggered_at = trigger.start_time.unwrap_or_default();
+    let processing_delay = now - trigger.next_run_at;
+    let time_in_queue = now - triggered_at;
 
-    let mut report = db::dashboards::reports::get(org_id, report_name).await?;
     let mut new_trigger = db::scheduler::Trigger {
-        next_run_at: Utc::now().timestamp_micros(),
+        next_run_at: now,
         is_realtime: false,
         is_silenced: false,
         status: db::scheduler::TriggerStatus::Waiting,
         retries: 0,
         ..trigger.clone()
+    };
+    let mut report = match db::dashboards::reports::get(org_id, report_name).await {
+        Ok(report) => report,
+        Err(e) => {
+            log::error!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] Error getting report: org: {org_id}, report name: {report_name}, error: {e}"
+            );
+            // if trigger max retries is reached, update the next run at
+            if trigger.retries + 1 >= max_retries {
+                // next run at is after 5mins
+                let next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
+                new_trigger.next_run_at = next_run_at;
+                db::scheduler::update_trigger(new_trigger).await?;
+            } else {
+                // Mark the trigger as failed
+                db::scheduler::update_status(
+                    &trigger.org,
+                    db::scheduler::TriggerModule::Report,
+                    &trigger.module_key,
+                    db::scheduler::TriggerStatus::Waiting,
+                    trigger.retries + 1,
+                    None,
+                )
+                .await?;
+            }
+            publish_triggers_usage(TriggerData {
+                _timestamp: now,
+                org: trigger.org.clone(),
+                module: TriggerDataType::Report,
+                key: trigger.module_key.clone(),
+                next_run_at: now,
+                is_realtime: trigger.is_realtime,
+                is_silenced: trigger.is_silenced,
+                status: TriggerDataStatus::Failed,
+                start_time: trigger.start_time.unwrap_or_default(),
+                end_time: trigger.end_time.unwrap_or_default(),
+                retries: trigger.retries,
+                error: None,
+                success_response: None,
+                is_partial: None,
+                delay_in_secs: Some(Duration::microseconds(processing_delay).num_seconds()),
+                evaluation_took_in_secs: None,
+                source_node: Some(LOCAL_NODE.name.clone()),
+                query_took: None,
+                scheduler_trace_id: Some(scheduler_trace_id.clone()),
+                time_in_queue_ms: Some(Duration::microseconds(time_in_queue).num_milliseconds()),
+                skipped_alerts_count: None,
+            })
+            .await;
+            return Err(anyhow::anyhow!(
+                "Error getting report: {report_name}, error: {e}"
+            ));
+        }
     };
 
     if !report.enabled {
@@ -717,10 +854,6 @@ async fn handle_report_triggers(
         );
     }
 
-    let triggered_at = trigger.start_time.unwrap_or_default();
-    let processing_delay = triggered_at - trigger.next_run_at;
-    let time_in_queue = Utc::now().timestamp_micros() - triggered_at;
-
     let mut trigger_data_stream = TriggerData {
         _timestamp: triggered_at,
         org: trigger.org.clone(),
@@ -761,7 +894,7 @@ async fn handle_report_triggers(
         return Ok(());
     }
     match report.send_subscribers().await {
-        Ok(_) => {
+        Ok(is_partial) => {
             log::info!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Report {} sent to destination",
                 report_name
@@ -775,7 +908,10 @@ async fn handle_report_triggers(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Update trigger for report: {}",
                 report_name
             );
-            trigger_data_stream.end_time = Utc::now().timestamp_micros();
+            if is_partial {
+                trigger_data_stream.status = TriggerDataStatus::PartiallyComplete
+            };
+            trigger_data_stream.end_time = now_micros();
         }
         Err(e) => {
             log::error!(

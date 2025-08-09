@@ -259,7 +259,8 @@ pub async fn trigger(org_id: &str, name: &str) -> Result<(), (http::StatusCode, 
     report
         .send_subscribers()
         .await
-        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(())
 }
 
 pub async fn enable(
@@ -285,13 +286,13 @@ pub async fn enable(
 #[async_trait]
 pub trait SendReport {
     /// Sends the report to subscribers
-    async fn send_subscribers(&self) -> Result<(), anyhow::Error>;
+    async fn send_subscribers(&self) -> Result<bool, anyhow::Error>;
 }
 
 #[async_trait]
 impl SendReport for Report {
     /// Sends the report to subscribers
-    async fn send_subscribers(&self) -> Result<(), anyhow::Error> {
+    async fn send_subscribers(&self) -> Result<bool, anyhow::Error> {
         if self.dashboards.is_empty() {
             return Err(anyhow::anyhow!("Atleast one dashboard is required"));
         }
@@ -340,12 +341,23 @@ impl SendReport for Report {
                             resp.bytes().await
                         ));
                     }
+                    let resp = resp.json::<serde_json::Value>().await;
+                    if let Ok(resp) = resp {
+                        log::info!("report sent successfully for the report {}", &self.name);
+                        if let Some(partially_complete) = resp.get("partially_complete") {
+                            if let Some(partially_complete) = partially_complete.as_bool() {
+                                return Ok(partially_complete);
+                            }
+                        }
+                    } else {
+                        log::error!("error sending report for the report {}", &self.name);
+                    }
                 }
                 Err(e) => {
                     return Err(anyhow::anyhow!("Error contacting report server: {e}"));
                 }
             }
-            Ok(())
+            Ok(false)
         } else {
             // Currently only one `ReportDashboard` can be captured and sent
             let dashboard = &self.dashboards[0];
@@ -359,7 +371,8 @@ impl SendReport for Report {
                 &self.name,
             )
             .await?;
-            send_email(self, &report.0, report.1).await
+            send_email(self, &report.0, report.1).await?;
+            Ok(false)
         }
     }
 }
