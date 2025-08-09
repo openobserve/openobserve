@@ -13,54 +13,90 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { createStore } from "vuex";
+import {
+  createTestWrapper,
+  defaultTestProps,
+  mockZincUtils,
+  mockCopyContent,
+  mockExternalDependencies,
+  cleanupTest,
+  commonAssertions,
+  type TestProps
+} from "@/test/unit/helpers/ingestionTestUtils";
 import Fluentd from "@/components/ingestion/logs/Fluentd.vue";
 
 installQuasar();
-const store = createStore({
-  state: {
-    organizationPasscode: 11,
-    API_ENDPOINT: "http://localhost:808",
-  },
-});
-describe.skip("Fluentd", async () => {
+mockZincUtils();
+mockCopyContent();
+mockExternalDependencies();
+
+describe("Fluentd", () => {
   let wrapper: any;
+
   beforeEach(() => {
-    wrapper = mount(Fluentd, {
-      props: {
-        currOrgIdentifier: "zinc_next",
-        currUserEmail: "tulsiraval2828@gmail.com",
-        orgAPIKey: 'L"4R{8f~56e72`0319V',
-      },
-      global: {
-        provide: {
-          store: store,
-        },
-      },
-    });
-  });
-  it("should mount Fluentd", async () => {
-    expect(wrapper.vm.currOrgIdentifier).not.toBe("");
-    expect(wrapper.vm.currUserEmail).not.toBe("");
-    expect(wrapper.vm.orgAPIKey).not.toBe("");
+    wrapper = createTestWrapper(Fluentd, defaultTestProps);
   });
 
-  it("should render title", () => {
-    const title = wrapper.find('[data-test="fluentd-title-text"]');
-    expect(title.text()).toBe("Fluentd");
+  afterEach(() => {
+    cleanupTest(wrapper);
   });
 
-  it("should render content", () => {
-    const content = wrapper.find('[data-test="fluentd-content-text"]');
-
-    expect(content.text()).matchSnapshot();
+  it("should mount successfully", () => {
+    commonAssertions.shouldMountSuccessfully(wrapper);
   });
 
-  it("should render copy icon", () => {
-    const btn = wrapper.find('[data-test="fluentd-copy-btn"]');
-    expect(btn.exists()).toBeTruthy();
+  it("should render CopyContent component", () => {
+    commonAssertions.shouldRenderCopyContent(wrapper);
+  });
+
+  it("should display Fluentd configuration content", () => {
+    const copyContent = wrapper.findComponent({ name: 'CopyContent' });
+    const content = copyContent.props('content');
+    expect(content).toContain('<source>');
+    expect(content).toContain('@type forward');
+    expect(content).toContain('<match **>');
+    expect(content).toContain('test_org');
+    expect(content).toContain('[EMAIL]');
+    expect(content).toContain('[PASSCODE]');
+  });
+
+  it("should handle props correctly", () => {
+    expect(wrapper.vm.currOrgIdentifier).toBe(defaultTestProps.currOrgIdentifier);
+    expect(wrapper.vm.currUserEmail).toBe(defaultTestProps.currUserEmail);
+  });
+
+  it("should generate content with organization identifier", () => {
+    const copyContent = wrapper.findComponent({ name: 'CopyContent' });
+    expect(copyContent.props('content')).toContain('test_org');
+  });
+
+  it("should handle different organization identifier", () => {
+    const customProps: TestProps = {
+      currOrgIdentifier: 'custom_org',
+      currUserEmail: 'custom@example.com'
+    };
+    
+    const customStoreState = {
+      selectedOrganization: {
+        identifier: 'custom_org'
+      }
+    };
+    
+    wrapper = createTestWrapper(Fluentd, customProps, customStoreState);
+    
+    const copyContent = wrapper.findComponent({ name: 'CopyContent' });
+    expect(copyContent.props('content')).toContain('custom_org');
+  });
+
+  it("should handle missing props gracefully", () => {
+    wrapper = createTestWrapper(Fluentd, {});
+    expect(wrapper.exists()).toBe(true);
+  });
+
+  it("should handle empty store state", () => {
+    wrapper = createTestWrapper(Fluentd, defaultTestProps, {});
+    expect(wrapper.exists()).toBe(true);
   });
 });

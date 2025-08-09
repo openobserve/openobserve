@@ -423,6 +423,14 @@ describe("AppSessions.vue", () => {
     });
 
     it("should get sessions data when component is mounted", async () => {
+      // Ensure the route is properly set
+      expect(router.currentRoute.value.name).toBe("Sessions");
+      
+      // Wait for component to fully mount and lifecycle hooks to complete
+      await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // The buildQueryPayload should be called during getSessions which is called in onMounted
       expect(mockQueryFunctions.buildQueryPayload).toHaveBeenCalled();
     });
 

@@ -32,5 +32,21 @@ export function installQuasar(options?: any) {
 
   afterAll(() => {
     config.global = globalConfigBackup;
+    
+    // Clear any pending Quasar timers/intervals
+    if (typeof global !== 'undefined' && global.document) {
+      // Clear any pending timeouts that Quasar might have set
+      const highestTimeoutId = setTimeout(() => {}, 0);
+      for (let i = 0; i < highestTimeoutId; i++) {
+        clearTimeout(i);
+      }
+      
+      // Clear any pending intervals
+      const highestIntervalId = setInterval(() => {}, 1000);
+      clearInterval(highestIntervalId);
+      for (let i = 0; i < highestIntervalId; i++) {
+        clearInterval(i);
+      }
+    }
   });
 }

@@ -65,13 +65,47 @@ global.document.queryCommandSupported = vi.fn().mockReturnValue(true);
 // Mock URL.createObjectURL and URL.revokeObjectURL for file download tests
 global.URL.createObjectURL = vi.fn().mockReturnValue('mock-object-url');
 global.URL.revokeObjectURL = vi.fn();
+// Mock Quasar's portal functionality to prevent DOM access issues
+if (typeof global !== 'undefined' && global.document) {
+  // Mock document.body if it doesn't exist
+  if (!global.document.body) {
+    global.document.body = global.document.createElement('body');
+  }
+  
+  // Mock any Quasar-specific DOM methods
+  global.document.addEventListener = vi.fn();
+  global.document.removeEventListener = vi.fn();
+}
 
 beforeAll(() => server.listen())
 
 // Reset any request handlers after each test (for test isolation)
-afterEach(() => server.resetHandlers())
+afterEach(() => {
+  server.resetHandlers();
+  
+  // Clear any pending timers that might be left by Quasar components
+  vi.clearAllTimers();
+  
+  // Clear any pending timeouts/intervals
+  if (typeof global !== 'undefined' && global.document) {
+    // This helps prevent the "document is not defined" error
+    const timeoutId = setTimeout(() => {}, 0);
+    clearTimeout(timeoutId);
+  }
+})
 
 // Stop the server when tests are done
 afterAll(() => {
-  server.close(); 
+  server.close();
+  
+  // Final cleanup of any remaining timers
+  vi.clearAllTimers();
+  
+  // Clear any remaining timeouts/intervals that Quasar might have set
+  if (typeof global !== 'undefined' && global.document) {
+    const highestTimeoutId = setTimeout(() => {}, 0);
+    for (let i = 0; i < highestTimeoutId; i++) {
+      clearTimeout(i);
+    }
+  }
 })
