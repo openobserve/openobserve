@@ -325,6 +325,10 @@ pub async fn search(
         result.set_order_by(Some(order_by.1));
     }
 
+    // set order by metadata
+    let order_by_metadata = sql.order_by.clone();
+    result.set_order_by_metadata(order_by_metadata);
+
     log::info!(
         "[trace_id {trace_id}] search->result: total: {}, scan_size: {} mb, took: {} ms",
         result.total,

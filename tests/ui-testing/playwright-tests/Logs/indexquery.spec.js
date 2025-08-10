@@ -1,4 +1,5 @@
 import { test, expect } from "../baseFixtures";
+// PageManager already imported; avoid duplicates
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from '../../pages/page-manager.js';
@@ -57,8 +58,10 @@ async function runQuery(page, query) {
   }
 
 test.describe("Compare SQL query execution times", () => {
+  let pageManager;
   test.beforeEach(async ({ page }) => {
     await login(page);
+    pageManager = new PageManager(page);
     await page.waitForTimeout(5000);
 
     const orgId = process.env["ORGNAME"];
@@ -172,5 +175,9 @@ test.describe("Compare SQL query execution times", () => {
     } catch (error) {
       console.error('Assertion failed: match_all query did not take less time than match_all_raw_ignorecase query.');
     }
+  });
+
+  test.afterEach(async ({ page }) => {
+    await pageManager.commonActions.flipStreaming();
   });
 });

@@ -232,6 +232,8 @@ pub struct Response {
     pub order_by: Option<OrderBy>,
     #[serde(default)]
     pub is_explain_plan: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub order_by_metadata: Vec<(String, OrderBy)>,
 }
 
 /// Iterator for Streaming response of search `Response`
@@ -397,6 +399,7 @@ impl Response {
             work_group: None,
             order_by: None,
             is_explain_plan: false,
+            order_by_metadata: Vec::new(),
         }
     }
 
@@ -496,6 +499,10 @@ impl Response {
 
     pub fn set_result_cache_ratio(&mut self, val: usize) {
         self.result_cache_ratio = val;
+    }
+
+    pub fn set_order_by_metadata(&mut self, val: Vec<(String, OrderBy)>) {
+        self.order_by_metadata = val;
     }
 }
 

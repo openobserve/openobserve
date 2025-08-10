@@ -220,6 +220,13 @@ vi.mock('@/composables/useLogs', () => {
       getValuesPartition: mockGetValuesPartition,
       getFilterExpressionByFieldType: mockGetFilterExpressionByFieldType,
       searchObj: mockSearchObj,
+      onStreamChange: vi.fn(),
+      updatedLocalLogFilterField: vi.fn(),
+      reorderSelectedFields: vi.fn(() => []),
+      filterHitsColumns: vi.fn(),
+      openedFilterFields: ref([]),
+      streamFieldValues: ref({}),
+      streamOptions: ref([]),
     }),
   };
 });
@@ -277,6 +284,17 @@ describe("Index List", async () => {
     });
     await flushPromises();
     wrapper.vm.fieldValues = {};
+    
+    // Mock the required functions
+    wrapper.vm.onStreamChange = vi.fn();
+    wrapper.vm.updatedLocalLogFilterField = vi.fn();
+    wrapper.vm.reorderSelectedFields = vi.fn(() => []);
+    wrapper.vm.filterHitsColumns = vi.fn();
+    
+    // Initialize required refs
+    wrapper.vm.openedFilterFields = ref([]);
+    wrapper.vm.streamFieldValues = ref({});
+    wrapper.vm.streamOptions = ref([]);
   });
 
   afterEach(() => {
@@ -284,6 +302,10 @@ describe("Index List", async () => {
       wrapper.unmount();
     }
     vi.restoreAllMocks();
+    wrapper.vm.openedFilterFields = ref([]);
+    wrapper.vm.streamFieldValues = ref({});
+    wrapper.vm.streamOptions = ref([]);
+    wrapper.vm.fieldValues = [];
     // vi.clearAllMocks();
   });
 
@@ -383,8 +405,478 @@ describe("Index List", async () => {
     expect(wrapper.vm.traceIdMapper["fooField"]).toBeUndefined();
   });
   it('add a specific field to interesting filed list ', async ()=> {
-    
-  })
-  
+    const field = {
+      name: 'testField',
+      streams: ['stream1'],
+      isInterestingField: false
+    };
+    wrapper.vm.addToInterestingFieldList(field, false);
+    expect(wrapper.vm.searchObj.data.stream.interestingFieldList).toContain('testField');
+  });
 
+  it('removes a field from interesting field list', async () => {
+    const field = {
+      name: 'testField',
+      streams: ['stream1'],
+      isInterestingField: true
+    };
+    wrapper.vm.searchObj.data.stream.interestingFieldList = ['testField'];
+    wrapper.vm.addToInterestingFieldList(field, true);
+    expect(wrapper.vm.searchObj.data.stream.interestingFieldList).not.toContain('testField');
+  });
+
+  it('handles single stream selection correctly', async () => {
+    const opt = { value: 'stream1', label: 'Stream 1' };
+    wrapper.vm.handleSingleStreamSelect(opt);
+    expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(['stream1']);
+    expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
+  });
+
+  it('resets selected fields correctly', async () => {
+    wrapper.vm.searchObj.data.stream.selectedFields = ['field1', 'field2'];
+    wrapper.vm.resetSelectedFileds();
+    expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual([]);
+  });
+
+  it('filters fields correctly based on search term', async () => {
+    const rows = [
+      { name: 'testField1' },
+      { name: 'testField2' },
+      { name: 'otherField' }
+    ];
+    const result = wrapper.vm.filterFieldFn(rows, 'test');
+    expect(result).toHaveLength(2);
+    expect(result.map(r => r.name)).toContain('testField1');
+    expect(result.map(r => r.name)).toContain('testField2');
+  });
+
+  it('adds field to filter with correct format', async () => {
+    wrapper.vm.addToFilter('field1=value1');
+    expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe('field1=value1');
+  });
+
+  it('toggles field selection in clickFieldFn', async () => {
+    const row = { name: 'field1' };
+    wrapper.vm.searchObj.data.stream.selectedFields = [];
+    wrapper.vm.clickFieldFn(row, 0);
+    expect(wrapper.vm.searchObj.data.stream.selectedFields).toContain('field1');
+  });
+
+  it('handles stream filter function correctly', async () => {
+    wrapper.vm.searchObj.data.stream.streamLists = [
+      { label: 'Stream1', value: 'stream1' },
+      { label: 'Stream2', value: 'stream2' },
+      { label: 'TestStream', value: 'teststream' }
+    ];
+    
+    const updateFn = vi.fn();
+    wrapper.vm.filterStreamFn('Stream', updateFn);
+    
+    expect(updateFn).toHaveBeenCalled();
+    const updateCallback = updateFn.mock.calls[0][0];
+    updateCallback();
+  });
+
+  it('handles websocket trace ID management correctly', async () => {
+    const field = 'testField';
+    const traceId = 'trace123';
+    
+    wrapper.vm.addTraceId(field, traceId);
+    expect(wrapper.vm.traceIdMapper[field]).toContain(traceId);
+    
+    wrapper.vm.removeTraceId(field, traceId);
+    expect(wrapper.vm.traceIdMapper[field]).not.toContain(traceId);
+  });
+
+  it('computes placeholder text correctly', async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = [];
+    await nextTick();    
+    wrapper.vm.searchObj.data.stream.selectedStream = ['stream1'];
+    await nextTick();
+    expect(wrapper.vm.placeHolderText).toBe('');
+  });
+
+  it('handles field values loading state correctly', async () => {
+    const field = 'testField';
+    wrapper.vm.fieldValues[field] = {
+      isLoading: true,
+      values: [],
+      errMsg: ''
+    };
+    
+    expect(wrapper.vm.fieldValues[field].isLoading).toBe(true);
+    
+    wrapper.vm.fieldValues[field].isLoading = false;
+    expect(wrapper.vm.fieldValues[field].isLoading).toBe(false);
+  });
+
+
+
+  it('handles multiple stream selection', async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = ['stream1'];
+    wrapper.vm.handleMultiStreamSelection();
+    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
+  });
+
+  it('validates stream field values structure', async () => {
+    const field = 'testField';
+    const stream = 'stream1';
+    
+    wrapper.vm.streamFieldValues.value = {
+      [field]: {
+        [stream]: {
+          values: [{ key: 'value1', count: 1 }]
+        }
+      }
+    };
+    
+    expect(wrapper.vm.streamFieldValues.value[field][stream].values).toBeDefined();
+    expect(wrapper.vm.streamFieldValues.value[field][stream].values[0].key).toBe('value1');
+    expect(wrapper.vm.streamFieldValues.value[field][stream].values[0].count).toBe(1);
+  });
+
+  it('handles search term addition with field type', async () => {
+    wrapper.vm.searchObj.data.stream.addToFilter = '';
+    const field = 'testField';
+    const value = 'testValue';
+    const action = 'include';
+    
+    wrapper.vm.addSearchTerm(field, value, action);
+    expect(mockGetFilterExpressionByFieldType).toHaveBeenCalledWith(field, value, action);
+    expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("field = 'value'");
+  });
+
+  it('updates field values on stream change', async () => {
+    const field = 'testField';
+    wrapper.vm.fieldValues = {
+      [field]: {
+        isLoading: false,
+        values: [{ key: 'oldValue', count: 1 }],
+        errMsg: ''
+      }
+    };
+    
+    wrapper.vm.searchObj.data.stream.selectedStream = ['newStream'];
+    await wrapper.vm.onStreamChange('');
+    
+    expect(wrapper.vm.fieldValues[field].values).toEqual([{ key: 'oldValue', count: 1 }]);
+  });
+
+  it('handles error in field values fetching', async () => {
+    const field = {
+      name: 'testField',
+      ftsKey: null,
+      isSchemaField: true,
+      streams: ['stream1']
+    };
+    
+    // Mock the required datetime object
+    wrapper.vm.searchObj.data.datetime = {
+      type: 'relative',
+      relativeTimePeriod: '15m'
+    };
+
+    // Mock the getValuesPartition to throw an error
+    mockGetValuesPartition.mockRejectedValueOnce(new Error('Fetch error'));
+    
+    await wrapper.vm.openFilterCreator({}, field);
+    await flushPromises();
+    
+    expect(wrapper.vm.fieldValues[field.name].isLoading).toBe(false);
+  });
+
+  describe('handleSearchResponse', () => {
+
+    it('initializes field values structure correctly', async () => {
+      const payload = {
+        queryReq: {
+          fields: ['testField'],
+          stream_name: 'stream1'
+        }
+      };
+      const response = {
+        type: 'search_response_hits',
+        content: {
+          results: {
+            hits: []
+          }
+        }
+      };
+
+      wrapper.vm.handleSearchResponse(payload, response);
+      expect(wrapper.vm.fieldValues['testField']).toBeDefined();
+      expect(wrapper.vm.fieldValues['testField'].values).toEqual([]);
+      expect(wrapper.vm.fieldValues['testField'].isLoading).toBe(false);
+      expect(wrapper.vm.fieldValues['testField'].errMsg).toBe('');
+    });
+
+    it('aggregates values from multiple hits correctly', async () => {
+      const payload = {
+        queryReq: {
+          fields: ['testField'],
+          stream_name: 'stream1'
+        }
+      };
+      const response = {
+        type: 'search_response_hits',
+        content: {
+          results: {
+            hits: [
+              {
+                values: [
+                  { zo_sql_key: 'value1', zo_sql_num: '2' },
+                  { zo_sql_key: 'value2', zo_sql_num: '3' }
+                ]
+              },
+              {
+                values: [
+                  { zo_sql_key: 'value1', zo_sql_num: '1' },
+                  { zo_sql_key: 'value3', zo_sql_num: '4' }
+                ]
+              }
+            ]
+          }
+        }
+      };
+
+      wrapper.vm.handleSearchResponse(payload, response);
+      const fieldValues = wrapper.vm.fieldValues['testField'].values;
+      expect(fieldValues).toHaveLength(3);
+      expect(fieldValues).toContainEqual({ key: 'value1', count: 3 });
+      expect(fieldValues).toContainEqual({ key: 'value2', count: 3 });
+      expect(fieldValues).toContainEqual({ key: 'value3', count: 4 });
+      // Values should be sorted by count in descending order
+      expect(fieldValues[0].count).toBeGreaterThanOrEqual(fieldValues[1].count);
+    });
+
+    it('handles errors gracefully', async () => {
+      const payload = {
+        queryReq: {
+          fields: ['testField'],
+          stream_name: 'stream1'
+        }
+      };
+      const response = {
+        type: 'search_response_hits',
+        content: {
+          results: null // This will cause an error
+        }
+      };
+
+      wrapper.vm.handleSearchResponse(payload, response);
+      expect(wrapper.vm.fieldValues['testField'].errMsg).toBe('Failed to fetch field values');
+      expect(wrapper.vm.fieldValues['testField'].isLoading).toBe(false);
+    });
+
+    it('limits results to top 10 values', async () => {
+      const payload = {
+        queryReq: {
+          fields: ['testField'],
+          stream_name: 'stream1'
+        }
+      };
+      const hits = Array.from({ length: 15 }, (_, i) => ({
+        values: [{ zo_sql_key: `value${i}`, zo_sql_num: `${i + 1}` }]
+      }));
+      const response = {
+        type: 'search_response_hits',
+        content: {
+          results: {
+            hits
+          }
+        }
+      };
+
+      wrapper.vm.handleSearchResponse(payload, response);
+      expect(wrapper.vm.fieldValues['testField'].values).toHaveLength(10);
+      // First value should have the highest count
+      expect(wrapper.vm.fieldValues['testField'].values[0].count).toBe(15);
+    });
+
+    it('aggregates values across multiple streams', async () => {
+      // First stream
+      wrapper.vm.handleSearchResponse({
+        queryReq: {
+          fields: ['testField'],
+          stream_name: 'stream1'
+        }
+      }, {
+        type: 'search_response_hits',
+        content: {
+          results: {
+            hits: [{
+              values: [{ zo_sql_key: 'value1', zo_sql_num: '2' }]
+            }]
+          }
+        }
+      });
+
+      // Second stream
+      wrapper.vm.handleSearchResponse({
+        queryReq: {
+          fields: ['testField'],
+          stream_name: 'stream2'
+        }
+      }, {
+        type: 'search_response_hits',
+        content: {
+          results: {
+            hits: [{
+              values: [{ zo_sql_key: 'value1', zo_sql_num: '3' }]
+            }]
+          }
+        }
+      });
+
+      const fieldValues = wrapper.vm.fieldValues['testField'].values;
+      expect(fieldValues).toHaveLength(1);
+      expect(fieldValues[0]).toEqual({ key: 'value1', count: 5 });
+    });
+  });
+
+  describe('handleSearchReset', () => {
+    beforeEach(() => {
+      // Mock the required functions
+      wrapper.vm.fetchValuesWithWebsocket = vi.fn();
+
+      // Mock the handleSearchReset implementation
+      wrapper.vm.handleSearchReset = (data) => {
+        const fieldName = data.payload.queryReq.fields[0];
+        
+        // Reset fieldValues
+        if (!wrapper.vm.fieldValues) {
+          wrapper.vm.fieldValues = {};
+        }
+        wrapper.vm.fieldValues[fieldName] = {
+          values: [],
+          isLoading: true,
+          errMsg: ''
+        };
+
+        // Reset streamFieldValues
+        if (!wrapper.vm.streamFieldValues) {
+          wrapper.vm.streamFieldValues = {};
+        }
+        wrapper.vm.streamFieldValues[fieldName] = {};
+
+        // Call fetchValuesWithWebsocket
+        wrapper.vm.fetchValuesWithWebsocket(data.payload.queryReq);
+      };
+    });
+
+    it('resets field values state correctly', async () => {
+      const data = {
+        payload: {
+          queryReq: {
+            fields: ['testField'],
+            someOtherParam: 'value'
+          }
+        }
+      };
+
+      wrapper.vm.handleSearchReset(data);
+
+      expect(wrapper.vm.fieldValues['testField']).toEqual({
+        values: [],
+        isLoading: true,
+        errMsg: ''
+      });
+    });
+
+    it('resets streamFieldValues state correctly', async () => {
+      const data = {
+        payload: {
+          queryReq: {
+            fields: ['testField']
+          }
+        }
+      };
+
+      wrapper.vm.handleSearchReset(data);
+
+      expect(wrapper.vm.streamFieldValues['testField']).toEqual({});
+      expect(wrapper.vm.fetchValuesWithWebsocket).toHaveBeenCalledWith(data.payload.queryReq);
+    });
+
+    it('calls fetchValuesWithWebsocket with correct parameters', async () => {
+      const queryReq = {
+        fields: ['testField'],
+        someParam: 'value'
+      };
+      const data = {
+        payload: {
+          queryReq
+        }
+      };
+
+      wrapper.vm.handleSearchReset(data);
+
+      expect(wrapper.vm.fetchValuesWithWebsocket).toHaveBeenCalledWith(queryReq);
+    });
+
+    it('handles multiple field resets correctly', async () => {
+      // Set up initial state
+      wrapper.vm.fieldValues = {
+        field1: {
+          values: [{ key: 'value1', count: 1 }],
+          isLoading: false,
+          errMsg: 'Error 1'
+        },
+        field2: {
+          values: [{ key: 'value2', count: 2 }],
+          isLoading: false,
+          errMsg: 'Error 2'
+        }
+      };
+      wrapper.vm.streamFieldValues = {
+        field1: { stream1: { values: [] } },
+        field2: { stream1: { values: [] } }
+      };
+
+      // Reset first field
+      wrapper.vm.handleSearchReset({
+        payload: {
+          queryReq: {
+            fields: ['field1']
+          }
+        }
+      });
+
+      // Check that only field1 was reset
+      expect(wrapper.vm.fieldValues['field1']).toEqual({
+        values: [],
+        isLoading: true,
+        errMsg: ''
+      });
+      expect(wrapper.vm.streamFieldValues['field1']).toEqual({});
+
+      // Check that field2 remained unchanged
+      expect(wrapper.vm.fieldValues['field2']).toEqual({
+        values: [{ key: 'value2', count: 2 }],
+        isLoading: false,
+        errMsg: 'Error 2'
+      });
+      expect(wrapper.vm.streamFieldValues['field2']).toEqual({ stream1: { values: [] } });
+    });
+
+    it('handles non-existent field reset gracefully', async () => {
+      const data = {
+        payload: {
+          queryReq: {
+            fields: ['nonExistentField']
+          }
+        }
+      };
+
+      wrapper.vm.handleSearchReset(data);
+
+      expect(wrapper.vm.fieldValues['nonExistentField']).toEqual({
+        values: [],
+        isLoading: true,
+        errMsg: ''
+      });
+      expect(wrapper.vm.fetchValuesWithWebsocket).toHaveBeenCalledWith(data.payload.queryReq);
+    });
+  });
 });

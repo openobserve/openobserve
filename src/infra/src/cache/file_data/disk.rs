@@ -469,14 +469,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         if cfg.disk_cache.gc_interval == 0 {
             return;
         }
-        let mut interval =
-            tokio::time::interval(tokio::time::Duration::from_secs(cfg.disk_cache.gc_interval));
-        interval.tick().await; // the first tick is immediate
         loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(cfg.disk_cache.gc_interval)).await;
             if let Err(e) = gc().await {
                 log::error!("disk cache gc error: {e}");
             }
-            interval.tick().await;
         }
     });
     Ok(())
