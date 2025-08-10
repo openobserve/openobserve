@@ -131,7 +131,7 @@ pub async fn search(
         if sql.is_explain {
             // Set flag to indicate this is an explain plan response
             result.is_explain_plan = true;
-            
+
             // Add plan data directly to hits
             for row in json_rows {
                 result.add_hit(&json::Value::Object(row));

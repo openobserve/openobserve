@@ -258,4 +258,3 @@ mod tests {
         assert!(converted_sql.contains("level"));
     }
 }
-
