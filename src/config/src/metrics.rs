@@ -154,6 +154,19 @@ pub static INGEST_WAL_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static INGEST_PARQUET_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ingest_parquet_files",
+            "Number of parquet files in the ingester pending upload to object store.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
 pub static INGEST_WAL_WRITE_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -1066,6 +1079,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_WAL_USED_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_PARQUET_FILES.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_WAL_WRITE_BYTES.clone()))
