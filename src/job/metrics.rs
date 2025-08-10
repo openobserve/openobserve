@@ -93,6 +93,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     // update metrics every 60 seconds
     loop {
+        tokio::time::sleep(time::Duration::from_secs(60)).await;
         if let Err(e) = update_metadata_metrics().await {
             log::error!("Error update metadata metrics: {e}");
         }
@@ -104,7 +105,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
         {
             log::error!("Error update parquet metrics: {e}");
         }
-        tokio::time::sleep(Duration::from_secs(60));
+        if let Err(e) = update_parquet_metadata_cache_metrics().await {
+            log::error!("Error update parquet metadata cache metrics: {}", e);
+        }
     }
 }
 
@@ -363,5 +366,19 @@ async fn traces_metrics_collect() -> Result<(), anyhow::Error> {
         );
     }
 
+    Ok(())
+}
+
+async fn update_parquet_metadata_cache_metrics() -> Result<(), anyhow::Error> {
+    let file_num =
+        crate::service::search::datafusion::storage::file_statistics_cache::GLOBAL_CACHE.len();
+    let mem_size = crate::service::search::datafusion::storage::file_statistics_cache::GLOBAL_CACHE
+        .memory_size();
+    metrics::QUERY_PARQUET_METADATA_CACHE_FILES
+        .with_label_values(&[])
+        .set(file_num as i64);
+    metrics::QUERY_PARQUET_METADATA_CACHE_USED_BYTES
+        .with_label_values(&[])
+        .set(mem_size as i64);
     Ok(())
 }

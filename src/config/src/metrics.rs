@@ -405,6 +405,32 @@ pub static QUERY_METRICS_CACHE_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// query parquet metadata cache stats
+pub static QUERY_PARQUET_METADATA_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_parquet_metadata_cache_files",
+            "Querier parquet metadata cache files.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_PARQUET_METADATA_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "query_parquet_metadata_cache_used_bytes",
+            "Querier parquet metadata cache used bytes.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
 // compactor stats
 pub static COMPACT_USED_TIME: Lazy<CounterVec> = Lazy::new(|| {
     CounterVec::new(
@@ -1112,6 +1138,12 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_METRICS_CACHE_RATIO.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_PARQUET_METADATA_CACHE_FILES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_PARQUET_METADATA_CACHE_USED_BYTES.clone()))
         .expect("Metric registered");
 
     // query manager

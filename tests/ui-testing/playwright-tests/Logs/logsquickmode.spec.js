@@ -1,7 +1,8 @@
 import { test, expect } from "../baseFixtures";
+import PageManager from "../../pages/page-manager.js";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import PageManager from '../../pages/page-manager.js';
+// (duplicate import removed)
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -96,6 +97,10 @@ test.describe("Logs Quickmode testcases", () => {
     if (isSwitchedOff) {
       await toggleButton.click();
     }
+  });
+
+  test.afterEach(async ({ page }) => {
+    await pageManager.commonActions.flipStreaming();
   });
   test("should click on interesting fields icon and display query in editor", {
     tag: ['@interestingFieldsLogs', '@all', '@logs']

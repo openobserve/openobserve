@@ -171,6 +171,7 @@ pub async fn do_partitioned_search(
                 "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), truncating results",
             );
             search_res.hits.truncate(req_size as usize);
+            search_res.total = search_res.hits.len();
         }
 
         if !search_res.hits.is_empty() {
@@ -461,6 +462,7 @@ pub async fn process_delta(
                 search_res
                     .hits
                     .truncate((total_hits - excess_hits) as usize);
+                search_res.total = search_res.hits.len();
             }
         }
 
@@ -578,6 +580,7 @@ pub async fn process_delta(
                 new_start_time,
                 new_end_time,
                 search_res.order_by,
+                search_res.order_by_metadata.clone(),
                 is_streaming_aggs,
                 sender,
                 is_result_array_skip_vrl,
@@ -652,6 +655,7 @@ async fn send_partial_search_resp(
     new_start_time: i64,
     new_end_time: i64,
     order_by: Option<OrderBy>,
+    order_by_metadata: Vec<(String, OrderBy)>,
     is_streaming_aggs: bool,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     is_result_array_skip_vrl: bool,
@@ -670,6 +674,7 @@ async fn send_partial_search_resp(
         new_start_time: Some(new_start_time),
         new_end_time: Some(new_end_time),
         order_by,
+        order_by_metadata,
         trace_id: trace_id.to_string(),
         ..Default::default()
     };

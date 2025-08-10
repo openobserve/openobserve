@@ -1,7 +1,8 @@
 import { test, expect } from "../baseFixtures.js";
+import PageManager from "../../pages/page-manager.js";
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
-import PageManager from '../../pages/page-manager.js';
+// (duplicate import removed)
 
 test.describe.configure({ mode: "parallel" });
 
@@ -109,6 +110,10 @@ test.describe("Search Partition Tests", () => {
 
     // Verify histogram state
     await pageManager.logsPage.verifyHistogramState();
+  });
+
+  test.afterEach(async ({ page }) => {
+    await pageManager.commonActions.flipStreaming();
   });
 });
 
