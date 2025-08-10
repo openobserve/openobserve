@@ -146,7 +146,14 @@ pub async fn check_cache(
         result_ts_col = Some(TIMESTAMP_COL_NAME.to_string());
     }
 
-    let result_ts_col = result_ts_col.unwrap();
+    // Check ts_col again, if it is still None, return default
+    let Some(result_ts_col) = result_ts_col else {
+        return MultiCachedQueryResponse {
+            order_by,
+            ..Default::default()
+        };
+    };
+
     let mut discard_interval = -1;
     if let Some(interval) = sql.histogram_interval {
         *file_path = format!("{file_path}_{interval}_{result_ts_col}");
