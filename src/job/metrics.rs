@@ -34,7 +34,7 @@ use opentelemetry_sdk::{
     },
     runtime,
 };
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, time};
 
 use crate::{
     common::infra::{
