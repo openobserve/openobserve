@@ -462,6 +462,12 @@ async fn move_files(
     let mut files_with_size = files.to_owned();
     files_with_size.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
     // check the total size
+
+    let stream_fields_num = if num_uds_fields > 0 {
+        num_uds_fields
+    } else {
+        stream_fields_num
+    };
     let total_original_size: i64 = files_with_size
         .iter()
         .map(|f| f.meta.original_size)
