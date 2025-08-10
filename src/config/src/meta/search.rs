@@ -230,9 +230,8 @@ pub struct Response {
     pub work_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_by: Option<OrderBy>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
-    pub explain_output: Option<json::Value>,
+    pub is_explain_plan: bool,
 }
 
 /// Iterator for Streaming response of search `Response`
@@ -397,7 +396,7 @@ impl Response {
             result_cache_ratio: 0,
             work_group: None,
             order_by: None,
-            explain_output: None,
+            is_explain_plan: false,
         }
     }
 

@@ -127,29 +127,17 @@ pub async fn search(
         let json_rows = record_batches_to_json_rows(&batches_query_ref)
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
 
-        // Handle EXPLAIN output
+        // Handle EXPLAIN output - return plan data as hits with a flag
         if sql.is_explain {
-            if sql.is_analyze {
-                // EXPLAIN ANALYZE: Extract metrics from AnalyzeExec output
-                // The json_rows contains the plan structure, we need to enhance it with metrics
-                let plan_with_metrics = json_rows.clone();
-
-                // For now, return the basic plan - we'll enhance this with metrics extraction
-                result.explain_output = Some(json::json!({
-                    "plan_with_metrics": plan_with_metrics,
-                    "note": "Metrics collection implemented - AnalyzeExec executed successfully"
-                }));
-            } else {
-                // Plain EXPLAIN: ExplainExec returns structured plan data
-                result.explain_output = Some(json::json!({
-                    "plan": json_rows
-                }));
+            // Set flag to indicate this is an explain plan response
+            result.is_explain_plan = true;
+            
+            // Add plan data directly to hits
+            for row in json_rows {
+                result.add_hit(&json::Value::Object(row));
             }
-        }
-
-        // For EXPLAIN queries, DataFusion doesn't return actual query results
-        // It only returns the plan information, so we don't process hits
-        if !sql.is_explain {
+        } else {
+            // Normal query processing
             let mut sources: Vec<json::Value> = if query_fn.is_empty() {
                 json_rows
                     .into_iter()
@@ -281,7 +269,7 @@ pub async fn search(
                     result.add_hit(&source);
                 }
             }
-        } // end of if !sql.is_explain || sql.is_analyze block
+        } // end of normal query processing
     }
 
     let total = if !track_total_hits {
