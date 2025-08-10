@@ -95,6 +95,7 @@ fn apply_sort_strategy(search_res: &mut Response, strategy: SortStrategy) {
             sort_by_column(search_res, &col, is_string, is_descending);
             if search_res.order_by.is_none() {
                 search_res.order_by = Some(order);
+                search_res.order_by_metadata.push((col, order));
             }
         }
         SortStrategy::AutoDetermine(col, is_string) => {

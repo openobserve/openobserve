@@ -2610,37 +2610,7 @@ const useLogs = () => {
           },
           "ui",
         )
-        .then(async (res) => {
-          //the res.data would look like this
-          //{
-          //     "took": 33,
-          //     "took_detail": {
-          //         "total": 33,
-          //         "cache_took": 1,
-          //         "file_list_took": 5,
-          //         "wait_in_queue": 0,
-          //         "idx_took": 0,
-          //         "search_took": 24
-          //     },
-          //     "hits": [
-          //         {
-          //             "_timestamp": 1749626987957218,
-          //             "job": "test",
-          //             "level": "info",
-          //             "log": "test message for openobserve"
-          //         }
-          //     ],
-          //     "from": 0,
-          //     "size": 50,
-          //     "cached_ratio": 0,
-          //     "scan_size": 0,
-          //     "idx_scan_size": 0,
-          //     "scan_records": 0,
-          //     "trace_id": "5e1ba640f7524326a153d04e0da01a49",
-          //     "is_partial": false,
-          //     "result_cache_ratio": 0,
-          //     "order_by": "desc"
-          // }
+        .then(async (res: any) => {
           if (
             res.data.hasOwnProperty("function_error") &&
             res.data.function_error != ""
@@ -2811,6 +2781,21 @@ const useLogs = () => {
               };
             }
           }
+
+          // sort the hits based on timestamp column
+          if (
+            searchObj.data.queryResults.hits.length > 0 &&
+            store.state.zoConfig.timestamp_column != "" &&
+            res.data.hasOwnProperty("order_by_metadata") &&
+            res.data.order_by_metadata.length > 0 
+          ) {
+            sortResponse(
+              searchObj.data.queryResults.hits,
+              store.state.zoConfig.timestamp_column,
+              res.data.order_by_metadata
+            );
+          }
+          
           // check for pagination request for the partition and check for subpage if we have to pull data from multiple partitions
           // it will check for subpage and if subpage is present then it will send pagination request for next partition
           if (
@@ -2940,6 +2925,79 @@ const useLogs = () => {
         });
     });
   };
+
+  // Convert timestamp to microseconds
+  interface RecordWithTimestamp {
+    [key: string]: any;
+  }
+
+  function getTsValue(tsColumn: string, record: RecordWithTimestamp): number {
+    const ts = record[tsColumn];
+
+    if (ts === undefined || ts === null) return 0;
+
+    if (typeof ts === 'string') {
+      const timestamp = Date.parse(ts);
+      return timestamp * 1000;
+    }
+
+    if (typeof ts === 'number') return ts;
+
+    return 0;
+  }
+
+  // Sorting function
+  interface OrderByField {
+    0: string;
+    1: "asc" | "desc" | "ASC" | "DESC";
+  }
+
+  type OrderByArray = OrderByField[];
+
+  interface RecordObject {
+    [key: string]: any;
+  }
+
+  function sortResponse(
+    responseObj: RecordObject[],
+    tsColumn: string,
+    orderBy: OrderByArray
+  ): void {
+    if (!Array.isArray(orderBy) || orderBy.length === 0) return;
+
+    responseObj.sort((a: RecordObject, b: RecordObject) => {
+      for (const entry of orderBy) {
+        if (!Array.isArray(entry) || entry.length !== 2) continue;
+        const [field, order] = entry;
+        let cmp = 0;
+
+        if (field === tsColumn) {
+          const aTs = getTsValue(tsColumn, a);
+          const bTs = getTsValue(tsColumn, b);
+          cmp = aTs - bTs;
+        } else {
+          const aVal = a[field] ?? null;
+          const bVal = b[field] ?? null;
+
+          if (typeof aVal === 'string' && typeof bVal === 'string') {
+            cmp = aVal.localeCompare(bVal);
+          } else if (typeof aVal === 'number' && typeof bVal === 'number') {
+            cmp = aVal - bVal;
+          } else if (typeof aVal === 'string' && typeof bVal === 'number') {
+            cmp = -1;
+          } else if (typeof aVal === 'number' && typeof bVal === 'string') {
+            cmp = 1;
+          } else {
+            cmp = 0;
+          }
+        }
+
+        const finalCmp = order === "desc" ? -cmp : cmp;
+        if (finalCmp !== 0) return finalCmp;
+      }
+      return 0;
+    });
+  }
 
   const filterHitsColumns = () => {
     searchObj.data.queryResults.filteredHit = [];

@@ -1,5 +1,6 @@
 import { test, expect } from "../baseFixtures.js";
-import PageManager from '../../pages/page-manager.js';
+import PageManager from "../../pages/page-manager.js";
+// (duplicate import removed)
 
 // Function to generate a random 9-character alphabetic name
 function generateRandomStreamName() {
@@ -172,5 +173,8 @@ test.describe("Pagination for logs", () => {
         await page.waitForTimeout(2000); 
         await pageManager.logsPage.pageNotVisible();
     });
-      
+    
+    test.afterEach(async ({ page }) => {
+        await pageManager.commonActions.flipStreaming();
+    });
 });

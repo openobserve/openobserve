@@ -89,7 +89,7 @@ jobs:
           retention-days: 1
 
   ui_integration_tests:
-    name: playwright_ui_integration_tests
+    name: e2e
     needs: [build_binary]
     runs-on:
       labels: ubicloud-standard-8
