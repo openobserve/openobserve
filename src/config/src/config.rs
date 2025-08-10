@@ -660,13 +660,12 @@ pub struct TCP {
     pub tcp_tls_ca_cert_path: String,
 }
 
-
 #[derive(PartialEq, Default)]
 pub enum RouteDispatchStrategy {
     #[default]
     Workload,
     Random,
-    Other
+    Other,
 }
 
 impl std::str::FromStr for RouteDispatchStrategy {
@@ -2242,7 +2241,9 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 fn check_route_config(cfg: &Config) -> Result<(), anyhow::Error> {
     if cfg.route.dispatch_strategy == RouteDispatchStrategy::Other {
-        return Err(anyhow::anyhow!("You must set ZO_ROUTE_STRATEGY to one of: workload (default) or random."));
+        return Err(anyhow::anyhow!(
+            "You must set ZO_ROUTE_STRATEGY to one of: workload (default) or random."
+        ));
     }
     Ok(())
 }

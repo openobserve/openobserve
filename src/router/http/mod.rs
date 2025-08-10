@@ -14,8 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ::config::{
-    META_ORG_ID, get_config,
-    RouteDispatchStrategy,
+    META_ORG_ID, RouteDispatchStrategy, get_config,
     meta::{
         cluster::{Node, Role, RoleGroup},
         promql::RequestRangeQuery,
