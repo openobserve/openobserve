@@ -260,6 +260,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
 /// Additional jobs that init processes should be deferred until the gRPC service
 /// starts in the main thread
 pub async fn init_deferred() -> Result<(), anyhow::Error> {
+    // Do these caching only in alert manager, querier and ingester
+    if !LOCAL_NODE.is_alert_manager() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_ingester() {
+        return Ok(());
+    }
+
     db::schema::cache_enrichment_tables()
         .await
         .expect("EnrichmentTables cache failed");
