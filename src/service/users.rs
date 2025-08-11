@@ -172,16 +172,15 @@ pub async fn post_user(
             #[cfg(feature = "enterprise")]
             {
                 use o2_openfga::authorizer::authz::{
-                    get_service_account_creation_tuple, get_user_crole_tuple, get_user_role_tuple,
-                    update_tuples,
+                    get_add_user_to_org_tuples, get_service_account_creation_tuple,
+                    get_user_crole_tuple, update_tuples,
                 };
                 if get_openfga_config().enabled {
                     let mut tuples = vec![];
-                    let org_id = org_id.replace(' ', "_");
-                    get_user_role_tuple(
-                        &usr_req.role.base_role.to_string(),
-                        &usr_req.email,
+                    get_add_user_to_org_tuples(
                         &org_id,
+                        &usr_req.email,
+                        &usr_req.role.base_role.to_string(),
                         &mut tuples,
                     );
                     if usr_req.role.base_role.eq(&UserRole::ServiceAccount) {
@@ -674,11 +673,11 @@ pub async fn add_user_to_org(
             #[cfg(feature = "enterprise")]
             {
                 use o2_openfga::authorizer::authz::{
-                    get_user_crole_tuple, get_user_role_tuple, update_tuples,
+                    get_add_user_to_org_tuples, get_user_crole_tuple, update_tuples,
                 };
                 if get_openfga_config().enabled {
                     let mut tuples = vec![];
-                    get_user_role_tuple(&base_role.to_string(), &email, org_id, &mut tuples);
+                    get_add_user_to_org_tuples(org_id, &email, &base_role.to_string(), &mut tuples);
                     if role.custom_role.is_some() {
                         let custom_role = role.custom_role.unwrap();
                         custom_role.iter().for_each(|crole| {

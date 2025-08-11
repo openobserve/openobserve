@@ -31,7 +31,9 @@ use {
     crate::{common::meta::user::TokenValidationResponse, service::db},
     config::meta::user::DBUser,
     jsonwebtoken::TokenData,
-    o2_openfga::authorizer::authz::{get_user_org_tuple, update_tuples},
+    o2_openfga::authorizer::authz::{
+        get_add_user_to_org_tuples, get_new_user_creation_tuple, get_user_org_tuple, update_tuples,
+    },
     o2_openfga::config::get_config as get_openfga_config,
     once_cell::sync::Lazy,
     regex::Regex,
@@ -77,7 +79,7 @@ pub async fn process_token(
     {
         use config::get_config;
         use o2_openfga::authorizer::authz::{
-            get_user_creation_tuples, get_user_role_creation_tuple, get_user_role_deletion_tuple,
+            get_add_user_to_org_tuples, get_user_role_deletion_tuple,
         };
 
         use crate::common::meta::user::UserOrgRole;
@@ -205,11 +207,12 @@ pub async fn process_token(
                 {
                     Ok(_) => {
                         log::info!("User added to the organization {}", org.name);
-                        write_tuples.push(get_user_role_creation_tuple(
-                            &org.role.to_string(),
-                            &user_email,
+                        get_add_user_to_org_tuples(
                             &org.name,
-                        ));
+                            &user_email,
+                            &org.role.to_string(),
+                            &mut write_tuples,
+                        );
                     }
                     Err(e) => {
                         log::error!("Error adding user to the organization {}: {}", org.name, e);
@@ -265,11 +268,12 @@ pub async fn process_token(
                             &user_email,
                             &org.name,
                         ));
-                        write_tuples.push(get_user_role_creation_tuple(
-                            &org.role.to_string(),
-                            &user_email,
+                        get_add_user_to_org_tuples(
                             &org.name,
-                        ));
+                            &user_email,
+                            &org.role.to_string(),
+                            &mut write_tuples,
+                        );
                     }
                     Err(e) => {
                         log::error!(
@@ -304,7 +308,7 @@ pub async fn process_token(
                 for (index, org) in source_orgs.iter().enumerate() {
                     // Assuming all the relevant tuples for this org exist
                     let mut tuples = vec![];
-                    get_user_creation_tuples(
+                    get_add_user_to_org_tuples(
                         &org.name,
                         &user_email,
                         &org.role.to_string(),
