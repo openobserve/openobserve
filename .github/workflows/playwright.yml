@@ -4,11 +4,19 @@ on:
   push:
     branches:
       - "main"
+    paths-ignore:
+      - "**.md"
+      - "**.yml"
+      - "**.yaml"
     # paths:
     #   - "web/**"
   pull_request:
     branches:
       - "*"
+    paths-ignore:
+      - "**.md"
+      - "**.yml"
+      - "**.yaml"
     # paths:
     #   - "web/**"
 

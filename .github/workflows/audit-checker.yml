@@ -1,6 +1,10 @@
 name: Security audit
 on:
   push:
+    paths-ignore:
+      - "**.md"
+      - "**.yml"
+      - "**.yaml"
 
 jobs:
   security_audit:

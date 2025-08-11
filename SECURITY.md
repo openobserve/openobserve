@@ -104,7 +104,3 @@ For phishing, account abuse, or suspicious activity affecting OpenObserve Cloud,
 * Backup: **security reports via GitHub → Security → “Report a vulnerability”**
 
 We appreciate your help in keeping OpenObserve safe for everyone.
-
----
-
-*Last updated: 2025‑08‑11*

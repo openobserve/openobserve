@@ -6,11 +6,15 @@ on:
       - "main"
     paths-ignore:
       - "**.md"
+      - "**.yml"
+      - "**.yaml"
   pull_request:
     branches:
       - "*"
     paths-ignore:
       - "**.md"
+      - "**.yml"
+      - "**.yaml"
 
 env:
   COLUMNS: 150
