@@ -75,8 +75,12 @@ impl FileStatisticsCache {
             total_size += std::mem::size_of::<Statistics>();
 
             // Column statistics size estimation
-            for _col_stat in &stats.column_statistics {
+            for col in &stats.column_statistics {
                 total_size += std::mem::size_of::<datafusion::common::ColumnStatistics>();
+                // add min_value, max_value, sum_value
+                total_size += col.min_value.get_value().map(|v| v.size()).unwrap_or(0);
+                total_size += col.max_value.get_value().map(|v| v.size()).unwrap_or(0);
+                total_size += col.sum_value.get_value().map(|v| v.size()).unwrap_or(0);
             }
         }
 
