@@ -42,8 +42,7 @@ pub type PipelineExecDFS = (
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct Pipeline {
-    #[serde(default)]
-    #[serde(rename = "pipeline_id")]
+    #[serde(rename = "pipeline_id", default)]
     pub id: String,
     #[serde(default)]
     pub version: i32,
@@ -427,7 +426,10 @@ pub fn default_status() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::json;
+    use crate::{
+        meta::alerts::{QueryCondition, TriggerCondition},
+        utils::json,
+    };
 
     #[test]
     fn test_stream_pipeline_serialization() {
@@ -570,5 +572,866 @@ mod tests {
         let nodes = nodes.unwrap();
         let new_nodes = json::from_str::<Option<Vec<Node>>>(&nodes);
         assert!(new_nodes.is_ok());
+    }
+
+    #[test]
+    fn test_pipeline_get_cache_key() {
+        let mut pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![],
+            edges: vec![],
+        };
+
+        let cache_key = pipeline.get_cache_key();
+        assert_eq!(cache_key, "test_org/test_org/test_stream/logs");
+
+        // Test scheduled pipeline
+        let derived_stream = DerivedStream {
+            org_id: "test_org".to_string(),
+            stream_type: StreamType::Logs,
+            query_condition: QueryCondition::default(),
+            trigger_condition: TriggerCondition::default(),
+            tz_offset: 0,
+            delay: None,
+            start_at: None,
+        };
+        pipeline.source = PipelineSource::Scheduled(derived_stream);
+        let cache_key = pipeline.get_cache_key();
+        assert_eq!(cache_key, "test_org/test_pipeline");
+    }
+
+    #[test]
+    fn test_pipeline_get_derived_stream() {
+        let mut pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![],
+            edges: vec![],
+        };
+
+        // Should return None for realtime pipeline
+        assert!(pipeline.get_derived_stream().is_none());
+
+        // Should return Some for scheduled pipeline
+        let derived_stream = DerivedStream {
+            org_id: "test_org".to_string(),
+            stream_type: StreamType::Logs,
+            query_condition: QueryCondition::default(),
+            trigger_condition: TriggerCondition::default(),
+            tz_offset: 0,
+            delay: None,
+            start_at: None,
+        };
+        pipeline.source = PipelineSource::Scheduled(derived_stream.clone());
+        assert_eq!(pipeline.get_derived_stream(), Some(derived_stream));
+    }
+
+    #[test]
+    fn test_pipeline_validation_empty_name() {
+        let mut pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "".to_string(), // Empty name
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![],
+            edges: vec![],
+        };
+
+        let result = pipeline.validate();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Please provide non-empty name")
+        );
+    }
+
+    #[test]
+    fn test_pipeline_validation_empty_nodes() {
+        let mut pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![], // Empty nodes
+            edges: vec![],
+        };
+
+        let result = pipeline.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Empty pipeline"));
+    }
+
+    #[test]
+    fn test_pipeline_validation_empty_edges() {
+        let mut pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "test_stream",
+                        StreamType::Logs,
+                    )),
+                    100.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "output_stream",
+                        StreamType::Logs,
+                    )),
+                    300.0,
+                    100.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![], // Empty edges
+        };
+
+        let result = pipeline.validate();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Please connect all Nodes")
+        );
+    }
+
+    #[test]
+    fn test_pipeline_validation_insufficient_edges() {
+        let mut pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "test_stream",
+                        StreamType::Logs,
+                    )),
+                    100.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "output_stream",
+                        StreamType::Logs,
+                    )),
+                    300.0,
+                    100.0,
+                    "output".to_string(),
+                ),
+                Node::new(
+                    "3".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "output_stream2",
+                        StreamType::Logs,
+                    )),
+                    500.0,
+                    100.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![
+                Edge {
+                    id: "e1-2".to_string(),
+                    source: "1".to_string(),
+                    target: "2".to_string(),
+                },
+                // Missing edge to node 3
+            ],
+        };
+
+        let result = pipeline.validate();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Insufficient number of edges")
+        );
+    }
+
+    #[test]
+    fn test_pipeline_get_node_map() {
+        let pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "test_stream",
+                        StreamType::Logs,
+                    )),
+                    100.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "output_stream",
+                        StreamType::Logs,
+                    )),
+                    300.0,
+                    100.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![],
+        };
+
+        let node_map = pipeline.get_node_map();
+        assert_eq!(node_map.len(), 2);
+        assert!(node_map.contains_key("1"));
+        assert!(node_map.contains_key("2"));
+    }
+
+    #[test]
+    fn test_pipeline_build_adjacency_list() {
+        let pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "test_stream",
+                        StreamType::Logs,
+                    )),
+                    100.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "output_stream",
+                        StreamType::Logs,
+                    )),
+                    300.0,
+                    100.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+            }],
+        };
+
+        let node_map = pipeline.get_node_map();
+        let adjacency_list = pipeline.build_adjacency_list(&node_map).unwrap();
+        assert_eq!(adjacency_list.len(), 1);
+        assert_eq!(adjacency_list.get("1").unwrap(), &vec!["2".to_string()]);
+    }
+
+    #[test]
+    fn test_pipeline_build_adjacency_list_invalid_source() {
+        let pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![Node::new(
+                "1".to_string(),
+                NodeData::Stream(StreamParams::new(
+                    "test_org",
+                    "test_stream",
+                    StreamType::Logs,
+                )),
+                100.0,
+                100.0,
+                "input".to_string(),
+            )],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "invalid_source".to_string(), // Invalid source
+                target: "1".to_string(),
+            }],
+        };
+
+        let node_map = pipeline.get_node_map();
+        let result = pipeline.build_adjacency_list(&node_map);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("source node not found")
+        );
+    }
+
+    #[test]
+    fn test_pipeline_num_of_func() {
+        let pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "test_stream",
+                        StreamType::Logs,
+                    )),
+                    100.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Function(components::FunctionParams {
+                        name: "test_function".to_string(),
+                        after_flatten: false,
+                        num_args: 0,
+                    }),
+                    200.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "3".to_string(),
+                    NodeData::Function(components::FunctionParams {
+                        name: "test_function2".to_string(),
+                        after_flatten: true,
+                        num_args: 0,
+                    }),
+                    300.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+            ],
+            edges: vec![],
+        };
+
+        assert_eq!(pipeline.num_of_func(), 2);
+    }
+
+    #[test]
+    fn test_pipeline_contains_function() {
+        let pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Function(components::FunctionParams {
+                        name: "test_function".to_string(),
+                        after_flatten: false,
+                        num_args: 0,
+                    }),
+                    100.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "test_stream",
+                        StreamType::Logs,
+                    )),
+                    200.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+            ],
+            edges: vec![],
+        };
+
+        assert!(pipeline.contains_function("test_function"));
+        assert!(!pipeline.contains_function("nonexistent_function"));
+    }
+
+    #[test]
+    fn test_pipeline_get_source_stream_params_realtime() {
+        let pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![],
+            edges: vec![],
+        };
+
+        let stream_params = pipeline.get_source_stream_params();
+        assert_eq!(stream_params.org_id, "test_org");
+        assert_eq!(stream_params.stream_name, "test_stream");
+        assert_eq!(stream_params.stream_type, StreamType::Logs);
+    }
+
+    #[test]
+    fn test_pipeline_get_source_stream_params_scheduled() {
+        let derived_stream = DerivedStream {
+            org_id: "test_org".to_string(),
+            stream_type: StreamType::Logs,
+            query_condition: QueryCondition {
+                sql: Some("SELECT * FROM test_stream".to_string()),
+                ..Default::default()
+            },
+            trigger_condition: TriggerCondition::default(),
+            tz_offset: 0,
+            delay: None,
+            start_at: None,
+        };
+
+        let pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Scheduled(derived_stream),
+            nodes: vec![],
+            edges: vec![],
+        };
+
+        let stream_params = pipeline.get_source_stream_params();
+        assert_eq!(stream_params.org_id, "test_org");
+        assert_eq!(stream_params.stream_name, "test_stream");
+        assert_eq!(stream_params.stream_type, StreamType::Logs);
+    }
+
+    #[test]
+    fn test_pipeline_contains_remote_destination() {
+        let pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![Node::new(
+                "1".to_string(),
+                NodeData::RemoteStream(crate::meta::stream::RemoteStreamParams {
+                    org_id: "test_org".to_string().into(),
+                    destination_name: "test_destination".to_string().into(),
+                }),
+                100.0,
+                100.0,
+                "input".to_string(),
+            )],
+            edges: vec![],
+        };
+
+        assert!(pipeline.contains_remote_destination("test_destination"));
+        assert!(!pipeline.contains_remote_destination("nonexistent_destination"));
+    }
+
+    #[test]
+    fn test_pipeline_get_metadata_by_stream_params() {
+        let mut node = Node::new(
+            "1".to_string(),
+            NodeData::Stream(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            100.0,
+            100.0,
+            "input".to_string(),
+        );
+        node.meta = Some(HashMap::from([
+            ("key1".to_string(), "value1".to_string()),
+            ("key2".to_string(), "value2".to_string()),
+        ]));
+
+        let pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![node],
+            edges: vec![],
+        };
+
+        let stream_params = StreamParams::new("test_org", "test_stream", StreamType::Logs);
+        let metadata = pipeline.get_metadata_by_stream_params(&stream_params);
+        assert!(metadata.is_some());
+        let metadata = metadata.unwrap();
+        assert_eq!(metadata.get("key1"), Some(&"value1".to_string()));
+        assert_eq!(metadata.get("key2"), Some(&"value2".to_string()));
+
+        // Test with non-matching stream params
+        let non_matching_params =
+            StreamParams::new("test_org", "different_stream", StreamType::Logs);
+        let metadata = pipeline.get_metadata_by_stream_params(&non_matching_params);
+        assert!(metadata.is_none());
+    }
+
+    #[test]
+    fn test_pipeline_dependency_item() {
+        let item = PipelineDependencyItem {
+            id: "test_id".to_string(),
+            name: "test_name".to_string(),
+        };
+
+        assert_eq!(item.id, "test_id");
+        assert_eq!(item.name, "test_name");
+    }
+
+    #[test]
+    fn test_pipeline_dependency_response() {
+        let response = PipelineDependencyResponse {
+            list: vec![
+                PipelineDependencyItem {
+                    id: "test_id1".to_string(),
+                    name: "test_name1".to_string(),
+                },
+                PipelineDependencyItem {
+                    id: "test_id2".to_string(),
+                    name: "test_name2".to_string(),
+                },
+            ],
+        };
+
+        assert_eq!(response.list.len(), 2);
+        assert_eq!(response.list[0].id, "test_id1");
+        assert_eq!(response.list[1].name, "test_name2");
+    }
+
+    #[test]
+    fn test_default_status() {
+        assert!(default_status());
+    }
+
+    #[test]
+    fn test_pipeline_validation_cyclical_detection() {
+        let mut pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "test_stream",
+                        StreamType::Logs,
+                    )),
+                    100.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "output_stream",
+                        StreamType::Logs,
+                    )),
+                    300.0,
+                    100.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![
+                Edge {
+                    id: "e1-2".to_string(),
+                    source: "1".to_string(),
+                    target: "2".to_string(),
+                },
+                Edge {
+                    id: "e2-1".to_string(),
+                    source: "2".to_string(),
+                    target: "1".to_string(), // Creates a cycle
+                },
+            ],
+        };
+
+        let result = pipeline.validate();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Cyclical pipeline detected")
+        );
+    }
+
+    #[test]
+    fn test_pipeline_validation_leaf_nodes_must_be_stream() {
+        let mut pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "test_stream",
+                        StreamType::Logs,
+                    )),
+                    100.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Function(components::FunctionParams {
+                        name: "test_function".to_string(),
+                        after_flatten: false,
+                        num_args: 0,
+                    }),
+                    300.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+            ],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+            }],
+        };
+
+        let result = pipeline.validate();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("All leaf nodes must be StreamNode")
+        );
+    }
+
+    #[test]
+    fn test_pipeline_validation_after_flatten_rule() {
+        let mut pipeline = Pipeline {
+            id: "test_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "test_pipeline".to_string(),
+            description: "test description".to_string(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Logs,
+            )),
+            nodes: vec![
+                Node::new(
+                    "1".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "test_stream",
+                        StreamType::Logs,
+                    )),
+                    100.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "2".to_string(),
+                    NodeData::Function(components::FunctionParams {
+                        name: "test_function1".to_string(),
+                        after_flatten: true, // Checked
+                        num_args: 0,
+                    }),
+                    200.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "3".to_string(),
+                    NodeData::Function(components::FunctionParams {
+                        name: "test_function2".to_string(),
+                        after_flatten: false, // Unchecked after checked
+                        num_args: 0,
+                    }),
+                    300.0,
+                    100.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "4".to_string(),
+                    NodeData::Stream(StreamParams::new(
+                        "test_org",
+                        "output_stream",
+                        StreamType::Logs,
+                    )),
+                    400.0,
+                    100.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![
+                Edge {
+                    id: "e1-2".to_string(),
+                    source: "1".to_string(),
+                    target: "2".to_string(),
+                },
+                Edge {
+                    id: "e2-3".to_string(),
+                    source: "2".to_string(),
+                    target: "3".to_string(),
+                },
+                Edge {
+                    id: "e3-4".to_string(),
+                    source: "3".to_string(),
+                    target: "4".to_string(),
+                },
+            ],
+        };
+
+        let result = pipeline.validate();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("After Flatten must be checked")
+        );
     }
 }

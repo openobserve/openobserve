@@ -576,6 +576,25 @@ pub async fn update_stream_settings(
                 });
             }
 
+            if let Some(enable_distinct_fields) = new_settings.enable_distinct_fields {
+                // Only reset timestamps when transitioning from disabled to enabled
+                let was_enabled = settings.enable_distinct_fields;
+                settings.enable_distinct_fields = enable_distinct_fields;
+                if !was_enabled && enable_distinct_fields {
+                    let current_time = now_micros();
+                    settings.distinct_value_fields.iter_mut().for_each(|f| {
+                        f.added_ts = current_time;
+                    });
+                    log::info!(
+                        "Re-enabling distinct fields for stream {}/{}/{}. Resetting timestamps for {:?} fields.",
+                        org_id,
+                        stream_type,
+                        stream_name,
+                        settings.distinct_value_fields
+                    );
+                }
+            }
+
             if !new_settings.full_text_search_keys.add.is_empty() {
                 settings
                     .full_text_search_keys
@@ -701,6 +720,25 @@ pub async fn delete_stream(
         }
     }
 
+    // create delete for compactor
+    if let Err(e) =
+        db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
+    {
+        log::error!(
+            "Failed to create retention job for stream: {}/{}/{}, error: {}",
+            org_id,
+            stream_type,
+            stream_name,
+            e
+        );
+        return Ok(HttpResponse::InternalServerError()
+            .append_header((ERROR_HEADER, format!("failed to delete stream: {e}")))
+            .json(MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to delete stream: {e}"),
+            )));
+    }
+
     // delete related resource
     if let Err(e) = stream_delete_inner(org_id, stream_type, stream_name).await {
         return Ok(HttpResponse::InternalServerError()
@@ -742,16 +780,6 @@ pub async fn stream_delete_inner(
     {
         use super::db::re_pattern::remove_stream_associations_after_deletion;
         remove_stream_associations_after_deletion(org_id, stream_name, stream_type).await?;
-    }
-
-    // create delete for compactor
-    if let Err(e) =
-        db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
-    {
-        log::error!(
-            "Failed to create retention job for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
-        );
-        return Err(e);
     }
 
     // delete stream schema cache

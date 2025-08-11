@@ -36,15 +36,17 @@ use config::{
     },
 };
 use datafusion::execution::cache::cache_manager::FileStatisticsCache;
-use futures::future::try_join_all;
+use futures::{StreamExt, stream};
 use hashbrown::HashMap;
 use infra::{
     cache::file_data,
     errors::{Error, ErrorCodes},
 };
 use itertools::Itertools;
+use roaring::RoaringBitmap;
 use tantivy::Directory;
 use tokio::sync::Semaphore;
+use tokio_stream::StreamExt as _;
 use tracing::Instrument;
 
 use crate::service::{
@@ -52,7 +54,10 @@ use crate::service::{
     search::{
         datafusion::exec,
         generate_search_schema_diff,
-        grpc::utils::{self, TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
+        grpc::{
+            tantivy_result_cache::{self, CacheEntry},
+            utils::{self, TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
+        },
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
@@ -73,7 +78,7 @@ pub async fn search(
     file_list: &[FileKey],
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
-    mut index_condition: Option<IndexCondition>,
+    index_condition: Option<IndexCondition>,
     mut fst_fields: Vec<String>,
     idx_optimize_rule: Option<IndexOptimizeMode>,
 ) -> super::SearchTable {
@@ -125,19 +130,15 @@ pub async fn search(
         files.len(),
     );
 
-    // Condition:All() means search tantivy without filter,
-    // so we should not use inverted index in datafusion search
-    // Condition:All() is used for TantivyOptimizeExec
-    let use_inverted_index = query.use_inverted_index
-        && index_condition.is_some()
-        && !index_condition.as_ref().unwrap().is_condition_all();
-    if use_inverted_index {
-        log::info!(
-            "[trace_id {}] flight->search: use_inverted_index with tantivy format {}",
-            query.trace_id,
-            use_inverted_index
-        );
-    }
+    let (use_inverted_index, tantivy_condition, datafusion_condition) =
+        check_inverted_index(query.clone(), index_condition);
+    log::info!(
+        "[trace_id {}] flight->search: use_inverted_index {}, tantivy_condition {:?}, datafusion_condition {:?}",
+        query.trace_id,
+        use_inverted_index,
+        tantivy_condition,
+        datafusion_condition
+    );
 
     let mut idx_took = 0;
     let mut is_add_filter_back = false;
@@ -145,7 +146,7 @@ pub async fn search(
         (idx_took, is_add_filter_back, ..) = filter_file_list_by_tantivy_index(
             query.clone(),
             &mut files,
-            index_condition.clone(),
+            tantivy_condition.clone(),
             idx_optimize_rule,
         )
         .await?;
@@ -178,11 +179,24 @@ pub async fn search(
         );
     }
 
+    let mut index_condition = generate_add_filter_back_condition(
+        tantivy_condition,
+        datafusion_condition,
+        &mut is_add_filter_back, // pass by reference to modify the value
+    );
+
     // set index_condition to None, means we do not need to add filter back
     if !is_add_filter_back {
         index_condition = None;
         fst_fields = vec![];
     }
+
+    log::info!(
+        "[trace_id {}] search->storage: add filter back index_condition {:?}, is_add_filter_back {}",
+        query.trace_id,
+        index_condition,
+        is_add_filter_back
+    );
 
     let cfg = get_config();
     let mut files_group: HashMap<usize, Vec<FileKey>> =
@@ -395,6 +409,87 @@ pub async fn search(
         )
     );
     Ok((tables, scan_stats))
+}
+
+// if Condition::All() -> disable inverted index
+// if negated condition
+//    1. split the negated condition into two parts (negative_conditions, positive_conditions)
+//    2. if negative_conditions is empty or enable not filter env, use inverted index
+//    3. if negative_conditions is not empty and positive_conditions is empty, do not use inverted
+//       index
+//    4. if negative_conditions is not empty and positive_conditions is not empty, use
+//       positive_conditions search tantivy, and if search error add filter back, always add
+//       negative_conditions to filter back
+// return
+//     1. use_inverted_index,
+//     2. index_condition(positive conditions used for tantivy search, if search tantivy error, also
+//        need add filter back)
+//     3. index_condition(negative conditions used for add filter back),
+fn check_inverted_index(
+    query: Arc<super::QueryParams>,
+    index_condition: Option<IndexCondition>,
+) -> (bool, Option<IndexCondition>, Option<IndexCondition>) {
+    if !query.use_inverted_index || index_condition.is_none() {
+        return (false, None, None);
+    }
+
+    // Condition:All() means search tantivy without filter,
+    // so we should not use inverted index in datafusion search
+    // Condition:All() is used for TantivyOptimizeExec
+    let index_condition = index_condition.unwrap();
+    if index_condition.is_condition_all() {
+        return (false, None, None);
+    }
+
+    // negative conditions with TantivyOptimizeExec is fast,
+    // but for row_ids it only fast when row_ids is small
+    // only positive conditions or enable not filter env, use inverted index
+    if get_config().common.feature_query_not_filter_with_index
+        || !index_condition.is_negated_condition()
+    {
+        return (true, Some(index_condition), None);
+    }
+
+    // only negative conditions, do not use inverted index
+    let (positive_conditions, negative_conditions) = index_condition.split_condition_by_negated();
+    if positive_conditions.is_empty() {
+        return (false, None, Some(negative_conditions));
+    }
+
+    // positive and negative conditions, use inverted index
+    (true, Some(positive_conditions), Some(negative_conditions))
+}
+
+fn generate_add_filter_back_condition(
+    tantivy_condition: Option<IndexCondition>,
+    datafusion_condition: Option<IndexCondition>,
+    is_add_filter_back: &mut bool,
+) -> Option<IndexCondition> {
+    // early return if tantivy_condition or datafusion_condition is None
+    if tantivy_condition.is_none() && datafusion_condition.is_none() {
+        return None;
+    }
+
+    // if have datafusion_condition, always add filter back
+    if datafusion_condition.is_some() {
+        let mut index_condition = datafusion_condition.clone();
+        if let Some(tantivy_cond) = tantivy_condition.as_ref()
+            && *is_add_filter_back
+        {
+            index_condition
+                .as_mut()
+                .unwrap()
+                .add_index_condition(tantivy_cond.clone());
+        }
+        *is_add_filter_back = true;
+        return index_condition;
+    }
+
+    if *is_add_filter_back {
+        return tantivy_condition;
+    }
+
+    None
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
@@ -635,30 +730,24 @@ pub async fn filter_file_list_by_tantivy_index(
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
     let time_range = query.time_range.unwrap_or((0, 0));
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
-    let (mut index_parquet_files, query_limit) =
+    let (index_parquet_files, query_limit) =
         partition_tantivy_files(index_parquet_files, &idx_optimize_mode, target_partitions);
 
     let mut no_more_files = false;
     let mut tantivy_result_builder = TantivyMultiResultBuilder::new(&idx_optimize_mode);
-    let group_num = index_parquet_files.len();
-    let max_group_len = index_parquet_files
-        .iter()
-        .map(|g| g.len())
-        .max()
-        .unwrap_or(0);
+    let group_num = index_parquet_files.first().unwrap_or(&vec![]).len();
+    let max_group_len = index_parquet_files.len();
 
     log::info!(
         "[trace_id {}] search->tantivy: target_partitions: {target_partitions}, group_num: {group_num}, max_group_len: {max_group_len}",
         query.trace_id,
     );
 
-    for _ in 0..max_group_len {
+    for file_group in index_parquet_files {
         if no_more_files {
             // delete the rest of the files
-            for i in 0..group_num {
-                if let Some(file) = extract_file_from_group(&mut index_parquet_files, i) {
-                    file_list_map.remove(&file.key);
-                }
+            for file in file_group {
+                file_list_map.remove(&file.key);
             }
             continue;
         }
@@ -666,15 +755,13 @@ pub async fn filter_file_list_by_tantivy_index(
         // Spawn a task for each group of files get row_id from index
         let mut tasks = Vec::new();
         let semaphore = std::sync::Arc::new(Semaphore::new(target_partitions));
-        for i in 0..group_num {
-            let Some(file) = extract_file_from_group(&mut index_parquet_files, i) else {
-                continue;
-            };
+        for file in file_group {
             let trace_id = query.trace_id.to_string();
             let index_condition_clone = index_condition.clone();
             let idx_optimize_rule_clone = idx_optimize_mode.clone();
-            let permit = semaphore.clone().acquire_owned().await.unwrap();
+            let semaphore_clone = semaphore.clone();
             let task = tokio::task::spawn(async move {
+                let permit = semaphore_clone.acquire_owned().await.unwrap();
                 let ret = search_tantivy_index(
                     &trace_id,
                     time_range,
@@ -699,33 +786,39 @@ pub async fn filter_file_list_by_tantivy_index(
             tasks.push(task)
         }
 
-        // Wait for all tasks to complete
-        let tasks = match try_join_all(tasks).await {
-            Ok(results) => results,
+        // if more than cpu_num's file returned many row_ids, we skip tantivy search
+        let mut threshold_num = cfg.limit.cpu_num;
+        let mut total_row_ids_percent = 0;
+        let mut tasks = stream::iter(tasks).buffer_unordered(target_partitions);
+        while let Some(result) = match tasks.try_next().await {
             Err(e) => {
+                let took = start.elapsed().as_millis() as usize;
                 log::error!(
-                    "[trace_id {}] search->tantivy: error filtering via index, error: {e:?}",
+                    "[trace_id {}] search->tantivy: error filtering via index, error: {e:?}, took: {took} ms",
                     query.trace_id,
                 );
                 // search error, need add filter back
-                return Ok((
-                    start.elapsed().as_millis() as usize,
-                    true,
-                    TantivyMultiResult::RowNums(0),
-                ));
+                return Ok((took, true, TantivyMultiResult::RowNums(0)));
             }
-        };
-        for result in tasks {
+            Ok(result) => result,
+        } {
             // Each result corresponds to a file in the file list
             match result {
                 Ok((file_name, result)) => {
                     if file_name.is_empty() {
                         // no need inverted index for this file, need add filter back
-                        log::warn!(
-                            "[trace_id {}] search->tantivy: no hits for index_condition: {:?}. Adding the parquet file back for Datafusion search",
-                            query.trace_id,
-                            index_condition,
-                        );
+                        let took = start.elapsed().as_millis() as usize;
+                        threshold_num -= 1;
+                        total_row_ids_percent += result.percent();
+                        if threshold_num == 0 {
+                            log::warn!(
+                                "[trace_id {}] search->tantivy: skip tantivy search, too many row_ids returned from tantivy index, avg percent: {}, took: {took} ms",
+                                query.trace_id,
+                                total_row_ids_percent as f64 / cfg.limit.cpu_num as f64,
+                            );
+                            file_list.extend(file_list_map.into_values());
+                            return Ok((took, true, TantivyMultiResult::RowNums(0)));
+                        }
                         is_add_filter_back = true;
                         continue;
                     }
@@ -848,8 +941,22 @@ async fn search_tantivy_index(
         ));
     };
 
-    // cache the indexer and reader
     let cfg = get_config();
+    let mut cache_key = String::new();
+    if cfg.common.inverted_index_result_cache_enabled {
+        metrics::TANTIVY_RESULT_CACHE_REQUESTS_TOTAL
+            .with_label_values(&[])
+            .inc();
+        cache_key = generate_cache_key(&index_condition, &idx_optimize_rule, parquet_file);
+        if let Some(result) = tantivy_result_cache::TANTIVY_RESULT_CACHE.get(&cache_key) {
+            metrics::TANTIVY_RESULT_CACHE_HITS_TOTAL
+                .with_label_values(&[])
+                .inc();
+            return Ok((parquet_file.key.to_string(), result));
+        }
+    }
+
+    // cache the indexer and reader
     let indexer = if cfg.common.inverted_index_cache_enabled {
         reader_cache::GLOBAL_CACHE.get(&ttv_file_name)
     } else {
@@ -942,8 +1049,7 @@ async fn search_tantivy_index(
     // search the index
     let file_in_range =
         parquet_file.meta.min_ts >= time_range.0 && parquet_file.meta.max_ts < time_range.1;
-    let idx_optimize_rule_clone = idx_optimize_rule.clone();
-    let res = tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule_clone) {
+    let res = tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule) {
         (false, _) | (true, None) => TantivyResult::handle_matched_docs(&searcher, query),
         (true, Some(IndexOptimizeMode::SimpleSelect(limit, ascend))) => {
             TantivyResult::handle_simple_select(&searcher, query, limit, ascend)
@@ -980,34 +1086,27 @@ async fn search_tantivy_index(
     .await??;
 
     let key = parquet_file.key.to_string();
-    match res {
-        TantivyResult::Count(count) => Ok((key, TantivyResult::Count(count))),
-        TantivyResult::Histogram(histogram) => Ok((key, TantivyResult::Histogram(histogram))),
-        TantivyResult::TopN(top_n) => Ok((key, TantivyResult::TopN(top_n))),
-        TantivyResult::Distinct(distinct) => Ok((key, TantivyResult::Distinct(distinct))),
+    let mut percent = 0.0;
+    let result = match res {
+        TantivyResult::Count(count) => TantivyResult::Count(count),
+        TantivyResult::Histogram(histogram) => TantivyResult::Histogram(histogram),
+        TantivyResult::TopN(top_n) => TantivyResult::TopN(top_n),
+        TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
         TantivyResult::RowIds(row_ids) => {
-            if row_ids.is_empty() {
+            if row_ids.is_empty() || parquet_file.meta.records == 0 {
                 return Ok((key, TantivyResult::RowIdsBitVec(0, BitVec::EMPTY)));
             }
             // return early if the number of matched docs is too large
-            if cfg.limit.inverted_index_skip_threshold > 0
-                && row_ids.len()
-                    > (parquet_file.meta.records as usize / 100
-                        * cfg.limit.inverted_index_skip_threshold)
-                && !matches!(idx_optimize_rule, Some(IndexOptimizeMode::SimpleCount))
-            {
-                log::debug!(
-                    "[trace_id {trace_id}] matched docs over [{}/100] in tantivy index, skip this file: {}",
-                    cfg.limit.inverted_index_skip_threshold,
-                    parquet_file.key
-                );
-                // return empty file name means we need to add filter back
+            let skip_threshold = cfg.limit.inverted_index_skip_threshold;
+            let row_ids_percent = row_ids.len() as f64 / parquet_file.meta.records as f64 * 100.0;
+            if skip_threshold > 0 && row_ids_percent > skip_threshold as f64 {
+                // return empty file name means we need to add filter back and skip tantivy search
                 return Ok((
                     "".to_string(),
-                    TantivyResult::RowIdsBitVec(0, BitVec::EMPTY),
+                    TantivyResult::RowIdsBitVec(row_ids_percent as usize, BitVec::EMPTY),
                 ));
             }
-            let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
+            percent = row_ids_percent;
             let max_doc_id = *row_ids.iter().max().unwrap_or(&0) as i64;
             if max_doc_id >= parquet_file.meta.records {
                 return Err(anyhow::anyhow!(
@@ -1016,16 +1115,28 @@ async fn search_tantivy_index(
                     parquet_file.meta.records,
                 ));
             }
+            let mut res = BitVec::repeat(false, max_doc_id as usize + 1);
             let num_rows = row_ids.len();
             for id in row_ids {
                 res.set(id as usize, true);
             }
-            Ok((key, TantivyResult::RowIdsBitVec(num_rows, res)))
+            TantivyResult::RowIdsBitVec(num_rows, res)
         }
         TantivyResult::RowIdsBitVec(..) => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
+    };
+
+    // cache the result if the memory size is less than the limit
+    if cfg.common.inverted_index_result_cache_enabled
+        && !cache_key.is_empty()
+        && (result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
+            || percent < 1.0)
+    {
+        let entry = get_cache_entry(result.clone(), percent);
+        tantivy_result_cache::TANTIVY_RESULT_CACHE.put(cache_key, entry);
     }
+    Ok((key, result))
 }
 
 /// if simple distinct without filter, we need to warm up the field
@@ -1038,24 +1149,72 @@ fn get_simple_distinct_field(idx_optimize_rule: &Option<IndexOptimizeMode>) -> V
 }
 
 // partition the tantivy files by time range
+// the return file groups should execte one by one
 fn partition_tantivy_files(
     index_parquet_files: Vec<FileKey>,
     idx_optimize_mode: &Option<IndexOptimizeMode>,
     target_partitions: usize,
 ) -> (Vec<Vec<FileKey>>, usize) {
-    if let Some(IndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_mode
+    let (file_groups, limit) = if let Some(IndexOptimizeMode::SimpleSelect(limit, _ascend)) =
+        idx_optimize_mode
         && *limit > 0
     {
-        (
-            group_files_by_time_range(index_parquet_files, target_partitions),
-            *limit,
-        )
+        let file_groups = group_files_by_time_range(index_parquet_files, target_partitions);
+        (file_groups, *limit)
     } else {
-        (
-            index_parquet_files.into_iter().map(|f| vec![f]).collect(),
-            0,
-        )
+        // splite the filter groups by target partitions
+        let file_groups = into_chunks(index_parquet_files, target_partitions);
+        (file_groups, 0)
+    };
+
+    if limit == 0 {
+        (file_groups, limit)
+    } else {
+        (regroup_tantivy_files(file_groups), limit)
     }
+}
+
+// regroup the tantivy for better performance
+// after [`partition_tantivy_files`] we get multiple groups that order by time range desc and each
+// group's time range not overlap, when execute the tantivy search, we get the last file in each
+// group and do the tantivy search.
+// so in this function, we recursive collect the last file in each group
+fn regroup_tantivy_files(file_groups: Vec<Vec<FileKey>>) -> Vec<Vec<FileKey>> {
+    let group_num = file_groups.len();
+    let max_group_len = file_groups.iter().map(|g| g.len()).max().unwrap_or(0);
+    let mut new_file_groups: Vec<Vec<FileKey>> = vec![Vec::new(); max_group_len];
+
+    let mut file_groups: Vec<_> = file_groups
+        .into_iter()
+        .map(|mut group| {
+            group.reverse();
+            group.into_iter()
+        })
+        .collect();
+
+    for new_group in new_file_groups.iter_mut().take(max_group_len) {
+        for file_group in file_groups.iter_mut().take(group_num) {
+            if let Some(file) = file_group.next() {
+                new_group.push(file)
+            }
+        }
+    }
+
+    new_file_groups
+}
+
+fn into_chunks<T>(mut v: Vec<T>, chunk_size: usize) -> Vec<Vec<T>> {
+    let mut chunks = Vec::new();
+    while !v.is_empty() {
+        let take = if v.len() >= chunk_size {
+            chunk_size
+        } else {
+            v.len()
+        };
+        let chunk: Vec<T> = v.drain(..take).collect();
+        chunks.push(chunk);
+    }
+    chunks
 }
 
 // Group files by time range
@@ -1117,18 +1276,49 @@ fn repartition_sorted_groups(
     groups
 }
 
-// Helper function to extract a file from a group at the specified index
-fn extract_file_from_group(
-    index_parquet_files: &mut [Vec<FileKey>],
-    group_index: usize,
-) -> Option<FileKey> {
-    index_parquet_files.get_mut(group_index).and_then(|g| {
-        if g.is_empty() {
-            None
-        } else {
-            Some(g.remove(g.len() - 1))
+fn get_cache_entry(tantivy_result: TantivyResult, percent: f64) -> CacheEntry {
+    match tantivy_result {
+        TantivyResult::RowIdsBitVec(num_rows, bitvec) => {
+            // if the percent is less than 1.0, we use roaring bitmap to store the row ids
+            // otherwise, we use bitvec to store the row ids.
+            // because the bitvec is not efficient for small percent, and the roaring bitmap is not
+            // efficient for large percent.
+            if percent < 1.0 {
+                let mut roaring = RoaringBitmap::new();
+                for (i, bit) in bitvec.into_iter().enumerate() {
+                    if bit {
+                        roaring.insert(i as u32);
+                    }
+                }
+                CacheEntry::RowIdsRoaring(num_rows, roaring)
+            } else {
+                CacheEntry::RowIdsBitVec(num_rows, bitvec)
+            }
         }
-    })
+        TantivyResult::Count(count) => CacheEntry::Count(count),
+        TantivyResult::Histogram(histogram) => CacheEntry::Histogram(histogram),
+        TantivyResult::TopN(top_n) => CacheEntry::TopN(top_n),
+        TantivyResult::Distinct(distinct) => CacheEntry::Distinct(distinct),
+        TantivyResult::RowIds(_) => {
+            unreachable!("unsupported tantivy search result in search_tantivy_index")
+        }
+    }
+}
+
+fn generate_cache_key(
+    index_condition: &Option<IndexCondition>,
+    idx_optimize_rule: &Option<IndexOptimizeMode>,
+    parquet_file: &FileKey,
+) -> String {
+    let condition = match index_condition {
+        Some(condition) => condition.to_query(),
+        None => return String::new(),
+    };
+    let rule = match idx_optimize_rule {
+        Some(rule) => rule.to_rule_string(),
+        None => return String::new(),
+    };
+    format!("{}_{}_{}", condition, rule, parquet_file.key)
 }
 
 #[cfg(test)]
@@ -1247,5 +1437,97 @@ mod tests {
         );
         let histogram = searcher.search(&all_query, &histogram_collector).unwrap();
         assert_eq!(histogram, vec![1, 1, 0, 1]);
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_basic() {
+        let file_groups = vec![
+            vec![create_file_key(1, 10), create_file_key(11, 20)],
+            vec![create_file_key(21, 30), create_file_key(31, 40)],
+        ];
+        let result = regroup_tantivy_files(file_groups);
+
+        // Should have 2 groups (max length of input groups)
+        assert_eq!(result.len(), 2);
+
+        // First group should contain the last file from each input group
+        assert_eq!(result[0].len(), 2);
+        assert_eq!(result[0][0].key, "file_11_20"); // Last file from first group
+        assert_eq!(result[0][1].key, "file_31_40"); // Last file from second group
+
+        // Second group should contain the first file from each input group
+        assert_eq!(result[1].len(), 2);
+        assert_eq!(result[1][0].key, "file_1_10"); // First file from first group
+        assert_eq!(result[1][1].key, "file_21_30"); // First file from second group
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_uneven_groups() {
+        let file_groups = vec![
+            vec![
+                create_file_key(1, 10),
+                create_file_key(11, 20),
+                create_file_key(21, 30),
+            ],
+            vec![create_file_key(31, 40)],
+        ];
+        let result = regroup_tantivy_files(file_groups);
+
+        // Should have 3 groups (max length of input groups)
+        assert_eq!(result.len(), 3);
+
+        // First group should contain the last file from each input group
+        assert_eq!(result[0].len(), 2);
+        assert_eq!(result[0][0].key, "file_21_30"); // Last file from first group
+        assert_eq!(result[0][1].key, "file_31_40"); // Last file from second group
+
+        // Second group should contain the middle file from first group, none from second
+        assert_eq!(result[1].len(), 1);
+        assert_eq!(result[1][0].key, "file_11_20"); // Middle file from first group
+
+        // Third group should contain the first file from first group, none from second
+        assert_eq!(result[2].len(), 1);
+        assert_eq!(result[2][0].key, "file_1_10"); // First file from first group
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_empty_groups() {
+        let file_groups: Vec<Vec<FileKey>> = vec![];
+        let result = regroup_tantivy_files(file_groups);
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_single_group() {
+        let file_groups = vec![vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+        ]];
+        let result = regroup_tantivy_files(file_groups);
+
+        // Should have 3 groups (length of the single input group)
+        assert_eq!(result.len(), 3);
+
+        // Each group should contain one file
+        assert_eq!(result[0].len(), 1);
+        assert_eq!(result[0][0].key, "file_21_30"); // Last file
+
+        assert_eq!(result[1].len(), 1);
+        assert_eq!(result[1][0].key, "file_11_20"); // Middle file
+
+        assert_eq!(result[2].len(), 1);
+        assert_eq!(result[2][0].key, "file_1_10"); // First file
+    }
+
+    #[test]
+    fn test_into_chunks_basic() {
+        let v = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let chunks = into_chunks(v, 3);
+
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], vec![1, 2, 3]);
+        assert_eq!(chunks[1], vec![4, 5, 6]);
+        assert_eq!(chunks[2], vec![7, 8]);
     }
 }

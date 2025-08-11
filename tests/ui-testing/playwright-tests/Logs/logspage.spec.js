@@ -3,6 +3,7 @@ import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from '../../pages/page-manager.js';
 
+// Run in parallel; streaming may flip between tests as part of stress validation
 test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
@@ -55,6 +56,8 @@ async function ingestion(page) {
 
 test.describe("Logs Page testcases", () => {
   let pageManager;
+  let testIndex = 0;
+  
   // let logData;
   function removeUTFCharacters(text) {
     // console.log(text, "tex");
@@ -73,6 +76,7 @@ test.describe("Logs Page testcases", () => {
     await expect.poll(async () => (await search).status()).toBe(200);
     // await search.hits.FIXME_should("be.an", "array");
   }
+  
   // tebefore(async function () {
   //   // logData("log");
   //   // const data = page;
@@ -80,6 +84,7 @@ test.describe("Logs Page testcases", () => {
 
   //   console.log("--logData--", logData);
   // });
+  
   test.beforeEach(async ({ page }) => {
     await login(page);
     pageManager = new PageManager(page);
@@ -96,11 +101,11 @@ test.describe("Logs Page testcases", () => {
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
 
+  // No per-test wrapper needed
+
   test("should click run query after SQL toggle on but without any query", {
     tag: ['@sqlQueryLogs', '@all', '@logs']
-  }, async ({
-    page,
-  }) => {
+  }, async ({ page }) => {
     await pageManager.logsPage.waitForTimeout(3000);
     await pageManager.logsPage.clickRefreshButton();
     await pageManager.logsPage.clickSQLModeToggle();
@@ -112,11 +117,11 @@ test.describe("Logs Page testcases", () => {
     await pageManager.logsPage.expectSQLQueryMissingError();
   });
 
+  // (no afterEach streaming flip)
+
   test("should be able to enter valid text in VRL and run query", {
     tag: ['@vrlQueryLogs', '@all', '@logs']
-  }, async ({
-    page,
-  }) => {
+  }, async ({ page }) => {
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative6WeeksButton();
     await applyQueryButton(page);
@@ -134,9 +139,7 @@ test.describe("Logs Page testcases", () => {
 
   test("should hide and display again after clicking the arrow", {
     tag: ['@hideAndDisplayLogs', '@all', '@logs']
-  }, async ({
-    page,
-  }) => {
+  }, async ({ page }) => {
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative6WeeksButton();
     await pageManager.logsPage.clickShowQueryToggle();
@@ -148,9 +151,7 @@ test.describe("Logs Page testcases", () => {
 
   test("should verify if special characters allowed in saved views name", {
     tag: ['@savedViewsSpecialCharacters', '@all', '@logs']
-  }, async ({
-    page,
-  }) => {
+  }, async ({ page }) => {
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative6WeeksButton();
     await pageManager.logsPage.clickShowQueryToggle();
@@ -163,9 +164,7 @@ test.describe("Logs Page testcases", () => {
 
   test("should display error when user directly clicks on OK without adding name", {
     tag: ['@savedViewsValidation', '@all', '@logs']
-  }, async ({
-    page,
-  }) => {
+  }, async ({ page }) => {
     await pageManager.logsPage.clickRefreshButton();
     await pageManager.logsPage.clickSavedViewsExpand();
     await pageManager.logsPage.clickSaveViewButton();
@@ -174,9 +173,7 @@ test.describe("Logs Page testcases", () => {
 
   test("should display the details of logs results on graph", {
     tag: ['@logsResultsGraph', '@all', '@logs']
-  }, async ({
-    page,
-  }) => {
+  }, async ({ page }) => {
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative6WeeksButton();
     await applyQueryButton(page);
@@ -191,9 +188,7 @@ test.describe("Logs Page testcases", () => {
 
   test("should click on live mode on button and select 5 sec, switch off, and then click run query", {
     tag: ['@liveMode', '@all', '@logs']
-  }, async ({
-    page,
-  }) => {
+  }, async ({ page }) => {
     await page.route("**/logData.ValueQuery", (route) => route.continue());
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative6WeeksButton();
@@ -207,9 +202,7 @@ test.describe("Logs Page testcases", () => {
 
   test("should click on VRL toggle and display the field, then disable toggle and make the VRL field disappear", {
     tag: ['@vrlToggle', '@all', '@logs']
-  }, async ({
-    page,
-  }) => {
+  }, async ({ page }) => {
     await pageManager.logsPage.expectVrlFieldVisible();
     await pageManager.logsPage.clickVrlToggle();
     await pageManager.logsPage.expectFnEditorNotVisible();
@@ -217,9 +210,7 @@ test.describe("Logs Page testcases", () => {
 
   test("should switch from past 6 weeks to past 6 days on date-time UI", {
     tag: ['@dateTimeUI', '@all', '@logs']
-  }, async ({
-    page,
-  }) => {
+  }, async ({ page }) => {
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative6WeeksButton();
     await pageManager.logsPage.expectTextVisible("Past 6 Weeks");
@@ -244,11 +235,10 @@ test.describe("Logs Page testcases", () => {
     await pageManager.logsPage.waitForTimeout(2000);
     await pageManager.logsPage.expectQueryEditorContainsSelectFrom();
   });
+  
   test("should display ingested logs - search logs, navigate on another tab, revisit logs page", {
     tag: ['@ingestedLogsPersistence', '@all', '@logs']
-  }, async ({
-    page,
-  }) => {
+  }, async ({ page }) => {
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();
     await applyQueryButton(page);
@@ -261,9 +251,7 @@ test.describe("Logs Page testcases", () => {
 
   test.skip("should redirect to logs after clicking on stream explorer via stream page", {
     tag: ['@streamExplorer', '@all', '@logs']
-  }, async ({
-    page,
-  }) => {
+  }, async ({ page }) => {
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickMenuLinkStreamsItem();
     await pageManager.logsPage.waitForTimeout(1000);

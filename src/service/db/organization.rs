@@ -289,7 +289,8 @@ pub async fn delete_org(org_id: &str) -> Result<(), anyhow::Error> {
 }
 
 pub(crate) async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error> {
-    let orgs = organizations::list(limit)
+    let filter = organizations::ListFilter::with_limit(limit);
+    let orgs = organizations::list(filter)
         .await
         .map_err(|e| anyhow::anyhow!("Error listing orgs: {}", e))?;
     Ok(orgs

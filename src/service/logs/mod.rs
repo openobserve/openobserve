@@ -51,6 +51,8 @@ use super::{
     },
     schema::stream_schema_exists,
 };
+#[cfg(feature = "cloud")]
+use crate::service::stream::get_stream;
 use crate::{
     common::meta::{ingestion::IngestionStatus, stream::SchemaRecords},
     service::{
@@ -217,6 +219,35 @@ async fn write_logs_by_stream(
         {
             log::warn!("stream [{stream_name}] is being deleted");
             continue; // skip
+        }
+
+        // for cloud, we want to sent event when user creates a new stream
+        #[cfg(feature = "cloud")]
+        if get_stream(org_id, &stream_name, StreamType::Logs)
+            .await
+            .is_none()
+        {
+            let org = match super::organization::get_org(&org_id).await {
+                None => {
+                    return Err(Error::Message(format!(
+                        "org with id {org_id} not found in db"
+                    )));
+                }
+                Some(org) => org,
+            };
+
+            super::self_reporting::cloud_events::enqueue_cloud_event(
+                super::self_reporting::cloud_events::CloudEvent {
+                    org_id: org.identifier.clone(),
+                    org_name: org.name.clone(),
+                    org_type: org.org_type.clone(),
+                    user: Some(user_email.to_string()),
+                    event: super::self_reporting::cloud_events::EventType::StreamCreated,
+                    subscription_type: None,
+                    stream_name: Some(stream_name.clone()),
+                },
+            )
+            .await;
         }
 
         // write json data by stream
@@ -471,25 +502,27 @@ async fn write_logs(
         // end check for alert triggers
 
         // get distinct_value items
-        let mut map = Map::new();
-        for field in DISTINCT_FIELDS.iter().chain(
-            stream_settings
-                .distinct_value_fields
-                .iter()
-                .map(|f| &f.name),
-        ) {
-            if let Some(val) = record_val.get(field) {
-                map.insert(field.clone(), val.clone());
+        if stream_settings.enable_distinct_fields {
+            let mut map = Map::new();
+            for field in DISTINCT_FIELDS.iter().chain(
+                stream_settings
+                    .distinct_value_fields
+                    .iter()
+                    .map(|f| &f.name),
+            ) {
+                if let Some(val) = record_val.get(field) {
+                    map.insert(field.clone(), val.clone());
+                }
             }
-        }
 
-        if !map.is_empty() {
-            // add distinct values
-            distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                stream_type: StreamType::Logs,
-                stream_name: stream_name.to_string(),
-                value: map,
-            }));
+            if !map.is_empty() {
+                // add distinct values
+                distinct_values.push(MetadataItem::DistinctValues(DvItem {
+                    stream_type: StreamType::Logs,
+                    stream_name: stream_name.to_string(),
+                    value: map,
+                }));
+            }
         }
 
         // get hour key
@@ -545,6 +578,7 @@ async fn write_logs(
     // send distinct_values
     if !distinct_values.is_empty()
         && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
+        && stream_settings.enable_distinct_fields
         && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
     {
         log::error!("Error while writing distinct values: {e}");

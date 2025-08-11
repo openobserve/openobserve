@@ -31,7 +31,6 @@ env:
   ZO_USAGE_PUBLISH_INTERVAL: 2
   ZO_USAGE_REPORTING_ENABLED: true
   ZO_MIN_AUTO_REFRESH_INTERVAL: 5
-  ZO_WEBSOCKET_ENABLED: true
   ZO_STREAMING_ENABLED: true
   ZO_COLS_PER_RECORD_LIMIT: "80000"
   ZO_SMTP_ENABLED: true
@@ -90,7 +89,7 @@ jobs:
           retention-days: 1
 
   ui_integration_tests:
-    name: playwright_ui_integration_tests
+    name: e2e
     needs: [build_binary]
     runs-on:
       labels: ubicloud-standard-8
@@ -121,6 +120,7 @@ jobs:
             "dashboards/dashboardtype.spec.js",
             "dashboards/visualize.spec.js",
             # "dashboards/visualization-vrl.spec.js",
+            "dashboards/dashboard-html-chart.spec.js",
             "GeneralTests/enrichment.spec.js",
             "Logs/join.spec.js",
             "Logs/logshistogram.spec.js",
@@ -144,7 +144,6 @@ jobs:
             "Logs/logsqueries.cte.spec.js",
             "Logs/logsqueries.matchall.spec.js",
             "GeneralTests/usersOrg.spec.js",
-            "Logs/websocket.spec.js",
             "Pipelines/pipeline-dynamic.spec.js",
             "Logs/searchpartition.spec.js",
             "Pipelines/pipeline-core.spec.js",

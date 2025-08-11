@@ -307,34 +307,6 @@ export const isTimeStamp = (sample: any, treatAsNonTimestamp: any) => {
   }
 };
 
-/**
- * Converts 16-digit microsecond timestamps to readable date format
- * @param value - The value to convert (can be single value or array)
- * @returns The converted value(s) in date format
- */
-export const convert16DigitTimestamp = (value: any): any => {
-  // If value is an array, convert each element
-  if (Array.isArray(value)) {
-    return value.map((item: any) => convert16DigitTimestamp(item));
-  }
-
-  // If value is a string or number, convert it
-  if (typeof value === "string" || typeof value === "number") {
-    const strValue = value.toString();
-    const microsecondsPattern = /^\d{16}$/;
-
-    if (microsecondsPattern.test(strValue)) {
-      // Convert microseconds to milliseconds (divide by 1000)
-      const milliseconds = parseInt(strValue) / 1000;
-      const date = new Date(milliseconds);
-      return formatDate(date);
-    }
-  }
-
-  // Return original value if not a 16-digit timestamp
-  return value;
-};
-
 export function convertOffsetToSeconds(
   offset: string,
   endISOTimestamp: number,

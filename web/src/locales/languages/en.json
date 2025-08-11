@@ -168,7 +168,10 @@
     "sqlModeDisabledForVisualization": "SQL mode cannot be disabled while on visualization with multiple streams",
     "transformType": "Transform Type",
     "saveActionDisabled": "Saving Action is currently unavailable",
-    "moreActions": "More Actions"
+    "moreActions": "More Actions",
+    "downloadCSV": "CSV",
+    "downloadJSON": "JSON",
+    "fileType": "File Type"
   },
   "menu": {
     "home": "Home",

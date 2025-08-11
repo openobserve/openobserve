@@ -41,6 +41,8 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::Map;
 
+#[cfg(feature = "cloud")]
+use crate::service::stream::get_stream;
 use crate::{
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
@@ -739,6 +741,28 @@ async fn write_traces_by_stream(
     json_data_by_stream: HashMap<String, O2IngestJsonData>,
 ) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
+        // for cloud, we want to sent event when user creates a new stream
+        #[cfg(feature = "cloud")]
+        if get_stream(org_id, &traces_stream_name, StreamType::Traces)
+            .await
+            .is_none()
+        {
+            let org = super::organization::get_org(&org_id).await.unwrap();
+
+            super::self_reporting::cloud_events::enqueue_cloud_event(
+                super::self_reporting::cloud_events::CloudEvent {
+                    org_id: org.identifier.clone(),
+                    org_name: org.name.clone(),
+                    org_type: org.org_type.clone(),
+                    user: None,
+                    event: super::self_reporting::cloud_events::EventType::StreamCreated,
+                    subscription_type: None,
+                    stream_name: Some(traces_stream_name.clone()),
+                },
+            )
+            .await;
+        }
+
         let mut req_stats = match write_traces(org_id, &traces_stream_name, json_data).await {
             Ok(v) => v,
             Err(e) => {
@@ -796,9 +820,6 @@ async fn write_traces(
         partition_time_level =
             unwrap_partition_time_level(partition_det.partition_time_level, StreamType::Traces);
     }
-    if partition_keys.is_empty() {
-        partition_keys.push(StreamPartition::new("service_name"));
-    }
 
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
@@ -853,23 +874,25 @@ async fn write_traces(
         // get service_name
         let service_name = json::get_string_value(record_val.get("service_name").unwrap());
         // get distinct_value item
-        let mut map = Map::new();
-        for field in DISTINCT_FIELDS.iter().chain(
-            stream_settings
-                .distinct_value_fields
-                .iter()
-                .map(|f| &f.name),
-        ) {
-            if let Some(val) = record_val.get(field) {
-                map.insert(field.clone(), val.clone());
+        if stream_settings.enable_distinct_fields {
+            let mut map = Map::new();
+            for field in DISTINCT_FIELDS.iter().chain(
+                stream_settings
+                    .distinct_value_fields
+                    .iter()
+                    .map(|f| &f.name),
+            ) {
+                if let Some(val) = record_val.get(field) {
+                    map.insert(field.clone(), val.clone());
+                }
             }
-        }
-        if !map.is_empty() {
-            distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                stream_type: StreamType::Traces,
-                stream_name: stream_name.to_string(),
-                value: map,
-            }));
+            if !map.is_empty() {
+                distinct_values.push(MetadataItem::DistinctValues(DvItem {
+                    stream_type: StreamType::Traces,
+                    stream_name: stream_name.to_string(),
+                    value: map,
+                }));
+            }
         }
 
         // build trace metadata
@@ -954,6 +977,7 @@ async fn write_traces(
     // send distinct_values
     if !distinct_values.is_empty()
         && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
+        && stream_settings.enable_distinct_fields
         && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
     {
         log::error!("Error while writing distinct values: {e}");
@@ -975,6 +999,7 @@ async fn write_traces(
 #[cfg(test)]
 mod tests {
     use config::utils::json::json;
+    use opentelemetry_proto::tonic::trace::v1::{Status, status::StatusCode};
 
     use crate::service::ingestion::grpc::get_val_for_attr;
 
@@ -984,5 +1009,99 @@ mod tests {
         let input = json!({ "key": in_val });
         let resp = get_val_for_attr(input);
         assert_eq!(resp.as_str().unwrap(), in_val.to_string());
+    }
+
+    #[test]
+    fn test_get_span_status() {
+        // Test OK status
+        let status = Status {
+            code: StatusCode::Ok as i32,
+            message: "success".to_string(),
+        };
+        assert_eq!(super::get_span_status(Some(status)), "OK");
+
+        // Test ERROR status
+        let status = Status {
+            code: StatusCode::Error as i32,
+            message: "error occurred".to_string(),
+        };
+        assert_eq!(super::get_span_status(Some(status)), "ERROR");
+
+        // Test UNSET status
+        let status = Status {
+            code: StatusCode::Unset as i32,
+            message: "".to_string(),
+        };
+        assert_eq!(super::get_span_status(Some(status)), "UNSET");
+
+        // Test None status (default case)
+        assert_eq!(super::get_span_status(None), "UNSET");
+    }
+
+    #[test]
+    fn test_format_response_success() {
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 0,
+                error_message: "".to_string(),
+            };
+
+        let result = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpJson,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_format_response_partial() {
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 5,
+                error_message: "".to_string(),
+            };
+
+        let result = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpJson,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_format_response_protobuf() {
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 0,
+                error_message: "".to_string(),
+            };
+
+        let result =
+            super::format_response(partial_success, config::meta::otlp::OtlpRequestType::Grpc);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_constants() {
+        // Test that constants are properly defined
+        assert_eq!(super::SERVICE_NAME, "service.name");
+        assert_eq!(super::SERVICE, "service");
+        assert_eq!(super::PARENT_SPAN_ID, "reference.parent_span_id");
+        assert_eq!(super::PARENT_TRACE_ID, "reference.parent_trace_id");
+        assert_eq!(super::REF_TYPE, "reference.ref_type");
+        assert_eq!(super::SPAN_ID_BYTES_COUNT, 8);
+        assert_eq!(super::TRACE_ID_BYTES_COUNT, 16);
+        assert_eq!(super::ATTR_STATUS_CODE, "status_code");
+        assert_eq!(super::ATTR_STATUS_MESSAGE, "status_message");
+    }
+
+    #[test]
+    fn test_block_fields() {
+        // Test that BLOCK_FIELDS contains expected values
+        let expected_fields = ["_timestamp", "duration", "start_time", "end_time"];
+        for field in expected_fields {
+            assert!(super::BLOCK_FIELDS.contains(&field));
+        }
+        assert_eq!(super::BLOCK_FIELDS.len(), 4);
     }
 }

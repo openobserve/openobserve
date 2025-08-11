@@ -436,7 +436,7 @@ mod tests {
 
         // Test with input 0 (uses current time, so we can't test the exact value)
         let result = get_ymdh_from_micros(0);
-        assert!(result.len() > 0);
+        assert!(!result.is_empty());
     }
 
     #[test]

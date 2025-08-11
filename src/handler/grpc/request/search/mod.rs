@@ -163,6 +163,7 @@ impl Search for Searcher {
             &request,
             "".to_string(),
             false,
+            None,
         )
         .await;
 

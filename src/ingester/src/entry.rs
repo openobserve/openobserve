@@ -217,6 +217,7 @@ pub struct PersistStat {
     pub arrow_size: usize,
     pub file_num: usize,
     pub batch_num: usize,
+    pub records: usize,
 }
 
 impl std::ops::Add for PersistStat {
@@ -228,6 +229,7 @@ impl std::ops::Add for PersistStat {
             arrow_size: self.arrow_size + other.arrow_size,
             file_num: self.file_num + other.file_num,
             batch_num: self.batch_num + other.batch_num,
+            records: self.records + other.records,
         }
     }
 }
@@ -238,5 +240,6 @@ impl std::ops::AddAssign for PersistStat {
         self.arrow_size += other.arrow_size;
         self.file_num += other.file_num;
         self.batch_num += other.batch_num;
+        self.records += other.records;
     }
 }

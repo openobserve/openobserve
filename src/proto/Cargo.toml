@@ -17,4 +17,4 @@ tokio.workspace = true
 
 [build-dependencies]
 tonic-build = { version = "0.11", features = ["prost"] }
-prost-build = "0.12"
+prost-build = "0.13"

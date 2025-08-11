@@ -223,9 +223,13 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
 
     // release lock when search done or get error
     let trace_id_move = trace_id.to_string();
+    let org_id_move = sql.org_id.clone();
     #[cfg(not(feature = "enterprise"))]
     let _defer = AsyncDefer::new({
         async move {
+            metrics::QUERY_RUNNING_NUMS
+                .with_label_values(&[&org_id_move])
+                .dec();
             // search done, release lock
             let _ = dist_lock::unlock_with_trace_id(&trace_id_move, &locker)
                 .await
@@ -244,6 +248,9 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     #[cfg(feature = "enterprise")]
     let _defer = AsyncDefer::new({
         async move {
+            metrics::QUERY_RUNNING_NUMS
+                .with_label_values(&[&org_id_move])
+                .dec();
             // search done, release lock
             let _ = work_group
                 .as_ref()
@@ -410,7 +417,7 @@ pub async fn run_datafusion(
 
     // 7. rewrite physical plan
     let match_all_keys = sql.match_items.clone().unwrap_or_default();
-    let mut equal_keys = sql
+    let equal_keys = sql
         .equal_items
         .iter()
         .map(|(stream_name, fields)| {
@@ -423,19 +430,6 @@ pub async fn run_datafusion(
             )
         })
         .collect::<HashMap<_, _>>();
-
-    // check inverted index prefix search
-    #[allow(deprecated)]
-    if sql.stream_type == StreamType::Index
-        && cfg.common.full_text_search_type.to_lowercase() != "contains"
-    {
-        for (stream, items) in sql.prefix_items.iter() {
-            equal_keys
-                .entry(stream.clone())
-                .or_insert_with(Vec::new)
-                .extend(items.iter().map(|(k, v)| cluster_rpc::KvItem::new(k, v)));
-        }
-    }
 
     #[cfg(feature = "enterprise")]
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
@@ -463,14 +457,19 @@ pub async fn run_datafusion(
         context,
     );
 
-    // TODO: if there is only one table and single node, we can skip the remote scan rewrite
+    // if there is only one table and single node, we can skip the remote scan rewrite
     let mut empty_exec_count_visitor = NewEmptyExecCountVisitor::default();
     physical_plan.visit(&mut empty_exec_count_visitor)?;
-    let _empty_exec_count = empty_exec_count_visitor.get_count();
-    physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
+    let empty_exec_count = empty_exec_count_visitor.get_count();
+    let is_changed = if empty_exec_count <= 1 && config::cluster::LOCAL_NODE.is_single_node() {
+        false
+    } else {
+        physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
+        rewrite.is_changed
+    };
 
     // add remote scan exec to top if physical plan is not changed
-    if !rewrite.is_changed {
+    if !is_changed {
         let table_name = sql.stream_names.first().unwrap();
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
@@ -777,8 +776,7 @@ pub async fn partition_filt_list(
 ) -> Result<Vec<Vec<i64>>> {
     let cfg = get_config();
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
-    let mut partition_strategy =
-        QueryPartitionStrategy::from(&cfg.common.feature_query_partition_strategy);
+    let mut partition_strategy = cfg.common.feature_query_partition_strategy.clone();
     if cfg.cache_latest_files.enabled {
         partition_strategy = QueryPartitionStrategy::FileHash;
     }

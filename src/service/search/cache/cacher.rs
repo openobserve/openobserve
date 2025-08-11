@@ -35,7 +35,10 @@ use crate::{
             MultiCachedQueryResponse,
             result_utils::{get_ts_value, round_down_to_nearest_minute},
         },
-        sql::{RE_HISTOGRAM, RE_SELECT_FROM, Sql, generate_histogram_interval},
+        sql::{
+            RE_HISTOGRAM, RE_SELECT_FROM, Sql,
+            visitor::histogram_interval::generate_histogram_interval,
+        },
     },
 };
 
@@ -143,7 +146,14 @@ pub async fn check_cache(
         result_ts_col = Some(TIMESTAMP_COL_NAME.to_string());
     }
 
-    let result_ts_col = result_ts_col.unwrap();
+    // Check ts_col again, if it is still None, return default
+    let Some(result_ts_col) = result_ts_col else {
+        return MultiCachedQueryResponse {
+            order_by,
+            ..Default::default()
+        };
+    };
+
     let mut discard_interval = -1;
     if let Some(interval) = sql.histogram_interval {
         *file_path = format!("{file_path}_{interval}_{result_ts_col}");
@@ -649,7 +659,7 @@ pub fn get_ts_col_order_by(
 }
 
 #[tracing::instrument]
-pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
+pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
     let root_dir = disk::get_dir().await;
     // Part 1: delete the results cache
     let pattern = format!("{root_dir}/results/{path}");
@@ -658,6 +668,21 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
     let mut remove_files: Vec<String> = vec![];
 
     for file in files {
+        // If timestamp is provided, check if we should delete this file
+        if delete_ts > 0 {
+            // Parse the start_time from filename:
+            // {start_time}_{end_time}_{is_aggregate}_{is_descending}.json
+            if let Some(file_name) = file.split('/').next_back()
+                && let Some(start_time_str) = file_name.split('_').next()
+                && let Ok(start_time) = start_time_str.parse::<i64>()
+            {
+                // Only delete if start_time > delete_ts (keep cache from delete_ts onwards)
+                if start_time > delete_ts {
+                    continue; // Skip this file, keep it
+                }
+            }
+        }
+
         match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
             Ok(_) => remove_files.push(file),
             Err(e) => {
@@ -669,14 +694,27 @@ pub async fn delete_cache(path: &str) -> std::io::Result<bool> {
 
     // Part 2: delete the aggregation cache
     #[cfg(feature = "enterprise")]
-    let mut aggs_remove_files: Vec<String> = vec![];
-    #[cfg(feature = "enterprise")]
     {
         let aggs_pattern = format!("{root_dir}/{STREAMING_AGGS_CACHE_DIR}/{path}");
         let aggs_files = scan_files(&aggs_pattern, "arrow", None).unwrap_or_default();
-        aggs_remove_files.extend(aggs_files);
 
-        for file in aggs_remove_files {
+        for file in aggs_files {
+            // If timestamp is provided, check if we should delete this file
+            if delete_ts > 0 {
+                // Parse the start_time from filename
+                // {start_time}_{end_time}.arrow
+                if let Some(file_name) = file.split('/').next_back()
+                    && let Some(start_time_str) = file_name.split('_').next()
+                    && let Ok(start_time) = start_time_str.parse::<i64>()
+                {
+                    // Only delete if start_time > delete_ts (keep cache from delete_ts
+                    // onwards)
+                    if start_time > delete_ts {
+                        continue; // Skip this file, keep it
+                    }
+                }
+            }
+
             match disk::remove(file.strip_prefix(&prefix).unwrap()).await {
                 Ok(_) => {}
                 Err(e) => {
@@ -867,6 +905,9 @@ mod tests {
                 result_cache_ratio: 33,
                 work_group: None,
                 order_by: Some(OrderBy::Asc),
+                order_by_metadata: vec![(String::from("x_axis_1"), OrderBy::Asc)],
+                converted_histogram_query: None,
+                is_histogram_eligible: None,
             },
             deltas: vec![],
             has_cached_data: true,
@@ -991,6 +1032,9 @@ mod tests {
                     result_cache_ratio: 100,
                     work_group: None,
                     order_by: None,
+                    order_by_metadata: vec![],
+                    converted_histogram_query: None,
+                    is_histogram_eligible: None,
                 },
                 deltas: vec![],
                 has_cached_data: true,
@@ -1025,6 +1069,9 @@ mod tests {
                     result_cache_ratio: 100,
                     work_group: None,
                     order_by: None,
+                    order_by_metadata: vec![],
+                    converted_histogram_query: None,
+                    is_histogram_eligible: None,
                 },
                 deltas: vec![],
                 has_cached_data: true,

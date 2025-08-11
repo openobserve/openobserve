@@ -388,6 +388,18 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
+    runId: {
+      type: String,
+      default: null,
+    },
+    tabId: {
+      type: String,
+      default: null,
+    },
+    tabName: {
+      type: String,
+      default: null,
+    },
     searchResponse: {
       required: false,
       type: Object,
@@ -447,6 +459,9 @@ export default defineComponent({
       folderId,
       reportId,
       allowAnnotationsAdd,
+      runId,
+      tabId,
+      tabName,
       searchResponse,
       is_ui_histogram,
     } = toRefs(props);
@@ -473,6 +488,9 @@ export default defineComponent({
       dashboardId,
       folderId,
       reportId,
+      runId,
+      tabId,
+      tabName,
       searchResponse,
       is_ui_histogram,
     );
@@ -589,14 +607,13 @@ export default defineComponent({
           [panelSchema?.value?.id]: false,
         };
       }
-      
+
       // Clear all refs to prevent memory leaks
       chartPanelRef.value = null;
       drilldownPopUpRef.value = null;
       annotationPopupRef.value = null;
       tableRendererRef.value = null;
       parser = null;
-      
     });
     watch(
       [data, store?.state],

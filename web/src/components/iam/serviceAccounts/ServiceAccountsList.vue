@@ -720,6 +720,7 @@ export default defineComponent({
     };
 
     return {
+      $q,
       t,
       qTable,
       router,

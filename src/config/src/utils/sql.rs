@@ -167,6 +167,29 @@ fn is_aggregate_expression(expr: &Expr) -> bool {
     }
 }
 
+// (is_eligible_for_histogram, is_sub_query)
+pub fn is_eligible_for_histogram(
+    query: &str,
+) -> Result<(bool, bool), sqlparser::parser::ParserError> {
+    // Histogram is not available for CTE, DISTINCT, UNION, JOIN and LIMIT queries.
+    let ast = Parser::parse_sql(&GenericDialect {}, query)?;
+    for statement in ast.iter() {
+        if let Statement::Query(query) = statement {
+            if has_distinct(query)
+                || has_limit(query)
+                || has_cte(query)
+                || has_join(query)
+                || has_union(query)
+            {
+                return Ok((false, false));
+            } else if has_subquery(statement) {
+                return Ok((true, true));
+            }
+        }
+    }
+    Ok((true, false))
+}
+
 // Check if has group_by
 fn has_group_by(query: &Query) -> bool {
     if let SetExpr::Select(ref select) = *query.body {
@@ -501,6 +524,10 @@ fn has_cte(query: &Query) -> bool {
     query.with.is_some()
 }
 
+fn has_limit(query: &Query) -> bool {
+    query.limit.is_some()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -698,8 +725,7 @@ mod tests {
             let result = is_timestamp_selected(sql)?;
             assert_eq!(
                 result, expected,
-                "Failed test case '{}': expected {}, got {}",
-                test_name, expected, result
+                "Failed test case '{test_name}': expected {expected}, got {result}"
             );
         }
 
@@ -710,7 +736,7 @@ mod tests {
     fn check_is_simple_aggregate() {
         let query = r#"SELECT histogram(_timestamp) AS zo_sql_time, "kubernetes_docker_id" AS zo_sql_key, SUM(count) AS zo_sql_num FROM "distinct_values_logs_default22" GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"#;
         let ab = is_aggregate_query(query);
-        print!("{:?}", ab);
+        print!("{ab:?}");
     }
 
     #[test]
@@ -867,14 +893,10 @@ mod tests {
 
         for (i, (query, description)) in queries.iter().enumerate() {
             let is_simple_aggregate = is_simple_aggregate_query(query).unwrap();
-            println!(
-                "Query [{}]: {} - is_simple: {:?}",
-                i, description, is_simple_aggregate
-            );
-            assert_eq!(
-                is_simple_aggregate, false,
-                "Failed test case [{}]: '{}' - should not be simple but returned true",
-                i, description
+            println!("Query [{i}]: {description} - is_simple: {is_simple_aggregate:?}");
+            assert!(
+                !is_simple_aggregate,
+                "Failed test case [{i}]: '{description}' - should not be simple but returned true"
             );
         }
     }
@@ -943,14 +965,10 @@ mod tests {
 
         for (i, (query, description)) in queries.iter().enumerate() {
             let is_simple_aggregate = is_simple_aggregate_query(query).unwrap();
-            println!(
-                "Simple Query [{}]: {} - is_simple: {:?}",
-                i, description, is_simple_aggregate
-            );
-            assert_eq!(
-                is_simple_aggregate, true,
-                "Failed test case [{}]: '{}' - should be simple but returned false",
-                i, description
+            println!("Simple Query [{i}]: {description} - is_simple: {is_simple_aggregate:?}");
+            assert!(
+                is_simple_aggregate,
+                "Failed test case [{i}]: '{description}' - should be simple but returned false"
             );
         }
     }
@@ -1007,8 +1025,8 @@ mod tests {
 
         for (i, query) in queries.iter().enumerate() {
             let is_simple_aggregate = is_simple_aggregate_query(query).unwrap();
-            println!("Query [{}] is_simple: {:?}", i, is_simple_aggregate);
-            assert_eq!(is_simple_aggregate, false);
+            println!("Query [{i}] is_simple: {is_simple_aggregate:?}");
+            assert!(!is_simple_aggregate);
         }
     }
 }

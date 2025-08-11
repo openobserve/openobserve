@@ -43,7 +43,7 @@ spec:
       # terminationGracePeriodSeconds: 0
       containers:
         - name: openobserve
-          image: public.ecr.aws/zinclabs/openobserve:latest
+          image: o2cr.ai/openobserve/openobserve:latest
           env:
             - name: ZO_ROOT_USER_EMAIL
               value: root@example.com

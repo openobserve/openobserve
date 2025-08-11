@@ -88,6 +88,7 @@ pub async fn create_checkout_session(
                 user: Some(email.to_string()),
                 event: EventType::SubscriptionChanged,
                 subscription_type: Some(sub_type.to_owned()),
+                stream_name: None,
             })
             .await;
             RedirectResponseBuilder::new(&redirect_url)
@@ -103,6 +104,7 @@ pub async fn create_checkout_session(
                 user: Some(email.to_string()),
                 event: EventType::CheckoutSessionCreated,
                 subscription_type: Some(sub_type.to_owned()),
+                stream_name: None,
             })
             .await;
             MetaHttpResponse::json(checkout_session)
@@ -182,6 +184,7 @@ pub async fn process_session_detail(
                 user: None,
                 event: EventType::SubscriptionCreated,
                 subscription_type: Some(query.plan.clone()),
+                stream_name: None,
             })
             .await;
             RedirectResponseBuilder::new(&redirect_url)
@@ -228,6 +231,7 @@ pub async fn unsubscribe(path: web::Path<String>, user_email: UserEmail) -> impl
                 user: Some(user_email.user_id.to_string()),
                 event: EventType::SubscriptionDeleted,
                 subscription_type: None,
+                stream_name: None,
             })
             .await;
             HttpResponse::Ok().body("Subscription will be cancelled at the end of billing cycle.")
@@ -388,6 +392,7 @@ pub async fn handle_stripe_event(
                     user: None,
                     event: EventType::SubscriptionDeleted,
                     subscription_type: Some(sub_type.to_string()),
+                    stream_name: None,
                 })
                 .await;
             }
