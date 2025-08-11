@@ -585,6 +585,9 @@ export default defineComponent({
       buildSearch,
       cancelQuery,
       processHttpHistogramResults,
+      getVisualizationConfig,
+      encodeVisualizationConfig,
+      decodeVisualizationConfig,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -610,16 +613,34 @@ export default defineComponent({
       generateLabelFromName,
       resetDashboardPanelData,
       setCustomQueryFields,
+      getResultSchema,
+      determineChartType,
+      convertSchemaToFields,
+      setFieldsBasedOnChartTypeValidation,
     } = useDashboardPanelData("logs");
     const visualizeErrorData: any = reactive({
       errors: [],
     });
+
+    // Schema caching for result_schema API calls
+    // This cache stores the response of result_schema API to avoid redundant calls
+    // when the same query is executed multiple times.
+    const schemaCache = ref<{
+      key: string;
+      response: any;
+    } | null>(null);
+
+    const clearSchemaCache = () => {
+      schemaCache.value = null;
+    };
 
     const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 
     onUnmounted(() => {
       // reset logsVisualizeToggle when user navigate to other page with keepAlive is false and navigate back to logs page
       searchObj.meta.logsVisualizeToggle = 'logs';
+      // Clear schema cache to free up memory
+      clearSchemaCache();
     });
 
     onBeforeMount(() => {
@@ -758,7 +779,7 @@ export default defineComponent({
           searchObj.data.queryResults.hits = [];
           searchObj.meta.searchApplied = false;
           resetStreamData();
-          restoreUrlQueryParams();
+          restoreUrlQueryParams(dashboardPanelData);
           // loadLogsData();
           //instead of loadLogsData so I have used all the functions that are used in that and removed getQuerydata from the list
           //of functions of loadLogsData to stop run query whenever this gets redirecited
@@ -790,7 +811,7 @@ export default defineComponent({
           searchObj.data.datetime.type = "absolute";
           searchObj.meta.searchApplied = false;
           resetStreamData();
-          await restoreUrlQueryParams();
+          await restoreUrlQueryParams(dashboardPanelData);
           await loadLogsData();
         }
       },
@@ -877,7 +898,7 @@ export default defineComponent({
         searchObj.meta.quickMode = isQuickModeEnabled();
         searchObj.meta.showHistogram = isHistogramEnabled();
 
-        restoreUrlQueryParams();
+        restoreUrlQueryParams(dashboardPanelData);
 
           searchObj.meta.showHistogram = isHistogramEnabled();
 
@@ -1008,7 +1029,7 @@ export default defineComponent({
       searchObj.data.stream.streamType = queryParams.stream_type;
       resetSearchObj();
       resetStreamData();
-      restoreUrlQueryParams();
+      restoreUrlQueryParams(dashboardPanelData);
       loadLogsData();
     }
 
@@ -1016,7 +1037,7 @@ export default defineComponent({
     function handleStreamExplorer() {
       resetSearchObj();
       resetStreamData();
-      restoreUrlQueryParams();
+      restoreUrlQueryParams(dashboardPanelData);
       loadLogsData();
     }
 
@@ -1350,6 +1371,19 @@ export default defineComponent({
       return parsedSQL;
     };
 
+    // Helper function to check if the query is a simple "SELECT * FROM....." query
+    const isSimpleSelectAllQuery = (query: string): boolean => {
+      if (!query || typeof query !== 'string') return false;
+      
+      // Normalize the query by removing extra whitespace
+      const normalizedQuery = query.trim().replace(/\s+/g, ' ');
+      
+      // Pattern to match: SELECT * FROM followed by anything (case insensitive)
+      const selectAllPattern = /^select\s+\*\s+from\s+/i;
+      
+      return selectAllPattern.test(normalizedQuery);
+    };
+
     const handleQuickModeChange = () => {
       if (searchObj.meta.quickMode == true) {
         let field_list: string = "*";
@@ -1432,13 +1466,25 @@ export default defineComponent({
 
     const shouldUseHistogramQuery = ref(false);
 
-    let fieldsExtractionPromise = new Promise((resolve) => resolve(true));
-
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
       async () => {
         try {
           if (searchObj.meta.logsVisualizeToggle == "visualize") {
+            // Enable quick mode automatically when switching to visualization if:
+            // 1. SQL mode is disabled OR 
+            // 2. Query is "SELECT * FROM some_stream" (simple select all query)
+            const shouldEnableQuickMode = 
+              !searchObj.meta.sqlMode || 
+              isSimpleSelectAllQuery(searchObj.data.query);
+            
+            if (shouldEnableQuickMode && !searchObj.meta.quickMode) {
+              searchObj.meta.quickMode = true;
+
+              // handle quick mode change
+              handleQuickModeChange();
+            }
+
             // close field list and splitter
             dashboardPanelData.layout.splitter = 0;
             dashboardPanelData.layout.showFieldList = false;
@@ -1447,60 +1493,73 @@ export default defineComponent({
               dashboardPanelData.layout.currentQueryIndex
             ].customQuery = true;
 
+            // Restore visualization data from URL parameters if available
+            const queryParams = router.currentRoute.value.query;
+            if (queryParams.visualization_data) {
+              const restoredData = decodeVisualizationConfig(queryParams.visualization_data);
+              if (restoredData && dashboardPanelData.data) {
+                dashboardPanelData.data = {
+                  ...dashboardPanelData.data,
+                  ...restoredData
+                };
+              }
+            } else {
+
+              shouldUseHistogramQuery.value = await extractVisualizationFields(true);
+
+              // if not able to parse query, do not do anything
+              if (shouldUseHistogramQuery.value === null) {
+                return;
+              }
+
+              // set logs page data to searchResponseForVisualization
+              if (shouldUseHistogramQuery.value === true) {
+
+                // only do it if is_histogram_eligible is true on logs page
+                // and showHistogram is true on logs page
+                if (searchObj?.data?.queryResults?.is_histogram_eligible === true && searchObj?.meta?.showHistogram === true) {
+
+                  // replace hits with histogram query data
+                  searchResponseForVisualization.value = {
+                    ...searchObj.data.queryResults,
+                    hits: searchObj.data.queryResults.aggs,
+                    histogram_interval:
+                      searchObj?.data?.queryResults
+                        ?.visualization_histogram_interval,
+                  };
+
+                  // assign converted_histogram_query to dashboardPanelData
+                  if (searchObj.data.queryResults.converted_histogram_query) {
+                    dashboardPanelData.data.queries[
+                      dashboardPanelData.layout.currentQueryIndex
+                    ].query = searchObj.data.queryResults.converted_histogram_query;
+
+                    // assign to visualizeChartData as well
+                    visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query
+                  }
+                }
+
+              } else {
+                searchResponseForVisualization.value = {
+                  ...searchObj.data.queryResults,
+                  histogram_interval:
+                    searchObj?.data?.queryResults
+                      ?.visualization_histogram_interval,
+                };
+
+                // if hits is empty and filteredHit is present, then set hits to filteredHit
+                if (
+                  searchResponseForVisualization?.value?.hits?.length === 0 &&
+                  searchResponseForVisualization?.value?.filteredHit
+                ) {
+                  searchResponseForVisualization.value.hits =
+                    searchResponseForVisualization?.value?.filteredHit ?? [];
+                }
+              }
+            }
+
             // reset old rendered chart
             visualizeChartData.value = {};
-
-            shouldUseHistogramQuery.value = await extractVisualizationFields();
-
-            // if not able to parse query, do not do anything
-            if (shouldUseHistogramQuery.value === null) {
-              return;
-            }
-
-            // set logs page data to searchResponseForVisualization
-            if (shouldUseHistogramQuery.value === true) {
-
-              // only do it if is_histogram_eligible is true on logs page
-              // and showHistogram is true on logs page
-              if(searchObj?.data?.queryResults?.is_histogram_eligible === true && searchObj?.meta?.showHistogram === true){
-
-              // replace hits with histogram query data
-              searchResponseForVisualization.value = {
-                ...searchObj.data.queryResults,
-                hits: searchObj.data.queryResults.aggs,
-                histogram_interval:
-                  searchObj?.data?.queryResults
-                    ?.visualization_histogram_interval,
-              };
-
-              // assign converted_histogram_query to dashboardPanelData
-              if(searchObj.data.queryResults.converted_histogram_query){
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
-                ].query = searchObj.data.queryResults.converted_histogram_query;
-
-                // assign to visualizeChartData as well
-                visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query
-              }
-            }
-
-            } else {
-              searchResponseForVisualization.value = {
-                ...searchObj.data.queryResults,
-                histogram_interval:
-                  searchObj?.data?.queryResults
-                    ?.visualization_histogram_interval,
-              };
-
-              // if hits is empty and filteredHit is present, then set hits to filteredHit
-              if (
-                searchResponseForVisualization?.value?.hits?.length === 0 &&
-                searchResponseForVisualization?.value?.filteredHit
-              ) {
-                searchResponseForVisualization.value.hits =
-                  searchResponseForVisualization?.value?.filteredHit ?? [];
-              }
-            }
 
 
             if (searchObj?.data?.customDownloadQueryObj?.query?.end_time && searchObj?.data?.datetime?.startTime) {
@@ -1553,7 +1612,7 @@ export default defineComponent({
     );
 
     // Create debounced function for visualization updates
-    const updateVisualization = async () => {
+    const updateVisualization = async (autoSelectChartType: boolean = true) => {
       try {
         if (searchObj?.meta?.logsVisualizeToggle == "visualize") {
           dashboardPanelData.data.queries[
@@ -1563,7 +1622,8 @@ export default defineComponent({
           // reset old rendered chart
           visualizeChartData.value = {};
 
-          shouldUseHistogramQuery.value = await extractVisualizationFields();
+          shouldUseHistogramQuery.value = await extractVisualizationFields(autoSelectChartType);
+
 
           // if not able to parse query, do not do anything
           if (shouldUseHistogramQuery.value === null) {
@@ -1589,15 +1649,22 @@ export default defineComponent({
             dashboardPanelData.layout.currentQueryIndex
           ].query;
 
+        // reset searchResponseForVisualization
+        searchResponseForVisualization.value = {};
+
+        // update visualization
+        await updateVisualization(false);
+
         // check if query is assigned and not empty
         // this prevents hard refresh early validation before query is assigned
         if (currentQuery && currentQuery.trim() !== "") {
           isValid(true, true);
         }
 
-        visualizeChartData.value = JSON.parse(
-          JSON.stringify(dashboardPanelData.data),
-        );
+        // Sync visualization data to URL parameters when chart type changes
+        if (searchObj.meta.logsVisualizeToggle === "visualize") {
+          updateUrlQueryParams(dashboardPanelData);
+        }
       },
     );
 
@@ -1630,7 +1697,7 @@ export default defineComponent({
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         // wait to extract fields if its ongoing; if promise rejects due to abort just return silently
         try {
-          const success = await updateVisualization();
+          const success = await updateVisualization(false);
           if (!success) {
             return;
           }
@@ -1689,6 +1756,9 @@ export default defineComponent({
         visualizeChartData.value = JSON.parse(
           JSON.stringify(dashboardPanelData.data),
         );
+
+        // Sync visualization config to URL parameters
+        updateUrlQueryParams(dashboardPanelData);
       }
     };
 
@@ -1730,7 +1800,7 @@ export default defineComponent({
       });
     };
 
-    const extractVisualizationFields = async () => {
+    const extractVisualizationFields = async (autoSelectChartType: boolean = true) => {
       // mark extraction as in-progress so that cancel button is shown
       variablesAndPanelsDataLoadingState.fieldsExtractionLoading = true;
 
@@ -1766,7 +1836,16 @@ export default defineComponent({
       };
 
       try {
-        let logsPageQuery = searchObj.data.query;
+        let logsPageQuery = "";
+        
+        // handle sql mode
+        if(!searchObj.meta.sqlMode){
+          const queryBuild = buildSearch();
+          logsPageQuery = queryBuild?.query?.sql ?? "";
+        } else {
+          logsPageQuery = searchObj.data.query;
+        }
+        
         // return if query is empty and stream is not selected
         if (
           logsPageQuery === "" &&
@@ -1779,16 +1858,19 @@ export default defineComponent({
           return null;
         }
 
-        // handle sql mode
-        if(!searchObj.meta.sqlMode){
-          const queryBuild = buildSearch();
-          logsPageQuery = queryBuild?.query?.sql ?? "";
-        }
-
         // check if query is empty
         if (logsPageQuery === "") {
           showErrorNotification(
             "Query is empty, please write query to visualize",
+          );
+          variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+          return null;
+        }
+
+        // if multiple sql, then do not allow to visualize
+        if(logsPageQuery && Array.isArray(logsPageQuery) && logsPageQuery.length > 1){
+          showErrorNotification(
+            "Multiple SQL queries are not allowed to visualize",
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -1817,42 +1899,27 @@ export default defineComponent({
 
         checkAbort();
 
-        const schemaRes = await queryService.result_schema(
-          {
-            org_identifier: store.state.selectedOrganization.identifier,
-            query: {
-              query: {
-                sql: store.state.zoConfig.sql_base64_enabled
-                  ? b64EncodeUnicode(logsPageQuery)
-                  : logsPageQuery,
-                query_fn: null,
-                start_time: startISOTimestamp,
-                end_time: endISOTimestamp,
-                size: -1,
-                histogram_interval: undefined,
-                streaming_output: false,
-                streaming_id: null,
-              },
-              ...(store.state.zoConfig.sql_base64_enabled
-                ? { encoding: "base64" }
-                : {}),
-            },
-            page_type: "dashboards",
-            is_streaming: isStreamingEnabled(store.state),
-          },
-          "dashboards",
-        );
+        // Handle schema caching in Index.vue
+        let extractedFields;
+        
+        // Check if we have a cached response for this query
+        if (schemaCache.value && schemaCache.value.key === logsPageQuery) {
+          extractedFields = schemaCache.value.response.data;
+        } else {
+          // Use the refactored getResultSchema function
+          extractedFields = await getResultSchema(logsPageQuery, signal, startISOTimestamp, endISOTimestamp);
+          
+          // Cache the response
+          schemaCache.value = {
+            key: logsPageQuery,
+            response: { data: extractedFields },
+          };
+        }
 
         checkAbort();
 
-        const extractedFields = schemaRes.data as {
-          group_by: string[];
-          projections: string[];
-          timeseries_field: string | null;
-        };
-
-        /* Decide whether to use histogram query */
-        shouldUseHistogramQuery.value = !(
+        /* Decide whether to use histogram query - don't use for table charts or when there are group_by fields */
+        shouldUseHistogramQuery.value = dashboardPanelData.data.type !== "table" && !(
           extractedFields?.group_by && extractedFields.group_by.length
         );
 
@@ -1891,12 +1958,12 @@ export default defineComponent({
           };
         }
 
-        fieldsExtractionPromise = setCustomQueryFields(
+        // Use the refactored functions
+        await setCustomQueryFields(
           fieldsForVisualization,
-          signal,
+          autoSelectChartType,
+          signal
         );
-
-        await fieldsExtractionPromise;
 
         visualizeChartData.value = JSON.parse(
           JSON.stringify(dashboardPanelData.data),
@@ -2127,8 +2194,9 @@ export default defineComponent({
       searchResponseForVisualization,
       shouldUseHistogramQuery,
       processHttpHistogramResults,
-  };
-},
+      clearSchemaCache,
+    };
+  },
   computed: {
     showFields() {
       return this.searchObj.meta.showFields;

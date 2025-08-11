@@ -473,7 +473,8 @@ export default defineComponent({
 
     const isOutDated = computed(() => {
       //compare chartdata and dashboardpaneldata
-      return !isEqual(chartData.value, dashboardPanelData.data);
+      // ignore histogram query comparison
+      return !is_ui_histogram.value && !isEqual(chartData.value, dashboardPanelData.data);
     });
 
     watch(isOutDated, () => {
@@ -749,9 +750,6 @@ export default defineComponent({
       if (resultMetaData?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
         dashboardPanelData.data.queries[0].query =
           resultMetaData?.[0]?.converted_histogram_query;
-
-        // assign to visualizeChartData as well
-        visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query
       }
     };
 
