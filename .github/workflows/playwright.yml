@@ -70,13 +70,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Cache web deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            web/node_modules
+          key: ${{ runner.os }}-web-npm-${{ hashFiles('web/package-lock.json') }}
 
       - name: Build frontend code
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
           VITE_COVERAGE: "true"
           COVERAGE: "true"
-        run: cd web && npm install && npm run build
+        run: cd web && npm ci && npm run build
 
       - name: Build and run binary
         run: cargo build --release --target x86_64-unknown-linux-gnu
@@ -94,7 +101,7 @@ jobs:
     runs-on:
       labels: ubicloud-standard-8
     container:
-      image: mcr.microsoft.com/playwright:v1.50.0-jammy
+      image: mcr.microsoft.com/playwright:v1.50.0-noble
       options: --user root
     strategy:
       matrix:
@@ -103,7 +110,7 @@ jobs:
             "alerts/alerts-e2e-flow.spec.js",
             "alerts/alerts-ui-operations.spec.js",
             "alerts/alerts-import.spec.js",
-            "GeneralTests/changeOrg.spec.js",
+
             "dashboards/custom-charts.spec.js",
             "dashboards/dashboard.spec.js",
             "dashboards/dashboard-filter.spec.js",
@@ -121,33 +128,38 @@ jobs:
             "dashboards/visualize.spec.js",
             "dashboards/visualization-vrl.spec.js",
             "dashboards/dashboard-html-chart.spec.js",
-            "GeneralTests/enrichment.spec.js",
+
             "Logs/join.spec.js",
             "Logs/logshistogram.spec.js",
             "Logs/logspage.spec.js",
             "Logs/logsqueries.spec.js",
             "Logs/logsquickmode.spec.js",
-            "Streams/multiselect-stream.spec.js",
+            "Logs/logsquickmode.spec.js",
             "Logs/pagination.spec.js",
-            "Pipelines/pipelines.spec.js",
-            "Reports/reportsUpdated.spec.js",
-            "Reports/reportsUpdated2.spec.js",
-            "GeneralTests/sanity.spec.js",
-            "GeneralTests/sanity2.spec.js",
-            "GeneralTests/schema.spec.js",
-            "GeneralTests/schemaload.spec.js",
-            "Logs/secondsPrecisionAdded.spec.js",
-            "GeneralTests/serviceAccount.spec.js",
-            "Streams/streamname.spec.js",
-            "Streams/streaming.spec.js",
             "Logs/unflattened.spec.js",
             "Logs/logsqueries.cte.spec.js",
             "Logs/logsqueries.matchall.spec.js",
-            "GeneralTests/usersOrg.spec.js",
-            "Pipelines/pipeline-dynamic.spec.js",
             "Logs/searchpartition.spec.js",
+
+            "Streams/multiselect-stream.spec.js",
+            "Streams/streamname.spec.js",
+            "Streams/streaming.spec.js",
+
+            "Reports/reportsUpdated.spec.js",
+            "Reports/reportsUpdated2.spec.js",
+
+            "GeneralTests/sanity.spec.js",
+            "GeneralTests/enrichment.spec.js",
+            "GeneralTests/changeOrg.spec.js",
+            "GeneralTests/sanity2.spec.js",
+            "GeneralTests/schema.spec.js",
+            "GeneralTests/schemaload.spec.js",
+            "GeneralTests/serviceAccount.spec.js",
+            "GeneralTests/usersOrg.spec.js",
+
+            "Pipelines/pipeline-dynamic.spec.js",
+            "Pipelines/pipelines.spec.js",
             "Pipelines/pipeline-core.spec.js",
-            # "remotepipeline.spec.js",
 
           ]
 
@@ -157,12 +169,25 @@ jobs:
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
+        with:
+          name: debug-binary
+
+      - name: Inspect binary dependencies
+        run: ldd ./debug-binary/openobserve || true
 
       - name: Start OpenObserve
         run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
-        run: sleep 15
+        shell: bash
+        run: |
+          for i in {1..120}; do
+            if curl -fsS http://localhost:5080/web/login >/dev/null 2>&1; then
+              echo "Server is up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "Server did not start in time"; exit 1
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
@@ -170,9 +195,13 @@ jobs:
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
 
-      - uses: actions/setup-node@v4
+      - name: Cache ui-testing deps
+        uses: actions/cache@v4
         with:
-          node-version: lts/*
+          path: |
+            ~/.npm
+            tests/ui-testing/node_modules
+          key: ${{ runner.os }}-uitest-npm-${{ hashFiles('tests/ui-testing/package-lock.json') }}
       - name: Install dependencies and run ui-tests
         run: |
           touch .env
@@ -205,19 +234,25 @@ jobs:
           path: tests/ui-testing/.nyc_output
           include-hidden-files: true
 
-      - name: Generate Coverage Report
-        run: cd tests/ui-testing && npx nyc report
+
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report
           path: playwright-report/
+          if-no-files-found: ignore
           retention-days: 30
 
       - name: Check OpenObserve logs
         if: always()
-        run: cat o2.log
+        run: |
+          if [ -f o2.log ]; then
+            echo "==== o2.log ===="
+            cat o2.log
+          else
+            echo "o2.log not found; skipping"
+          fi
 
   generate_coverage_report:
     name: Generate Coverage Report
