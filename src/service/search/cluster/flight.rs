@@ -776,8 +776,7 @@ pub async fn partition_filt_list(
 ) -> Result<Vec<Vec<i64>>> {
     let cfg = get_config();
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
-    let mut partition_strategy =
-        QueryPartitionStrategy::from(&cfg.common.feature_query_partition_strategy);
+    let mut partition_strategy = cfg.common.feature_query_partition_strategy.clone();
     if cfg.cache_latest_files.enabled {
         partition_strategy = QueryPartitionStrategy::FileHash;
     }
