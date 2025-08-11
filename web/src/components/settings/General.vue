@@ -18,68 +18,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div class="q-px-md q-py-md">
-      <div class="text-body1 text-bold">
+      <div class="general-page-title">
         {{ t("settings.generalPageTitle") }}
       </div>
+      <div class="general-page-subtitle">
+        Adjust settings for your Application
+      </div>
     </div>
-    <q-separator />
-    <div class="q-w-md q-mx-lg">
-      <q-form @submit.stop="onSubmit.execute">
-        <q-input
-          v-model.number="scrapeIntereval"
-          type="number"
-          min="0"
-          :label="t('settings.scrapintervalLabel')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          :rules="[(val: any) => !!val || 'Scrape interval is required']"
-          :lazy-rules="true"
-        />
+    <!-- platform settings section -->
+    <div class="tw-mx-4">
+      <GroupHeader title="Platform Settings" :iconPath="store.state.theme == 'dark' ? 'images/common/platform_settings_dark.svg' : 'images/common/platform_settings_light.svg'"/>
+      <div class="tw-w-full tw-flex tw-flex-col">
+        <q-form @submit.stop="onSubmit.execute">
+          <!-- scape interval section -->
+          <div class="tw-flex tw-justify-between tw-items-center">
+            <div class="tw-flex tw-flex-col tw-items-start">
+              <span class="individual-setting-title">
+                {{ t('settings.scrapintervalLabel') }}
+              </span>
+              <span class="individual-setting-description">
+                The scrape interval is the frequency, in seconds, at which the monitoring system collects metrics.
+              </span>
+            </div>
+              <q-input
+              v-model.number="scrapeIntereval"
+              type="number"
+              min="0"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-md showLabelOnTop o2-numeric-input"
+              :class="store.state.theme == 'dark' ? 'o2-numeric-input-dark' : 'o2-numeric-input-light' "
+              stack-label
+              outlined
+              filled
+              dense
+              :rules="[(val: any) => !!val || 'Scrape interval is required']"
+              :lazy-rules="true"
+              style="width: 120px;"
+              />
+          </div>
+          <!-- enable web socket search section -->
+          <div v-if="store.state.zoConfig.websocket_enabled" class="tw-flex tw-justify-between tw-items-center">
+            <div class="tw-flex tw-flex-col tw-items-start">
+              <span class="individual-setting-title">
+                {{ t('settings.enableWebsocketSearch') }}
+              </span>
+              <span class="individual-setting-description">
+                Websockets Search uses sockets logic to improve performance .
+              </span>
+            </div>
+            <q-toggle
+            style="width: 120px;"
+              v-model="enableWebsocketSearch"
+              :label="'enabled'"
+              data-test="general-settings-enable-websocket"
+              class="q-pt-md q-pb-md showLabelOnTop"
+            />
+          </div>
+          <!-- enable search streaming section -->
+          <div v-if="store.state.zoConfig.streaming_enabled" class="tw-flex tw-justify-between tw-items-center">
+            <div class="tw-flex tw-flex-col tw-items-start">
+              <span class="individual-setting-title">
+                {{ t('settings.enableStreamingSearch') }}
+              </span>
+              <span class="individual-setting-description">
+                Enabling Search Streaming will increase performance.
+              </span>
+            </div>
+              <q-toggle
+              style="width: 120px;"
+              v-model="enableStreamingSearch"
+              :label="'Enabled'"
+              data-test="general-settings-enable-streaming"
+              class="q-pb-lg showLabelOnTop"
+              />
+          </div>
+          <!-- enable aggregation cache section -->
+          <div v-if="config.isEnterprise == 'true'" class="tw-flex tw-justify-between tw-items-center">
+            <div class="tw-flex tw-flex-col tw-items-start">
+              <span class="individual-setting-title">
+                {{ t('settings.enableAggregationCache') }}
+              </span>
+              <span class="individual-setting-description">
+                Enabling Aggregation Cache will increase performance.
+              </span>
+            </div>
+                <q-toggle
+                style="width: 120px;"
+                v-model="enableAggregationCache"
+                :label="'Enabled'"
+                data-test="general-settings-enable-aggregation-cache"
+                class="q-pb-lg showLabelOnTop"
+              />
+          </div>
+          <span>&nbsp;</span>
 
-        <q-toggle
-          v-if="store.state.zoConfig.websocket_enabled"
-          v-model="enableWebsocketSearch"
-          :label="t('settings.enableWebsocketSearch')"
-          data-test="general-settings-enable-websocket"
-          class="q-pt-md q-pb-md showLabelOnTop"
-        />
-
-        <q-toggle
-          v-if="store.state.zoConfig.streaming_enabled"
-          v-model="enableStreamingSearch"
-          :label="t('settings.enableStreamingSearch')"
-          data-test="general-settings-enable-streaming"
-          class="q-pb-lg showLabelOnTop"
-        />
-
-        <q-toggle
-          v-if="config.isEnterprise == 'true'"
-          v-model="enableStreamingAggregation"
-          :label="t('settings.enableStreamingAggregation')"
-          data-test="general-settings-enable-aggregation-cache"
-          class="q-pb-lg showLabelOnTop"
-        />
-
-        <span>&nbsp;</span>
-
-        <div class="flex justify-start">
-          <q-btn
-            data-test="dashboard-add-submit"
-            :loading="onSubmit.isLoading.value"
-            :label="t('dashboard.save')"
-            class="q-mb-md text-bold no-border"
-            color="secondary"
-            type="submit"
-            no-caps
-            size="md"
-          />
-        </div>
-      </q-form>
+          <div class="flex justify-start">
+            <q-btn
+              data-test="dashboard-add-submit"
+              :loading="onSubmit.isLoading.value"
+              :label="t('dashboard.save')"
+              class="q-mb-md text-bold no-border"
+              color="secondary"
+              type="submit"
+              no-caps
+              size="md"
+            />
+          </div>
+        </q-form>
+      </div>
     </div>
     <div
       id="enterpriseFeature"
@@ -250,6 +297,7 @@ import settingsService from "@/services/settings";
 import config from "@/aws-exports";
 import configService from "@/services/config";
 import DOMPurify from "dompurify";
+import GroupHeader from "../common/GroupHeader.vue";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -264,6 +312,9 @@ export default defineComponent({
     confirmDeleteLogo() {
       this.confirmDeleteImage = true;
     },
+  },
+  components: {
+    GroupHeader,
   },
   setup() {
     const { t } = useI18n();
@@ -285,9 +336,9 @@ export default defineComponent({
         ?.enable_streaming_search ?? false,
     );
 
-    const enableStreamingAggregation = ref(
+    const enableAggregationCache = ref(
       store.state?.organizationData?.organizationSettings
-        ?.streaming_aggregation_enabled ?? false,
+        ?.aggregation_cache_enabled ?? false,
     );
 
     const loadingState = ref(false);
@@ -310,9 +361,9 @@ export default defineComponent({
         store.state?.organizationData?.organizationSettings
           ?.enable_streaming_search ?? false;
 
-      enableStreamingAggregation.value =
+      enableAggregationCache.value =
         store.state?.organizationData?.organizationSettings
-          ?.streaming_aggregation_enabled ?? false;
+          ?.aggregation_cache_enabled ?? false;
     });
 
     watch(
@@ -333,7 +384,7 @@ export default defineComponent({
           scrape_interval: scrapeIntereval.value,
           enable_websocket_search: enableWebsocketSearch.value,
           enable_streaming_search: enableStreamingSearch.value,
-          streaming_aggregation_enabled: enableStreamingAggregation.value,
+          aggregation_cache_enabled: enableAggregationCache.value,
         });
 
         //update settings in backend
@@ -559,8 +610,31 @@ export default defineComponent({
       confirmDeleteImage: ref(false),
       sanitizeInput,
       enableStreamingSearch,
-      enableStreamingAggregation,
+      enableAggregationCache,
     };
   },
 });
 </script>
+
+<style scoped lang="scss">
+
+.general-page-title {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 24px;
+}
+.general-page-subtitle{
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.individual-setting-title{
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.individual-setting-description{
+  font-size: 12px;
+  opacity: 0.6;
+}
+</style>

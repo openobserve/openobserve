@@ -20,18 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="alert-list-page"
     class="q-pa-none flex"
-    style="height: calc(100vh - 57px)"
+    style="height: calc(100vh - 57px);"
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   >
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
-      class="flex justify-between full-width tw-py-3 tw-px-4 items-center"
+      class="flex justify-between full-width tw-py-3 tw-px-4 items-center tw-border-b-[1px]"
+      :class="store.state.theme === 'dark' ? 'tw-border-gray-500' : 'tw-border-gray-200'"
     >
-      <div class="q-table__title" data-test="alerts-list-title">
+      <div class="q-table__title tw-font-[600]" data-test="alerts-list-title" >
         {{ t("alerts.header") }}
       </div>
       <div class="flex q-ml-auto tw-ps-2 items-center">
-        <div class="app-tabs-container q-mr-md">
+        <div class="app-tabs-container tw-h-[36px] q-mr-md" :class="store.state.theme === 'dark' ? 'app-tabs-container-dark' : 'app-tabs-container-light'">
           <app-tabs
           class="tabs-selection-container"
           :class="store.state.theme === 'dark' ? 'tabs-selection-container-dark' : 'tabs-selection-container-light'"
@@ -43,7 +44,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="dynamicQueryModel"
           dense
-          filled
           borderless
           :placeholder="
             searchAcrossFolders
@@ -53,9 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-list-search-input"
           :clearable="searchAcrossFolders"
           @clear="clearSearchHistory"
+
+          class="o2-search-input"
+          :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
         >
           <template #prepend>
-            <q-icon name="search" />
+            <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
           </template>
         </q-input>
         <div>
@@ -63,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-list-search-across-folders-toggle"
             v-model="searchAcrossFolders"
             label="All Folders"
-            class="tw-mr-3"
+            class="tw-mr-3 tw-h-[36px]"
           >
           </q-toggle>
           <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
@@ -76,29 +79,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <q-btn
-        class="q-ml-md text-bold"
-        padding="sm lg"
-        outline
+        class="q-ml-md o2-secondary-button tw-h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         no-caps
+        flat
         :label="t(`dashboard.import`)"
         @click="importAlert"
         data-test="alert-import"
+
       />
       <q-btn
         data-test="alert-list-add-alert-btn"
-        class="q-ml-md text-bold no-border"
-        padding="sm lg"
-        color="secondary"
+        class="q-ml-md o2-primary-button tw-h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         no-caps
+        flat
         :disable="!destinations.length"
         :title="!destinations.length ? t('alerts.noDestinations') : ''"
         :label="t(`alerts.add`)"
         @click="showAddUpdateFn({})"
       />
     </div>
+    
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       class="full-width alert-list-table"
+      style="height: calc(100vh - 138px)"
     >
       <q-splitter
         v-model="splitterModel"
@@ -124,9 +130,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="alert_id"
             :pagination="pagination"
-            style="width: 100%"
-            class="o2-quasar-table"
-            :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+            style="width: 100%;"
+            :style="filteredResults?.length 
+            ? 'width: 100%; height: calc(100vh - 112px)' 
+            : 'width: 100%'"
+
+            class="o2-quasar-table o2-quasar-table-header-sticky"
+            :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light'"
           >
           <template v-slot:header="props">
             <q-tr :props="props">
@@ -135,7 +145,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-checkbox
                   v-model="props.selected"
                   size="sm"
-                  color="secondary"
+                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                  class="o2-table-checkbox"
                   @update:model-value="props.select"
                 />
               </q-th>
@@ -171,7 +182,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-checkbox
                     v-model="props.selected"
                     size="sm"
-                    color="secondary"
+                    :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                    class="o2-table-checkbox"
                   />
                 </q-td>
 
@@ -462,7 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-td>
             </template>
 
-            <template #top="scope">
+            <!-- <template #top="scope">
               <QTablePagination
                 :scope="scope"
                 :pageTitle="t('alerts.header')"
@@ -471,28 +483,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :perPageOptions="perPageOptions"
                 @update:changeRecordPerPage="changePagination"
               />
-            </template>
+            </template> -->
 
             <template #bottom="scope">
-              <div class="bottom-btn">
+              <div class="bottom-btn tw-h-[48px]">
+                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+                  {{ resultTotal }} {{ t('alerts.header') }}
+                </div>
+
                 <q-btn
                   v-if="selectedAlerts.length > 0"
                   data-test="alert-list-move-across-folders-btn"
-                  class="flex items-center move-btn q-mr-md no-border"
-                  color="secondary"
-                  :icon="outlinedDriveFileMove"
-                  :label="'Move'"
+                  class="flex items-center q-mr-md no-border o2-secondary-button tw-h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  no-caps
+                  dense
                   @click="moveMultipleAlerts"
-                />
+                  >
+                    <q-icon :name="outlinedDriveFileMove" size="16px" />
+                    <span class="tw-ml-2">Move</span>
+                </q-btn>
                 <q-btn
                   v-if="selectedAlerts.length > 0"
                   data-test="alert-list-export-alerts-btn"
-                  class="flex items-center export-btn no-border"
-                  color="secondary"
-                  icon="download"
-                  :label="'Export'"
+                  class="flex items-center no-border o2-secondary-button tw-h-[36px]"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  no-caps
+                  dense
                   @click="multipleExportAlert"
-                />
+                >
+                  <q-icon name="download" size="16px" />
+                  <span class="tw-ml-2">Export</span>
+              </q-btn>
                 <QTablePagination
                   :scope="scope"
                   :position="'bottom'"
@@ -2067,33 +2089,6 @@ export default defineComponent({
 }
 
 
-.alerts-tabs {
-  .q-tabs {
-    &--vertical {
-      margin: 1.5rem 1rem 0 0;
-
-      .q-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-
-        &--active {
-          background-color: $accent;
-        }
-      }
-    }
-  }
-}
 .clone-alert-popup {
   width: 400px;
 }
