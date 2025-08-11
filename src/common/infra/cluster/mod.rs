@@ -102,6 +102,7 @@ pub async fn get_node_from_consistent_hash(
     role: &Role,
     group: Option<RoleGroup>,
 ) -> Option<String> {
+    let hash = config::utils::hash::gxhash::new().sum64(key);
     let nodes = match role {
         Role::Querier => match group {
             Some(RoleGroup::Interactive) => QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await,
@@ -115,7 +116,6 @@ pub async fn get_node_from_consistent_hash(
     if nodes.is_empty() {
         return None;
     }
-    let hash = config::utils::hash::gxhash::new().sum64(key);
     let mut iter = nodes.lower_bound(Bound::Included(&hash));
     if let Some((_, name)) = iter.next() {
         return Some(name.clone());
