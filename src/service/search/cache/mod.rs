@@ -28,7 +28,13 @@ use config::{
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
     },
-    utils::{base64, hash::Sum64, json, sql::is_aggregate_query, time::format_duration},
+    utils::{
+        base64,
+        hash::Sum64,
+        json,
+        sql::{is_aggregate_query, is_eligible_for_histogram},
+        time::format_duration,
+    },
 };
 use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
@@ -446,6 +452,10 @@ pub async fn search(
         res.new_start_time = Some(req.query.start_time);
         res.new_end_time = Some(req.query.end_time);
     }
+
+    res.is_histogram_eligible = is_eligible_for_histogram(&req.query.sql)
+        .ok()
+        .map(|(is_eligible, _)| is_eligible);
 
     let write_res = deep_copy_response(&res);
     let mut local_res = deep_copy_response(&res);
