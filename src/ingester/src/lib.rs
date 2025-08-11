@@ -32,9 +32,10 @@ pub use immutable::read_from_immutable;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
+pub use wal::collect_wal_parquet_metrics;
 pub use writer::{
-    Writer, check_memory_circuit_breaker, check_memtable_size, collect_parquet_metrics, flush_all,
-    get_writer, read_from_memtable,
+    Writer, check_memory_circuit_breaker, check_memtable_size, flush_all, get_writer,
+    read_from_memtable,
 };
 
 use crate::errors::OpenDirSnafu;
