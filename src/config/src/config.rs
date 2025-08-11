@@ -33,7 +33,7 @@ use lettre::{
 use once_cell::sync::Lazy;
 
 use crate::{
-    meta::cluster,
+    meta::{cluster, stream::QueryPartitionStrategy},
     utils::{file::get_file_meta, sysinfo},
 };
 
@@ -774,8 +774,12 @@ pub struct Common {
     pub feature_filelist_dedup_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
     pub feature_query_queue_enabled: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_PARTITION_STRATEGY", default = "file_num")]
-    pub feature_query_partition_strategy: String,
+    #[env_config(
+        name = "ZO_FEATURE_QUERY_PARTITION_STRATEGY",
+        parse,
+        default = "file_num"
+    )]
+    pub feature_query_partition_strategy: QueryPartitionStrategy,
     #[env_config(name = "ZO_FEATURE_QUERY_INFER_SCHEMA", default = false)]
     pub feature_query_infer_schema: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
