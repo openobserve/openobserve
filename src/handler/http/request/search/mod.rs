@@ -307,14 +307,6 @@ pub async fn search(
             .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
     }
 
-    // get stream name
-    let stream_names = match resolve_stream_names(&req.query.sql) {
-        Ok(v) => v.clone(),
-        Err(e) => {
-            return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
-        }
-    };
-
     // get stream settings
     for stream_name in stream_names {
         if let Some(settings) =
