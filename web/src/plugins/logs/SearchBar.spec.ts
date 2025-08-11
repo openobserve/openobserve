@@ -332,6 +332,11 @@ describe("SearchBar Component", () => {
       config: {} as any
     });
 
+    // Mock the downloadLogs method to avoid URL.createObjectURL issues
+    const downloadLogsSpy = vi.spyOn(wrapper.vm, 'downloadLogs').mockImplementation(() => {
+      // Mock implementation that doesn't actually create files
+    });
+
     wrapper.vm.searchObj = {
       data: {
         query: 'some query',
@@ -362,6 +367,37 @@ describe("SearchBar Component", () => {
 
     expect(searchServiceMock).toHaveBeenCalled();
     expect(wrapper.vm.customDownloadDialog).toBe(false);
+  });
+
+  it("should handle downloadLogs method with mocked URL APIs", async () => {
+    const testData = [{ field1: 'value1', field2: 'value2' }];
+    const format = 'csv';
+    
+    // Mock json2csv function
+    const mockJson2csv = vi.fn().mockResolvedValue('field1,field2\nvalue1,value2');
+    wrapper.vm.json2csv = mockJson2csv;
+    
+    // Mock document methods
+    const mockLink = {
+      click: vi.fn(),
+      href: '',
+      download: ''
+    };
+    const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(mockLink as any);
+    const appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockLink as any);
+    const removeChildSpy = vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockLink as any);
+
+    await wrapper.vm.downloadLogs(testData, format);
+
+    expect(global.URL.createObjectURL).toHaveBeenCalled();
+    expect(createElementSpy).toHaveBeenCalledWith('a');
+    expect(mockLink.click).toHaveBeenCalled();
+    expect(global.URL.revokeObjectURL).toHaveBeenCalled();
+
+    // Cleanup
+    createElementSpy.mockRestore();
+    appendChildSpy.mockRestore();
+    removeChildSpy.mockRestore();
   });
 
   it("should trigger handleKeyDown method", () => {
