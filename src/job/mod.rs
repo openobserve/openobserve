@@ -364,13 +364,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         log::info!(
                             "[O2::ENT] No online alert manager node found in two consecutive checks, exiting"
                         );
-                        if let Err(e) = std::process::Command::new("kill")
-                            .arg("-SIGINT")
-                            .arg(std::process::id().to_string())
-                            .spawn()
-                        {
-                            log::error!("[O2::ENT] Failed to send ctrl-c signal: {e}");
-                        }
+                        std::process::exit(-1);
                     } else {
                         last_check = false;
                     }
