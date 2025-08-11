@@ -41,6 +41,8 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::Map;
 
+#[cfg(feature = "cloud")]
+use crate::service::stream::get_stream;
 use crate::{
     common::meta::{
         http::HttpResponse as MetaHttpResponse,
@@ -739,6 +741,28 @@ async fn write_traces_by_stream(
     json_data_by_stream: HashMap<String, O2IngestJsonData>,
 ) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
+        // for cloud, we want to sent event when user creates a new stream
+        #[cfg(feature = "cloud")]
+        if get_stream(org_id, &traces_stream_name, StreamType::Traces)
+            .await
+            .is_none()
+        {
+            let org = super::organization::get_org(&org_id).await.unwrap();
+
+            super::self_reporting::cloud_events::enqueue_cloud_event(
+                super::self_reporting::cloud_events::CloudEvent {
+                    org_id: org.identifier.clone(),
+                    org_name: org.name.clone(),
+                    org_type: org.org_type.clone(),
+                    user: None,
+                    event: super::self_reporting::cloud_events::EventType::StreamCreated,
+                    subscription_type: None,
+                    stream_name: Some(traces_stream_name.clone()),
+                },
+            )
+            .await;
+        }
+
         let mut req_stats = match write_traces(org_id, &traces_stream_name, json_data).await {
             Ok(v) => v,
             Err(e) => {
