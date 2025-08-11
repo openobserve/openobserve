@@ -216,7 +216,7 @@ pub async fn search(
     )
     .await?;
     // add work_group
-    req.add_work_group(Some(work_group_str));
+    req.add_work_group(Some(work_group_str.clone()));
     log::info!(
         "[trace_id {trace_id}] flight->follower_leader: add work_group: {work_group_str}, took: {took_wait} ms"
     );
