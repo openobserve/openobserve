@@ -25,8 +25,8 @@ use o2_dex::config::get_config as get_dex_config;
 use o2_openfga::{
     authorizer::{
         authz::{
-            get_org_creation_tuples, get_user_creation_tuples, get_user_org_tuple,
-            get_user_role_creation_tuple, get_user_role_deletion_tuple, update_tuples,
+            get_add_user_to_org_tuples, get_new_user_creation_tuple, get_org_creation_tuples,
+            get_user_org_tuple, get_user_role_deletion_tuple, update_tuples,
         },
         roles::{
             check_and_get_crole_tuple_for_new_user, get_roles_for_user,
@@ -125,9 +125,10 @@ pub async fn process_token(
             log::info!("User does not exist in the database");
 
             if openfga_cfg.enabled {
+                // User does not exist in the database, create orgs and user in openfga
                 for (index, org) in source_orgs.iter().enumerate() {
                     let mut tuples = vec![];
-                    get_user_creation_tuples(
+                    get_add_user_to_org_tuples(
                         &org.name,
                         &user_email,
                         &org.role.to_string(),
@@ -146,11 +147,7 @@ pub async fn process_token(
 
                     if index == 0 {
                         // this is to allow user call organization api with org
-                        tuples.push(get_user_org_tuple(
-                            &user_email,
-                            &user_email,
-                            Some(&org.role.to_string()),
-                        ));
+                        get_new_user_creation_tuple(&user_email, &mut tuples);
                     }
 
                     tuples_to_add.insert(org.name.to_owned(), tuples);
@@ -245,10 +242,10 @@ pub async fn process_token(
                 {
                     Ok(_) => {
                         log::info!("User added to the organization {}", org.name);
-                        write_tuples.push(get_user_role_creation_tuple(
-                            &org.role.to_string(),
-                            &user_email,
+                        write_tuples.push(get_user_org_tuple(
                             &org.name,
+                            &user_email,
+                            Some(&org.role.to_string()),
                         ));
                     }
                     Err(e) => {
@@ -302,10 +299,10 @@ pub async fn process_token(
                             &user_email,
                             &org.name,
                         ));
-                        write_tuples.push(get_user_role_creation_tuple(
-                            &org.role.to_string(),
-                            &user_email,
+                        write_tuples.push(get_user_org_tuple(
                             &org.name,
+                            &user_email,
+                            Some(&org.role.to_string()),
                         ));
                     }
                     Err(e) => {
