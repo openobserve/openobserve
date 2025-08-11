@@ -359,3 +359,31 @@
     background-color: $primary !important;
   }
 }
+
+
+//this is used to target the checkbox in the table
+//we need to add the class o2-table-checkbox-light or o2-table-checkbox-dark to the checkbox directly 
+//and don't add the color to the checkbox directly
+//any non theme related styling should be done here inside the o2-table-checkbox class
+.o2-table-checkbox{
+  .q-checkbox__bg{
+    width: 16px !important;
+    height: 16px !important;
+  }
+}
+.o2-table-checkbox-light{
+  .q-checkbox__inner--truthy .q-checkbox__bg, .q-checkbox__inner--indet .q-checkbox__bg {
+    background: #826AF9 !important;
+    border: 2px solid #826AF9 !important;
+  }
+}
+
+
+.o2-table-checkbox-dark{
+  .q-checkbox__inner--truthy .q-checkbox__bg, .q-checkbox__inner--indet .q-checkbox__bg {
+    background: #9E86FF !important;
+    border: 2px solid #9E86FF !important;
+  }
+}
+
+

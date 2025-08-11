@@ -135,7 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-checkbox
                   v-model="props.selected"
                   size="sm"
-                  color="secondary"
+                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                  class="o2-table-checkbox"
                   @update:model-value="props.select"
                 />
               </q-th>
@@ -171,7 +172,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-checkbox
                     v-model="props.selected"
                     size="sm"
-                    color="secondary"
+                    :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
+                    class="o2-table-checkbox"
                   />
                 </q-td>
 
