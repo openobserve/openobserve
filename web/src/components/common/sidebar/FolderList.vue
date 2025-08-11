@@ -26,15 +26,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-input
           v-model="searchQuery"   
           dense
-          filled
           borderless
           data-test="folder-search"
           placeholder="Search Folder"
           style="width: 100%;"
           clearable
+          class="o2-search-input tw-mx-1"
+          :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
         >
           <template #prepend>
-            <q-icon name="search" />
+            <q-icon  class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'"  name="search" />
           </template>
         </q-input>
               <div>
@@ -108,18 +109,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-tabs>
     </div>
     <div
-        class="row justify-center full-width q-px-xs q-pb-xs"
+        class="row full-width  q-pb-xs"
         style="position: sticky; bottom: 0px"
     >
       <q-btn
-          class="text-bold no-border full-width"
-          padding="sm lg"
-          color="secondary"
+          class="text-bold o2-secondary-button tw-mx-1 tw-w-full"
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           no-caps
+          flat
           label="New Folder"
           @click.stop="addFolder"
           data-test="dashboard-new-folder-btn"
-        />
+          icon="add"
+        >
+      </q-btn>
     </div>
 
       <q-dialog
