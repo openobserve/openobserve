@@ -51,6 +51,8 @@ pub struct PipelineError {
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(serialize_with = "serialize_values_only")]
     pub node_errors: HashMap<String, NodeErrors>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function_name: Option<String>,
 }
 
 impl PipelineError {
@@ -60,14 +62,23 @@ impl PipelineError {
             pipeline_name: pipeline_name.to_string(),
             error: None,
             node_errors: HashMap::new(),
+            function_name: None,
         }
     }
 
-    pub fn add_node_error(&mut self, node_id: String, node_type: String, error: String) {
+    pub fn add_node_error(
+        &mut self,
+        node_id: String,
+        node_type: String,
+        error: String,
+        fn_name: Option<String>,
+    ) {
         self.node_errors
             .entry(node_id.clone())
             .or_insert_with(|| NodeErrors::new(node_id, node_type))
             .add_error(error);
+        println!("errors are:{:?}",self.node_errors);
+        self.function_name = fn_name;
     }
 }
 
