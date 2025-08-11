@@ -43,7 +43,6 @@ use {
 use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
 use crate::{
     common::{
-        infra::config::USERS_RUM_TOKEN,
         meta::organization::{
             AlertSummary, CUSTOM, DEFAULT_ORG, IngestionPasscode, IngestionTokensContainer,
             OrgSummary, Organization, PipelineSummary, RumIngestionToken, StreamSummary,
@@ -52,7 +51,6 @@ use crate::{
         utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
     service::{
-        db,
         db::{self, org_users},
         self_reporting,
         stream::get_streams,
