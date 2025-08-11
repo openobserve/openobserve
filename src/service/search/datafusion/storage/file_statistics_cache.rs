@@ -46,6 +46,63 @@ impl FileStatisticsCache {
         self.statistics.len()
     }
 
+    pub fn memory_size(&self) -> usize {
+        let mut total_size = 0;
+
+        // Size of the struct itself
+        total_size += std::mem::size_of::<Self>();
+
+        // Size of DashMap entries
+        for entry in self.statistics.iter() {
+            let (key, (meta, stats)) = entry.pair();
+
+            // Key string
+            total_size += std::mem::size_of::<String>() + key.len();
+
+            // ObjectMeta
+            total_size += std::mem::size_of::<ObjectMeta>();
+            // Path string in ObjectMeta
+            total_size += meta.location.as_ref().len();
+            // Optional e_tag
+            if let Some(ref etag) = meta.e_tag {
+                total_size += std::mem::size_of::<String>() + etag.len();
+            }
+            // Optional version
+            if let Some(ref version) = meta.version {
+                total_size += std::mem::size_of::<String>() + version.len();
+            }
+
+            // Arc<Statistics> - estimate size
+            // Statistics contains num_rows, total_byte_size, and column_statistics
+            total_size += std::mem::size_of::<Statistics>();
+
+            // Column statistics size estimation
+            for _col_stat in &stats.column_statistics {
+                total_size += std::mem::size_of::<datafusion::common::ColumnStatistics>();
+            }
+        }
+
+        // Size of VecDeque<String> in cacher
+        let cacher_guard = self.cacher.lock();
+        total_size += std::mem::size_of::<VecDeque<String>>();
+        for key in cacher_guard.iter() {
+            total_size += std::mem::size_of::<String>() + key.len();
+        }
+        drop(cacher_guard);
+
+        // DashMap overhead (approximate)
+        // DashMap uses sharding internally, estimate based on typical overhead
+        // This is an approximation since we can't access internal shards
+        let estimated_shards = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(8)
+            .min(128); // DashMap typically uses CPU count for shards
+        let dashmap_overhead = estimated_shards * std::mem::size_of::<parking_lot::RwLock<()>>();
+        total_size += dashmap_overhead;
+
+        total_size
+    }
+
     fn format_key(&self, k: &Path) -> String {
         if let Some(mut p) = k.as_ref().find(TRACE_ID_SEPARATOR) {
             if let Some(pp) = k.as_ref()[..p].find("/schema=") {
@@ -197,5 +254,53 @@ mod tests {
         let mut meta2 = meta;
         meta2.location = Path::from("test2");
         assert!(cache.get_with_extra(&meta2.location, &meta2).is_none());
+    }
+
+    #[test]
+    fn test_memory_size_calculation() {
+        let cache = FileStatisticsCache::new(100);
+
+        // Empty cache should have some base size
+        let empty_size = cache.memory_size();
+        assert!(empty_size > 0);
+
+        // Add some entries
+        for i in 0..10 {
+            let meta = ObjectMeta {
+                location: Path::from(format!("test_file_{}", i)),
+                last_modified: DateTime::parse_from_rfc3339("2022-09-27T22:36:00+02:00")
+                    .unwrap()
+                    .into(),
+                size: 1024 * (i + 1),
+                e_tag: Some(format!("etag_{}", i)),
+                version: Some(format!("v{}", i)),
+            };
+
+            let schema = Schema::new(vec![
+                Field::new("column1", DataType::Utf8, false),
+                Field::new("column2", DataType::Int64, true),
+                Field::new(
+                    "column3",
+                    DataType::Timestamp(TimeUnit::Microsecond, None),
+                    false,
+                ),
+            ]);
+
+            cache.put_with_extra(
+                &meta.location,
+                Statistics::new_unknown(&schema).into(),
+                &meta,
+            );
+        }
+
+        // Size should increase after adding entries
+        let filled_size = cache.memory_size();
+        assert!(filled_size > empty_size);
+
+        println!(
+            "Cache with {} entries uses {} bytes",
+            cache.len(),
+            filled_size,
+        );
     }
 }
