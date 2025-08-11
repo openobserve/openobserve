@@ -907,12 +907,15 @@ fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, a
         DataType::UInt64 => Arc::new(Literal::new(ScalarValue::UInt64(Some(value.parse()?)))),
         DataType::Float64 => Arc::new(Literal::new(ScalarValue::Float64(Some(value.parse()?)))),
         DataType::Utf8 => Arc::new(Literal::new(ScalarValue::Utf8(Some(value.to_string())))),
-        DataType::Binary => Arc::new(Literal::new(ScalarValue::Binary(Some(
-            value.as_bytes().to_vec(),
-        )))),
         DataType::Utf8View => {
             Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
         }
+        DataType::LargeUtf8 => {
+            Arc::new(Literal::new(ScalarValue::LargeUtf8(Some(value.to_string()))))
+        }
+        DataType::Binary => Arc::new(Literal::new(ScalarValue::Binary(Some(
+            value.as_bytes().to_vec(),
+        )))),
         _ => unimplemented!(),
     })
 }
