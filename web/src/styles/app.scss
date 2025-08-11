@@ -386,4 +386,37 @@
   }
 }
 
+//this is used to target the radio button in the app
+//we need to add the class o2-radio-button-light or o2-radio-button-dark to the radio button directly
+//and don't add the color to the radio button directly
+//any non theme related styling should be done here inside the o2-radio-button class
+
+.o2-radio-button{
+  .q-radio{
+    display: flex;
+  }
+  .q-radio__bg{
+    width: 16px !important;
+    height: 16px !important;
+  }
+  .q-radio__label{
+    font-size: 13px !important;
+  }
+  .q-radio__inner{
+    height: 16px !important;
+  }
+}
+
+.o2-radio-button-light{
+  .q-radio__inner--truthy{
+    color: #7B61FF !important;
+  }
+}
+
+.o2-radio-button-dark{
+  .q-radio__inner--truthy{
+    color: #9E86FF !important;
+  }
+}
+
 

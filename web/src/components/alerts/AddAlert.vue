@@ -201,7 +201,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   val="false"
                   dense
                   :label="t('alerts.scheduled')"
-                  class="q-ml-none"
+                  class="q-ml-none o2-radio-button"
+                  :class="store.state.theme == 'dark' ? 'o2-radio-button-dark' : 'o2-radio-button-light'"
                 />
                 <q-radio
                   data-test="add-alert-realtime-alert-radio"
@@ -212,8 +213,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   val="true"
                   dense
                   :label="t('alerts.realTime')"
-                  class="q-ml-none"
-                />
+                  class="q-ml-none o2-radio-button"
+                  :class="store.state.theme == 'dark' ? 'o2-radio-button-dark' : 'o2-radio-button-light'" 
+                  />
               </div>
               </div>
             </div>
