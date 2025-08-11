@@ -35,6 +35,8 @@ use crate::{
 mod alert_manager;
 #[cfg(feature = "enterprise")]
 mod cipher;
+#[cfg(feature = "cloud")]
+mod cloud;
 mod compactor;
 mod file_downloader;
 mod file_list_dump;
@@ -312,6 +314,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::metering::init(get_usage)
             .await
             .expect("cloud usage metering job init failed");
+
+        // run these cloud jobs only in alert manager
+        if LOCAL_NODE.is_alert_manager() {
+            cloud::start();
+        }
     }
 
     // Shouldn't serve request until initialization finishes

@@ -70,6 +70,24 @@ impl From<Model> for OrganizationRecord {
     }
 }
 
+// internal struct to pass filters to list orgs
+#[derive(Default)]
+pub struct ListFilter {
+    pub created_after: Option<i64>,
+    pub created_before: Option<i64>,
+    pub limit: Option<i64>,
+}
+
+impl ListFilter {
+    pub fn with_limit(limit: Option<i64>) -> Self {
+        Self {
+            created_after: None,
+            created_before: None,
+            limit,
+        }
+    }
+}
+
 #[derive(FromQueryResult, Debug)]
 pub struct OrgId {
     pub identifier: String,
@@ -188,11 +206,17 @@ pub async fn get(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
     Ok(OrganizationRecord::from(record))
 }
 
-pub async fn list(limit: Option<i64>) -> Result<Vec<OrganizationRecord>, errors::Error> {
+pub async fn list(filter: ListFilter) -> Result<Vec<OrganizationRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let mut res = Entity::find().order_by(Column::CreatedAt, Order::Desc);
-    if let Some(limit) = limit {
+    if let Some(limit) = filter.limit {
         res = res.limit(limit as u64);
+    }
+    if let Some(start) = filter.created_before {
+        res = res.filter(Column::CreatedAt.lt(start));
+    }
+    if let Some(end) = filter.created_after {
+        res = res.filter(Column::CreatedAt.gt(end))
     }
     let records = res
         .all(client)
