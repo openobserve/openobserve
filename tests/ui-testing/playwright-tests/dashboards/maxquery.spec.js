@@ -1,0 +1,107 @@
+import { test, expect } from "../baseFixtures.js";
+import logData from "../../cypress/fixtures/log.json";
+import { login } from "./utils/dashLogin.js";
+import { ingestion } from "./utils/dashIngestion.js";
+import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+
+import StreamSettingsPage from "../../pages/dashboardPages/streams.js";
+import PageManager from "../../pages/page-manager";
+
+const randomDashboardName =
+  "Dashboard_" + Math.random().toString(36).substr(2, 9);
+
+test.describe.configure({ mode: "parallel" });
+
+test.describe("dashboard max query testcases", () => {
+  test.beforeEach(async ({ page }) => {
+    console.log("running before each");
+    await login(page);
+    await page.waitForTimeout(1000);
+    await ingestion(page);
+    await page.waitForTimeout(2000);
+    // Navigate to the logs page to ensure correct org context
+    await page.goto(
+      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+    );
+  });
+  test("should correctly display max query range error message when max query range is exceeded.", async ({
+    page,
+  }) => {
+    // Instantiate PageManager (pm) for this test case
+    const pm = new PageManager(page);
+    const streamSettingsPage = new StreamSettingsPage(page);
+
+    // Ensure Streaming is disabled for consistent test behaviour
+    await pm.managementPage.ensureStreamingDisabled();
+
+    await pm.dashboardList.menuItem("streams-item");
+
+    await streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "4");
+
+    await pm.dashboardList.menuItem("dashboards-item");
+
+    await waitForDashboardPage(page);
+
+    await pm.dashboardCreate.createDashboard(randomDashboardName);
+
+    await pm.dashboardCreate.addPanel();
+
+    await pm.chartTypeSelector.selectChartType("bar");
+
+    await pm.chartTypeSelector.selectStreamType("logs");
+
+    await pm.chartTypeSelector.selectStream("e2e_automate");
+
+    await pm.chartTypeSelector.searchAndAddField(
+      "kubernetes_namespace_name",
+      "y"
+    );
+
+    await pm.chartTypeSelector.searchAndAddField("kubernetes_labels_name", "b");
+
+    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+
+    await pm.dashboardPanelActions.waitForChartToRender();
+
+    await pm.dashboardPanelActions.addPanelName(randomDashboardName);
+
+    await pm.dashboardPanelActions.savePanel();
+
+    await page.waitForTimeout(2000);
+
+    await pm.dateTimeHelper.setRelativeTimeRange("6-w");
+
+    const response = await page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .includes("/api/default/_search?type=logs&search_type=dashboards") &&
+        response.status() === 200
+    );
+    const data = await response.json();
+
+    expect(data.hits.length).toBeGreaterThan(0);
+
+    await expect(
+      page.locator('[data-test="dashboard-panel-max-duration-warning"]')
+    ).toBeVisible({ timeout: 15000 });
+
+    await pm.dateTimeHelper.setRelativeTimeRange("2-h");
+
+    await expect(
+      page.locator('[data-test="dashboard-panel-max-duration-warning"]')
+    ).not.toBeVisible();
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+
+    await deleteDashboard(page, randomDashboardName);
+
+    await page.waitForTimeout(1000);
+
+    await pm.dashboardList.menuItem("streams-item");
+
+    await streamSettingsPage.updateStreamMaxQueryRange("e2e_automate", "0");
+  });
+});
