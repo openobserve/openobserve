@@ -240,6 +240,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("ai prompts cache failed");
 
     infra_file_list::create_table_index().await?;
+    infra_file_list::LOCAL_CACHE.create_table().await?;
     infra_file_list::LOCAL_CACHE.create_table_index().await?;
 
     #[cfg(feature = "enterprise")]
