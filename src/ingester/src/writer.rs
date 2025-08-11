@@ -204,58 +204,6 @@ pub async fn flush_all() -> Result<()> {
     Ok(())
 }
 
-/// Collect parquet file metrics from the files directory
-/// Counts parquet files that are pending upload to object store
-pub async fn collect_parquet_metrics() -> Result<()> {
-    use std::path::PathBuf;
-
-    use config::{get_config, metrics};
-    use hashbrown::HashMap;
-
-    use crate::wal::wal_scan_files;
-
-    let cfg = get_config();
-    let parquet_dir = PathBuf::from(&cfg.common.data_wal_dir).join("files");
-
-    // Get all parquet files
-    let parquet_files = match wal_scan_files(parquet_dir, "parquet").await {
-        Ok(files) => files,
-        Err(_) => return Ok(()), // Directory doesn't exist or no files
-    };
-
-    // Count parquet files by org_id and stream_type
-    let mut parquet_counts: HashMap<(String, String), i64> = HashMap::new();
-
-    for file_path in parquet_files {
-        // Parse the file path to extract org_id and stream_type
-        // Path format: files/org_id/stream_type/stream_name/...
-        let path_str = file_path.to_string_lossy();
-        let parts: Vec<&str> = path_str.split('/').collect();
-
-        // Find the "files" directory and extract org_id and stream_type from there
-        if let Some(files_idx) = parts.iter().position(|&p| p == "files")
-            && parts.len() > files_idx + 2
-        {
-            let org_id = parts[files_idx + 1];
-            let stream_type = parts[files_idx + 2];
-
-            if !org_id.is_empty() && !stream_type.is_empty() {
-                let key = (org_id.to_string(), stream_type.to_string());
-                *parquet_counts.entry(key).or_insert(0) += 1;
-            }
-        }
-    }
-
-    // Update metrics with current counts
-    for ((org_id, stream_type), count) in parquet_counts {
-        metrics::INGEST_PARQUET_FILES
-            .with_label_values(&[&org_id, &stream_type])
-            .set(count);
-    }
-
-    Ok(())
-}
-
 impl Writer {
     pub(crate) fn new(idx: usize, key: WriterKey) -> Arc<Writer> {
         let now = Utc::now().timestamp_micros();

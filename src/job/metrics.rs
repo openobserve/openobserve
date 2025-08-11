@@ -313,7 +313,7 @@ async fn update_storage_metrics() -> Result<(), anyhow::Error> {
 
 async fn update_parquet_metrics() -> Result<(), anyhow::Error> {
     // Call the ingester's parquet metrics collection function
-    ingester::collect_parquet_metrics()
+    ingester::collect_wal_parquet_metrics()
         .await
         .map_err(|e| anyhow::anyhow!("Failed to collect parquet metrics: {}", e))?;
     Ok(())
