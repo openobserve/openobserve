@@ -1740,8 +1740,8 @@ export default defineComponent({
           for (const childVariable of childVariableObjects) {
             // Only apply guard for REST API mode
             if (
-              !isStreamingEnabled(store.state) &&
-              !isWebSocketEnabled(store.state)
+              !isStreamingEnabled() &&
+              !isWebSocketEnabled()
             ) {
               if (isInitialLoad) {
                 variableLog(
