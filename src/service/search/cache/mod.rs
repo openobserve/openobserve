@@ -395,7 +395,7 @@ pub async fn search(
         } else {
             None
         },
-        request_body: Some(req.query.sql),
+        request_body: Some(req.query.sql.clone()),
         function: req.query.query_fn,
         user_email: user_id,
         min_ts: Some(req.query.start_time),
