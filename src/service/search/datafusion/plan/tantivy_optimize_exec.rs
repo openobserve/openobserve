@@ -429,11 +429,11 @@ fn create_field_array(
         arrow_schema::DataType::Utf8 => {
             Ok(Arc::new(arrow::array::StringArray::from(field_values)) as Arc<dyn Array>)
         }
-        arrow_schema::DataType::LargeUtf8 => {
-            Ok(Arc::new(arrow::array::LargeStringArray::from(field_values)) as Arc<dyn Array>)
-        }
         arrow_schema::DataType::Utf8View => {
             Ok(Arc::new(arrow::array::StringViewArray::from(field_values)) as Arc<dyn Array>)
+        }
+        arrow_schema::DataType::LargeUtf8 => {
+            Ok(Arc::new(arrow::array::LargeStringArray::from(field_values)) as Arc<dyn Array>)
         }
         arrow_schema::DataType::Int64 => parse_i64_array(&field_values),
         arrow_schema::DataType::UInt64 => parse_u64_array(&field_values),
