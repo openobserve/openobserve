@@ -39,136 +39,137 @@
         data-test="dashboard-tab-settings-tab-name-edit-cancel"
       ></q-btn>
     </div>
-  <div class="flex tw-justify-between tw-flex-col">
-    <div class="tw-mt-2 scrollable-content scroll tw-min-h-52">
-      <draggable
-        v-model="editColorBySeries"
-        :options="dragOptions"
-        @mousedown.stop="() => {}"
-        data-test="dashboard-addpanel-config-value-mapping-drag"
-      >
-        <div
-          v-for="(mapping, index) in editColorBySeries"
-          :key="index"
-          class="draggable-row"
+    <div class="flex tw-justify-between tw-flex-col">
+      <div class="tw-mt-2 scrollable-content scroll tw-min-h-52">
+        <draggable
+          v-model="editColorBySeries"
+          :options="dragOptions"
+          @mousedown.stop="() => {}"
+          data-test="dashboard-addpanel-config-value-mapping-drag"
         >
-          <div class="draggable-handle tw-self-center">
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
-              class="q-mr-xs"
-              :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
-            />
-          </div>
-          <div class="draggable-content tw-flex tw-gap-x-6">
-         
-            <div
-              class="input-container tw-flex-1"
-            >
-             <CommonAutoComplete
-                v-model="mapping.value"
-                :items="seriesDataItems"
-                searchRegex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
-                label="Select Series"
-                color="input-border"
-                bg-color="input-bg"
-                stack-label
-                outlined
-                label-slot
-                style="top: none !important; margin-top: none !important; padding-top: 1px !important; width: auto !important;"
-                :value-replace-fn="selectColorBySeriesOption"
-              >
-                <template v-slot:label>
-                  <div class="row items-center all-pointer-events">
-                    Select series
-                  </div>
-                </template>
-              </CommonAutoComplete>
-
+          <div
+            v-for="(mapping, index) in editColorBySeries"
+            :key="index"
+            class="draggable-row"
+          >
+            <div class="draggable-handle tw-self-center">
+              <q-icon
+                name="drag_indicator"
+                color="grey-13"
+                class="q-mr-xs"
+                :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
+              />
             </div>
-
-            <!-- Color Picker -->
-            <div class="color-section tw-flex-1">
-              <div
-                v-if="mapping.color !== null"
-                class="tw-items-center tw-flex"
-              >
-                <q-input
-                  v-model="mapping.color"
-                  filled
-                  style="width: 90%"
-                  class="input-spacing"
-                  dense
+            <div class="draggable-content tw-flex tw-gap-x-6">
+              <div class="input-container tw-flex-1">
+                <CommonAutoComplete
+                  v-model="mapping.value"
+                  :items="seriesDataItems"
+                  searchRegex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
+                  label="Select Series"
+                  color="input-border"
+                  bg-color="input-bg"
+                  stack-label
+                  outlined
+                  label-slot
+                  style="
+                    top: none !important;
+                    margin-top: none !important;
+                    padding-top: 1px !important;
+                    width: auto !important;
+                  "
+                  :value-replace-fn="selectColorBySeriesOption"
                 >
-                  <template v-slot:append>
-                    <q-icon 
-                      name="colorize" 
-                      class="cursor-pointer"
-                      :ref="`colorize-icon-${index}`"
-                      @click="openColorPicker(index)"
-                    >
-                      <q-popup-proxy cover transition-show="scale">
-                        <q-color v-model="mapping.color" />
-                      </q-popup-proxy>
-                    </q-icon>
+                  <template v-slot:label>
+                    <div class="row items-center all-pointer-events">
+                      Select series
+                    </div>
                   </template>
-                </q-input>
-                <q-icon
-                  :name="outlinedCancel"
-                  style="width: 10%"
-                  class="cursor-pointer tw-align-middle"
-                  size="xs"
-                  title="Remove color"
-                  @click="removeColorByIndex(index)"
-                />
+                </CommonAutoComplete>
               </div>
-              <div v-else class="tw-w-full">
-                <q-btn
-                  label="Set color"
-                  no-caps
-                  flat
-                  dense
-                  class="tw-text-blue-700 tw-font-semibold tw-w-full"
-                  @click="handleSetColorClick(index)"
-                />
-              </div>
-            </div>
 
-            <!-- Delete Mapping -->
-            <q-btn
-              icon="close"
-              class="delete-btn"
-              dense
-              flat
-              round
-              @click="removecolorBySeriesByIndex(index)"
-              :data-test="`dashboard-addpanel-config-value-mapping-delete-btn-${index}`"
-            />
+              <!-- Color Picker -->
+              <div class="color-section tw-flex-1">
+                <div
+                  v-if="mapping.color !== null"
+                  class="tw-items-center tw-flex"
+                >
+                  <q-input
+                    v-model="mapping.color"
+                    filled
+                    style="width: 90%"
+                    class="input-spacing"
+                    dense
+                  >
+                    <template v-slot:append>
+                      <q-icon
+                        name="colorize"
+                        class="cursor-pointer"
+                        :ref="`colorize-icon-${index}`"
+                        @click="openColorPicker(index)"
+                      >
+                        <q-popup-proxy cover transition-show="scale">
+                          <q-color v-model="mapping.color" />
+                        </q-popup-proxy>
+                      </q-icon>
+                    </template>
+                  </q-input>
+                  <q-icon
+                    :name="outlinedCancel"
+                    style="width: 10%"
+                    class="cursor-pointer tw-align-middle"
+                    size="xs"
+                    title="Remove color"
+                    @click="removeColorByIndex(index)"
+                  />
+                </div>
+                <div v-else class="tw-w-full">
+                  <q-btn
+                    label="Set color"
+                    no-caps
+                    flat
+                    dense
+                    class="tw-text-blue-700 tw-font-semibold tw-w-full"
+                    @click="handleSetColorClick(index)"
+                  />
+                </div>
+              </div>
+
+              <!-- Delete Mapping -->
+              <q-btn
+                icon="close"
+                class="delete-btn"
+                dense
+                flat
+                round
+                @click="removecolorBySeriesByIndex(index)"
+                :data-test="`dashboard-addpanel-config-value-mapping-delete-btn-${index}`"
+              />
+            </div>
           </div>
-        </div>
-      </draggable>
-    </div>
+        </draggable>
+      </div>
       <!-- Footer Buttons -->
     </div>
-      <div class="flex justify-between tw-sticky tw-bottom-0 sticky-footer">
-        <q-btn
-          @click="addcolorBySeries"
-          label="+ Add a new color"
-          no-caps
-          outline
-          dense
-          data-test="dashboard-addpanel-config-value-mapping-add-btn"
-        />
-        <q-btn
-          @click="applycolorBySeries"
-          color="primary"
-          label="Save"
-          style="margin-right: 10px"
-          padding="5px 14px"
-          no-caps
-          dense
-          data-test="dashboard-addpanel-config-value-mapping-apply-btn"
-        />
+    <div class="flex justify-between tw-sticky tw-bottom-0 sticky-footer">
+      <q-btn
+        @click="addcolorBySeries"
+        label="+ Add a new color"
+        no-caps
+        outline
+        dense
+        data-test="dashboard-addpanel-config-value-mapping-add-btn"
+      />
+      <q-btn
+        @click="applycolorBySeries"
+        color="primary"
+        label="Save"
+        style="margin-right: 10px"
+        padding="5px 14px"
+        no-caps
+        dense
+        data-test="dashboard-addpanel-config-value-mapping-apply-btn"
+      />
     </div>
   </div>
 </template>
@@ -185,7 +186,6 @@ import { watch } from "vue";
 import { inject } from "vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 
-
 export default defineComponent({
   name: "colorBySeriesPopUp",
   components: { draggable: VueDraggableNext as any, CommonAutoComplete },
@@ -198,7 +198,7 @@ export default defineComponent({
   emits: ["close", "save"],
   setup(props: any, { emit }) {
     const { t } = useI18n();
-     const dashboardPanelDataPageKey = inject(
+    const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
     );
@@ -210,30 +210,37 @@ export default defineComponent({
       props.colorBySeries.mappings?.length
         ? props.colorBySeries.mappings.map((m: any) => ({
             ...m,
-            value: typeof m.value === 'string' ? m.value : '',
-            color: m.color || null
+            value: typeof m.value === "string" ? m.value : "",
+            color: m.color || null,
           }))
-        : [{ type: "value", value: "", text: "", color: null }]
+        : [{ type: "value", value: "", text: "", color: null }],
     );
     // Watcher to ensure mapping.value is always a string
 
-    watch(editColorBySeries, (newVal) => {
-      newVal.forEach((mapping: any) => {
-        if (typeof mapping.value !== "string") {
-          mapping.value = "";
-        }
-      });
-    }, { deep: true });
+    watch(
+      editColorBySeries,
+      (newVal) => {
+        newVal.forEach((mapping: any) => {
+          if (typeof mapping.value !== "string") {
+            mapping.value = "";
+          }
+        });
+      },
+      { deep: true },
+    );
 
     // Watch for changes in mapping.value to ensure proper reactivity
-    watch(editColorBySeries, (newVal) => {
-      newVal.forEach((mapping: any) => {
-        if (mapping.value === undefined || mapping.value === null) {
-          mapping.value = "";
-        }
-      });
-    }, { deep: true });
-
+    watch(
+      editColorBySeries,
+      (newVal) => {
+        newVal.forEach((mapping: any) => {
+          if (mapping.value === undefined || mapping.value === null) {
+            mapping.value = "";
+          }
+        });
+      },
+      { deep: true },
+    );
 
     const dragOptions = ref({
       animation: 200,
@@ -248,15 +255,21 @@ export default defineComponent({
       });
     };
 
-    {{console.log("props", props?.colorBySeries?.options)}}
-    const seriesDataItems = computed(() =>
-      props?.colorBySeries?.options?.series?.map((it: any) => ({
-        label: it.name,
-        value: it.name,
-      })) || []
+    {
+      {
+        console.log("props", props?.colorBySeries?.options);
+      }
+    }
+    const seriesDataItems = computed(
+      () =>
+        props?.colorBySeries?.options?.series
+          ?.map((it: any) => ({
+            label: it?.name,
+            value: it?.name,
+          }))
+          .filter((item: any) => item.label !== undefined) || [],
     );
 
-  
     const selectColorBySeriesOption = (option: any) => {
       return option.value || option.label || option;
     };
@@ -282,9 +295,9 @@ export default defineComponent({
 
     const applycolorBySeries = () => {
       // emit("save", editColorBySeries.value);
-       emit("save", {
+      emit("save", {
         ...props.colorBySeries,
-        mappings: editColorBySeries.value
+        mappings: editColorBySeries.value,
       });
     };
 
@@ -297,9 +310,11 @@ export default defineComponent({
       setColorByIndex(index);
       // Use nextTick to ensure DOM is updated before trying to focus
       nextTick(() => {
-        if (typeof window !== 'undefined' && window.document) {
+        if (typeof window !== "undefined" && window.document) {
           // Find the colorize icon and click it to open the color picker
-          const colorizeIcons = window.document.querySelectorAll('.color-section .q-icon[name="colorize"]');
+          const colorizeIcons = window.document.querySelectorAll(
+            '.color-section .q-icon[name="colorize"]',
+          );
           if (colorizeIcons && colorizeIcons[index]) {
             (colorizeIcons[index] as HTMLElement).click();
           }
@@ -327,7 +342,7 @@ export default defineComponent({
       seriesDataItems,
       handleSetColorClick,
       openColorPicker,
-      selectColorBySeriesOption
+      selectColorBySeriesOption,
     };
   },
 });
