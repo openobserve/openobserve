@@ -18,6 +18,7 @@ pub enum EventType {
     SubscriptionCreated,
     SubscriptionChanged,
     SubscriptionDeleted,
+    StreamCreated,
 }
 
 #[derive(Serialize, Deserialize, Debug, Hash)]
@@ -30,6 +31,8 @@ pub struct CloudEvent {
     pub event: EventType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subscription_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_name: Option<String>,
 }
 
 pub(super) static CLOUD_EVENT_QUEUE: Lazy<Mutex<Vec<CloudEvent>>> =
