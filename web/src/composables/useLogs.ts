@@ -359,7 +359,10 @@ const useLogs = () => {
   });
 
   const clearSearchObj = () => {
-    searchObj = reactive(Object.assign({}, JSON.parse(JSON.stringify(defaultObject))));
+    // Reset the existing searchObj instead of creating a new one
+    // This maintains the same reference so watchers continue to work
+    Object.assign(searchObj, JSON.parse(JSON.stringify(defaultObject)));
+    searchObj.organizationIdentifier = store.state?.selectedOrganization?.identifier;
   };
 
   /**
@@ -561,6 +564,7 @@ const useLogs = () => {
         let selectedStream: any[] = [];
 
         searchObj.data.stream.streamLists = [];
+
         let itemObj: {
           label: string;
           value: string;
@@ -627,19 +631,22 @@ const useLogs = () => {
 
   const getStreamList = async (selectStream: boolean = true) => {
     try {
-      // commented below function as we are doing resetStreamData from all the places where getStreamList is called
-      // resetStreamData();
-      const streamType = searchObj.data.stream.streamType || "logs";
-      const streamData: any = await getStreams(streamType, false);
-      searchObj.data.streamResults = {
-        ...streamData,
-      };
-      await nextTick();
-      await loadStreamLists(selectStream);
-      return;
+      return new Promise(async (resolve, reject) => {
+        // commented below function as we are doing resetStreamData from all the places where getStreamList is called
+        // resetStreamData();
+        const streamType = searchObj.data.stream.streamType || "logs";
+        const streamData: any = await getStreams(streamType, false);
+        searchObj.data.streamResults = {
+          ...streamData,
+        };
+        
+        await loadStreamLists(selectStream);
+        resolve(true);
+      });
     } catch (e: any) {
-      console.error("Error while getting stream list", e);
+      return Promise.reject(e);
     }
+      
   };
 
   // Helper functions for visualization config sync
@@ -1296,7 +1303,7 @@ const useLogs = () => {
 
           await searchService
             .partition({
-              org_identifier: searchObj.organizationIdentifier,
+              org_identifier: store.state?.selectedOrganization?.identifier,
               query: partitionQueryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
@@ -2217,7 +2224,7 @@ const useLogs = () => {
               searchService
               .schedule_search(
               {
-                org_identifier: searchObj.organizationIdentifier,
+                org_identifier: store.state?.selectedOrganization?.identifier,
                 query: queryReq,
                 page_type: searchObj.data.stream.streamType,
               },
@@ -2442,7 +2449,7 @@ const useLogs = () => {
         searchService
           .search(
             {
-              org_identifier: searchObj.organizationIdentifier,
+              org_identifier: store.state?.selectedOrganization?.identifier,
               query: queryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
@@ -2664,7 +2671,7 @@ const useLogs = () => {
         : "search";
       searchService[decideSearch](
           {
-            org_identifier: searchObj.organizationIdentifier,
+            org_identifier: store.state?.selectedOrganization?.identifier,
             query: queryReq,
             jobId: searchObj.meta.jobId ? searchObj.meta.jobId : "",
             page_type: searchObj.data.stream.streamType,
@@ -3126,7 +3133,7 @@ const useLogs = () => {
         searchService
           .search(
             {
-              org_identifier: searchObj.organizationIdentifier,
+              org_identifier: store.state?.selectedOrganization?.identifier,
               query: queryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
@@ -4473,7 +4480,7 @@ const useLogs = () => {
 
       searchService
         .search_around({
-          org_identifier: searchObj.organizationIdentifier,
+          org_identifier: store.state?.selectedOrganization?.identifier,
           index: streamName,
           key: obj.key,
           size: obj.size,
@@ -4647,6 +4654,7 @@ const useLogs = () => {
       }
       refreshData();
     } catch (e: any) {
+      console.log("Error while loading logs data", e);
       searchObj.loading = false;
     }
   };
@@ -4764,6 +4772,11 @@ const useLogs = () => {
       return;
     }
 
+    // set org_identifier
+    if (queryParams.org_identifier) {
+      searchObj.organizationIdentifier = queryParams.org_identifier;
+    }
+
     const date = {
       startTime: Number(queryParams.from),
       endTime: Number(queryParams.to),
@@ -4830,9 +4843,7 @@ const useLogs = () => {
     searchObj.meta.quickMode = queryParams.quick_mode == "false" ? false : true;
 
     if (queryParams.stream) {
-      searchObj.data.stream.selectedStream.push(
-        ...queryParams.stream.split(","),
-      );
+      searchObj.data.stream.selectedStream = queryParams.stream.split(",");
     }
 
     if (queryParams.show_histogram) {
@@ -5752,7 +5763,7 @@ const useLogs = () => {
       type,
       isPagination,
       traceId,
-      org_id: searchObj.organizationIdentifier,
+      org_id: store.state?.selectedOrganization?.identifier,
       meta,
     };
 
@@ -5888,7 +5899,7 @@ const useLogs = () => {
           stream_type: searchObj.data.stream.streamType,
           search_type: "ui",
           use_cache: (window as any).use_cache ?? true,
-          org_id: searchObj.organizationIdentifier,
+          org_id: store.state?.selectedOrganization?.identifier,
         },
       };
 
