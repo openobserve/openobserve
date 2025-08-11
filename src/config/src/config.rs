@@ -660,12 +660,34 @@ pub struct TCP {
     pub tcp_tls_ca_cert_path: String,
 }
 
+#[derive(PartialEq, Default)]
+pub enum RouteDispatchStrategy {
+    #[default]
+    Workload,
+    Random,
+    Other,
+}
+
+impl std::str::FromStr for RouteDispatchStrategy {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "random" => Ok(RouteDispatchStrategy::Random),
+            "workload" => Ok(RouteDispatchStrategy::default()),
+            _ => Ok(RouteDispatchStrategy::Other),
+        }
+    }
+}
+
 #[derive(EnvConfig, Default)]
 pub struct Route {
     #[env_config(name = "ZO_ROUTE_TIMEOUT", default = 600)]
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
+    #[env_config(name = "ZO_ROUTE_STRATEGY", parse, default = "workload")]
+    pub dispatch_strategy: RouteDispatchStrategy,
 }
 
 #[derive(EnvConfig, Default)]
@@ -1879,7 +1901,7 @@ pub struct Pipeline {
     pub max_connections: usize,
     #[env_config(
         name = "ZO_PIPELINE_BATCH_ENABLED",
-        default = true,
+        default = false,
         help = "Enable batching of entries before sending HTTP requests"
     )]
     pub batch_enabled: bool,
@@ -2020,6 +2042,11 @@ pub fn init() -> Config {
     // check limit config
     if let Err(e) = check_limit_config(&mut cfg) {
         panic!("limit config error: {e}");
+    }
+
+    // check route config
+    if let Err(e) = check_route_config(&cfg) {
+        panic!("route config error: {e}");
     }
 
     // check common config
@@ -2209,6 +2236,15 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.calculate_stats_step_limit = 1000000;
     }
 
+    Ok(())
+}
+
+fn check_route_config(cfg: &Config) -> Result<(), anyhow::Error> {
+    if cfg.route.dispatch_strategy == RouteDispatchStrategy::Other {
+        return Err(anyhow::anyhow!(
+            "You must set ZO_ROUTE_STRATEGY to one of: workload (default) or random."
+        ));
+    }
     Ok(())
 }
 
@@ -2977,5 +3013,15 @@ mod tests {
         assert_eq!(cfg.common.data_stream_dir, "/abc/".to_string());
         assert_eq!(cfg.common.data_dir, "/abc/".to_string());
         assert_eq!(cfg.common.base_uri, "/abc".to_string());
+
+        // Test route dispatch strategies
+        cfg.route.dispatch_strategy = RouteDispatchStrategy::Workload;
+        assert!(check_route_config(&cfg).is_ok());
+
+        cfg.route.dispatch_strategy = RouteDispatchStrategy::Random;
+        assert!(check_route_config(&cfg).is_ok());
+
+        cfg.route.dispatch_strategy = RouteDispatchStrategy::Other;
+        assert!(check_route_config(&cfg).is_err());
     }
 }

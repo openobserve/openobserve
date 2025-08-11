@@ -92,16 +92,22 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     // update metrics every 60 seconds
-    let mut interval = time::interval(time::Duration::from_secs(60));
-    interval.tick().await; // trigger the first run
     loop {
+        tokio::time::sleep(time::Duration::from_secs(60)).await;
         if let Err(e) = update_metadata_metrics().await {
             log::error!("Error update metadata metrics: {e}");
         }
         if let Err(e) = update_storage_metrics().await {
             log::error!("Error update storage metrics: {e}");
         }
-        interval.tick().await;
+        if config::cluster::LOCAL_NODE.is_ingester()
+            && let Err(e) = update_parquet_metrics().await
+        {
+            log::error!("Error update parquet metrics: {e}");
+        }
+        if let Err(e) = update_parquet_metadata_cache_metrics().await {
+            log::error!("Error update parquet metadata cache metrics: {}", e);
+        }
     }
 }
 
@@ -305,6 +311,14 @@ async fn update_storage_metrics() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn update_parquet_metrics() -> Result<(), anyhow::Error> {
+    // Call the ingester's parquet metrics collection function
+    ingester::collect_wal_parquet_metrics()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to collect parquet metrics: {}", e))?;
+    Ok(())
+}
+
 pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
     let exporter = O2MetricsExporter::new(
         O2MetricsClient::new(),
@@ -352,5 +366,19 @@ async fn traces_metrics_collect() -> Result<(), anyhow::Error> {
         );
     }
 
+    Ok(())
+}
+
+async fn update_parquet_metadata_cache_metrics() -> Result<(), anyhow::Error> {
+    let file_num =
+        crate::service::search::datafusion::storage::file_statistics_cache::GLOBAL_CACHE.len();
+    let mem_size = crate::service::search::datafusion::storage::file_statistics_cache::GLOBAL_CACHE
+        .memory_size();
+    metrics::QUERY_PARQUET_METADATA_CACHE_FILES
+        .with_label_values(&[])
+        .set(file_num as i64);
+    metrics::QUERY_PARQUET_METADATA_CACHE_USED_BYTES
+        .with_label_values(&[])
+        .set(mem_size as i64);
     Ok(())
 }
