@@ -897,8 +897,6 @@ export default defineComponent({
 
         restoreUrlQueryParams(dashboardPanelData);
 
-        await importSqlParser();
-
           if (isEnterpriseClusterEnabled()) {
             await getRegionInfo();
           }
