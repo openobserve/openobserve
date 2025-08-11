@@ -101,7 +101,7 @@ jobs:
     runs-on:
       labels: ubicloud-standard-8
     container:
-      image: mcr.microsoft.com/playwright:v1.50.0-jammy
+      image: mcr.microsoft.com/playwright:v1.50.0-noble
       options: --user root
     strategy:
       matrix:
@@ -171,6 +171,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-binary
+
+      - name: Inspect binary dependencies
+        run: ldd ./debug-binary/openobserve || true
 
       - name: Start OpenObserve
         run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
