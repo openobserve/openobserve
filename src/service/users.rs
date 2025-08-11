@@ -115,17 +115,17 @@ pub async fn post_user(
             {
                 use o2_openfga::{
                     authorizer::authz::{
-                        get_org_creation_tuples, get_service_account_creation_tuple,
-                        get_user_role_tuple, update_tuples,
+                        get_add_user_to_org_tuples, get_org_creation_tuples,
+                        get_service_account_creation_tuple, update_tuples,
                     },
                     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
                 };
                 if get_openfga_config().enabled {
                     let mut tuples = vec![];
-                    get_user_role_tuple(
-                        &usr_req.role.to_string(),
-                        &usr_req.email,
+                    get_add_user_to_org_tuples(
                         &org_id,
+                        &usr_req.email,
+                        &usr_req.role.to_string(),
                         &mut tuples,
                     );
                     if usr_req.role.eq(&UserRole::ServiceAccount) {
@@ -470,13 +470,13 @@ pub async fn add_user_to_org(
             {
                 use o2_openfga::{
                     authorizer::authz::{
-                        get_org_creation_tuples, get_user_role_tuple, update_tuples,
+                        get_add_user_to_org_tuples, get_org_creation_tuples, update_tuples,
                     },
                     meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
                 };
                 if get_openfga_config().enabled {
                     let mut tuples = vec![];
-                    get_user_role_tuple(&role.to_string(), email, org_id, &mut tuples);
+                    get_add_user_to_org_tuples(org_id, email, &role.to_string(), &mut tuples);
                     get_org_creation_tuples(
                         org_id,
                         &mut tuples,
