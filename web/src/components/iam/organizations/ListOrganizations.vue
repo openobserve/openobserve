@@ -140,7 +140,6 @@ export default defineComponent({
     AddUpdateOrganization,
     QTablePagination,
     NoData,
-    AddUpdateOrganization,
   },
   setup() {
     const store = useStore();
