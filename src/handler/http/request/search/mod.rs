@@ -57,7 +57,10 @@ use crate::{
     service::{
         db::enrichment_table,
         metadata::distinct_values::DISTINCT_STREAM_PREFIX,
-        search::{self::{self as SearchService, sql::visitor::pickup_where::pickup_where}, datafusion::plan::projections::get_result_schema},
+        search::{
+            self as SearchService, datafusion::plan::projections::get_result_schema,
+            sql::visitor::pickup_where::pickup_where,
+        },
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };

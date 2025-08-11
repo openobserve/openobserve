@@ -6931,7 +6931,6 @@ const useLogs = () => {
     clearSearchObj,
     setCommunicationMethod,
     hasAggregation,
-    processHttpHistogramResults
     loadVisualizeData,
     processHttpHistogramResults,
     getVisualizationConfig,
