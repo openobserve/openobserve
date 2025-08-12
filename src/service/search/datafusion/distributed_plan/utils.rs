@@ -56,9 +56,7 @@ pub async fn make_flight_client(
         .encode(&mut buf)
         .map_err(|e| Status::internal(format!("{e:?}")))?;
 
-    let mut request = tonic::Request::new(Ticket {
-        ticket: buf.clone().into(),
-    });
+    let mut request = tonic::Request::new(Ticket { ticket: buf.into() });
 
     let org_id: MetadataValue<_> = org_id
         .parse()

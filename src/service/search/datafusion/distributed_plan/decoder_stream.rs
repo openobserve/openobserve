@@ -134,7 +134,7 @@ impl FlightDecoderStream {
     fn create_stream_end_span(
         &self,
     ) -> std::result::Result<opentelemetry::trace::SpanContext, infra::errors::Error> {
-        let tracer = opentelemetry::global::tracer("FlightSenderStream");
+        let tracer = opentelemetry::global::tracer("FlightDecoderStream");
 
         let QueryContext {
             trace_id,
