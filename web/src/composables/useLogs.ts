@@ -631,22 +631,17 @@ const useLogs = () => {
 
   const getStreamList = async (selectStream: boolean = true) => {
     try {
-      return new Promise(async (resolve, reject) => {
-        // commented below function as we are doing resetStreamData from all the places where getStreamList is called
-        // resetStreamData();
-        const streamType = searchObj.data.stream.streamType || "logs";
-        const streamData: any = await getStreams(streamType, false);
-        searchObj.data.streamResults = {
-          ...streamData,
-        };
-        
-        await loadStreamLists(selectStream);
-        resolve(true);
-      });
-    } catch (e: any) {
-      return Promise.reject(e);
-    }
+      const streamType = searchObj.data.stream.streamType || "logs";
+      const streamData: any = await getStreams(streamType, false);
+      searchObj.data.streamResults = {
+        ...streamData,
+      };
       
+      await loadStreamLists(selectStream);
+      return true;
+    } catch (e: any) {
+      console.error("Error while getting stream list", e);
+    }
   };
 
   // Helper functions for visualization config sync
