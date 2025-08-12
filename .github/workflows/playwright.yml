@@ -75,7 +75,7 @@ jobs:
         uses: arduino/setup-protoc@v3
         with:
           version: "21.12"
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
 
@@ -90,7 +90,7 @@ jobs:
         run: cargo build --release --target x86_64-unknown-linux-gnu
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: debug-binary
           path: target/x86_64-unknown-linux-gnu/release/openobserve
@@ -178,7 +178,7 @@ jobs:
       - name: Create coverage json folder
         run: mkdir -p tests/ui-testing/.nyc_output
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v4
         with:
           node-version: lts/*
       - name: Install dependencies and run ui-tests
@@ -207,7 +207,7 @@ jobs:
           echo "SANITIZED_FILENAME=$SANITIZED_FILENAME" >> $GITHUB_ENV
 
       - name: Upload Coverage Data
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-coverage-${{ env.SANITIZED_FILENAME }}
           path: tests/ui-testing/.nyc_output
@@ -216,7 +216,7 @@ jobs:
       - name: Generate Coverage Report
         run: cd tests/ui-testing && npx nyc report
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report
@@ -256,7 +256,7 @@ jobs:
         run: cd tests/ui-testing && npm ci && npx nyc report
 
       - name: Upload Coverage Report
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: tests/ui-testing/coverage-report
