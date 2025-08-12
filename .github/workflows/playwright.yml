@@ -165,6 +165,10 @@ jobs:
 
       - name: Download artifacts
         uses: actions/download-artifact@v5
+        with:
+          name: debug-binary
+          path: debug-binary
+          if-no-files-found: ignore
 
       - name: Start OpenObserve
         run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
