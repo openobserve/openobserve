@@ -230,6 +230,13 @@ pub struct Response {
     pub work_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_by: Option<OrderBy>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub order_by_metadata: Vec<(String, OrderBy)>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub converted_histogram_query: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_histogram_eligible: Option<bool>,
 }
 
 /// Iterator for Streaming response of search `Response`
@@ -394,6 +401,9 @@ impl Response {
             result_cache_ratio: 0,
             work_group: None,
             order_by: None,
+            order_by_metadata: Vec::new(),
+            converted_histogram_query: None,
+            is_histogram_eligible: None,
         }
     }
 
@@ -494,6 +504,10 @@ impl Response {
     pub fn set_result_cache_ratio(&mut self, val: usize) {
         self.result_cache_ratio = val;
     }
+
+    pub fn set_order_by_metadata(&mut self, val: Vec<(String, OrderBy)>) {
+        self.order_by_metadata = val;
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
@@ -513,6 +527,8 @@ pub struct SearchPartitionRequest {
     pub streaming_output: bool,
     #[serde(default)]
     pub histogram_interval: i64,
+    #[serde(default)]
+    pub search_type: Option<SearchEventType>,
 }
 
 impl SearchPartitionRequest {
@@ -546,6 +562,7 @@ impl From<&Request> for SearchPartitionRequest {
             query_fn: req.query.query_fn.clone(),
             streaming_output: req.query.streaming_output,
             histogram_interval: req.query.histogram_interval,
+            search_type: req.search_type,
         }
     }
 }
@@ -566,6 +583,8 @@ pub struct SearchPartitionResponse {
     pub streaming_output: bool,
     pub streaming_aggs: bool,
     pub streaming_id: Option<String>,
+    #[serde(default)]
+    pub is_histogram_eligible: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
@@ -886,6 +905,7 @@ pub enum SearchEventType {
     RUM,
     DerivedStream,
     SearchJob,
+    Download,
 }
 
 impl<'de> Deserialize<'de> for SearchEventType {
@@ -926,6 +946,7 @@ impl std::fmt::Display for SearchEventType {
             Self::RUM => write!(f, "rum"),
             Self::DerivedStream => write!(f, "derived_stream"),
             Self::SearchJob => write!(f, "search_job"),
+            Self::Download => write!(f, "download"),
         }
     }
 }
@@ -943,6 +964,7 @@ impl TryFrom<&str> for SearchEventType {
             "rum" => Ok(Self::RUM),
             "derived_stream" | "derivedstream" => Ok(Self::DerivedStream),
             "search_job" | "searchjob" => Ok(Self::SearchJob),
+            "download" => Ok(Self::Download),
             _ => Err(format!(
                 "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`"
             )),
@@ -1468,6 +1490,7 @@ mod tests {
             query_fn: Some("fn1".to_string()),
             streaming_output: false,
             histogram_interval: 0,
+            search_type: Some(SearchEventType::UI),
         };
 
         req.decode().unwrap();
@@ -2077,6 +2100,7 @@ mod tests {
             streaming_output: true,
             streaming_aggs: false,
             streaming_id: Some("stream123".to_string()),
+            is_histogram_eligible: false,
         };
 
         response
@@ -2406,6 +2430,40 @@ impl StreamResponses {
                 let streaming_aggs = *streaming_aggs;
                 let time_offset = time_offset.clone();
                 let streaming_id = streaming_id.clone();
+
+                if results.hits.is_empty() {
+                    // Send metadata first
+                    let metadata = StreamResponses::SearchResponseMetadata {
+                        results: results.clone(),
+                        streaming_aggs,
+                        time_offset: time_offset.clone(),
+                        streaming_id: streaming_id.clone(),
+                    };
+                    let metadata_data = serde_json::to_string(&metadata).unwrap_or_else(|_| {
+                        log::error!("Failed to serialize metadata: {:?}", metadata);
+                        String::new()
+                    });
+                    let metadata_bytes = format_event("search_response_metadata", &metadata_data);
+
+                    // Send empty hits
+                    let hits = StreamResponses::SearchResponseHits {
+                        hits: results.hits.clone(),
+                    };
+                    let hits_data = serde_json::to_string(&hits).unwrap_or_else(|_| {
+                        log::error!("Failed to serialize hits: {:?}", hits);
+                        String::new()
+                    });
+                    let hits_bytes = format_event("search_response_hits", &hits_data);
+
+                    // Return both chunks in sequence
+                    let chunks_iter =
+                        std::iter::once(Ok(metadata_bytes)).chain(std::iter::once(Ok(hits_bytes)));
+
+                    return StreamResponseChunks {
+                        chunks_iter: Some(Box::new(chunks_iter)),
+                        single_chunk: None,
+                    };
+                }
 
                 // Create an iterator that maps each chunk to a formatted BytesImpl
                 let chunks_iter = iterator.map(move |chunk| {

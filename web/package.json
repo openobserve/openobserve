@@ -14,14 +14,15 @@
     "preview": "vite preview",
     "copy": "cd dist && mkdir src && cd src && mkdir assets && cd .. && cd .. && cp -r src/assets/* dist/src/assets/",
     "test:unit": "vitest --environment jsdom --root src/",
-    "test:unit:coverage": "vitest --coverage",
+    "test:unit:coverage": "vitest --coverage --run",
+    "test:coverage:check": "./coverage.sh check",
     "test:e2e": "start-server-and-test preview :4173 'cypress run --e2e'",
     "test:e2e:dev": "start-server-and-test 'vite dev --port 4173' :4173 'cypress open --e2e'",
     "build-only": "vite build",
     "build-only-alpha1": "vite build --mode=alpha1",
     "build-only-cloud-prod": "vite build --mode=production",
     "type-check": "vue-tsc --noEmit -p tsconfig.vitest.json --composite false",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",
@@ -67,6 +68,7 @@
     "highlight.js": "^11.11.1",
     "js-beautify": "^1.15.4",
     "js-cookie": "^3.0.5",
+    "json-2-csv": "^5.5.9",
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "lodash-es": "^4.17.21",

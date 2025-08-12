@@ -56,9 +56,7 @@ pub async fn token_validator(
         &get_dex_config().client_id,
         false,
         true,
-    )
-    .await
-    {
+    ) {
         Ok(res) => {
             let user_id = &res.0.user_email;
             if res.0.is_valid {
@@ -152,9 +150,7 @@ pub async fn get_user_name_from_token(auth_str: &str) -> Option<String> {
         &get_dex_config().client_id,
         false,
         true,
-    )
-    .await
-    {
+    ) {
         Ok(res) => {
             if res.0.is_valid {
                 Some(res.0.user_email)

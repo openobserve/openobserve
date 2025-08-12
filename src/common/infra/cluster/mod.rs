@@ -101,6 +101,7 @@ pub async fn get_node_from_consistent_hash(
     role: &Role,
     group: Option<RoleGroup>,
 ) -> Option<String> {
+    let hash = config::utils::hash::gxhash::new().sum64(key);
     let nodes = match role {
         Role::Querier => match group {
             Some(RoleGroup::Interactive) => QUERIER_INTERACTIVE_CONSISTENT_HASH.read().await,
@@ -114,7 +115,6 @@ pub async fn get_node_from_consistent_hash(
     if nodes.is_empty() {
         return None;
     }
-    let hash = config::utils::hash::gxhash::new().sum64(key);
     let mut iter = nodes.lower_bound(Bound::Included(&hash));
     if let Some((_, name)) = iter.next() {
         return Some(name.clone());
@@ -331,9 +331,7 @@ async fn watch_node_list() -> Result<()> {
                     Err(e) => {
                         let value_str = String::from_utf8_lossy(ev.value.as_ref().unwrap());
                         log::error!(
-                            "[CLUSTER] watch_node_list: error parsing node: {}, payload: {}",
-                            e,
-                            value_str
+                            "[CLUSTER] watch_node_list: error parsing node: {e}, payload: {value_str}"
                         );
                         continue;
                     }

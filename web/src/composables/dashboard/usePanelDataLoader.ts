@@ -68,6 +68,9 @@ export const usePanelDataLoader = (
   dashboardId: any,
   folderId: any,
   reportId: any,
+  runId?: any,
+  tabId?: any,
+  tabName?: any,
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -443,6 +446,8 @@ export const usePanelDataLoader = (
             },
             page_type: pageType,
             traceparent,
+            searchType: "dashboards",
+
           }),
         abortControllerRef.signal,
       );
@@ -531,6 +536,11 @@ export const usePanelDataLoader = (
                   traceparent,
                   dashboard_id: dashboardId?.value,
                   folder_id: folderId?.value,
+                  panel_id: panelSchema.value.id,
+                  panel_name: panelSchema.value.title,
+                  run_id: runId?.value,
+                  tab_id: tabId?.value,
+                  tab_name: tabName?.value,
                 },
                 searchType.value ?? "dashboards",
               ),
@@ -851,6 +861,11 @@ export const usePanelDataLoader = (
         use_cache: (window as any).use_cache ?? true,
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,
+        panel_id: panelSchema.value.id,
+        panel_name: panelSchema.value.title,
+        run_id: runId?.value,
+        tab_id: tabId?.value,
+        tab_name: tabName?.value,
         fallback_order_by_col: getFallbackOrderByCol(),
       },
     });
@@ -971,6 +986,11 @@ export const usePanelDataLoader = (
         pageType,
         meta: {
           currentQueryIndex,
+          panel_id: panelSchema.value.id,
+          panel_name: panelSchema.value.title,
+          run_id: runId?.value,
+          tab_id: tabId?.value,
+          tab_name: tabName?.value,
         },
       };
 
@@ -1040,6 +1060,11 @@ export const usePanelDataLoader = (
           currentQueryIndex,
           dashboard_id: dashboardId?.value,
           folder_id: folderId?.value,
+          panel_id: panelSchema.value.id,
+          panel_name: panelSchema.value.title,
+          run_id: runId?.value,
+          tab_id: tabId?.value,
+          tab_name: tabName?.value,
           fallback_order_by_col: getFallbackOrderByCol(),
         },
       };
@@ -1230,6 +1255,13 @@ export const usePanelDataLoader = (
                     start_time: startISOTimestamp,
                     end_time: endISOTimestamp,
                     step: panelSchema.value.config.step_value ?? "0",
+                    dashboard_id: dashboardId?.value,
+                    folder_id: folderId?.value,
+                    panel_id: panelSchema.value.id,
+                    panel_name: panelSchema.value.title,
+                    run_id: runId?.value,
+                    tab_id: tabId?.value,
+                    tab_name: tabName?.value,
                   }),
                 abortController.signal,
               );
@@ -1397,6 +1429,11 @@ export const usePanelDataLoader = (
                           traceparent,
                           dashboard_id: dashboardId?.value,
                           folder_id: folderId?.value,
+                          panel_id: panelSchema.value.id,
+                          panel_name: panelSchema.value.title,
+                          run_id: runId?.value,
+                          tab_id: tabId?.value,
+                          tab_name: tabName?.value,
                         },
                         searchType.value ?? "dashboards",
                       ),

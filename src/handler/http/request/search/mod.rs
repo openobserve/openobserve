@@ -37,13 +37,14 @@ use utils::check_stream_permissions;
 use {crate::service::organization::is_org_in_free_trial_period, actix_web::http::StatusCode};
 
 #[cfg(feature = "enterprise")]
-use crate::service::search::sql::get_cipher_key_names;
+use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::{
             functions,
             http::{
+                get_dashboard_info_from_request, get_is_ui_histogram_from_request,
                 get_or_create_trace_id, get_search_event_context_from_request,
                 get_search_type_from_request, get_stream_type_from_request,
                 get_use_cache_from_request, get_work_group,
@@ -54,7 +55,7 @@ use crate::{
     service::{
         db::enrichment_table,
         metadata::distinct_values::DISTINCT_STREAM_PREFIX,
-        search as SearchService,
+        search::{self as SearchService, sql::visitor::pickup_where::pickup_where},
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
@@ -84,6 +85,10 @@ async fn can_use_distinct_stream(
     let stream_settings = infra::schema::get_settings(org, stream_name, stream_type)
         .await
         .unwrap_or_default();
+
+    if !stream_settings.enable_distinct_fields {
+        return false;
+    }
 
     // all fields which are requested must be in the distinct stream
     let all_fields_distinct = fields.iter().all(|f| {
@@ -157,6 +162,7 @@ async fn can_use_distinct_stream(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
     ),
     request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
         "query": {
@@ -244,6 +250,9 @@ pub async fn search(
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let is_ui_histogram = get_is_ui_histogram_from_request(&query);
+
+    let dashboard_info = get_dashboard_info_from_request(&query);
 
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
@@ -258,6 +267,32 @@ pub async fn search(
     };
     req.use_cache = get_use_cache_from_request(&query);
 
+    // get stream name
+    let stream_names = match resolve_stream_names(&req.query.sql) {
+        Ok(v) => v.clone(),
+        Err(e) => {
+            return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
+        }
+    };
+
+    // Handle histogram data for UI
+    let mut converted_histogram_query: Option<String> = None;
+    if is_ui_histogram {
+        // Convert the original query to a histogram query
+        match crate::service::search::sql::histogram::convert_to_histogram_query(
+            &req.query.sql,
+            &stream_names,
+        ) {
+            Ok(histogram_query) => {
+                req.query.sql = histogram_query;
+                converted_histogram_query = Some(req.query.sql.clone());
+            }
+            Err(e) => {
+                return Ok(map_error_to_http_response(&(e), Some(trace_id)));
+            }
+        }
+    }
+
     // set search event type
     if req.search_type.is_none() {
         req.search_type = match get_search_type_from_request(&query) {
@@ -271,14 +306,6 @@ pub async fn search(
             .as_ref()
             .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
     }
-
-    // get stream name
-    let stream_names = match resolve_stream_names(&req.query.sql) {
-        Ok(v) => v.clone(),
-        Err(e) => {
-            return Ok(map_error_to_http_response(&(e.into()), Some(trace_id)));
-        }
-    };
 
     // get stream settings
     for stream_name in stream_names {
@@ -374,12 +401,14 @@ pub async fn search(
         &req,
         range_error,
         false,
+        dashboard_info,
     )
     .instrument(http_span)
     .await;
     match res {
         Ok(mut res) => {
             res.set_took(start.elapsed().as_millis() as usize);
+            res.converted_histogram_query = converted_histogram_query;
             Ok(HttpResponse::Ok().json(res))
         }
         Err(err) => {
@@ -805,14 +834,13 @@ pub async fn build_search_request_per_field(
                     .any(|fn_name| decoded_sql.contains(&format!("{fn_name}(")));
 
                 // pick up where clause from sql
-                let sql_where_from_query =
-                    match SearchService::sql::pickup_where(&decoded_sql, None) {
-                        Ok(Some(v)) => format!("WHERE {v}"),
-                        Ok(None) => "".to_string(),
-                        Err(e) => {
-                            return Err(Error::other(e));
-                        }
-                    };
+                let sql_where_from_query = match pickup_where(&decoded_sql) {
+                    Ok(Some(v)) => format!("WHERE {v}"),
+                    Ok(None) => "".to_string(),
+                    Err(e) => {
+                        return Err(Error::other(e));
+                    }
+                };
                 let can_use_distinct_stream = can_use_distinct_stream(
                     org_id,
                     stream_name,
@@ -993,7 +1021,7 @@ async fn values_v1(
     };
 
     // pick up where clause from sql
-    let where_str = match SearchService::sql::pickup_where(&query_sql, None) {
+    let where_str = match pickup_where(&query_sql) {
         Ok(v) => v.unwrap_or_default(),
         Err(e) => {
             return Err(Error::other(e));
@@ -1156,6 +1184,7 @@ async fn values_v1(
             &req,
             "".to_string(),
             false,
+            None,
         )
         .instrument(http_span)
         .await;
@@ -1267,6 +1296,7 @@ async fn values_v1(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("search_type" = String, Query, description = "query param with value 'ui', 'dashboards', 'reports', 'alerts' , 'rum' or 'values' allowed"),
     ),
     request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
         "sql": "select * from k8s ",
@@ -1313,6 +1343,9 @@ pub async fn search_partition(
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let search_type = get_search_type_from_request(&query).map_or(SearchEventType::Other, |opt| {
+        opt.unwrap_or(SearchEventType::Other)
+    });
 
     #[cfg(feature = "cloud")]
     {
@@ -1337,6 +1370,7 @@ pub async fn search_partition(
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
+    req.search_type = Some(search_type);
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.sql) {
         req.sql = sql;
     }

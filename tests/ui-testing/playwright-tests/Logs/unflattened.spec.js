@@ -1,7 +1,9 @@
 import { test, expect } from "../baseFixtures.js";
+// pageManager.commonActions is used for streaming flip; no direct import needed
 import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from '../../pages/page-manager.js';
+// (unused CommonActions import removed)
 
 test.describe.configure({ mode: "parallel" });
 const streamName = `stream${Date.now()}`;
@@ -103,6 +105,10 @@ test.describe("Unflattened testcases", () => {
     const allsearch = page.waitForResponse("**/api/default/_search**");
     await pageManager.logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
+  });
+
+  test.afterEach(async ({ page }) => {
+    await pageManager.commonActions.flipStreaming();
   });
 
   test("stream to toggle store original data toggle and display o2 id", async ({ page }) => {

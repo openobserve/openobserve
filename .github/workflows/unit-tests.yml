@@ -6,11 +6,15 @@ on:
       - "main"
     paths-ignore:
       - "**.md"
+      - "**.yml"
+      - "**.yaml"
   pull_request:
     branches:
       - "*"
     paths-ignore:
       - "**.md"
+      - "**.yml"
+      - "**.yaml"
 
 env:
   COLUMNS: 150
@@ -40,12 +44,19 @@ jobs:
 
     steps:
       - name: Clone the current repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: Check if API code has changes and skip if none
+        run: |
+          if [[ -n "${{ github.event.before }}" ]] && ! git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^src/"; then
+            echo "API code hasn't changed, skipping unit tests"
+            exit 0
+          fi
 
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-03-02
+          toolchain: nightly-2025-05-20
           targets: x86_64-unknown-linux-gnu
       - uses: taiki-e/install-action@v2
         with:
@@ -63,6 +74,9 @@ jobs:
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
+
+      - name: Check code formatting
+        run: cargo fmt --all -- --check
 
       - name: Setup cargo config
         run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
@@ -103,3 +117,32 @@ jobs:
 
           # finally print the coverage data
           ./coverage.sh check
+
+  ui_unit_tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Check if frontend code has changes and skip if none
+        run: |
+          if [[ -n "${{ github.event.before }}" ]] && ! git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^web/"; then
+            echo "Frontend code hasn't changed, skipping frontend tests"
+            exit 0
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Run frontend unit tests with coverage and check thresholds
+        working-directory: web
+        run: ./coverage.sh check

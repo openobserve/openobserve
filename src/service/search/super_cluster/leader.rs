@@ -44,7 +44,7 @@ use crate::service::search::{
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     request::Request,
     sql::Sql,
-    utils::ScanStatsVisitor,
+    utils::{AsyncDefer, ScanStatsVisitor},
 };
 
 #[async_recursion]
@@ -112,6 +112,15 @@ pub async fn search(
         .with_label_values(&[&sql.org_id])
         .inc();
 
+    let org_id_move = sql.org_id.clone();
+    let _defer = AsyncDefer::new({
+        async move {
+            metrics::QUERY_RUNNING_NUMS
+                .with_label_values(&[&org_id_move])
+                .dec();
+        }
+    });
+
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     if super::super::SEARCH_SERVER
         .insert_sender(trace_id, abort_sender, true)
@@ -142,9 +151,8 @@ pub async fn search(
     );
 
     let trace_id_move = trace_id.to_string();
-    let follower_nodes = nodes.clone();
     let query_task = DATAFUSION_RUNTIME.spawn(async move {
-        run_datafusion(trace_id_move, req, sql, follower_nodes)
+        run_datafusion(trace_id_move, req, sql, nodes)
             .instrument(datafusion_span)
             .await
     });
@@ -172,6 +180,8 @@ pub async fn search(
         }
     };
 
+    drop(_defer);
+
     let data = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err),
@@ -183,10 +193,6 @@ pub async fn search(
             return Err(e);
         }
     };
-
-    let main_trace_id = trace_id.split("-").next().unwrap();
-    let stats = super::super::utils::collect_scan_stats(&nodes, main_trace_id, true).await;
-    scan_stats.add(&stats);
 
     log::info!("[trace_id {trace_id}] super cluster leader: search finished");
 

@@ -188,16 +188,25 @@ const useHttpStreaming = () => {
       ? (window as any).use_cache
       : true;
 
-      //TODO OK: Create method to get the url based on the type
-      if(type === "search" || type === "histogram" || type === "pageCount") {
-        url = `/_search_stream?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
-        if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
-        if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
-        if (meta?.fallback_order_by_col) url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
-      } else if(type === "values") {
-        const fieldsString = meta?.fields.join(",");
-        url = `/_values_stream`
-      }
+    //TODO OK: Create method to get the url based on the type
+    if (type === "search" || type === "histogram" || type === "pageCount") {
+      url = `/_search_stream?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
+      if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
+      if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
+      if (meta?.panel_id) url += `&panel_id=${meta?.panel_id}`;
+      if (meta?.panel_name)
+        url += `&panel_name=${encodeURIComponent(meta?.panel_name)}`;
+      if (meta?.run_id) url += `&run_id=${meta?.run_id}`;
+      if (meta?.tab_id) url += `&tab_id=${meta?.tab_id}`;
+      if (meta?.tab_name)
+        url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
+      if (meta?.fallback_order_by_col)
+        url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
+      if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
+    } else if (type === "values") {
+      const fieldsString = meta?.fields.join(",");
+      url = `/_values_stream`;
+    }
 
     url = `${store.state.API_ENDPOINT}/api/${org_id}` + url;
 

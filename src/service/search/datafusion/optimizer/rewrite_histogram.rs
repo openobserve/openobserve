@@ -32,7 +32,8 @@ use datafusion::{
 };
 
 use crate::service::search::{
-    datafusion::udf::histogram_udf::HISTOGRAM_UDF_NAME, sql::generate_histogram_interval,
+    datafusion::udf::histogram_udf::HISTOGRAM_UDF_NAME,
+    sql::visitor::histogram_interval::generate_histogram_interval,
 };
 
 /// Optimization rule that rewrite histogram to date_bin()
@@ -132,11 +133,11 @@ impl TreeNodeRewriter for HistogramToDatebin {
                                 .to_string()
                         };
                         cast(
-                            Expr::Literal(ScalarValue::from(interval)),
+                            Expr::Literal(ScalarValue::from(interval), None),
                             DataType::Interval(IntervalUnit::MonthDayNano),
                         )
                     } else if args.len() == 2 {
-                        if let Expr::Literal(ScalarValue::Utf8(_)) = &args[1] {
+                        if let Expr::Literal(ScalarValue::Utf8(_), _) = &args[1] {
                             cast(
                                 args[1].clone(),
                                 DataType::Interval(IntervalUnit::MonthDayNano),
@@ -161,7 +162,10 @@ impl TreeNodeRewriter for HistogramToDatebin {
                     // construct optional origin-timestamp
                     let arg3 = Expr::ScalarFunction(ScalarFunction {
                         func: Arc::new(ScalarUDF::from(ToTimestampFunc::new())),
-                        args: vec![Expr::Literal(ScalarValue::from("2001-01-01T00:00:00"))],
+                        args: vec![Expr::Literal(
+                            ScalarValue::from("2001-01-01T00:00:00"),
+                            None,
+                        )],
                     });
                     return Ok(Transformed::yes(Expr::ScalarFunction(ScalarFunction {
                         func: new_func,

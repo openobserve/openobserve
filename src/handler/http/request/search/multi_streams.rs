@@ -21,7 +21,7 @@ use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
         function::{RESULT_ARRAY, VRLResultResolver},
-        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE},
+        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE, SearchEventType},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -36,15 +36,16 @@ use tracing::{Instrument, Span};
 use {crate::service::organization::is_org_in_free_trial_period, actix_web::http::StatusCode};
 
 #[cfg(feature = "enterprise")]
-use crate::service::search::sql::get_cipher_key_names;
+use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::{
             functions,
             http::{
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
+                get_dashboard_info_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request,
             },
             stream::get_settings_max_query_range,
         },
@@ -158,6 +159,8 @@ pub async fn search_multi(
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+
+    let dashboard_info = get_dashboard_info_from_request(&query);
 
     let search_type = match get_search_type_from_request(&query) {
         Ok(v) => v,
@@ -351,6 +354,7 @@ pub async fn search_multi(
             &req,
             range_error.clone(),
             false,
+            dashboard_info.clone(),
         )
         .instrument(http_span.clone())
         .await;
@@ -630,7 +634,10 @@ pub async fn search_multi(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchPartitionMulti",
-    params(("org_id" = String, Path, description = "Organization name")),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("search_type" = String, Query, description = "query param with value 'ui', 'dashboards', 'reports', 'alerts' , 'rum' or 'values' allowed"),
+    ),
     request_body(
         content = SearchRequest,
         description = "Search query",
@@ -700,6 +707,9 @@ pub async fn _search_partition_multi(
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let search_type = get_search_type_from_request(&query).map_or(SearchEventType::Other, |opt| {
+        opt.unwrap_or(SearchEventType::Other)
+    });
 
     #[cfg(feature = "cloud")]
     {
@@ -727,8 +737,14 @@ pub async fn _search_partition_multi(
         }
     };
 
-    let search_fut =
-        SearchService::search_partition_multi(&trace_id, &org_id, &user_id, stream_type, &req);
+    let search_fut = SearchService::search_partition_multi(
+        &trace_id,
+        &org_id,
+        &user_id,
+        stream_type,
+        search_type,
+        &req,
+    );
     let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         search_fut.instrument(http_span).await
     } else {
@@ -939,4 +955,311 @@ pub async fn around_multi(
         b_ts.cmp(&a_ts)
     });
     Ok(HttpResponse::Ok().json(multi_resp))
+}
+
+#[cfg(test)]
+mod tests {
+
+    use chrono::Utc;
+    use config::meta::search::{MultiSearchPartitionRequest, MultiStreamRequest};
+
+    #[test]
+    fn test_multi_stream_request_structure() {
+        let request = MultiStreamRequest {
+            sql: vec![config::meta::search::SqlQuery {
+                sql: "SELECT * FROM logs".to_string(),
+                start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                end_time: Some(Utc::now().timestamp_micros()),
+                query_fn: None,
+                is_old_format: false,
+            }],
+            encoding: config::meta::search::RequestEncoding::Empty,
+            timeout: 0,
+            from: 0,
+            size: 10,
+            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            end_time: Utc::now().timestamp_micros(),
+            sort_by: None,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: None,
+            skip_wal: false,
+            regions: vec![],
+            clusters: vec![],
+            search_type: None,
+            search_event_context: None,
+            index_type: "".to_string(),
+            per_query_response: false,
+        };
+
+        assert!(!request.sql.is_empty());
+        assert_eq!(request.size, 10);
+        assert_eq!(request.from, 0);
+    }
+
+    #[test]
+    fn test_multi_search_partition_request_structure() {
+        let request = MultiSearchPartitionRequest {
+            sql: vec!["SELECT * FROM logs".to_string()],
+            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            end_time: Utc::now().timestamp_micros(),
+            encoding: config::meta::search::RequestEncoding::Empty,
+            regions: vec![],
+            clusters: vec![],
+            query_fn: None,
+            streaming_output: false,
+            histogram_interval: 0,
+        };
+
+        assert!(!request.sql.is_empty());
+        assert_eq!(request.sql[0], "SELECT * FROM logs");
+    }
+
+    #[test]
+    fn test_search_multi_invalid_time_range() {
+        let request = MultiStreamRequest {
+            sql: vec![config::meta::search::SqlQuery {
+                sql: "SELECT * FROM logs".to_string(),
+                start_time: Some(Utc::now().timestamp_micros()),
+                end_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                query_fn: None,
+                is_old_format: false,
+            }],
+            encoding: config::meta::search::RequestEncoding::Empty,
+            timeout: 0,
+            from: 0,
+            size: 10,
+            start_time: Utc::now().timestamp_micros(),
+            end_time: Utc::now().timestamp_micros() - 3600_000_000,
+            sort_by: None,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: None,
+            skip_wal: false,
+            regions: vec![],
+            clusters: vec![],
+            search_type: None,
+            search_event_context: None,
+            index_type: "".to_string(),
+            per_query_response: false,
+        };
+
+        // Test that invalid time range is detected
+        assert!(request.start_time > request.end_time);
+    }
+
+    #[test]
+    fn test_search_multi_empty_queries() {
+        let request = MultiStreamRequest {
+            sql: vec![],
+            encoding: config::meta::search::RequestEncoding::Empty,
+            timeout: 0,
+            from: 0,
+            size: 10,
+            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            end_time: Utc::now().timestamp_micros(),
+            sort_by: None,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: None,
+            skip_wal: false,
+            regions: vec![],
+            clusters: vec![],
+            search_type: None,
+            search_event_context: None,
+            index_type: "".to_string(),
+            per_query_response: false,
+        };
+
+        assert!(request.sql.is_empty());
+    }
+
+    #[test]
+    fn test_search_multi_with_vrl_function() {
+        let request = MultiStreamRequest {
+            sql: vec![config::meta::search::SqlQuery {
+                sql: "SELECT * FROM logs".to_string(),
+                start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                end_time: Some(Utc::now().timestamp_micros()),
+                query_fn: Some("base64_encoded_vrl_function".to_string()),
+                is_old_format: false,
+            }],
+            encoding: config::meta::search::RequestEncoding::Empty,
+            timeout: 0,
+            from: 0,
+            size: 10,
+            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            end_time: Utc::now().timestamp_micros(),
+            sort_by: None,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: Some("base64_encoded_vrl_function".to_string()),
+            skip_wal: false,
+            regions: vec![],
+            clusters: vec![],
+            search_type: None,
+            search_event_context: None,
+            index_type: "".to_string(),
+            per_query_response: false,
+        };
+
+        assert!(request.query_fn.is_some());
+        assert!(request.sql[0].query_fn.is_some());
+    }
+
+    #[test]
+    fn test_search_multi_per_query_response() {
+        let request = MultiStreamRequest {
+            sql: vec![config::meta::search::SqlQuery {
+                sql: "SELECT * FROM logs".to_string(),
+                start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                end_time: Some(Utc::now().timestamp_micros()),
+                query_fn: None,
+                is_old_format: false,
+            }],
+            encoding: config::meta::search::RequestEncoding::Empty,
+            timeout: 0,
+            from: 0,
+            size: 10,
+            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            end_time: Utc::now().timestamp_micros(),
+            sort_by: None,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: None,
+            skip_wal: false,
+            regions: vec![],
+            clusters: vec![],
+            search_type: None,
+            search_event_context: None,
+            index_type: "".to_string(),
+            per_query_response: true,
+        };
+
+        assert!(request.per_query_response);
+    }
+
+    #[test]
+    fn test_search_multi_with_multiple_queries() {
+        let request = MultiStreamRequest {
+            sql: vec![
+                config::meta::search::SqlQuery {
+                    sql: "SELECT * FROM logs".to_string(),
+                    start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                    end_time: Some(Utc::now().timestamp_micros()),
+                    query_fn: None,
+                    is_old_format: false,
+                },
+                config::meta::search::SqlQuery {
+                    sql: "SELECT * FROM metrics".to_string(),
+                    start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                    end_time: Some(Utc::now().timestamp_micros()),
+                    query_fn: None,
+                    is_old_format: false,
+                },
+            ],
+            encoding: config::meta::search::RequestEncoding::Empty,
+            timeout: 0,
+            from: 0,
+            size: 10,
+            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            end_time: Utc::now().timestamp_micros(),
+            sort_by: None,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: None,
+            skip_wal: false,
+            regions: vec![],
+            clusters: vec![],
+            search_type: None,
+            search_event_context: None,
+            index_type: "".to_string(),
+            per_query_response: false,
+        };
+
+        assert_eq!(request.sql.len(), 2);
+        assert_eq!(request.sql[0].sql, "SELECT * FROM logs");
+        assert_eq!(request.sql[1].sql, "SELECT * FROM metrics");
+    }
+
+    #[test]
+    fn test_search_multi_large_size() {
+        let request = MultiStreamRequest {
+            sql: vec![config::meta::search::SqlQuery {
+                sql: "SELECT * FROM logs".to_string(),
+                start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                end_time: Some(Utc::now().timestamp_micros()),
+                query_fn: None,
+                is_old_format: false,
+            }],
+            encoding: config::meta::search::RequestEncoding::Empty,
+            timeout: 0,
+            from: 0,
+            size: 10000,
+            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            end_time: Utc::now().timestamp_micros(),
+            sort_by: None,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: None,
+            skip_wal: false,
+            regions: vec![],
+            clusters: vec![],
+            search_type: None,
+            search_event_context: None,
+            index_type: "".to_string(),
+            per_query_response: false,
+        };
+
+        assert_eq!(request.size, 10000);
+    }
+
+    #[test]
+    fn test_base64_decode_url() {
+        let encoded = "dGVzdF9zdHJlYW0="; // "test_stream" in base64
+        let decoded = config::utils::base64::decode_url(encoded);
+        assert!(decoded.is_ok());
+        assert_eq!(decoded.unwrap(), "test_stream");
+    }
+
+    #[test]
+    fn test_invalid_base64_decode_url() {
+        let invalid = "invalid_base64!@#";
+        let decoded = config::utils::base64::decode_url(invalid);
+        assert!(decoded.is_err());
+    }
+
+    #[test]
+    fn test_time_range_validation() {
+        let start_time = Utc::now().timestamp_micros();
+        let end_time = start_time + 3600_000_000; // 1 hour later
+
+        assert!(end_time > start_time);
+        assert_eq!(end_time - start_time, 3600_000_000);
+    }
+
+    #[test]
+    fn test_stream_names_parsing() {
+        let stream_names = "stream1,stream2,stream3";
+        let parsed: Vec<&str> = stream_names.split(',').collect();
+
+        assert_eq!(parsed.len(), 3);
+        assert_eq!(parsed[0], "stream1");
+        assert_eq!(parsed[1], "stream2");
+        assert_eq!(parsed[2], "stream3");
+    }
 }

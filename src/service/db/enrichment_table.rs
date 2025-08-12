@@ -60,7 +60,12 @@ pub async fn get_enrichment_table_data(
         use_cache: false,
         local_mode: Some(true),
     };
-    log::debug!("get enrichment table {name} data req start time: {start_time}");
+    log::info!(
+        "get enrichment table {}/{} data req start time: {}",
+        org_id,
+        name,
+        start_time
+    );
     // do search
     match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {
         Ok(res) => {
@@ -71,7 +76,12 @@ pub async fn get_enrichment_table_data(
             }
         }
         Err(err) => {
-            log::error!("get enrichment table data error: {err:?}");
+            log::error!(
+                "get enrichment table {}/{} data error: {:?}",
+                org_id,
+                name,
+                err
+            );
             Ok(vec![])
         }
     }
@@ -213,8 +223,7 @@ pub async fn get_table_size(org_id: &str, name: &str) -> f64 {
                 let size = String::from_utf8_lossy(&size);
                 size.parse::<f64>().unwrap_or(0.0)
             }
-            Err(e) => {
-                log::warn!("get_table_size error: {:?}", e);
+            Err(_) => {
                 stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables).storage_size
             }
         },
@@ -246,8 +255,7 @@ pub async fn get_meta_table_stats(
     .await
     {
         Ok(size) => size,
-        Err(e) => {
-            log::warn!("get_table_size error: {:?}", e);
+        Err(_) => {
             return None;
         }
     };

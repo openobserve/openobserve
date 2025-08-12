@@ -196,6 +196,7 @@ pub enum ErrorCodes {
     SearchTimeout(String),
     InvalidParams(String),
     RatelimitExceeded(String),
+    SearchHistogramNotAvailable(String),
 }
 
 impl From<sea_orm::DbErr> for Error {
@@ -250,6 +251,7 @@ impl ErrorCodes {
             ErrorCodes::SearchTimeout(_) => 20010,
             ErrorCodes::InvalidParams(_) => 20011,
             ErrorCodes::RatelimitExceeded(_) => 20012,
+            ErrorCodes::SearchHistogramNotAvailable(_) => 20013,
         }
     }
 
@@ -276,6 +278,9 @@ impl ErrorCodes {
             ErrorCodes::SearchTimeout(_) => "Search query timed out".to_string(),
             ErrorCodes::InvalidParams(_) => "Invalid parameters".to_string(),
             ErrorCodes::RatelimitExceeded(_) => "Ratelimit exceeded".to_string(),
+            ErrorCodes::SearchHistogramNotAvailable(_) => {
+                "Search histogram not available".to_string()
+            }
         }
     }
 
@@ -294,6 +299,7 @@ impl ErrorCodes {
             ErrorCodes::SearchTimeout(msg) => msg.to_owned(),
             ErrorCodes::InvalidParams(msg) => msg.to_owned(),
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
+            ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
         }
     }
 
@@ -312,6 +318,7 @@ impl ErrorCodes {
             ErrorCodes::SearchTimeout(msg) => msg.to_owned(),
             ErrorCodes::InvalidParams(msg) => msg.to_owned(),
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
+            ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
         }
     }
 

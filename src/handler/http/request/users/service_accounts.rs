@@ -55,8 +55,7 @@ pub async fn exchange_token(
                 &get_dex_config().client_id,
                 true,
                 false,
-            )
-            .await;
+            );
             match token_ver {
                 Ok(res) => {
                     audit_message.user_email = res.0.user_email.clone();

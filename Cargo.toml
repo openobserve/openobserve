@@ -194,6 +194,9 @@ derive_more = { version = "2.0.1", features = ["full"] }
 brotli = "8.0.1"
 tokio-rustls.workspace = true
 cuckoofilter-mmap.workspace = true
+roaring.workspace = true
+flight.workspace = true
+async-stream.workspace = true
 
 [dev-dependencies]
 async-walkdir.workspace = true
@@ -210,6 +213,7 @@ members = [
     "src/wal",
     "src/proto",
     "src/report_server",
+    "src/flight",
 ]
 resolver = "2"
 
@@ -225,6 +229,7 @@ ingester = { path = "src/ingester" }
 wal = { path = "src/wal" }
 proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
+flight = { path = "src/flight" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = { version = "4.9", features = ["rustls-0_23"] }
@@ -255,17 +260,17 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "47.0.0"
-datafusion-proto = "47.0.0"
-datafusion-functions-aggregate-common = "47.0.0"
-datafusion-functions-json = "0.47.0"
+datafusion = "49"
+datafusion-proto = "49"
+datafusion-functions-aggregate-common = "49"
+datafusion-functions-json = "0.49.0"
 expect-test = "1.4"
-arrow = { version = "55.0.0", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "55.0.0"
-arrow-json = "55.0.0"
-arrow-schema = { version = "55.0.0", features = ["serde"] }
-parquet = { version = "55.0.0", features = ["arrow", "async", "object_store"] }
-object_store = { version = "0.12.0", features = ["aws", "azure", "gcp"] }
+arrow = { version = "55.2.0", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "55.2.0"
+arrow-json = "55.2.0"
+arrow-schema = { version = "55.2.0", features = ["serde"] }
+parquet = { version = "55.2.0", features = ["arrow", "async", "object_store"] }
+object_store = { version = "0.12.3", features = ["aws", "azure", "gcp"] }
 sqlparser = { version = "0.55.0", features = ["serde", "visitor"] }
 dotenv_config = "0.2.2"
 dotenvy = "0.15.7"
@@ -393,3 +398,5 @@ vrl = { version = "0.22", features = ["value", "compiler", "test"] }
 zip = "3.0.0"
 zstd = "0.13"
 cuckoofilter-mmap = "0.1.0"
+roaring = "0.11.2"
+async-stream = "0.3.6"

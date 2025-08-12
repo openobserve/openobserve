@@ -20,8 +20,8 @@ use std::{
 };
 
 use arrow::array::{
-    BooleanArray, Float64Array, Int64Array, RecordBatch, StringArray, TimestampMicrosecondArray,
-    UInt64Array,
+    BooleanArray, Float64Array, Int64Array, LargeStringArray, RecordBatch, StringArray,
+    TimestampMicrosecondArray, UInt64Array,
 };
 use arrow_schema::{DataType, SortOptions, TimeUnit};
 use config::TIMESTAMP_COL_NAME;
@@ -29,7 +29,10 @@ use datafusion::{
     arrow::datatypes::SchemaRef,
     common::{Result, Statistics, internal_err},
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, LexRequirement, Partitioning, PhysicalSortRequirement},
+    physical_expr::{
+        EquivalenceProperties, LexRequirement, OrderingRequirements, Partitioning,
+        PhysicalSortRequirement,
+    },
     physical_plan::{
         DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
@@ -135,12 +138,12 @@ impl ExecutionPlan for DeduplicationExec {
     }
 
     fn statistics(&self) -> Result<Statistics> {
-        self.input.statistics()
+        self.input.partition_statistics(None)
     }
 
     // if don't have this, the optimizer will not merge the SortExec
     // and get wrong result
-    fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
+    fn required_input_ordering(&self) -> Vec<Option<OrderingRequirements>> {
         let mut sort_requirment = self
             .deduplication_columns
             .iter()
@@ -157,7 +160,7 @@ impl ExecutionPlan for DeduplicationExec {
                 Some(SortOptions::new(true, false)),
             ));
         }
-        vec![Some(LexRequirement::new(sort_requirment))]
+        vec![LexRequirement::new(sort_requirment).map(OrderingRequirements::new)]
     }
 
     fn required_input_distribution(&self) -> Vec<Distribution> {
@@ -254,6 +257,7 @@ impl DeduplicationArrays {
 #[derive(Debug, Clone)]
 enum Array {
     String(StringArray),
+    LargeString(LargeStringArray),
     Int64(Int64Array),
     UInt64(UInt64Array),
     Boolean(BooleanArray),
@@ -265,6 +269,7 @@ impl Array {
     pub fn get_value(&self, i: usize) -> Value {
         match &self {
             Array::String(array) => Value::String(array.value(i).to_string()),
+            Array::LargeString(array) => Value::String(array.value(i).to_string()),
             Array::Int64(array) => Value::Int64(array.value(i)),
             Array::UInt64(array) => Value::UInt64(array.value(i)),
             Array::Boolean(array) => Value::Boolean(array.value(i)),
@@ -296,6 +301,13 @@ fn generate_deduplication_arrays(
                     array
                         .as_any()
                         .downcast_ref::<StringArray>()
+                        .unwrap()
+                        .clone(),
+                ),
+                DataType::LargeUtf8 => Array::LargeString(
+                    array
+                        .as_any()
+                        .downcast_ref::<LargeStringArray>()
                         .unwrap()
                         .clone(),
                 ),

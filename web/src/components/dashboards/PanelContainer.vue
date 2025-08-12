@@ -331,6 +331,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboard-id="props.dashboardId"
       :folder-id="props.folderId"
       :report-id="props.reportId"
+      :runId="runId"
+      :tabId="props.tabId"
+      :tabName="props.tabName"
       @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
       @limit-number-of-series-warning-message-update="
@@ -399,10 +402,11 @@ import {
 } from "@quasar/extras/material-symbols-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
-import { getFunctionErrorMessage } from "@/utils/zincutils";
+import { getFunctionErrorMessage, getUUID } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import shortURL from "@/services/short_url";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -419,6 +423,7 @@ export default defineComponent({
     "refresh",
     "update:initial-variable-values",
     "onEditLayout",
+    "update:runId",
   ],
   props: [
     "data",
@@ -434,6 +439,9 @@ export default defineComponent({
     "folderId",
     "reportId",
     "currentVariablesData",
+    "runId",
+    "tabId",
+    "tabName",
   ],
   components: {
     PanelSchemaRenderer,
@@ -599,6 +607,12 @@ export default defineComponent({
     };
 
     const onLogPanel = async () => {
+      const showNotification = showPositiveNotification(
+        "Redirecting to logs page",
+        {
+          color: "warning",
+        },
+      );
       const queryDetails = props.data;
       if (!queryDetails) {
         console.error("Data is undefined.");
@@ -634,7 +648,23 @@ export default defineComponent({
         vrlFunctionQueryEncoded,
       );
 
-      window.open(logsUrl.toString(), "_blank");
+      // Use short_url service to shorten the URL and redirect
+      try {
+        const org_identifier = store.state.selectedOrganization.identifier;
+        const response = await shortURL.create(
+          org_identifier,
+          logsUrl.toString(),
+        );
+        const shortUrl = response?.data?.short_url;
+        if (shortUrl) {
+          window.open(shortUrl, "_blank");
+        } else {
+          window.open(logsUrl.toString(), "_blank");
+        }
+        showNotification();
+      } catch (error) {
+        window.open(logsUrl.toString(), "_blank");
+      }
     };
 
     //create a duplicate panel
@@ -710,7 +740,31 @@ export default defineComponent({
       isPanelLoading.value = isLoading;
     };
 
+    // Initialize dashboard run ID management
+    const runId = ref(props.runId || getUUID().replace(/-/g, ""));
+
+    // Watch for changes in the runId prop and update local runId
+    watch(
+      () => props.runId,
+      (newRunId) => {
+        if (newRunId) {
+          runId.value = newRunId;
+        }
+      },
+    );
+
+    const generateNewDashboardRunId = () => {
+      const newRunId = getUUID().replace(/-/g, "");
+      runId.value = newRunId;
+      // Emit the new run ID to parent component
+      emit("update:runId", newRunId);
+      return newRunId;
+    };
+
     const onRefreshPanel = async () => {
+      // Need to generate a new run id when refreshing the panel
+      generateNewDashboardRunId();
+
       if (isPanelLoading.value) return;
 
       isPanelLoading.value = true;

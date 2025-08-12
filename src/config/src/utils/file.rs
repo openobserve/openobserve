@@ -193,7 +193,7 @@ mod tests {
         );
 
         std::fs::remove_file(&file_name).unwrap();
-        std::fs::remove_dir(&dir_name).unwrap();
+        std::fs::remove_dir(dir_name).unwrap();
     }
 
     #[test]

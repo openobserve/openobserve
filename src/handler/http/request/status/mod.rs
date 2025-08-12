@@ -356,8 +356,6 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     stats.insert("LOCAL_NODE_UUID", json::json!(LOCAL_NODE.uuid.clone()));
     stats.insert("LOCAL_NODE_NAME", json::json!(&cfg.common.instance_name));
     stats.insert("LOCAL_NODE_ROLE", json::json!(&cfg.common.node_role));
-    let nodes = cluster::get_cached_online_nodes().await;
-    stats.insert("NODE_LIST", json::json!(nodes));
 
     let (stream_num, stream_schema_num, mem_size) = get_stream_schema_status().await;
     stats.insert("STREAM_SCHEMA", json::json!({"stream_num": stream_num,"stream_schema_num": stream_schema_num, "mem_size": mem_size}));
@@ -401,11 +399,14 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     );
     stats.insert(
         "DATAFUSION",
-        json::json!({"file_stat_cache": file_statistics_cache::GLOBAL_CACHE.clone().len()}),
+        json::json!({"file_stat_cache": {
+            "file_num": file_statistics_cache::GLOBAL_CACHE.len(),
+            "mem_size": file_statistics_cache::GLOBAL_CACHE.memory_size()
+        }}),
     );
     stats.insert(
         "INVERTED_INDEX",
-        json::json!({"reader_cache": reader_cache::GLOBAL_CACHE.clone().len()}),
+        json::json!({"reader_cache": reader_cache::GLOBAL_CACHE.len()}),
     );
 
     #[cfg(feature = "enterprise")]
@@ -462,14 +463,15 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
 async fn get_stream_schema_status() -> (usize, usize, usize) {
     let mut stream_num = 0;
     let mut stream_schema_num = 0;
-    let mut mem_size = 0;
+    let mut mem_size = std::mem::size_of::<HashMap<String, Vec<Schema>>>();
     let r = STREAM_SCHEMAS.read().await;
     for (key, val) in r.iter() {
         stream_num += 1;
         mem_size += std::mem::size_of::<Vec<Schema>>();
-        mem_size += key.len();
+        mem_size += std::mem::size_of::<String>() + key.len();
         for schema in val.iter() {
             stream_schema_num += 1;
+            mem_size += std::mem::size_of::<i64>();
             mem_size += schema.1.size();
         }
     }
@@ -478,8 +480,8 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
     for (key, schema) in r.iter() {
         stream_num += 1;
         stream_schema_num += 1;
-        mem_size += key.len();
-        mem_size += schema.schema().size();
+        mem_size += std::mem::size_of::<String>() + key.len();
+        mem_size += schema.size();
     }
     drop(r);
     (stream_num, stream_schema_num, mem_size)
@@ -549,8 +551,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 &get_dex_config().client_id,
                 true,
                 true,
-            )
-            .await;
+            );
             let id_token;
             match token_ver {
                 Ok(res) => {
@@ -583,7 +584,7 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                             }
                         }
                         Err(e) => {
-                            log::error!("Failed to check domain management: {}", e);
+                            log::error!("Failed to check domain management: {e}");
                             // Fail open - allow access if domain management check fails
                             // This prevents system lockouts due to configuration errors
                         }

@@ -336,7 +336,7 @@ mod tests {
         "#;
 
         let result = replace_o2_custom_patterns(sql).unwrap();
-        println!("result: {}", result);
+        println!("result: {result}");
 
         assert!(result.contains("str_match(username, 'admin')"));
         assert!(!result.contains("::_o2_custom"));
@@ -351,7 +351,7 @@ mod tests {
         "#;
 
         let result = replace_o2_custom_patterns(sql).unwrap();
-        println!("result: {}", result);
+        println!("result: {result}");
 
         assert!(result.contains("str_match(username, 'admin')"));
         assert!(result.contains("str_match(role, 'superuser')"));
@@ -368,7 +368,7 @@ mod tests {
         "#;
 
         let result = replace_o2_custom_patterns(sql).unwrap();
-        println!("result: {}", result);
+        println!("result: {result}");
 
         assert!(result.contains("str_match(department, 'engineering')"));
         assert!(result.contains("str_match(sub.name, 'john')"));
@@ -387,7 +387,7 @@ mod tests {
         "#;
 
         let result = replace_o2_custom_patterns(sql).unwrap();
-        println!("result: {}", result);
+        println!("result: {result}");
 
         assert!(result.contains("str_match(status, 'active')"));
         assert!(result.contains("str_match(role, 'admin')"));
@@ -405,7 +405,7 @@ mod tests {
         "#;
 
         let result = replace_o2_custom_patterns(sql).unwrap();
-        println!("result: {}", result);
+        println!("result: {result}");
 
         assert!(result.contains("str_match(u.department, 'sales')"));
         assert!(result.contains("str_match(p.category, 'internal')"));
@@ -419,7 +419,7 @@ mod tests {
         "#;
 
         let result = replace_o2_custom_patterns(sql).unwrap();
-        println!("result: {}", result);
+        println!("result: {result}");
 
         assert!(result.contains("::_o2_custom")); // Original should remain
     }
@@ -432,7 +432,7 @@ mod tests {
         "#;
 
         let result = replace_o2_custom_patterns(sql).unwrap();
-        println!("result: {}", result);
+        println!("result: {result}");
 
         assert!(result.contains("::_o2_custom")); // Original should remain
     }
@@ -471,7 +471,7 @@ mod tests {
         "#;
 
         let result = replace_o2_custom_patterns(sql).unwrap();
-        println!("result: {}", result);
+        println!("result: {result}");
 
         assert!(result.contains("str_match(username, 'admin')"));
         assert!(!result.contains("::_o2_custom"));
@@ -486,7 +486,7 @@ mod tests {
         "#;
 
         let result = replace_o2_custom_patterns(sql).unwrap();
-        println!("result: {}", result);
+        println!("result: {result}");
 
         assert!(result.contains("str_match(LOWER(username), 'admin')"));
         assert!(result.contains("str_match(table.field, 'value')"));
@@ -502,7 +502,7 @@ mod tests {
         "#;
 
         let result = replace_o2_custom_patterns(sql).unwrap();
-        println!("result: {}", result);
+        println!("result: {result}");
 
         assert!(result.contains("str_match(username, 'admin')"));
         assert!(result.contains("str_match(role, 'superuser')"));

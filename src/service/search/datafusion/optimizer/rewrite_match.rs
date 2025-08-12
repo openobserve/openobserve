@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use arrow_schema::DataType;
 use config::get_config;
 use datafusion::{
     self,
@@ -36,12 +37,12 @@ use crate::service::search::datafusion::udf::{
 /// Optimization rule that rewrite match_all() to str_match()
 #[derive(Default, Debug)]
 pub struct RewriteMatch {
-    fields: Vec<String>,
+    fields: Vec<(String, DataType)>,
 }
 
 impl RewriteMatch {
     #[allow(missing_docs)]
-    pub fn new(fields: Vec<String>) -> Self {
+    pub fn new(fields: Vec<(String, DataType)>) -> Self {
         Self { fields }
     }
 }
@@ -101,11 +102,11 @@ fn is_match_all(expr: &Expr) -> bool {
 // Rewriter for match_all() to str_match()
 #[derive(Debug, Clone)]
 pub struct MatchToFullTextMatch {
-    fields: Vec<String>,
+    fields: Vec<(String, DataType)>,
 }
 
 impl MatchToFullTextMatch {
-    pub fn new(fields: Vec<String>) -> Self {
+    pub fn new(fields: Vec<(String, DataType)>) -> Self {
         Self { fields }
     }
 }
@@ -116,9 +117,10 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
     fn f_up(&mut self, expr: Expr) -> Result<Transformed<Expr>, DataFusionError> {
         match &expr {
             Expr::ScalarFunction(ScalarFunction { func, args }) => {
+                let cfg = get_config();
                 let name = func.name();
                 if name == MATCH_ALL_UDF_NAME {
-                    let Expr::Literal(ScalarValue::Utf8(Some(item))) = args[0].clone() else {
+                    let Expr::Literal(ScalarValue::Utf8(Some(item)), _) = args[0].clone() else {
                         return Err(DataFusionError::Internal(format!(
                             "Unexpected argument type for match_all() keyword: {:?}",
                             args[0]
@@ -130,13 +132,20 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                         .trim_start_matches('*') // contains
                         .trim_end_matches('*') // prefix or contains
                         .to_string(); // remove prefix and suffix *
-                    let item = if get_config().common.utf8_view_enabled {
-                        Expr::Literal(ScalarValue::Utf8View(Some(format!("%{item}%"))))
+                    let term = if cfg.common.utf8_view_enabled {
+                        Expr::Literal(ScalarValue::Utf8View(Some(format!("%{item}%"))), None)
                     } else {
-                        Expr::Literal(ScalarValue::Utf8(Some(format!("%{item}%"))))
+                        Expr::Literal(ScalarValue::Utf8(Some(format!("%{item}%"))), None)
                     };
-                    for field in self.fields.iter() {
-                        let new_expr = create_like_expr_with_not_null(field, item.clone());
+                    for (field, data_type) in self.fields.iter() {
+                        let term = if !cfg.common.utf8_view_enabled
+                            && data_type == &DataType::LargeUtf8
+                        {
+                            Expr::Literal(ScalarValue::LargeUtf8(Some(format!("%{item}%"))), None)
+                        } else {
+                            term.clone()
+                        };
+                        let new_expr = create_like_expr_with_not_null(field, term);
                         expr_list.push(new_expr);
                     }
                     if expr_list.is_empty() {
@@ -147,30 +156,37 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                     let new_expr = disjunction(expr_list).unwrap();
                     Ok(Transformed::yes(new_expr))
                 } else if name == FUZZY_MATCH_ALL_UDF_NAME {
-                    let Expr::Literal(ScalarValue::Utf8(Some(item))) = args[0].clone() else {
+                    let Expr::Literal(ScalarValue::Utf8(Some(item)), _) = args[0].clone() else {
                         return Err(DataFusionError::Internal(format!(
                             "Unexpected argument type for fuzzy_match_all() keyword: {:?}",
                             args[0]
                         )));
                     };
-                    let Expr::Literal(ScalarValue::Int64(Some(distance))) = args[1].clone() else {
+                    let Expr::Literal(ScalarValue::Int64(Some(distance)), _) = args[1].clone()
+                    else {
                         return Err(DataFusionError::Internal(format!(
                             "Unexpected argument type for fuzzy_match_all() distance: {:?}",
                             args[1]
                         )));
                     };
                     let mut expr_list = Vec::with_capacity(self.fields.len());
-                    let item = if get_config().common.utf8_view_enabled {
-                        Expr::Literal(ScalarValue::Utf8View(Some(item.to_string())))
+                    let term = if cfg.common.utf8_view_enabled {
+                        Expr::Literal(ScalarValue::Utf8View(Some(item.to_string())), None)
                     } else {
-                        Expr::Literal(ScalarValue::Utf8(Some(item.to_string())))
+                        Expr::Literal(ScalarValue::Utf8(Some(item.to_string())), None)
                     };
-                    let distance = Expr::Literal(ScalarValue::Int64(Some(distance)));
+                    let distance = Expr::Literal(ScalarValue::Int64(Some(distance)), None);
                     let fuzzy_expr = fuzzy_match_udf::FUZZY_MATCH_UDF.clone();
-                    for field in self.fields.iter() {
+                    for (field, data_type) in self.fields.iter() {
+                        let term =
+                            if !cfg.common.utf8_view_enabled && data_type == &DataType::LargeUtf8 {
+                                Expr::Literal(ScalarValue::LargeUtf8(Some(item.to_string())), None)
+                            } else {
+                                term.clone()
+                            };
                         let new_expr = fuzzy_expr.call(vec![
                             Expr::Column(Column::new_unqualified(field)),
-                            item.clone(),
+                            term,
                             distance.clone(),
                         ]);
                         expr_list.push(new_expr);
@@ -319,7 +335,10 @@ mod tests {
         )
         .unwrap();
 
-        let fields = vec!["name".to_string(), "log".to_string()];
+        let fields = vec![
+            ("name".to_string(), DataType::Utf8),
+            ("log".to_string(), DataType::Utf8),
+        ];
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new())
@@ -416,7 +435,10 @@ mod tests {
         )
         .unwrap();
 
-        let fields = vec!["name".to_string(), "log".to_string()];
+        let fields = vec![
+            ("name".to_string(), DataType::Utf8),
+            ("log".to_string(), DataType::Utf8),
+        ];
 
         let state = SessionStateBuilder::new()
             .with_config(SessionConfig::new())
@@ -440,7 +462,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_like_expr_with_not_null() {
         let field = "name";
-        let item = Expr::Literal(ScalarValue::Utf8(Some("open".to_string())));
+        let item = Expr::Literal(ScalarValue::Utf8(Some("open".to_string())), None);
         let expr = create_like_expr_with_not_null(field, item.clone());
         assert_eq!(
             expr,
