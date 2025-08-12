@@ -315,6 +315,8 @@ pub struct PanelConfig {
     background: Option<Background>,
     #[serde(skip_serializing_if = "Option::is_none")]
     trellis: Option<Trellis>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    show_gridlines: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
