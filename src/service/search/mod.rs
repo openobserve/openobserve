@@ -94,6 +94,7 @@ pub(crate) mod cardinality;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
+pub(crate) mod grpc_cuckoo_filter;
 pub(crate) mod grpc_search;
 pub(crate) mod index;
 pub(crate) mod inspector;

@@ -18,6 +18,7 @@ service Search {
     rpc GetResult(GetResultRequest) returns (GetResultResponse) {}
     rpc DeleteResult(DeleteResultRequest) returns (DeleteResultResponse) {}
     rpc GetScanStats(GetScanStatsRequest) returns (ScanStatsResponse) {}
+    rpc CuckooFilterQuery(CuckooFilterQueryRequest) returns (CuckooFilterQueryResponse) {}
 }
 
 message QueryStatusRequest {}
@@ -53,7 +54,7 @@ message SearchPartitionRequest {
     string               org_id = 2;
     string          stream_type = 3;
     bytes               request = 5;
-    bool   skip_max_query_range = 6; 
+    bool   skip_max_query_range = 6;
 }
 
 message SearchPartitionResponse {
@@ -82,6 +83,17 @@ message GetScanStatsRequest {
 
 message ScanStatsResponse {
     ScanStats stats = 1;
+}
+
+message CuckooFilterQueryRequest {
+    string org_id = 1;
+    string stream_name = 2;
+    string trace_id = 3;
+    repeated string hours = 4;
+}
+
+message CuckooFilterQueryResponse {
+    repeated string found_hours = 1;
 }
 
 // Search request query
@@ -127,5 +139,3 @@ message Query {
     int64 start_time = 2;
     int64   end_time = 3;
 }
-
-

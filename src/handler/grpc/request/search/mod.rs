@@ -18,10 +18,11 @@ use config::{
     utils::json,
 };
 use proto::cluster_rpc::{
-    CancelQueryRequest, CancelQueryResponse, DeleteResultRequest, DeleteResultResponse,
-    GetResultRequest, GetResultResponse, GetScanStatsRequest, QueryStatusRequest,
-    QueryStatusResponse, ScanStatsResponse, SearchPartitionRequest, SearchPartitionResponse,
-    SearchRequest, SearchResponse, search_server::Search,
+    CancelQueryRequest, CancelQueryResponse, CuckooFilterQueryRequest, CuckooFilterQueryResponse,
+    DeleteResultRequest, DeleteResultResponse, GetResultRequest, GetResultResponse,
+    GetScanStatsRequest, QueryStatusRequest, QueryStatusResponse, ScanStatsResponse,
+    SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
+    search_server::Search,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -32,7 +33,10 @@ use {
     proto::cluster_rpc::ScanStats,
 };
 
-use crate::{handler::grpc::MetadataMap, service::search as SearchService};
+use crate::{
+    handler::grpc::MetadataMap,
+    service::{index::cuckoo_filter, search as SearchService},
+};
 
 #[derive(Clone, Debug)]
 #[cfg(feature = "enterprise")]
@@ -406,5 +410,76 @@ impl Search for Searcher {
         _req: Request<GetScanStatsRequest>,
     ) -> Result<Response<ScanStatsResponse>, Status> {
         Err(Status::unimplemented("Not Supported"))
+    }
+
+    #[tracing::instrument(name = "grpc:search:cuckoo_filter_query", skip_all)]
+    async fn cuckoo_filter_query(
+        &self,
+        req: Request<CuckooFilterQueryRequest>,
+    ) -> Result<Response<CuckooFilterQueryResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(req.metadata()))
+        });
+        tracing::Span::current().set_parent(parent_cx.clone());
+
+        // Check if this is an ingester query (no S3 download)
+        let is_ingester_query = req
+            .metadata()
+            .get("ingester-cuckoofilter-query")
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v == "true")
+            .unwrap_or(false);
+
+        let req = req.into_inner();
+        log::debug!(
+            "Processing cuckoo filter query: org_id={}, stream_name={}, trace_id={}, hours={:?}, is_ingester_query={}",
+            req.org_id,
+            req.stream_name,
+            req.trace_id,
+            req.hours,
+            is_ingester_query
+        );
+
+        // Query local cuckoo filters with appropriate method
+        let result = if is_ingester_query {
+            // For ingester queries, only check local cache/files (no S3 download)
+            cuckoo_filter::query_local_ingester_cuckoo_filter_hours(
+                &req.org_id,
+                &req.stream_name,
+                &req.trace_id,
+                &req.hours,
+            )
+            .await
+        } else {
+            // For querier queries, allow S3 download
+            cuckoo_filter::query_local_cuckoo_filter_hours(
+                &req.org_id,
+                &req.stream_name,
+                &req.trace_id,
+                &req.hours,
+            )
+            .await
+        };
+
+        match result {
+            Ok(found_hours) => {
+                log::debug!(
+                    "Cuckoo filter query successful: trace_id={}, found_hours={:?}, is_ingester_query={}",
+                    req.trace_id,
+                    found_hours,
+                    is_ingester_query
+                );
+                Ok(Response::new(CuckooFilterQueryResponse { found_hours }))
+            }
+            Err(e) => {
+                log::error!(
+                    "Failed to query local cuckoo filter: trace_id={}, error={e}, is_ingester_query={is_ingester_query}",
+                    req.trace_id,
+                );
+                Err(Status::internal(
+                    format!("Cuckoo filter query failed: {e}",),
+                ))
+            }
+        }
     }
 }

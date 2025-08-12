@@ -417,6 +417,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(traces::traces_write)
         .service(traces::otlp_traces_write)
         .service(traces::get_latest_traces)
+        .service(traces::get_trace_detail)
         .service(metrics::ingest::json)
         .service(metrics::ingest::otlp_metrics_write)
         .service(promql::remote_write)

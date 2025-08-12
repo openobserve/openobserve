@@ -41,7 +41,7 @@ use crate::{
     },
 };
 
-const STREAM_NAME: &str = "trace_list_index";
+pub const STREAM_NAME: &str = "trace_list_index";
 
 static PARTITION_KEYS: Lazy<[StreamPartition; 1]> =
     Lazy::new(|| [StreamPartition::new("service_name")]);

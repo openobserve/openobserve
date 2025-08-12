@@ -134,6 +134,19 @@ fn create_cli_app() -> Command {
             ]),
             Command::new("upgrade-db")
                 .about("upgrade db table schemas").args(dataArgs()),
+            Command::new("index")
+                .about("index management commands")
+                .subcommand(
+                    Command::new("trace")
+                        .about("build cuckoo filters for traces")
+                        .args([
+                            arg!("start-time", 's', "start-time", "Start time (format: YYYY-MM-DD HH:MM:SS)", true),
+                            arg!("end-time", 'e', "end-time", "End time (format: YYYY-MM-DD HH:MM:SS)", true),
+                            arg!("org", 'o', "org", "Organization ID (optional, processes all orgs if not specified)", false),
+                            arg!("stream", 't', "stream", "Stream name (default: default)", false).default_value("default"),
+                            arg!("force", 'f', "force", "Force rebuild existing cuckoo filters", false).action(ArgAction::SetTrue),
+                        ])
+                ),
         ])
 }
 
@@ -403,6 +416,45 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         }
         "upgrade-db" => {
             crate::migration::init_db().await?;
+        }
+        "index" => {
+            let command = command.subcommand();
+            match command {
+                Some(("trace", args)) => {
+                    let start_time_str = args.get_one::<String>("start-time").unwrap();
+                    let end_time_str = args.get_one::<String>("end-time").unwrap();
+                    let org_id = args.get_one::<String>("org").cloned();
+                    let stream_name = args.get_one::<String>("stream").unwrap();
+                    let force = args.get_flag("force");
+
+                    // Parse time strings
+                    let start_time =
+                        chrono::NaiveDateTime::parse_from_str(start_time_str, "%Y-%m-%d %H:%M:%S")
+                            .map_err(|e| anyhow::anyhow!("Invalid start time format: {}", e))?
+                            .and_utc();
+                    let end_time =
+                        chrono::NaiveDateTime::parse_from_str(end_time_str, "%Y-%m-%d %H:%M:%S")
+                            .map_err(|e| anyhow::anyhow!("Invalid end time format: {}", e))?
+                            .and_utc();
+
+                    if start_time >= end_time {
+                        return Err(anyhow::anyhow!("Start time must be before end time"));
+                    }
+
+                    println!("Building cuckoo filters for traces...");
+                    crate::job::files::cuckoo_filter::build_cuckoo_filters_for_time_range(
+                        start_time,
+                        end_time,
+                        org_id,
+                        stream_name,
+                        force,
+                    )
+                    .await?;
+                }
+                _ => {
+                    return Err(anyhow::anyhow!("unsupported index sub command"));
+                }
+            }
         }
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));

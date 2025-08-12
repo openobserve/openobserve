@@ -21,6 +21,7 @@ use config::{
 };
 
 pub mod broadcast;
+pub mod cuckoo_filter;
 pub mod parquet;
 
 pub async fn run() -> Result<(), anyhow::Error> {

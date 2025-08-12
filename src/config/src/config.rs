@@ -438,6 +438,7 @@ pub struct Config {
     pub health_check: HealthCheck,
     pub encryption: Encryption,
     pub enrichment_table: EnrichmentTable,
+    pub cuckoo_filter: CuckooFilter,
 }
 
 #[derive(EnvConfig, Default)]
@@ -1590,6 +1591,8 @@ pub struct DiskCache {
     pub result_max_size: usize,
     #[env_config(name = "ZO_DISK_AGGREGATION_CACHE_MAX_SIZE", default = 0)]
     pub aggregation_max_size: usize,
+    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
+    pub aggregation_cache_enabled: bool,
     // MB, will skip the cache when a query need cache great than this value, default is 50% of
     // max_size
     #[env_config(name = "ZO_DISK_CACHE_SKIP_SIZE", default = 0)]
@@ -1976,6 +1979,43 @@ pub struct EnrichmentTable {
     pub merge_interval: u64,
 }
 
+#[derive(EnvConfig, Default)]
+pub struct CuckooFilter {
+    #[env_config(name = "ZO_CUCKOO_FILTER_ENABLED", default = true)]
+    pub enabled: bool,
+
+    #[env_config(
+        name = "ZO_CUCKOO_FILTER_DIR",
+        default = "",
+        help = "cuckoo filter dir"
+    )]
+    pub dir: String,
+    #[env_config(
+        name = "ZO_CUCKOO_FILTER_CAPACITY",
+        default = 50000000,
+        help = "The desired capacity of the filter, default for per file hourly, almost 128M"
+    )]
+    pub capacity: usize,
+    #[env_config(
+        name = "ZO_CUCKOO_FILTER_FLUSH_MODE",
+        default = "none",
+        help = "Defines the flushing strategy for the Cuckoo Filter"
+    )]
+    pub flush_mode: String,
+    #[env_config(
+        name = "ZO_DATA_LOOKBACK_DAYS",
+        default = 7,
+        help = "Enable hourly job to generate cuckoo filters from S3 trace_index_list"
+    )]
+    pub data_lookback_days: i64,
+    #[env_config(
+        name = "ZO_BUILD_INDEX_INTERVAL",
+        default = 3600,
+        help = "building cuckoo filter index job interval, unit seconds, default 1 hour"
+    )]
+    pub build_index_interval: u64,
+}
+
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().expect("config init error");
@@ -2308,6 +2348,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.common.default_hec_stream.is_empty() {
         cfg.common.default_hec_stream = "_hec".to_string();
+    }
+
+    if cfg.cuckoo_filter.enabled && cfg.cuckoo_filter.dir.is_empty() {
+        cfg.cuckoo_filter.dir = format!("{}cuckoo_filter/", cfg.common.data_dir);
     }
 
     Ok(())

@@ -516,6 +516,280 @@ pub async fn get_latest_traces(
     Ok(HttpResponse::Ok().json(resp))
 }
 
+/// GetTraceDetail
+///
+/// Get all spans for a specific trace_id
+/// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"get"}#
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetTraceDetail",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("trace_id" = String, Query, description = "Trace ID to query"),
+        ("start_time" = i64, Query, description = "start time"),
+        ("end_time" = i64, Query, description = "end time"),
+        ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/{stream_name}/traces/detail")]
+pub async fn get_trace_detail(
+    path: web::Path<(String, String)>,
+    in_req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let start = std::time::Instant::now();
+    let cfg = get_config();
+
+    let (org_id, stream_name) = path.into_inner();
+    let http_span = if cfg.common.tracing_search_enabled {
+        tracing::info_span!(
+            "/api/{org_id}/{stream_name}/traces/detail",
+            org_id = org_id.clone(),
+            stream_name = stream_name.clone()
+        )
+    } else {
+        Span::none()
+    };
+    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+
+    // Check permissions on stream
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_openfga::meta::mapping::OFGA_MODELS;
+
+        use crate::{
+            common::utils::auth::{AuthExtractor, is_root_user},
+            service::users::get_user,
+        };
+        let user_id = in_req.headers().get("user_id").unwrap();
+        if !is_root_user(user_id.to_str().unwrap()) {
+            let user: config::meta::user::User = get_user(Some(&org_id), user_id.to_str().unwrap())
+                .await
+                .unwrap();
+            let stream_type_str = StreamType::Traces.as_str();
+
+            if !crate::handler::http::auth::validator::check_permissions(
+                user_id.to_str().unwrap(),
+                AuthExtractor {
+                    auth: "".to_string(),
+                    method: "GET".to_string(),
+                    o2_type: format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(stream_type_str)
+                            .map_or(stream_type_str, |model| model.key),
+                        stream_name
+                    ),
+                    org_id: org_id.clone(),
+                    bypass_check: false,
+                    parent_id: "".to_string(),
+                },
+                user.role,
+                user.is_external,
+            )
+            .await
+            {
+                return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
+            }
+        }
+    }
+
+    // Get query parameters
+    let query_trace_id = match query.get("trace_id") {
+        Some(v) => v.to_string(),
+        None => return Ok(MetaHttpResponse::bad_request("trace_id is required")),
+    };
+
+    let mut start_time = query
+        .get("start_time")
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+    if start_time == 0 {
+        return Ok(MetaHttpResponse::bad_request("start_time is empty"));
+    }
+    let end_time = query
+        .get("end_time")
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+    if end_time == 0 {
+        return Ok(MetaHttpResponse::bad_request("end_time is empty"));
+    }
+
+    let max_query_range = crate::common::utils::stream::get_max_query_range(
+        std::slice::from_ref(&stream_name),
+        org_id.as_str(),
+        &user_id,
+        StreamType::Traces,
+    )
+    .await;
+    let mut range_error = String::new();
+    if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
+        start_time = end_time - max_query_range * 3600 * 1_000_000;
+        range_error = format!(
+            "[trace_id {query_trace_id}] Query duration is modified due to query range restriction of {max_query_range} hours"
+        );
+    }
+
+    let timeout = query
+        .get("timeout")
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+
+    // Use cuckoo filter to optimize time range
+    log::info!(
+        "[trace_id {query_trace_id}] original start_time: {start_time}, end_time: {end_time}, we begin to use filter optimized time range"
+    );
+    let optimized_time_ranges =
+        match crate::service::index::cuckoo_filter::query_distributed_cuckoo_filter(
+            &org_id,
+            &stream_name,
+            &query_trace_id,
+            start_time,
+            end_time,
+        )
+        .await
+        {
+            Ok(ranges) => ranges,
+            Err(e) => {
+                log::warn!(
+                    "[trace_id {query_trace_id}] Failed to query cuckoo filter, using original time range: {}",
+                    e
+                );
+                vec![(start_time, end_time)]
+            }
+        };
+
+    if optimized_time_ranges.is_empty() {
+        // No data found in cuckoo filter, return empty result
+        let resp: HashMap<&str, json::Value> = [
+            ("took", json::Value::from(0)),
+            ("total", json::Value::from(0)),
+            ("hits", json::Value::Array(vec![])),
+            ("trace_id", json::Value::from(trace_id.clone())),
+        ]
+        .into_iter()
+        .collect();
+        return Ok(HttpResponse::Ok().json(resp));
+    }
+
+    // Construct SQL query for trace details
+    let query_sql = format!("SELECT * FROM {stream_name} WHERE trace_id = '{query_trace_id}'",);
+
+    let mut all_hits = Vec::new();
+
+    // Query each optimized time range
+    for (range_start, range_end) in optimized_time_ranges {
+        log::info!(
+            "[trace_id {query_trace_id}] optimized_time_ranges start_time: {range_start}, end_time: {range_end}"
+        );
+        let mut req = config::meta::search::Request {
+            query: config::meta::search::Query {
+                sql: query_sql.clone(),
+                from: 0,
+                size: -1,
+                start_time: range_start,
+                end_time: range_end,
+                quick_mode: false,
+                query_type: "".to_string(),
+                track_total_hits: false,
+                uses_zo_fn: false,
+                query_fn: None,
+                action_id: None,
+                skip_wal: false,
+                streaming_output: false,
+                streaming_id: None,
+                histogram_interval: 0,
+            },
+            encoding: config::meta::search::RequestEncoding::Empty,
+            regions: vec![],
+            clusters: vec![],
+            timeout,
+            search_type: None,
+            search_event_context: None,
+            use_cache: default_use_cache(),
+            local_mode: None,
+        };
+
+        req.use_cache = get_use_cache_from_request(&query);
+
+        let stream_type = StreamType::Traces;
+        let user_id = in_req
+            .headers()
+            .get("user_id")
+            .unwrap()
+            .to_str()
+            .ok()
+            .map(|v| v.to_string());
+
+        let search_res = SearchService::cache::search(
+            &trace_id,
+            &org_id,
+            stream_type,
+            user_id.clone(),
+            &req,
+            "".to_string(),
+            false,
+        )
+        .instrument(http_span.clone())
+        .await;
+
+        match search_res {
+            Ok(res) => {
+                all_hits.extend(res.hits);
+            }
+            Err(err) => {
+                log::error!("get trace detail data error: {err:?}");
+                return Ok(map_error_to_http_response(&err, Some(trace_id)));
+            }
+        }
+    }
+
+    let time = start.elapsed().as_secs_f64();
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/api/org/traces/detail",
+            "200",
+            &org_id,
+            StreamType::Traces.as_str(),
+            "",
+            "",
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            "/api/org/traces/detail",
+            "200",
+            &org_id,
+            StreamType::Traces.as_str(),
+            "",
+            "",
+        ])
+        .inc();
+
+    let mut resp: HashMap<&str, json::Value> = HashMap::new();
+    resp.insert("took", json::Value::from((time * 1000.0) as usize));
+    resp.insert("total", json::Value::from(all_hits.len()));
+    resp.insert("hits", json::to_value(all_hits).unwrap());
+    resp.insert("trace_id", json::Value::from(trace_id));
+    if !range_error.is_empty() {
+        resp.insert("function_error", json::Value::String(range_error));
+    }
+    Ok(HttpResponse::Ok().json(resp))
+}
+
 #[derive(Debug, Serialize)]
 struct TraceResponseItem {
     trace_id: String,

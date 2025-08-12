@@ -306,6 +306,9 @@ async fn main() -> Result<(), anyhow::Error> {
             // flush db
             let db = infra::db::get_db().await;
             _ = db.close().await;
+
+            // stop cuckoo filter manager
+            job::files::cuckoo_filter::GLOBAL_CUCKOO_FILTER_MANAGER.close();
         });
     });
 

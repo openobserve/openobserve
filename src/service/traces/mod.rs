@@ -961,11 +961,20 @@ async fn write_traces(
 
     // send trace metadata
     if !trace_index_values.is_empty()
-        && let Err(e) = write(org_id, MetadataType::TraceListIndexer, trace_index_values).await
+        && let Err(e) = write(
+            org_id,
+            MetadataType::TraceListIndexer,
+            trace_index_values.clone(),
+        )
+        .await
     {
         log::error!("Error while writing trace_index values: {e}");
     }
 
+    if !trace_index_values.is_empty() {
+        let _ =
+            crate::service::index::cuckoo_filter::build_cockfoo_filter(org_id, trace_index_values);
+    }
     // only one trigger per request
     evaluate_trigger(triggers).await;
 

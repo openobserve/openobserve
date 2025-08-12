@@ -2873,6 +2873,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cuckoofilter-mmap"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfa71f81bf8b47c11cdd91830a2c7f028d274d970a549f48597cdde7dc733bdb"
+dependencies = [
+ "log",
+ "memmap2",
+ "murmur3",
+ "rand 0.8.5",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "curve25519-dalek"
 version = "4.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5115,6 +5128,7 @@ dependencies = [
  "chrono",
  "collapse",
  "config",
+ "cuckoofilter-mmap",
  "datafusion",
  "etcd-client",
  "futures",
@@ -6420,6 +6434,7 @@ dependencies = [
  "console-subscriber",
  "cron",
  "csv",
+ "cuckoofilter-mmap",
  "dashmap",
  "datafusion",
  "datafusion-functions-aggregate-common",
