@@ -133,6 +133,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     let scan_stats = ScanStats {
         files: file_id_list_num as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
+        file_list_took: file_id_list_took as i64,
         ..Default::default()
     };
 
@@ -776,8 +777,7 @@ pub async fn partition_filt_list(
 ) -> Result<Vec<Vec<i64>>> {
     let cfg = get_config();
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
-    let mut partition_strategy =
-        QueryPartitionStrategy::from(&cfg.common.feature_query_partition_strategy);
+    let mut partition_strategy = cfg.common.feature_query_partition_strategy.clone();
     if cfg.cache_latest_files.enabled {
         partition_strategy = QueryPartitionStrategy::FileHash;
     }

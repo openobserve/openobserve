@@ -143,7 +143,7 @@ pub async fn search(
         )
     );
 
-    let mut scan_stats = ScanStats {
+    let scan_stats = ScanStats {
         files: file_id_list_num as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
         file_list_took: file_id_list_took as i64,
@@ -205,7 +205,7 @@ pub async fn search(
     );
 
     // check work group
-    let (_took_wait, work_group_str, work_group) = check_work_group(
+    let (took_wait, work_group_str, work_group) = check_work_group(
         &req,
         &trace_id,
         &nodes,
@@ -216,7 +216,10 @@ pub async fn search(
     )
     .await?;
     // add work_group
-    req.add_work_group(Some(work_group_str));
+    req.add_work_group(Some(work_group_str.clone()));
+    log::info!(
+        "[trace_id {trace_id}] flight->follower_leader: add work_group: {work_group_str}, took: {took_wait} ms"
+    );
 
     // release work_group in flight follow search
     let user_id = req.user_id.clone();
@@ -240,6 +243,10 @@ pub async fn search(
 
     // partition file list
     let partition_file_lists = partition_filt_list(file_id_list, &nodes, role_group).await?;
+    log::info!(
+        "[trace_id {trace_id}] flight->follower_leader: get partition_file_lists num: {}",
+        partition_file_lists.len()
+    );
     let mut need_ingesters = 0;
     let mut need_queriers = 0;
     for (i, node) in nodes.iter().enumerate() {
@@ -303,13 +310,6 @@ pub async fn search(
     }
 
     log::info!("[trace_id {trace_id}] flight->follower_leader: generate physical plan finish");
-
-    // we should collect scan state by `collect_stats`, here need to reutrn empty for super cluster
-    // follower
-    scan_stats.files = 0;
-    scan_stats.records = 0;
-    scan_stats.original_size = 0;
-    scan_stats.compressed_size = 0;
 
     Ok((ctx, physical_plan, defer, scan_stats))
 }

@@ -336,6 +336,19 @@ pub async fn get(org_id: &str, email: &str) -> Result<OrgUserRecord, errors::Err
     Ok(OrgUserRecord::from(record))
 }
 
+pub async fn get_admin(org_id: &str) -> Result<OrgUserRecord, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let user = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Role.eq(UserRole::Admin as i16))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("User not found".to_string())))?;
+
+    Ok(OrgUserRecord::from(user))
+}
+
 pub async fn get_expanded_user_org(
     org_id: &str,
     email: &str,

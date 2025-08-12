@@ -88,10 +88,10 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
         let fts_fields = get_stream_setting_fts_fields(&stream_settings);
         for fts_field in fts_fields {
-            if schema.field_with_name(&fts_field).is_none() {
+            let Some(field) = schema.field_with_name(&fts_field) else {
                 continue;
-            }
-            fields.push(fts_field);
+            };
+            fields.push((fts_field, field.data_type().clone()));
         }
         // *********** custom rules ***********
         rules.push(Arc::new(RewriteMatch::new(fields)));

@@ -422,7 +422,7 @@ export default defineComponent({
       }
       return (
         store.state.organizationData.folders.find(
-          (item: any) => item.folderId === route.query.folder ?? "default",
+          (item: any) => item.folderId === (route.query.folder ?? "default"),
         )?.name ?? "default"
       );
     });
@@ -656,7 +656,7 @@ export default defineComponent({
       currentDashboardData.data = await getDashboard(
         store,
         route.query.dashboard,
-        route.query.folder ?? "default",
+        (route.query.folder ?? "default"),
       );
 
       if (
@@ -816,7 +816,7 @@ export default defineComponent({
       return router.push({
         path: "/dashboards",
         query: {
-          folder: route.query.folder ?? "default",
+          folder: (route.query.folder ?? "default"),
         },
       });
     };
@@ -828,7 +828,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
-          folder: route.query.folder ?? "default",
+          folder: (route.query.folder ?? "default"),
           tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
         },
       });
@@ -947,7 +947,7 @@ export default defineComponent({
           store,
           route.query.dashboard,
           panelId,
-          route.query.folder ?? "default",
+          (route.query.folder ?? "default"),
           route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
         );
         await loadDashboard();
@@ -977,7 +977,7 @@ export default defineComponent({
           store,
           route.query.dashboard,
           panelId,
-          route.query.folder ?? "default",
+          (route.query.folder ?? "default"),
           route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
           newTabId,
         );
