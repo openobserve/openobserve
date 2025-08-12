@@ -18,6 +18,7 @@ import {
   formatDate,
   formatUnitValue,
   getContrastColor,
+  applySeriesColorMappings,
   getUnitValue,
 } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
@@ -799,73 +800,12 @@ export const convertPromQLData = async (
   }
 
   options.series = options.series.flat();
-  // Handle colorBySeries logic to prevent duplicate colors between
-  // auto-generated palette colors and user-configured series colors.
-  if (panelSchema?.config?.color?.colorBySeries?.length) {
-    const mappings: Array<{ value: string; color: string | null }> =
-      panelSchema.config.color.colorBySeries;
-
-    // Gather configured series and colors
-    const configuredSeriesToColor = new Map<string, string>();
-    const configuredColors = new Set<string>();
-    for (const m of mappings) {
-      if (m?.value && m?.color) {
-        configuredSeriesToColor.set(String(m.value), String(m.color));
-        configuredColors.add(String(m.color));
-      }
-    }
-
-    if (configuredSeriesToColor.size > 0) {
-      const usedColors = new Set<string>(configuredColors);
-
-      const getSeriesClr = (s: any): string | undefined =>
-        s?.color ?? s?.itemStyle?.color;
-      const setSeriesClr = (s: any, clr: string) => {
-        if (s) {
-          if (s.color !== undefined) s.color = clr;
-          if (s.itemStyle?.color !== undefined) s.itemStyle.color = clr;
-        }
-      };
-
-      // First, enforce mapping colors for mapped series and record colors in use
-      options.series.forEach((series: any) => {
-        const mappedColor = configuredSeriesToColor.get(series?.name);
-        if (mappedColor) {
-          setSeriesClr(series, mappedColor);
-          usedColors.add(mappedColor);
-        } else {
-          const current = getSeriesClr(series);
-          if (current) usedColors.add(current);
-        }
-      });
-
-      // Helper to generate a unique non-conflicting color
-      const generateUniqueColor = (
-        used: Set<string>,
-        theme: string,
-      ): string => {
-        const palette = getColorPalette(theme);
-        for (const c of palette) {
-          if (!used.has(c)) return c;
-        }
-        const hue = (used.size * 137.508) % 360;
-        const saturation = 70 + (used.size % 20);
-        const lightness = 45 + (used.size % 20);
-        return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-      };
-
-      // Then, reassign any auto-generated series that collide with configured colors
-      options.series.forEach((series: any) => {
-        if (configuredSeriesToColor.has(series?.name)) return; // skip configured series
-        const current = getSeriesClr(series);
-        if (current && configuredColors.has(current)) {
-          const next = generateUniqueColor(usedColors, store.state.theme);
-          usedColors.add(next);
-          setSeriesClr(series, next);
-        }
-      });
-    }
-  }
+  // Apply series color mappings via reusable helper
+  applySeriesColorMappings(
+    options.series,
+    panelSchema?.config?.color?.colorBySeries,
+    store.state.theme,
+  );
 
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
   //only check for vertical side only
