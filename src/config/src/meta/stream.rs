@@ -249,21 +249,24 @@ pub struct FileListDeleted {
     pub flattened: bool,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub enum QueryPartitionStrategy {
+    #[default]
     FileNum,
     FileSize,
     FileHash,
 }
 
-impl From<&String> for QueryPartitionStrategy {
-    fn from(s: &String) -> Self {
-        match s.to_lowercase().as_str() {
+impl std::str::FromStr for QueryPartitionStrategy {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_lowercase().as_str() {
             "file_num" => QueryPartitionStrategy::FileNum,
             "file_size" => QueryPartitionStrategy::FileSize,
             "file_hash" => QueryPartitionStrategy::FileHash,
             _ => QueryPartitionStrategy::FileNum,
-        }
+        })
     }
 }
 

@@ -116,7 +116,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         .filter(|f| {
             schema_fields
                 .get(f)
-                .map(|v| v.data_type() == &DataType::Utf8)
+                .map(|v| v.data_type() == &DataType::Utf8 || v.data_type() == &DataType::LargeUtf8)
                 .is_some()
         })
         .map(|f| f.to_string())
