@@ -540,6 +540,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
+    log::info!("EnrichmentTables cache start");
     let r = STREAM_SCHEMAS_LATEST.read().await;
     let mut tables = HashMap::new();
     for schema_key in r.keys() {
