@@ -13,29 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    io::Cursor,
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::{io::Cursor, sync::Arc};
 
-use arrow::{
-    array::RecordBatch,
-    ipc::{CompressionType, writer::IpcWriteOptions},
-};
+use arrow::ipc::{CompressionType, writer::IpcWriteOptions};
 use arrow_flight::{
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
-    encode::FlightDataEncoderBuilder, error::FlightError, flight_service_server::FlightService,
+    flight_service_server::FlightService,
 };
-use arrow_schema::Schema;
-use config::{cluster::LOCAL_NODE, meta::search::ScanStats, metrics};
+use config::{cluster::LOCAL_NODE, meta::search::ScanStats};
 use datafusion::{
     common::{DataFusionError, Result},
-    execution::SendableRecordBatchStream,
     physical_plan::execute_stream,
 };
-use futures::{Stream, StreamExt, TryStreamExt, stream::BoxStream};
+use flight::common::CustomMessage;
+use futures::{StreamExt, stream::BoxStream};
+use futures_util::pin_mut;
 use prost::Message;
 use tonic::{Request, Response, Status, Streaming};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -47,7 +40,7 @@ use {
 };
 
 use crate::{
-    handler::grpc::MetadataMap,
+    handler::grpc::{MetadataMap, flight::stream::FlightEncoderStreamBuilder},
     service::search::{
         grpc::flight as grpcFlight,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -55,6 +48,8 @@ use crate::{
         utils::AsyncDefer,
     },
 };
+
+mod stream;
 
 #[derive(Default)]
 pub struct FlightServiceImpl;
@@ -96,11 +91,7 @@ impl FlightService for FlightServiceImpl {
         );
         let is_super_cluster = req.super_cluster_info.is_super_cluster;
         let timeout = req.search_info.timeout as u64;
-        log::info!(
-            "[trace_id {}] flight->search: do_get, timeout: {}s",
-            trace_id,
-            timeout
-        );
+        log::info!("[trace_id {trace_id}] flight->search: do_get, timeout: {timeout}s",);
 
         #[cfg(feature = "enterprise")]
         if is_super_cluster && !SEARCH_SERVER.contain_key(&trace_id).await {
@@ -145,12 +136,8 @@ impl FlightService for FlightServiceImpl {
         };
 
         log::info!(
-            "[trace_id {}] flight->search: executing stream, is super cluster: {}",
-            trace_id,
-            is_super_cluster
+            "[trace_id {trace_id}] flight->search: executing stream, is super cluster: {is_super_cluster}"
         );
-
-        let mut schema = physical_plan.schema();
 
         if cfg.common.print_key_sql {
             log::info!(
@@ -162,7 +149,6 @@ impl FlightService for FlightServiceImpl {
             );
         }
 
-        schema = add_scan_stats_to_schema(schema, scan_stats);
         #[cfg(feature = "enterprise")]
         if get_o2_config().super_cluster.enabled && !req.super_cluster_info.is_super_cluster {
             // we only set for non-follow leaders
@@ -185,6 +171,7 @@ impl FlightService for FlightServiceImpl {
                 );
                 Status::internal(e.to_string())
             })?;
+
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
             // clear session data
             clear_session_data(&trace_id);
@@ -193,22 +180,35 @@ impl FlightService for FlightServiceImpl {
             );
             Status::internal(e.to_string())
         })?;
-        let flight_data_stream = FlightDataEncoderBuilder::new()
-            .with_schema(schema)
-            .with_max_flight_data_size(33554432) // 32MB
-            .with_options(write_options)
-            .build(FlightSenderStream::new(
-                trace_id.to_string(),
-                stream,
-                defer,
-                start,
-                timeout,
-            ))
-            .map_err(|err| Status::from_error(Box::new(err)));
 
-        Ok(Response::new(
-            Box::pin(flight_data_stream) as Self::DoGetStream
-        ))
+        let mut stream = FlightEncoderStreamBuilder::new(write_options, 33554432)
+            .with_trace_id(trace_id.to_string())
+            .with_defer(defer)
+            .with_start(start)
+            .with_custom_message(CustomMessage::ScanStats(scan_stats))
+            .build(stream);
+
+        let stream = async_stream::stream! {
+            let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));
+            pin_mut!(timeout);
+            loop {
+                tokio::select! {
+                    batch = stream.next() => {
+                        if let Some(batch) = batch {
+                            yield batch
+                        } else {
+                            break;
+                        }
+                    }
+                    _ = &mut timeout => {
+                        log::info!("[trace_id {trace_id}] flight->search: timeout");
+                        break;
+                    }
+                }
+            }
+        };
+
+        Ok(Response::new(Box::pin(stream) as Self::DoGetStream))
     }
 
     async fn handshake(
@@ -275,92 +275,6 @@ impl FlightService for FlightServiceImpl {
     }
 }
 
-struct FlightSenderStream {
-    trace_id: String,
-    stream: SendableRecordBatchStream,
-    defer: Option<AsyncDefer>,
-    start: std::time::Instant,
-    timeout: u64,
-}
-
-impl FlightSenderStream {
-    fn new(
-        trace_id: String,
-        stream: SendableRecordBatchStream,
-        defer: Option<AsyncDefer>,
-        start: std::time::Instant,
-        timeout: u64,
-    ) -> Self {
-        Self {
-            trace_id,
-            stream,
-            defer,
-            start,
-            timeout,
-        }
-    }
-}
-
-impl Stream for FlightSenderStream {
-    type Item = Result<RecordBatch, FlightError>;
-
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
-        if self.start.elapsed().as_secs() > self.timeout {
-            return Poll::Ready(None);
-        }
-        match self.stream.poll_next_unpin(ctx) {
-            Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(Ok(batch))),
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(Some(Err(e))) => {
-                log::error!(
-                    "[trace_id {}] flight->search: stream error: {}, took: {} ms",
-                    self.trace_id,
-                    e,
-                    self.start.elapsed().as_millis()
-                );
-                Poll::Ready(Some(Err(FlightError::Tonic(
-                    Status::internal(e.to_string()).into(),
-                ))))
-            }
-        }
-    }
-}
-
-impl Drop for FlightSenderStream {
-    fn drop(&mut self) {
-        let end = self.start.elapsed().as_millis();
-        log::info!(
-            "[trace_id {}] flight->search: stream end, took: {} ms",
-            self.trace_id,
-            end
-        );
-
-        // metrics
-        let time = self.start.elapsed().as_secs_f64();
-        metrics::GRPC_RESPONSE_TIME
-            .with_label_values(&["/search/flight/do_get", "200", "", "", "", ""])
-            .observe(time);
-        metrics::GRPC_INCOMING_REQUESTS
-            .with_label_values(&["/search/flight/do_get", "200", "", "", "", ""])
-            .inc();
-
-        if let Some(defer) = self.defer.take() {
-            drop(defer);
-        } else {
-            log::info!(
-                "[trace_id {}] flight->search: drop FlightSenderStream",
-                self.trace_id
-            );
-            // clear session data
-            clear_session_data(&self.trace_id);
-        }
-    }
-}
-
 type PlanResult = (
     datafusion::prelude::SessionContext,
     Arc<dyn datafusion::physical_plan::ExecutionPlan>,
@@ -392,13 +306,6 @@ async fn get_ctx_and_physical_plan(
 ) -> Result<PlanResult, infra::errors::Error> {
     let (ctx, physical_plan, scan_stats) = grpcFlight::search(trace_id, req).await?;
     Ok((ctx, physical_plan, None, scan_stats))
-}
-
-fn add_scan_stats_to_schema(schema: Arc<Schema>, scan_stats: ScanStats) -> Arc<Schema> {
-    let mut metadata = schema.metadata().clone();
-    let stats_string = serde_json::to_string(&scan_stats).unwrap_or_default();
-    metadata.insert("scan_stats".to_string(), stats_string);
-    Arc::new(schema.as_ref().clone().with_metadata(metadata))
 }
 
 fn clear_session_data(trace_id: &str) {

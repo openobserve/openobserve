@@ -194,6 +194,8 @@ derive_more = { version = "2.0.1", features = ["full"] }
 brotli = "8.0.1"
 tokio-rustls.workspace = true
 roaring.workspace = true
+flight.workspace = true
+async-stream.workspace = true
 
 [dev-dependencies]
 async-walkdir.workspace = true
@@ -210,6 +212,7 @@ members = [
     "src/wal",
     "src/proto",
     "src/report_server",
+    "src/flight",
 ]
 resolver = "2"
 
@@ -225,6 +228,7 @@ ingester = { path = "src/ingester" }
 wal = { path = "src/wal" }
 proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
+flight = { path = "src/flight" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = { version = "4.9", features = ["rustls-0_23"] }
@@ -393,3 +397,4 @@ vrl = { version = "0.22", features = ["value", "compiler", "test"] }
 zip = "3.0.0"
 zstd = "0.13"
 roaring = "0.11.2"
+async-stream = "0.3.6"
