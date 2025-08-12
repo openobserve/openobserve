@@ -983,7 +983,7 @@ const useLogs = () => {
       }
 
       if (searchObj.meta.sqlMode == true) {
-        searchObj.data.query = query.trim().startsWith("--");
+        searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
         if (parsedSQL != undefined) {
           //check if query is valid or not , if the query is invalid --> empty query
@@ -1012,7 +1012,9 @@ const useLogs = () => {
           }
         }
 
-        req.query.sql = query;
+        req.query.sql = query.split("\n")
+          .filter((line: string) => !line.trim().startsWith("--"))
+          .join("\n");
         req.query["sql_mode"] = "full";
         // delete req.aggs;
       } else {
