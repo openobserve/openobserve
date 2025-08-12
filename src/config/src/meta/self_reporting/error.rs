@@ -100,10 +100,16 @@ impl PipelineError {
         }
     }
 
-    pub fn add_node_error(&mut self, node_id: String, node_type: String, error: String) {
+    pub fn add_node_error(
+        &mut self,
+        node_id: String,
+        node_type: String,
+        error: String,
+        fn_name: Option<String>,
+    ) {
         self.node_errors
             .entry(node_id.clone())
-            .or_insert_with(|| NodeErrors::new(node_id, node_type))
+            .or_insert_with(|| NodeErrors::new(node_id, node_type, fn_name))
             .add_error(error);
     }
 }
@@ -115,15 +121,18 @@ pub struct NodeErrors {
     node_type: String,
     errors: HashSet<String>,
     error_count: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function_name: Option<String>,
 }
 
 impl NodeErrors {
-    pub fn new(node_id: String, node_type: String) -> Self {
+    pub fn new(node_id: String, node_type: String, function_name: Option<String>) -> Self {
         Self {
             node_id,
             node_type,
             errors: HashSet::new(),
             error_count: 0,
+            function_name,
         }
     }
 
@@ -154,6 +163,7 @@ mod tests {
                         node_type: "function".to_string(),
                         errors: HashSet::from(["failed to compile".to_string()]),
                         error_count: 1,
+                        function_name: None,
                     },
                 )]),
             }),
