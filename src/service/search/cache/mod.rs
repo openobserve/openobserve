@@ -85,7 +85,6 @@ pub async fn search(
 
     // Result caching check start
     let mut origin_sql = in_req.query.sql.clone();
-    origin_sql = origin_sql.replace('\n', " ");
     let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
     let (stream_name, all_streams) = match resolve_stream_names(&origin_sql) {
         // TODO: cache don't not support multiple stream names
