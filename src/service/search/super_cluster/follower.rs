@@ -143,7 +143,7 @@ pub async fn search(
         )
     );
 
-    let mut scan_stats = ScanStats {
+    let scan_stats = ScanStats {
         files: file_id_list_num as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
         file_list_took: file_id_list_took as i64,
@@ -310,13 +310,6 @@ pub async fn search(
     }
 
     log::info!("[trace_id {trace_id}] flight->follower_leader: generate physical plan finish");
-
-    // we should collect scan state by `collect_stats`, here need to reutrn empty for super cluster
-    // follower
-    scan_stats.files = 0;
-    scan_stats.records = 0;
-    scan_stats.original_size = 0;
-    scan_stats.compressed_size = 0;
 
     Ok((ctx, physical_plan, defer, scan_stats))
 }
