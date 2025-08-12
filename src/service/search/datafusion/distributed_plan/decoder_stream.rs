@@ -36,7 +36,6 @@ use crate::service::search::{
 pub struct FlightDecoderStream {
     inner: FlightDataDecoder,
     query_context: QueryContext,
-    num_rows: usize,
 }
 
 impl FlightDecoderStream {
@@ -49,7 +48,6 @@ impl FlightDecoderStream {
         Self {
             inner: FlightDataDecoder::new(inner, Some(schema)),
             query_context,
-            num_rows: 0,
         }
     }
 
@@ -93,7 +91,7 @@ impl Stream for FlightDecoderStream {
                 // translate data
                 Some(Ok(data)) => match data {
                     FlightMessage::RecordBatch(batch) => {
-                        self.num_rows += batch.num_rows();
+                        self.query_context.num_rows += batch.num_rows();
                         return Poll::Ready(Some(Ok(batch)));
                     }
                     FlightMessage::CustomMessage(message) => {
