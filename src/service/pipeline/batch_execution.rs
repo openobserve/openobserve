@@ -993,7 +993,7 @@ async fn process_node(
             let err_msg = "[Pipeline]: remote destination is not supported in open source version. Records dropped".to_string();
             log::error!("{err_msg}");
             if let Err(send_err) = error_sender
-                .send((node.id.to_string(), node.node_type(), err_msg))
+                .send((node.id.to_string(), node.node_type(), err_msg, None))
                 .await
             {
                 log::error!(
