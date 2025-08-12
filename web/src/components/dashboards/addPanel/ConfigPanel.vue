@@ -1538,7 +1538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="space"></div>
     <ColorPaletteDropDown v-if="showColorPalette" />
     <div class="space"></div>
-    <ColorBySeries :colorBySeriesData="panelData" />
+    <ColorBySeries :colorBySeriesData="panelData" v-if="showColorPalette" />
     <div class="space"></div>
     <OverrideConfig
       v-if="dashboardPanelData.data.type == 'table'"
