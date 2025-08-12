@@ -983,7 +983,7 @@ const useLogs = () => {
       }
 
       if (searchObj.meta.sqlMode == true) {
-        searchObj.data.query = query;
+        searchObj.data.query = query.trim().startsWith("--");
         const parsedSQL: any = fnParsedSQL();
         if (parsedSQL != undefined) {
           //check if query is valid or not , if the query is invalid --> empty query
