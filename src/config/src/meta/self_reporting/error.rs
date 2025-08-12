@@ -77,7 +77,6 @@ impl PipelineError {
             .entry(node_id.clone())
             .or_insert_with(|| NodeErrors::new(node_id, node_type))
             .add_error(error);
-        println!("errors are:{:?}",self.node_errors);
         self.function_name = fn_name;
     }
 }
@@ -137,6 +136,7 @@ mod tests {
                 pipeline_id: "pipeline_id".to_string(),
                 pipeline_name: "pipeline_name".to_string(),
                 error: Some("pipeline init error".to_string()),
+                function_name: None,
                 node_errors: HashMap::from([(
                     "node_1".to_string(),
                     NodeErrors {

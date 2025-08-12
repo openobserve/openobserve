@@ -199,7 +199,7 @@ impl ExecutablePipeline {
                     pipeline_name: pipeline.name.to_string(),
                     error: Some(format!("Init error: failed to compile function: {e}")),
                     node_errors: HashMap::new(),
-                    function_name: None
+                    function_name: None,
                 };
                 publish_error(ErrorData {
                     _timestamp: Utc::now().timestamp_micros(),
@@ -220,7 +220,7 @@ impl ExecutablePipeline {
                         "Init error: failed to sort pipeline nodes for execution".to_string(),
                     ),
                     node_errors: HashMap::new(),
-                    function_name: None
+                    function_name: None,
                 };
                 publish_error(ErrorData {
                     _timestamp: Utc::now().timestamp_micros(),
@@ -262,7 +262,8 @@ impl ExecutablePipeline {
             channel::<(usize, StreamParams, Value)>(batch_size);
 
         // error_channel
-        let (error_sender, mut error_receiver) = channel::<(String, String, String, Option<String>)>(batch_size);
+        let (error_sender, mut error_receiver) =
+            channel::<(String, String, String, Option<String>)>(batch_size);
 
         let mut node_senders = HashMap::new();
         let mut node_receivers = HashMap::new();
@@ -333,9 +334,8 @@ impl ExecutablePipeline {
         let error_task = tokio::spawn(async move {
             log::debug!("[Pipeline]: starts error collecting job");
             let mut count = 0;
-            while let Some((node_id, node_type, error , fn_name)) = error_receiver.recv().await {
-                //println!("found error :{error}");
-                pipeline_error.add_node_error(node_id, node_type, error,fn_name);
+            while let Some((node_id, node_type, error, fn_name)) = error_receiver.recv().await {
+                pipeline_error.add_node_error(node_id, node_type, error, fn_name);
                 count += 1;
             }
             log::debug!("[Pipeline]: collected {count} errors");
@@ -714,8 +714,14 @@ async fn process_node(
                             Ok(flattened) => flattened,
                             Err(e) => {
                                 let err_msg = format!("FunctionNode error with flattening: {}", e);
+                                let err_msg = err_msg.get(0..500).unwrap_or(&err_msg);
                                 if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg, Some(func_params.name.to_owned())))
+                                    .send((
+                                        node.id.to_string(),
+                                        node.node_type(),
+                                        err_msg.to_owned(),
+                                        Some(func_params.name.to_owned()),
+                                    ))
                                     .await
                                 {
                                     log::error!(
@@ -738,9 +744,17 @@ async fn process_node(
                         ) {
                             (res, None) => res,
                             (res, Some(error)) => {
-                                let err_msg = format!("FunctionNode error: {}", error);
+                                let err_msg = format!(
+                                    "FunctionNode error: {}",
+                                    error.get(0..500).unwrap_or(&error)
+                                );
                                 if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg, Some(func_params.name.to_owned())))
+                                    .send((
+                                        node.id.to_string(),
+                                        node.node_type(),
+                                        err_msg.to_owned(),
+                                        Some(func_params.name.to_owned()),
+                                    ))
                                     .await
                                 {
                                     log::error!(
@@ -776,9 +790,17 @@ async fn process_node(
                     ) {
                         (res, None) => res,
                         (res, Some(error)) => {
-                            let err_msg = format!("FunctionNode error: {}", error);
+                            let err_msg = format!(
+                                "FunctionNode error: {}",
+                                error.get(0..500).unwrap_or(&error)
+                            );
                             if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg, Some(func_params.name.to_owned())))
+                                .send((
+                                    node.id.to_string(),
+                                    node.node_type(),
+                                    err_msg.to_owned(),
+                                    Some(func_params.name.to_owned()),
+                                ))
                                 .await
                             {
                                 log::error!(
