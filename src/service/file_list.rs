@@ -156,8 +156,6 @@ pub async fn query_by_ids(trace_id: &str, ids: &[i64]) -> Result<Vec<FileKey>> {
         let trace_id = trace_id.to_string();
         tokio::task::spawn(async move {
             let start = std::time::Instant::now();
-            let cfg = get_config();
-            let start = std::time::Instant::now();
             if let Err(e) = file_list::LOCAL_CACHE.batch_add_with_id(&db_files).await {
                 log::error!("[trace_id {trace_id}] file_list set cache failed: {:?}", e);
             }
