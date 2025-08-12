@@ -25,7 +25,7 @@
         size="sm"
         flat
         icon="info_outline"
-        data-test="dashboard-addpanel-config-drilldown-info"
+        data-test="dashboard-addpanel-config-color-by-series"
       >
         <q-tooltip
           class="bg-grey-8"
@@ -47,7 +47,7 @@
           : ' Apply color by series'
       "
       no-caps
-      data-test="dashboard-addpanel-config-drilldown-add-btn"
+      data-test="dashboard-addpanel-config-colorBySeries-add-btn"
     />
     <q-dialog v-model="showColorBySeriesPopUp">
       <ColorBySeriesPopUp

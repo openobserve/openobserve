@@ -17,7 +17,7 @@
 <template>
   <div
     class="scroll"
-    data-test="dashboard-value-series-popup"
+    data-test="dashboard-color-by-series-popup"
     style="padding: 5px 10px; min-width: min(1200px, 90vw)"
   >
     <div
@@ -36,7 +36,7 @@
         outline
         :title="t('dashboard.cancel')"
         @click.stop="cancelEdit"
-        data-test="dashboard-tab-settings-tab-name-edit-cancel"
+        data-test="dashboard-color-by-series-cancel"
       ></q-btn>
     </div>
     <div class="flex tw-justify-between tw-flex-col">
@@ -45,7 +45,7 @@
           v-model="editColorBySeries"
           :options="dragOptions"
           @mousedown.stop="() => {}"
-          data-test="dashboard-addpanel-config-value-series-drag"
+          data-test="dashboard-addpanel-config-color-by-series-drag"
         >
           <div
             v-for="(series, index) in editColorBySeries"
@@ -57,7 +57,7 @@
                 name="drag_indicator"
                 color="grey-13"
                 class="q-mr-xs"
-                :data-test="`dashboard-addpanel-config-value-series-drag-handle-${index}`"
+                :data-test="`dashboard-addpanel-config-color-by-series-drag-handle-${index}`"
               />
             </div>
             <div class="draggable-content tw-flex tw-gap-x-6">
@@ -143,7 +143,7 @@
                 flat
                 round
                 @click="removecolorBySeriesByIndex(index)"
-                :data-test="`dashboard-addpanel-config-value-series-delete-btn-${index}`"
+                :data-test="`dashboard-addpanel-config-color-by-series-delete-btn-${index}`"
               />
             </div>
           </div>
@@ -158,7 +158,7 @@
         no-caps
         outline
         dense
-        data-test="dashboard-addpanel-config-value-series-add-btn"
+        data-test="dashboard-addpanel-config-color-by-series-add-btn"
       />
       <q-btn
         @click="applycolorBySeries"
@@ -168,7 +168,7 @@
         padding="5px 14px"
         no-caps
         dense
-        data-test="dashboard-addpanel-config-value-series-apply-btn"
+        data-test="dashboard-addpanel-config-color-by-series-apply-btn"
       />
     </div>
   </div>
@@ -181,10 +181,7 @@ import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
 import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import CommonAutoComplete from "./CommonAutoComplete.vue";
-import { items } from "happy-dom/lib/PropertySymbol";
 import { watch } from "vue";
-import { inject } from "vue";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
 
 export default defineComponent({
   name: "colorBySeriesPopUp",
