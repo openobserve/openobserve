@@ -6,11 +6,15 @@ on:
       - "main"
     paths-ignore:
       - "**.md"
+      - "**.yml"
+      - "**.yaml"
   pull_request:
     branches:
       - "*"
     paths-ignore:
       - "**.md"
+      - "**.yml"
+      - "**.yaml"
 
 env:
   COLUMNS: 150
@@ -40,7 +44,7 @@ jobs:
 
     steps:
       - name: Clone the current repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check if API code has changes and skip if none
         run: |
@@ -119,7 +123,7 @@ jobs:
     
     steps:
       - name: Clone the current repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check if frontend code has changes and skip if none
         run: |

@@ -110,7 +110,7 @@ pub fn cast_to_type(
             continue;
         }
         match field.data_type() {
-            DataType::Utf8 => {
+            DataType::Utf8 | DataType::LargeUtf8 => {
                 if val.is_string() {
                     continue;
                 }
