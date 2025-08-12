@@ -58,6 +58,7 @@ impl From<Dashboard> for super::Dashboard {
         Self {
             v1: None,
             v2: Some(value),
+            v6: None,
             v3: None,
             v4: None,
             v5: None,
