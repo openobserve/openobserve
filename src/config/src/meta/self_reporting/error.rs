@@ -51,8 +51,6 @@ pub struct PipelineError {
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(serialize_with = "serialize_values_only")]
     pub node_errors: HashMap<String, NodeErrors>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub function_name: Option<String>,
 }
 
 impl PipelineError {
@@ -62,7 +60,6 @@ impl PipelineError {
             pipeline_name: pipeline_name.to_string(),
             error: None,
             node_errors: HashMap::new(),
-            function_name: None,
         }
     }
 
@@ -75,9 +72,8 @@ impl PipelineError {
     ) {
         self.node_errors
             .entry(node_id.clone())
-            .or_insert_with(|| NodeErrors::new(node_id, node_type))
+            .or_insert_with(|| NodeErrors::new(node_id, node_type, fn_name))
             .add_error(error);
-        self.function_name = fn_name;
     }
 }
 
@@ -88,15 +84,18 @@ pub struct NodeErrors {
     node_type: String,
     errors: HashSet<String>,
     error_count: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function_name: Option<String>,
 }
 
 impl NodeErrors {
-    pub fn new(node_id: String, node_type: String) -> Self {
+    pub fn new(node_id: String, node_type: String, function_name: Option<String>) -> Self {
         Self {
             node_id,
             node_type,
             errors: HashSet::new(),
             error_count: 0,
+            function_name,
         }
     }
 
@@ -136,7 +135,6 @@ mod tests {
                 pipeline_id: "pipeline_id".to_string(),
                 pipeline_name: "pipeline_name".to_string(),
                 error: Some("pipeline init error".to_string()),
-                function_name: None,
                 node_errors: HashMap::from([(
                     "node_1".to_string(),
                     NodeErrors {
@@ -144,6 +142,7 @@ mod tests {
                         node_type: "function".to_string(),
                         errors: HashSet::from(["failed to compile".to_string()]),
                         error_count: 1,
+                        function_name: None,
                     },
                 )]),
             }),

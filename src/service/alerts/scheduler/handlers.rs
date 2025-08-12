@@ -1182,7 +1182,6 @@ async fn handle_derived_stream_triggers(
                 pipeline_name: pipeline.name.to_string(),
                 error: Some(err_msg),
                 node_errors: HashMap::new(),
-                function_name: None,
             };
             crate::service::self_reporting::publish_error(ErrorData {
                 _timestamp: Utc::now().timestamp_micros(),
@@ -1323,7 +1322,6 @@ async fn handle_derived_stream_triggers(
                         pipeline_name: pipeline.name.to_string(),
                         error: Some(err),
                         node_errors: HashMap::new(),
-                        function_name: None,
                     };
                     crate::service::self_reporting::publish_error(ErrorData {
                         _timestamp: Utc::now().timestamp_micros(),
@@ -1432,7 +1430,6 @@ async fn handle_derived_stream_triggers(
             pipeline_name: pipeline.name.to_string(),
             error: Some(err_msg),
             node_errors: HashMap::new(),
-            function_name: None,
         };
         crate::service::self_reporting::publish_error(ErrorData {
             _timestamp: Utc::now().timestamp_micros(),

@@ -199,7 +199,6 @@ impl ExecutablePipeline {
                     pipeline_name: pipeline.name.to_string(),
                     error: Some(format!("Init error: failed to compile function: {e}")),
                     node_errors: HashMap::new(),
-                    function_name: None,
                 };
                 publish_error(ErrorData {
                     _timestamp: Utc::now().timestamp_micros(),
@@ -220,7 +219,6 @@ impl ExecutablePipeline {
                         "Init error: failed to sort pipeline nodes for execution".to_string(),
                     ),
                     node_errors: HashMap::new(),
-                    function_name: None,
                 };
                 publish_error(ErrorData {
                     _timestamp: Utc::now().timestamp_micros(),
