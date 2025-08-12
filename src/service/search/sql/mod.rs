@@ -346,7 +346,8 @@ impl Sql {
                     .fields()
                     .iter()
                     .map(|f| {
-                        if f.data_type() == &DataType::Utf8 {
+                        if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8
+                        {
                             Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
                         } else {
                             f.clone()

@@ -18,8 +18,9 @@ use std::sync::Arc;
 use arrow::{
     array::{
         ArrayBuilder, ArrayRef, BinaryBuilder, BooleanArray, BooleanBuilder, Float64Array,
-        Float64Builder, Int64Array, Int64Builder, NullBuilder, RecordBatchOptions, StringArray,
-        StringBuilder, StringViewBuilder, UInt64Array, UInt64Builder, new_null_array,
+        Float64Builder, Int64Array, Int64Builder, LargeStringArray, LargeStringBuilder,
+        NullBuilder, RecordBatchOptions, StringArray, StringBuilder, StringViewArray,
+        StringViewBuilder, UInt64Array, UInt64Builder, new_null_array,
     },
     record_batch::RecordBatch,
 };
@@ -88,6 +89,17 @@ pub fn convert_json_to_record_batch(
                 continue;
             };
             match data_type {
+                DataType::Utf8 => {
+                    let b = builder
+                        .as_any_mut()
+                        .downcast_mut::<StringBuilder>()
+                        .unwrap();
+                    if v.is_null() {
+                        b.append_null();
+                    } else {
+                        b.append_value(get_string_value(v));
+                    }
+                }
                 DataType::Utf8View => {
                     let b = builder
                         .as_any_mut()
@@ -99,10 +111,10 @@ pub fn convert_json_to_record_batch(
                         b.append_value(get_string_value(v));
                     }
                 }
-                DataType::Utf8 => {
+                DataType::LargeUtf8 => {
                     let b = builder
                         .as_any_mut()
-                        .downcast_mut::<StringBuilder>()
+                        .downcast_mut::<LargeStringBuilder>()
                         .unwrap();
                     if v.is_null() {
                         b.append_null();
@@ -190,15 +202,21 @@ pub fn convert_json_to_record_batch(
         builders.iter_mut().for_each(|(k, (data_type, b))| {
             if !record_keys.contains(k) {
                 match data_type {
+                    DataType::Utf8 => {
+                        b.as_any_mut()
+                            .downcast_mut::<StringBuilder>()
+                            .unwrap()
+                            .append_null();
+                    }
                     DataType::Utf8View => {
                         b.as_any_mut()
                             .downcast_mut::<StringViewBuilder>()
                             .unwrap()
                             .append_null();
                     }
-                    DataType::Utf8 => {
+                    DataType::LargeUtf8 => {
                         b.as_any_mut()
-                            .downcast_mut::<StringBuilder>()
+                            .downcast_mut::<LargeStringBuilder>()
                             .unwrap()
                             .append_null();
                     }
@@ -302,6 +320,130 @@ pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> 
                                     b.append_value(col.value(i));
                                 }
                             }
+                            DataType::Utf8View => {
+                                let col = col.as_any().downcast_ref::<StringViewArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i));
+                                }
+                            }
+                            DataType::LargeUtf8 => {
+                                let col = col.as_any().downcast_ref::<LargeStringArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i));
+                                }
+                            }
+                            DataType::Int64 => {
+                                let col = col.as_any().downcast_ref::<Int64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).to_string());
+                                }
+                            }
+                            DataType::UInt64 => {
+                                let col = col.as_any().downcast_ref::<UInt64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).to_string());
+                                }
+                            }
+                            DataType::Float64 => {
+                                let col = col.as_any().downcast_ref::<Float64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).to_string());
+                                }
+                            }
+                            DataType::Boolean => {
+                                let col = col.as_any().downcast_ref::<BooleanArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).to_string());
+                                }
+                            }
+                            DataType::Null => {
+                                for _ in 0..records_len {
+                                    b.append_null();
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    DataType::Utf8View => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<StringViewBuilder>()
+                            .unwrap();
+                        match data_type {
+                            DataType::Utf8 => {
+                                let col = col.as_any().downcast_ref::<StringArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i));
+                                }
+                            }
+                            DataType::Utf8View => {
+                                let col = col.as_any().downcast_ref::<StringViewArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i));
+                                }
+                            }
+                            DataType::LargeUtf8 => {
+                                let col = col.as_any().downcast_ref::<LargeStringArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i));
+                                }
+                            }
+                            DataType::Int64 => {
+                                let col = col.as_any().downcast_ref::<Int64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).to_string());
+                                }
+                            }
+                            DataType::UInt64 => {
+                                let col = col.as_any().downcast_ref::<UInt64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).to_string());
+                                }
+                            }
+                            DataType::Float64 => {
+                                let col = col.as_any().downcast_ref::<Float64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).to_string());
+                                }
+                            }
+                            DataType::Boolean => {
+                                let col = col.as_any().downcast_ref::<BooleanArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).to_string());
+                                }
+                            }
+                            DataType::Null => {
+                                for _ in 0..records_len {
+                                    b.append_null();
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    DataType::LargeUtf8 => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<LargeStringBuilder>()
+                            .unwrap();
+                        match data_type {
+                            DataType::Utf8 => {
+                                let col = col.as_any().downcast_ref::<StringArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i));
+                                }
+                            }
+                            DataType::Utf8View => {
+                                let col = col.as_any().downcast_ref::<StringViewArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i));
+                                }
+                            }
+                            DataType::LargeUtf8 => {
+                                let col = col.as_any().downcast_ref::<LargeStringArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i));
+                                }
+                            }
                             DataType::Int64 => {
                                 let col = col.as_any().downcast_ref::<Int64Array>().unwrap();
                                 for i in 0..records_len {
@@ -339,6 +481,18 @@ pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> 
                         match data_type {
                             DataType::Utf8 => {
                                 let col = col.as_any().downcast_ref::<StringArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).parse().unwrap_or_default());
+                                }
+                            }
+                            DataType::Utf8View => {
+                                let col = col.as_any().downcast_ref::<StringViewArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).parse().unwrap_or_default());
+                                }
+                            }
+                            DataType::LargeUtf8 => {
+                                let col = col.as_any().downcast_ref::<LargeStringArray>().unwrap();
                                 for i in 0..records_len {
                                     b.append_value(col.value(i).parse().unwrap_or_default());
                                 }
@@ -387,6 +541,18 @@ pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> 
                                     b.append_value(col.value(i).parse().unwrap_or_default());
                                 }
                             }
+                            DataType::Utf8View => {
+                                let col = col.as_any().downcast_ref::<StringViewArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).parse().unwrap_or_default());
+                                }
+                            }
+                            DataType::LargeUtf8 => {
+                                let col = col.as_any().downcast_ref::<LargeStringArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).parse().unwrap_or_default());
+                                }
+                            }
                             DataType::Int64 => {
                                 let col = col.as_any().downcast_ref::<Int64Array>().unwrap();
                                 for i in 0..records_len {
@@ -431,6 +597,18 @@ pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> 
                                     b.append_value(col.value(i).parse().unwrap_or_default());
                                 }
                             }
+                            DataType::Utf8View => {
+                                let col = col.as_any().downcast_ref::<StringViewArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).parse().unwrap_or_default());
+                                }
+                            }
+                            DataType::LargeUtf8 => {
+                                let col = col.as_any().downcast_ref::<LargeStringArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).parse().unwrap_or_default());
+                                }
+                            }
                             DataType::Int64 => {
                                 let col = col.as_any().downcast_ref::<Int64Array>().unwrap();
                                 for i in 0..records_len {
@@ -471,6 +649,18 @@ pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> 
                         match data_type {
                             DataType::Utf8 => {
                                 let col = col.as_any().downcast_ref::<StringArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).parse().unwrap_or_default());
+                                }
+                            }
+                            DataType::Utf8View => {
+                                let col = col.as_any().downcast_ref::<StringViewArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).parse().unwrap_or_default());
+                                }
+                            }
+                            DataType::LargeUtf8 => {
+                                let col = col.as_any().downcast_ref::<LargeStringArray>().unwrap();
                                 for i in 0..records_len {
                                     b.append_value(col.value(i).parse().unwrap_or_default());
                                 }
