@@ -914,23 +914,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="showFunctionEditor">
                 <div class="tw-relative tw-h-full tw-w-full">
                   <code-query-editor
-                  v-if="router.currentRoute.value.name === 'logs'"
-                  data-test="logs-vrl-function-editor"
-                  ref="fnEditorRef"
-                  editor-id="fnEditor"
-                  class="monaco-editor"
-                  v-model:query="searchObj.data.tempFunctionContent"
-                  :class="
-                    searchObj.data.tempFunctionContent == '' &&
-                    searchObj.meta.functionEditorPlaceholderFlag
-                      ? 'empty-function'
-                      : ''
-                  "
-                  @keydown="handleKeyDown"
-                  language="vrl"
-                  @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
-                  @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
-                />
+                    v-if="router.currentRoute.value.name === 'logs'"
+                    data-test="logs-vrl-function-editor"
+                    ref="fnEditorRef"
+                    editor-id="fnEditor"
+                    class="monaco-editor"
+                    v-model:query="searchObj.data.tempFunctionContent"
+                    :class="
+                      searchObj.data.tempFunctionContent == '' &&
+                      searchObj.meta.functionEditorPlaceholderFlag
+                        ? 'empty-function'
+                        : ''
+                    "
+                    @keydown="handleKeyDown"
+                    language="vrl"
+                    @focus="
+                      searchObj.meta.functionEditorPlaceholderFlag = false
+                    "
+                    @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
+                  />
                 </div>
                 <div
                   v-if="searchObj.meta.logsVisualizeToggle === 'visualize'"
@@ -1446,8 +1448,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
-import { json2csv } from 'json-2-csv';
-
+import { json2csv } from "json-2-csv";
 
 const defaultValue: any = () => {
   return {
@@ -1926,8 +1927,6 @@ export default defineComponent({
         if (parsedSQL != undefined && parsedSQL?.columns?.length > 0) {
           const columnNames = getColumnNames(parsedSQL);
 
-          searchObj.data.stream.interestingFieldList = [];
-
           const defaultInterestingFields = new Set(
             store.state?.zoConfig?.default_quick_mode_fields || [],
           );
@@ -1973,9 +1972,15 @@ export default defineComponent({
           }
 
           // Add timestamp column to the interesting field list, as it is default interesting field
-          searchObj.data.stream.interestingFieldList.unshift(
-            store.state.zoConfig?.timestamp_column,
-          );
+          if (
+            !searchObj.data.stream.interestingFieldList.includes(
+              store.state.zoConfig?.timestamp_column,
+            )
+          ) {
+            searchObj.data.stream.interestingFieldList.unshift(
+              store.state.zoConfig?.timestamp_column,
+            );
+          }
 
           for (const item of searchObj.data.stream.selectedStreamFields) {
             if (
@@ -2189,20 +2194,19 @@ export default defineComponent({
         queryEditorRef.value.setValue(searchObj.data.query);
     };
 
-
     const downloadLogs = async (data, format) => {
       //here we are using a package json2csv which converts json to csv data
       //why package because we faced one issue where user has , in some of the fields so
-      //it is treating it as seperate fields 
+      //it is treating it as seperate fields
       //eg: {body:"hey this is the email body , with some info in it "}
       //after converting it will treat hey this is the email body this as the body and remaining will be the next column
       //to solve this issue we are using json2csv package
       try {
-          let filename = "logs-data";
-          let dataobj;
-          const options = {
-            emptyFieldValue: "",
-          };
+        let filename = "logs-data";
+        let dataobj;
+        const options = {
+          emptyFieldValue: "",
+        };
 
         if (format === "csv") {
           filename += ".csv";
@@ -3388,13 +3392,17 @@ export default defineComponent({
 
     const onLogsVisualizeToggleUpdate = (value: any) => {
       // prevent action if visualize is disabled (SQL mode disabled with multiple streams)
-      if (value === "visualize" && !searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1) {
+      if (
+        value === "visualize" &&
+        !searchObj.meta.sqlMode &&
+        searchObj.data.stream.selectedStream.length > 1
+      ) {
         showErrorNotification(
-          "Please enable SQL mode or select a single stream to visualize"
+          "Please enable SQL mode or select a single stream to visualize",
         );
         return;
       }
-      
+
       // confirm with user on toggle from visualize to logs
       if (
         value == "logs" &&
@@ -3415,7 +3423,10 @@ export default defineComponent({
           getQueryData();
           searchObj.meta.logsVisualizeDirtyFlag = false;
         }
-      } else if (value == "visualize" && searchObj.meta.logsVisualizeToggle == "logs") {
+      } else if (
+        value == "visualize" &&
+        searchObj.meta.logsVisualizeToggle == "logs"
+      ) {
         // validate query
         // return if query is emptry and stream is not selected
         if (
@@ -3443,7 +3454,11 @@ export default defineComponent({
         }
 
         // if multiple sql, then do not allow to visualize
-        if(logsPageQuery && Array.isArray(logsPageQuery) && logsPageQuery.length > 1){
+        if (
+          logsPageQuery &&
+          Array.isArray(logsPageQuery) &&
+          logsPageQuery.length > 1
+        ) {
           showErrorNotification(
             "Multiple SQL queries are not allowed to visualize",
           );
@@ -3844,10 +3859,16 @@ export default defineComponent({
   },
   computed: {
     isVisualizeDisabled() {
-      return !this.searchObj.meta.sqlMode && this.searchObj.data.stream.selectedStream.length > 1;
+      return (
+        !this.searchObj.meta.sqlMode &&
+        this.searchObj.data.stream.selectedStream.length > 1
+      );
     },
     isSqlModeDisabled() {
-      return this.searchObj.meta.logsVisualizeToggle === 'visualize' && this.searchObj.data.stream.selectedStream.length > 1;
+      return (
+        this.searchObj.meta.logsVisualizeToggle === "visualize" &&
+        this.searchObj.data.stream.selectedStream.length > 1
+      );
     },
     addSearchTerm() {
       return this.searchObj.data.stream.addToFilter;
