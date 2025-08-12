@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-        <div class="q-mx-md q-my-sm scroll" style="width: 50vw">
+        <div class="q-mx-sm q-my-sm scroll" style="width: 50vw">
           <q-tab-panels
             v-model="activeTab"
             animated
@@ -154,6 +154,11 @@ export default defineComponent({
     justify-content: flex-end;
   }
 }
+
+.q-tab-panel {
+  padding: 0px !important;
+}
+
 .functions-tabs {
   .q-tabs {
     &--vertical {
