@@ -4218,6 +4218,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "flight"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "arrow-flight",
+ "arrow-schema",
+ "bytes",
+ "config",
+ "datafusion",
+ "flatbuffers",
+ "futures",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tonic 0.12.3",
+]
+
+[[package]]
 name = "float-cmp"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6457,6 +6476,7 @@ dependencies = [
  "arrow-flight",
  "arrow-schema",
  "async-recursion",
+ "async-stream",
  "async-trait",
  "async-walkdir",
  "awc",
@@ -6488,6 +6508,7 @@ dependencies = [
  "expect-test",
  "faststr",
  "flate2",
+ "flight",
  "float-cmp",
  "futures",
  "futures-core",
