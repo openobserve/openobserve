@@ -801,9 +801,9 @@ export const convertPromQLData = async (
   options.series = options.series.flat();
   // Handle colorBySeries logic to prevent duplicate colors between
   // auto-generated palette colors and user-configured series colors.
-  if (panelSchema?.config?.color?.colorBySeries?.mappings?.length) {
+  if (panelSchema?.config?.color?.colorBySeries?.length) {
     const mappings: Array<{ value: string; color: string | null }> =
-      panelSchema.config.color.colorBySeries.mappings;
+      panelSchema.config.color.colorBySeries;
 
     // Gather configured series and colors
     const configuredSeriesToColor = new Map<string, string>();

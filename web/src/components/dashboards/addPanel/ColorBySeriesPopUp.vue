@@ -17,7 +17,7 @@
 <template>
   <div
     class="scroll"
-    data-test="dashboard-value-mapping-popup"
+    data-test="dashboard-value-series-popup"
     style="padding: 5px 10px; min-width: min(1200px, 90vw)"
   >
     <div
@@ -45,10 +45,10 @@
           v-model="editColorBySeries"
           :options="dragOptions"
           @mousedown.stop="() => {}"
-          data-test="dashboard-addpanel-config-value-mapping-drag"
+          data-test="dashboard-addpanel-config-value-series-drag"
         >
           <div
-            v-for="(mapping, index) in editColorBySeries"
+            v-for="(series, index) in editColorBySeries"
             :key="index"
             class="draggable-row"
           >
@@ -57,15 +57,15 @@
                 name="drag_indicator"
                 color="grey-13"
                 class="q-mr-xs"
-                :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
+                :data-test="`dashboard-addpanel-config-value-series-drag-handle-${index}`"
               />
             </div>
             <div class="draggable-content tw-flex tw-gap-x-6">
               <div class="input-container tw-flex-1">
                 <CommonAutoComplete
-                  v-model="mapping.value"
+                  v-model="series.value"
                   :items="seriesDataItems"
-                  searchRegex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
+                  searchRegex="(?:{([^}])(?:{.})*$|([a-zA-Z-_]+)$)"
                   label="Select Series"
                   color="input-border"
                   bg-color="input-bg"
@@ -91,11 +91,11 @@
               <!-- Color Picker -->
               <div class="color-section tw-flex-1">
                 <div
-                  v-if="mapping.color !== null"
+                  v-if="series.color !== null"
                   class="tw-items-center tw-flex"
                 >
                   <q-input
-                    v-model="mapping.color"
+                    v-model="series.color"
                     filled
                     style="width: 90%"
                     class="input-spacing"
@@ -109,7 +109,7 @@
                         @click="openColorPicker(index)"
                       >
                         <q-popup-proxy cover transition-show="scale">
-                          <q-color v-model="mapping.color" />
+                          <q-color v-model="series.color" />
                         </q-popup-proxy>
                       </q-icon>
                     </template>
@@ -135,7 +135,7 @@
                 </div>
               </div>
 
-              <!-- Delete Mapping -->
+              <!-- Delete series -->
               <q-btn
                 icon="close"
                 class="delete-btn"
@@ -143,7 +143,7 @@
                 flat
                 round
                 @click="removecolorBySeriesByIndex(index)"
-                :data-test="`dashboard-addpanel-config-value-mapping-delete-btn-${index}`"
+                :data-test="`dashboard-addpanel-config-value-series-delete-btn-${index}`"
               />
             </div>
           </div>
@@ -158,7 +158,7 @@
         no-caps
         outline
         dense
-        data-test="dashboard-addpanel-config-value-mapping-add-btn"
+        data-test="dashboard-addpanel-config-value-series-add-btn"
       />
       <q-btn
         @click="applycolorBySeries"
@@ -168,7 +168,7 @@
         padding="5px 14px"
         no-caps
         dense
-        data-test="dashboard-addpanel-config-value-mapping-apply-btn"
+        data-test="dashboard-addpanel-config-value-series-apply-btn"
       />
     </div>
   </div>
@@ -194,48 +194,49 @@ export default defineComponent({
       type: Array,
       default: () => [],
     },
+    seriesOptions: {
+      type: Array,
+      default: () => [],
+    },
   },
   emits: ["close", "save"],
   setup(props: any, { emit }) {
+
     const { t } = useI18n();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
-    // const editColorBySeries = ref(props.colorBySeries.options.series);
+
+    // Initialize with colorBySeries (edited data) if available, otherwise default empty
     const editColorBySeries = ref(
-      props.colorBySeries.mappings?.length
-        ? props.colorBySeries.mappings.map((m: any) => ({
+      props.colorBySeries?.length
+        ? props.colorBySeries.map((m: any) => ({
             ...m,
             value: typeof m.value === "string" ? m.value : "",
             color: m.color || null,
           }))
         : [{ type: "value", value: "", text: "", color: null }],
     );
-    // Watcher to ensure mapping.value is always a string
 
+    // Watcher to ensure series.value is always a string
+    console.log(editColorBySeries.value,"editcolorbyseries");
+    
     watch(
       editColorBySeries,
       (newVal) => {
-        newVal.forEach((mapping: any) => {
-          if (typeof mapping.value !== "string") {
-            mapping.value = "";
+        newVal.forEach((series: any) => {
+          if (typeof series.value !== "string") {
+            series.value = "";
           }
         });
       },
       { deep: true },
     );
 
-    // Watch for changes in mapping.value to ensure proper reactivity
+    // Watch for changes in series.value to ensure proper reactivity
     watch(
       editColorBySeries,
       (newVal) => {
-        newVal.forEach((mapping: any) => {
-          if (mapping.value === undefined || mapping.value === null) {
-            mapping.value = "";
+        newVal.forEach((series: any) => {
+          if (series.value === undefined || series.value === null) {
+            series.value = "";
           }
         });
       },
@@ -255,14 +256,12 @@ export default defineComponent({
       });
     };
 
-    {
-      {
-        console.log("props", props?.colorBySeries?.options);
-      }
-    }
+    console.log("props", props?.seriesOptions);
+    
+    // Use props.options for series dropdown options (not for initialization)
     const seriesDataItems = computed(
       () =>
-        props?.colorBySeries?.options?.series
+        props?.seriesOptions
           ?.map((it: any) => ({
             label: it?.name,
             value: it?.name,
@@ -270,8 +269,8 @@ export default defineComponent({
           .filter((item: any) => item.label !== undefined) || [],
     );
 
-    const selectColorBySeriesOption = (option: any) => {
-      return option.value || option.label || option;
+    const selectColorBySeriesOption = (seriesOptions: any) => {
+      return seriesOptions.value || seriesOptions.label || seriesOptions;
     };
 
     const removecolorBySeriesByIndex = (index: number) => {
@@ -279,7 +278,7 @@ export default defineComponent({
     };
 
     onMounted(() => {
-      // if mappings is empty, add default value mapping
+      // if editColorBySeries is empty, add default color
       if (editColorBySeries.value.length == 0) {
         addcolorBySeries();
       }
@@ -294,11 +293,8 @@ export default defineComponent({
     };
 
     const applycolorBySeries = () => {
-      // emit("save", editColorBySeries.value);
-      emit("save", {
-        ...props.colorBySeries,
-        mappings: editColorBySeries.value,
-      });
+      emit("save", editColorBySeries.value);
+      console.log("Saving color by series:", editColorBySeries.value);
     };
 
     const cancelEdit = () => {

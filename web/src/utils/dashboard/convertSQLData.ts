@@ -1367,7 +1367,7 @@ export const convertSQLData = async (
 
     return seriesData;
   };
-
+{{ console.log(panelSchema?.config?.color?.colorBySeries,"colorbyseries array")}}
   const getSeriesObj = (
     yAxisName: string,
     seriesData: Array<number> = [],
@@ -2822,10 +2822,11 @@ export const convertSQLData = async (
 
   // Handle colorBySeries logic to prevent duplicate colors between
   // auto-generated palette colors and user-configured series colors.
-  if (panelSchema?.config?.color?.colorBySeries?.mappings?.length) {
+  if (panelSchema?.config?.color?.colorBySeries?.length) {
+    console.log(panelSchema?.config?.color?.colorBySeries,"colorbyseries array");
     const mappings: Array<{ value: string; color: string | null }> =
-      panelSchema.config.color.colorBySeries.mappings;
-
+      panelSchema.config.color.colorBySeries;
+    console.log("mappings logs 1", mappings);
     // Gather configured series and colors
     const configuredSeriesToColor = new Map<string, string>();
     const configuredColors = new Set<string>();
@@ -2834,6 +2835,7 @@ export const convertSQLData = async (
         configuredSeriesToColor.set(String(m.value), String(m.color));
         configuredColors.add(String(m.color));
       }
+      console.log(mappings,"mappings logs 2")
     }
 
     if (configuredSeriesToColor.size > 0) {
