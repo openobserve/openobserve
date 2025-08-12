@@ -420,3 +420,31 @@
 }
 
 
+//this is used to target the numeric input in the whole app and if we want to apply any styling to the numeric input we need to add the class o2-numeric-input-light or o2-numeric-input-dark to the numeric input
+//and don't add the color to the numeric input directly
+//any non theme related styling should be done here inside the o2-numeric-input class
+.o2-numeric-input{
+  .q-field__inner{
+    border-radius: 2px !important;
+  }
+}
+
+.o2-numeric-input-light{
+  .q-field__inner{
+    border: 1px solid #C4C4C4 !important;
+  }
+  .q-field__control{
+    background-color: #ffffff !important;
+  }
+}
+//TODO O2: after getting the dark theme work on it
+.o2-numeric-input-dark{
+  .q-field__inner{
+    border: 1px solid #454F5B !important;
+  }
+  .q-field__control{
+    background-color: #212121 !important;
+  }
+}
+
+

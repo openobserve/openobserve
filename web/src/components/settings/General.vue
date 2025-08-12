@@ -46,7 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               min="0"
               color="input-border"
               bg-color="input-bg"
-              class="q-py-md showLabelOnTop"
+              class="q-py-md showLabelOnTop o2-numeric-input"
+              :class="store.state.theme == 'dark' ? 'o2-numeric-input-dark' : 'o2-numeric-input-light' "
               stack-label
               outlined
               filled
