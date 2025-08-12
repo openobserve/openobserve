@@ -966,7 +966,10 @@ const useLogs = () => {
           }
         }
 
-        req.query.sql = query;
+        req.query.sql = query.split("\n")
+          .filter((line: string) => !line.trim().startsWith("--"))
+          .join("\n");
+        req.query["sql_mode"] = "full";
         // delete req.aggs;
       } else {
         const parseQuery = [query];
