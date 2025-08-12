@@ -779,7 +779,7 @@ async fn process_node(
                         let err_msg = format!(
                             "FunctionNode error: {}",
                             error.get(0..500).unwrap_or(&error)
-                        );  
+                        );
                         if let Err(send_err) = error_sender
                             .send((
                                 node.id.to_string(),
