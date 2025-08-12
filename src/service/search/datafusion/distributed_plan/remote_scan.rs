@@ -93,6 +93,14 @@ impl RemoteScanExec {
         })
     }
 
+    pub fn scan_stats(&self) -> Arc<Mutex<ScanStats>> {
+        self.scan_stats.clone()
+    }
+
+    pub fn partial_err(&self) -> Arc<Mutex<String>> {
+        self.partial_err.clone()
+    }
+
     fn output_partitioning_helper(n_partitions: usize) -> Partitioning {
         Partitioning::UnknownPartitioning(n_partitions)
     }
@@ -168,8 +176,8 @@ impl ExecutionPlan for RemoteScanExec {
             partition,
             partition == self.enrich_mode_node_idx,
             self.input.schema().clone(),
-            self.scan_stats.clone(),
-            self.partial_err.clone(),
+            self.scan_stats(),
+            self.partial_err(),
         );
         let stream = futures::stream::once(fut).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(

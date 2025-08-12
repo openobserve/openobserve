@@ -26,7 +26,7 @@ use datafusion::{
     common::{DataFusionError, Result},
     physical_plan::execute_stream,
 };
-use flight::common::CustomMessage;
+use flight::common::PreCustomMessage;
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;
@@ -36,7 +36,10 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use {crate::service::search::SEARCH_SERVER, o2_enterprise::enterprise::search::TaskStatus};
 
 use crate::{
-    handler::grpc::{MetadataMap, flight::stream::FlightEncoderStreamBuilder},
+    handler::grpc::{
+        MetadataMap,
+        flight::{stream::FlightEncoderStreamBuilder, visitor::get_scan_stats},
+    },
     service::search::{
         grpc::flight as grpcFlight,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -46,6 +49,7 @@ use crate::{
 };
 
 mod stream;
+mod visitor;
 
 #[derive(Default)]
 pub struct FlightServiceImpl;
@@ -157,6 +161,9 @@ impl FlightService for FlightServiceImpl {
                 Status::internal(e.to_string())
             })?;
 
+        // used for super cluster follower leader to get scan stats
+        let scan_stats_ref = get_scan_stats(physical_plan.clone());
+
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
             // clear session data
             clear_session_data(&trace_id);
@@ -170,7 +177,8 @@ impl FlightService for FlightServiceImpl {
             .with_trace_id(trace_id.to_string())
             .with_defer(defer)
             .with_start(start)
-            .with_custom_message(CustomMessage::ScanStats(scan_stats))
+            .with_custom_message(PreCustomMessage::ScanStats(scan_stats))
+            .with_custom_message(PreCustomMessage::ScanStatsRef(scan_stats_ref))
             .build(stream);
 
         let stream = async_stream::stream! {

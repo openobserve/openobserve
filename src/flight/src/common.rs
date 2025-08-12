@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use arrow::array::RecordBatch;
 use arrow_schema::SchemaRef;
 use config::meta::search::ScanStats;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
@@ -25,7 +28,26 @@ pub enum FlightMessage {
     CustomMessage(CustomMessage),
 }
 
+/// Custom message for ser/deserialize
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum CustomMessage {
     ScanStats(ScanStats),
+}
+
+/// the CustomMessage is not ready, so we need to use this struct to store
+/// the scan stats, and send it to the client when the scan stats is ready
+pub enum PreCustomMessage {
+    ScanStats(ScanStats),
+    ScanStatsRef(Option<Arc<Mutex<ScanStats>>>),
+}
+
+impl PreCustomMessage {
+    pub fn get_custom_message(&self) -> Option<CustomMessage> {
+        match self {
+            PreCustomMessage::ScanStats(stats) => Some(CustomMessage::ScanStats(*stats)),
+            PreCustomMessage::ScanStatsRef(stats_ref) => stats_ref
+                .as_ref()
+                .map(|stats| CustomMessage::ScanStats(*stats.lock())),
+        }
+    }
 }

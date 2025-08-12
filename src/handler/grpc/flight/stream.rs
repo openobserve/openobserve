@@ -19,7 +19,7 @@ use arrow::{array::RecordBatch, ipc::writer::IpcWriteOptions};
 use arrow_flight::{FlightData, error::FlightError};
 use config::metrics;
 use datafusion::execution::SendableRecordBatchStream;
-use flight::{common::CustomMessage, encoder::FlightDataEncoder};
+use flight::{common::PreCustomMessage, encoder::FlightDataEncoder};
 use futures::{Stream, StreamExt};
 use futures_core::ready;
 
@@ -28,7 +28,7 @@ use crate::{handler::grpc::flight::clear_session_data, service::search::utils::A
 pub struct FlightEncoderStreamBuilder {
     encoder: FlightDataEncoder,
     queue: VecDeque<FlightData>,
-    custom_messages: Vec<CustomMessage>,
+    custom_messages: Vec<PreCustomMessage>,
     // query context
     trace_id: String,
     defer: Option<AsyncDefer>,
@@ -47,7 +47,7 @@ impl FlightEncoderStreamBuilder {
         }
     }
 
-    pub fn with_custom_message(mut self, message: CustomMessage) -> Self {
+    pub fn with_custom_message(mut self, message: PreCustomMessage) -> Self {
         self.custom_messages.push(message);
         self
     }
@@ -86,7 +86,7 @@ pub struct FlightEncoderStream {
     encoder: FlightDataEncoder,
     queue: VecDeque<FlightData>,
     done: bool,
-    custom_messages: Vec<CustomMessage>,
+    custom_messages: Vec<PreCustomMessage>,
     // query context
     trace_id: String,
     defer: Option<AsyncDefer>,
@@ -104,8 +104,11 @@ impl FlightEncoderStream {
     fn encode_custom_messages(&mut self) -> Result<(), FlightError> {
         let custom_messages = std::mem::take(&mut self.custom_messages);
         for message in custom_messages.into_iter() {
-            let flight_data = self.encoder.encode_custom(&message)?;
-            self.queue.push_back(flight_data);
+            let message = message.get_custom_message();
+            if let Some(message) = message {
+                let flight_data = self.encoder.encode_custom(&message)?;
+                self.queue.push_back(flight_data);
+            }
         }
         Ok(())
     }

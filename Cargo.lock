@@ -4229,6 +4229,7 @@ dependencies = [
  "datafusion",
  "flatbuffers",
  "futures",
+ "parking_lot",
  "serde",
  "serde_json",
  "tokio",
