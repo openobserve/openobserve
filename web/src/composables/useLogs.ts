@@ -3470,10 +3470,10 @@ const useLogs = () => {
         searchObj.data.datetime.queryRangeRestrictionMsg = "";
         searchObj.data.datetime.queryRangeRestrictionInHour = -1;
 
-        const interestingFieldsMapping: {[key: string]: string[]} = {
-          "common": [],
+        const interestingFieldsMapping: {[key: string]: Set<string>} = {
+          "common": new Set([]),
           ...Object.fromEntries(
-            selectedStreamValues.sort().map((stream: any) => [stream, []]),
+            selectedStreamValues.sort().map((stream: any) => [stream, new Set([])]),
           ),
         }
 
@@ -3703,14 +3703,13 @@ const useLogs = () => {
 
                     if(fieldObj.isInterestingField) {
                       interestingCommonSchemaMaps.push(fieldObj);
-                      interestingFieldsMapping["common"].push(fieldObj.name);
+                      interestingFieldsMapping["common"].add(fieldObj.name);
                       interestingFieldsMap[fieldObj.name] = true;
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
 
-                      if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0 && interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].includes(fieldObj.name)) {
-                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] =
-                          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] - 1;
+                      if(interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].has(fieldObj.name)) {
+                        interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].delete(fieldObj.name);
                       }
                     }
 
@@ -3739,7 +3738,7 @@ const useLogs = () => {
                     schemaMaps.push(fieldObj);
                     if(fieldObj.isInterestingField) {
                       interestingSchemaMaps.push(fieldObj);
-                      interestingFieldsMapping[stream.name].push(fieldObj.name);
+                      interestingFieldsMapping[stream.name].add(fieldObj.name);
                       interestingFieldsMap[fieldObj.name] = true;
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
                         searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
@@ -3785,13 +3784,8 @@ const useLogs = () => {
 
 
                     if(fieldObj.isInterestingField) {
-                      if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0 && interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].includes(fieldObj.name)) {
-                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-                          schemaMaps[schemaFieldsIndex].streams[0]
-                        ] =
-                          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-                            schemaMaps[schemaFieldsIndex].streams[0]
-                          ] - 1;
+                      if(interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].has(fieldObj.name)) {
+                        interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].delete(fieldObj.name);
                       }
                     }
                   }
@@ -3800,7 +3794,7 @@ const useLogs = () => {
 
                   if(fieldObj.isInterestingField) {
                     interestingCommonSchemaMaps.push(fieldObj);
-                    interestingFieldsMapping["common"].push(fieldObj.name);
+                    interestingFieldsMapping["common"].add(fieldObj.name);
                     interestingFieldsMap[fieldObj.name] = true;
                     searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
@@ -3829,7 +3823,7 @@ const useLogs = () => {
 
                   if(fieldObj.isInterestingField) {
                     interestingSchemaMaps.push(fieldObj);
-                    interestingFieldsMapping[stream.name].push(fieldObj.name);
+                    interestingFieldsMapping[stream.name].add(fieldObj.name);
                     interestingFieldsMap[fieldObj.name] = true;
                     searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
@@ -3860,7 +3854,6 @@ const useLogs = () => {
               });
 
               interestingCommonSchemaMaps.unshift(commonSchemaMaps[0]);
-              interestingFieldsMapping["common"].unshift(commonSchemaMaps[0]);
 
               commonSchemaFields.unshift("dummylabel");
               // searchObj.data.stream.expandGroupRowsFieldCount["common"] = searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
@@ -3938,7 +3931,7 @@ const useLogs = () => {
 
                   if(fieldObj.isInterestingField) {
                     interestingSchemaMaps.push(fieldObj);
-                    interestingFieldsMapping[stream.name].push(fieldObj);
+                    interestingFieldsMapping[stream.name].add(fieldObj.name);
                     interestingFieldsMap[fieldObj.name] = true;
                   }
                   schemaFields.push(key);
@@ -3963,6 +3956,10 @@ const useLogs = () => {
           ...interestingCommonSchemaMaps,
           ...interestingSchemaMaps,
         ];
+
+        Object.entries(searchObj.data.stream.interestingExpandedGroupRowsFieldCount).forEach(([key, value]) => {
+          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[key] = interestingFieldsMapping[key].size;
+        });
 
         if (
           searchObj.data.stream.selectedStreamFields != undefined &&
