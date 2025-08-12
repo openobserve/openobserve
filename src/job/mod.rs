@@ -240,7 +240,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("ai prompts cache failed");
 
     infra_file_list::create_table_index().await?;
-    infra_file_list::LOCAL_CACHE.create_table_index().await?;
+    if !LOCAL_NODE.is_alert_manager() {
+        infra_file_list::LOCAL_CACHE.create_table_index().await?;
+    }
 
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {

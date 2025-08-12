@@ -22,7 +22,7 @@
     "build-only-alpha1": "vite build --mode=alpha1",
     "build-only-cloud-prod": "vite build --mode=production",
     "type-check": "vue-tsc --noEmit -p tsconfig.vitest.json --composite false",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.18.6",

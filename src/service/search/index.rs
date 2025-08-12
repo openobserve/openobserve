@@ -652,6 +652,7 @@ impl Condition {
         schema: &arrow_schema::Schema,
         fst_fields: &[String],
     ) -> Result<Arc<dyn PhysicalExpr>, anyhow::Error> {
+        let cfg = get_config();
         match self {
             Condition::Equal(name, value) => {
                 let index = schema.index_of(name).unwrap();
@@ -689,7 +690,7 @@ impl Condition {
                     .trim_start_matches('*') // contains
                     .trim_end_matches('*') // prefix or contains
                     .to_string();
-                let term = if get_config().common.utf8_view_enabled {
+                let term = if cfg.common.utf8_view_enabled {
                     Arc::new(Literal::new(ScalarValue::Utf8View(Some(format!(
                         "%{value}%"
                     )))))
@@ -699,7 +700,17 @@ impl Condition {
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
                     Vec::with_capacity(fst_fields.len());
                 for field in fst_fields.iter() {
-                    expr_list.push(create_like_expr_with_not_null(field, term.clone(), schema));
+                    let term = if !cfg.common.utf8_view_enabled
+                        && let Some((_idx, schema_field)) = schema.column_with_name(field)
+                        && schema_field.data_type() == &DataType::LargeUtf8
+                    {
+                        Arc::new(Literal::new(ScalarValue::LargeUtf8(Some(format!(
+                            "%{value}%"
+                        )))))
+                    } else {
+                        term.clone()
+                    };
+                    expr_list.push(create_like_expr_with_not_null(field, term, schema));
                 }
                 if expr_list.is_empty() {
                     return Err(anyhow::anyhow!(
@@ -710,7 +721,7 @@ impl Condition {
             }
             Condition::FuzzyMatchAll(value, distance) => {
                 let fuzzy_expr = Arc::new(fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
-                let term = if get_config().common.utf8_view_enabled {
+                let term = if cfg.common.utf8_view_enabled {
                     Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
                 } else {
                     Arc::new(Literal::new(ScalarValue::Utf8(Some(value.to_string()))))
@@ -719,11 +730,21 @@ impl Condition {
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
                     Vec::with_capacity(fst_fields.len());
                 for field in fst_fields.iter() {
+                    let term = if !cfg.common.utf8_view_enabled
+                        && let Some((_idx, schema_field)) = schema.column_with_name(field)
+                        && schema_field.data_type() == &DataType::LargeUtf8
+                    {
+                        Arc::new(Literal::new(ScalarValue::LargeUtf8(Some(
+                            value.to_string(),
+                        ))))
+                    } else {
+                        term.clone()
+                    };
                     let new_expr = Arc::new(ScalarFunctionExpr::try_new(
                         fuzzy_expr.clone(),
                         vec![
                             Arc::new(Column::new(field, schema.index_of(field).unwrap())),
-                            term.clone(),
+                            term,
                             distance.clone(),
                         ],
                         schema,
@@ -907,12 +928,15 @@ fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, a
         DataType::UInt64 => Arc::new(Literal::new(ScalarValue::UInt64(Some(value.parse()?)))),
         DataType::Float64 => Arc::new(Literal::new(ScalarValue::Float64(Some(value.parse()?)))),
         DataType::Utf8 => Arc::new(Literal::new(ScalarValue::Utf8(Some(value.to_string())))),
-        DataType::Binary => Arc::new(Literal::new(ScalarValue::Binary(Some(
-            value.as_bytes().to_vec(),
-        )))),
         DataType::Utf8View => {
             Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
         }
+        DataType::LargeUtf8 => Arc::new(Literal::new(ScalarValue::LargeUtf8(Some(
+            value.to_string(),
+        )))),
+        DataType::Binary => Arc::new(Literal::new(ScalarValue::Binary(Some(
+            value.as_bytes().to_vec(),
+        )))),
         _ => unimplemented!(),
     })
 }
