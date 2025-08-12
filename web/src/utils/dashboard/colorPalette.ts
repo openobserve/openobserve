@@ -396,8 +396,8 @@ export const getSeriesColor = (
   const colorPalette = getColorPalette(theme);
 
   // Check for custom color from colorBySeries mappings first
-  if (colorBySeries?.mappings?.length > 0) {
-    const customMapping = colorBySeries.mappings.find(
+  if (colorBySeries?.length > 0) {
+    const customMapping = colorBySeries.find(
       (mapping: any) => mapping.value === seriesName && mapping.color
     );
     if (customMapping) {

@@ -42,7 +42,7 @@
       @click="openColorBySeriesPopUp"
       style="cursor: pointer; padding: 0px 5px"
       :label="
-        dashboardPanelData?.data?.config?.color?.colorBySeries?.mappings?.length
+        dashboardPanelData?.data?.config?.color?.colorBySeries?.length
           ? ' Edit color by series'
           : ' Apply color by series'
       "
@@ -51,13 +51,10 @@
     />
     <q-dialog v-model="showColorBySeriesPopUp">
       <ColorBySeriesPopUp
-        :color-By-Series="{
-          ...panelData,
-          options: {
-            series: panelData.options?.series || []
-          },
-          mappings: dashboardPanelData?.data?.config?.color?.colorBySeries?.mappings || []
-        }"
+        :seriesOptions="seriesOptions?.series"
+        :colorBySeries="
+          dashboardPanelData?.data?.config?.color?.colorBySeries || []
+        "
         @close="showColorBySeriesPopUp = false"
         @save="saveColorBySeriesconfig"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
@@ -77,7 +74,7 @@ export default defineComponent({
   name: "ColorBySeries",
   components: { ColorBySeriesPopUp },
   props: {
-    panelData: {
+    colorBySeriesData: {
       type: Object,
       required: true,
     },
@@ -86,10 +83,10 @@ export default defineComponent({
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey
+      dashboardPanelDataPageKey,
     );
 
     const showColorBySeriesPopUp = ref(false);
@@ -101,9 +98,7 @@ export default defineComponent({
     onBeforeMount(() => {
       // Ensure that the colorBySeries object is initialized in config
       if (!dashboardPanelData?.data?.config?.color?.colorBySeries) {
-        dashboardPanelData.data.config.color.colorBySeries = {
-          mappings: []
-        };
+        dashboardPanelData.data.config.color.colorBySeries = [];
       }
     });
 
@@ -115,10 +110,12 @@ export default defineComponent({
     return {
       store,
       dashboardPanelData,
-      colorBySeries: dashboardPanelData?.data?.config?.color?.colorBySeries?.mappings || [],
+      // colorBySeries:
+      //   dashboardPanelData?.data?.config?.color?.colorBySeries || [],
       showColorBySeriesPopUp,
       openColorBySeriesPopUp,
       saveColorBySeriesconfig,
+      seriesOptions: props.colorBySeriesData?.options || { series: [] },
     };
   },
 });
