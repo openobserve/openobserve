@@ -168,6 +168,7 @@
         padding="5px 14px"
         no-caps
         dense
+        :disable="!isFieldEmpty"
         data-test="dashboard-addpanel-config-color-by-series-apply-btn"
       />
     </div>
@@ -198,7 +199,6 @@ export default defineComponent({
   },
   emits: ["close", "save"],
   setup(props: any, { emit }) {
-
     const { t } = useI18n();
 
     // Initialize with colorBySeries (edited data) if available, otherwise default empty
@@ -209,12 +209,21 @@ export default defineComponent({
             value: typeof m.value === "string" ? m.value : "",
             color: m.color || null,
           }))
-        : [{ type: "value", value: "", text: "", color: null }],
+        : [{ type: "value", value: "", color: null }],
     );
 
+    // Validate for save button click
+    // Each series must have both value (series name) and color selected for save it
+    const isFieldEmpty = computed(() => {
+      return editColorBySeries.value.every((series: any) => {
+        return (
+          series.value && series.value.trim() !== "" && series.color !== null
+        );
+      });
+    });
+
     // Watcher to ensure series.value is always a string
-    console.log(editColorBySeries.value,"editcolorbyseries");
-    
+    console.log(editColorBySeries.value, "editcolorbyseries");
     watch(
       editColorBySeries,
       (newVal) => {
@@ -248,13 +257,12 @@ export default defineComponent({
       editColorBySeries.value.push({
         type: "value",
         value: "",
-        text: "",
         color: null,
       });
     };
 
     console.log("props", props?.seriesOptions);
-    
+
     // Use props.options for series dropdown options (not for initialization)
     const seriesDataItems = computed(
       () =>
@@ -282,7 +290,7 @@ export default defineComponent({
     });
 
     const setColorByIndex = (index: number) => {
-      editColorBySeries.value[index].color = "#000000";
+      editColorBySeries.value[index].color = "#5960b2";
     };
 
     const removeColorByIndex = (index: number) => {
@@ -290,8 +298,11 @@ export default defineComponent({
     };
 
     const applycolorBySeries = () => {
-      emit("save", editColorBySeries.value);
-      console.log("Saving color by series:", editColorBySeries.value);
+      // Only save if fields are not empty
+      if (isFieldEmpty.value) {
+        emit("save", editColorBySeries.value);
+        console.log("Saving color by series:", editColorBySeries.value);
+      }
     };
 
     const cancelEdit = () => {
@@ -336,6 +347,7 @@ export default defineComponent({
       handleSetColorClick,
       openColorPicker,
       selectColorBySeriesOption,
+      isFieldEmpty,
     };
   },
 });
