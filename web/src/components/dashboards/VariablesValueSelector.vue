@@ -1564,7 +1564,7 @@ export default defineComponent({
           if (
             val !== undefined &&
             val !== null &&
-            !newOptions.some((opt) => opt.value === val) &&
+            !newOptions.some((opt: any) => opt.value === val) &&
             val !== SELECT_ALL_VALUE
           ) {
             newOptions.push({ label: val, value: val });
@@ -1573,7 +1573,7 @@ export default defineComponent({
           !variableObject.multiSelect &&
           variableObject.value !== null &&
           variableObject.value !== undefined &&
-          !newOptions.some((opt) => opt.value === variableObject.value) &&
+          !newOptions.some((opt: any) => opt.value === variableObject.value) &&
           variableObject.value !== SELECT_ALL_VALUE
         ) {
           newOptions.push({
@@ -1789,7 +1789,7 @@ export default defineComponent({
       try {
         // When a dropdown is opened, only load the variable data
         await loadSingleVariableDataByName(variableObject);
-      } catch (error) {
+      } catch (error: any) {
         variableLog(
           variableObject.name,
           `Error loading variable options for ${variableObject.name}: ${error.message}`,
