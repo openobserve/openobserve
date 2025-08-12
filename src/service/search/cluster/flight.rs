@@ -133,6 +133,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     let scan_stats = ScanStats {
         files: file_id_list_num as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
+        file_list_took: file_id_list_took as i64,
         ..Default::default()
     };
 

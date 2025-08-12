@@ -17,7 +17,6 @@ service Search {
     rpc SearchPartition(SearchPartitionRequest) returns (SearchPartitionResponse) {}
     rpc GetResult(GetResultRequest) returns (GetResultResponse) {}
     rpc DeleteResult(DeleteResultRequest) returns (DeleteResultResponse) {}
-    rpc GetScanStats(GetScanStatsRequest) returns (ScanStatsResponse) {}
 }
 
 message QueryStatusRequest {}
@@ -47,7 +46,6 @@ message SearchResponse {
     bytes              response = 2;
 }
 
-
 message SearchPartitionRequest {
     string             trace_id = 1;
     string               org_id = 2;
@@ -75,15 +73,6 @@ message GetResultResponse {
     bytes        response = 1;
 }
 
-message GetScanStatsRequest {
-    string trace_id = 1;
-    bool is_leader  = 2;
-}
-
-message ScanStatsResponse {
-    ScanStats stats = 1;
-}
-
 // Search request query
 message SearchQuery {
     string                sql = 1;
@@ -100,8 +89,6 @@ message SearchQuery {
     string         action_id = 15;
     int64 histogram_interval = 16;
 }
-
-
 
 message QueryStatus {
     string                trace_id = 1;
@@ -127,5 +114,3 @@ message Query {
     int64 start_time = 2;
     int64   end_time = 3;
 }
-
-
