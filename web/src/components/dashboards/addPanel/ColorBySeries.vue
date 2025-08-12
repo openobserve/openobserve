@@ -64,7 +64,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, inject, ref } from "vue";
+import { defineComponent, inject, ref, computed } from "vue";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import ColorBySeriesPopUp from "./ColorBySeriesPopUp.vue";
@@ -107,6 +107,10 @@ export default defineComponent({
       showColorBySeriesPopUp.value = false;
     };
 
+    const seriesOptions = computed(() => {
+      return props.colorBySeriesData?.options || { series: [] };
+    });
+
     return {
       store,
       dashboardPanelData,
@@ -115,7 +119,7 @@ export default defineComponent({
       showColorBySeriesPopUp,
       openColorBySeriesPopUp,
       saveColorBySeriesconfig,
-      seriesOptions: props.colorBySeriesData?.options || { series: [] },
+      seriesOptions,
     };
   },
 });
