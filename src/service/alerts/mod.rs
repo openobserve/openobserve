@@ -773,7 +773,7 @@ fn build_expr(
         cond.column.as_str()
     };
     let expr = match field_type {
-        DataType::Utf8 => {
+        DataType::Utf8 | DataType::LargeUtf8 => {
             let val = if cond.value.is_string() {
                 cond.value.as_str().unwrap_or_default().to_string()
             } else {

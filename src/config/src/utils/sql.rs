@@ -167,6 +167,29 @@ fn is_aggregate_expression(expr: &Expr) -> bool {
     }
 }
 
+// (is_eligible_for_histogram, is_sub_query)
+pub fn is_eligible_for_histogram(
+    query: &str,
+) -> Result<(bool, bool), sqlparser::parser::ParserError> {
+    // Histogram is not available for CTE, DISTINCT, UNION, JOIN and LIMIT queries.
+    let ast = Parser::parse_sql(&GenericDialect {}, query)?;
+    for statement in ast.iter() {
+        if let Statement::Query(query) = statement {
+            if has_distinct(query)
+                || has_limit(query)
+                || has_cte(query)
+                || has_join(query)
+                || has_union(query)
+            {
+                return Ok((false, false));
+            } else if has_subquery(statement) {
+                return Ok((true, true));
+            }
+        }
+    }
+    Ok((true, false))
+}
+
 // Check if has group_by
 fn has_group_by(query: &Query) -> bool {
     if let SetExpr::Select(ref select) = *query.body {
@@ -499,6 +522,10 @@ impl Visitor for WindowFunctionVisitor {
 fn has_cte(query: &Query) -> bool {
     // Check if query has WITH clause (CTEs)
     query.with.is_some()
+}
+
+fn has_limit(query: &Query) -> bool {
+    query.limit.is_some()
 }
 
 #[cfg(test)]

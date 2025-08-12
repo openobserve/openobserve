@@ -696,7 +696,7 @@ export default defineComponent({
     const { closeSocket } = useSearchWebSocket();
 
     const isMonacoEditorLoaded = ref(false);
-    const showGetStarted = ref(localStorage.getItem('isFirstTimeLogin') == 'true' ?? false);
+    const showGetStarted = ref((localStorage.getItem('isFirstTimeLogin') ?? 'false') === 'true');
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const rowsPerPage = ref(10);

@@ -149,9 +149,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="height: 100px"
           v-else-if="
             searchObj.meta.showHistogram &&
-            Object.keys(plotChart)?.length == 0 &&
-            searchObj.loadingHistogram == false &&
-            searchObj.loading == false
+            !searchObj.loadingHistogram &&
+            !searchObj.loading
           "
         >
           <h3 class="text-center">
@@ -165,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           style="height: 100px"
           v-else-if="
-            searchObj.meta.showHistogram && Object.keys(plotChart)?.length == 0
+            searchObj.meta.showHistogram && Object.keys(plotChart)?.length === 0
           "
         >
           <h3 class="text-center">
@@ -316,6 +315,7 @@ import {
   onMounted,
   onUpdated,
   defineAsyncComponent,
+  watch,
 } from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -719,7 +719,18 @@ export default defineComponent({
 
     const closeTable = () => {
       searchObj.meta.showDetailTab = false;
-    }
+    };
+
+    const resetPlotChart = computed(() => {
+      return searchObj.meta.resetPlotChart;
+    });
+
+    watch(resetPlotChart, (newVal) => {
+      if (newVal) {
+        plotChart.value = {};
+        searchObj.meta.resetPlotChart = false;
+      }
+    });
 
     return {
       t,
@@ -761,7 +772,7 @@ export default defineComponent({
       refreshJobPagination,
       histogramLoader,
       sendToAiChat,
-      closeTable
+      closeTable,
     };
   },
   computed: {
@@ -777,9 +788,6 @@ export default defineComponent({
     reDrawChartData() {
       return this.searchObj.data.histogram;
     },
-    resetPlotChart() {
-      return this.searchObj.meta.resetPlotChart;
-    },
   },
   watch: {
     toggleWrapFlag() {
@@ -790,12 +798,6 @@ export default defineComponent({
     },
     updateTitle() {
       this.noOfRecordsTitle = this.searchObj.data.histogram.chartParams.title;
-    },
-    resetPlotChart(newVal: boolean) {
-      if (newVal) {
-        this.plotChart = {};
-        this.searchObj.meta.resetPlotChart = false;
-      }
     },
     reDrawChartData: {
       deep: true,
