@@ -350,16 +350,16 @@ mod tests {
         assert_eq!(
             extractor.projections,
             vec![
-                "log",
+                "_timestamp",
+                "code",
+                "floatvalue",
+                "k8s_container_name",
+                "k8s_container_restart_count",
                 "k8s_namespace_name",
                 "k8s_node_name",
-                "k8s_container_name",
-                "k8s_pod_uid",
                 "k8s_pod_name",
-                "k8s_container_restart_count",
-                "floatvalue",
-                "code",
-                "_timestamp",
+                "k8s_pod_uid",
+                "log"
             ]
         );
     }
@@ -519,16 +519,16 @@ mod tests {
         assert_eq!(
             extractor.projections,
             vec![
-                "log",
+                "_timestamp",
+                "code",
+                "floatvalue",
+                "k8s_container_name",
+                "k8s_container_restart_count",
                 "k8s_namespace_name",
                 "k8s_node_name",
-                "k8s_container_name",
-                "k8s_pod_uid",
                 "k8s_pod_name",
-                "k8s_container_restart_count",
-                "floatvalue",
-                "code",
-                "_timestamp",
+                "k8s_pod_uid",
+                "log"
             ]
         );
 
