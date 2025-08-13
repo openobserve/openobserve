@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster::LOCAL_NODE, meta::promql::ClusterLeader};
+use config::{cluster::LOCAL_NODE, meta::promql::ClusterLeader, get_config};
 use hashbrown::HashMap;
-use tokio::time::{self, Duration};
+use tokio::time::Duration;
 
 use crate::{common::infra::config::METRIC_CLUSTER_LEADER, service::db};
 
@@ -29,13 +29,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let mut interval = time::interval(Duration::from_secs(cfg.limit.metrics_leader_push_interval));
-    interval.tick().await; // trigger the first run
-
     let mut last_leaders: HashMap<String, ClusterLeader> = HashMap::new(); // maintain the last state
 
     loop {
-        interval.tick().await;
+        tokio::time::sleep(Duration::from_secs(get_config().limit.metrics_leader_push_interval)).await;
         // only update if there's a change
         let map = METRIC_CLUSTER_LEADER.read().await.clone();
         for (key, value) in map.iter() {

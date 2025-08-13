@@ -339,12 +339,10 @@ impl Metadata for DistinctValues {
 }
 
 async fn run_flush() {
-    let mut interval = time::interval(time::Duration::from_secs(
-        get_config().limit.distinct_values_interval,
-    ));
-    interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await;
+        tokio::time::sleep(time::Duration::from_secs(
+            get_config().limit.distinct_values_interval,
+        )).await;
         if let Err(e) = INSTANCE.flush().await {
             log::error!("[DISTINCT_VALUES] error flush data to wal: {}", e);
         }

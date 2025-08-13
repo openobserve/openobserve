@@ -16,6 +16,7 @@
 use tokio::time;
 
 use crate::common::meta::telemetry::Telemetry;
+use config::get_config;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = config::get_config();
@@ -23,12 +24,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let mut interval = time::interval(time::Duration::from_secs(
-        (cfg.common.telemetry_heartbeat).try_into().unwrap(),
-    ));
-    interval.tick().await;
     loop {
-        interval.tick().await;
+        tokio::time::sleep(time::Duration::from_secs(
+            get_config().common.telemetry_heartbeat.try_into().unwrap(),
+        )).await;
         Telemetry::new()
             .heart_beat("OpenObserve - heartbeat", None)
             .await;

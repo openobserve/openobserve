@@ -466,11 +466,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     });
 
     tokio::task::spawn(async move {
-        if cfg.disk_cache.gc_interval == 0 {
-            return;
-        }
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(cfg.disk_cache.gc_interval)).await;
+            let gc_interval = get_config().disk_cache.gc_interval;
+            if gc_interval == 0 {
+                return;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(gc_interval)).await;
             if let Err(e) = gc().await {
                 log::error!("disk cache gc error: {}", e);
             }

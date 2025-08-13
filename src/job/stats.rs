@@ -27,19 +27,16 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 // get stats from file_list to update stream_stats
 async fn file_list_update_stats() -> Result<(), anyhow::Error> {
-    let cfg = get_config();
     if !LOCAL_NODE.is_compactor() {
         return Ok(());
     }
 
     // should run it at least every 10 seconds
-    let mut interval = time::interval(time::Duration::from_secs(std::cmp::max(
-        10,
-        cfg.limit.calculate_stats_interval,
-    )));
-    interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await;
+        tokio::time::sleep(time::Duration::from_secs(std::cmp::max(
+            10,
+            get_config().limit.calculate_stats_interval,
+        ))).await;
         match update_stats_from_file_list().await {
             Err(e) => {
                 log::error!(
@@ -63,11 +60,6 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
     }
 
     // should run it at least every minute
-    let mut interval = time::interval(time::Duration::from_secs(std::cmp::max(
-        60,
-        get_config().limit.calculate_stats_interval,
-    )));
-
     #[cfg(feature = "enterprise")]
     let need_wait_one_around = o2_enterprise::enterprise::common::infra::config::get_config()
         .super_cluster
@@ -76,11 +68,17 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
     let need_wait_one_around = false;
     if need_wait_one_around {
         // wait one around to make sure the dependent models are ready
-        interval.tick().await;
+        tokio::time::sleep(time::Duration::from_secs(std::cmp::max(
+            60,
+            get_config().limit.calculate_stats_interval,
+        ))).await;
     }
 
     loop {
-        interval.tick().await;
+        tokio::time::sleep(time::Duration::from_secs(std::cmp::max(
+            60,
+            get_config().limit.calculate_stats_interval,
+        ))).await;
         if let Err(e) = db::file_list::cache_stats().await {
             log::error!("[STATS] run cached stream stats error: {}", e);
         } else {
