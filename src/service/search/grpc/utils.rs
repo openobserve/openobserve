@@ -185,6 +185,8 @@ impl TantivyResult {
                     match bucket.key {
                         Key::Str(s) => (s, count),
                         Key::F64(f) => (f.to_string(), count),
+                        Key::I64(i) => (i.to_string(), count),
+                        Key::U64(u) => (u.to_string(), count),
                     }
                 })
                 .collect::<Vec<_>>();
