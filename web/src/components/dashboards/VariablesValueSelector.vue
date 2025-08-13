@@ -1204,14 +1204,6 @@ export default defineComponent({
           return;
         }
 
-        if (currentlyExecutingPromises[name] === null) {
-          variableLog(
-            name,
-            `Promise already cancelled, skipping load for variable ${name}`,
-          );
-          currentlyExecutingPromises[name] = reject;
-        }
-
         // For search operations, use comprehensive cancellation
         if (searchText) {
           cancelAllVariableOperations(name);
