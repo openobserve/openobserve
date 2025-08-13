@@ -116,7 +116,6 @@ const useHttpStreaming = () => {
       org_id: string;
       pageType: string;
       searchType: string;
-      enable_align_histogram: boolean;
       meta: any;
     },
     handlers: {
@@ -167,7 +166,6 @@ const useHttpStreaming = () => {
       org_id: string;
       pageType: string;
       searchType: string;
-      enable_align_histogram: boolean;
       meta: any;
     },
     handlers: {
@@ -177,7 +175,7 @@ const useHttpStreaming = () => {
       reset: (data: any, response: any) => void;
     }
   ) => {
-    const { traceId, org_id, type, queryReq, searchType, pageType, enable_align_histogram, meta } = data;
+    const { traceId, org_id, type, queryReq, searchType, pageType, meta } = data;
     const abortController = new AbortController();
 
     // Store the abort controller for this trace
@@ -197,7 +195,6 @@ const useHttpStreaming = () => {
         if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
         if (meta?.fallback_order_by_col) url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
         if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
-        if (enable_align_histogram) url += `&enable_align_histogram=${enable_align_histogram}`;
       } else if(type === "values") {
         const fieldsString = meta?.fields.join(",");
         url = `/_values_stream`
