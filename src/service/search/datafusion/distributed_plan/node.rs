@@ -28,6 +28,7 @@ use crate::service::search::{
     request::{FlightSearchRequest, Request},
 };
 
+#[derive(Debug, Clone)]
 pub struct RemoteScanNodes {
     pub req: Request,
     pub nodes: Vec<Arc<dyn NodeInfo>>,

@@ -15,179 +15,23 @@
 
 use std::sync::Arc;
 
-use config::meta::{cluster::NodeInfo, inverted_index::IndexOptimizeMode, stream::FileKey};
+use config::meta::{inverted_index::IndexOptimizeMode, stream::FileKey};
 use datafusion::{
     common::{
-        Result, TableReference,
-        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
+        Result,
+        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter},
     },
-    physical_expr::LexOrdering,
     physical_plan::{
-        ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        ExecutionPlan,
         aggregates::{AggregateExec, AggregateMode},
-        repartition::RepartitionExec,
-        sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
         union::UnionExec,
     },
 };
-use hashbrown::HashMap;
-use proto::cluster_rpc::KvItem;
 
-use super::{empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec};
 use crate::service::search::{
     datafusion::plan::tantivy_optimize_exec::TantivyOptimizeExec, grpc::QueryParams,
-    index::IndexCondition, request::Request,
+    index::IndexCondition,
 };
-
-// add remote scan to physical plan
-pub struct RemoteScanRewriter {
-    pub remote_scan_nodes: RemoteScanNodes,
-    pub is_changed: bool,
-}
-
-impl RemoteScanRewriter {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        req: Request,
-        nodes: Vec<Arc<dyn NodeInfo>>,
-        file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
-        equal_keys: HashMap<TableReference, Vec<KvItem>>,
-        index_condition: Option<IndexCondition>,
-        index_optimize_mode: Option<IndexOptimizeMode>,
-        is_leader: bool,
-        opentelemetry_context: opentelemetry::Context,
-    ) -> Self {
-        Self {
-            remote_scan_nodes: RemoteScanNodes::new(
-                req,
-                nodes,
-                file_id_lists,
-                equal_keys,
-                index_condition,
-                index_optimize_mode,
-                is_leader,
-                opentelemetry_context,
-            ),
-            is_changed: false,
-        }
-    }
-}
-
-impl TreeNodeRewriter for RemoteScanRewriter {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
-        if node.name() == "RepartitionExec" || node.name() == "CoalescePartitionsExec" {
-            let mut visitor = TableNameVisitor::new();
-            node.visit(&mut visitor)?;
-            if visitor.is_remote_scan {
-                let table_name = visitor.table_name.clone().unwrap();
-                let input = node.children()[0];
-                let remote_scan = Arc::new(RemoteScanExec::new(
-                    input.clone(),
-                    self.remote_scan_nodes.get_remote_node(&table_name),
-                )?);
-                let output_partitioning =
-                    Partitioning::RoundRobinBatch(input.output_partitioning().partition_count());
-                let repartition =
-                    Arc::new(RepartitionExec::try_new(remote_scan, output_partitioning)?);
-                let new_node = node.with_new_children(vec![repartition])?;
-                self.is_changed = true;
-                return Ok(Transformed::yes(new_node));
-            }
-        } else if node.name() == "SortPreservingMergeExec" {
-            let mut visitor = TableNameVisitor::new();
-            node.visit(&mut visitor)?;
-            if visitor.is_remote_scan {
-                let table_name = visitor.table_name.clone().unwrap();
-                let follow_merge_node = node.clone();
-                let new_input =
-                    follow_merge_node.with_new_children(vec![node.children()[0].clone()])?;
-
-                let remote_scan = Arc::new(RemoteScanExec::new(
-                    new_input,
-                    self.remote_scan_nodes.get_remote_node(&table_name),
-                )?);
-                let new_node = node.with_new_children(vec![remote_scan])?;
-                self.is_changed = true;
-                return Ok(Transformed::yes(new_node));
-            }
-        } else if node.name() == "UnionExec" {
-            let mut visitor = TableNameVisitor::new();
-            node.visit(&mut visitor)?;
-            // add each remote scan for each child
-            if visitor.is_remote_scan {
-                let mut new_children: Vec<Arc<dyn ExecutionPlan>> = vec![];
-                for child in node.children() {
-                    let mut visitor = TableNameVisitor::new();
-                    child.visit(&mut visitor)?;
-                    // For sort, we should add a SortPreservingMergeExec
-                    if child.name() == "SortExec" {
-                        let table_name = visitor.table_name.clone().unwrap();
-                        let sort = child.as_any().downcast_ref::<SortExec>().unwrap();
-                        let sort_merge = Arc::new(
-                            SortPreservingMergeExec::new(
-                                LexOrdering::new(sort.expr().to_vec()).unwrap(),
-                                Arc::new(sort.clone()),
-                            )
-                            .with_fetch(sort.fetch()),
-                        );
-                        let remote_scan = Arc::new(RemoteScanExec::new(
-                            sort_merge,
-                            self.remote_scan_nodes.get_remote_node(&table_name),
-                        )?);
-                        new_children.push(remote_scan);
-                    } else {
-                        let table_name = visitor.table_name.clone().unwrap();
-                        let remote_scan = Arc::new(RemoteScanExec::new(
-                            child.clone(),
-                            self.remote_scan_nodes.get_remote_node(&table_name),
-                        )?);
-                        new_children.push(remote_scan);
-                    }
-                }
-                let new_node = node.with_new_children(new_children)?;
-                self.is_changed = true;
-                return Ok(Transformed::yes(new_node));
-            }
-        }
-        Ok(Transformed::no(node))
-    }
-}
-
-// visit physical plan to get underlying table name and check is add a remote scan after current
-// physical plan
-struct TableNameVisitor {
-    table_name: Option<TableReference>,
-    is_remote_scan: bool, // is add remote scan after current physical plan
-}
-
-impl TableNameVisitor {
-    pub fn new() -> Self {
-        Self {
-            table_name: None,
-            is_remote_scan: true,
-        }
-    }
-}
-
-impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        let name = node.name();
-        if name == "RemoteScanExec" {
-            self.is_remote_scan = false;
-            Ok(TreeNodeRecursion::Stop)
-        } else if name == "NewEmptyExec" {
-            let table = node.as_any().downcast_ref::<NewEmptyExec>().unwrap();
-            self.table_name = Some(TableReference::from(table.name()));
-            Ok(TreeNodeRecursion::Continue)
-        } else {
-            Ok(TreeNodeRecursion::Continue)
-        }
-    }
-}
 
 // rewrite the physical plan to add tantivy optimize exec
 pub fn tantivy_optimize_rewrite(

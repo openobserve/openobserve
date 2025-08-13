@@ -19,28 +19,40 @@ use add_sort_and_limit::AddSortAndLimitRule;
 use add_timestamp::AddTimestampRule;
 #[cfg(feature = "enterprise")]
 use cipher::{RewriteCipherCall, RewriteCipherKey};
-use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME};
-use datafusion::optimizer::{
-    AnalyzerRule, OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
-    decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
-    eliminate_cross_join::EliminateCrossJoin, eliminate_duplicated_expr::EliminateDuplicatedExpr,
-    eliminate_filter::EliminateFilter, eliminate_group_by_constant::EliminateGroupByConstant,
-    eliminate_join::EliminateJoin, eliminate_limit::EliminateLimit,
-    eliminate_nested_union::EliminateNestedUnion, eliminate_one_union::EliminateOneUnion,
-    eliminate_outer_join::EliminateOuterJoin, extract_equijoin_predicate::ExtractEquijoinPredicate,
-    filter_null_join_keys::FilterNullJoinKeys, optimize_projections::OptimizeProjections,
-    propagate_empty_relation::PropagateEmptyRelation, push_down_filter::PushDownFilter,
-    push_down_limit::PushDownLimit, replace_distinct_aggregate::ReplaceDistinctWithAggregate,
-    scalar_subquery_to_join::ScalarSubqueryToJoin, simplify_expressions::SimplifyExpressions,
-    single_distinct_to_groupby::SingleDistinctToGroupBy,
+use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, meta::cluster::NodeInfo};
+use datafusion::{
+    optimizer::{
+        AnalyzerRule, OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
+        decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
+        eliminate_cross_join::EliminateCrossJoin,
+        eliminate_duplicated_expr::EliminateDuplicatedExpr, eliminate_filter::EliminateFilter,
+        eliminate_group_by_constant::EliminateGroupByConstant, eliminate_join::EliminateJoin,
+        eliminate_limit::EliminateLimit, eliminate_nested_union::EliminateNestedUnion,
+        eliminate_one_union::EliminateOneUnion, eliminate_outer_join::EliminateOuterJoin,
+        extract_equijoin_predicate::ExtractEquijoinPredicate,
+        filter_null_join_keys::FilterNullJoinKeys, optimize_projections::OptimizeProjections,
+        propagate_empty_relation::PropagateEmptyRelation, push_down_filter::PushDownFilter,
+        push_down_limit::PushDownLimit, replace_distinct_aggregate::ReplaceDistinctWithAggregate,
+        scalar_subquery_to_join::ScalarSubqueryToJoin, simplify_expressions::SimplifyExpressions,
+        single_distinct_to_groupby::SingleDistinctToGroupBy,
+    },
+    physical_optimizer::PhysicalOptimizerRule,
+    sql::TableReference,
 };
+use hashbrown::HashMap;
 use infra::schema::get_stream_setting_fts_fields;
 use limit_join_right_side::LimitJoinRightSide;
 use remove_index_fields::RemoveIndexFieldsRule;
 use rewrite_histogram::RewriteHistogram;
 use rewrite_match::RewriteMatch;
 
-use crate::service::search::sql::Sql;
+use crate::service::search::{
+    datafusion::optimizer::{
+        join_reorder::JoinReorderRule, remote_scan::generate_remote_scan_rules,
+    },
+    request::Request,
+    sql::Sql,
+};
 
 pub mod add_sort_and_limit;
 pub mod add_timestamp;
@@ -48,6 +60,7 @@ pub mod add_timestamp;
 pub mod cipher;
 pub mod join_reorder;
 pub mod limit_join_right_side;
+pub mod remote_scan;
 pub mod remove_index_fields;
 pub mod rewrite_histogram;
 pub mod rewrite_match;
@@ -159,5 +172,25 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     }
     // ************************************
 
+    rules
+}
+
+pub fn generate_physical_optimizer_rules(
+    req: &Request,
+    sql: &Sql,
+    nodes: Vec<Arc<dyn NodeInfo>>,
+    partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
+    context: opentelemetry::Context,
+    is_leader: bool,
+) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
+    let mut rules = vec![Arc::new(JoinReorderRule::new()) as _];
+    rules.push(generate_remote_scan_rules(
+        req,
+        sql,
+        nodes,
+        partitioned_file_lists,
+        context,
+        is_leader,
+    ));
     rules
 }

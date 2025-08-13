@@ -21,7 +21,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        cluster::{IntoArcVec, Node, Role, RoleGroup},
+        cluster::{IntoArcVec, Node, NodeInfo, Role, RoleGroup},
         search::{ScanStats, SearchEventType},
         sql::TableReferenceExt,
         stream::{QueryPartitionStrategy, StreamType},
@@ -41,7 +41,6 @@ use infra::{
     file_list::FileId,
 };
 use itertools::Itertools;
-use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -52,12 +51,12 @@ use crate::{
         search::{
             DATAFUSION_RUNTIME, SearchResult,
             datafusion::{
-                distributed_plan::{
-                    EmptyExecVisitor, NewEmptyExecCountVisitor, remote_scan::RemoteScanExec,
-                    rewrite::RemoteScanRewriter,
-                },
+                distributed_plan::EmptyExecVisitor,
                 exec::{DataFusionContextBuilder, register_udf},
-                optimizer::{generate_analyzer_rules, generate_optimizer_rules},
+                optimizer::{
+                    generate_analyzer_rules, generate_optimizer_rules,
+                    generate_physical_optimizer_rules,
+                },
                 table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
             },
             inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -400,80 +399,25 @@ pub async fn run_datafusion(
     partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
-    let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
+    let ctx = SearchContextBuilder::new()
+        .nodes(nodes.into_arc_vec())
+        .partitioned_file_lists(partitioned_file_lists)
+        .target_partitions(cfg.limit.cpu_num)
+        .context(tracing::Span::current().context())
+        .build(&req, &sql)
+        .await?;
     log::info!(
         "[trace_id {trace_id}] flight->search: datafusion context created with target_partitions: {}",
         ctx.state().config().target_partitions(),
     );
 
     register_table(&ctx, &sql).await?;
-
     let plan = ctx.state().create_logical_plan(&sql.sql).await?;
-
+    #[allow(unused_mut)]
     let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
         print_plan(&trace_id, &physical_plan, "before");
-    }
-
-    // 7. rewrite physical plan
-    let equal_keys = sql
-        .equal_items
-        .iter()
-        .map(|(stream_name, fields)| {
-            (
-                stream_name.clone(),
-                fields
-                    .iter()
-                    .map(|(k, v)| cluster_rpc::KvItem::new(k, v))
-                    .collect::<Vec<_>>(),
-            )
-        })
-        .collect::<HashMap<_, _>>();
-
-    #[cfg(feature = "enterprise")]
-    let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
-    #[cfg(feature = "enterprise")]
-    let streaming_output = req.streaming_output;
-    #[cfg(feature = "enterprise")]
-    let streaming_id = req.streaming_id.clone();
-    #[cfg(feature = "enterprise")]
-    let use_cache = req.use_cache;
-    #[cfg(feature = "enterprise")]
-    let org_id = req.org_id.clone();
-
-    let context = tracing::Span::current().context();
-
-    // rewrite physical plan
-    let mut rewrite = RemoteScanRewriter::new(
-        req,
-        nodes.into_arc_vec(),
-        partitioned_file_lists,
-        equal_keys,
-        sql.index_condition.clone(),
-        sql.index_optimize_mode.clone(),
-        false, // for super cluster
-        context,
-    );
-
-    // if there is only one table and single node, we can skip the remote scan rewrite
-    let mut empty_exec_count_visitor = NewEmptyExecCountVisitor::default();
-    physical_plan.visit(&mut empty_exec_count_visitor)?;
-    let empty_exec_count = empty_exec_count_visitor.get_count();
-    let is_changed = if empty_exec_count <= 1 && config::cluster::LOCAL_NODE.is_single_node() {
-        false
-    } else {
-        physical_plan = physical_plan.rewrite(&mut rewrite)?.data;
-        rewrite.is_changed
-    };
-
-    // add remote scan exec to top if physical plan is not changed
-    if !is_changed {
-        let table_name = sql.stream_names.first().unwrap();
-        physical_plan = Arc::new(RemoteScanExec::new(
-            physical_plan,
-            rewrite.remote_scan_nodes.get_remote_node(table_name),
-        )?);
     }
 
     // check for streaming aggregation query
@@ -482,7 +426,11 @@ pub async fn run_datafusion(
     #[allow(unused_mut)]
     let mut aggs_cache_ratio = 0;
     #[cfg(feature = "enterprise")]
-    if streaming_output {
+    if req.streaming_output {
+        let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
+        let streaming_id = req.streaming_id.clone();
+        let use_cache = req.use_cache;
+        let org_id = req.org_id.clone();
         let Some(streaming_id) = streaming_id else {
             return Err(Error::Message(
                 "streaming_id is required for streaming aggregation query".to_string(),
@@ -503,8 +451,7 @@ pub async fn run_datafusion(
                 use_cache,
                 target_partitions,
                 physical_plan,
-            )
-            .await?;
+            )?;
         physical_plan = plan;
         // Check for aggs cache hit
         if is_complete_cache_hit {
@@ -891,27 +838,80 @@ pub(crate) async fn partition_file_by_hash(
     partitions
 }
 
-pub async fn generate_context(
-    req: &Request,
-    sql: &Arc<Sql>,
-    target_partitions: usize,
-) -> Result<SessionContext> {
-    let analyzer_rules = generate_analyzer_rules(sql);
-    let optimizer_rules = generate_optimizer_rules(sql);
-    let mut ctx = DataFusionContextBuilder::new()
-        .trace_id(&req.trace_id)
-        .work_group(req.work_group.clone())
-        .analyzer_rules(analyzer_rules)
-        .optimizer_rules(optimizer_rules)
-        .sorted_by_time(sql.sorted_by_time)
-        .build(target_partitions)
-        .await?;
+pub struct SearchContextBuilder {
+    pub nodes: Vec<Arc<dyn NodeInfo>>,
+    pub partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
+    pub target_partitions: usize,
+    pub context: opentelemetry::Context,
+    pub is_leader: bool, // if it is super cluster leader
+}
 
-    // register udf
-    register_udf(&ctx, &req.org_id)?;
-    datafusion_functions_json::register_all(&mut ctx)?;
+impl SearchContextBuilder {
+    pub fn new() -> Self {
+        Self {
+            nodes: vec![],
+            partitioned_file_lists: HashMap::new(),
+            target_partitions: 0,
+            context: opentelemetry::Context::new(),
+            is_leader: false,
+        }
+    }
 
-    Ok(ctx)
+    pub fn nodes(mut self, nodes: Vec<Arc<dyn NodeInfo>>) -> Self {
+        self.nodes = nodes;
+        self
+    }
+
+    pub fn partitioned_file_lists(
+        mut self,
+        partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
+    ) -> Self {
+        self.partitioned_file_lists = partitioned_file_lists;
+        self
+    }
+
+    pub fn target_partitions(mut self, target_partitions: usize) -> Self {
+        self.target_partitions = target_partitions;
+        self
+    }
+
+    pub fn context(mut self, context: opentelemetry::Context) -> Self {
+        self.context = context;
+        self
+    }
+
+    pub fn super_cluster_leader(mut self, is_leader: bool) -> Self {
+        self.is_leader = is_leader;
+        self
+    }
+
+    pub async fn build(self, req: &Request, sql: &Arc<Sql>) -> Result<SessionContext> {
+        let analyzer_rules = generate_analyzer_rules(sql);
+        let optimizer_rules = generate_optimizer_rules(sql);
+        let physical_optimizer_rules = generate_physical_optimizer_rules(
+            req,
+            sql,
+            self.nodes,
+            self.partitioned_file_lists,
+            self.context,
+            self.is_leader,
+        );
+        let mut ctx = DataFusionContextBuilder::new()
+            .trace_id(&req.trace_id)
+            .work_group(req.work_group.clone())
+            .analyzer_rules(analyzer_rules)
+            .optimizer_rules(optimizer_rules)
+            .physical_optimizer_rules(physical_optimizer_rules)
+            .sorted_by_time(sql.sorted_by_time)
+            .build(self.target_partitions)
+            .await?;
+
+        // register udf
+        register_udf(&ctx, &req.org_id)?;
+        datafusion_functions_json::register_all(&mut ctx)?;
+
+        Ok(ctx)
+    }
 }
 
 pub async fn register_table(ctx: &SessionContext, sql: &Sql) -> Result<()> {

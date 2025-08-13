@@ -27,7 +27,7 @@ use hashbrown::HashSet;
 use infra::errors::Error;
 
 use crate::service::search::{
-    cluster::flight::{generate_context, register_table},
+    cluster::flight::{SearchContextBuilder, register_table},
     request::Request,
     sql::Sql,
 };
@@ -38,7 +38,9 @@ pub async fn get_group_by_fields(sql: &Sql) -> Result<Vec<String>, Error> {
         return Ok(vec![]);
     }
     let sql_arc = Arc::new(sql.clone());
-    let ctx = generate_context(&Request::default(), &sql_arc, 0).await?;
+    let ctx = SearchContextBuilder::new()
+        .build(&Request::default(), &sql_arc)
+        .await?;
     register_table(&ctx, &sql_arc).await?;
     let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;

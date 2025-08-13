@@ -44,6 +44,7 @@ use datafusion::{
     },
     logical_expr::AggregateUDF,
     optimizer::{AnalyzerRule, OptimizerRule},
+    physical_optimizer::PhysicalOptimizerRule,
     physical_plan::execute_stream,
     prelude::{Expr, SessionContext},
 };
@@ -62,7 +63,6 @@ use {
 
 use super::{
     file_type::{FileType, GetExt},
-    optimizer::join_reorder::JoinReorderRule,
     planner::extension_planner::OpenobserveQueryPlanner,
     storage::file_list,
     table_provider::{NewListingTable, uniontable::NewUnionTable},
@@ -480,6 +480,7 @@ pub struct DataFusionContextBuilder<'a> {
     work_group: Option<String>,
     analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
+    physical_optimizer_rules: Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>>,
     sorted_by_time: bool,
 }
 
@@ -490,6 +491,7 @@ impl<'a> DataFusionContextBuilder<'a> {
             work_group: None,
             analyzer_rules: vec![],
             optimizer_rules: vec![],
+            physical_optimizer_rules: vec![],
             sorted_by_time: false,
         }
     }
@@ -517,6 +519,14 @@ impl<'a> DataFusionContextBuilder<'a> {
         optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
     ) -> Self {
         self.optimizer_rules = optimizer_rules;
+        self
+    }
+
+    pub fn physical_optimizer_rules(
+        mut self,
+        physical_optimizer_rules: Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>>,
+    ) -> Self {
+        self.physical_optimizer_rules = physical_optimizer_rules;
         self
     }
 
@@ -548,9 +558,10 @@ impl<'a> DataFusionContextBuilder<'a> {
             builder = builder.with_analyzer_rule(rule);
         }
         if !self.optimizer_rules.is_empty() {
-            builder = builder
-                .with_optimizer_rules(self.optimizer_rules)
-                .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()));
+            builder = builder.with_optimizer_rules(self.optimizer_rules)
+        }
+        for rule in self.physical_optimizer_rules {
+            builder = builder.with_physical_optimizer_rule(rule);
         }
         if cfg.common.feature_join_match_one_enabled {
             builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));

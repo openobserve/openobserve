@@ -28,8 +28,7 @@ use config::{
     metrics,
     utils::json,
 };
-use datafusion::{common::tree_node::TreeNode, physical_plan::visit_execution_plan};
-use hashbrown::HashMap;
+use datafusion::physical_plan::visit_execution_plan;
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
 use o2_enterprise::enterprise::{search::WorkGroup, super_cluster::search::get_cluster_nodes};
@@ -39,8 +38,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
     DATAFUSION_RUNTIME, SearchResult,
-    cluster::flight::{generate_context, register_table},
-    datafusion::distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
+    cluster::flight::{SearchContextBuilder, register_table},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     request::Request,
     sql::Sql,
@@ -216,12 +214,13 @@ async fn run_datafusion(
     req.add_work_group(Some(work_group));
 
     // construct physical plan
-    let ctx = match generate_context(&req, &sql, cfg.limit.cpu_num).await {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(e);
-        }
-    };
+    let ctx = SearchContextBuilder::new()
+        .nodes(nodes)
+        .target_partitions(cfg.limit.cpu_num)
+        .context(tracing::Span::current().context())
+        .super_cluster_leader(true)
+        .build(&req, &sql)
+        .await?;
 
     // register table
     register_table(&ctx, &sql).await?;
@@ -248,53 +247,11 @@ async fn run_datafusion(
         );
     }
 
-    // 6. rewrite physical plan
-    let partition_keys = sql
-        .equal_items
-        .iter()
-        .map(|(stream_name, fields)| {
-            (
-                stream_name.clone(),
-                fields
-                    .iter()
-                    .map(|(k, v)| cluster_rpc::KvItem::new(k, v))
-                    .collect::<Vec<_>>(),
-            )
-        })
-        .collect::<HashMap<_, _>>();
-
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
     let streaming_output = req.streaming_output;
     let streaming_id = req.streaming_id.clone();
     let use_cache = req.use_cache;
     let org_id = req.org_id.clone();
-
-    let context = tracing::Span::current().context();
-    let mut rewrite = RemoteScanRewriter::new(
-        req,
-        nodes,
-        HashMap::new(),
-        partition_keys,
-        sql.index_condition.clone(),
-        sql.index_optimize_mode.clone(),
-        true,
-        context,
-    );
-    physical_plan = match physical_plan.rewrite(&mut rewrite) {
-        Ok(v) => v.data,
-        Err(e) => {
-            return Err(e.into());
-        }
-    };
-
-    // add remote scan exec to top if physical plan is not changed
-    if !rewrite.is_changed {
-        let table_name = sql.stream_names.first().unwrap();
-        physical_plan = Arc::new(RemoteScanExec::new(
-            physical_plan,
-            rewrite.remote_scan_nodes.get_remote_node(table_name),
-        )?);
-    }
 
     // check for streaming aggregation query
     let mut aggs_cache_ratio = 0;
@@ -319,8 +276,7 @@ async fn run_datafusion(
                 use_cache,
                 target_partitions,
                 physical_plan,
-            )
-            .await?;
+            )?;
         physical_plan = plan;
         // Check for aggs cache hit
         if is_complete_cache_hit {
