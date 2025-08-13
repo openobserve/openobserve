@@ -237,6 +237,8 @@ actix-tls = { version = "3.4", features = [
 anyhow = "1.0"
 arc-swap = "1.7.1"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
+async-nats = "0.39"
+async-stream = "0.3.6"
 async-trait = "0.1"
 async-recursion = "1.0"
 async-walkdir = "1.0.0"
@@ -294,9 +296,28 @@ log = "0.4"
 md5 = "0.7.0"
 memchr = "2.7"
 murmur3 = "0.5"
-async-nats = "0.39"
 once_cell = "1.20"
 ordered-float = { version = "4.5.0", features = ["serde"] }
+opentelemetry = "0.26"
+opentelemetry_sdk = { version = "0.26", features = [
+    "rt-tokio",
+    "trace",
+    "metrics",
+] }
+opentelemetry-otlp = { version = "0.26", features = [
+    "http-proto",
+    "serialize",
+    "serde",
+    "trace",
+    "reqwest-client",
+] }
+opentelemetry-proto = { version = "0.26", features = [
+    "gen-tonic",
+    "with-serde",
+    "logs",
+    "metrics",
+    "trace",
+] }
 parking_lot = "0.12"
 prometheus = { version = "0.13", features = ["process"] }
 prost = "0.13.1"
@@ -309,6 +330,7 @@ reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls-native-roots",
     "stream",
 ] }
+roaring = "0.11.2"
 rustls-pemfile = "2"
 rustls = { version = "0.23.20", default-features = false, features = [
     "std",
@@ -364,26 +386,6 @@ tracing-subscriber = { version = "0.3.0", features = [
     "json",
     "registry",
 ] }
-opentelemetry = "0.26"
-opentelemetry_sdk = { version = "0.26", features = [
-    "rt-tokio",
-    "trace",
-    "metrics",
-] }
-opentelemetry-otlp = { version = "0.26", features = [
-    "http-proto",
-    "serialize",
-    "serde",
-    "trace",
-    "reqwest-client",
-] }
-opentelemetry-proto = { version = "0.26", features = [
-    "gen-tonic",
-    "with-serde",
-    "logs",
-    "metrics",
-    "trace",
-] }
 url = "2.5"
 urlencoding = "2.1"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
@@ -392,5 +394,3 @@ vector-enrichment = { version = "0.1.0", package = "enrichment", git = "https://
 vrl = { version = "0.22", features = ["value", "compiler", "test"] }
 zip = "3.0.0"
 zstd = "0.13"
-roaring = "0.11.2"
-async-stream = "0.3.6"
