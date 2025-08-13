@@ -37,6 +37,7 @@ const search = {
       is_ui_histogram?: boolean;
     },
     search_type: string = "ui",
+    is_multi_stream_search: boolean = false,
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
@@ -48,6 +49,7 @@ const search = {
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
     if (folder_id) url += `&folder_id=${folder_id}`;
     if (is_ui_histogram) url += `&is_ui_histogram=${is_ui_histogram}`;
+    if (is_multi_stream_search) url += `&is_multi_stream_search=${is_multi_stream_search}`;
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
       if (query.hasOwnProperty("aggs")) {
@@ -230,19 +232,20 @@ const search = {
     query,
     page_type = "logs",
     traceparent,
-    searchType,
+    enable_align_histogram,
   }: {
     org_identifier: string;
     query: any;
     page_type: string;
     traceparent: string;
-    searchType: string;
+    enable_align_histogram: boolean;
   }) => {
     // const url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
 
-    let url = `/api/${org_identifier}/_search_partition?type=${page_type}&search_type=${searchType}`;
+    let url = `/api/${org_identifier}/_search_partition?type=${page_type}&enable_align_histogram=${enable_align_histogram}`;
     if (typeof query.sql != "string") {
-      url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}&search_type=${searchType}`;
+      // this condition will be true for multi-stream search non-sql mode.
+      url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}&enable_align_histogram=true`;
     }
 
     return http({
