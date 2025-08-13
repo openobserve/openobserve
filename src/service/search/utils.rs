@@ -19,8 +19,6 @@ use config::meta::search::ScanStats;
 use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
 use sqlparser::ast::{BinaryOperator, Expr};
 use tokio::sync::Mutex;
-#[cfg(feature = "enterprise")]
-use {crate::service::grpc::make_grpc_search_client, config::meta::cluster::NodeInfo};
 
 use super::{DATAFUSION_RUNTIME, datafusion::distributed_plan::remote_scan::RemoteScanExec};
 
@@ -177,39 +175,6 @@ pub fn get_field_name(expr: &Expr) -> String {
         Expr::CompoundIdentifier(ident) => trim_quotes(ident[1].to_string().as_str()),
         _ => unreachable!(),
     }
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn collect_scan_stats(
-    nodes: &[Arc<dyn NodeInfo>],
-    trace_id: &str,
-    is_leader: bool,
-) -> ScanStats {
-    let mut scan_stats = ScanStats::default();
-    for node in nodes {
-        let mut scan_stats_request = tonic::Request::new(proto::cluster_rpc::GetScanStatsRequest {
-            trace_id: trace_id.to_string(),
-            is_leader,
-        });
-        let mut client =
-            match make_grpc_search_client(trace_id, &mut scan_stats_request, node).await {
-                Ok(c) => c,
-                Err(e) => {
-                    log::error!("error in creating get scan stats client :{e}, skipping");
-                    continue;
-                }
-            };
-        let stats = match client.get_scan_stats(scan_stats_request).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("error in getting scan stats : {e}, skipping");
-                continue;
-            }
-        };
-        let stats = stats.into_inner().stats.unwrap_or_default();
-        scan_stats.add(&(&stats).into());
-    }
-    scan_stats
 }
 
 #[cfg(test)]

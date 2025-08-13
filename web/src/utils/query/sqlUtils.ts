@@ -774,7 +774,6 @@ export const convertQueryIntoSingleLine = async (query: any) => {
     return query;
   }
 };
-
 // // List of known aggregation functions
 // const aggregationFunctions = new Set([
 //   "count",

@@ -25,7 +25,6 @@ use actix_web::{
     middleware, web,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
-use actix_web_lab::middleware::{Next, from_fn};
 use config::get_config;
 use futures::FutureExt;
 use utoipa::OpenApi;
@@ -76,7 +75,7 @@ pub fn get_cors() -> Rc<Cors> {
 #[cfg(feature = "enterprise")]
 async fn audit_middleware(
     mut req: ServiceRequest,
-    next: Next<impl MessageBody>,
+    next: middleware::Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
     let method = req.method().to_string();
     let prefix = format!("{}/api/", get_config().common.base_uri);
@@ -165,7 +164,7 @@ async fn audit_middleware(
 #[cfg(not(feature = "enterprise"))]
 async fn audit_middleware(
     req: ServiceRequest,
-    next: Next<impl MessageBody>,
+    next: middleware::Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
     let mut res = next.call(req).await?;
     res.headers_mut().remove(ERROR_HEADER);
@@ -364,7 +363,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
     let server = cfg.common.instance_name_short.to_string();
 
     let service = web::scope("/api")
-        .wrap(from_fn(audit_middleware))
+        .wrap(middleware::from_fn(audit_middleware))
         .wrap(HttpAuthentication::with_fn(
             super::auth::validator::oo_validator,
         ))
@@ -438,6 +437,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(promql::format_query_post)
         .service(search::search)
         .service(search::search_partition)
+        .service(search::result_schema)
         .service(search::around_v1)
         .service(search::around_v2)
         .service(search_inspector::get_search_profile)
@@ -650,7 +650,7 @@ pub fn get_other_service_routes(svc: &mut web::ServiceConfig) {
     svc.service(
         web::scope("/rum")
             .wrap(cors)
-            .wrap(from_fn(RumExtraData::extractor))
+            .wrap(middleware::from_fn(RumExtraData::extractor))
             .wrap(HttpAuthentication::with_fn(
                 super::auth::validator::validator_rum,
             ))

@@ -138,6 +138,7 @@ const defaultObject = {
       ? JSON.parse(useLocalWrapContent())
       : false,
     histogramDirtyFlag: false,
+    logsVisualizeDirtyFlag: false,
     sqlMode: false,
     sqlModeManualTrigger: false,
     quickMode: false,
@@ -636,7 +637,33 @@ const useLogs = () => {
     }
   };
 
-  const generateURLQuery = (isShareLink: boolean = false) => {
+  // Helper functions for visualization config sync
+  const getVisualizationConfig = (dashboardPanelData: any) => {
+    if (!dashboardPanelData?.data) {
+      return null;
+    }
+    return dashboardPanelData.data;
+  };
+
+  const encodeVisualizationConfig = (config: any) => {
+    try {
+      return b64EncodeUnicode(JSON.stringify(config));
+    } catch (error) {
+      console.error("Failed to encode visualization config:", error);
+      return null;
+    }
+  };
+
+  const decodeVisualizationConfig = (encodedConfig: string) => {
+    try {
+      return JSON.parse(b64DecodeUnicode(encodedConfig) ?? "{}");
+    } catch (error) {
+      console.error("Failed to decode visualization config:", error);
+      return null;
+    }
+  };
+
+  const generateURLQuery = (isShareLink: boolean = false, dashboardPanelData: any = null) => {
     const date = searchObj.data.datetime;
 
     const query: any = {};
@@ -705,11 +732,26 @@ const useLogs = () => {
       query["clusters"] = searchObj.meta.clusters.join(",");
     }
 
+    if(searchObj.meta.logsVisualizeToggle) {
+      query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
+    }
+
+    // Add visualization data to URL if in visualize mode and dashboardPanelData is provided
+    if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
+      const visualizationConfig = getVisualizationConfig(dashboardPanelData);
+      if (visualizationConfig) {
+        const encodedConfig = encodeVisualizationConfig(visualizationConfig);
+        if (encodedConfig) {
+          query["visualization_data"] = encodedConfig;
+        }
+      }
+    }
+
     return query;
   };
 
-  const updateUrlQueryParams = () => {
-    const query = generateURLQuery(false);
+  const updateUrlQueryParams = (dashboardPanelData: any = null) => {
+    const query = generateURLQuery(false, dashboardPanelData);
     if (
       (Object.hasOwn(query, "type") &&
         query.type == "search_history_re_apply") ||
@@ -966,7 +1008,10 @@ const useLogs = () => {
           }
         }
 
-        req.query.sql = query;
+        req.query.sql = query.split("\n")
+          .filter((line: string) => !line.trim().startsWith("--"))
+          .join("\n");
+        req.query["sql_mode"] = "full";
         // delete req.aggs;
       } else {
         const parseQuery = [query];
@@ -1247,7 +1292,10 @@ const useLogs = () => {
 
           partitionQueryReq["streaming_output"] = true;
 
-          searchObj.data.queryResults.histogram_interval = 0;
+          searchObj.data.queryResults.histogram_interval = null;
+
+          // for visualization, will require to set histogram interval to fill missing values
+          searchObj.data.queryResults.visualization_histogram_interval = null;
 
           await searchService
             .partition({
@@ -1290,6 +1338,16 @@ const useLogs = () => {
               };
               //we get is_histogram_eligible flag to check from the BE so that if it is false then we dont need to make histogram call
               searchObj.data.queryResults.is_histogram_eligible = res.data?.is_histogram_eligible;
+              searchObj.data.queryResults.histogram_interval = res.data.histogram_interval;
+
+              // check if histogram interval is undefined, then set current response as histogram response
+              // for visualization, will require to set histogram interval to fill missing values
+              // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+              // created new attribute visualization_histogram_interval to avoid this issue
+              if(!searchObj.data.queryResults.visualization_histogram_interval && res.data?.histogram_interval) {
+                searchObj.data.queryResults.visualization_histogram_interval = res.data?.histogram_interval;
+              }
+
               if (typeof partitionQueryReq.sql != "string") {
                 const partitionSize = 0;
                 let partitions = [];
@@ -1921,7 +1979,7 @@ const useLogs = () => {
           await processHttpHistogramResults(queryReq);
         } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
           resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
             -1
           );
           searchObj.meta.histogramDirtyFlag = false;
@@ -1944,20 +2002,19 @@ const useLogs = () => {
           }
           if(isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible){
             resetHistogramWithError(
-              "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+              "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
               -1
             );
           }
           else{
             resetHistogramWithError(
-              "Histogram unavailable for CTEs, DISTINCT and LIMIT queries",
+              "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries",
               -1
             );
 
           }
           searchObj.meta.histogramDirtyFlag = false;
-        } 
-        else {
+        } else {
           let aggFlag = false;
           if (parsedSQL) {
             aggFlag = hasAggregation(parsedSQL?.columns);
@@ -1965,13 +2022,16 @@ const useLogs = () => {
           if (
             queryReq.query.from == 0 &&
             searchObj.data.queryResults.hits.length > 0 &&
-            !aggFlag
+            !aggFlag &&
+            searchObj.data.queryResults.aggs == undefined
           ) {
             setTimeout(async () => {
               searchObjDebug["pagecountStartTime"] = performance.now();
               await getPageCount(queryReq);
               searchObjDebug["pagecountEndTime"] = performance.now();
             }, 0);
+          } else {
+            await generateHistogramData();
           }
         }
       } else {
@@ -2534,7 +2594,7 @@ const useLogs = () => {
 
       const isAggregation = searchObj.meta.sqlMode && parsedSQL != undefined && (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
 
-      if(!queryReq.query?.streaming_output && searchObj.data.queryResults.histogram_interval) {
+      if(searchObj.data.queryResults.histogram_interval) {
         queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
       }
       
@@ -3034,6 +3094,9 @@ const useLogs = () => {
               searchObj.data.queryResults.aggs = [];
             }
 
+            // copy converted_histogram_query to queryResults
+            searchObj.data.queryResults.converted_histogram_query = res?.data?.converted_histogram_query ?? "";
+
             const parsedSQL: any = fnParsedSQL();
             const partitions = JSON.parse(
               JSON.stringify(
@@ -3113,7 +3176,14 @@ const useLogs = () => {
               }
             }
 
-            searchObj.data.queryResults.aggs.push(...res.data.hits);
+            const order_by = res?.data?.order_by ?? "desc"
+
+            if (order_by?.toLowerCase() === "desc") {
+              searchObj.data.queryResults.aggs.push(...res.data.hits);
+            } else {
+              searchObj.data.queryResults.aggs.unshift(...res.data.hits);
+            }
+
             searchObj.data.queryResults.scan_size += res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
             searchObj.data.queryResults.result_cache_ratio +=
@@ -3148,6 +3218,15 @@ const useLogs = () => {
               searchObj.data.queryResults.partitionDetail.paginations[
                 searchObj.data.resultGrid.currentPage - 1
               ][0].endTime;
+
+
+            // check if histogram interval is undefined, then set current response as histogram response
+            // for visualization, will require to set histogram interval to fill missing values
+            // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+            // created new attribute visualization_histogram_interval to avoid this issue
+            if(!searchObj.data.queryResults.visualization_histogram_interval && res.data?.histogram_interval) {
+              searchObj.data.queryResults.visualization_histogram_interval = res.data?.histogram_interval;
+            }
 
             // if (hasAggregationFlag) {
             //   searchObj.data.queryResults.total = res.data.total;
@@ -4356,6 +4435,19 @@ const useLogs = () => {
       searchObj.loading = false;
     }
   };
+
+  const loadVisualizeData = async () => {
+    try {
+      resetFunctions();
+      await getStreamList();
+      await getFunctions();
+      if (isActionsEnabled.value) await getActions();
+      await extractFields();
+    } catch (e: any) {
+      searchObj.loading = false;
+    }
+  };
+
   const loadJobData = async () => {
     try {
       resetFunctions();
@@ -4449,7 +4541,7 @@ const useLogs = () => {
     return { from: fromTimestamp, to: toTimestamp };
   }
 
-  const restoreUrlQueryParams = async () => {
+  const restoreUrlQueryParams = async (dashboardPanelData: any = null) => {
     searchObj.shouldIgnoreWatcher = true;
     const queryParams: any = router.currentRoute.value.query;
     if (!queryParams.stream) {
@@ -4523,9 +4615,7 @@ const useLogs = () => {
     searchObj.meta.quickMode = queryParams.quick_mode == "false" ? false : true;
 
     if (queryParams.stream) {
-      searchObj.data.stream.selectedStream.push(
-        ...queryParams.stream.split(","),
-      );
+      searchObj.data.stream.selectedStream = queryParams.stream.split(",");
     }
 
     if (queryParams.show_histogram) {
@@ -4548,6 +4638,23 @@ const useLogs = () => {
 
     if(store.state.zoConfig?.super_cluster_enabled && queryParams.clusters) {
       searchObj.meta.clusters = queryParams.clusters.split(",");
+    }
+
+    if(queryParams.hasOwnProperty("logs_visualize_toggle") && queryParams.logs_visualize_toggle != "") {
+      searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
+    }
+
+    // Restore visualization data if available and in visualize mode
+    if (queryParams.visualization_data && 
+        searchObj.meta.logsVisualizeToggle === "visualize" && 
+        dashboardPanelData) {
+      const restoredData = decodeVisualizationConfig(queryParams.visualization_data);
+      if (restoredData && dashboardPanelData.data) {
+        dashboardPanelData.data = {
+          ...dashboardPanelData.data,
+          ...restoredData
+        };
+      }
     }
 
     // TODO OK : Replace push with replace and test all scenarios
@@ -5804,7 +5911,13 @@ const useLogs = () => {
       }
     }
     
-    searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+    // if order by is desc, append new partition response at end
+    if (searchObj.data.queryResults.order_by?.toLowerCase() === "desc") {
+      searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+    } else {
+      // else append new partition response at start
+      searchObj.data.queryResults.aggs.unshift(...response.content.results.hits);
+    }
 
     (async () => {
       try {
@@ -5846,6 +5959,22 @@ const useLogs = () => {
       response.content.results.result_cache_ratio;
       searchObj.data.queryResults.histogram_interval = response.content.results.histogram_interval;
       if(searchObj.data.queryResults.histogram_interval) searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
+    searchObj.data.queryResults.order_by = response?.content?.results?.order_by ?? "desc";
+
+    // copy converted_histogram_query to queryResults
+    searchObj.data.queryResults.converted_histogram_query = response?.content?.results?.converted_histogram_query ?? "";
+
+    // check if histogram interval is undefined, then set current response as histogram response
+    // for visualization, will require to set histogram interval to fill missing values
+    // Using same histogram interval attribute creates pagination issue(showing 1 to 50 out of .... was not shown on page change)
+    // created new attribute visualization_histogram_interval to avoid this issue
+    if (
+      !searchObj.data.queryResults.visualization_histogram_interval &&
+      response.content?.results?.histogram_interval
+    ) {
+      searchObj.data.queryResults.visualization_histogram_interval  =
+        response.content?.results?.histogram_interval;
+    }
   }
 
   const handlePageCountStreamingHits = (payload: WebSocketSearchPayload, response: WebSocketSearchResponse, isPagination: boolean, appendResult: boolean = false) => {
@@ -6328,7 +6457,7 @@ const useLogs = () => {
         addTraceId(payload.traceId);
       }
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
-      resetHistogramWithError("Histogram unavailable for CTEs, DISTINCT and LIMIT queries.", -1);
+      resetHistogramWithError("Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.", -1);
       searchObj.meta.histogramDirtyFlag = false;
     } else if (searchObj.meta.sqlMode && (isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible)) {
       if (shouldGetPageCount(queryReq, parsedSQL) && isFromZero) {
@@ -6340,14 +6469,14 @@ const useLogs = () => {
       }
       if(isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible){
         resetHistogramWithError(
-          "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+          "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
           -1
         );
         searchObj.meta.histogramDirtyFlag = false;
       }
       else{
         resetHistogramWithError(
-          "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+          "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
           -1
         );
       }
@@ -6803,8 +6932,12 @@ const useLogs = () => {
     clearSearchObj,
     setCommunicationMethod,
     hasAggregation,
-    processHttpHistogramResults
-    };
+    loadVisualizeData,
+    processHttpHistogramResults,
+    getVisualizationConfig,
+    encodeVisualizationConfig,
+    decodeVisualizationConfig
+  };
 };
 
 export default useLogs;

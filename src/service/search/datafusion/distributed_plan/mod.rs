@@ -24,11 +24,14 @@ use datafusion::{
 };
 
 pub mod codec;
+mod common;
+mod decoder_stream;
 pub mod empty_exec;
 pub mod enrich_exec;
 pub mod node;
 pub mod remote_scan;
 pub mod rewrite;
+mod utils;
 
 pub struct NewEmptyExecVisitor {
     data: Option<Arc<dyn ExecutionPlan>>,

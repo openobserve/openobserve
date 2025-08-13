@@ -742,32 +742,43 @@ pub async fn delete_cache(path: &str, delete_ts: i64) -> std::io::Result<bool> {
     Ok(true)
 }
 
-fn handle_histogram(
+pub fn handle_histogram(
     origin_sql: &mut String,
     q_time_range: Option<(i64, i64)>,
     histogram_interval: i64,
 ) {
-    let caps = RE_HISTOGRAM.captures(origin_sql.as_str()).unwrap();
-    let interval = if histogram_interval > 0 {
-        format!("{histogram_interval} second")
+    let caps = if let Some(caps) = RE_HISTOGRAM.captures(origin_sql.as_str()) {
+        caps
     } else {
-        let attrs = caps
-            .get(1)
-            .unwrap()
+        return;
+    };
+
+    // 0th capture is the whole histogram(...) ,
+    // 1st capture is the comma-delimited list of args
+    // ideally there should be at least one arg, otherwise df with anyways complain,
+    // so we we return from here if capture[1] is None
+    let args = match caps.get(1) {
+        Some(v) => v
             .as_str()
             .split(',')
             .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
-            .collect::<Vec<&str>>();
+            .collect::<Vec<&str>>(),
+        None => return,
+    };
 
-        attrs
-            .get(1)
+    let interval = if histogram_interval > 0 {
+        format!("{histogram_interval} second")
+    } else {
+        args.get(1)
             .map_or_else(|| generate_histogram_interval(q_time_range), |v| *v)
             .to_string()
     };
 
+    let field = args.first().unwrap_or(&"_timestamp");
+
     *origin_sql = origin_sql.replace(
         caps.get(0).unwrap().as_str(),
-        &format!("histogram(_timestamp,'{interval}')"),
+        &format!("histogram({field},'{interval}')"),
     );
 }
 

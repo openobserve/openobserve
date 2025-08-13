@@ -330,7 +330,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="q-px-sm q-mt-xs"
                     style="
-                      background-color: #ffffff !important;
                       border: 1px solid #c1c1c1;
                       border-radius: 4px;
                     "

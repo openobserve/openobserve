@@ -17,8 +17,8 @@ use actix_web::{
     body::MessageBody,
     dev::{ServiceRequest, ServiceResponse},
     http::{ConnectionType, StatusCode},
+    middleware::Next,
 };
-use actix_web_lab::middleware::Next;
 
 pub async fn check_keep_alive(
     req: ServiceRequest,

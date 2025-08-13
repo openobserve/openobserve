@@ -5,7 +5,7 @@ import PageManager from '../../pages/page-manager.js';
 /**
  * Helper function for login
  * Handles the initial login process and navigation
- */
+   */
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);

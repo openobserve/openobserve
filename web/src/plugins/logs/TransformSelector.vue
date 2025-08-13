@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :icon="transformIcon"
     class="float-left tw-cursor-pointer"
     size="32px"
-    :disable="!searchObj.data.transformType"
+    :disable="!searchObj.data.transformType || searchObj.meta.logsVisualizeToggle === 'visualize'"
   >
     <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
       {{ getTransformLabelTooltip }}
@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="saved-views-dropdown btn-function no-case q-pl-sm q-pr-none"
         :class="`${searchObj.data.transformType || 'transform'}-icon`"
         label-class="no-case"
+        :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
       >
         <q-list data-test="logs-search-saved-function-list">
           <!-- Search Input -->
@@ -129,14 +130,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-mr-xs save-transform-btn q-px-sm"
       size="sm"
       icon="save"
-      :disable="searchObj.data.transformType !== 'function'"
+      :disable="searchObj.data.transformType !== 'function' || searchObj.meta.logsVisualizeToggle === 'visualize'"
       @click="fnSavedFunctionDialog"
     >
       <q-tooltip class="tw-text-[12px]" :offset="[0, 6]">
         {{
           searchObj.data.transformType === "action"
             ? t("search.saveActionDisabled")
-            : t("common.save")
+            : searchObj.meta.logsVisualizeToggle === 'visualize' ? 'Not supported for visualization' : t("common.save")
         }}
       </q-tooltip>
     </q-btn>
@@ -144,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import useLogs from "@/composables/useLogs";
 import { getImageURL } from "@/utils/zincutils";
@@ -234,6 +235,8 @@ const transformsLabel = computed(() => {
     return searchObj.data.selectedTransform.name;
   }
 
+  if (searchObj.meta.logsVisualizeToggle === 'visualize') return "Function selection is not supported for visualization";
+
   if (!isActionsEnabled.value) return "Function";
 
   return searchObj.data.transformType === "action"
@@ -302,6 +305,10 @@ const fnSavedFunctionDialog = () => {
 };
 
 const getTransformLabelTooltip = computed(() => {
+
+  // function selection is not supported for visualization
+  if (searchObj.meta.logsVisualizeToggle === 'visualize') return "Function selection is not supported for visualization";
+
   if (!isActionsEnabled.value) return "Toggle Function Editor";
 
   return searchObj.meta.showTransformEditor

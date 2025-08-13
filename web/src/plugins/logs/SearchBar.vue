@@ -54,23 +54,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 class="button button-right tw-flex tw-justify-center tw-items-center no-border no-outline !tw-rounded-l-none q-px-sm"
                 @click="onLogsVisualizeToggleUpdate('visualize')"
-                :disabled="isVisualizeToggleDisabled"
+                :disable="isVisualizeDisabled"
                 no-caps
                 size="sm"
                 style="height: 32px"
               >
-                <q-tooltip>
-                  {{
-                    isVisualizeToggleDisabled
-                      ? t("search.visualizeDisabledForMultiStream")
-                      : t("search.visualize")
-                  }}
-                </q-tooltip>
                 <img
                   :src="visualizeIcon"
                   alt="Visualize"
                   style="width: 20px; height: 20px"
                 />
+                <q-tooltip v-if="isVisualizeDisabled">
+                  {{ t("search.enableSqlModeOrSelectSingleStream") }}
+                </q-tooltip>
+                <q-tooltip v-else>
+                  {{ t("search.visualize") }}
+                </q-tooltip>
               </q-btn>
             </div>
           </div>
@@ -102,13 +101,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-toggle
             data-test="logs-search-bar-sql-mode-toggle-btn"
             v-model="searchObj.meta.sqlMode"
+            :disable="isSqlModeDisabled"
           >
             <img
               :src="sqlIcon"
               alt="SQL Mode"
               style="width: 20px; height: 20px"
             />
-            <q-tooltip>
+            <q-tooltip v-if="isSqlModeDisabled">
+              {{ t("search.sqlModeDisabledForVisualization") }}
+            </q-tooltip>
+            <q-tooltip v-else>
               {{ t("search.sqlModeLabel") }}
             </q-tooltip>
           </q-toggle>
@@ -550,9 +553,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="wrap_text"
           class="float-left"
           size="32px"
+          :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
         >
           <q-tooltip>
-            {{ t("search.messageWrapContent") }}
+           {{ searchObj.meta.logsVisualizeToggle === 'visualize' ? 'Not supported for visualization' : t("search.messageWrapContent") }}
           </q-tooltip>
         </q-toggle>
 
@@ -930,6 +934,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 100%; height: 100%"
             >
               <template v-if="showFunctionEditor">
+              <div class="tw-relative tw-h-full tw-w-full"
+              >
                 <code-query-editor
                   v-if="router.currentRoute.value.name === 'logs'"
                   data-test="logs-vrl-function-editor"
@@ -943,11 +949,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'empty-function'
                       : ''
                   "
+                  :readOnly="searchObj.meta.logsVisualizeToggle === 'visualize'"
                   @keydown="handleKeyDown"
                   language="vrl"
                   @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
                   @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
                 />
+             </div>
+               <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'" 
+               :class="store.state.theme == 'dark' ? 'tw-bg-white tw-bg-opacity-10' : 'tw-bg-black tw-bg-opacity-10'"
+               class="tw-absolute tw-bottom-0 tw-w-full " style="margin-top: 12px; display: flex; align-items: center; flex">
+                <q-icon name="warning" color="warning" size="20px" class="q-mx-sm" />
+                <span class="text-negative q-pa-sm" style="font-weight: semibold; font-size: 14px;">VRL Function Editor is not supported in visualize mode.</span>
+              </div>
               </template>
               <template v-else-if="searchObj.data.transformType === 'action'">
                 <code-query-editor
@@ -1373,13 +1387,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmUpdate = false"
       v-model="confirmUpdate"
     />
-    <ConfirmDialog
-      title="Reset Changes"
-      message="Navigating away from visualize will reset your changes. Are you sure you want to proceed?"
-      @update:ok="changeLogsVisualizeToggle"
-      @update:cancel="confirmLogsVisualizeModeChangeDialog = false"
-      v-model="confirmLogsVisualizeModeChangeDialog"
-    />
   </div>
 </template>
 
@@ -1441,7 +1448,9 @@ import { useLoading } from "@/composables/useLoading";
 import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
+import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
+import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 
 const defaultValue: any = () => {
   return {
@@ -1590,6 +1599,7 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const store = useStore();
+    const { showErrorNotification } = useNotifications();
     const rowsPerPage = ref(10);
     const regionFilter = ref();
     const regionFilterRef = ref(null);
@@ -1642,9 +1652,6 @@ export default defineComponent({
     const saveFunctionLoader = ref(false);
 
     const isFocused = ref(false);
-
-    // confirm dialog for logs visualization toggle
-    const confirmLogsVisualizeModeChangeDialog = ref(false);
 
     const confirmDialogVisible: boolean = ref(false);
     const confirmSavedViewDialogVisible: boolean = ref(false);
@@ -1775,6 +1782,7 @@ export default defineComponent({
     watch(
       () => searchObj.meta.functionEditorPlaceholderFlag,
       (val) => {
+
         if (
           searchObj.meta.jobId != "" &&
           val == true &&
@@ -3078,7 +3086,7 @@ export default defineComponent({
     };
 
     const shareLink = useLoading(async () => {
-      const queryObj = generateURLQuery(true);
+      const queryObj = generateURLQuery(true, dashboardPanelData);
       // Removed the 'type' property from the object to avoid issues when navigating from the stream to the logs page,
       // especially when the user performs multi-select on streams and shares the URL.
       delete queryObj?.type;
@@ -3355,17 +3363,68 @@ export default defineComponent({
     };
 
     const onLogsVisualizeToggleUpdate = (value: any) => {
+      // prevent action if visualize is disabled (SQL mode disabled with multiple streams)
+      if (value === "visualize" && !searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1) {
+        showErrorNotification(
+          "Please enable SQL mode or select a single stream to visualize"
+        );
+        return;
+      }
+      
       // confirm with user on toggle from visualize to logs
       if (
         value == "logs" &&
         searchObj.meta.logsVisualizeToggle == "visualize"
       ) {
-        confirmLogsVisualizeModeChangeDialog.value = true;
-      } else {
+        // cancel all the visualize queries
+        cancelVisualizeQueries();
+        if(searchObj.meta.logsVisualizeDirtyFlag === true || !Object.hasOwn(searchObj.data?.queryResults, "hits") || searchObj.data?.queryResults?.hits?.length == 0) {
+          searchObj.loading = true;
+          if(searchObj.meta.sqlMode) {
+            searchObj.data.queryResults.aggs = undefined;
+          }
+          searchObj.meta.refreshHistogram = true;
+          getQueryData();
+          searchObj.meta.logsVisualizeDirtyFlag = false;
+        }
+      } else if (value == "visualize" && searchObj.meta.logsVisualizeToggle == "logs") {
+        // validate query
+        // return if query is emptry and stream is not selected 
+        if(searchObj.data.query === "" && searchObj?.data?.stream?.selectedStream?.length === 0){ 
+          showErrorNotification("Query is empty, please write query to visualize");
+          return;
+        }
+
+        let logsPageQuery = searchObj.data.query;
+
+        // handle sql mode
+        if(!searchObj.data.sqlMode){
+          const queryBuild= buildSearch();
+          logsPageQuery = queryBuild?.query?.sql ?? "";
+        }
+
+        // if multiple sql, then do not allow to visualize
+        if(logsPageQuery && Array.isArray(logsPageQuery) && logsPageQuery.length > 1){
+          showErrorNotification(
+            "Multiple SQL queries are not allowed to visualize",
+          );
+          return;
+        }
+
+        // validate sql query that all fields have alias
+        if(!allSelectionFieldsHaveAlias(logsPageQuery)){
+          showErrorNotification("All fields must have alias in query to visualize");
+          return;
+        }
+
         // cancel all the logs queries
         cancelQuery();
-        searchObj.meta.logsVisualizeToggle = value;
       }
+      searchObj.meta.logsVisualizeToggle = value;
+      updateUrlQueryParams();
+
+      // dispatch resize event
+      window.dispatchEvent(new Event("resize"));
     };
 
     const dashboardPanelDataPageKey = inject(
@@ -3375,28 +3434,6 @@ export default defineComponent({
     const { dashboardPanelData, resetDashboardPanelData } =
       useDashboardPanelData(dashboardPanelDataPageKey);
 
-    const isVisualizeToggleDisabled = computed(() => {
-      return searchObj.data.stream.selectedStream.length > 1;
-    });
-
-    const changeLogsVisualizeToggle = () => {
-      // change logs visualize toggle
-      searchObj.meta.logsVisualizeToggle = "logs";
-      confirmLogsVisualizeModeChangeDialog.value = false;
-
-      // cancel all the visualize queries
-      cancelVisualizeQueries();
-
-      // store dashboardPanelData meta object
-      const dashboardPanelDataMetaObj = dashboardPanelData.meta;
-
-      // reset old dashboardPanelData
-      resetDashboardPanelData();
-
-      // assign, old dashboardPanelData meta object
-      dashboardPanelData.meta = dashboardPanelDataMetaObj;
-    };
-
     // [START] cancel running queries
 
     const variablesAndPanelsDataLoadingState =
@@ -3405,9 +3442,15 @@ export default defineComponent({
     const visualizeSearchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
         variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
-      ).filter((item: any) => item.length > 0);
+      ).filter((item: any) => item.length > 0)
+        .flat() as string[];
 
-      return searchIds.flat() as string[];
+      // If custom field extraction is in progress, push a dummy trace id so that cancel button is visible.
+      if (variablesAndPanelsDataLoadingState?.fieldsExtractionLoading) {
+        searchIds.push("fieldExtraction");
+      }
+
+      return searchIds;
     });
     const backgroundColorStyle = computed(() => {
       const isDarkMode = store.state.theme === "dark";
@@ -3444,7 +3487,11 @@ export default defineComponent({
     const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery();
 
     const cancelVisualizeQueries = () => {
-      traceIdRef.value = visualizeSearchRequestTraceIds.value;
+      // Filter out the dummy id before sending to backend cancel API
+      traceIdRef.value = visualizeSearchRequestTraceIds.value.filter(
+        (id: any) => id !== "fieldExtraction",
+      );
+
       cancelVisualizeQuery();
     };
 
@@ -3704,9 +3751,6 @@ export default defineComponent({
       resetRegionFilter,
       validateFilterForMultiStream,
       cancelQuery,
-      confirmLogsVisualizeModeChangeDialog,
-      changeLogsVisualizeToggle,
-      isVisualizeToggleDisabled,
       onLogsVisualizeToggleUpdate,
       visualizeSearchRequestTraceIds,
       disable,
@@ -3762,6 +3806,12 @@ export default defineComponent({
     };
   },
   computed: {
+    isVisualizeDisabled() {
+      return !this.searchObj.meta.sqlMode && this.searchObj.data.stream.selectedStream.length > 1;
+    },
+    isSqlModeDisabled() {
+      return this.searchObj.meta.logsVisualizeToggle === 'visualize' && this.searchObj.data.stream.selectedStream.length > 1;
+    },
     addSearchTerm() {
       return this.searchObj.data.stream.addToFilter;
     },

@@ -52,7 +52,7 @@ use tracing::Instrument;
 use crate::service::{
     db, file_list,
     search::{
-        datafusion::exec,
+        datafusion::exec::TableBuilder,
         generate_search_schema_diff,
         grpc::{
             tantivy_result_cache::{self, CacheEntry},
@@ -377,18 +377,15 @@ pub async fn search(
         log::debug!("search->storage: session target_partitions: {target_partitions}");
 
         let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
-        let table = exec::create_parquet_table(
-            &session,
-            latest_schema.clone(),
-            &files,
-            diff_fields,
-            sorted_by_time,
-            file_stat_cache.clone(),
-            index_condition.clone(),
-            fst_fields.clone(),
-            true,
-        )
-        .await?;
+        let table = TableBuilder::new()
+            .rules(diff_fields)
+            .sorted_by_time(sorted_by_time)
+            .file_stat_cache(file_stat_cache.clone())
+            .index_condition(index_condition.clone())
+            .fst_fields(fst_fields.clone())
+            .need_optimize_partition(true)
+            .build(session, &files, latest_schema.clone())
+            .await?;
         tables.push(table);
     }
 

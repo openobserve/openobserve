@@ -400,6 +400,15 @@ export default defineComponent({
       type: String,
       default: null,
     },
+    searchResponse: {
+      required: false,
+      type: Object,
+    },
+    is_ui_histogram: {
+      type: Boolean,
+      required: false,
+      default: false,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -453,6 +462,8 @@ export default defineComponent({
       runId,
       tabId,
       tabName,
+      searchResponse,
+      is_ui_histogram,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -480,6 +491,8 @@ export default defineComponent({
       runId,
       tabId,
       tabName,
+      searchResponse,
+      is_ui_histogram,
     );
 
     const {

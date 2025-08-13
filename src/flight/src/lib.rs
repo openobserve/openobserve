@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod deduplication;
-pub mod deduplication_exec;
-pub mod projections;
-pub mod tantivy_optimize_exec;
+pub mod common;
+pub mod decoder;
+pub mod encoder;

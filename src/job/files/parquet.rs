@@ -51,7 +51,7 @@ use crate::{
     service::{
         db,
         schema::generate_schema_for_defined_schema_fields,
-        search::datafusion::exec::{self, MergeParquetResult},
+        search::datafusion::exec::{self, MergeParquetResult, TableBuilder},
         tantivy::create_tantivy_index,
     },
 };
@@ -714,18 +714,11 @@ async fn merge_files(
         target_partitions: 0,
     };
     let rules = hashbrown::HashMap::new();
-    let table = exec::create_parquet_table(
-        &session,
-        schema.clone(),
-        &new_file_list,
-        rules,
-        true,
-        None,
-        None,
-        vec![],
-        false,
-    )
-    .await?;
+    let table = TableBuilder::new()
+        .rules(rules)
+        .sorted_by_time(true)
+        .build(session, &new_file_list, schema.clone())
+        .await?;
     let tables = vec![table];
 
     let start = std::time::Instant::now();

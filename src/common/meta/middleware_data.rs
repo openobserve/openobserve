@@ -19,9 +19,9 @@ use actix_web::{
     Error as ActixErr, HttpMessage,
     body::MessageBody,
     dev::{ServiceRequest, ServiceResponse},
+    middleware::Next,
     web,
 };
-use actix_web_lab::middleware::Next;
 use maxminddb::geoip2::city::Location;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
