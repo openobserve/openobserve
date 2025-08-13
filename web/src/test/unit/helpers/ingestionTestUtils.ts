@@ -336,25 +336,18 @@ export const cleanupTest = async (wrapper: any) => {
   try {
     if (wrapper && wrapper.unmount) {
       // Ensure proper cleanup of Vue component instance
-      await wrapper.unmount();
+      wrapper.unmount();
     }
   } catch (error) {
     // Ignore unmount errors that might occur during cleanup
     console.warn("Warning during component unmount:", error);
   }
 
-  // Clear all mocks and timers
+  // Clear all mocks
   vi.clearAllMocks();
-  vi.clearAllTimers();
-
-  // Clear any pending microtasks and macrotasks
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  
+  // Clear any pending microtasks synchronously
   await Promise.resolve();
-
-  // Force garbage collection if available (helps prevent memory leaks)
-  if (global.gc) {
-    global.gc();
-  }
 };
 
 // Common test assertions - these are just helper functions, expect should be imported in test files

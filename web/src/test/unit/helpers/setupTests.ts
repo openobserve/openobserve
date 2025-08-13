@@ -95,17 +95,30 @@ afterEach(() => {
 })
 
 // Stop the server when tests are done
-afterAll(() => {
+afterAll(async () => {
+  // Close MSW server properly
   server.close();
   
   // Final cleanup of any remaining timers
   vi.clearAllTimers();
+  vi.clearAllMocks();
   
   // Clear any remaining timeouts/intervals that Quasar might have set
   if (typeof global !== 'undefined' && global.document) {
     const highestTimeoutId = setTimeout(() => {}, 0);
     for (let i = 0; i < highestTimeoutId; i++) {
       clearTimeout(i);
+      clearInterval(i);
     }
+  }
+  
+  // Force cleanup of any hanging promises
+  await Promise.resolve();
+  
+  // Force process exit if in test environment
+  if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
+    setTimeout(() => {
+      process.exit(0);
+    }, 100);
   }
 })

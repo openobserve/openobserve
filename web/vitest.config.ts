@@ -23,8 +23,17 @@ export default mergeConfig(
       include: ["src/**/*.spec.{ts,js,vue}"],
       root: fileURLToPath(new URL('.', import.meta.url)),
       setupFiles: ['src/test/unit/helpers/setupTests.ts'],
+      testTimeout: 10000, // 10 second timeout per test
+      hookTimeout: 10000, // 10 second timeout for hooks
+      teardownTimeout: 5000, // 5 second timeout for teardown
       deps: {
         inline: ["monaco-editor", "vitest-canvas-mock"],
+      },
+      pool: 'forks', // Use forks instead of threads for better isolation
+      poolOptions: {
+        forks: {
+          singleFork: true, // Use single fork to prevent hanging
+        }
       },
       coverage: {
         reporter: ["text", "json", "html", "json-summary"],
