@@ -21,7 +21,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        cluster::{IntoArcVec, Node, NodeInfo, Role, RoleGroup},
+        cluster::{IntoArcVec, Node, Role, RoleGroup},
         search::{ScanStats, SearchEventType},
         sql::TableReferenceExt,
         stream::{QueryPartitionStrategy, StreamType},
@@ -54,6 +54,7 @@ use crate::{
                 distributed_plan::EmptyExecVisitor,
                 exec::{DataFusionContextBuilder, register_udf},
                 optimizer::{
+                    context::{PhysicalOptimizerContext, RemoteScanContext},
                     generate_analyzer_rules, generate_optimizer_rules,
                     generate_physical_optimizer_rules,
                 },
@@ -400,10 +401,13 @@ pub async fn run_datafusion(
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
     let ctx = SearchContextBuilder::new()
-        .nodes(nodes.into_arc_vec())
-        .partitioned_file_lists(partitioned_file_lists)
         .target_partitions(cfg.limit.cpu_num)
-        .context(tracing::Span::current().context())
+        .add_context(PhysicalOptimizerContext::RemoteScan(RemoteScanContext {
+            nodes: nodes.into_arc_vec(),
+            partitioned_file_lists,
+            context: tracing::Span::current().context(),
+            is_leader: false,
+        }))
         .build(&req, &sql)
         .await?;
     log::info!(
@@ -839,35 +843,16 @@ pub(crate) async fn partition_file_by_hash(
 }
 
 pub struct SearchContextBuilder {
-    pub nodes: Vec<Arc<dyn NodeInfo>>,
-    pub partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
     pub target_partitions: usize,
-    pub context: opentelemetry::Context,
-    pub is_leader: bool, // if it is super cluster leader
+    pub contexts: Vec<PhysicalOptimizerContext>,
 }
 
 impl SearchContextBuilder {
     pub fn new() -> Self {
         Self {
-            nodes: vec![],
-            partitioned_file_lists: HashMap::new(),
             target_partitions: 0,
-            context: opentelemetry::Context::new(),
-            is_leader: false,
+            contexts: vec![],
         }
-    }
-
-    pub fn nodes(mut self, nodes: Vec<Arc<dyn NodeInfo>>) -> Self {
-        self.nodes = nodes;
-        self
-    }
-
-    pub fn partitioned_file_lists(
-        mut self,
-        partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
-    ) -> Self {
-        self.partitioned_file_lists = partitioned_file_lists;
-        self
     }
 
     pub fn target_partitions(mut self, target_partitions: usize) -> Self {
@@ -875,27 +860,15 @@ impl SearchContextBuilder {
         self
     }
 
-    pub fn context(mut self, context: opentelemetry::Context) -> Self {
-        self.context = context;
-        self
-    }
-
-    pub fn super_cluster_leader(mut self, is_leader: bool) -> Self {
-        self.is_leader = is_leader;
+    pub fn add_context(mut self, context: PhysicalOptimizerContext) -> Self {
+        self.contexts.push(context);
         self
     }
 
     pub async fn build(self, req: &Request, sql: &Arc<Sql>) -> Result<SessionContext> {
         let analyzer_rules = generate_analyzer_rules(sql);
         let optimizer_rules = generate_optimizer_rules(sql);
-        let physical_optimizer_rules = generate_physical_optimizer_rules(
-            req,
-            sql,
-            self.nodes,
-            self.partitioned_file_lists,
-            self.context,
-            self.is_leader,
-        );
+        let physical_optimizer_rules = generate_physical_optimizer_rules(req, sql, self.contexts);
         let mut ctx = DataFusionContextBuilder::new()
             .trace_id(&req.trace_id)
             .work_group(req.work_group.clone())

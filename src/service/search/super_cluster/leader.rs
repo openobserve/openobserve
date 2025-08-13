@@ -29,6 +29,7 @@ use config::{
     utils::json,
 };
 use datafusion::physical_plan::visit_execution_plan;
+use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
 use o2_enterprise::enterprise::{search::WorkGroup, super_cluster::search::get_cluster_nodes};
@@ -39,6 +40,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::service::search::{
     DATAFUSION_RUNTIME, SearchResult,
     cluster::flight::{SearchContextBuilder, register_table},
+    datafusion::optimizer::context::{PhysicalOptimizerContext, RemoteScanContext},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     request::Request,
     sql::Sql,
@@ -215,10 +217,13 @@ async fn run_datafusion(
 
     // construct physical plan
     let ctx = SearchContextBuilder::new()
-        .nodes(nodes)
         .target_partitions(cfg.limit.cpu_num)
-        .context(tracing::Span::current().context())
-        .super_cluster_leader(true)
+        .add_context(PhysicalOptimizerContext::RemoteScan(RemoteScanContext {
+            nodes,
+            partitioned_file_lists: HashMap::new(),
+            context: tracing::Span::current().context(),
+            is_leader: true,
+        }))
         .build(&req, &sql)
         .await?;
 

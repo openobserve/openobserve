@@ -19,7 +19,7 @@ use add_sort_and_limit::AddSortAndLimitRule;
 use add_timestamp::AddTimestampRule;
 #[cfg(feature = "enterprise")]
 use cipher::{RewriteCipherCall, RewriteCipherKey};
-use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, meta::cluster::NodeInfo};
+use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME};
 use datafusion::{
     optimizer::{
         AnalyzerRule, OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
@@ -37,9 +37,7 @@ use datafusion::{
         single_distinct_to_groupby::SingleDistinctToGroupBy,
     },
     physical_optimizer::PhysicalOptimizerRule,
-    sql::TableReference,
 };
-use hashbrown::HashMap;
 use infra::schema::get_stream_setting_fts_fields;
 use limit_join_right_side::LimitJoinRightSide;
 use remove_index_fields::RemoveIndexFieldsRule;
@@ -48,7 +46,8 @@ use rewrite_match::RewriteMatch;
 
 use crate::service::search::{
     datafusion::optimizer::{
-        join_reorder::JoinReorderRule, remote_scan::generate_remote_scan_rules,
+        context::PhysicalOptimizerContext, join_reorder::JoinReorderRule,
+        remote_scan::generate_remote_scan_rules,
     },
     request::Request,
     sql::Sql,
@@ -58,6 +57,7 @@ pub mod add_sort_and_limit;
 pub mod add_timestamp;
 #[cfg(feature = "enterprise")]
 pub mod cipher;
+pub mod context;
 pub mod join_reorder;
 pub mod limit_join_right_side;
 pub mod remote_scan;
@@ -178,19 +178,15 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
 pub fn generate_physical_optimizer_rules(
     req: &Request,
     sql: &Sql,
-    nodes: Vec<Arc<dyn NodeInfo>>,
-    partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
-    context: opentelemetry::Context,
-    is_leader: bool,
+    contexts: Vec<PhysicalOptimizerContext>,
 ) -> Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>> {
     let mut rules = vec![Arc::new(JoinReorderRule::new()) as _];
-    rules.push(generate_remote_scan_rules(
-        req,
-        sql,
-        nodes,
-        partitioned_file_lists,
-        context,
-        is_leader,
-    ));
+    for context in contexts.into_iter() {
+        match context {
+            PhysicalOptimizerContext::RemoteScan(context) => {
+                rules.push(generate_remote_scan_rules(req, sql, context));
+            }
+        }
+    }
     rules
 }

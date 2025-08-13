@@ -34,8 +34,11 @@ use hashbrown::HashMap;
 use proto::cluster_rpc::{self, KvItem};
 
 use crate::service::search::{
-    datafusion::distributed_plan::{
-        empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec,
+    datafusion::{
+        distributed_plan::{
+            empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec,
+        },
+        optimizer::context::RemoteScanContext,
     },
     index::IndexCondition,
     request::Request,
@@ -45,11 +48,15 @@ use crate::service::search::{
 pub fn generate_remote_scan_rules(
     req: &Request,
     sql: &Sql,
-    nodes: Vec<Arc<dyn NodeInfo>>,
-    partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
-    context: opentelemetry::Context,
-    is_leader: bool,
+    context: RemoteScanContext,
 ) -> Arc<dyn PhysicalOptimizerRule + Send + Sync> {
+    let RemoteScanContext {
+        nodes,
+        partitioned_file_lists,
+        context,
+        is_leader,
+    } = context;
+
     let equal_keys = sql
         .equal_items
         .iter()
