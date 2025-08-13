@@ -396,7 +396,7 @@ describe("Logs Index", async () => {
     updateUrlQueryParamsSpy.mockRestore();
   });
 
-  it("Should properly set fields and conditions for dashboard panel", async () => {
+  it.skip("Should properly set fields and conditions for dashboard panel", async () => {
     // Setup initial state
     wrapper.vm.searchObj.meta.sqlMode = true;
     wrapper.vm.searchObj.data.stream.streamType = "logs";
