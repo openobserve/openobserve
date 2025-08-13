@@ -307,7 +307,7 @@ pub async fn search(
 
     log::info!("[trace_id {trace_id}] flight->follower_leader: generate physical plan finish");
 
-    // reset the scan_stats, because we only want to get the scan stats from the remote scan exec
+    // we only want to get the scan stats from the remote scan exec
     let scan_stats = ScanStats {
         file_list_took: file_id_list_took as i64,
         ..Default::default()
