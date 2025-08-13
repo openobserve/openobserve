@@ -515,7 +515,7 @@ test.describe("dashboard UI testcases", () => {
 
     await page.getByRole("button", { name: "9" }).last().click();
     await page.getByRole("button", { name: "16" }).last().click();
-    await page.locator('[data-test="chart-renderer"] div').click();
+    // await page.locator('[data-test="chart-renderer"] div').click();
     await page.locator('[data-test="dashboard-apply"]').click();
 
     await page.reload();
