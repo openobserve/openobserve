@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
 import {
   createTestWrapper,
@@ -48,15 +48,31 @@ export const createSimpleIngestionComponentTest = (
   docUrlPattern?: RegExp
 ) => {
   return describe(componentName, () => {
+    // Set test timeout to prevent hanging
+    const originalTimeout = 10000; // 10 seconds
     let wrapper: any;
     let Component: any;
 
     beforeEach(async () => {
+      // Clear any previous state
+      vi.clearAllMocks();
+      vi.clearAllTimers();
+      
       // Handle both component path and component object
       if (typeof componentPathOrComponent === 'string') {
-        // Dynamic import for path
-        const module = await import(componentPathOrComponent);
-        Component = module.default;
+        // Dynamic import for path with timeout to prevent hanging
+        const importPromise = import(componentPathOrComponent);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Import timeout')), 5000)
+        );
+        
+        try {
+          const module = await Promise.race([importPromise, timeoutPromise]);
+          Component = (module as any).default;
+        } catch (error) {
+          console.error(`Failed to import component ${componentPathOrComponent}:`, error);
+          throw error;
+        }
       } else {
         // Direct component object
         Component = componentPathOrComponent;
@@ -67,22 +83,24 @@ export const createSimpleIngestionComponentTest = (
 
     afterEach(async () => {
       await cleanupTest(wrapper);
+      wrapper = null;
+      Component = null;
     });
 
     it('should mount successfully', () => {
       expect(wrapper.exists()).toBe(true);
-    });
+    }, originalTimeout);
 
     it('should render CopyContent component', () => {
       const copyContent = wrapper.findComponent({ name: 'CopyContent' });
       expect(copyContent.exists()).toBe(true);
-    });
+    }, originalTimeout);
 
     it('should display correct content', () => {
       const copyContent = wrapper.findComponent({ name: 'CopyContent' });
       const content = copyContent.props('content');
       expect(content).toContain(expectedContentKeyword);
-    });
+    }, originalTimeout);
 
     it('should render documentation link', () => {
       const link = wrapper.find('a[target="_blank"]');
@@ -93,7 +111,7 @@ export const createSimpleIngestionComponentTest = (
       } else {
         expect(link.attributes('href')).toMatch(/^https?:\/\//);
       }
-    });
+    }, originalTimeout);
 
     it('should handle props correctly', () => {
       if (wrapper.vm.currOrgIdentifier !== undefined) {
@@ -102,9 +120,9 @@ export const createSimpleIngestionComponentTest = (
       if (wrapper.vm.currUserEmail !== undefined) {
         expect(wrapper.vm.currUserEmail).toBe(defaultTestProps.currUserEmail);
       }
-    });
+    }, originalTimeout);
 
-    it('should handle different organization identifier', () => {
+    it('should handle different organization identifier', async () => {
       const customProps: TestProps = {
         currOrgIdentifier: 'custom_org',
         currUserEmail: 'custom@example.com'
@@ -116,21 +134,27 @@ export const createSimpleIngestionComponentTest = (
         }
       };
       
+      // Clean up previous wrapper
+      await cleanupTest(wrapper);
       wrapper = createTestWrapper(Component, customProps, customStoreState);
       
       const copyContent = wrapper.findComponent({ name: 'CopyContent' });
       expect(copyContent.props('content')).toContain('test_org'); // The mock always returns test_org for now
-    });
+    }, originalTimeout);
 
-    it('should handle missing props gracefully', () => {
+    it('should handle missing props gracefully', async () => {
+      // Clean up previous wrapper
+      await cleanupTest(wrapper);
       wrapper = createTestWrapper(Component, {});
       expect(wrapper.exists()).toBe(true);
-    });
+    }, originalTimeout);
 
-    it('should handle empty store state', () => {
+    it('should handle empty store state', async () => {
+      // Clean up previous wrapper
+      await cleanupTest(wrapper);
       wrapper = createTestWrapper(Component, defaultTestProps, {});
       expect(wrapper.exists()).toBe(true);
-    });
+    }, originalTimeout);
 
     it('should have proper accessibility attributes', () => {
       const link = wrapper.find('a[target="_blank"]');
@@ -142,7 +166,7 @@ export const createSimpleIngestionComponentTest = (
           expect(rel).toMatch(/noopener|noreferrer/);
         }
       }
-    });
+    }, originalTimeout);
   });
 };
 
@@ -160,18 +184,37 @@ export const createComplexIngestionComponentTest = (
   expectedLinkCount: number
 ) => {
   return describe(componentName, () => {
+    // Set test timeout to prevent hanging
+     // 10 seconds
     let wrapper: any;
     let Component: any;
 
     beforeEach(async () => {
-      const module = await import(componentPath);
-      Component = module.default;
+      // Clear any previous state
+      vi.clearAllMocks();
+      vi.clearAllTimers();
+      
+      // Import with timeout to prevent hanging
+      const importPromise = import(componentPath);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Import timeout')), 5000)
+      );
+      
+      try {
+        const module = await Promise.race([importPromise, timeoutPromise]);
+        Component = (module as any).default;
+      } catch (error) {
+        console.error(`Failed to import component ${componentPath}:`, error);
+        throw error;
+      }
       
       wrapper = createTestWrapper(Component, defaultTestProps);
     });
 
     afterEach(async () => {
       await cleanupTest(wrapper);
+      wrapper = null;
+      Component = null;
     });
 
     it('should mount successfully', () => {
