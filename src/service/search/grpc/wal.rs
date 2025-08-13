@@ -46,7 +46,7 @@ use crate::{
     service::{
         db, file_list,
         search::{
-            datafusion::{exec, table_provider::memtable::NewMemTable},
+            datafusion::{exec::TableBuilder, table_provider::memtable::NewMemTable},
             generate_filter_from_equal_items, generate_search_schema_diff,
             grpc::utils,
             index::IndexCondition,
@@ -287,18 +287,15 @@ pub async fn search_parquet(
         };
 
         let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
-        match exec::create_parquet_table(
-            &session,
-            latest_schema.clone(),
-            &files,
-            diff_fields,
-            sorted_by_time,
-            file_stat_cache.clone(),
-            index_condition.clone(),
-            fst_fields.clone(),
-            true,
-        )
-        .await
+        match TableBuilder::new()
+            .rules(diff_fields)
+            .sorted_by_time(sorted_by_time)
+            .file_stat_cache(file_stat_cache.clone())
+            .index_condition(index_condition.clone())
+            .fst_fields(fst_fields.clone())
+            .need_optimize_partition(true)
+            .build(session, &files, latest_schema.clone())
+            .await
         {
             Ok(v) => tables.push(v),
             Err(e) => {
