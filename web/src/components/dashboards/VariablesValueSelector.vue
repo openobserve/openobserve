@@ -1550,7 +1550,30 @@ export default defineComponent({
             value: value.zo_sql_key.toString(),
           }));
 
-        // Update options with new values
+        // Efficiently add the selected value to options if not present
+        if (variableObject.multiSelect && Array.isArray(variableObject.value)) {
+          const val = variableObject.value[0];
+          if (
+            val !== undefined &&
+            val !== null &&
+            !newOptions.some((opt: any) => opt.value === val) &&
+            val !== SELECT_ALL_VALUE
+          ) {
+            newOptions.push({ label: val, value: val });
+          }
+        } else if (
+          !variableObject.multiSelect &&
+          variableObject.value !== null &&
+          variableObject.value !== undefined &&
+          !newOptions.some((opt: any) => opt.value === variableObject.value) &&
+          variableObject.value !== SELECT_ALL_VALUE
+        ) {
+          newOptions.push({
+            label: variableObject.value,
+            value: variableObject.value,
+          });
+        }
+
         variableObject.options = newOptions;
 
         // Set default value
@@ -1706,39 +1729,45 @@ export default defineComponent({
             variableObject.name,
             `Old Varilables Data: ${JSON.stringify(oldVariablesData)}`,
           );
-
-          
-            variableLog(
-              variableObject.name,
-              `finalizePartialVariableLoading: loading child variables: ${childVariables}, ${JSON.stringify(childVariableObjects)}`,
-            );
-            const results = await Promise.all(
-              childVariableObjects.map((childVariable: any) => {
-                // Only load children if the parent value actually changed 
-                // OR child is waiting for the load
-                if(childVariable.isVariableLoadingPending || oldVariablesData[name] !== variableObject.value) {
-                  
-                  variableLog(
-                    variableObject.name,
-                    `finalizePartialVariableLoading: Loading child variable ${childVariable.name} as parent value changed`,
-                  )
-                  
-                  return loadSingleVariableDataByName(childVariable, isInitialLoad);
-                } else {
-                  
-                  variableLog(
-                    variableObject.name,
-                    `finalizePartialVariableLoading: Skipping child variable ${childVariable.name} loading as parent value did not change`,
-                  );
-                
-                }
-              }),
-            );
-
-            variableLog(
-              variableObject.name,
-              `finalizePartialVariableLoading: child variables results: ${JSON.stringify(results)}`,
-            );
+          for (const childVariable of childVariableObjects) {
+            // Only apply guard for REST API mode
+            if (
+              !isStreamingEnabled() &&
+              !isWebSocketEnabled()
+            ) {
+              if (isInitialLoad) {
+                variableLog(
+                  variableObject.name,
+                  `finalizePartialVariableLoading: Initial load, always loading child variable ${childVariable.name}`,
+                );
+                await loadSingleVariableDataByName(childVariable, true);
+                continue;
+              }
+              if (
+                (childVariable.isVariableLoadingPending ||
+                  oldVariablesData[name] !== variableObject.value) &&
+                !childVariable.isLoading &&
+                !childVariable.isVariableLoadingPending
+              ) {
+                variableLog(
+                  variableObject.name,
+                  `finalizePartialVariableLoading: [REST] Loading child variable ${childVariable.name} as parent value changed`,
+                );
+                await loadSingleVariableDataByName(childVariable, false);
+              } else {
+                variableLog(
+                  variableObject.name,
+                  `finalizePartialVariableLoading: [REST] Skipping child variable ${childVariable.name} loading as parent value did not change or child is already loading/pending`,
+                );
+              }
+            } else {
+              variableLog(
+                variableObject.name,
+                `finalizePartialVariableLoading: [Streaming/WebSocket] Loading child variable ${childVariable.name}`,
+              );
+              await loadSingleVariableDataByName(childVariable, isInitialLoad);
+            }
+          }
         }
       } catch (error) {
         // console.error(`Error finalizing partial variable loading for ${variableObject.name}:`, error);
@@ -1755,8 +1784,15 @@ export default defineComponent({
       if (variableObject.isLoading) {
         return;
       }
-      // When a dropdown is opened, only load the variable data
-      await loadSingleVariableDataByName(variableObject);
+      try {
+        // When a dropdown is opened, only load the variable data
+        await loadSingleVariableDataByName(variableObject);
+      } catch (error: any) {
+        variableLog(
+          variableObject.name,
+          `Error loading variable options for ${variableObject.name}: ${error.message}`,
+        );
+      }
     };
 
     let isLoading = false;

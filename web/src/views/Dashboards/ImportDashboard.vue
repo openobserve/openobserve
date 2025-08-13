@@ -303,7 +303,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </span>
 
-                    <span v-else>{{ errorMessage }}</span>
+                    <span
+                      v-else-if="errorMessage.field == 'dashboard_validation'"
+                      class="text-red"
+                    >
+                      {{ errorMessage.message }}
+                    </span>
+
+                    <span v-else>{{
+                      errorMessage.message || errorMessage
+                    }}</span>
                   </div>
                 </div>
               </div>
@@ -326,6 +335,7 @@ import { useRouter, useRoute } from "vue-router";
 import dashboardService from "../../services/dashboards.js";
 import axios from "axios";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import { validateDashboardJson } from "@/utils/dashboard/convertDataIntoUnitValue";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -529,10 +539,10 @@ export default defineComponent({
         return;
       }
 
-
       const data = jsonStr.value.map((parsedContent, fileIndex) => {
         return new Promise(async (resolve, reject) => {
-          const fileName = jsonFiles.value[fileIndex]?.name || `File ${fileIndex + 1}`;
+          const fileName =
+            jsonFiles.value[fileIndex]?.name || `File ${fileIndex + 1}`;
 
           try {
             //this is done because if the user uploads a single dashboard, it will be an object and if the user uploads multiple dashboards, it will be an array of objects
@@ -550,8 +560,24 @@ export default defineComponent({
               //it will convert the dashboard schema version to the latest version
 
               try {
-                const convertedSchema = convertDashboardSchemaVersion(dashboard);
-                const res = await importDashboardFromJSON(convertedSchema, selectedFolder.value);
+                const convertedSchema =
+                  convertDashboardSchemaVersion(dashboard);
+
+                // Validate the converted schema before importing
+                const validationErrors = validateDashboardJson(convertedSchema);
+                if (validationErrors.length > 0) {
+                  const errorMessage = validationErrors.join("; ");
+                  results.push({
+                    index: i + 1,
+                    error: new Error(errorMessage),
+                  });
+                  continue;
+                }
+
+                const res = await importDashboardFromJSON(
+                  convertedSchema,
+                  selectedFolder.value,
+                );
                 results.push({ index: i + 1, result: res });
               } catch (e) {
                 results.push({ index: i + 1, error: e });
@@ -559,17 +585,17 @@ export default defineComponent({
             }
 
             const failedMessages = results
-                .filter(r => r.error)
-                .map(r => `${r.error?.message || r.error}`);
+              .filter((r) => r.error)
+              .map((r) => `${r.error?.message || r.error}`);
 
-              if (failedMessages.length) {
-                reject({
-                  file: `JSON ${fileIndex + 1}`,         
-                  error: failedMessages.join("; "),
-                });
-              } else {
-                resolve({ file: fileName, results });
-              }
+            if (failedMessages.length) {
+              reject({
+                file: `JSON ${fileIndex + 1}`,
+                error: failedMessages.join("; "),
+              });
+            } else {
+              resolve({ file: fileName, results });
+            }
           } catch (e) {
             reject({ file: fileName, error: "Error processing file" });
           }
@@ -579,14 +605,18 @@ export default defineComponent({
       Promise.allSettled(data).then(async (results) => {
         filesImportResults.value = results;
 
-        const successfulImports = results.filter(r => r.status === "fulfilled").length;
+        const successfulImports = results.filter(
+          (r) => r.status === "fulfilled",
+        ).length;
 
         if (results.length === successfulImports) {
           await resetAndRefresh(ImportType.FILES, selectedFolder.value);
         }
 
         if (successfulImports) {
-          showPositiveNotification(`${successfulImports} File(s) Imported Successfully`);
+          showPositiveNotification(
+            `${successfulImports} File(s) Imported Successfully`,
+          );
         }
 
         const failedImports = results.length - successfulImports;
@@ -597,7 +627,6 @@ export default defineComponent({
         isLoading.value = false;
       });
     };
-
 
     // reset and refresh the value based on selected type
     const resetAndRefresh = async (type, selectedFolder) => {
@@ -644,11 +673,18 @@ export default defineComponent({
         //Example: if user uploads a single object file it will be converted to an array and if user uploads a array of objects it is already an array so we dont do anything
         const rawJson = JSON.parse(jsonStr.value);
         const dashboards = Array.isArray(rawJson) ? rawJson : [rawJson];
-        
 
         const importPromises = dashboards.map((dashboard, index) => {
           try {
             const converted = convertDashboardSchemaVersion(dashboard);
+
+            // Validate the converted schema before importing
+            const validationErrors = validateDashboardJson(converted);
+            if (validationErrors.length > 0) {
+              const errorMessage = validationErrors.join("; ");
+              return Promise.reject({ index, error: new Error(errorMessage) });
+            }
+
             return importDashboardFromJSON(converted, selectedFolder.value);
           } catch (e) {
             return Promise.reject({ index, error: e });
@@ -657,12 +693,16 @@ export default defineComponent({
 
         const results = await Promise.allSettled(importPromises);
 
-        const successCount = results.filter(r => r.status === 'fulfilled').length;
+        const successCount = results.filter(
+          (r) => r.status === "fulfilled",
+        ).length;
         const failedCount = results.length - successCount;
 
         if (successCount > 0) {
           await resetAndRefresh(ImportType.URL, selectedFolder.value);
-          showPositiveNotification(`${successCount} Dashboard(s) Imported Successfully`);
+          showPositiveNotification(
+            `${successCount} Dashboard(s) Imported Successfully`,
+          );
         }
 
         if (failedCount > 0) {
@@ -674,12 +714,11 @@ export default defineComponent({
         showErrorNotification("Failed to Import Dashboard");
       } finally {
         if (jsonStr.value && typeof jsonStr.value !== "string") {
-            jsonStr.value = "";
-          }
+          jsonStr.value = "";
+        }
         isLoading.value = false;
       }
     };
-
 
     // import dashboard from json string
     const importFromJsonStr = async () => {
@@ -690,6 +729,14 @@ export default defineComponent({
         const oldImportedSchema = JSON.parse(jsonStr.value);
         const convertedSchema =
           convertDashboardSchemaVersion(oldImportedSchema);
+
+        // Validate the converted schema before importing
+        const validationErrors = validateDashboardJson(convertedSchema);
+        if (validationErrors.length > 0) {
+          const errorMessage = validationErrors.join("; ");
+          showErrorNotification(`Validation failed: ${errorMessage}`);
+          return;
+        }
 
         await importDashboardFromJSON(
           convertedSchema,
@@ -759,11 +806,24 @@ export default defineComponent({
       }
     };
     const validateBasicInputs = (input, index = 0) => {
+      // Basic title validation
       if (input.title === "" || typeof input.title !== "string") {
         dashboardErrorsToDisplay.value.push({
           message: `Title is required for dashboard - ${index ? index + 1 : 1}  and should be a string`,
           field: "dashboard_title",
           dashboardIndex: index,
+        });
+      }
+
+      // Comprehensive dashboard validation using validateDashboardJson
+      const validationErrors = validateDashboardJson(input);
+      if (validationErrors.length > 0) {
+        validationErrors.forEach((error) => {
+          dashboardErrorsToDisplay.value.push({
+            message: `Dashboard ${index ? index + 1 : 1}: ${error}`,
+            field: "dashboard_validation",
+            dashboardIndex: index,
+          });
         });
       }
     };
