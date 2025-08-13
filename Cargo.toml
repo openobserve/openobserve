@@ -52,15 +52,11 @@ actix-http = "3.9"
 actix-multipart = { version = "0.7", features = ["derive"] }
 actix-web.workspace = true
 actix-web-httpauth = "0.8"
-actix-web-lab = "0.21"
-actix-web-opentelemetry = { version = "0.19", features = ["metrics"] }
+actix-web-opentelemetry = { version = "0.22", features = ["metrics"] }
 actix-web-rust-embed-responder = { version = "2.2", default-features = false, features = [
     "support-rust-embed-for-web",
     "base64",
 ] }
-actix-ws = "0.3.0"
-actix = "0.13.5"
-actix-web-actors = "4.3.0"
 actix-tls.workspace = true
 ahash.workspace = true
 anyhow.workspace = true
@@ -231,7 +227,7 @@ report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
-actix-web = { version = "4.9", features = ["rustls-0_23"] }
+actix-web = { version = "4.11", features = ["rustls-0_23"] }
 actix-tls = { version = "3.4", features = [
     "connect",
     "uri",
@@ -346,7 +342,7 @@ sqlx = { version = "0.8.3", features = [
 strum = { version = "0.26", features = ["derive"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.33"
-tantivy = { version = "0.22.0", features = ["quickwit"] }
+tantivy = { version = "0.24", features = ["quickwit"] }
 tantivy-fst = "0.5"
 tempfile = "3"
 thiserror = "1.0"
