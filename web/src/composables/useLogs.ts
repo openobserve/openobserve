@@ -359,7 +359,10 @@ const useLogs = () => {
   });
 
   const clearSearchObj = () => {
-    searchObj = reactive(Object.assign({}, JSON.parse(JSON.stringify(defaultObject))));
+    // Reset the existing searchObj instead of creating a new one
+    // This maintains the same reference so watchers continue to work
+    Object.assign(searchObj, JSON.parse(JSON.stringify(defaultObject)));
+    searchObj.organizationIdentifier = store.state?.selectedOrganization?.identifier;
   };
 
   /**
@@ -561,6 +564,7 @@ const useLogs = () => {
         let selectedStream: any[] = [];
 
         searchObj.data.stream.streamLists = [];
+
         let itemObj: {
           label: string;
           value: string;
@@ -627,16 +631,14 @@ const useLogs = () => {
 
   const getStreamList = async (selectStream: boolean = true) => {
     try {
-      // commented below function as we are doing resetStreamData from all the places where getStreamList is called
-      // resetStreamData();
       const streamType = searchObj.data.stream.streamType || "logs";
       const streamData: any = await getStreams(streamType, false);
       searchObj.data.streamResults = {
         ...streamData,
       };
-      await nextTick();
+      
       await loadStreamLists(selectStream);
-      return;
+      return true;
     } catch (e: any) {
       console.error("Error while getting stream list", e);
     }
@@ -1298,7 +1300,7 @@ const useLogs = () => {
 
           await searchService
             .partition({
-              org_identifier: searchObj.organizationIdentifier,
+              org_identifier: store.state?.selectedOrganization?.identifier,
               query: partitionQueryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
@@ -2219,7 +2221,7 @@ const useLogs = () => {
               searchService
               .schedule_search(
               {
-                org_identifier: searchObj.organizationIdentifier,
+                org_identifier: store.state?.selectedOrganization?.identifier,
                 query: queryReq,
                 page_type: searchObj.data.stream.streamType,
               },
@@ -2444,7 +2446,7 @@ const useLogs = () => {
         searchService
           .search(
             {
-              org_identifier: searchObj.organizationIdentifier,
+              org_identifier: store.state?.selectedOrganization?.identifier,
               query: queryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
@@ -2666,7 +2668,7 @@ const useLogs = () => {
         : "search";
       searchService[decideSearch](
           {
-            org_identifier: searchObj.organizationIdentifier,
+            org_identifier: store.state?.selectedOrganization?.identifier,
             query: queryReq,
             jobId: searchObj.meta.jobId ? searchObj.meta.jobId : "",
             page_type: searchObj.data.stream.streamType,
@@ -3128,7 +3130,7 @@ const useLogs = () => {
         searchService
           .search(
             {
-              org_identifier: searchObj.organizationIdentifier,
+              org_identifier: store.state?.selectedOrganization?.identifier,
               query: queryReq,
               page_type: searchObj.data.stream.streamType,
               traceparent,
@@ -3465,10 +3467,10 @@ const useLogs = () => {
         searchObj.data.datetime.queryRangeRestrictionMsg = "";
         searchObj.data.datetime.queryRangeRestrictionInHour = -1;
 
-        const interestingFieldsMapping: {[key: string]: string[]} = {
-          "common": [],
+        const interestingFieldsMapping: {[key: string]: Set<string>} = {
+          "common": new Set([]),
           ...Object.fromEntries(
-            selectedStreamValues.sort().map((stream: any) => [stream, []]),
+            selectedStreamValues.sort().map((stream: any) => [stream, new Set([])]),
           ),
         }
 
@@ -3698,14 +3700,13 @@ const useLogs = () => {
 
                     if(fieldObj.isInterestingField) {
                       interestingCommonSchemaMaps.push(fieldObj);
-                      interestingFieldsMapping["common"].push(fieldObj.name);
+                      interestingFieldsMapping["common"].add(fieldObj.name);
                       interestingFieldsMap[fieldObj.name] = true;
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
 
-                      if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0 && interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].includes(fieldObj.name)) {
-                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] =
-                          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] - 1;
+                      if(interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].has(fieldObj.name)) {
+                        interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].delete(fieldObj.name);
                       }
                     }
 
@@ -3734,7 +3735,7 @@ const useLogs = () => {
                     schemaMaps.push(fieldObj);
                     if(fieldObj.isInterestingField) {
                       interestingSchemaMaps.push(fieldObj);
-                      interestingFieldsMapping[stream.name].push(fieldObj.name);
+                      interestingFieldsMapping[stream.name].add(fieldObj.name);
                       interestingFieldsMap[fieldObj.name] = true;
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
                         searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
@@ -3780,13 +3781,8 @@ const useLogs = () => {
 
 
                     if(fieldObj.isInterestingField) {
-                      if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0 && interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].includes(fieldObj.name)) {
-                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-                          schemaMaps[schemaFieldsIndex].streams[0]
-                        ] =
-                          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
-                            schemaMaps[schemaFieldsIndex].streams[0]
-                          ] - 1;
+                      if(interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].has(fieldObj.name)) {
+                        interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].delete(fieldObj.name);
                       }
                     }
                   }
@@ -3795,7 +3791,7 @@ const useLogs = () => {
 
                   if(fieldObj.isInterestingField) {
                     interestingCommonSchemaMaps.push(fieldObj);
-                    interestingFieldsMapping["common"].push(fieldObj.name);
+                    interestingFieldsMapping["common"].add(fieldObj.name);
                     interestingFieldsMap[fieldObj.name] = true;
                     searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
@@ -3824,7 +3820,7 @@ const useLogs = () => {
 
                   if(fieldObj.isInterestingField) {
                     interestingSchemaMaps.push(fieldObj);
-                    interestingFieldsMapping[stream.name].push(fieldObj.name);
+                    interestingFieldsMapping[stream.name].add(fieldObj.name);
                     interestingFieldsMap[fieldObj.name] = true;
                     searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
                       searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
@@ -3855,7 +3851,6 @@ const useLogs = () => {
               });
 
               interestingCommonSchemaMaps.unshift(commonSchemaMaps[0]);
-              interestingFieldsMapping["common"].unshift(commonSchemaMaps[0]);
 
               commonSchemaFields.unshift("dummylabel");
               // searchObj.data.stream.expandGroupRowsFieldCount["common"] = searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
@@ -3933,7 +3928,7 @@ const useLogs = () => {
 
                   if(fieldObj.isInterestingField) {
                     interestingSchemaMaps.push(fieldObj);
-                    interestingFieldsMapping[stream.name].push(fieldObj);
+                    interestingFieldsMapping[stream.name].add(fieldObj.name);
                     interestingFieldsMap[fieldObj.name] = true;
                   }
                   schemaFields.push(key);
@@ -3958,6 +3953,10 @@ const useLogs = () => {
           ...interestingCommonSchemaMaps,
           ...interestingSchemaMaps,
         ];
+
+        Object.entries(searchObj.data.stream.interestingExpandedGroupRowsFieldCount).forEach(([key, value]) => {
+          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[key] = interestingFieldsMapping[key].size;
+        });
 
         if (
           searchObj.data.stream.selectedStreamFields != undefined &&
@@ -4475,7 +4474,7 @@ const useLogs = () => {
 
       searchService
         .search_around({
-          org_identifier: searchObj.organizationIdentifier,
+          org_identifier: store.state?.selectedOrganization?.identifier,
           index: streamName,
           key: obj.key,
           size: obj.size,
@@ -4649,6 +4648,7 @@ const useLogs = () => {
       }
       refreshData();
     } catch (e: any) {
+      console.log("Error while loading logs data", e);
       searchObj.loading = false;
     }
   };
@@ -4764,6 +4764,11 @@ const useLogs = () => {
     if (!queryParams.stream) {
       searchObj.shouldIgnoreWatcher = false;
       return;
+    }
+
+    // set org_identifier
+    if (queryParams.org_identifier) {
+      searchObj.organizationIdentifier = queryParams.org_identifier;
     }
 
     const date = {
@@ -5752,7 +5757,7 @@ const useLogs = () => {
       type,
       isPagination,
       traceId,
-      org_id: searchObj.organizationIdentifier,
+      org_id: store.state?.selectedOrganization?.identifier,
       meta,
     };
 
@@ -5888,7 +5893,7 @@ const useLogs = () => {
           stream_type: searchObj.data.stream.streamType,
           search_type: "ui",
           use_cache: (window as any).use_cache ?? true,
-          org_id: searchObj.organizationIdentifier,
+          org_id: store.state?.selectedOrganization?.identifier,
         },
       };
 
