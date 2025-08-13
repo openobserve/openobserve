@@ -886,7 +886,7 @@ export default defineComponent({
 
           searchObj.meta.pageType = "logs";
           searchObj.meta.refreshHistogram = true;
-          searchObj.loading = true;
+          // searchObj.loading = true;
 
           resetSearchObj();
 

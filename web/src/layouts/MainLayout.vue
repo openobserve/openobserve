@@ -15,7 +15,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  
   <q-layout
     view="hHh Lpr lff"
     :class="[store.state.printMode === true ? 'printMode' : '']"
@@ -105,9 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="router.replace('/billings/plans')"
             >Upgrade to PRO Plan</q-btn
           >
-        </div>   
+        </div>
         <q-btn
-          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+          v-if="
+            config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
+          "
           :ripple="false"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"
@@ -117,12 +118,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           class="o2-button ai-hover-btn q-px-sm q-py-sm"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-          style="border-radius: 100%;"
+          style="border-radius: 100%"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
-          <div class="row items-center no-wrap tw-gap-2  ">
-            <img  :src="getBtnLogo" class="header-icon ai-icon" />
+          <div class="row items-center no-wrap tw-gap-2">
+            <img :src="getBtnLogo" class="header-icon ai-icon" />
           </div>
         </q-btn>
         <div
@@ -253,8 +254,6 @@ class="padding-none" />
         </div> -->
 
         <ThemeSwitcher></ThemeSwitcher>
-
-
 
         <q-btn
           round
@@ -476,10 +475,8 @@ class="padding-none" />
             </q-list>
           </q-menu>
         </q-btn>
-        
       </q-toolbar>
     </q-header>
-    
 
     <q-drawer
       v-model="drawer"
@@ -513,7 +510,7 @@ class="padding-none" />
     </q-page-container>
     </div>
 
-    <!-- Right Panel (AI Chat) -->
+      <!-- Right Panel (AI Chat) -->
 
     <div
       class="col-auto"
@@ -611,7 +608,7 @@ import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
-import O2AIChat from '@/components/O2AIChat.vue';
+import O2AIChat from "@/components/O2AIChat.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -1017,19 +1014,17 @@ export default defineComponent({
       store.dispatch("logs/resetLogs");
       store.dispatch("setIsDataIngested", false);
       const orgIdentifier = selectedOrg.value.identifier;
-      const queryParams =
-        router.currentRoute.value.path.indexOf(".logs") > -1
-          ? router.currentRoute.value.query
-          : {};
-      router.push({
+
+      await router.push({
         path: router.currentRoute.value.path,
         query: {
-          ...queryParams,
           org_identifier: orgIdentifier,
         },
       });
+
       useLocalOrganization(selectedOrg.value);
       store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
+
       // setSelectedOrganization();
       // if (
       //   config.isCloud &&
@@ -1342,7 +1337,6 @@ export default defineComponent({
       const isEnabled = !store.state.isAiChatEnabled;
       store.dispatch("setIsAiChatEnabled", isEnabled);
       window.dispatchEvent(new Event("resize"));
-
     };
 
     const closeChat = () => {
@@ -1352,7 +1346,7 @@ export default defineComponent({
 
     const getBtnLogo = computed(() => {
       if (isHovered.value || store.state.isAiChatEnabled) {
-        return getImageURL('images/common/ai_icon_dark.svg')
+        return getImageURL("images/common/ai_icon_dark.svg");
       }
 
       return store.state.theme === 'dark'
@@ -1372,7 +1366,7 @@ export default defineComponent({
       }
       //here we reset the value befoere setting it because if user clears the input then again click on the same value it wont trigger the watcher that is there in the child component
       //so to force trigger we do this
-      aiChatInputContext.value = '';
+      aiChatInputContext.value = "";
       nextTick(() => {
         aiChatInputContext.value = value;
       });
@@ -1765,32 +1759,32 @@ body.ai-chat-open {
   transition: width 0.3s ease;
 }
 
-.o2-button{
-   border-radius: 4px;
-    padding: 0px 8px;
-     color: white;
+.o2-button {
+  border-radius: 4px;
+  padding: 0px 8px;
+  color: white;
 }
-.dark-mode-chat-container{
-  border-left: 1.5px solid #232323FF ;
+.dark-mode-chat-container {
+  border-left: 1.5px solid #232323ff;
 }
-.light-mode-chat-container{
-  border-left: 1.5px solid #F7F7F7;
-  }
+.light-mode-chat-container {
+  border-left: 1.5px solid #f7f7f7;
+}
 
-  .ai-btn-active{
-    background-color: #5960b2 !important;
-  }
-  .ai-hover-btn {
-    transition: background-color 1s ease;
-  }
+.ai-btn-active {
+  background-color: #5960b2 !important;
+}
+.ai-hover-btn {
+  transition: background-color 1s ease;
+}
 
-  .ai-hover-btn:hover {
-    background-color: #5960b2; 
-  }
+.ai-hover-btn:hover {
+  background-color: #5960b2;
+}
 
-  .ai-icon {
-    transition: transform 0.6s ease;
-  }
+.ai-icon {
+  transition: transform 0.6s ease;
+}
 
   .ai-hover-btn:hover .ai-icon {
     transform: rotate(-180deg);
