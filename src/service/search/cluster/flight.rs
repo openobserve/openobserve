@@ -482,8 +482,7 @@ pub async fn run_datafusion(
         let plan = o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_topk_agg_plan(
             sql.limit,
             physical_plan,
-        )
-        .await?;
+        )?;
         physical_plan = plan;
     }
 
