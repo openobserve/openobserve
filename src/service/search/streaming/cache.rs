@@ -128,6 +128,7 @@ pub async fn handle_cache_responses_and_deltas(
     started_at: i64,
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
+    is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
@@ -213,6 +214,7 @@ pub async fn handle_cache_responses_and_deltas(
                     is_result_array_skip_vrl,
                     backup_query_fn.clone(),
                     all_streams,
+                    is_multi_stream_search,
                 )
                 .await?;
                 delta_iter.next(); // Move to the next delta after processing
@@ -262,6 +264,7 @@ pub async fn handle_cache_responses_and_deltas(
                 is_result_array_skip_vrl,
                 backup_query_fn.clone(),
                 all_streams,
+                is_multi_stream_search,
             )
             .await?;
             delta_iter.next(); // Move to the next delta after processing
