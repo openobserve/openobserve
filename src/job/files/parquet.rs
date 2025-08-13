@@ -95,7 +95,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             break;
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            cfg.limit.file_push_interval,
+            get_config().limit.file_push_interval,
         ))
         .await;
         // check pending delete files

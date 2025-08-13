@@ -81,14 +81,12 @@ async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
 }
 
 async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
-    let scheduler_watch_interval = get_config().limit.scheduler_watch_interval;
-    if scheduler_watch_interval < 0 {
-        return Ok(());
-    }
-    let mut interval = time::interval(time::Duration::from_secs(scheduler_watch_interval as u64));
-    interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await;
+        let scheduler_watch_interval = get_config().limit.scheduler_watch_interval;
+        if scheduler_watch_interval < 0 {
+            return Ok(());
+        }
+        tokio::time::sleep(time::Duration::from_secs(scheduler_watch_interval as u64)).await;
         if let Err(e) = infra::scheduler::watch_timeout().await {
             log::error!("[SCHEDULER] watch timeout jobs error: {}", e);
         }
@@ -97,11 +95,8 @@ async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
 
 #[cfg(feature = "enterprise")]
 async fn run_search_jobs(id: i64) -> Result<(), anyhow::Error> {
-    let interval = get_config().limit.search_job_scheduler_interval;
-    let mut interval = time::interval(time::Duration::from_secs(interval as u64));
-    interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await;
+        tokio::time::sleep(time::Duration::from_secs(get_config().limit.search_job_scheduler_interval as u64)).await;
         if let Err(e) = service::search_jobs::run(id).await {
             log::error!("[SEARCH JOB {id}] run search jobs error: {}", e);
         }
@@ -110,11 +105,8 @@ async fn run_search_jobs(id: i64) -> Result<(), anyhow::Error> {
 
 #[cfg(feature = "enterprise")]
 async fn run_check_running_search_jobs() -> Result<(), anyhow::Error> {
-    let time = get_config().limit.search_job_run_timeout;
-    let mut interval = time::interval(time::Duration::from_secs(time as u64));
-    interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await;
+        tokio::time::sleep(time::Duration::from_secs(get_config().limit.search_job_run_timeout as u64)).await;
         log::debug!("[SEARCH JOB] Running check on running jobs");
         let now = config::utils::time::now_micros();
         let updated_at = now - (time * 1_000_000);
