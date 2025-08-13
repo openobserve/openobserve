@@ -116,7 +116,6 @@ const useHttpStreaming = () => {
       org_id: string;
       pageType: string;
       searchType: string;
-      enable_align_histogram: boolean;
       meta: any;
     },
     handlers: {
@@ -167,7 +166,6 @@ const useHttpStreaming = () => {
       org_id: string;
       pageType: string;
       searchType: string;
-      enable_align_histogram: boolean;
       meta: any;
     },
     handlers: {
@@ -177,7 +175,7 @@ const useHttpStreaming = () => {
       reset: (data: any, response: any) => void;
     }
   ) => {
-    const { traceId, org_id, type, queryReq, searchType, pageType, enable_align_histogram, meta } = data;
+    const { traceId, org_id, type, queryReq, searchType, pageType, meta } = data;
     const abortController = new AbortController();
 
     // Store the abort controller for this trace
