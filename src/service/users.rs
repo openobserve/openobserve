@@ -177,6 +177,7 @@ pub async fn post_user(
                 };
                 if get_openfga_config().enabled {
                     let mut tuples = vec![];
+                    let org_id = org_id.replace(' ', "_");
                     get_add_user_to_org_tuples(
                         &org_id,
                         &usr_req.email,
