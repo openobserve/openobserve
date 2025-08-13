@@ -56,7 +56,7 @@ use crate::{
                     EmptyExecVisitor, NewEmptyExecCountVisitor, remote_scan::RemoteScanExec,
                     rewrite::RemoteScanRewriter,
                 },
-                exec::{prepare_datafusion_context, register_udf},
+                exec::{DataFusionContextBuilder, register_udf},
                 optimizer::{generate_analyzer_rules, generate_optimizer_rules},
                 table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
             },
@@ -900,15 +900,14 @@ pub async fn generate_context(
 ) -> Result<SessionContext> {
     let analyzer_rules = generate_analyzer_rules(sql);
     let optimizer_rules = generate_optimizer_rules(sql);
-    let mut ctx = prepare_datafusion_context(
-        &req.trace_id,
-        req.work_group.clone(),
-        analyzer_rules,
-        optimizer_rules,
-        sql.sorted_by_time,
-        target_partitions,
-    )
-    .await?;
+    let mut ctx = DataFusionContextBuilder::new()
+        .trace_id(&req.trace_id)
+        .work_group(req.work_group.clone())
+        .analyzer_rules(analyzer_rules)
+        .optimizer_rules(optimizer_rules)
+        .sorted_by_time(sql.sorted_by_time)
+        .build(target_partitions)
+        .await?;
 
     // register udf
     register_udf(&ctx, &req.org_id)?;
