@@ -30,12 +30,25 @@ use crate::{common::meta::telemetry, service::stream::get_streams};
 const NO_INGESTION_REPORT_INTERVAL: u64 = 3600;
 
 pub fn start() {
-    tokio::spawn(async move { report_org_no_ingestion().await });
+    tokio::spawn(async move { run_no_ingestion().await });
 }
 
-async fn report_no_ingestion_to_segment(org_id: &str) {
+async fn run_no_ingestion() {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+        NO_INGESTION_REPORT_INTERVAL,
+    ));
+    interval.tick().await; // trigger the first run
+    loop {
+        report_org_no_ingestion(24, "24hr").await;
+        report_org_no_ingestion(24 * 7, "7d").await;
+        report_org_no_ingestion(24 * 13, "13d").await;
+        interval.tick().await;
+    }
+}
+
+async fn report_no_ingestion_to_segment(org_id: &str, duration: &str) {
     // Send no ingestion in last 24 hours to ActiveCampaign via segment proxy
-    log::info!("sending track event : no ingestion in last 24 hours for {org_id} to segment");
+    log::info!("sending track event : no ingestion in duration {duration} for {org_id} to segment");
     let org_admin = match get_admin(org_id).await {
         Ok(u) => u,
         Err(e) => {
@@ -52,6 +65,10 @@ async fn report_no_ingestion_to_segment(org_id: &str) {
             "organization_id".to_string(),
             json::Value::String(org_id.to_string()),
         ),
+        (
+            "duration".to_string(),
+            json::Value::String(duration.to_string()),
+        ),
     ]);
     telemetry::Telemetry::new()
         .send_track_event(
@@ -63,38 +80,33 @@ async fn report_no_ingestion_to_segment(org_id: &str) {
         .await;
 }
 
-pub async fn report_org_no_ingestion() {
-    let h24_micro = hour_micros(24);
-    let h25_micro = hour_micros(25);
+async fn report_org_no_ingestion(start_hour: i64, duration: &str) {
+    let h_start_micro = hour_micros(start_hour);
+    let h_end_micro = hour_micros(start_hour + 1);
 
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
-        NO_INGESTION_REPORT_INTERVAL,
-    ));
-    interval.tick().await; // trigger the first run
-    loop {
-        log::info!("checking no ingestion for orgs created in last 24 hours");
-        let now = now_micros();
+    log::info!("checking no ingestion for duration {duration}");
+    let now = now_micros();
 
-        let filter = infra::table::organizations::ListFilter {
-            created_after: Some(now - h25_micro),
-            created_before: Some(now - h24_micro),
-            limit: None,
-        };
+    let filter = infra::table::organizations::ListFilter {
+        created_after: Some(now - h_end_micro),
+        created_before: Some(now - h_start_micro),
+        limit: None,
+    };
 
-        let orgs = match infra::table::organizations::list(filter).await {
-            Ok(o) => o,
-            Err(e) => {
-                log::error!("error in list all orgs for the no ingestion telemetry job {e}");
-                continue;
-            }
-        };
-        for org in orgs {
-            let streams = get_streams(&org.identifier, None, false, None).await;
-            if streams.is_empty() {
-                report_no_ingestion_to_segment(&org.identifier).await;
-            }
+    let orgs = match infra::table::organizations::list(filter).await {
+        Ok(o) => o,
+        Err(e) => {
+            log::error!(
+                "error in list all orgs for the no ingestion duration {duration} telemetry job {e}"
+            );
+            return;
         }
-        log::info!("check for no ingestion for orgs created in last 24 hours completed");
-        interval.tick().await;
+    };
+    for org in orgs {
+        let streams = get_streams(&org.identifier, None, false, None).await;
+        if streams.is_empty() {
+            report_no_ingestion_to_segment(&org.identifier, duration).await;
+        }
     }
+    log::info!("check for no ingestion for duration {duration} completed");
 }
