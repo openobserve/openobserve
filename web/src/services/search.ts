@@ -287,7 +287,7 @@ const search = {
 
     let url = `/api/${org_identifier}/_search_partition?type=${page_type}&search_type=${searchType}`;
     if (typeof query.sql != "string") {
-      url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}&search_type=${searchType}`;
+      url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}&enable_align_histogram=true`;
     }
 
     return http({
