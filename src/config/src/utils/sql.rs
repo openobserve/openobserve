@@ -200,10 +200,10 @@ fn is_multi_search_eligible_for_histogram(
 ) -> Result<bool, sqlparser::parser::ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
-        if let Statement::Query(query) = statement {
-            if has_union_all(query) {
-                return Ok(true);
-            }
+        if let Statement::Query(query) = statement
+            && has_union_all(query)
+        {
+            return Ok(true);
         }
     }
     Ok(false)
@@ -350,11 +350,11 @@ impl Visitor for UnionAllVisitor {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
-        if let SetExpr::SetOperation { set_quantifier, .. } = *query.body {
-            if set_quantifier == SetQuantifier::All {
-                self.has_union_all = true;
-                return ControlFlow::Break(());
-            }
+        if let SetExpr::SetOperation { set_quantifier, .. } = *query.body
+            && set_quantifier == SetQuantifier::All
+        {
+            self.has_union_all = true;
+            return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
     }

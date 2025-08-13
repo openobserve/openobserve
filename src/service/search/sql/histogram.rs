@@ -85,7 +85,6 @@ fn multi_stream_histogram_query(
     statements: &[Statement],
     stream_names: &[String],
 ) -> Result<String, Error> {
-    // TODO: Check if query consists of union all if not return error
     if statements.is_empty() || stream_names.is_empty() {
         return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
             "No statements or stream names provided".to_string(),
@@ -96,8 +95,7 @@ fn multi_stream_histogram_query(
     let mut histogram_queries = Vec::new();
     for stream_name in stream_names {
         let mut query = format!(
-            "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"{}\"",
-            stream_name
+            "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"{stream_name}\"",
         );
 
         query.push_str(" GROUP BY zo_sql_key");
@@ -109,8 +107,7 @@ fn multi_stream_histogram_query(
 
     // Build the complete query with CTE
     let final_query = format!(
-        "WITH multistream_histogram AS ({}) SELECT zo_sql_key, sum(zo_sql_num) AS zo_sql_num FROM multistream_histogram GROUP BY zo_sql_key ORDER BY zo_sql_key",
-        cte_body
+        "WITH multistream_histogram AS ({cte_body}) SELECT zo_sql_key, sum(zo_sql_num) AS zo_sql_num FROM multistream_histogram GROUP BY zo_sql_key ORDER BY zo_sql_key",
     );
 
     Ok(final_query)

@@ -63,6 +63,7 @@ pub mod cacher;
 pub mod multi;
 pub mod result_utils;
 
+#[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
 pub async fn search(
     trace_id: &str,
