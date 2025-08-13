@@ -3,6 +3,8 @@ import { LogsQueryPage } from './logsQueryPage.js';
 import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export class LogsPage {
     constructor(page) {
@@ -1115,9 +1117,34 @@ export class LogsPage {
         return await this.loginPage.login();
     }
 
-    // Ingestion methods - delegate to IngestionPage
+    // Ingestion methods - implement directly like original working code
     async ingestLogs(orgId, streamName, logData) {
-        return await this.ingestionPage.ingestLogs(orgId, streamName, logData);
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+        
+        const response = await this.page.evaluate(async ({ url, headers, orgId, streamName, logData }) => {
+            const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(logData)
+            });
+            return await fetchResponse.json();
+        }, {
+            url: process.env.INGESTION_URL,
+            headers: headers,
+            orgId: orgId,
+            streamName: streamName,
+            logData: logData
+        });
+        
+        console.log(response);
+        return response;
     }
 
     // Management methods - delegate to ManagementPage
@@ -1148,6 +1175,10 @@ export class LogsPage {
 
     async fillQueryEditor(query) {
         return await this.page.locator(this.queryEditor).getByRole('textbox').fill(query);
+    }
+
+    async clearQueryEditor() {
+        return await this.page.locator(this.queryEditor).getByRole('textbox').press('ControlOrMeta+a');
     }
 
     async typeInQueryEditor(text) {
@@ -1807,5 +1838,120 @@ export class LogsPage {
         await this.page.waitForSelector(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`, { state: "visible" });
         await this.page.waitForTimeout(2000);
         await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`).first().click();
+    }
+
+    // Download-related functions
+    async setupDownloadDirectory() {
+        // Create unique directory with timestamp and random string
+        const timestamp = Date.now();
+        const randomString = Math.random().toString(36).substring(2, 8);
+        const downloadDir = path.join(process.cwd(), `temp-downloads-${timestamp}-${randomString}`);
+        
+        // Create fresh directory
+        fs.mkdirSync(downloadDir, { recursive: true });
+        
+        // Verify directory was created and is writable
+        expect(fs.existsSync(downloadDir)).toBe(true);
+        
+        // Test write permissions by creating a test file
+        const testFile = path.join(downloadDir, 'test-write.txt');
+        fs.writeFileSync(testFile, 'test');
+        expect(fs.existsSync(testFile)).toBe(true);
+        fs.unlinkSync(testFile);
+        
+        return downloadDir;
+    }
+
+    async cleanupDownloadDirectory(downloadDir) {
+        if (downloadDir && fs.existsSync(downloadDir)) {
+            const files = fs.readdirSync(downloadDir);
+            for (const file of files) {
+                fs.unlinkSync(path.join(downloadDir, file));
+            }
+            fs.rmdirSync(downloadDir);
+        }
+    }
+
+    async verifyDownload(download, expectedFileName, downloadDir) {
+        const downloadPath = path.join(downloadDir, expectedFileName);
+        
+        // Save the download
+        await download.saveAs(downloadPath);
+        
+        // Wait for file system to sync
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Verify file exists and has content
+        expect(fs.existsSync(downloadPath)).toBe(true);
+        const stats = fs.statSync(downloadPath);
+        expect(stats.size).toBeGreaterThan(0);
+        
+        // Verify it's a CSV file
+        const content = fs.readFileSync(downloadPath, 'utf8');
+        expect(content).toContain('_timestamp');
+        
+        // Count rows in the CSV file
+        const rows = content.split('\n').filter(line => line.trim() !== '');
+        const rowCount = rows.length - 1; // Subtract 1 for header row
+        console.log(`Download ${expectedFileName}: ${rowCount} data rows`);
+        
+        // Assert row count based on scenario
+        if (expectedFileName.includes('custom_100.csv')) {
+            expect(rowCount).toBe(100);
+        } else if (expectedFileName.includes('custom_500.csv')) {
+            expect(rowCount).toBe(500);
+        } else if (expectedFileName.includes('custom_1000.csv')) {
+            expect(rowCount).toBe(1000);
+        } else if (expectedFileName.includes('custom_5000.csv')) {
+            expect(rowCount).toBe(5000);
+        } else if (expectedFileName.includes('custom_10000.csv')) {
+            expect(rowCount).toBe(10000);
+        } else if (expectedFileName.includes('sql_limit_2000.csv')) {
+            expect(rowCount).toBe(2000);
+        } else if (expectedFileName.includes('sql_limit_2000_custom_500.csv')) {
+            expect(rowCount).toBe(500);
+        } else {
+            // For normal "Download results" downloads, we expect some data but not a specific count
+            expect(rowCount).toBeGreaterThan(0);
+        }
+        
+        return downloadPath;
+    }
+
+    // Download action methods
+    async clickMoreOptionsButton() {
+        return await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
+    }
+
+    async clickDownloadResults() {
+        return await this.page.getByText('Download results', { exact: true }).click();
+    }
+
+    async clickDownloadResultsForCustom() {
+        return await this.page.getByText('Download results for custom').click();
+    }
+
+    async clickCustomDownloadRangeSelect() {
+        return await this.page.locator('[data-test="custom-download-range-select"]').click();
+    }
+
+    async selectCustomDownloadRange(range) {
+        return await this.page.getByText(range, { exact: true }).click();
+    }
+
+    async clickConfirmDialogOkButton() {
+        return await this.page.locator('[data-test="logs-search-bar-confirm-dialog-ok-btn"]').click();
+    }
+
+    async expectCustomDownloadDialogVisible() {
+        return await expect(this.page.getByText('Enter the initial number and')).toBeVisible();
+    }
+
+    async expectRequestFailedError() {
+        return await expect(this.page.getByText('Request failed with status')).toBeVisible();
+    }
+
+    async waitForDownload() {
+        return await this.page.waitForEvent('download');
     }
 } 
