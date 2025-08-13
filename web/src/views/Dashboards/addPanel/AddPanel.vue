@@ -577,6 +577,7 @@ export default defineComponent({
       resetDashboardPanelDataAndAddTimeField,
       resetAggregationFunction,
       validatePanel,
+      makeAutoSQLQuery,
     } = useDashboardPanelData("dashboard");
     const editMode = ref(false);
     const selectedDate: any = ref(null);
@@ -753,10 +754,21 @@ export default defineComponent({
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
       // console.time("add panel loadDashboard");
-      loadDashboard();
+      await loadDashboard();
 
       registerAiContextHandler();
       // console.timeEnd("add panel loadDashboard");
+
+      // Call makeAutoSQLQuery after dashboard data is loaded
+      // Only generate SQL if we're in auto query mode
+      if (
+        !editMode.value &&
+        !dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery
+      ) {
+        await makeAutoSQLQuery();
+      }
     });
 
     let list = computed(function () {
@@ -954,6 +966,75 @@ export default defineComponent({
         }
         // console.timeEnd("watch:dashboardPanelData.layout.showQueryBar");
       },
+    );
+
+    // Generate the query when the fields are updated
+    watch(
+      () => [
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.stream,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.filter,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.latitude,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.longitude,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.weight,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.source,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.target,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.name,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.value_for_maps,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.limit,
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].joins,
+      ],
+      () => {
+        // only continue if current mode is auto query generation
+        if (
+          !dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].customQuery
+        ) {
+          // makeAutoSQLQuery is async function
+          makeAutoSQLQuery();
+        }
+      },
+      { deep: true },
     );
 
     const runQuery = () => {
