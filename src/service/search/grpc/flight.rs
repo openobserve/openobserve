@@ -51,7 +51,7 @@ use crate::service::{
                 NewEmptyExecVisitor, ReplaceTableScanExec, codec::get_physical_extension_codec,
                 empty_exec::NewEmptyExec, rewrite::tantivy_optimize_rewrite,
             },
-            exec::{prepare_datafusion_context, register_udf},
+            exec::{DataFusionContextBuilder, register_udf},
             table_provider::{enrich_table::NewEnrichTable, uniontable::NewUnionTable},
         },
         index::IndexCondition,
@@ -76,15 +76,11 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] flight->search: start");
 
     // create datafusion context, just used for decode plan, the params can use default
-    let mut ctx = prepare_datafusion_context(
-        &trace_id,
-        work_group.clone(),
-        vec![],
-        vec![],
-        false,
-        cfg.limit.cpu_num,
-    )
-    .await?;
+    let mut ctx = DataFusionContextBuilder::new()
+        .trace_id(&trace_id)
+        .work_group(work_group.clone())
+        .build(cfg.limit.cpu_num)
+        .await?;
 
     // register udf
     register_udf(&ctx, &org_id)?;

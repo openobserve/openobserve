@@ -64,7 +64,7 @@ use crate::{
         schema::generate_schema_for_defined_schema_fields,
         search::{
             DATAFUSION_RUNTIME,
-            datafusion::exec::{self, MergeParquetResult},
+            datafusion::exec::{self, MergeParquetResult, TableBuilder},
         },
         tantivy::create_tantivy_index,
     },
@@ -846,26 +846,19 @@ pub async fn merge_files(
         };
 
         let diff_fields = generate_schema_diff(&schema, &latest_schema_fields)?;
-        let table = match exec::create_parquet_table(
-            &session,
-            latest_schema.clone(),
-            &files,
-            diff_fields,
-            true,
-            None,
-            None,
-            vec![],
-            is_match_downsampling_rule,
-        )
-        .await
+        match TableBuilder::new()
+            .rules(diff_fields)
+            .sorted_by_time(true)
+            .need_optimize_partition(is_match_downsampling_rule)
+            .build(session, &files, latest_schema.clone())
+            .await
         {
-            Ok(v) => v,
+            Ok(table) => tables.push(table),
             Err(e) => {
                 log::error!("create_parquet_table err: {e}, files: {files:?}, schema: {schema:?}");
                 return Err(DataFusionError::Plan(format!("create_parquet_table err: {e}")).into());
             }
         };
-        tables.push(table);
     }
 
     let merge_result = {
