@@ -417,7 +417,9 @@ export const usePanelDataLoader = (
             },
             page_type: pageType,
             traceparent,
-            searchType: "dashboards",
+            // Using same config for align histogram
+            // in future we can make it seperate for scenarios
+            enable_align_histogram: is_ui_histogram.value ?? false,
           }),
         abortControllerRef.signal,
       );
@@ -978,6 +980,7 @@ export const usePanelDataLoader = (
         org_id: string;
         pageType: string;
         searchType: string;
+        enable_align_histogram: boolean;
         meta: any;
       } = {
         queryReq: {
@@ -997,6 +1000,9 @@ export const usePanelDataLoader = (
         org_id: store?.state?.selectedOrganization?.identifier,
         pageType,
         searchType: searchType.value ?? "dashboards",
+        // Using same config for align histogram
+        // in future we can make it seperate for scenarios 
+        enable_align_histogram: is_ui_histogram.value ?? false,
         meta: {
           currentQueryIndex,
           dashboard_id: dashboardId?.value,

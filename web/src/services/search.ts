@@ -230,19 +230,19 @@ const search = {
     query,
     page_type = "logs",
     traceparent,
-    searchType,
+    enable_align_histogram,
   }: {
     org_identifier: string;
     query: any;
     page_type: string;
     traceparent: string;
-    searchType: string;
+    enable_align_histogram: boolean;
   }) => {
     // const url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
 
-    let url = `/api/${org_identifier}/_search_partition?type=${page_type}&search_type=${searchType}`;
+    let url = `/api/${org_identifier}/_search_partition?type=${page_type}&enable_align_histogram=${enable_align_histogram}`;
     if (typeof query.sql != "string") {
-      url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}&search_type=${searchType}`;
+      url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}&enable_align_histogram=${enable_align_histogram}`;
     }
 
     return http({
