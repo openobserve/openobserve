@@ -601,7 +601,7 @@ pub async fn search_multi(
 }
 
 #[tracing::instrument(name = "service:search_partition", skip(req))]
-pub async fn earch_partition(
+pub async fn search_partition(
     trace_id: &str,
     org_id: &str,
     user_id: Option<&str>,
