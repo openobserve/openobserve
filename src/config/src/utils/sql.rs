@@ -19,8 +19,8 @@ use hashbrown::HashSet;
 use sqlparser::{
     ast::{
         DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList,
-        FunctionArguments, GroupByExpr, Query, SelectItem, SetExpr, Statement, TableFactor, Visit,
-        Visitor,
+        FunctionArguments, GroupByExpr, Query, SelectItem, SetExpr, SetQuantifier, Statement,
+        TableFactor, Visit, Visitor,
     },
     dialect::GenericDialect,
     parser::Parser,
@@ -173,7 +173,8 @@ pub fn is_eligible_for_histogram(
     is_multi_stream_search: bool,
 ) -> Result<(bool, bool), sqlparser::parser::ParserError> {
     if is_multi_stream_search {
-        return Ok((true, false));
+        let is_eligible = is_multi_search_eligible_for_histogram(query)?;
+        return Ok((is_eligible, false));
     }
     // Histogram is not available for CTE, DISTINCT, UNION, JOIN and LIMIT queries.
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
@@ -192,6 +193,20 @@ pub fn is_eligible_for_histogram(
         }
     }
     Ok((true, false))
+}
+
+fn is_multi_search_eligible_for_histogram(
+    query: &str,
+) -> Result<bool, sqlparser::parser::ParserError> {
+    let ast = Parser::parse_sql(&GenericDialect {}, query)?;
+    for statement in ast.iter() {
+        if let Statement::Query(query) = statement {
+            if has_union_all(query) {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }
 
 // Check if has group_by
@@ -285,6 +300,12 @@ fn has_union(query: &Query) -> bool {
     visitor.has_union
 }
 
+fn has_union_all(query: &Query) -> bool {
+    let mut visitor = UnionAllVisitor::new();
+    let _ = query.visit(&mut visitor);
+    visitor.has_union_all
+}
+
 fn has_subquery(stat: &Statement) -> bool {
     let mut visitor = SubqueryVisitor::new();
     let _ = stat.visit(&mut visitor);
@@ -308,6 +329,32 @@ impl Visitor for UnionVisitor {
         if let SetExpr::SetOperation { .. } = *query.body {
             self.has_union = true;
             return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+pub struct UnionAllVisitor {
+    pub has_union_all: bool,
+}
+
+impl UnionAllVisitor {
+    fn new() -> Self {
+        Self {
+            has_union_all: false,
+        }
+    }
+}
+
+impl Visitor for UnionAllVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
+        if let SetExpr::SetOperation { set_quantifier, .. } = *query.body {
+            if set_quantifier == SetQuantifier::All {
+                self.has_union_all = true;
+                return ControlFlow::Break(());
+            }
         }
         ControlFlow::Continue(())
     }
@@ -1041,7 +1088,7 @@ mod tests {
             r#"SELECT * FROM "olympics" WHERE _timestamp >= 1716854400000 AND _timestamp <= 1716940800000"#,
         ];
         for query in queries.iter() {
-            let (is_eligible, is_sub_query) = is_eligible_for_histogram(query).unwrap();
+            let (is_eligible, is_sub_query) = is_eligible_for_histogram(query, false).unwrap();
             assert_eq!(is_eligible, true);
             assert_eq!(is_sub_query, false);
         }
@@ -1056,7 +1103,7 @@ mod tests {
             r#"SELECT * FROM "olympics" LIMIT 100"#,
         ];
         for query in queries.iter() {
-            let (is_eligible, is_sub_query) = is_eligible_for_histogram(query).unwrap();
+            let (is_eligible, is_sub_query) = is_eligible_for_histogram(query, false).unwrap();
             assert_eq!(is_eligible, false);
             // Note: subqueries return (true, true) but are still not eligible for histogram
             if query.contains("SELECT * FROM (SELECT") {
@@ -1065,5 +1112,17 @@ mod tests {
                 assert_eq!(is_sub_query, false);
             }
         }
+    }
+
+    #[test]
+    fn check_union_all_visitor() {
+        let sql1 = "select * from oly union select * from oly2";
+        let sql2 = "select * from oly union all select * from oly2";
+
+        let is_not_union_all = is_multi_search_eligible_for_histogram(sql1).unwrap();
+        let is_union_all = is_multi_search_eligible_for_histogram(sql2).unwrap();
+
+        assert_eq!(is_not_union_all, false);
+        assert_eq!(is_union_all, true);
     }
 }
