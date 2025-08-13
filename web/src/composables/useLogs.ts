@@ -133,7 +133,7 @@ const defaultObject = {
     showQuery: true,
     showHistogram: true,
     showDetailTab: false,
-    showTransformEditor: true,
+    showTransformEditor: false, //we are making showTransformEditor false because by default function / actions editor should be hidden
     searchApplied: false,
     toggleSourceWrap: useLocalWrapContent()
       ? JSON.parse(useLocalWrapContent())
@@ -711,6 +711,9 @@ const useLogs = () => {
       query["query"] = b64EncodeUnicode(searchObj.data.query.trim());
     }
 
+    //add the function editor toggle is true or false
+    //it will help to retain the function editor state when we refresh the page
+    query["fn_editor"] = searchObj.meta.showTransformEditor;
     if (
       searchObj.data.transformType === "function" &&
       searchObj.data.tempFunctionContent != ""
@@ -4905,6 +4908,11 @@ const useLogs = () => {
           ...restoredData
         };
       }
+    }
+
+    //here we restore the fn editor state from the url query params
+    if(queryParams.fn_editor) {
+      searchObj.meta.showTransformEditor = queryParams.fn_editor == "true" ? true : false;
     }
 
     // TODO OK : Replace push with replace and test all scenarios
