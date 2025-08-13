@@ -17,6 +17,7 @@ exceptions = [
     { name = "ingester", allow = ["AGPL-3.0"] },
     { name = "wal", allow = ["AGPL-3.0"] },
     { name = "proto", allow = ["AGPL-3.0"] },
+    { name = "flight", allow = ["AGPL-3.0"] },
     { name = "report_server", allow = ["AGPL-3.0"] },
     { name = "arrayref", allow = ["BSD-2-Clause"] },
     { name = "mach", allow = ["BSD-2-Clause"] },
