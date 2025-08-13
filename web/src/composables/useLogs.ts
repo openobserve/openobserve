@@ -361,8 +361,7 @@ const useLogs = () => {
   const clearSearchObj = () => {
     // Reset the existing searchObj instead of creating a new one
     // This maintains the same reference so watchers continue to work
-    Object.assign(searchObj, JSON.parse(JSON.stringify(defaultObject)));
-    searchObj.organizationIdentifier = store.state?.selectedOrganization?.identifier;
+    resetSearchObj();
   };
 
   /**
