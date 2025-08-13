@@ -38,6 +38,16 @@ pub(crate) fn get_stream_type_from_request(
 }
 
 #[inline(always)]
+pub(crate) fn get_enable_align_histogram_from_request(
+    query: &Query<HashMap<String, String>>,
+) -> bool {
+    query
+        .get("enable_align_histogram")
+        .map(|s| s.parse().unwrap_or_default())
+        .unwrap_or_default()
+}
+
+#[inline(always)]
 pub(crate) fn get_ts_from_request_with_key(
     query: &Query<HashMap<String, String>>,
     key: &str,
