@@ -1117,7 +1117,7 @@ export class LogsPage {
         return await this.loginPage.login();
     }
 
-    // Ingestion methods - implement directly like original working code
+    // Ingestion methods
     async ingestLogs(orgId, streamName, logData) {
         const basicAuthCredentials = Buffer.from(
             `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
