@@ -1,3 +1,18 @@
+// Copyright 2025 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use std::sync::Arc;
 
 use datafusion::{
@@ -190,10 +205,6 @@ pub async fn get_result_schema(
     is_streaming: bool,
     use_cache: bool,
 ) -> Result<ResultSchemaExtractor, anyhow::Error> {
-    if sql.schemas.len() != 1 {
-        return Ok(ResultSchemaExtractor::new());
-    }
-
     if !is_streaming
         && use_cache
         && let Some(interval) = sql.histogram_interval
@@ -250,7 +261,7 @@ mod tests {
         };
     }
 
-    fn get_fields() -> Vec<Field> {
+    fn get_fields_default() -> Vec<Field> {
         vec![
             Field::new("log", DataType::Utf8, true),
             Field::new("k8s_namespace_name", DataType::Utf8, false),
@@ -265,14 +276,38 @@ mod tests {
         ]
     }
 
+    fn get_fields_test() -> Vec<Field> {
+        vec![
+            Field::new("log", DataType::Utf8, true),
+            Field::new("kubernetes_namespace_name", DataType::Utf8, false),
+            Field::new("kubernetes_node_name", DataType::Utf8, false),
+            Field::new("kubernetes_container_name", DataType::Utf8, false),
+            Field::new("kubernetes_pod_uid", DataType::Utf8, false),
+            Field::new("kubernetes_pod_name", DataType::Utf8, false),
+            Field::new("kubernetes_container_restart_count", DataType::Int32, false),
+            Field::new("_timestamp", DataType::Int64, false),
+        ]
+    }
+
     async fn get_sql(sql: &str) -> Sql {
-        let schema = Schema::new(get_fields());
+        let default_schema = Schema::new(get_fields_default());
+        let test_schema = Schema::new(get_fields_test());
         infra::db_init().await.unwrap();
         infra::schema::merge(
             "parse_test",
             "default",
             StreamType::Logs,
-            &schema,
+            &default_schema,
+            Some(1752660674351000),
+        )
+        .await
+        .unwrap();
+
+        infra::schema::merge(
+            "parse_test",
+            "test",
+            StreamType::Logs,
+            &test_schema,
             Some(1752660674351000),
         )
         .await
@@ -330,16 +365,16 @@ mod tests {
         assert_eq!(
             extractor.projections,
             vec![
-                "log",
+                "_timestamp",
+                "code",
+                "floatvalue",
+                "k8s_container_name",
+                "k8s_container_restart_count",
                 "k8s_namespace_name",
                 "k8s_node_name",
-                "k8s_container_name",
-                "k8s_pod_uid",
                 "k8s_pod_name",
-                "k8s_container_restart_count",
-                "floatvalue",
-                "code",
-                "_timestamp",
+                "k8s_pod_uid",
+                "log"
             ]
         );
     }
@@ -499,16 +534,16 @@ mod tests {
         assert_eq!(
             extractor.projections,
             vec![
-                "log",
+                "_timestamp",
+                "code",
+                "floatvalue",
+                "k8s_container_name",
+                "k8s_container_restart_count",
                 "k8s_namespace_name",
                 "k8s_node_name",
-                "k8s_container_name",
-                "k8s_pod_uid",
                 "k8s_pod_name",
-                "k8s_container_restart_count",
-                "floatvalue",
-                "code",
-                "_timestamp",
+                "k8s_pod_uid",
+                "log"
             ]
         );
 
