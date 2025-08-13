@@ -334,7 +334,7 @@ impl Visitor for UnionVisitor {
     }
 }
 
-pub struct UnionAllVisitor {
+struct UnionAllVisitor {
     pub has_union_all: bool,
 }
 
