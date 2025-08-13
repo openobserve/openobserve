@@ -600,6 +600,7 @@ pub async fn search_multi(
     Ok(multi_res)
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "service:search_partition", skip(req))]
 pub async fn search_partition(
     trace_id: &str,
