@@ -4480,9 +4480,7 @@ const useLogs = () => {
     searchObj.meta.quickMode = queryParams.quick_mode == "false" ? false : true;
 
     if (queryParams.stream) {
-      searchObj.data.stream.selectedStream.push(
-        ...queryParams.stream.split(","),
-      );
+      searchObj.data.stream.selectedStream = queryParams.stream.split(",");
     }
 
     if (queryParams.show_histogram) {
