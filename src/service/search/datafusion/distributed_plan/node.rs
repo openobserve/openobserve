@@ -33,7 +33,6 @@ pub struct RemoteScanNodes {
     pub nodes: Vec<Arc<dyn NodeInfo>>,
     pub file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
     pub equal_keys: HashMap<TableReference, Vec<KvItem>>,
-    pub match_all_keys: Vec<String>,
     pub index_condition: Option<IndexCondition>,
     pub index_optimize_mode: Option<IndexOptimizeMode>,
     pub is_leader: bool, // for super cluster
@@ -47,7 +46,6 @@ impl RemoteScanNodes {
         nodes: Vec<Arc<dyn NodeInfo>>,
         file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
         equal_keys: HashMap<TableReference, Vec<KvItem>>,
-        match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
         index_optimize_mode: Option<IndexOptimizeMode>,
         is_leader: bool,
@@ -58,7 +56,6 @@ impl RemoteScanNodes {
             nodes,
             file_id_lists,
             equal_keys,
-            match_all_keys,
             index_condition,
             index_optimize_mode,
             is_leader,
@@ -99,7 +96,6 @@ impl RemoteScanNodes {
             use_inverted_index: self.req.use_inverted_index,
             index_condition,
             equal_keys: self.equal_keys.get(table_name).unwrap_or(&vec![]).clone(),
-            match_all_keys: self.match_all_keys.clone(),
             index_optimize_mode: self.index_optimize_mode.clone().map(|x| x.into()),
         };
 

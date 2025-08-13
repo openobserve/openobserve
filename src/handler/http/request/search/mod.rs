@@ -124,7 +124,7 @@ async fn can_use_distinct_stream(
             // where clause can contain match_all and a valid field which is in distinct stream
             // but since there is match_all, we cannot infer the field from the where clause
             // so we need to return false
-            if sql.match_items.is_some() {
+            if sql.has_match_all {
                 return false;
             }
             sql.columns.values().flatten().cloned().collect()

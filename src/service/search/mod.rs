@@ -42,7 +42,7 @@ use hashbrown::HashMap;
 use infra::{
     cache::stats,
     errors::{Error, ErrorCodes},
-    schema::{get_stream_setting_index_fields, unwrap_stream_settings},
+    schema::unwrap_stream_settings,
 };
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
@@ -1482,31 +1482,8 @@ pub fn is_use_inverted_index(sql: &Arc<Sql>) -> bool {
     }
 
     let cfg = get_config();
-    let index_terms = if sql.equal_items.len() == 1 {
-        let schema = sql.schemas.values().next().unwrap().schema();
-        let stream_settings = infra::schema::unwrap_stream_settings(schema);
-        let index_fields = get_stream_setting_index_fields(&stream_settings);
-        filter_index_fields(sql.equal_items.values().next().unwrap(), &index_fields)
-    } else {
-        vec![]
-    };
-
-    sql.stream_type != StreamType::Index
-        && sql.use_inverted_index
+    sql.use_inverted_index
         && cfg.common.inverted_index_enabled
         && !cfg.common.feature_query_without_index
-        && (sql.index_condition.is_some() || sql.match_items.is_some() || !index_terms.is_empty())
-}
-
-pub fn filter_index_fields(
-    items: &[(String, String)],
-    index_fields: &[String],
-) -> Vec<(String, String)> {
-    let mut result = Vec::new();
-    for item in items {
-        if index_fields.contains(&item.0) {
-            result.push(item.clone());
-        }
-    }
-    result
+        && sql.index_condition.is_some()
 }

@@ -417,7 +417,6 @@ pub async fn run_datafusion(
     }
 
     // 7. rewrite physical plan
-    let match_all_keys = sql.match_items.clone().unwrap_or_default();
     let equal_keys = sql
         .equal_items
         .iter()
@@ -451,7 +450,6 @@ pub async fn run_datafusion(
         nodes.into_arc_vec(),
         partitioned_file_lists,
         equal_keys,
-        match_all_keys,
         sql.index_condition.clone(),
         sql.index_optimize_mode.clone(),
         false, // for super cluster

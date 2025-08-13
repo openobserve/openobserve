@@ -249,7 +249,6 @@ async fn run_datafusion(
     }
 
     // 6. rewrite physical plan
-    let match_all_keys = sql.match_items.clone().unwrap_or_default();
     let partition_keys = sql
         .equal_items
         .iter()
@@ -276,7 +275,6 @@ async fn run_datafusion(
         nodes,
         HashMap::new(),
         partition_keys,
-        match_all_keys,
         sql.index_condition.clone(),
         sql.index_optimize_mode.clone(),
         true,
