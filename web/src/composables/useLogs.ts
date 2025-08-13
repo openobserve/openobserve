@@ -1724,7 +1724,7 @@ const useLogs = () => {
       ));
     }
 
-    return `with multistream_histogram as (` + multiSql.join(" UNION ALL ") + `) select zo_sql_key, sum(zo_sql_num) as zo_sql_num from multistream_histogram group by zo_sql_key order by zo_sql_key`;
+    return multiSql.join(" UNION ALL ");
   }
 
   const getQueryData = async (isPagination = false) => {
@@ -3133,6 +3133,7 @@ const useLogs = () => {
               is_ui_histogram: true,
             },
             "ui",
+            searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false ? true : false,
           )
           .then(async (res: any) => {
             removeTraceId(traceId);
