@@ -27,7 +27,7 @@ use infra::{
 };
 use rayon::slice::ParallelSliceMut;
 
-use crate::service::search::datafusion::exec::{DataFusionContextBuilder, create_parquet_table};
+use crate::service::search::datafusion::exec::{DataFusionContextBuilder, TableBuilder};
 
 macro_rules! get_col {
     ($var:ident, $name:literal, $typ:ty, $rbatch:ident) => {
@@ -172,23 +172,14 @@ async fn inner_exec(
         work_group: None,
         target_partitions: partitions,
     };
-    let tbl = create_parquet_table(
-        &session,
-        schema.clone(),
-        dump_files,
-        HashMap::new(),
-        false,
-        None,
-        None,
-        vec![],
-        false,
-    )
-    .await?;
+    let table = TableBuilder::new()
+        .build(session, dump_files, schema.clone())
+        .await?;
     let ctx = DataFusionContextBuilder::new()
         .trace_id(trace_id)
         .build(partitions)
         .await?;
-    ctx.register_table("file_list", tbl)?;
+    ctx.register_table("file_list", table)?;
     let df = ctx.sql(query).await?;
     let ret = df.collect().await?;
     Ok(ret)
