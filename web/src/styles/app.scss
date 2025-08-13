@@ -196,7 +196,7 @@
     right: 0;
     z-index: 1;
     background: #ffffff;
-    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
+    box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1);
   }
 }
 //here we have dark theme styling for the table
@@ -205,7 +205,7 @@
   th:last-child.actions-column,
   td:last-child.actions-column {
     background: var(--q-dark);
-    box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1);
+    box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1);
     width: 150px;
   }
 }
@@ -215,7 +215,7 @@
   td:last-child.actions-column {
     background: #ffffff;
     width: 150px;
-    box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1);
+    box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1);
   }
 }
 //this is for in some of pages we are having a header for eg: pipelines ,functions ,enrichments listing pages
@@ -270,7 +270,7 @@
   .q-virtual-scroll__content{
     td:last-child.actions-column {
       background: #ffffff !important;
-      box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1) !important;
+      box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1) !important;
       width: 150px !important;
     }
   }
@@ -278,7 +278,7 @@
     thead{
       th:last-child.actions-column{
         background: #ffffff !important;
-        box-shadow: -4px 0px 4px 0 rgba(0, 0, 0, 0.1) !important;
+        box-shadow: -2px 0px 2px 0 rgba(0, 0, 0, 0.1) !important;
         width: 150px !important;
       }
     }
@@ -289,7 +289,7 @@
   .q-virtual-scroll__content{
     td:last-child.actions-column {
       background: var(--q-dark) !important;
-      box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1) !important;
+      box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1) !important;
       width: 150px !important;
     }
   }
@@ -297,7 +297,7 @@
     thead{
       th:last-child.actions-column{
         background: var(--q-dark) !important;
-        box-shadow: -4px 0px 4px 0 rgba(144, 144, 144, 0.1) !important;
+        box-shadow: -2px 0px 2px 0 rgba(144, 144, 144, 0.1) !important;
         width: 150px !important;
       }
     }
@@ -311,13 +311,13 @@
 }
 
 .app-tabs-container-dark{
-  outline: 1px solid #5A4AA9;
+  border: 1px solid #DFE1E5;
   border-radius: 4px;
-  background-color: #2B2D30 !important;
+  background-color: #000000 !important;
 
 }
 .app-tabs-container-light{
-  outline: 1px solid #D0AEFF;
+  border: 1px solid #C9CCD6;
   border-radius: 4px;
   background-color: #F7F8FA;
 
@@ -329,59 +329,54 @@
   .rum-tab{
     height: 100% !important;
     margin: 0px !important;
-    border-bottom: none !important;
     width: auto !important;
     white-space: normal !important;
     background-color: #2B2D30 !important;
     font-size: 13px !important;
     font-weight: 500 !important;
     line-height: 16px !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
   .active{
-    background-color: #2B2D30 !important;
-    color: #DFE1E5 !important;
-    border: 2px solid #826AF9 !important;    border-radius: 4px !important;
+    background-color: #575FC5 !important;
+    color: #F7F8FA !important;
+    border-radius: 4px !important;
 
   }
   .rum-tab:hover{
-    background-color: #373A3B !important;
+    background-color: #5A5D6B !important;
+    border-radius: 4px !important;
   }
   .rum-tab.active:hover{
-    background-color: #2B2D30 !important;
+    background-color: #575FC5 !important;
+    border-radius: 4px !important;
   }
 }
 
 .tabs-selection-container-light{
   border: none !important;
-  border-radius: none !important;
+  height: 100% !important;
   .rum-tab{
     height: 100% !important;
     margin: 0px !important;
-    border-bottom: none !important;
     width: auto !important;
     white-space: normal !important;
-    background-color: #F7F8FA;
+    background-color: #EBECF0;
     font-size: 13px !important;
     font-weight: 500 !important;
     line-height: 16px !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
-  .rum-tab.active{
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    border: 2px solid #9E86FF !important;
+  .active{
+    background-color: #575FC5 !important;
+    color: #F7F8FA !important;
     border-radius: 4px !important;
   }
   .rum-tab:hover{
-    background-color: #f0f0f0 !important;
+    background-color: #D3D5DB !important;
+    border-radius: 4px !important;
   }
   .rum-tab.active:hover{
-    background-color: #ffffff !important;
+    background-color: #575FC5 !important;
+    border-radius: 4px !important;
   }
 }
 
@@ -506,18 +501,11 @@
     outline: 1px solid #C9CCD6 !important;
 
   }
-  .q-field__native{
-    color: #818594 !important;
-
-  }
 }
 .o2-search-input-dark{
   .q-field__control{
     background-color: #2B2D30 !important;
     border: 1px solid #4E5157 !important;
-  }
-  .q-field__native{
-    color: #6F737A !important;
   }
 }
 //this is done because we need to select the search input when it is focused
@@ -561,12 +549,14 @@
   line-height: 16px !important;
   border-radius: 4px !important;
   min-width: 72px !important;
+  padding: 0px 12px !important;
+  min-width: 90px !important;
 }
 
 .o2-secondary-button-light{
   color: #19191E !important;
-
   border: 1px solid #D3D5DB !important;
+  background-color: #F7F8FA;
 }
 .o2-secondary-button-dark{
   color: #DFE1E5 !important;
@@ -600,5 +590,31 @@
   &:hover{
     background-color: #6B76E3 !important;
     border: 1px solid #6B76E3 !important;
+  }
+}
+
+
+.o2-table-footer-title{
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 16px;
+}
+.o2-quasar-table-header-sticky{
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+}
+
+.o2-quasar-table-header-sticky-dark{
+  thead {
+    background-color: #181A1B;
+  }
+}
+
+.o2-quasar-table-header-sticky-light{
+  thead {
+    background-color: #ffffff;
   }
 }

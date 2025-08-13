@@ -129,9 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="alert_id"
             :pagination="pagination"
-            style="width: 100%"
-            class="o2-quasar-table"
-            :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+            style="width: 100%;"
+            :style="filteredResults?.length 
+            ? 'width: 100%; height: calc(100vh - 112px)' 
+            : 'width: 100%'"
+
+            class="o2-quasar-table o2-quasar-table-header-sticky"
+            :class="store.state.theme === 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light'"
           >
           <template v-slot:header="props">
             <q-tr :props="props">
@@ -469,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-td>
             </template>
 
-            <template #top="scope">
+            <!-- <template #top="scope">
               <QTablePagination
                 :scope="scope"
                 :pageTitle="t('alerts.header')"
@@ -478,28 +482,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :perPageOptions="perPageOptions"
                 @update:changeRecordPerPage="changePagination"
               />
-            </template>
+            </template> -->
 
             <template #bottom="scope">
-              <div class="bottom-btn">
+              <div class="bottom-btn tw-h-[48px]">
+                <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[100px] tw-mr-md">
+                  {{ resultTotal }} {{ t('alerts.header') }}
+                </div>
+
                 <q-btn
                   v-if="selectedAlerts.length > 0"
                   data-test="alert-list-move-across-folders-btn"
-                  class="flex items-center move-btn q-mr-md no-border"
-                  color="secondary"
-                  :icon="outlinedDriveFileMove"
-                  :label="'Move'"
+                  class="flex items-center q-mr-md no-border o2-secondary-button tw-h-[28px]"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  no-caps
+                  dense
                   @click="moveMultipleAlerts"
-                />
+                  >
+                    <q-icon :name="outlinedDriveFileMove" size="16px" />
+                    <span class="tw-ml-2">Move</span>
+                </q-btn>
                 <q-btn
                   v-if="selectedAlerts.length > 0"
                   data-test="alert-list-export-alerts-btn"
-                  class="flex items-center export-btn no-border"
-                  color="secondary"
-                  icon="download"
-                  :label="'Export'"
+                  class="flex items-center no-border o2-secondary-button tw-h-[28px]"
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  no-caps
+                  dense
                   @click="multipleExportAlert"
-                />
+                >
+                  <q-icon name="download" size="16px" />
+                  <span class="tw-ml-2">Export</span>
+              </q-btn>
                 <QTablePagination
                   :scope="scope"
                   :position="'bottom'"
