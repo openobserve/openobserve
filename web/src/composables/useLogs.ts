@@ -7187,9 +7187,6 @@ const useLogs = () => {
     getVisualizationConfig,
     encodeVisualizationConfig,
     decodeVisualizationConfig,
-    processHttpHistogramResults,
-    streamSchemaFieldsIndexMapping
-
   };
 };
 
