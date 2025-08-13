@@ -144,15 +144,10 @@ pub async fn merge_parquet_files(
     let sort_by_timestamp_desc = true;
     // force use DATAFUSION_MIN_PARTITION for each merge task
     let target_partitions = DATAFUSION_MIN_PARTITION;
-    let ctx = prepare_datafusion_context(
-        "",
-        None,
-        vec![],
-        vec![],
-        sort_by_timestamp_desc,
-        target_partitions,
-    )
-    .await?;
+    let ctx = DataFusionContextBuilder::new()
+        .sorted_by_time(sort_by_timestamp_desc)
+        .build(target_partitions)
+        .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
     ctx.register_table("tbl", union_table)?;
@@ -258,17 +253,10 @@ pub async fn merge_parquet_files_with_downsampling(
     log::debug!("merge_parquet_files_with_downsampling sql: {sql}");
 
     // create datafusion context
-    let sort_by_timestamp_desc = true;
-    let target_partitions = 2; // force use 2 cpu cores for one merge task
-    let ctx = prepare_datafusion_context(
-        "",
-        None,
-        vec![],
-        vec![],
-        sort_by_timestamp_desc,
-        target_partitions,
-    )
-    .await?;
+    let ctx = DataFusionContextBuilder::new()
+        .sorted_by_time(true)
+        .build(DATAFUSION_MIN_PARTITION)
+        .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
     ctx.register_table("tbl", union_table)?;
@@ -487,44 +475,88 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
     builder.build()
 }
 
-pub async fn prepare_datafusion_context(
-    _trace_id: &str,
-    _work_group: Option<String>,
+pub struct DataFusionContextBuilder<'a> {
+    trace_id: &'a str,
+    work_group: Option<String>,
     analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
     sorted_by_time: bool,
-    target_partitions: usize,
-) -> Result<SessionContext, DataFusionError> {
-    let cfg = get_config();
-    let (target_partitions, memory_size) =
-        (target_partitions, cfg.memory_cache.datafusion_max_size);
-    #[cfg(feature = "enterprise")]
-    let (target_partitions, memory_size) = get_cpu_and_mem_limit(
-        _trace_id,
-        _work_group.clone(),
-        target_partitions,
-        memory_size,
-    )
-    .await?;
+}
 
-    let session_config = create_session_config(sorted_by_time, target_partitions)?;
-    let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
-    let mut builder = SessionStateBuilder::new()
-        .with_config(session_config)
-        .with_runtime_env(runtime_env)
-        .with_default_features();
-    for rule in analyzer_rules {
-        builder = builder.with_analyzer_rule(rule);
+impl<'a> DataFusionContextBuilder<'a> {
+    pub fn new() -> Self {
+        Self {
+            trace_id: "",
+            work_group: None,
+            analyzer_rules: vec![],
+            optimizer_rules: vec![],
+            sorted_by_time: false,
+        }
     }
-    if !optimizer_rules.is_empty() {
-        builder = builder
-            .with_optimizer_rules(optimizer_rules)
-            .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()));
+
+    pub fn trace_id(mut self, trace_id: &'a str) -> Self {
+        self.trace_id = trace_id;
+        self
     }
-    if cfg.common.feature_join_match_one_enabled {
-        builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
+
+    pub fn work_group(mut self, work_group: Option<String>) -> Self {
+        self.work_group = work_group;
+        self
     }
-    Ok(SessionContext::new_with_state(builder.build()))
+
+    pub fn analyzer_rules(
+        mut self,
+        analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
+    ) -> Self {
+        self.analyzer_rules = analyzer_rules;
+        self
+    }
+
+    pub fn optimizer_rules(
+        mut self,
+        optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
+    ) -> Self {
+        self.optimizer_rules = optimizer_rules;
+        self
+    }
+
+    pub fn sorted_by_time(mut self, sorted_by_time: bool) -> Self {
+        self.sorted_by_time = sorted_by_time;
+        self
+    }
+
+    pub async fn build(self, target_partitions: usize) -> Result<SessionContext, DataFusionError> {
+        let cfg = get_config();
+        let (target_partitions, memory_size) =
+            (target_partitions, cfg.memory_cache.datafusion_max_size);
+        #[cfg(feature = "enterprise")]
+        let (target_partitions, memory_size) = get_cpu_and_mem_limit(
+            self.trace_id,
+            self.work_group.clone(),
+            target_partitions,
+            memory_size,
+        )
+        .await?;
+
+        let session_config = create_session_config(self.sorted_by_time, target_partitions)?;
+        let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
+        let mut builder = SessionStateBuilder::new()
+            .with_config(session_config)
+            .with_runtime_env(runtime_env)
+            .with_default_features();
+        for rule in self.analyzer_rules {
+            builder = builder.with_analyzer_rule(rule);
+        }
+        if !self.optimizer_rules.is_empty() {
+            builder = builder
+                .with_optimizer_rules(self.optimizer_rules)
+                .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()));
+        }
+        if cfg.common.feature_join_match_one_enabled {
+            builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
+        }
+        Ok(SessionContext::new_with_state(builder.build()))
+    }
 }
 
 pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
@@ -592,15 +624,12 @@ pub async fn register_table(
     let sorted_by_time =
         sort_key.len() == 1 && sort_key[0].0 == TIMESTAMP_COL_NAME && sort_key[0].1;
 
-    let ctx = prepare_datafusion_context(
-        &session.id,
-        session.work_group.clone(),
-        vec![],
-        vec![],
-        sorted_by_time,
-        session.target_partitions,
-    )
-    .await?;
+    let ctx = DataFusionContextBuilder::new()
+        .trace_id(&session.id)
+        .work_group(session.work_group.clone())
+        .sorted_by_time(sorted_by_time)
+        .build(session.target_partitions)
+        .await?;
 
     let table = create_parquet_table(
         session,
