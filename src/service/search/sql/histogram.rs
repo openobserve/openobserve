@@ -85,7 +85,6 @@ fn multi_stream_histogram_query(
     statements: &[Statement],
     stream_names: &[String],
 ) -> Result<String, Error> {
-    // TODO: Check if query consists of union all if not return error
     if statements.is_empty() || stream_names.is_empty() {
         return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
             "No statements or stream names provided".to_string(),
