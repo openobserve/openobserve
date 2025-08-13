@@ -163,6 +163,7 @@ impl Search for Searcher {
             &request,
             "".to_string(),
             false,
+            false,
         )
         .await;
 
@@ -233,6 +234,8 @@ impl Search for Searcher {
             &request,
             req.skip_max_query_range,
             true,
+            // `is_multi_stream_search`
+            false,
         )
         .await;
 

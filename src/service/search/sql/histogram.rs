@@ -16,7 +16,7 @@
 use config::utils::sql::is_eligible_for_histogram;
 use infra::errors::{Error, ErrorCodes};
 use sqlparser::{
-    ast::{SetExpr, Statement},
+    ast::{Expr, FunctionArg, FunctionArgExpr, SelectItem, SetExpr, Statement},
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
@@ -26,9 +26,11 @@ use sqlparser::{
 pub fn convert_to_histogram_query(
     original_query: &str,
     stream_names: &[String],
+    is_multi_stream_search: bool,
 ) -> Result<String, Error> {
     let (is_eligible, is_sub_query) =
-        is_eligible_for_histogram(original_query).map_err(|e| Error::Message(e.to_string()))?;
+        is_eligible_for_histogram(original_query, is_multi_stream_search)
+            .map_err(|e| Error::Message(e.to_string()))?;
     if !is_eligible {
         let error = Error::ErrorCode(ErrorCodes::SearchHistogramNotAvailable(
             "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.".to_string(),
@@ -40,6 +42,20 @@ pub fn convert_to_histogram_query(
     let statements = Parser::parse_sql(&PostgreSqlDialect {}, original_query)
         .map_err(|e| anyhow::anyhow!("Failed to parse SQL query: {}", e))?;
 
+    let histogram_query = if is_multi_stream_search {
+        multi_stream_histogram_query(&statements, stream_names, is_sub_query)?
+    } else {
+        single_stream_histogram_query(&statements, stream_names, is_sub_query)?
+    };
+
+    Ok(histogram_query)
+}
+
+fn single_stream_histogram_query(
+    statements: &[Statement],
+    stream_names: &[String],
+    is_sub_query: bool,
+) -> Result<String, Error> {
     let statement = statements
         .first()
         .ok_or_else(|| anyhow::anyhow!("No SQL statement found"))?;
@@ -49,7 +65,6 @@ pub fn convert_to_histogram_query(
     let stream_name = stream_names
         .first()
         .ok_or_else(|| anyhow::anyhow!("No stream name found"))?;
-
     // Build histogram query
     let mut histogram_query = format!(
         "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"{stream_name}\""
@@ -63,8 +78,22 @@ pub fn convert_to_histogram_query(
 
     // Add GROUP BY and ORDER BY
     histogram_query.push_str(" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC");
-
     Ok(histogram_query)
+}
+
+fn multi_stream_histogram_query(
+    statements: &[Statement],
+    stream_names: &[String],
+    is_sub_query: bool,
+) -> Result<String, Error> {
+    // Check if query consists of union all if not return error
+    // Input query: SELECT * FROM "default" UNION ALL SELECT * FROM "default_enrich"
+    if statements.is_empty() || stream_names.is_empty() {
+        return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+            "No statements or stream names provided".to_string(),
+        )));
+    }
+    todo!()
 }
 
 /// Extract WHERE clause from SQL statement

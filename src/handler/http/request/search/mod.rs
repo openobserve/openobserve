@@ -42,6 +42,7 @@ use crate::{
         utils::{
             functions,
             http::{
+                get_enable_align_histogram_from_request, get_is_multi_stream_search_from_request,
                 get_is_ui_histogram_from_request, get_or_create_trace_id,
                 get_search_event_context_from_request, get_search_type_from_request,
                 get_stream_type_from_request, get_use_cache_from_request, get_work_group,
@@ -156,6 +157,7 @@ async fn can_use_distinct_stream(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
+        ("is_multi_stream_search" = bool, Query, description = "Indicate is search is for multi stream"),
     ),
     request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
         "query": {
@@ -224,6 +226,7 @@ pub async fn search(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
+    let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
 
     // let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
@@ -254,6 +257,7 @@ pub async fn search(
         match crate::service::search::sql::histogram::convert_to_histogram_query(
             &req.query.sql,
             &stream_names,
+            is_multi_stream_search,
         ) {
             Ok(histogram_query) => {
                 req.query.sql = histogram_query;
@@ -378,6 +382,7 @@ pub async fn search(
         &req,
         range_error,
         false,
+        is_multi_stream_search,
     )
     .instrument(http_span)
     .await;
@@ -1161,6 +1166,8 @@ async fn values_v1(
             &req,
             "".to_string(),
             false,
+            // `is_multi_stream_search` false for values
+            false,
         )
         .instrument(http_span)
         .await;
@@ -1271,6 +1278,7 @@ async fn values_v1(
         ("Authorization"= [])
     ),
     params(
+        ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
@@ -1318,9 +1326,7 @@ pub async fn search_partition(
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let search_type = get_search_type_from_request(&query).map_or(SearchEventType::Other, |opt| {
-        opt.unwrap_or(SearchEventType::Other)
-    });
+    let enable_align_histogram = get_enable_align_histogram_from_request(&query);
 
     let mut req: config::meta::search::SearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,
@@ -1329,7 +1335,6 @@ pub async fn search_partition(
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.sql) {
         req.sql = sql;
     }
-    req.search_type = Some(search_type);
 
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
@@ -1343,6 +1348,7 @@ pub async fn search_partition(
         &req,
         false,
         true,
+        enable_align_histogram,
     )
     .instrument(http_span)
     .await;
