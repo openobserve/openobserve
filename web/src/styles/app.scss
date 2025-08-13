@@ -1,3 +1,6 @@
+@import 'variables';
+
+
 .q-w-sm {
   width: 360px;
 }
@@ -304,34 +307,50 @@
 //so to make this work just introduce a new div around the app-tabs component and add the class app-tabs-container to it
 //and then add the class tabs-selection-container-dark or tabs-selection-container-light to the app-tabs component
 .app-tabs-container{
-  border: 1px solid #cacaca;
-  padding: 4px;
-  border-radius: 2px;
+  padding: 0px;
+}
+
+.app-tabs-container-dark{
+  outline: 1px solid #5A4AA9;
+  border-radius: 4px;
+  background-color: #2B2D30 !important;
+
+}
+.app-tabs-container-light{
+  outline: 1px solid #D0AEFF;
+  border-radius: 4px;
+  background-color: #F7F8FA;
+
 }
 
 .tabs-selection-container-dark{
   border: none !important;
   border-radius: none !important;
   .rum-tab{
-    border-radius: 4px !important;
-    height: 30px !important;
-    margin: 0 2px !important;
-    padding: 4px 12px !important;
+    height: 100% !important;
+    margin: 0px !important;
     border-bottom: none !important;
     width: auto !important;
     white-space: normal !important;
+    background-color: #2B2D30 !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    line-height: 16px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .active{
-    background-color: $primary !important;
-    color: white !important;
-    border: 1px solid #cacaca !important;
-    border-bottom: 1px solid #cacaca !important;
+    background-color: #2B2D30 !important;
+    color: #DFE1E5 !important;
+    border: 2px solid #826AF9 !important;    border-radius: 4px !important;
+
   }
   .rum-tab:hover{
     background-color: #373A3B !important;
   }
   .rum-tab.active:hover{
-    background-color: $primary !important;
+    background-color: #2B2D30 !important;
   }
 }
 
@@ -339,24 +358,30 @@
   border: none !important;
   border-radius: none !important;
   .rum-tab{
-    border-radius: 4px !important;
-    height: 30px !important;
-    margin: 0 2px !important;
-    padding: 4px 12px !important;
+    height: 100% !important;
+    margin: 0px !important;
     border-bottom: none !important;
     width: auto !important;
     white-space: normal !important;
+    background-color: #F7F8FA;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    line-height: 16px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .rum-tab.active{
-    background-color: $primary !important;
-    color: white !important;
-    border: 1px solid #cacaca !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #9E86FF !important;
+    border-radius: 4px !important;
   }
   .rum-tab:hover{
     background-color: #f0f0f0 !important;
   }
   .rum-tab.active:hover{
-    background-color: $primary !important;
+    background-color: #ffffff !important;
   }
 }
 
@@ -448,3 +473,132 @@
 }
 
 
+//here we have implemented the search input in the whole app that will be used at the top of the table
+//we have added the class o2-search-input-light or o2-search-input-dark to the search input
+//any non theme related styling should be done here inside the o2-search-input class
+
+.o2-search-input{
+  height: 36px !important;
+  .q-field__control{
+  height: 36px !important;
+  border-radius: 4px !important;
+  display: flex;
+  align-items: end;
+  font-size: 13px;
+  padding: 0px 6px !important;
+  font-weight: 500 !important;
+  color: transparent !important;
+}
+  .q-field__prepend{
+    height: 36px !important;
+    padding-bottom: 4px !important;
+  }
+  .q-field--highlighted{
+    .q-field__control{
+      background-color: red !important;
+    }
+  }
+}
+
+.o2-search-input-light{
+  .q-field__control{
+    background-color: #ffffff !important;
+    outline: 1px solid #C9CCD6 !important;
+
+  }
+  .q-field__native{
+    color: #818594 !important;
+
+  }
+}
+.o2-search-input-dark{
+  .q-field__control{
+    background-color: #2B2D30 !important;
+    border: 1px solid #4E5157 !important;
+  }
+  .q-field__native{
+    color: #6F737A !important;
+  }
+}
+//this is done because we need to select the search input when it is focused
+.o2-search-input-light.q-field--focused .q-field__control {
+  outline: 2px solid #7B61FF !important;
+  box-shadow: none !important;
+  background-color: #FFFFFF !important;
+  border-radius: 4px !important;
+}
+
+.o2-search-input-dark.q-field--focused .q-field__control {
+  outline: 2px solid #7B61FF !important;
+  box-shadow: none !important;
+  background-color: #2B2D30 !important;
+  border-radius: 4px !important;
+}
+
+//this is for search input icon
+//we have added the class o2-search-input-icon-light or o2-search-input-icon-dark to the search input icon
+//any non theme related styling should be done here inside the o2-search-input-icon class
+
+.o2-search-input-icon{
+  height: 16px !important;
+  width: 16px !important;
+  margin-right: 10px;
+}
+.o2-search-input-icon-light{
+  color: #818594;
+}
+.o2-search-input-icon-dark{
+  color: #6F737A;
+}
+
+//this is for o2 secondary button
+//in a page we can have multiple secondary buttons so we need to add the class o2-secondary-button-light or o2-secondary-button-dark to the button
+//any non theme related styling should be done here inside the o2-secondary-button class
+
+.o2-secondary-button{
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  border-radius: 4px !important;
+  min-width: 72px !important;
+}
+
+.o2-secondary-button-light{
+  color: #19191E !important;
+
+  border: 1px solid #D3D5DB !important;
+}
+.o2-secondary-button-dark{
+  color: #DFE1E5 !important;
+  border: 1px solid #6F737A !important;
+}
+
+
+
+.o2-primary-button{
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  border-radius: 4px !important;
+  min-width: 72px !important;
+}
+
+.o2-primary-button-light{
+  background-color: #575FC5 !important;
+  color: #ffffff !important;
+  border: 1px solid #575FC5 !important;
+  &:hover{
+    background-color: #6B76E3 !important;
+    border: 1px solid #6B76E3 !important;
+  }
+}
+//TODO o2: after getting the dark theme work on it
+.o2-primary-button-dark{
+  background-color: #575FC5 !important;
+  color: #ffffff !important;
+  border: 1px solid #575FC5 !important;
+  &:hover{
+    background-color: #6B76E3 !important;
+    border: 1px solid #6B76E3 !important;
+  }
+}

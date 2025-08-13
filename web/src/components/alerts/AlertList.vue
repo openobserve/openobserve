@@ -25,13 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
-      class="flex justify-between full-width tw-py-3 tw-px-4 items-center"
+      class="flex justify-between full-width tw-py-3 tw-px-4 items-center tw-border-b-[1px]"
+      :class="store.state.theme === 'dark' ? 'tw-border-gray-500' : 'tw-border-gray-200'"
     >
-      <div class="q-table__title" data-test="alerts-list-title">
+      <div class="q-table__title tw-font-[600]" data-test="alerts-list-title" >
         {{ t("alerts.header") }}
       </div>
       <div class="flex q-ml-auto tw-ps-2 items-center">
-        <div class="app-tabs-container q-mr-md">
+        <div class="app-tabs-container tw-h-[36px] q-mr-md" :class="store.state.theme === 'dark' ? 'app-tabs-container-dark' : 'app-tabs-container-light'">
           <app-tabs
           class="tabs-selection-container"
           :class="store.state.theme === 'dark' ? 'tabs-selection-container-dark' : 'tabs-selection-container-light'"
@@ -43,7 +44,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="dynamicQueryModel"
           dense
-          filled
           borderless
           :placeholder="
             searchAcrossFolders
@@ -53,9 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-list-search-input"
           :clearable="searchAcrossFolders"
           @clear="clearSearchHistory"
+
+          class="o2-search-input"
+          :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
         >
           <template #prepend>
-            <q-icon name="search" />
+            <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
           </template>
         </q-input>
         <div>
@@ -63,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-list-search-across-folders-toggle"
             v-model="searchAcrossFolders"
             label="All Folders"
-            class="tw-mr-3"
+            class="tw-mr-3 tw-h-[36px]"
           >
           </q-toggle>
           <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
@@ -76,26 +79,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <q-btn
-        class="q-ml-md text-bold"
-        padding="sm lg"
-        outline
+        class="q-ml-md o2-secondary-button tw-h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         no-caps
+        flat
         :label="t(`dashboard.import`)"
         @click="importAlert"
         data-test="alert-import"
+
       />
       <q-btn
         data-test="alert-list-add-alert-btn"
-        class="q-ml-md text-bold no-border"
-        padding="sm lg"
-        color="secondary"
+        class="q-ml-md o2-primary-button tw-h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         no-caps
+        flat
         :disable="!destinations.length"
         :title="!destinations.length ? t('alerts.noDestinations') : ''"
         :label="t(`alerts.add`)"
         @click="showAddUpdateFn({})"
       />
     </div>
+    
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       class="full-width alert-list-table"
