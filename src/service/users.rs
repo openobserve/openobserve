@@ -579,13 +579,13 @@ pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyh
         // Update OFGA
         #[cfg(feature = "enterprise")]
         {
-            use o2_openfga::authorizer::authz::{get_user_role_tuple, update_tuples};
+            use o2_openfga::authorizer::authz::{get_add_user_to_org_tuples, update_tuples};
             if get_openfga_config().enabled {
                 let mut tuples = vec![];
-                get_user_role_tuple(
-                    &UserRole::Admin.to_string(),
-                    user_email,
+                get_add_user_to_org_tuples(
                     org_id,
+                    user_email,
+                    &UserRole::Admin.to_string(),
                     &mut tuples,
                 );
                 match update_tuples(tuples, vec![]).await {

@@ -21,6 +21,7 @@ use {
     },
     config::meta::user::{UserOrg, UserRole},
     o2_dex::config::get_config as get_dex_config,
+    o2_openfga::authorizer::authz::get_add_user_to_org_tuples,
     o2_openfga::authorizer::roles::{
         check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_removal_tuples,
     },
@@ -31,9 +32,7 @@ use {
     crate::{common::meta::user::TokenValidationResponse, service::db},
     config::meta::user::DBUser,
     jsonwebtoken::TokenData,
-    o2_openfga::authorizer::authz::{
-        get_add_user_to_org_tuples, get_new_user_creation_tuple, get_user_org_tuple, update_tuples,
-    },
+    o2_openfga::authorizer::authz::{get_new_user_creation_tuple, update_tuples},
     o2_openfga::config::get_config as get_openfga_config,
     once_cell::sync::Lazy,
     regex::Regex,
@@ -78,9 +77,7 @@ pub async fn process_token(
     #[cfg(not(feature = "cloud"))]
     {
         use config::get_config;
-        use o2_openfga::authorizer::authz::{
-            get_add_user_to_org_tuples, get_user_role_deletion_tuple,
-        };
+        use o2_openfga::authorizer::authz::get_user_role_deletion_tuple;
 
         use crate::common::meta::user::UserOrgRole;
 
@@ -321,11 +318,7 @@ pub async fn process_token(
 
                     if index == 0 {
                         // this is to allow user call organization api with org
-                        tuples.push(get_user_org_tuple(
-                            &user_email,
-                            &user_email,
-                            Some(&org.role.to_string()),
-                        ));
+                        get_new_user_creation_tuple(&user_email, &mut tuples);
                     }
 
                     tuples_to_add.insert(org.name.to_owned(), tuples);
@@ -433,18 +426,15 @@ async fn map_group_to_custom_role(
 
         if openfga_cfg.enabled {
             let _ = organization::check_and_create_org(&dex_cfg.default_org).await;
-            tuples.push(get_user_org_tuple(
+            get_add_user_to_org_tuples(
                 &dex_cfg.default_org,
                 user_email,
-                Some(&role.to_string()),
-            ));
+                &role.to_string(),
+                &mut tuples,
+            );
             // this check added to avoid service accounts from logging in
             if !role.eq(&UserRole::ServiceAccount) {
-                tuples.push(get_user_org_tuple(
-                    user_email,
-                    user_email,
-                    Some(&role.to_string()),
-                ));
+                get_new_user_creation_tuple(user_email, &mut tuples);
             }
             let start = std::time::Instant::now();
             check_and_get_crole_tuple_for_new_user(
@@ -597,7 +587,8 @@ pub async fn check_and_add_to_org(user_email: &str, name: &str) -> bool {
         .await
         {
             Ok(_) => {
-                let tuples = vec![get_user_org_tuple(user_email, user_email, None)];
+                let mut tuples = vec![];
+                get_new_user_creation_tuple(user_email, &mut tuples);
                 tuples_to_add.insert(user_email.to_string(), tuples);
                 log::info!("User added to the database");
             }
