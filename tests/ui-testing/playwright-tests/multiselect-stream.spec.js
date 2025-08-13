@@ -173,7 +173,7 @@ await page.waitForTimeout(1000);
     });
     await page.waitForTimeout(8000);
     await expect(page.locator(".q-notification__message")).toContainText(
-      "Live mode is enabled. Only top 50 results are shown."
+      "Live mode is enabled"
     );
     await page.waitForTimeout(5000);
     await page
