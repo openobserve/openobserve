@@ -3144,6 +3144,8 @@ mod tests {
                 meta_ddl_dsn: String::default(),
                 feature_query_not_filter_with_index: bool::default(),
                 default_hec_stream: String::default(),
+                usage_reporting_errors_enabled: bool::default(),
+                inverted_index_result_cache_enabled: bool::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),
@@ -3258,6 +3260,8 @@ mod tests {
                 file_download_enable_priority_queue: bool::default(),
                 calculate_stats_step_limit: i64::default(),
                 histogram_enabled: bool::default(),
+                inverted_index_result_cache_max_entries: usize::default(),
+                inverted_index_result_cache_max_entry_size: usize::default(),
             },
             compact: config::Compact {
                 enabled: bool::default(),
