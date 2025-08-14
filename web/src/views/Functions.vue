@@ -91,8 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="tw-overflow-auto q-mx-sm"
-          style="height: calc(100vh - 57px)"
+          style="height: calc(100vh - 42px)"
         >
           <!-- :templates="templates"
             :functionAssociatedStreams="functionAssociatedStreams"
