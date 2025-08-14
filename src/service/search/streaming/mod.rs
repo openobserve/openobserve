@@ -74,6 +74,7 @@ pub async fn process_search_stream_request(
     values_ctx: Option<ValuesEventContext>,
     fallback_order_by_col: Option<String>,
     _audit_ctx: Option<AuditContext>,
+    is_multi_stream_search: bool,
 ) {
     log::debug!(
         "[HTTP2_STREAM trace_id {trace_id}] Received HTTP/2 stream request for org_id: {org_id}",
@@ -245,6 +246,7 @@ pub async fn process_search_stream_request(
                 started_at,
                 is_result_array_skip_vrl,
                 backup_query_fn,
+                is_multi_stream_search,
             )
             .instrument(search_span.clone())
             .await
@@ -323,6 +325,7 @@ pub async fn process_search_stream_request(
                 is_result_array_skip_vrl,
                 backup_query_fn,
                 &all_streams,
+                is_multi_stream_search,
             )
             .instrument(search_span.clone())
             .await
@@ -451,6 +454,7 @@ pub async fn process_search_stream_request(
             is_result_array_skip_vrl,
             backup_query_fn,
             &all_streams,
+            is_multi_stream_search,
         )
         .instrument(search_span.clone())
         .await

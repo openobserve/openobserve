@@ -1587,6 +1587,7 @@ export default defineComponent({
           query: queryReq,
           page_type: searchObj.data.stream.streamType,
           traceparent: generateTraceContext().traceId,
+          enable_align_histogram: true,
         });
 
         return res;
@@ -1675,6 +1676,8 @@ export default defineComponent({
       traceIdMapper,
       checkSelectedFields,
       resetSelectedFileds,
+      handleSearchResponse,
+      handleSearchReset
     };
   },
 });

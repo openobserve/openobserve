@@ -1,7 +1,8 @@
 import { test, expect } from "../baseFixtures";
+import PageManager from "../../pages/page-manager.js";
 import logData from "../../cypress/fixtures/log.json";
 import matchAllLogsData from "../../../test-data/match_all.json";
-import PageManager from '../../pages/page-manager.js';
+// (duplicate import removed)
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
@@ -171,5 +172,9 @@ test.describe("Match All Logs Queries testcases", () => {
     await pageManager.logsPage.waitForTimeout(2000);
     await pageManager.logsPage.clickSearchBarRefreshButton();
     await pageManager.logsPage.expectLogTableColumnSourceVisible();
+  });
+
+  test.afterEach(async ({ page }) => {
+    await pageManager.commonActions.flipStreaming();
   });
 }); 

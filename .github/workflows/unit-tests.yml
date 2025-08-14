@@ -6,11 +6,15 @@ on:
       - "main"
     paths-ignore:
       - "**.md"
+      - "**.yml"
+      - "**.yaml"
   pull_request:
     branches:
       - "*"
     paths-ignore:
       - "**.md"
+      - "**.yml"
+      - "**.yaml"
 
 env:
   COLUMNS: 150
@@ -40,7 +44,7 @@ jobs:
 
     steps:
       - name: Clone the current repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check if API code has changes and skip if none
         run: |
@@ -113,3 +117,32 @@ jobs:
 
           # finally print the coverage data
           ./coverage.sh check
+
+  ui_unit_tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Check if frontend code has changes and skip if none
+        run: |
+          if [[ -n "${{ github.event.before }}" ]] && ! git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q "^web/"; then
+            echo "Frontend code hasn't changed, skipping frontend tests"
+            exit 0
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Run frontend unit tests with coverage and check thresholds
+        working-directory: web
+        run: ./coverage.sh check

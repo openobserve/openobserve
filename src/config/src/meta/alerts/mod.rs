@@ -773,20 +773,19 @@ mod test {
         ];
 
         for (json, expected) in test_cases {
-            println!("Testing: {}", json);
+            println!("Testing: {json}");
             let deserialized: ConditionList = serde_json::from_str(json).unwrap_or_else(|e| {
-                panic!("Failed to deserialize '{}': {}", json, e);
+                panic!("Failed to deserialize '{json}': {e}");
             });
 
             // Use pattern matching to verify enum variant
             assert!(
                 matches!(deserialized, ConditionList::LegacyConditions(_)),
-                "Expected LegacyConditions variant for '{}'",
-                json
+                "Expected LegacyConditions variant for '{json}'"
             );
 
             // Then verify equality with the expected value
-            assert_eq!(deserialized, expected, "Value mismatch for '{}'", json);
+            assert_eq!(deserialized, expected, "Value mismatch for '{json}'");
         }
 
         // Test the full backcompat case

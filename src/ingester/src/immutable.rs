@@ -39,7 +39,6 @@ pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Arc<Immutable>>> =
 static PROCESSING_TABLES: Lazy<RwLock<HashSet<PathBuf>>> =
     Lazy::new(|| RwLock::new(HashSet::new()));
 
-#[warn(dead_code)]
 pub(crate) struct Immutable {
     idx: usize,
     key: WriterKey,
@@ -162,12 +161,13 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
         }
     };
     log::info!(
-        "[INGESTER:MEM:{idx}] finish persist file: {}, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}, took: {} ms",
+        "[INGESTER:MEM:{idx}] finish persist file: {}, json_size: {}, arrow_size: {}, file_num: {} batch_num: {}, records: {}, took: {} ms",
         path.to_string_lossy(),
         stat.json_size,
         stat.arrow_size,
         stat.file_num,
         stat.batch_num,
+        stat.records,
         start.elapsed().as_millis(),
     );
 

@@ -95,6 +95,7 @@ fn apply_sort_strategy(search_res: &mut Response, strategy: SortStrategy) {
             sort_by_column(search_res, &col, is_string, is_descending);
             if search_res.order_by.is_none() {
                 search_res.order_by = Some(order);
+                search_res.order_by_metadata.push((col, order));
             }
         }
         SortStrategy::AutoDetermine(col, is_string) => {
@@ -191,7 +192,7 @@ fn determine_sort_column(first_hit: &Value) -> Option<(String, bool)> {
         // First try to find non-numeric columns
         for (key, value) in obj {
             if !value.is_number() {
-                log::debug!("Using string column for sorting: {}", key);
+                log::debug!("Using string column for sorting: {key}");
                 return Some((key.clone(), true)); // (column, is_string)
             }
         }
@@ -199,7 +200,7 @@ fn determine_sort_column(first_hit: &Value) -> Option<(String, bool)> {
         // If no non-numeric column found, take first numeric column
         for (key, value) in obj {
             if value.is_number() {
-                log::debug!("Using numeric column for sorting: {}", key);
+                log::debug!("Using numeric column for sorting: {key}");
                 return Some((key.clone(), false)); // (column, is_string)
             }
         }

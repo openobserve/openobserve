@@ -723,13 +723,25 @@ impl SchemaCache {
             .get(field_name)
             .and_then(|i| self.schema.fields().get(*i))
     }
+
+    pub fn size(&self) -> usize {
+        let mut size = std::mem::size_of::<SchemaRef>() + self.schema.size();
+        size += std::mem::size_of::<HashMap<String, usize>>();
+        for (key, _val) in self.fields_map.iter() {
+            size += std::mem::size_of::<String>() + key.len();
+            size += std::mem::size_of::<usize>();
+        }
+        size += std::mem::size_of::<String>() + self.hash_key.len();
+        size
+    }
 }
 
 pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
     let allowed_type = match from {
-        DataType::Boolean => vec![DataType::Utf8],
+        DataType::Boolean => vec![DataType::Utf8, DataType::LargeUtf8],
         DataType::Int8 => vec![
             DataType::Utf8,
+            DataType::LargeUtf8,
             DataType::Int16,
             DataType::Int32,
             DataType::Int64,
@@ -739,6 +751,7 @@ pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
         ],
         DataType::Int16 => vec![
             DataType::Utf8,
+            DataType::LargeUtf8,
             DataType::Int32,
             DataType::Int64,
             DataType::Float16,
@@ -747,25 +760,44 @@ pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
         ],
         DataType::Int32 => vec![
             DataType::Utf8,
+            DataType::LargeUtf8,
             DataType::Int64,
             DataType::UInt32,
             DataType::UInt64,
             DataType::Float32,
             DataType::Float64,
         ],
-        DataType::Int64 => vec![DataType::Utf8, DataType::UInt64, DataType::Float64],
+        DataType::Int64 => vec![
+            DataType::Utf8,
+            DataType::LargeUtf8,
+            DataType::UInt64,
+            DataType::Float64,
+        ],
         DataType::UInt8 => vec![
             DataType::Utf8,
+            DataType::LargeUtf8,
             DataType::UInt16,
             DataType::UInt32,
             DataType::UInt64,
         ],
-        DataType::UInt16 => vec![DataType::Utf8, DataType::UInt32, DataType::UInt64],
-        DataType::UInt32 => vec![DataType::Utf8, DataType::UInt64],
-        DataType::UInt64 => vec![DataType::Utf8],
-        DataType::Float16 => vec![DataType::Utf8, DataType::Float32, DataType::Float64],
-        DataType::Float32 => vec![DataType::Utf8, DataType::Float64],
-        DataType::Float64 => vec![DataType::Utf8],
+        DataType::UInt16 => vec![
+            DataType::Utf8,
+            DataType::LargeUtf8,
+            DataType::UInt32,
+            DataType::UInt64,
+        ],
+        DataType::UInt32 => vec![DataType::Utf8, DataType::LargeUtf8, DataType::UInt64],
+        DataType::UInt64 => vec![DataType::Utf8, DataType::LargeUtf8],
+        DataType::Float16 => vec![
+            DataType::Utf8,
+            DataType::LargeUtf8,
+            DataType::Float32,
+            DataType::Float64,
+        ],
+        DataType::Float32 => vec![DataType::Utf8, DataType::LargeUtf8, DataType::Float64],
+        DataType::Float64 => vec![DataType::Utf8, DataType::LargeUtf8],
+        DataType::Utf8 => vec![DataType::LargeUtf8],
+        DataType::LargeUtf8 => vec![DataType::LargeUtf8],
         _ => vec![DataType::Utf8],
     };
     allowed_type.contains(to)

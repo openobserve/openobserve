@@ -155,34 +155,56 @@ where
     }
 
     pub fn _read_entry(&mut self) -> Result<(Option<Vec<u8>>, u64)> {
+        let total_start = std::time::Instant::now();
+
+        // Time checksum reading
+        let checksum_start = std::time::Instant::now();
         let expected_checksum = match self.f.read_u32::<BigEndian>() {
             Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => return Ok((None, 0)),
             other => other.context(UnableToReadChecksumSnafu)?,
         };
+        let checksum_read_duration = checksum_start.elapsed();
+
         if expected_checksum == 0 {
             return Ok((None, 0));
         }
 
+        // Time length reading
+        let length_start = std::time::Instant::now();
         let expected_len = self
             .f
             .read_u32::<BigEndian>()
             .context(UnableToReadLengthSnafu)?
             .into();
+        let length_read_duration = length_start.elapsed();
+
         if expected_len == 0 {
             return Ok((Some(vec![]), 0));
         }
 
+        // Time compressed data reading with CRC
+        let data_read_start = std::time::Instant::now();
         let compressed_read = self.f.by_ref().take(expected_len);
         let hashing_read = CrcReader::new(compressed_read);
+        let data_read_setup_duration = data_read_start.elapsed();
+
+        // Time decompression
+        let decompress_start = std::time::Instant::now();
         let mut decompressing_read = snap::read::FrameDecoder::new(hashing_read);
 
         let mut data = Vec::with_capacity(1024);
         decompressing_read
             .read_to_end(&mut data)
             .context(UnableToReadDataSnafu)?;
+        let decompress_duration = decompress_start.elapsed();
 
+        // Time CRC extraction and verification
+        let crc_verify_start = std::time::Instant::now();
         let (actual_compressed_len, actual_checksum) = decompressing_read.into_inner().checksum();
+        let crc_verify_duration = crc_verify_start.elapsed();
 
+        // Time validation checks
+        let validation_start = std::time::Instant::now();
         if expected_len != actual_compressed_len {
             return Err(Error::LengthMismatch {
                 expected: expected_len,
@@ -195,6 +217,34 @@ where
                 expected: expected_checksum,
                 actual: actual_checksum,
             });
+        }
+        let validation_duration = validation_start.elapsed();
+
+        let total_duration = total_start.elapsed();
+
+        // Log timing breakdown if slow
+        if total_duration.as_millis() > 100 {
+            log::warn!(
+                "[WAL Reader] SLOW _read_entry: {}ms total (checksum_read: {}μs, length_read: {}μs, data_setup: {}μs, decompress: {}ms, crc_verify: {}μs, validation: {}μs) - data_len: {}, compressed_len: {}",
+                total_duration.as_millis(),
+                checksum_read_duration.as_micros(),
+                length_read_duration.as_micros(),
+                data_read_setup_duration.as_micros(),
+                decompress_duration.as_millis(),
+                crc_verify_duration.as_micros(),
+                validation_duration.as_micros(),
+                data.len(),
+                expected_len
+            );
+        } else if total_duration.as_millis() > 10 {
+            log::info!(
+                "[WAL Reader] _read_entry: {}ms (decompress: {}ms, crc_verify: {}μs) - data_len: {}, compressed_len: {}",
+                total_duration.as_millis(),
+                decompress_duration.as_millis(),
+                crc_verify_duration.as_micros(),
+                data.len(),
+                expected_len
+            );
         }
 
         Ok((Some(data), actual_compressed_len))

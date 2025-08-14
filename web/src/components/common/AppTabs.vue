@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="show" class="flex items-center rum-tabs">
     <div
-      v-for="tab in tabs as Tab[]"
       :key="tab.value + tab.disabled"
+      v-for="tab in tabs as Tab[]"
       class="cursor-pointer"
     >
       <div

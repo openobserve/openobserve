@@ -33,7 +33,7 @@ use lettre::{
 use once_cell::sync::Lazy;
 
 use crate::{
-    meta::cluster,
+    meta::{cluster, stream::QueryPartitionStrategy},
     utils::{file::get_file_meta, sysinfo},
 };
 
@@ -46,7 +46,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 6;
+pub const DB_SCHEMA_VERSION: u64 = 7;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -91,8 +91,9 @@ pub const MESSAGE_COL_NAME: &str = "message";
 pub const STREAM_NAME_LABEL: &str = "o2_stream_name";
 pub const DEFAULT_STREAM_NAME: &str = "default";
 
-const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
-    ["log", "message", "msg", "content", "data", "body", "json"];
+const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 9] = [
+    "log", "message", "msg", "content", "data", "body", "json", "error", "errors",
+];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
         _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS
@@ -659,12 +660,34 @@ pub struct TCP {
     pub tcp_tls_ca_cert_path: String,
 }
 
+#[derive(PartialEq, Default)]
+pub enum RouteDispatchStrategy {
+    #[default]
+    Workload,
+    Random,
+    Other,
+}
+
+impl std::str::FromStr for RouteDispatchStrategy {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "random" => Ok(RouteDispatchStrategy::Random),
+            "workload" => Ok(RouteDispatchStrategy::default()),
+            _ => Ok(RouteDispatchStrategy::Other),
+        }
+    }
+}
+
 #[derive(EnvConfig, Default)]
 pub struct Route {
     #[env_config(name = "ZO_ROUTE_TIMEOUT", default = 600)]
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
+    #[env_config(name = "ZO_ROUTE_STRATEGY", parse, default = "workload")]
+    pub dispatch_strategy: RouteDispatchStrategy,
 }
 
 #[derive(EnvConfig, Default)]
@@ -751,8 +774,12 @@ pub struct Common {
     pub feature_filelist_dedup_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
     pub feature_query_queue_enabled: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_PARTITION_STRATEGY", default = "file_num")]
-    pub feature_query_partition_strategy: String,
+    #[env_config(
+        name = "ZO_FEATURE_QUERY_PARTITION_STRATEGY",
+        parse,
+        default = "file_num"
+    )]
+    pub feature_query_partition_strategy: QueryPartitionStrategy,
     #[env_config(name = "ZO_FEATURE_QUERY_INFER_SCHEMA", default = false)]
     pub feature_query_infer_schema: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
@@ -874,6 +901,8 @@ pub struct Common {
     pub usage_reporting_url: String,
     #[env_config(name = "ZO_USAGE_REPORTING_CREDS", default = "")]
     pub usage_reporting_creds: String,
+    #[env_config(name = "ZO_USAGE_REPORTING_ERRORS_ENABLED", default = true)]
+    pub usage_reporting_errors_enabled: bool,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
     #[env_config(
@@ -930,11 +959,11 @@ pub struct Common {
     )]
     pub inverted_index_enabled: bool,
     #[env_config(
-        name = "ZO_INVERTED_INDEX_CACHE_ENABLED",
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
         default = false,
-        help = "Toggle inverted index cache."
+        help = "Toggle tantivy result cache."
     )]
-    pub inverted_index_cache_enabled: bool,
+    pub inverted_index_result_cache_enabled: bool,
     #[env_config(
         name = "ZO_INVERTED_INDEX_OLD_FORMAT",
         default = false,
@@ -1415,6 +1444,18 @@ pub struct Limit {
     )]
     pub inverted_index_cache_max_entries: usize,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
+        default = 10000,
+        help = "Maximum number of entries in the inverted index result cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub inverted_index_result_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRY_SIZE",
+        default = 20480, // bytes, default is 20KB
+        help = "Maximum size of a single entry in the inverted index result cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub inverted_index_result_cache_max_entry_size: usize,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
         default = 35,
         help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
@@ -1858,7 +1899,7 @@ pub struct Pipeline {
     pub max_connections: usize,
     #[env_config(
         name = "ZO_PIPELINE_BATCH_ENABLED",
-        default = true,
+        default = false,
         help = "Enable batching of entries before sending HTTP requests"
     )]
     pub batch_enabled: bool,
@@ -1922,6 +1963,18 @@ pub struct Pipeline {
         help = "pipeline exporter client max retry time in hours"
     )]
     pub max_retry_time_in_hours: u64,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_FILE_SIZE_ON_DISK_MB",
+        default = 128,
+        help = "pipeline max file size on disk in MB"
+    )]
+    pub pipeline_max_file_size_on_disk_mb: usize,
+    #[env_config(
+        name = "ZO_PIPELINE_MAX_FILE_RETENTION_TIME_SECONDS",
+        default = 600,
+        help = "pipeline max file retention time in seconds"
+    )]
+    pub pipeline_max_file_retention_time_seconds: u64,
 }
 
 #[derive(EnvConfig, Default)]
@@ -1987,6 +2040,11 @@ pub fn init() -> Config {
     // check limit config
     if let Err(e) = check_limit_config(&mut cfg) {
         panic!("limit config error: {e}");
+    }
+
+    // check route config
+    if let Err(e) = check_route_config(&cfg) {
+        panic!("route config error: {e}");
     }
 
     // check common config
@@ -2176,6 +2234,15 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.calculate_stats_step_limit = 1000000;
     }
 
+    Ok(())
+}
+
+fn check_route_config(cfg: &Config) -> Result<(), anyhow::Error> {
+    if cfg.route.dispatch_strategy == RouteDispatchStrategy::Other {
+        return Err(anyhow::anyhow!(
+            "You must set ZO_ROUTE_STRATEGY to one of: workload (default) or random."
+        ));
+    }
     Ok(())
 }
 
@@ -2944,5 +3011,15 @@ mod tests {
         assert_eq!(cfg.common.data_stream_dir, "/abc/".to_string());
         assert_eq!(cfg.common.data_dir, "/abc/".to_string());
         assert_eq!(cfg.common.base_uri, "/abc".to_string());
+
+        // Test route dispatch strategies
+        cfg.route.dispatch_strategy = RouteDispatchStrategy::Workload;
+        assert!(check_route_config(&cfg).is_ok());
+
+        cfg.route.dispatch_strategy = RouteDispatchStrategy::Random;
+        assert!(check_route_config(&cfg).is_ok());
+
+        cfg.route.dispatch_strategy = RouteDispatchStrategy::Other;
+        assert!(check_route_config(&cfg).is_err());
     }
 }

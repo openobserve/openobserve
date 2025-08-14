@@ -36,6 +36,11 @@ use futures::future::try_join_all;
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
 use once_cell::sync::Lazy;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
+#[cfg(feature = "enterprise")]
+use tokio::{
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 
 use crate::{
     common::infra::config::QUERY_FUNCTIONS,
@@ -44,6 +49,53 @@ use crate::{
         self_reporting::publish_error,
     },
 };
+
+// Global batch buffer for accumulating remote stream records
+#[cfg(feature = "enterprise")]
+#[derive(Debug)]
+struct BatchBuffer {
+    records: Vec<json::Value>,
+    total_bytes: usize,
+    last_write: Instant,
+}
+
+#[cfg(feature = "enterprise")]
+impl BatchBuffer {
+    fn new() -> Self {
+        Self {
+            records: Vec::new(),
+            total_bytes: 0,
+            last_write: Instant::now(),
+        }
+    }
+
+    fn add_records(&mut self, new_records: Vec<json::Value>) {
+        for record in new_records {
+            self.total_bytes += record.to_string().len();
+            self.records.push(record);
+        }
+    }
+
+    fn should_flush(&self) -> bool {
+        const MAX_BATCH_SIZE: usize = 50; // Flush after 50 records
+        const MAX_BATCH_BYTES: usize = 32 * 1024; // Or 32KB
+        const MAX_BATCH_TIME_MS: u64 = 5000; // Or 5 seconds
+
+        self.records.len() >= MAX_BATCH_SIZE
+            || self.total_bytes >= MAX_BATCH_BYTES
+            || self.last_write.elapsed() >= Duration::from_millis(MAX_BATCH_TIME_MS)
+    }
+
+    fn take_records(&mut self) -> Vec<json::Value> {
+        self.last_write = Instant::now();
+        self.total_bytes = 0;
+        std::mem::take(&mut self.records)
+    }
+}
+
+#[cfg(feature = "enterprise")]
+static BATCH_BUFFERS: Lazy<Mutex<HashMap<String, BatchBuffer>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 static DYNAMIC_STREAM_NAME_PATTERN: Lazy<regex::Regex> =
     Lazy::new(|| regex::Regex::new(r"\{([^}]+)\}").unwrap());
@@ -208,7 +260,8 @@ impl ExecutablePipeline {
             channel::<(usize, StreamParams, Value)>(batch_size);
 
         // error_channel
-        let (error_sender, mut error_receiver) = channel::<(String, String, String)>(batch_size);
+        let (error_sender, mut error_receiver) =
+            channel::<(String, String, String, Option<String>)>(batch_size);
 
         let mut node_senders = HashMap::new();
         let mut node_receivers = HashMap::new();
@@ -233,7 +286,7 @@ impl ExecutablePipeline {
                 .collect();
             let result_sender_cp = node.children.is_empty().then_some(result_sender.clone());
             let error_sender_cp = error_sender.clone();
-            let vrl_runtime = self.vrl_map.get(node_id).cloned();
+            let vrl_runtime: Option<(VRLResultResolver, bool)> = self.vrl_map.get(node_id).cloned();
             let pipeline_name = pipeline_name.clone();
             let stream_name = stream_name.clone();
 
@@ -276,8 +329,8 @@ impl ExecutablePipeline {
         let error_task = tokio::spawn(async move {
             log::debug!("[Pipeline]: starts error collecting job");
             let mut count = 0;
-            while let Some((node_id, node_type, error)) = error_receiver.recv().await {
-                pipeline_error.add_node_error(node_id, node_type, error);
+            while let Some((node_id, node_type, error, fn_name)) = error_receiver.recv().await {
+                pipeline_error.add_node_error(node_id, node_type, error, fn_name);
                 count += 1;
             }
             log::debug!("[Pipeline]: collected {count} errors");
@@ -496,7 +549,7 @@ async fn process_node(
     mut child_senders: Vec<Sender<(usize, Value, bool)>>,
     vrl_runtime: Option<(VRLResultResolver, bool)>,
     result_sender: Option<Sender<(usize, StreamParams, Value)>>,
-    error_sender: Sender<(String, String, String)>,
+    error_sender: Sender<(String, String, String, Option<String>)>,
     pipeline_name: String,
     stream_name: Option<String>,
 ) -> Result<()> {
@@ -519,7 +572,7 @@ async fn process_node(
                             Err(e) => {
                                 let err_msg = format!("LeafNode error with flattening: {e}");
                                 if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .send((node.id.to_string(), node.node_type(), err_msg, None))
                                     .await
                                 {
                                     log::error!(
@@ -554,7 +607,7 @@ async fn process_node(
                                 };
                                 log::warn!("{err_msg}");
                                 if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .send((node.id.to_string(), node.node_type(), err_msg, None))
                                     .await
                                 {
                                     log::error!(
@@ -603,7 +656,7 @@ async fn process_node(
                         Err(e) => {
                             let err_msg = format!("ConditionNode error with flattening: {e}");
                             if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .send((node.id.to_string(), node.node_type(), err_msg, None))
                                 .await
                             {
                                 log::error!(
@@ -648,8 +701,14 @@ async fn process_node(
                             Ok(flattened) => flattened,
                             Err(e) => {
                                 let err_msg = format!("FunctionNode error with flattening: {e}");
+                                let err_msg = err_msg.get(0..500).unwrap_or(&err_msg);
                                 if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .send((
+                                        node.id.to_string(),
+                                        node.node_type(),
+                                        err_msg.to_owned(),
+                                        Some(func_params.name.to_owned()),
+                                    ))
                                     .await
                                 {
                                     log::error!(
@@ -671,9 +730,17 @@ async fn process_node(
                         ) {
                             (res, None) => res,
                             (res, Some(error)) => {
-                                let err_msg = format!("FunctionNode error: {error}");
+                                let err_msg = format!(
+                                    "FunctionNode error: {}",
+                                    error.get(0..500).unwrap_or(&error)
+                                );
                                 if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .send((
+                                        node.id.to_string(),
+                                        node.node_type(),
+                                        err_msg.to_owned(),
+                                        Some(func_params.name.to_owned()),
+                                    ))
                                     .await
                                 {
                                     log::error!(
@@ -709,9 +776,17 @@ async fn process_node(
                 ) {
                     (res, None) => res,
                     (res, Some(error)) => {
-                        let err_msg = format!("FunctionNode error: {error}");
+                        let err_msg = format!(
+                            "FunctionNode error: {}",
+                            error.get(0..500).unwrap_or(&error)
+                        );
                         if let Err(send_err) = error_sender
-                            .send((node.id.to_string(), node.node_type(), err_msg))
+                            .send((
+                                node.id.to_string(),
+                                node.node_type(),
+                                err_msg.to_owned(),
+                                Some(func_params.name.to_owned()),
+                            ))
                             .await
                         {
                             log::error!(
@@ -767,7 +842,7 @@ async fn process_node(
                         Err(e) => {
                             let err_msg = format!("DestinationNode error with flattening: {e}");
                             if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .send((node.id.to_string(), node.node_type(), err_msg, None))
                                 .await
                             {
                                 log::error!(
@@ -784,7 +859,7 @@ async fn process_node(
                 {
                     let err_msg = format!("DestinationNode error handling timestamp: {e}");
                     if let Err(send_err) = error_sender
-                        .send((node.id.to_string(), node.node_type(), err_msg))
+                        .send((node.id.to_string(), node.node_type(), err_msg, None))
                         .await
                     {
                         log::error!(
@@ -798,20 +873,94 @@ async fn process_node(
                 count += 1;
             }
 
+            log::debug!(
+                "[Pipeline]: RemoteStream node processed {} records",
+                records.len()
+            );
             if !records.is_empty() {
-                let mut remote_stream = remote_stream.clone();
-                remote_stream.org_id = org_id.into();
-                let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream).await?;
-                if let Err(e) = writer.write_wal(records).await {
-                    let err_msg = format!(
-                        "DestinationNode error persisting data to be ingested externally: {e}"
+                // Group records by batch_key for routing to different remote streams
+                let mut records_by_batch_key: HashMap<String, Vec<json::Value>> = HashMap::new();
+
+                for record in records {
+                    // Extract batch_key from record, fallback to "default" if not present
+                    let batch_key = record
+                        .get("batch_key")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("default")
+                        .to_string();
+
+                    records_by_batch_key
+                        .entry(batch_key)
+                        .or_default()
+                        .push(record);
+                }
+
+                log::debug!(
+                    "[Pipeline]: Grouped records into {} batch keys",
+                    records_by_batch_key.len()
+                );
+
+                // Process each batch_key group separately
+                for (batch_key, batch_records) in records_by_batch_key {
+                    // Create buffer key that includes batch_key for routing
+                    let buffer_key = format!(
+                        "{}:{}:{}:{}:{}",
+                        pipeline_id,
+                        remote_stream.org_id,
+                        remote_stream.destination_name,
+                        batch_key,
+                        "remote"
                     );
-                    if let Err(send_err) = error_sender
-                        .send((node.id.to_string(), node.node_type(), err_msg))
-                        .await
-                    {
-                        log::error!(
-                            "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+
+                    // Add records to the accumulating buffer and check if we should flush
+                    let mut buffers = BATCH_BUFFERS.lock().await;
+                    let buffer = buffers
+                        .entry(buffer_key.clone())
+                        .or_insert_with(BatchBuffer::new);
+
+                    let initial_record_count = buffer.records.len();
+                    buffer.add_records(batch_records);
+
+                    log::debug!(
+                        "[Pipeline]: Added {} records to buffer for batch_key '{batch_key}', total: {} records, {} bytes",
+                        buffer.records.len() - initial_record_count,
+                        buffer.records.len(),
+                        buffer.total_bytes
+                    );
+
+                    // Check if buffer should be flushed to WAL
+                    if buffer.should_flush() {
+                        let records_to_write = buffer.take_records();
+                        drop(buffers); // Release the lock before async operations
+
+                        log::debug!(
+                            "[Pipeline]: Flushing buffer for batch_key '{}' - writing {} records to WAL",
+                            batch_key,
+                            records_to_write.len()
+                        );
+
+                        // Create remote stream configuration with batch_key routing
+                        let mut remote_stream_for_batch = remote_stream.clone();
+                        remote_stream_for_batch.org_id = org_id.clone().into();
+
+                        let writer =
+                            get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
+                        if let Err(e) = writer.write_wal(records_to_write).await {
+                            let err_msg = format!(
+                                "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
+                            );
+                            if let Err(send_err) = error_sender
+                                .send((node.id.to_string(), node.node_type(), err_msg, None))
+                                .await
+                            {
+                                log::error!(
+                                    "[Pipeline]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                                );
+                            }
+                        }
+                    } else {
+                        log::debug!(
+                            "[Pipeline]: Buffer for batch_key '{batch_key}' not ready for flush, continuing to accumulate"
                         );
                     }
                 }
@@ -824,7 +973,7 @@ async fn process_node(
             let err_msg = "[Pipeline]: remote destination is not supported in open source version. Records dropped".to_string();
             log::error!("{err_msg}");
             if let Err(send_err) = error_sender
-                .send((node.id.to_string(), node.node_type(), err_msg))
+                .send((node.id.to_string(), node.node_type(), err_msg, None))
                 .await
             {
                 log::error!(
@@ -835,6 +984,56 @@ async fn process_node(
     }
 
     // all cloned senders dropped when function goes out of scope -> close the channel
+
+    Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
+    let mut buffers = BATCH_BUFFERS.lock().await;
+
+    for (batch_key, buffer) in buffers.iter_mut() {
+        // let buffer_key = format!("{}:{}:{}:{}:{}", pipeline_id, remote_stream.org_id,
+        // remote_stream.destination_name, batch_key, "remote");
+        let key = batch_key.clone();
+        let key_parts = key.split(":").collect::<Vec<&str>>();
+        let pipeline_id = key_parts[0].to_string();
+        let org_id = key_parts[1].to_string();
+        let destination_name = key_parts[2].to_string();
+        let batch_key = key_parts[3].to_string();
+        // let stream_type = key_parts[4].to_string();
+
+        let remote_stream = config::meta::stream::RemoteStreamParams {
+            org_id: org_id.clone().into(),
+            destination_name: destination_name.into(),
+        };
+
+        let mut remote_stream_for_batch = remote_stream.clone();
+        remote_stream_for_batch.org_id = org_id.clone().into();
+
+        if buffer.should_flush() {
+            let records_to_write = buffer.take_records();
+
+            log::debug!(
+                "[Pipeline]: Flushing buffer for batch_key '{}' - writing {} records to WAL",
+                batch_key,
+                records_to_write.len()
+            );
+
+            // Create remote stream configuration with batch_key routing
+            let mut remote_stream_for_batch = remote_stream.clone();
+            remote_stream_for_batch.org_id = org_id.clone().into();
+
+            let writer = get_pipeline_wal_writer(&pipeline_id, remote_stream_for_batch).await?;
+            if let Err(e) = writer.write_wal(records_to_write).await {
+                let err_msg = format!(
+                    "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
+                );
+                log::error!("{err_msg}");
+            }
+        }
+    }
+    drop(buffers); // Release the lock before async operations
 
     Ok(())
 }

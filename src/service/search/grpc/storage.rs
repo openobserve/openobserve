@@ -43,6 +43,7 @@ use infra::{
     errors::{Error, ErrorCodes},
 };
 use itertools::Itertools;
+use roaring::RoaringBitmap;
 use tantivy::Directory;
 use tokio::sync::Semaphore;
 use tokio_stream::StreamExt as _;
@@ -51,9 +52,12 @@ use tracing::Instrument;
 use crate::service::{
     db, file_list,
     search::{
-        datafusion::exec,
+        datafusion::exec::TableBuilder,
         generate_search_schema_diff,
-        grpc::utils::{self, TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
+        grpc::{
+            tantivy_result_cache::{self, CacheEntry},
+            utils::{self, TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
+        },
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     },
@@ -61,7 +65,6 @@ use crate::service::{
         caching_directory::CachingDirectory,
         footer_cache::FooterCache,
         reader::{PuffinDirReader, warm_up_terms},
-        reader_cache,
     },
 };
 
@@ -373,18 +376,15 @@ pub async fn search(
         log::debug!("search->storage: session target_partitions: {target_partitions}");
 
         let diff_fields = generate_search_schema_diff(&schema, &latest_schema_map);
-        let table = exec::create_parquet_table(
-            &session,
-            latest_schema.clone(),
-            &files,
-            diff_fields,
-            sorted_by_time,
-            file_stat_cache.clone(),
-            index_condition.clone(),
-            fst_fields.clone(),
-            true,
-        )
-        .await?;
+        let table = TableBuilder::new()
+            .rules(diff_fields)
+            .sorted_by_time(sorted_by_time)
+            .file_stat_cache(file_stat_cache.clone())
+            .index_condition(index_condition.clone())
+            .fst_fields(fst_fields.clone())
+            .need_optimize_partition(true)
+            .build(session, &files, latest_schema.clone())
+            .await?;
         tables.push(table);
     }
 
@@ -937,49 +937,48 @@ async fn search_tantivy_index(
         ));
     };
 
-    // cache the indexer and reader
     let cfg = get_config();
-    let indexer = if cfg.common.inverted_index_cache_enabled {
-        reader_cache::GLOBAL_CACHE.get(&ttv_file_name)
-    } else {
-        None
-    };
-    let (tantivy_index, tantivy_reader) = match indexer {
-        Some((indexer, reader)) => (indexer, reader),
-        None => {
-            log::debug!("[trace_id {trace_id}] init cache for tantivy file: {ttv_file_name}");
-
-            let puffin_dir = Arc::new(
-                get_tantivy_directory(
-                    trace_id,
-                    &file_account,
-                    &ttv_file_name,
-                    parquet_file.meta.index_size,
-                )
-                .await?,
-            );
-            let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
-            let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
-            let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
-
-            let index = tantivy::Index::open(reader_directory)?;
-            index
-                .tokenizers()
-                .register(O2_TOKENIZER, o2_tokenizer_build());
-            let reader = index
-                .reader_builder()
-                .reload_policy(tantivy::ReloadPolicy::Manual)
-                .num_warming_threads(0)
-                .try_into()?;
-            let index = Arc::new(index);
-            let reader = Arc::new(reader);
-            if cfg.common.inverted_index_cache_enabled {
-                reader_cache::GLOBAL_CACHE
-                    .put(ttv_file_name.to_string(), (index.clone(), reader.clone()));
-            }
-            (index, reader)
+    let mut cache_key = String::new();
+    if cfg.common.inverted_index_result_cache_enabled {
+        metrics::TANTIVY_RESULT_CACHE_REQUESTS_TOTAL
+            .with_label_values(&[])
+            .inc();
+        cache_key = generate_cache_key(&index_condition, &idx_optimize_rule, parquet_file);
+        if let Some(result) = tantivy_result_cache::GLOBAL_CACHE.get(&cache_key) {
+            metrics::TANTIVY_RESULT_CACHE_HITS_TOTAL
+                .with_label_values(&[])
+                .inc();
+            return Ok((parquet_file.key.to_string(), result));
         }
-    };
+    }
+
+    // open the tantivy index
+    log::debug!("[trace_id {trace_id}] init cache for tantivy file: {ttv_file_name}");
+
+    let puffin_dir = Arc::new(
+        get_tantivy_directory(
+            trace_id,
+            &file_account,
+            &ttv_file_name,
+            parquet_file.meta.index_size,
+        )
+        .await?,
+    );
+    let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
+    let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
+    let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
+
+    let index = tantivy::Index::open(reader_directory)?;
+    index
+        .tokenizers()
+        .register(O2_TOKENIZER, o2_tokenizer_build());
+    let reader = index
+        .reader_builder()
+        .reload_policy(tantivy::ReloadPolicy::Manual)
+        .num_warming_threads(0)
+        .try_into()?;
+    let tantivy_index = Arc::new(index);
+    let tantivy_reader = Arc::new(reader);
 
     let searcher = tantivy_reader.searcher();
     let tantivy_schema = tantivy_index.schema();
@@ -1031,8 +1030,7 @@ async fn search_tantivy_index(
     // search the index
     let file_in_range =
         parquet_file.meta.min_ts >= time_range.0 && parquet_file.meta.max_ts < time_range.1;
-    let idx_optimize_rule_clone = idx_optimize_rule.clone();
-    let res = tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule_clone) {
+    let res = tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule) {
         (false, _) | (true, None) => TantivyResult::handle_matched_docs(&searcher, query),
         (true, Some(IndexOptimizeMode::SimpleSelect(limit, ascend))) => {
             TantivyResult::handle_simple_select(&searcher, query, limit, ascend)
@@ -1069,11 +1067,12 @@ async fn search_tantivy_index(
     .await??;
 
     let key = parquet_file.key.to_string();
-    match res {
-        TantivyResult::Count(count) => Ok((key, TantivyResult::Count(count))),
-        TantivyResult::Histogram(histogram) => Ok((key, TantivyResult::Histogram(histogram))),
-        TantivyResult::TopN(top_n) => Ok((key, TantivyResult::TopN(top_n))),
-        TantivyResult::Distinct(distinct) => Ok((key, TantivyResult::Distinct(distinct))),
+    let mut percent = 0.0;
+    let result = match res {
+        TantivyResult::Count(count) => TantivyResult::Count(count),
+        TantivyResult::Histogram(histogram) => TantivyResult::Histogram(histogram),
+        TantivyResult::TopN(top_n) => TantivyResult::TopN(top_n),
+        TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
         TantivyResult::RowIds(row_ids) => {
             if row_ids.is_empty() || parquet_file.meta.records == 0 {
                 return Ok((key, TantivyResult::RowIdsBitVec(0, BitVec::EMPTY)));
@@ -1088,7 +1087,7 @@ async fn search_tantivy_index(
                     TantivyResult::RowIdsBitVec(row_ids_percent as usize, BitVec::EMPTY),
                 ));
             }
-            let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
+            percent = row_ids_percent;
             let max_doc_id = *row_ids.iter().max().unwrap_or(&0) as i64;
             if max_doc_id >= parquet_file.meta.records {
                 return Err(anyhow::anyhow!(
@@ -1097,16 +1096,28 @@ async fn search_tantivy_index(
                     parquet_file.meta.records,
                 ));
             }
+            let mut res = BitVec::repeat(false, max_doc_id as usize + 1);
             let num_rows = row_ids.len();
             for id in row_ids {
                 res.set(id as usize, true);
             }
-            Ok((key, TantivyResult::RowIdsBitVec(num_rows, res)))
+            TantivyResult::RowIdsBitVec(num_rows, res)
         }
         TantivyResult::RowIdsBitVec(..) => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
+    };
+
+    // cache the result if the memory size is less than the limit
+    if cfg.common.inverted_index_result_cache_enabled
+        && !cache_key.is_empty()
+        && (result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
+            || percent < 1.0)
+    {
+        let entry = get_cache_entry(result.clone(), percent);
+        tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
     }
+    Ok((key, result))
 }
 
 /// if simple distinct without filter, we need to warm up the field
@@ -1244,6 +1255,51 @@ fn repartition_sorted_groups(
     }
 
     groups
+}
+
+fn get_cache_entry(tantivy_result: TantivyResult, percent: f64) -> CacheEntry {
+    match tantivy_result {
+        TantivyResult::RowIdsBitVec(num_rows, bitvec) => {
+            // if the percent is less than 1.0, we use roaring bitmap to store the row ids
+            // otherwise, we use bitvec to store the row ids.
+            // because the bitvec is not efficient for small percent, and the roaring bitmap is not
+            // efficient for large percent.
+            if percent < 1.0 {
+                let mut roaring = RoaringBitmap::new();
+                for (i, bit) in bitvec.into_iter().enumerate() {
+                    if bit {
+                        roaring.insert(i as u32);
+                    }
+                }
+                CacheEntry::RowIdsRoaring(num_rows, roaring)
+            } else {
+                CacheEntry::RowIdsBitVec(num_rows, bitvec)
+            }
+        }
+        TantivyResult::Count(count) => CacheEntry::Count(count),
+        TantivyResult::Histogram(histogram) => CacheEntry::Histogram(histogram),
+        TantivyResult::TopN(top_n) => CacheEntry::TopN(top_n),
+        TantivyResult::Distinct(distinct) => CacheEntry::Distinct(distinct),
+        TantivyResult::RowIds(_) => {
+            unreachable!("unsupported tantivy search result in search_tantivy_index")
+        }
+    }
+}
+
+fn generate_cache_key(
+    index_condition: &Option<IndexCondition>,
+    idx_optimize_rule: &Option<IndexOptimizeMode>,
+    parquet_file: &FileKey,
+) -> String {
+    let condition = match index_condition {
+        Some(condition) => condition.to_query(),
+        None => return String::new(),
+    };
+    let rule = match idx_optimize_rule {
+        Some(rule) => rule.to_rule_string(),
+        None => return String::new(),
+    };
+    format!("{}_{}_{}", condition, rule, parquet_file.key)
 }
 
 #[cfg(test)]

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod histogram;
 use std::sync::Arc;
 
 use arrow_schema::{DataType, Field};
@@ -49,9 +50,12 @@ use crate::service::search::sql::{
     },
     schema::{generate_schema_fields, generate_select_star_schema, has_original_column},
     visitor::{
-        column::ColumnVisitor, histogram_interval::HistogramIntervalVisitor,
-        index_optimize::IndexOptimizeModeVisitor, match_all::MatchVisitor,
-        partition_column::PartitionColumnVisitor, prefix_column::PrefixColumnVisitor,
+        column::ColumnVisitor,
+        histogram_interval::{HistogramIntervalVisitor, validate_and_adjust_histogram_interval},
+        index_optimize::IndexOptimizeModeVisitor,
+        match_all::MatchVisitor,
+        partition_column::PartitionColumnVisitor,
+        prefix_column::PrefixColumnVisitor,
         utils::is_complex_query,
     },
 };
@@ -240,7 +244,10 @@ impl Sql {
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         let _ = statement.visit(&mut histogram_interval_visitor);
         let histogram_interval = if query.histogram_interval > 0 {
-            Some(query.histogram_interval)
+            Some(validate_and_adjust_histogram_interval(
+                query.histogram_interval,
+                Some((query.start_time, query.end_time)),
+            ))
         } else {
             histogram_interval_visitor.interval
         };
@@ -334,25 +341,36 @@ impl Sql {
         let final_schemas = if cfg.common.utf8_view_enabled {
             let mut final_schemas = HashMap::with_capacity(used_schemas.len());
             for (stream, schema) in used_schemas.iter() {
-                let fields = schema
+                let mut fields = schema
                     .schema()
                     .fields()
                     .iter()
                     .map(|f| {
-                        if f.data_type() == &DataType::Utf8 {
+                        if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8
+                        {
                             Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
                         } else {
                             f.clone()
                         }
                     })
                     .collect::<Vec<_>>();
+                fields.sort_by(|a, b| a.name().cmp(b.name()));
                 let new_schema =
                     Schema::new(fields).with_metadata(schema.schema().metadata().clone());
                 final_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(new_schema)));
             }
             final_schemas
         } else {
-            used_schemas.clone()
+            let mut final_schemas = HashMap::with_capacity(used_schemas.len());
+            // sort the schema fields by name
+            for (stream, schema) in used_schemas.iter() {
+                let mut fields = schema.schema().fields().to_vec();
+                fields.sort_by(|a, b| a.name().cmp(b.name()));
+                let new_schema =
+                    Schema::new(fields).with_metadata(schema.schema().metadata().clone());
+                final_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(new_schema)));
+            }
+            final_schemas
         };
 
         let is_complex = is_complex_query(&mut statement);

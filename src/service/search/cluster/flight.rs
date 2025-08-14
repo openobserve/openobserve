@@ -56,7 +56,7 @@ use crate::{
                     EmptyExecVisitor, NewEmptyExecCountVisitor, remote_scan::RemoteScanExec,
                     rewrite::RemoteScanRewriter,
                 },
-                exec::{prepare_datafusion_context, register_udf},
+                exec::{DataFusionContextBuilder, register_udf},
                 optimizer::{generate_analyzer_rules, generate_optimizer_rules},
                 table_provider::{catalog::StreamTypeProvider, empty_table::NewEmptyTable},
             },
@@ -133,6 +133,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     let scan_stats = ScanStats {
         files: file_id_list_num as i64,
         original_size: file_id_list_vec.iter().map(|v| v.original_size).sum(),
+        file_list_took: file_id_list_took as i64,
         ..Default::default()
     };
 
@@ -223,9 +224,13 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
 
     // release lock when search done or get error
     let trace_id_move = trace_id.to_string();
+    let org_id_move = sql.org_id.clone();
     #[cfg(not(feature = "enterprise"))]
     let _defer = AsyncDefer::new({
         async move {
+            metrics::QUERY_RUNNING_NUMS
+                .with_label_values(&[&org_id_move])
+                .dec();
             // search done, release lock
             let _ = dist_lock::unlock_with_trace_id(&trace_id_move, &locker)
                 .await
@@ -244,6 +249,9 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     #[cfg(feature = "enterprise")]
     let _defer = AsyncDefer::new({
         async move {
+            metrics::QUERY_RUNNING_NUMS
+                .with_label_values(&[&org_id_move])
+                .dec();
             // search done, release lock
             let _ = work_group
                 .as_ref()
@@ -769,8 +777,7 @@ pub async fn partition_filt_list(
 ) -> Result<Vec<Vec<i64>>> {
     let cfg = get_config();
     let querier_num = nodes.iter().filter(|node| node.is_querier()).count();
-    let mut partition_strategy =
-        QueryPartitionStrategy::from(&cfg.common.feature_query_partition_strategy);
+    let mut partition_strategy = cfg.common.feature_query_partition_strategy.clone();
     if cfg.cache_latest_files.enabled {
         partition_strategy = QueryPartitionStrategy::FileHash;
     }
@@ -893,15 +900,14 @@ pub async fn generate_context(
 ) -> Result<SessionContext> {
     let analyzer_rules = generate_analyzer_rules(sql);
     let optimizer_rules = generate_optimizer_rules(sql);
-    let mut ctx = prepare_datafusion_context(
-        &req.trace_id,
-        req.work_group.clone(),
-        analyzer_rules,
-        optimizer_rules,
-        sql.sorted_by_time,
-        target_partitions,
-    )
-    .await?;
+    let mut ctx = DataFusionContextBuilder::new()
+        .trace_id(&req.trace_id)
+        .work_group(req.work_group.clone())
+        .analyzer_rules(analyzer_rules)
+        .optimizer_rules(optimizer_rules)
+        .sorted_by_time(sql.sorted_by_time)
+        .build(target_partitions)
+        .await?;
 
     // register udf
     register_udf(&ctx, &req.org_id)?;
