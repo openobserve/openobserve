@@ -399,6 +399,7 @@ pub async fn run_datafusion(
     partitioned_file_lists: HashMap<TableReference, Vec<Vec<i64>>>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
+
     let ctx = SearchContextBuilder::new()
         .target_partitions(cfg.limit.cpu_num)
         .add_context(PhysicalOptimizerContext::RemoteScan(RemoteScanContext {
@@ -407,8 +408,10 @@ pub async fn run_datafusion(
             context: tracing::Span::current().context(),
             is_leader: false,
         }))
+        .add_context(PhysicalOptimizerContext::AggregateTopk)
         .build(&req, &sql)
         .await?;
+
     log::info!(
         "[trace_id {trace_id}] flight->search: datafusion context created with target_partitions: {}",
         ctx.state().config().target_partitions(),
@@ -466,16 +469,6 @@ pub async fn run_datafusion(
             };
             return Ok((vec![], scan_stats, "".to_string()));
         }
-    }
-
-    // rewrite physical plan for merge aggregation and get topk
-    #[cfg(feature = "enterprise")]
-    {
-        let plan = o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_topk_agg_plan(
-            sql.limit,
-            physical_plan,
-        )?;
-        physical_plan = plan;
     }
 
     if cfg.common.print_key_sql {

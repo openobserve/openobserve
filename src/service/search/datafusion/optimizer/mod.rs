@@ -17,8 +17,6 @@ use std::sync::Arc;
 
 use add_sort_and_limit::AddSortAndLimitRule;
 use add_timestamp::AddTimestampRule;
-#[cfg(feature = "enterprise")]
-use cipher::{RewriteCipherCall, RewriteCipherKey};
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME};
 use datafusion::{
     optimizer::{
@@ -40,9 +38,14 @@ use datafusion::{
 };
 use infra::schema::get_stream_setting_fts_fields;
 use limit_join_right_side::LimitJoinRightSide;
-use remove_index_fields::RemoveIndexFieldsRule;
 use rewrite_histogram::RewriteHistogram;
 use rewrite_match::RewriteMatch;
+#[cfg(feature = "enterprise")]
+use {
+    cipher::{RewriteCipherCall, RewriteCipherKey},
+    o2_enterprise::enterprise::search::datafusion::optimizer::aggregate_topk::AggregateTopkRule,
+    remove_index_fields::RemoveIndexFieldsRule,
+};
 
 use crate::service::search::{
     datafusion::optimizer::{
@@ -185,6 +188,12 @@ pub fn generate_physical_optimizer_rules(
         match context {
             PhysicalOptimizerContext::RemoteScan(context) => {
                 rules.push(generate_remote_scan_rules(req, sql, context));
+            }
+            PhysicalOptimizerContext::AggregateTopk => {
+                #[cfg(feature = "enterprise")]
+                rules.push(Arc::new(AggregateTopkRule::new(sql.limit as u64)));
+                #[cfg(not(feature = "enterprise"))]
+                continue;
             }
         }
     }

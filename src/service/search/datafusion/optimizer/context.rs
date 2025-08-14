@@ -21,6 +21,7 @@ use hashbrown::HashMap;
 
 pub enum PhysicalOptimizerContext {
     RemoteScan(RemoteScanContext),
+    AggregateTopk,
 }
 
 pub struct RemoteScanContext {

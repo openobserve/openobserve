@@ -224,6 +224,7 @@ async fn run_datafusion(
             context: tracing::Span::current().context(),
             is_leader: true,
         }))
+        .add_context(PhysicalOptimizerContext::AggregateTopk)
         .build(&req, &sql)
         .await?;
 
@@ -297,13 +298,6 @@ async fn run_datafusion(
             return Ok((vec![], scan_stats, "".to_string()));
         }
     }
-
-    // rewrite physical plan for merge aggregation and get topk
-    let plan = o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_topk_agg_plan(
-        sql.limit,
-        physical_plan,
-    )?;
-    physical_plan = plan;
 
     if cfg.common.print_key_sql {
         log::info!("[trace_id {trace_id}] leader physical plan after rewrite");
