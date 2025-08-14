@@ -42,10 +42,11 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_enable_align_histogram_from_request, get_is_multi_stream_search_from_request,
-                get_is_ui_histogram_from_request, get_or_create_trace_id,
-                get_search_event_context_from_request, get_search_type_from_request,
-                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
+                get_dashboard_info_from_request, get_enable_align_histogram_from_request,
+                get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
+                get_or_create_trace_id, get_search_event_context_from_request,
+                get_search_type_from_request, get_stream_type_from_request,
+                get_use_cache_from_request, get_work_group,
             },
             stream::get_settings_max_query_range,
         },
@@ -229,6 +230,8 @@ pub async fn search(
     let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
 
     // let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
+    let dashboard_info = get_dashboard_info_from_request(&query);
+
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
@@ -383,6 +386,7 @@ pub async fn search(
         range_error,
         false,
         is_multi_stream_search,
+        dashboard_info,
     )
     .instrument(http_span)
     .await;
@@ -1168,6 +1172,7 @@ async fn values_v1(
             false,
             // `is_multi_stream_search` false for values
             false,
+            None,
         )
         .instrument(http_span)
         .await;

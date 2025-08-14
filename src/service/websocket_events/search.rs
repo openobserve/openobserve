@@ -361,6 +361,7 @@ async fn do_search(
         "".to_string(),
         true,
         false, // websocket no longer used
+        None,
     )
     .await;
 

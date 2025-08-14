@@ -164,6 +164,7 @@ impl Search for Searcher {
             "".to_string(),
             false,
             false,
+            None,
         )
         .await;
 
