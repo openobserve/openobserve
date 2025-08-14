@@ -1748,6 +1748,8 @@ pub struct Nats {
     pub subscription_capacity: usize,
     #[env_config(name = "ZO_NATS_QUEUE_MAX_AGE", default = 60)] // days
     pub queue_max_age: u64,
+    #[env_config(name = "ZO_NATS_QUEUE_MAX_BYTES", default = 1024 * 1024 * 1024)] // 1GB
+    pub queue_max_bytes: i64,
 }
 
 #[derive(Debug, Default, EnvConfig)]
