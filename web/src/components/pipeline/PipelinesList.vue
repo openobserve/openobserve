@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     
     :class="store.state.theme === 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
     >
-      <div class="q-table__title" data-test="pipeline-list-title">
+      <div class="q-table__title tw-font-[600]" data-test="pipeline-list-title">
             {{ t("pipeline.header") }}
           </div>
           <div class="tw-flex tw-items-centertabs q-ml-auto">
@@ -82,16 +82,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-table
         data-test="pipeline-list-table"
         ref="qTableRef"
-        :rows="filteredPipelines"
+        :rows="visibleRows"
         :columns="columns"
         row-key="name"
         :pagination="pagination"
         :filter="filterQuery"
-        :filter-method="filterData"
         style="width: 100%"
         selection="multiple"
         v-model:selected="selectedPipelines"
-        :style="filteredPipelines?.length 
+        :style="hasVisibleRows
             ? 'width: 100%; height: calc(100vh - 114px)' 
             : 'width: 100%'"
         class="o2-quasar-table o2-quasar-table-header-sticky "
@@ -922,7 +921,14 @@ const handleResumePipeline = () => {
 const handleCancelResumePipeline = () => {
   resumePipelineDialogMeta.value.show = false;
   return;
-}
+};
+
+const visibleRows = computed(() => {
+    if (!filterQuery.value) return filteredPipelines.value || []
+    return filterData(filteredPipelines.value || [], filterQuery.value)
+  });
+
+const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 </script>
 <style lang="scss" scoped>
 .dark-mode {
