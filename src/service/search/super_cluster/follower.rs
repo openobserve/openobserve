@@ -44,7 +44,6 @@ use crate::service::{
             distributed_plan::{
                 NewEmptyExecVisitor,
                 codec::get_physical_extension_codec,
-                empty_exec::NewEmptyExec,
                 node::{RemoteScanNode, SearchInfos},
                 remote_scan::RemoteScanExec,
             },
@@ -99,18 +98,13 @@ pub async fn search(
 
     // replace empty table to real table
     let mut visitor = NewEmptyExecVisitor::default();
-    if physical_plan.visit(&mut visitor).is_err() || visitor.get_data().is_none() {
+    if physical_plan.visit(&mut visitor).is_err() || !visitor.has_empty_exec() {
         return Err(Error::Message(
             "flight->follower_leader: physical plan visit error: there is no EmptyTable"
                 .to_string(),
         ));
     }
-    let empty_exec = visitor
-        .get_data()
-        .unwrap()
-        .as_any()
-        .downcast_ref::<NewEmptyExec>()
-        .unwrap();
+    let empty_exec = visitor.plan();
 
     // get stream name
     let stream = TableReference::from(empty_exec.name());

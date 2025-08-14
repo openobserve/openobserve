@@ -21,10 +21,12 @@ use datafusion::{
         DFSchema, Result,
         tree_node::{
             Transformed, TransformedResult, TreeNode, TreeNodeRecursion, TreeNodeRewriter,
+            TreeNodeVisitor,
         },
     },
     datasource::DefaultTableSource,
     logical_expr::{Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan, TableSource, col},
+    physical_plan::ExecutionPlan,
     prelude::Expr,
     scalar::ScalarValue,
 };
@@ -311,4 +313,35 @@ pub fn is_contain_deduplication_plan(plan: &LogicalPlan) -> bool {
 pub fn is_empty_relation(plan: &LogicalPlan) -> bool {
     plan.exists(|plan| Ok(matches!(plan, LogicalPlan::EmptyRelation(_))))
         .unwrap()
+}
+
+pub fn is_place_holder(plan: &Arc<dyn ExecutionPlan>) -> bool {
+    let mut visitor = PlaceHolderVisitor::new();
+    plan.visit(&mut visitor).unwrap();
+    visitor.is_place_holder
+}
+
+// visit physical plan to check is add a place holder after current physical plan
+struct PlaceHolderVisitor {
+    is_place_holder: bool,
+}
+
+impl PlaceHolderVisitor {
+    pub fn new() -> Self {
+        Self {
+            is_place_holder: false,
+        }
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for PlaceHolderVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        if node.name() == "PlaceholderRowExec" {
+            self.is_place_holder = true;
+            return Ok(TreeNodeRecursion::Stop);
+        }
+        Ok(TreeNodeRecursion::Continue)
+    }
 }
