@@ -232,6 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @last-triggered-at-update="
                               handleLastTriggeredAtUpdate
                             "
+                            @series-data-update="seriesDataUpdate"
                             searchType="ui"
                           />
                         </div>
@@ -285,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ConfigPanel
                     :dashboardPanelData="dashboardPanelData"
                     :variablesData="{}"
+                    :panelData="seriesData"
                   />
                 </PanelSidebar>
               </div>
@@ -431,6 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @last-triggered-at-update="
                               handleLastTriggeredAtUpdate
                             "
+                            @series-data-update="seriesDataUpdate"
                             searchType="ui"
                           />
                         </template>
@@ -469,6 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ConfigPanel
                     :dashboardPanelData="dashboardPanelData"
                     :variablesData="{}"
+                    :panelData="seriesData"
                   />
                 </PanelSidebar>
               </div>
@@ -609,6 +613,11 @@ export default defineComponent({
     };
 
     const showAddToDashboardDialog = ref(false);
+
+    const seriesData = ref([] as any[]);
+    const seriesDataUpdate = (data: any) => {
+      seriesData.value = data;
+    };
 
     // refresh interval v-model
     const refreshInterval = ref(0);
@@ -1130,6 +1139,8 @@ export default defineComponent({
       updateVrlFunctionFieldList,
       lastTriggeredAt,
       handleLastTriggeredAtUpdate,
+      seriesDataUpdate,
+      seriesData,
       searchRequestTraceIds,
       cancelAddPanelQuery,
       disable,
