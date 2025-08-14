@@ -21,7 +21,6 @@ use datafusion::{
         DFSchema, Result,
         tree_node::{
             Transformed, TransformedResult, TreeNode, TreeNodeRecursion, TreeNodeRewriter,
-            TreeNodeVisitor,
         },
     },
     datasource::DefaultTableSource,
@@ -315,33 +314,7 @@ pub fn is_empty_relation(plan: &LogicalPlan) -> bool {
         .unwrap()
 }
 
-pub fn is_place_holder(plan: &Arc<dyn ExecutionPlan>) -> bool {
-    let mut visitor = PlaceHolderVisitor::new();
-    plan.visit(&mut visitor).unwrap();
-    visitor.is_place_holder
-}
-
-// visit physical plan to check is add a place holder after current physical plan
-struct PlaceHolderVisitor {
-    is_place_holder: bool,
-}
-
-impl PlaceHolderVisitor {
-    pub fn new() -> Self {
-        Self {
-            is_place_holder: false,
-        }
-    }
-}
-
-impl<'n> TreeNodeVisitor<'n> for PlaceHolderVisitor {
-    type Node = Arc<dyn ExecutionPlan>;
-
-    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if node.name() == "PlaceholderRowExec" {
-            self.is_place_holder = true;
-            return Ok(TreeNodeRecursion::Stop);
-        }
-        Ok(TreeNodeRecursion::Continue)
-    }
+pub fn is_place_holder_or_empty(plan: &Arc<dyn ExecutionPlan>) -> bool {
+    plan.exists(|plan| Ok(plan.name() == "PlaceholderRowExec" || plan.name() == "EmptyExec"))
+        .unwrap()
 }

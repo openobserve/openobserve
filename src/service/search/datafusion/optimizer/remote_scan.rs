@@ -38,7 +38,7 @@ use crate::service::search::{
         distributed_plan::{
             empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec,
         },
-        optimizer::{context::RemoteScanContext, utils::is_place_holder},
+        optimizer::{context::RemoteScanContext, utils::is_place_holder_or_empty},
     },
     index::IndexCondition,
     request::Request,
@@ -124,7 +124,7 @@ impl PhysicalOptimizerRule for RemoteScanRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        if is_place_holder(&plan) {
+        if is_place_holder_or_empty(&plan) {
             return Ok(plan);
         }
 
