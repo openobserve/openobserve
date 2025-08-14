@@ -1750,9 +1750,9 @@ pub struct Nats {
     pub queue_max_age: u64,
     #[env_config(
         name = "ZO_NATS_QUEUE_MAX_SIZE",
-        help = "The maximum size of the queue in GB",
-        default = 2
-    )] // GB
+        help = "The maximum size of the queue in MB, default is 2048MB",
+        default = 2048
+    )]
     pub queue_max_size: i64,
 }
 
@@ -2934,9 +2934,9 @@ pub fn get_parquet_compression(compression: &str) -> parquet::basic::Compression
 
 fn check_nats_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.nats.queue_max_size == 0 {
-        cfg.nats.queue_max_size = 2; // 2GB
+        cfg.nats.queue_max_size = 2048; // 2GB
     }
-    cfg.nats.queue_max_size *= 1024 * 1024 * 1024; // convert to bytes
+    cfg.nats.queue_max_size *= 1024 * 1024; // convert to bytes
     Ok(())
 }
 
