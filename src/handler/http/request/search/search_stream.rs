@@ -38,10 +38,10 @@ use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::http::{
-            get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
-            get_is_ui_histogram_from_request, get_or_create_trace_id,
-            get_search_event_context_from_request, get_search_type_from_request,
-            get_stream_type_from_request, get_use_cache_from_request,
+            get_dashboard_info_from_request, get_fallback_order_by_col_from_request,
+            get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
+            get_or_create_trace_id, get_search_event_context_from_request,
+            get_search_type_from_request, get_stream_type_from_request, get_use_cache_from_request,
         },
     },
     handler::http::request::search::{
@@ -131,6 +131,7 @@ pub async fn search_http2_stream(
         return MetaHttpResponse::bad_request("Invalid query parameters");
     };
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let dashboard_info = get_dashboard_info_from_request(&query);
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
     let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
 
@@ -418,6 +419,7 @@ pub async fn search_http2_stream(
         fallback_order_by_col,
         audit_ctx,
         is_multi_stream_search,
+        dashboard_info,
     ));
 
     // Return streaming response
@@ -736,6 +738,7 @@ pub async fn values_http2_stream(
         None,
         audit_ctx,
         false,
+        None,
     ));
 
     // Return streaming response

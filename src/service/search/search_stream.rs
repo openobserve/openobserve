@@ -17,6 +17,7 @@ use std::time::Instant;
 
 use config::{
     meta::{
+        dashboards::usage_report::DashboardInfo,
         search::{
             PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
             SearchPartitionResponse, StreamResponses, TimeOffset, ValuesEventContext,
@@ -104,6 +105,7 @@ pub async fn process_search_stream_request(
     fallback_order_by_col: Option<String>,
     _audit_ctx: Option<AuditContext>,
     is_multi_stream_search: bool,
+    dashboard_info: Option<DashboardInfo>,
 ) {
     log::info!(
         "[HTTP2_STREAM trace_id {}] Received test HTTP/2 stream request for org_id: {}",
@@ -279,6 +281,7 @@ pub async fn process_search_stream_request(
                 is_result_array_skip_vrl,
                 backup_query_fn,
                 is_multi_stream_search,
+                dashboard_info,
             )
             .instrument(search_span.clone())
             .await
@@ -358,6 +361,7 @@ pub async fn process_search_stream_request(
                 backup_query_fn,
                 &all_streams,
                 is_multi_stream_search,
+                dashboard_info,
             )
             .instrument(search_span.clone())
             .await
@@ -485,6 +489,7 @@ pub async fn process_search_stream_request(
             backup_query_fn,
             &all_streams,
             is_multi_stream_search,
+            dashboard_info,
         )
         .instrument(search_span.clone())
         .await
@@ -592,6 +597,7 @@ pub async fn do_partitioned_search(
     backup_query_fn: Option<String>,
     stream_name: &str,
     is_multi_stream_search: bool,
+    dashboard_info: Option<DashboardInfo>,
 ) -> Result<(), infra::errors::Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -687,6 +693,7 @@ pub async fn do_partitioned_search(
             user_id,
             use_cache,
             is_multi_stream_search,
+            dashboard_info.clone(),
         )
         .await?;
 
@@ -900,6 +907,7 @@ async fn do_search(
     user_id: &str,
     use_cache: bool,
     is_multi_stream_search: bool,
+    dashboard_info: Option<DashboardInfo>,
 ) -> Result<Response, infra::errors::Error> {
     let mut req = req.clone();
 
@@ -913,6 +921,7 @@ async fn do_search(
         "".to_string(),
         true,
         is_multi_stream_search,
+        dashboard_info,
     )
     .await;
 
@@ -959,6 +968,7 @@ pub async fn handle_cache_responses_and_deltas(
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
     is_multi_stream_search: bool,
+    dashboard_info: Option<DashboardInfo>,
 ) -> Result<(), infra::errors::Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
@@ -1054,6 +1064,7 @@ pub async fn handle_cache_responses_and_deltas(
                     backup_query_fn.clone(),
                     all_streams,
                     is_multi_stream_search,
+                    dashboard_info.clone(),
                 )
                 .await?;
                 delta_iter.next(); // Move to the next delta after processing
@@ -1107,6 +1118,7 @@ pub async fn handle_cache_responses_and_deltas(
                 backup_query_fn.clone(),
                 all_streams,
                 is_multi_stream_search,
+                dashboard_info.clone(),
             )
             .await?;
             delta_iter.next(); // Move to the next delta after processing
@@ -1170,6 +1182,7 @@ async fn process_delta(
     backup_query_fn: Option<String>,
     stream_name: &str,
     is_multi_stream_search: bool,
+    dashboard_info: Option<DashboardInfo>,
 ) -> Result<(), infra::errors::Error> {
     log::info!(
         "[HTTP2_STREAM]: Processing delta for trace_id: {}, delta: {:?}",
@@ -1229,6 +1242,7 @@ async fn process_delta(
             user_id,
             true,
             is_multi_stream_search,
+            dashboard_info.clone(),
         )
         .await?;
 
