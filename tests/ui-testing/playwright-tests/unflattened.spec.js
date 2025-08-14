@@ -101,7 +101,8 @@ test.describe("Unflattened testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
+    const org = process.env["ORGNAME"];
+    const allsearch = page.waitForResponse(`**/api/${org}/_search**`);
     await logsPage.selectStreamAndStreamTypeForLogs("e2e_automate"); 
     await applyQueryButton(page);
   });
@@ -320,8 +321,9 @@ test.describe("Unflattened testcases", () => {
     await unflattenedPage.logTableRowExpandMenu.click();
     
     await page.waitForTimeout(2000);
-    await page.getByText("arrow_drop_down_timestamp:").waitFor();
-    await page.getByText("arrow_drop_down_timestamp:").click();
+    const tsLabel = page.getByText("arrow_drop_down_timestamp:").first();
+    await tsLabel.waitFor();
+    await tsLabel.click();
 });
 
 
