@@ -576,13 +576,14 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.openVisualiseTab();
 
     // Assert that the event-streaming search API call is **not** fired
+    const org = process.env["ORGNAME"];
     const apiCallHappened = await page
       .waitForResponse(
         (response) =>
           response
             .url()
             .includes(
-              "/api/default/_search_stream?type=logs&search_type=dashboards"
+              `/api/${org}/_search_stream?type=logs&search_type=dashboards`
             ),
         { timeout: 5000 }
       )

@@ -106,6 +106,7 @@ export class LogsPage {
         this.sqlGroupOrderLimitPagination = '[data-test="logs-search-sql-group-order-limit-pagination"]';
         this.interestingFieldBtn = field => `[data-test="log-search-index-list-interesting-${field}-field-btn"]`;
         this.logsSearchBarFunctionDropdownSave = '[data-test="logs-search-bar-function-dropdown"] button';
+		this.logsSearchBarSaveTransformBtn = '[data-test="logs-search-bar-save-transform-btn"]';
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
         this.qNotifyWarning = '#q-notify div';
         this.qPageContainer = '.q-page-container';
@@ -898,6 +899,7 @@ export class LogsPage {
 
     // Interesting fields methods
     async clickInterestingFields() {
+        await this.page.getByRole('button').filter({ hasText: /^schema$/ }).click();
         await this.fillIndexFieldSearchInput('kubernetes_pod_name');
         await this.page.locator('[data-test="log-search-index-list-interesting-kubernetes_pod_name-field-btn"]').first().click();
     }
@@ -1702,6 +1704,10 @@ export class LogsPage {
 
     async clickFunctionDropdownSave() {
         return await this.page.locator(this.logsSearchBarFunctionDropdownSave).filter({ hasText: 'save' }).click();
+    }
+
+    async clickSaveTransformButton() {
+        return await this.page.locator(this.logsSearchBarSaveTransformBtn).click();
     }
 
     async clickSavedFunctionNameInput() {
