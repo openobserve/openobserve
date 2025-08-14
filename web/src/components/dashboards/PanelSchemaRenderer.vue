@@ -396,6 +396,7 @@ export default defineComponent({
       type: Boolean,
       required: false,
       default: false,
+    },
     runId: {
       type: String,
       default: null,
