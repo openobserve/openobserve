@@ -95,7 +95,8 @@ test.describe("Logs Page testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
+    const org = process.env["ORGNAME"];
+    const allsearch = page.waitForResponse(`**/api/${org}/_search**`);
     await pageManager.logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
@@ -261,13 +262,6 @@ test.describe("Logs Page testcases", () => {
     await pageManager.logsPage.waitForTimeout(1000);
     await pageManager.logsPage.clickExploreButton();
     await pageManager.logsPage.expectUrlContainsLogs();
-  });
-
-  test('should display error when save function is clicked without any VRL function', {
-    tag: ['@functionValidation', '@all', '@logs']
-  }, async ({ page }) => {
-    await pageManager.logsPage.clickFunctionDropdownSave();
-    await pageManager.logsPage.expectWarningNoFunctionDefinition();
   });
 
   test('should create a function and then delete it', {

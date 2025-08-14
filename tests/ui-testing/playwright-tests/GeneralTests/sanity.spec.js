@@ -89,7 +89,8 @@ test.describe("Sanity testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
+    const org = process.env["ORGNAME"];
+    const allsearch = page.waitForResponse(`**/api/${org}/_search**`);
     await pm.logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
   });
@@ -355,8 +356,9 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="alert-templates-tab"]').click();
   
     // Wait for template API before clicking "Add Template" button
+    const org = process.env["ORGNAME"];
     await page.waitForResponse(response =>
-      response.url().includes("/api/default/alerts/templates") && response.status() === 200
+      response.url().includes(`/api/${org}/alerts/templates`) && response.status() === 200
     );
   
     await page.locator('[data-test="alert-template-list-add-alert-btn"]').click();
@@ -390,7 +392,7 @@ test.describe("Sanity testcases", () => {
   
     // Wait for API before proceeding
     await page.waitForResponse(response =>
-      response.url().includes("/api/default/alerts/destinations") && response.status() === 200
+      response.url().includes(`/api/${org}/alerts/destinations`) && response.status() === 200
     );
   
     await page.locator('[data-test="menu-link-\\/alerts-item"]').click();
