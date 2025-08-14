@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ::config::{
-    META_ORG_ID, RouteDispatchStrategy, get_config,
+    Config, META_ORG_ID, RouteDispatchStrategy, get_config,
     meta::{
         cluster::{Node, Role, RoleGroup},
         promql::RequestRangeQuery,
@@ -164,7 +164,7 @@ async fn dispatch(
         });
     }
 
-    let new_url = get_url(&path).await;
+    let new_url = get_url(&path, &cfg).await;
     if new_url.is_error {
         log::error!(
             "dispatch: {} to {}, get url details error: {:?}, took: {} ms",
@@ -189,9 +189,16 @@ async fn dispatch(
     default_proxy(req, payload, client, new_url, start).await
 }
 
-async fn get_url(path: &str) -> URLDetails {
+async fn get_url(path: &str, cfg: &Config) -> URLDetails {
     let node_type;
-    let is_querier_path = is_querier_route(path);
+    // all the path handling after this is based on
+    // path starting with /api, so if we have any base_uri
+    // we strip it here
+    let mut api_path = path;
+    if !cfg.common.base_uri.is_empty() {
+        api_path = path.strip_prefix(&cfg.common.base_uri).unwrap_or(path);
+    }
+    let is_querier_path = is_querier_route(api_path);
 
     let nodes = if is_querier_path {
         node_type = Role::Querier;
