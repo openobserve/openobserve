@@ -235,6 +235,33 @@
   z-index: 1000;
 }
 
+//this is used to target the header and footer of the table to make it sticky all the time
+//we have added the class o2-table-footer-title to the footer title
+.o2-table-footer-title{
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 16px;
+}
+.o2-quasar-table-header-sticky{
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+}
+
+.o2-quasar-table-header-sticky-dark{
+  thead {
+    background-color: #181A1B;
+  }
+}
+
+.o2-quasar-table-header-sticky-light{
+  thead {
+    background-color: #ffffff;
+  }
+}
+
 
 //this is used to target the table in the app-table component internally it uses q-table component
 //but due to virtual scroll the classes are different so we need to target the classes differently
@@ -593,28 +620,88 @@
   }
 }
 
-
-.o2-table-footer-title{
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 16px;
-}
-.o2-quasar-table-header-sticky{
-  thead {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
+//q-toggle in small size
+.o2-toggle-button-sm{
+  .q-toggle__track{
+    height: 20px;
+    border-radius: 16px;
+    width: 36px;
+    background-color: #EBECF0;
+    opacity: 100%;
   }
+  .q-toggle__thumb:after{
+    top: 4.8px;
+    left: 4px;
+    height: 16px;
+    width: 16px;
+  }
+  .q-toggle__label{
+    margin-top: 6px;
+  }
+  .q-toggle__inner--truthy{
+    .q-toggle__thumb:after{
+      position: relative;
+      top: 3.2px !important;
+      left: 2px !important;
+    }
+  }
+
 }
 
-.o2-quasar-table-header-sticky-dark{
-  thead {
-    background-color: #181A1B;
+.o2-toggle-button-sm-light{
+  .q-toggle__track{
+    background-color: #EBECF0;
+    opacity: 100%;
   }
+  .q-toggle__thumb:after{
+  }
+  .q-toggle__inner--truthy{
+    color: #ffffff;
+    .q-toggle__track{
+      background-color: #575FC5;
+    }
+    }
 }
 
-.o2-quasar-table-header-sticky-light{
-  thead {
-    background-color: #ffffff;
+//q-toggle in large size
+.o2-toggle-button-lg{
+
+  .q-toggle__track{
+    height: 24px;
+    border-radius: 16px;
+    width: 44px;
+    background-color: #EBECF0;
+    opacity: 100%;
   }
+  .q-toggle__thumb:after{
+    top: 5.8px;
+    left: 4.8px;
+    height: 20px;
+    width: 20px;
+  }
+  .q-toggle__label{
+    margin-top: 6px;
+  }
+  .q-toggle__inner--truthy{
+    .q-toggle__thumb:after{
+      top: 5.8px;
+      left: 3.8px;
+    }
+  }
+
+}
+
+.o2-toggle-button-lg-light{
+  .q-toggle__track{
+    background-color: #EBECF0;
+    opacity: 100%;
+  }
+  .q-toggle__thumb:after{
+  }
+  .q-toggle__inner--truthy{
+    color: #ffffff;
+    .q-toggle__track{
+      background-color: #575FC5;
+    }
+    }
 }
