@@ -1368,7 +1368,6 @@ export const convertSQLData = async (
 
     return seriesData;
   };
-{{ console.log(panelSchema?.config?.color?.colorBySeries,"colorbyseries array")}}
   const getSeriesObj = (
     yAxisName: string,
     seriesData: Array<number> = [],

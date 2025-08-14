@@ -1,6 +1,5 @@
 <template>
   <div class="relative" style="margin-top: 5px">
-  {{ console.log("CommonAutoComplete", fieldsFilteredOptions) }}
     <q-input
       v-model="inputValue"
       @update:model-value="onModelValueChanged"
@@ -33,7 +32,6 @@
       >
         {{ option.label }}
       </div>
-      {{ console.log(fieldsFilteredOptions,"optionsssssssssss") }}
     </div>
   </div>
 </template>
@@ -77,15 +75,11 @@ export default defineComponent({
     watch(
       () => props.modelValue,
       (newValue) => {
-        console.log("modelValue changed", newValue);
-        
         inputValue.value = newValue;
-      }
+      },
     );
 
     watch(inputValue, (newValue) => {
-      console.log("inputValue changed", newValue);
-      
       fieldsFilterFn(newValue);
     });
     // when q-input's model value updated, update the model value which will be synced back to input value
@@ -95,7 +89,6 @@ export default defineComponent({
     };
 
     const itemsRef = toRef(props, "items");
-console.log("itemsRef", itemsRef.value);
     // apply filter on label
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
       useSearchInputUsingRegex(itemsRef, "label", props.searchRegex);
