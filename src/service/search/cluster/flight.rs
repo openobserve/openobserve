@@ -444,7 +444,7 @@ pub async fn run_datafusion(
         let org_settings = crate::service::db::organization::get_org_setting(&org_id)
             .await
             .unwrap_or_default();
-        let use_cache = use_cache && org_settings.aggregation_cache_enabled;
+        let use_cache = use_cache && org_settings.streaming_aggregation_enabled;
         let target_partitions = ctx.state().config().target_partitions();
         let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) =
             o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_streaming_agg_plan(

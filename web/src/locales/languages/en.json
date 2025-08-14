@@ -1139,7 +1139,7 @@
     "cipherKeys": "Cipher Keys",
     "nodes": "Nodes",
     "enableStreamingSearch": "Enable Streaming Search",
-    "enableAggregationCache": "Enable Aggregation Cache",
+    "enableStreamingAggregation": "Enable Streaming Aggregation",
     "organizationManagement": "Organization Management",
     "extendTrial": "Extend Trial",
     "searchOrgs": "Search Orgs",
