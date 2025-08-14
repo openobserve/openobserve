@@ -191,7 +191,7 @@ pub fn generate_physical_optimizer_rules(
             }
             PhysicalOptimizerContext::AggregateTopk => {
                 #[cfg(feature = "enterprise")]
-                rules.push(Arc::new(AggregateTopkRule::new(sql.limit as u64)));
+                rules.push(Arc::new(AggregateTopkRule::new(sql.limit)));
                 #[cfg(not(feature = "enterprise"))]
                 continue;
             }
