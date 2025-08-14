@@ -946,12 +946,6 @@ pub struct Common {
     )]
     pub inverted_index_result_cache_enabled: bool,
     #[env_config(
-        name = "ZO_INVERTED_INDEX_CACHE_ENABLED",
-        default = false,
-        help = "Toggle inverted index cache."
-    )]
-    pub inverted_index_cache_enabled: bool,
-    #[env_config(
         name = "ZO_INVERTED_INDEX_CAMEL_CASE_TOKENIZER_DISABLED",
         default = false,
         help = "Disable camel case tokenizer for inverted index."

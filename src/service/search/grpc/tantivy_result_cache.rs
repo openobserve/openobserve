@@ -25,7 +25,7 @@ use roaring::RoaringBitmap;
 
 use crate::service::search::grpc::utils::TantivyResult;
 
-pub static TANTIVY_RESULT_CACHE: Lazy<Arc<TantivyResultCache>> =
+pub static GLOBAL_CACHE: Lazy<Arc<TantivyResultCache>> =
     Lazy::new(|| Arc::new(TantivyResultCache::default()));
 
 #[derive(Debug, Clone)]
@@ -138,6 +138,17 @@ impl TantivyResultCache {
             .with_label_values(&[])
             .add(memory_usage as i64);
         self.readers.insert(key, value)
+    }
+
+    pub fn len(&self) -> usize {
+        self.readers.len()
+    }
+
+    pub fn memory_size(&self) -> usize {
+        self.readers
+            .iter()
+            .map(|r| r.value().get_memory_size() + 2 * r.key().capacity())
+            .sum()
     }
 }
 
@@ -417,7 +428,7 @@ mod tests {
 
     #[test]
     fn test_global_cache_accessibility() {
-        let global_cache = &*TANTIVY_RESULT_CACHE;
+        let global_cache = &*GLOBAL_CACHE;
 
         let key = "global_test_key".to_string();
         let result = create_test_count_result();
