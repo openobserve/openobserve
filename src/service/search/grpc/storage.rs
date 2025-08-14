@@ -65,7 +65,6 @@ use crate::service::{
         caching_directory::CachingDirectory,
         footer_cache::FooterCache,
         reader::{PuffinDirReader, warm_up_terms},
-        reader_cache,
     },
 };
 
@@ -945,7 +944,7 @@ async fn search_tantivy_index(
             .with_label_values(&[])
             .inc();
         cache_key = generate_cache_key(&index_condition, &idx_optimize_rule, parquet_file);
-        if let Some(result) = tantivy_result_cache::TANTIVY_RESULT_CACHE.get(&cache_key) {
+        if let Some(result) = tantivy_result_cache::GLOBAL_CACHE.get(&cache_key) {
             metrics::TANTIVY_RESULT_CACHE_HITS_TOTAL
                 .with_label_values(&[])
                 .inc();
@@ -953,48 +952,33 @@ async fn search_tantivy_index(
         }
     }
 
-    // cache the indexer and reader
-    let indexer = if cfg.common.inverted_index_cache_enabled {
-        reader_cache::GLOBAL_CACHE.get(&ttv_file_name)
-    } else {
-        None
-    };
-    let (tantivy_index, tantivy_reader) = match indexer {
-        Some((indexer, reader)) => (indexer, reader),
-        None => {
-            log::debug!("[trace_id {trace_id}] init cache for tantivy file: {ttv_file_name}");
+    // open the tantivy index
+    log::debug!("[trace_id {trace_id}] init cache for tantivy file: {ttv_file_name}");
 
-            let puffin_dir = Arc::new(
-                get_tantivy_directory(
-                    trace_id,
-                    &file_account,
-                    &ttv_file_name,
-                    parquet_file.meta.index_size,
-                )
-                .await?,
-            );
-            let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
-            let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
-            let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
+    let puffin_dir = Arc::new(
+        get_tantivy_directory(
+            trace_id,
+            &file_account,
+            &ttv_file_name,
+            parquet_file.meta.index_size,
+        )
+        .await?,
+    );
+    let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
+    let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
+    let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
 
-            let index = tantivy::Index::open(reader_directory)?;
-            index
-                .tokenizers()
-                .register(O2_TOKENIZER, o2_tokenizer_build());
-            let reader = index
-                .reader_builder()
-                .reload_policy(tantivy::ReloadPolicy::Manual)
-                .num_warming_threads(0)
-                .try_into()?;
-            let index = Arc::new(index);
-            let reader = Arc::new(reader);
-            if cfg.common.inverted_index_cache_enabled {
-                reader_cache::GLOBAL_CACHE
-                    .put(ttv_file_name.to_string(), (index.clone(), reader.clone()));
-            }
-            (index, reader)
-        }
-    };
+    let index = tantivy::Index::open(reader_directory)?;
+    index
+        .tokenizers()
+        .register(O2_TOKENIZER, o2_tokenizer_build());
+    let reader = index
+        .reader_builder()
+        .reload_policy(tantivy::ReloadPolicy::Manual)
+        .num_warming_threads(0)
+        .try_into()?;
+    let tantivy_index = Arc::new(index);
+    let tantivy_reader = Arc::new(reader);
 
     let searcher = tantivy_reader.searcher();
     let tantivy_schema = tantivy_index.schema();
@@ -1131,7 +1115,7 @@ async fn search_tantivy_index(
             || percent < 1.0)
     {
         let entry = get_cache_entry(result.clone(), percent);
-        tantivy_result_cache::TANTIVY_RESULT_CACHE.put(cache_key, entry);
+        tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
     }
     Ok((key, result))
 }
