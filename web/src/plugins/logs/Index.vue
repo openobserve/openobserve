@@ -2373,17 +2373,17 @@ export default defineComponent({
             return;
           }
 
+          if (this.chartRedrawTimeout) clearTimeout(this.chartRedrawTimeout);
+
           this.processHttpHistogramResults(
             this.searchObj.data.customDownloadQueryObj,
+            false,
           )
             .then((res: any) => {
               this.refreshTimezone();
-              const timeout = setTimeout(() => {
+              this.chartRedrawTimeout = setTimeout(() => {
                 if (this.searchResultRef) this.searchResultRef.reDrawChart();
               }, 100);
-
-              // Store timeout reference for cleanup
-              this.chartRedrawTimeout = timeout;
             })
             .finally(() => {
               this.searchObj.loadingHistogram = false;

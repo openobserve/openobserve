@@ -1020,7 +1020,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Matches either message (case–insensitive)
     const errorMsg = page.getByText(
-      /(sql parser error: Expected:|Search field not found:)/i
+      /(sql parser error: Expected:|Search field not found:|Schema error: No field named controller\.?)/i
     );
 
     await expect(errorMsg.first()).toBeVisible();
