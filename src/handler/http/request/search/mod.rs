@@ -42,9 +42,10 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_is_ui_histogram_from_request, get_or_create_trace_id,
-                get_search_event_context_from_request, get_search_type_from_request,
-                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
+                get_enable_align_histogram_from_request, get_is_ui_histogram_from_request,
+                get_or_create_trace_id, get_search_event_context_from_request,
+                get_search_type_from_request, get_stream_type_from_request,
+                get_use_cache_from_request, get_work_group,
             },
             stream::get_settings_max_query_range,
         },
@@ -1259,6 +1260,7 @@ async fn values_v1(
         ("Authorization"= [])
     ),
     params(
+        ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
@@ -1306,15 +1308,12 @@ pub async fn search_partition(
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let search_type = get_search_type_from_request(&query).map_or(SearchEventType::Other, |opt| {
-        opt.unwrap_or(SearchEventType::Other)
-    });
+    let enable_align_histogram = get_enable_align_histogram_from_request(&query);
 
     let mut req: config::meta::search::SearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
-    req.search_type = Some(search_type);
 
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
@@ -1328,6 +1327,7 @@ pub async fn search_partition(
         &req,
         false,
         true,
+        enable_align_histogram,
     )
     .instrument(http_span)
     .await;
