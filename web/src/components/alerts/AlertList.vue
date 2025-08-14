@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="alert-list-page"
     class="q-pa-none flex"
-    style="height: calc(100vh - 57px);"
+    style="height: calc(100vh - 65px);"
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   >
     <div
@@ -61,12 +61,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
           </template>
         </q-input>
-        <div>
+        <div class="tw-mb-2">
           <q-toggle
             data-test="alert-list-search-across-folders-toggle"
             v-model="searchAcrossFolders"
             label="All Folders"
-            class="tw-mr-3 tw-h-[36px]"
+            class="tw-mr-3 tw-h-[36px] o2-toggle-button-lg"
+            size="lg"
+            :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
           >
           </q-toggle>
           <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
