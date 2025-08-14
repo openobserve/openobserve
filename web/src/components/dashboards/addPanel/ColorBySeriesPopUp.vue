@@ -223,7 +223,6 @@ export default defineComponent({
     });
 
     // Watcher to ensure series.value is always a string
-    console.log(editColorBySeries.value, "editcolorbyseries");
     watch(
       editColorBySeries,
       (newVal) => {
@@ -260,8 +259,6 @@ export default defineComponent({
         color: null,
       });
     };
-
-    console.log("props", props?.seriesOptions);
 
     // Use props.options for series dropdown options (not for initialization)
     const seriesDataItems = computed(
@@ -301,7 +298,6 @@ export default defineComponent({
       // Only save if fields are not empty
       if (isFieldEmpty.value) {
         emit("save", editColorBySeries.value);
-        console.log("Saving color by series:", editColorBySeries.value);
       }
     };
 
