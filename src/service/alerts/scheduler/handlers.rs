@@ -937,7 +937,7 @@ async fn handle_report_triggers(
         return Ok(());
     }
     match report.send_subscribers().await {
-        Ok(is_partial) => {
+        Ok(_) => {
             log::info!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Report name: {report_name} id: {report_id} sent to destination"
             );
@@ -949,9 +949,6 @@ async fn handle_report_triggers(
             log::debug!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Update trigger for report name: {report_name} id: {report_id}"
             );
-            if is_partial {
-                trigger_data_stream.status = TriggerDataStatus::PartiallyComplete
-            };
             trigger_data_stream.end_time = now_micros();
         }
         Err(e) => {
