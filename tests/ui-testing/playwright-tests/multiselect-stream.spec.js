@@ -171,7 +171,7 @@ await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-refresh-time-5"]').click({
       force: true,
     });
-    await page.waitForTimeout(8000);
+    await page.waitForTimeout(1000);
     await expect(page.locator(".q-notification__message")).toContainText(
       "Live mode is enabled"
     );
