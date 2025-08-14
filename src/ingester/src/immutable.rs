@@ -39,7 +39,6 @@ pub(crate) static IMMUTABLES: Lazy<RwIndexMap<PathBuf, Arc<Immutable>>> =
 static PROCESSING_TABLES: Lazy<RwLock<HashSet<PathBuf>>> =
     Lazy::new(|| RwLock::new(HashSet::new()));
 
-#[warn(dead_code)]
 pub(crate) struct Immutable {
     idx: usize,
     key: WriterKey,
