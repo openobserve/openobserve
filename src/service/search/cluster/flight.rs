@@ -30,9 +30,7 @@ use config::{
     utils::{json, time::now_micros},
 };
 use datafusion::{
-    common::TableReference,
-    physical_plan::{ExecutionPlan, visit_execution_plan},
-    prelude::SessionContext,
+    common::TableReference, physical_plan::visit_execution_plan, prelude::SessionContext,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -41,6 +39,7 @@ use infra::{
     file_list::FileId,
 };
 use itertools::Itertools;
+use parking_lot::Mutex;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -53,7 +52,9 @@ use crate::{
             datafusion::{
                 exec::{DataFusionContextBuilder, register_udf},
                 optimizer::{
-                    context::{PhysicalOptimizerContext, RemoteScanContext},
+                    context::{
+                        PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext,
+                    },
                     generate_analyzer_rules, generate_optimizer_rules,
                     generate_physical_optimizer_rules,
                 },
@@ -400,6 +401,7 @@ pub async fn run_datafusion(
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
 
+    let is_complete_cache_hit = Arc::new(Mutex::new(false));
     let ctx = SearchContextBuilder::new()
         .target_partitions(cfg.limit.cpu_num)
         .add_context(PhysicalOptimizerContext::RemoteScan(RemoteScanContext {
@@ -409,6 +411,9 @@ pub async fn run_datafusion(
             is_leader: false,
         }))
         .add_context(PhysicalOptimizerContext::AggregateTopk)
+        .add_context(PhysicalOptimizerContext::StreamingAggregation(
+            StreamingAggregationContext::new(&req, is_complete_cache_hit.clone()).await?,
+        ))
         .build(&req, &sql)
         .await?;
 
@@ -419,62 +424,20 @@ pub async fn run_datafusion(
 
     register_table(&ctx, &sql).await?;
     let plan = ctx.state().create_logical_plan(&sql.sql).await?;
-    #[allow(unused_mut)]
-    let mut physical_plan = ctx.state().create_physical_plan(&plan).await?;
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
-        print_plan(&trace_id, &physical_plan, "before");
+        log::info!("[trace_id {trace_id}] leader physical plan");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
+        );
     }
 
-    #[allow(unused_mut)]
     let mut aggs_cache_ratio = 0;
-    #[cfg(feature = "enterprise")]
-    if req.streaming_output {
-        let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
-        let streaming_id = req.streaming_id.clone();
-        let use_cache = req.use_cache;
-        let org_id = req.org_id.clone();
-        let Some(streaming_id) = streaming_id else {
-            return Err(Error::Message(
-                "streaming_id is required for streaming aggregation query".to_string(),
-            ));
-        };
-
-        // NOTE: temporary check
-        let org_settings = crate::service::db::organization::get_org_setting(&org_id)
-            .await
-            .unwrap_or_default();
-        let use_cache = use_cache && org_settings.streaming_aggregation_enabled;
-        let target_partitions = ctx.state().config().target_partitions();
-        let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) =
-            o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_streaming_agg_plan(
-                streaming_id,
-                start_time,
-                end_time,
-                use_cache,
-                target_partitions,
-                physical_plan,
-            )?;
-        physical_plan = plan;
-        // Check for aggs cache hit
-        if is_complete_cache_hit {
-            aggs_cache_ratio = 100;
-        }
-
-        // no need to run datafusion, return empty result
-        if is_complete_cache_hit_with_no_data {
-            let scan_stats = ScanStats {
-                aggs_cache_ratio,
-                ..Default::default()
-            };
-            return Ok((vec![], scan_stats, "".to_string()));
-        }
+    if *is_complete_cache_hit.lock() {
+        aggs_cache_ratio = 100;
     }
-
-    if cfg.common.print_key_sql {
-        print_plan(&trace_id, &physical_plan, "after");
-    }
-
     // run datafusion
     let datafusion_start = std::time::Instant::now();
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
@@ -920,12 +883,4 @@ pub async fn get_file_id_lists(
         file_lists.insert(stream.clone(), file_id_list);
     }
     Ok(file_lists)
-}
-
-pub fn print_plan(trace_id: &str, physical_plan: &Arc<dyn ExecutionPlan>, stage: &str) {
-    log::info!("[trace_id {trace_id}] leader physical plan {stage} rewrite");
-    log::info!(
-        "{}",
-        config::meta::plan::generate_plan_string(trace_id, physical_plan.as_ref())
-    );
 }

@@ -33,6 +33,7 @@ use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use itertools::Itertools;
 use o2_enterprise::enterprise::{search::WorkGroup, super_cluster::search::get_cluster_nodes};
+use parking_lot::Mutex;
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -40,7 +41,9 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::service::search::{
     DATAFUSION_RUNTIME, SearchResult,
     cluster::flight::{SearchContextBuilder, register_table},
-    datafusion::optimizer::context::{PhysicalOptimizerContext, RemoteScanContext},
+    datafusion::optimizer::context::{
+        PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext,
+    },
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     request::Request,
     sql::Sql,
@@ -216,6 +219,7 @@ async fn run_datafusion(
     req.add_work_group(Some(work_group));
 
     // construct physical plan
+    let is_complete_cache_hit = Arc::new(Mutex::new(false));
     let ctx = SearchContextBuilder::new()
         .target_partitions(cfg.limit.cpu_num)
         .add_context(PhysicalOptimizerContext::RemoteScan(RemoteScanContext {
@@ -225,6 +229,9 @@ async fn run_datafusion(
             is_leader: true,
         }))
         .add_context(PhysicalOptimizerContext::AggregateTopk)
+        .add_context(PhysicalOptimizerContext::StreamingAggregation(
+            StreamingAggregationContext::new(&req, is_complete_cache_hit.clone()).await?,
+        ))
         .build(&req, &sql)
         .await?;
 
@@ -238,66 +245,12 @@ async fn run_datafusion(
             return Err(e.into());
         }
     };
-    let mut physical_plan = match ctx.state().create_physical_plan(&plan).await {
+    let physical_plan = match ctx.state().create_physical_plan(&plan).await {
         Ok(v) => v,
         Err(e) => {
             return Err(e.into());
         }
     };
-
-    if cfg.common.print_key_sql {
-        log::info!("[trace_id {trace_id}] leader physical plan before rewrite");
-        log::info!(
-            "{}",
-            config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
-        );
-    }
-
-    let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
-    let streaming_output = req.streaming_output;
-    let streaming_id = req.streaming_id.clone();
-    let use_cache = req.use_cache;
-    let org_id = req.org_id.clone();
-
-    // check for streaming aggregation query
-    let mut aggs_cache_ratio = 0;
-    if streaming_output {
-        let Some(streaming_id) = streaming_id else {
-            return Err(Error::Message(
-                "streaming_id is required for streaming aggregation query".to_string(),
-            ));
-        };
-
-        // NOTE: temporary check
-        let org_settings = crate::service::db::organization::get_org_setting(&org_id)
-            .await
-            .unwrap_or_default();
-        let use_cache = use_cache && org_settings.streaming_aggregation_enabled;
-        let target_partitions = ctx.state().config().target_partitions();
-        let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) =
-            o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_streaming_agg_plan(
-                streaming_id,
-                start_time,
-                end_time,
-                use_cache,
-                target_partitions,
-                physical_plan,
-            )?;
-        physical_plan = plan;
-        // Check for aggs cache hit
-        if is_complete_cache_hit {
-            aggs_cache_ratio = 100;
-        }
-
-        // no need to run datafusion, return empty result
-        if is_complete_cache_hit_with_no_data {
-            let scan_stats = ScanStats {
-                aggs_cache_ratio,
-                ..Default::default()
-            };
-            return Ok((vec![], scan_stats, "".to_string()));
-        }
-    }
 
     if cfg.common.print_key_sql {
         log::info!("[trace_id {trace_id}] leader physical plan after rewrite");
@@ -307,6 +260,11 @@ async fn run_datafusion(
         );
     }
 
+    let mut aggs_cache_ratio = 0;
+    if *is_complete_cache_hit.lock() {
+        aggs_cache_ratio = 100;
+    }
+    // run datafusion
     let datafusion_start = std::time::Instant::now();
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
     let mut visit = ScanStatsVisitor::new();

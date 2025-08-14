@@ -43,6 +43,7 @@ use rewrite_histogram::RewriteHistogram;
 use rewrite_match::RewriteMatch;
 #[cfg(feature = "enterprise")]
 use {
+    crate::service::search::datafusion::optimizer::context::generate_streaming_agg_rules,
     cipher::{RewriteCipherCall, RewriteCipherKey},
     o2_enterprise::enterprise::search::datafusion::optimizer::aggregate_topk::AggregateTopkRule,
 };
@@ -194,6 +195,14 @@ pub fn generate_physical_optimizer_rules(
                 rules.push(Arc::new(AggregateTopkRule::new(sql.limit)));
                 #[cfg(not(feature = "enterprise"))]
                 continue;
+            }
+            PhysicalOptimizerContext::StreamingAggregation(context) => {
+                if let Some(context) = context {
+                    #[cfg(feature = "enterprise")]
+                    rules.push(generate_streaming_agg_rules(context));
+                    #[cfg(not(feature = "enterprise"))]
+                    continue;
+                }
             }
         }
     }
