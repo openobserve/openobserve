@@ -295,6 +295,7 @@ pub async fn get_latest_traces(
         &req,
         "".to_string(),
         false,
+        false,
         None,
     )
     .instrument(http_span.clone())
@@ -383,6 +384,7 @@ pub async fn get_latest_traces(
             user_id.clone(),
             &req,
             "".to_string(),
+            false,
             false,
             None,
         )
