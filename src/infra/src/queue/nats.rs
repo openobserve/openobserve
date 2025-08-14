@@ -77,7 +77,7 @@ impl super::Queue for NatsQueue {
             retention: jetstream::stream::RetentionPolicy::Limits,
             max_age: Duration::from_secs(60 * 60 * 24 * max(1, cfg.nats.queue_max_age)),
             num_replicas: cfg.nats.replicas,
-            max_bytes: cfg.nats.queue_max_bytes,
+            max_bytes: cfg.nats.queue_max_size,
             ..Default::default()
         };
         _ = jetstream.get_or_create_stream(config).await?;

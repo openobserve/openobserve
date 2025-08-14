@@ -1748,8 +1748,12 @@ pub struct Nats {
     pub subscription_capacity: usize,
     #[env_config(name = "ZO_NATS_QUEUE_MAX_AGE", default = 60)] // days
     pub queue_max_age: u64,
-    #[env_config(name = "ZO_NATS_QUEUE_MAX_BYTES", default = 1024 * 1024 * 1024)] // 1GB
-    pub queue_max_bytes: i64,
+    #[env_config(
+        name = "ZO_NATS_QUEUE_MAX_SIZE",
+        help = "The maximum size of the queue in GB, 0 means no limit",
+        default = 0
+    )] // GB
+    pub queue_max_size: i64,
 }
 
 #[derive(Debug, Default, EnvConfig)]
@@ -2112,6 +2116,11 @@ pub fn init() -> Config {
     // check pipeline config
     if let Err(e) = check_pipeline_config(&mut cfg) {
         panic!("pipeline config error: {e}");
+    }
+
+    // check nats config
+    if let Err(e) = check_nats_config(&mut cfg) {
+        panic!("nats config error: {e}");
     }
 
     cfg
@@ -2921,6 +2930,14 @@ pub fn get_parquet_compression(compression: &str) -> parquet::basic::Compression
         "zstd" => parquet::basic::Compression::ZSTD(Default::default()),
         _ => parquet::basic::Compression::ZSTD(Default::default()),
     }
+}
+
+fn check_nats_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.nats.queue_max_size == 0 {
+        cfg.nats.queue_max_size = 2; // 2GB
+    }
+    cfg.nats.queue_max_size *= 1024 * 1024 * 1024; // convert to bytes
+    Ok(())
 }
 
 #[cfg(test)]
