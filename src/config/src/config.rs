@@ -1751,7 +1751,7 @@ pub struct Nats {
     #[env_config(
         name = "ZO_NATS_QUEUE_MAX_SIZE",
         help = "The maximum size of the queue in GB",
-        default = 0
+        default = 2
     )] // GB
     pub queue_max_size: i64,
 }
