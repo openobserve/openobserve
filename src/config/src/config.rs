@@ -1919,7 +1919,7 @@ pub struct Pipeline {
     #[env_config(
         name = "ZO_PIPELINE_SINK_TASK_SPAWN_INTERVAL_MS",
         default = 100,
-        help = "interval in seconds to spawn a new sink task"
+        help = "interval in milliseconds to spawn a new sink task"
     )]
     pub pipeline_sink_task_spawn_interval_ms: u64,
 }
@@ -2760,7 +2760,7 @@ fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     
     if cfg.pipeline.pipeline_file_push_back_interval == 0 {
-        cfg.pipeline.pipeline_file_push_back_interval = 2; // 60 seconds
+        cfg.pipeline.pipeline_file_push_back_interval = 2; // 2 seconds
     }
 
     if cfg.pipeline.pipeline_sink_task_spawn_interval_ms == 0 {
