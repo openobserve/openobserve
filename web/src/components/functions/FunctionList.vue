@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="id"
         :pagination="pagination"
         :filter="filterQuery"
-        :filter-method="filterData"
         style="width: 100%"
         :style="hasVisibleRows
             ? 'width: 100%; height: calc(100vh - 114px)' 
