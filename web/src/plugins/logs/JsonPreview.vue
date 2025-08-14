@@ -2,6 +2,7 @@
   <div>
     <div class="q-pb-xs flex justify-start q-px-md copy-log-btn">
       <app-tabs
+        v-if="filteredTabs.length"
         class="logs-json-preview-tabs q-mr-sm"
         style="border: 1px solid #8a8a8a; border-radius: 4px; overflow: hidden"
         data-test="logs-json-preview-tabs"
@@ -203,13 +204,23 @@
                 >
               </q-item-section>
             </q-item>
-            <q-item v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled" clickable v-close-popup>
+            <q-item
+              v-if="
+                config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
+              "
+              clickable
+              v-close-popup
+            >
               <q-item-section>
                 <q-item-label
                   data-test="send-to-ai-chat-btn"
-                  @click.stop="sendToAiChat(JSON.stringify({
-                    [key]: value[key],
-                  }))"
+                  @click.stop="
+                    sendToAiChat(
+                      JSON.stringify({
+                        [key]: value[key],
+                      }),
+                    )
+                  "
                   v-close-popup
                   ><q-btn
                     title="Send to AI Chat"
@@ -217,8 +228,11 @@
                     round
                     class="q-mr-sm pointer"
                   >
-                  <q-img height="14px" width="14px" :src="getBtnLogo" />
-                  </q-btn
+                    <q-img
+                      height="14px"
+                      width="14px"
+                      :src="getBtnLogo"
+                    /> </q-btn
                   >Send to AI Chat</q-item-label
                 >
               </q-item-section>
@@ -294,7 +308,14 @@ export default {
       () => import("@/components/CodeQueryEditor.vue"),
     ),
   },
-  emits: ["copy", "addSearchTerm", "addFieldToTable", "view-trace", "sendToAiChat","closeTable"],
+  emits: [
+    "copy",
+    "addSearchTerm",
+    "addFieldToTable",
+    "view-trace",
+    "sendToAiChat",
+    "closeTable",
+  ],
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
@@ -519,10 +540,10 @@ export default {
     };
 
     const getBtnLogo = computed(() => {
-      return store.state.theme === 'dark'
-        ? getImageURL('images/common/ai_icon_dark.svg')
-        : getImageURL('images/common/ai_icon.svg')
-    })
+      return store.state.theme === "dark"
+        ? getImageURL("images/common/ai_icon_dark.svg")
+        : getImageURL("images/common/ai_icon.svg");
+    });
 
     return {
       t,
@@ -554,7 +575,7 @@ export default {
       addOrRemoveLabel,
       sendToAiChat,
       getBtnLogo,
-      config
+      config,
     };
   },
 };
