@@ -898,6 +898,7 @@ async fn get_partitions(
     Ok(res)
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "service:search:http::do_search", skip_all)]
 async fn do_search(
     trace_id: &str,
