@@ -231,7 +231,6 @@ pub async fn publish_error(error_data: ErrorData) {
     if !cfg.common.usage_enabled {
         return;
     }
-
     match queues::ERROR_QUEUE
         .enqueue(ReportingData::Error(Box::new(error_data)))
         .await
