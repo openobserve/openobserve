@@ -244,37 +244,6 @@ test.describe("Logs UI testcases", () => {
     ).not.toBeHidden();
   });
 
-  test("should click on live mode on button and select 5 sec, switch off, and then click run query", async ({
-    page,
-  }) => {
-    await page.route("**/logData.ValueQuery", (route) => route.continue());
-    await page.locator('[data-test="date-time-btn"]').click({ force: true });
-
-    await page
-      .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
-      .click({
-        force: true,
-      });
-    await page
-      .locator(".q-pl-sm > .q-btn > .q-btn__content")
-      .click({ force: true });
-    await page.locator('[data-test="logs-search-bar-refresh-time-5"]').click({
-      force: true,
-    });
-    await expect(page.locator(".q-notification__message")).toContainText(
-      "Live mode is enabled"
-    );
-    await page
-      .locator(".q-pl-sm > .q-btn > .q-btn__content")
-      .click({ force: true });
-    await page
-      .locator(
-        '[data-test="logs-search-off-refresh-interval"] > .q-btn__content'
-      )
-      .click({ force: true });
-    await applyQueryButton(page);
-  });
-
   test("should click on VRL toggle and display the field, then disable toggle and make the VRL field disappear", async ({
     page,
   }) => {

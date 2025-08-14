@@ -252,10 +252,10 @@ test.describe("Unflattened testcases", () => {
 
     // Update the query editor with 'SELECT * FROM "e2e_automate"'
     await unflattenedPage.logsSearchBarQueryEditor.waitFor();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').first().click();
     await unflattenedPage.logsSearchBarQueryEditor.click();
-    await page.keyboard.press("Control+A");
-    await page.keyboard.press("Delete");
     await page.keyboard.type('SELECT * FROM "e2e_automate"');
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.waitForTimeout(2000);
 
     // Interact with log table rows and verify details

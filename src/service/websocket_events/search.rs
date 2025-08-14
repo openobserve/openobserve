@@ -360,6 +360,7 @@ async fn do_search(
         &req.payload,
         "".to_string(),
         true,
+        false, // websocket no longer used
     )
     .await;
 
@@ -792,7 +793,6 @@ async fn get_partitions(
         query_fn: Default::default(),
         streaming_output: true,
         histogram_interval: search_payload.query.histogram_interval,
-        search_type: Some(req.search_type),
     };
 
     let res = SearchService::search_partition(
@@ -803,6 +803,7 @@ async fn get_partitions(
         &search_partition_req,
         false,
         false,
+        false, //  TEMPORARY, Websocket deprecated
     )
     .instrument(tracing::info_span!(
         "src::handler::http::request::websocket::search::get_partitions"

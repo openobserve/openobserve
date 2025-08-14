@@ -19,8 +19,8 @@ use hashbrown::HashSet;
 use sqlparser::{
     ast::{
         DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList,
-        FunctionArguments, GroupByExpr, Query, SelectItem, SetExpr, Statement, TableFactor, Visit,
-        Visitor,
+        FunctionArguments, GroupByExpr, Query, SelectItem, SetExpr, SetQuantifier, Statement,
+        TableFactor, Visit, Visitor,
     },
     dialect::GenericDialect,
     parser::Parser,
@@ -170,7 +170,12 @@ fn is_aggregate_expression(expr: &Expr) -> bool {
 // (is_eligible_for_histogram, is_sub_query)
 pub fn is_eligible_for_histogram(
     query: &str,
+    is_multi_stream_search: bool,
 ) -> Result<(bool, bool), sqlparser::parser::ParserError> {
+    if is_multi_stream_search {
+        let is_eligible = is_multi_search_eligible_for_histogram(query)?;
+        return Ok((is_eligible, false));
+    }
     // Histogram is not available for CTE, DISTINCT, UNION, JOIN and LIMIT queries.
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
@@ -188,6 +193,20 @@ pub fn is_eligible_for_histogram(
         }
     }
     Ok((true, false))
+}
+
+fn is_multi_search_eligible_for_histogram(
+    query: &str,
+) -> Result<bool, sqlparser::parser::ParserError> {
+    let ast = Parser::parse_sql(&GenericDialect {}, query)?;
+    for statement in ast.iter() {
+        if let Statement::Query(query) = statement
+            && has_union_all(query)
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 // Check if has group_by
@@ -281,6 +300,12 @@ fn has_union(query: &Query) -> bool {
     visitor.has_union
 }
 
+fn has_union_all(query: &Query) -> bool {
+    let mut visitor = UnionAllVisitor::new();
+    let _ = query.visit(&mut visitor);
+    visitor.has_union_all
+}
+
 fn has_subquery(stat: &Statement) -> bool {
     let mut visitor = SubqueryVisitor::new();
     let _ = stat.visit(&mut visitor);
@@ -303,6 +328,32 @@ impl Visitor for UnionVisitor {
     fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
         if let SetExpr::SetOperation { .. } = *query.body {
             self.has_union = true;
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+struct UnionAllVisitor {
+    pub has_union_all: bool,
+}
+
+impl UnionAllVisitor {
+    fn new() -> Self {
+        Self {
+            has_union_all: false,
+        }
+    }
+}
+
+impl Visitor for UnionAllVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<Self::Break> {
+        if let SetExpr::SetOperation { set_quantifier, .. } = *query.body
+            && set_quantifier == SetQuantifier::All
+        {
+            self.has_union_all = true;
             return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
@@ -744,36 +795,36 @@ mod tests {
         let queries = [
             // Test case 1: Query with JOINs (should be false)
             (
-                r#"SELECT COUNT(*), SUM(a.value) 
-                   FROM table_a a 
+                r#"SELECT COUNT(*), SUM(a.value)
+                   FROM table_a a
                    JOIN table_b b ON a.id = b.id"#,
                 "Query with JOIN should not be simple",
             ),
             // Test case 2: Query with table subquery in FROM clause (should be false)
             (
-                r#"SELECT COUNT(*), AVG(total) 
+                r#"SELECT COUNT(*), AVG(total)
                    FROM (SELECT SUM(value) as total FROM events GROUP BY user_id) subq"#,
                 "Query with table subquery should not be simple",
             ),
             // Test case 3: Query with expression subquery (should be false)
             (
-                r#"SELECT COUNT(*), AVG(salary) 
-                   FROM employees 
+                r#"SELECT COUNT(*), AVG(salary)
+                   FROM employees
                    WHERE department_id IN (SELECT id FROM departments WHERE active = 1)"#,
                 "Query with expression subquery should not be simple",
             ),
             // Test case 4: Query with UNION (should be false)
             (
                 r#"SELECT COUNT(*) FROM (
-                     SELECT user_id FROM events_2023 
-                     UNION ALL 
+                     SELECT user_id FROM events_2023
+                     UNION ALL
                      SELECT user_id FROM events_2024
                    ) combined"#,
                 "Query with UNION should not be simple",
             ),
             // Test case 5: Query with window functions (should be false)
             (
-                r#"SELECT COUNT(*), 
+                r#"SELECT COUNT(*),
                           SUM(value) OVER (PARTITION BY category) as window_sum
                    FROM events"#,
                 "Query with window functions should not be simple",
@@ -788,7 +839,7 @@ mod tests {
             ),
             // Test case 7: Complex query with multiple complexity factors (should be false)
             (
-                r#"SELECT 
+                r#"SELECT
                      SUM(event_count) OVER (PARTITION BY time_bucket) AS total_events,
                      time_bucket,
                      ROW_NUMBER() OVER (PARTITION BY time_bucket) AS row_num
@@ -807,7 +858,7 @@ mod tests {
             ),
             // Test case 8: Query with EXISTS subquery (should be false)
             (
-                r#"SELECT COUNT(*), AVG(amount) 
+                r#"SELECT COUNT(*), AVG(amount)
                    FROM orders o
                    WHERE EXISTS (SELECT 1 FROM customers c WHERE c.id = o.customer_id AND c.active = 1)"#,
                 "Query with EXISTS subquery should not be simple",
@@ -825,7 +876,7 @@ mod tests {
                      SELECT SUM(amount) as total FROM sales_q1
                      UNION
                      (SELECT SUM(amount) as total FROM sales_q2
-                      UNION 
+                      UNION
                       SELECT SUM(amount) as total FROM sales_q3)
                    )"#,
                 "Query with nested UNION should not be simple",
@@ -834,7 +885,7 @@ mod tests {
             (
                 r#"WITH user_totals AS (
                      SELECT user_id, SUM(amount) as total
-                     FROM orders 
+                     FROM orders
                      GROUP BY user_id
                    )
                    SELECT COUNT(*) FROM user_totals WHERE total > 100"#,
@@ -844,7 +895,7 @@ mod tests {
             (
                 r#"WITH sales_summary AS (
                      SELECT region, SUM(amount) as total_sales
-                     FROM sales 
+                     FROM sales
                      GROUP BY region
                    ),
                    top_regions AS (
@@ -860,7 +911,7 @@ mod tests {
                      FROM categories WHERE parent_id IS NULL
                      UNION ALL
                      SELECT c.id, c.parent_id, c.name, h.level + 1
-                     FROM categories c 
+                     FROM categories c
                      JOIN hierarchy h ON c.parent_id = h.id
                    )
                    SELECT COUNT(*) FROM hierarchy"#,
@@ -869,7 +920,7 @@ mod tests {
             // Test case 14: Query with CTE containing complex operations (should be false)
             (
                 r#"WITH complex_cte AS (
-                     SELECT user_id, 
+                     SELECT user_id,
                             ROW_NUMBER() OVER (ORDER BY created_at) as rank,
                             SUM(amount) OVER (PARTITION BY region) as region_total
                      FROM orders
@@ -921,23 +972,23 @@ mod tests {
             ),
             // Test case 4: Aggregate with GROUP BY and HAVING
             (
-                r#"SELECT category, COUNT(*), AVG(price) 
-                   FROM products 
-                   GROUP BY category 
+                r#"SELECT category, COUNT(*), AVG(price)
+                   FROM products
+                   GROUP BY category
                    HAVING COUNT(*) > 5"#,
                 "Aggregate with GROUP BY and HAVING should be simple",
             ),
             // Test case 5: Query with DISTINCT (should be true)
             (
-                r#"SELECT DISTINCT user_id, COUNT(*) 
-                   FROM events 
+                r#"SELECT DISTINCT user_id, COUNT(*)
+                   FROM events
                    GROUP BY user_id"#,
                 "Query with DISTINCT should be simple",
             ),
             // Test case 6: Query with DISTINCT and aggregate (should be true)
             (
                 r#"SELECT DISTINCT region, SUM(amount) as total
-                   FROM sales 
+                   FROM sales
                    GROUP BY region"#,
                 "Query with DISTINCT and aggregate should be simple",
             ),
@@ -976,25 +1027,25 @@ mod tests {
     #[test]
     fn check_is_simple_aggregate_for_complex_queries_should_be_false_2() {
         let queries = [r#"
-            SELECT 
+            SELECT
                 SUM(event_count) OVER (PARTITION BY time_bucket) AS total_events,
                 time_bucket,
                 (
-                    SUM(error_events) OVER (PARTITION BY time_bucket) / 
+                    SUM(error_events) OVER (PARTITION BY time_bucket) /
                     SUM(event_count) OVER (PARTITION BY time_bucket)
                 ) AS error_rate,
                 (
-                    CASE 
-                        WHEN (SUM(error_events) OVER (PARTITION BY time_bucket) / 
-                              SUM(event_count) OVER (PARTITION BY time_bucket)) > 0.001 
-                             AND SUM(event_count) OVER (PARTITION BY time_bucket) > 1 
-                        THEN 1 
-                        ELSE 0 
+                    CASE
+                        WHEN (SUM(error_events) OVER (PARTITION BY time_bucket) /
+                              SUM(event_count) OVER (PARTITION BY time_bucket)) > 0.001
+                             AND SUM(event_count) OVER (PARTITION BY time_bucket) > 1
+                        THEN 1
+                        ELSE 0
                     END
                 ) AS alert_flag,
                 ROW_NUMBER() OVER (PARTITION BY time_bucket) AS row_num
             FROM (
-                SELECT 
+                SELECT
                     histogram(event_time, '5 minutes') AS time_bucket,
                     0 AS error_events,
                     'source_a' AS source_type,
@@ -1005,10 +1056,10 @@ mod tests {
                         path = '/' OR path LIKE '/?%' OR path = '/variant' OR path LIKE '/variant?%'
                     )
                 GROUP BY time_bucket
-    
+
                 UNION ALL
-    
-                SELECT 
+
+                SELECT
                     histogram(event_time, '5 minutes') AS time_bucket,
                     CAST(SUM(CASE WHEN status_code = '500' THEN 1 END) AS FLOAT) AS error_events,
                     'source_b' AS source_type,
@@ -1037,7 +1088,7 @@ mod tests {
             r#"SELECT * FROM "olympics" WHERE _timestamp >= 1716854400000 AND _timestamp <= 1716940800000"#,
         ];
         for query in queries.iter() {
-            let (is_eligible, is_sub_query) = is_eligible_for_histogram(query).unwrap();
+            let (is_eligible, is_sub_query) = is_eligible_for_histogram(query, false).unwrap();
             assert_eq!(is_eligible, true);
             assert_eq!(is_sub_query, false);
         }
@@ -1052,7 +1103,7 @@ mod tests {
             r#"SELECT * FROM "olympics" LIMIT 100"#,
         ];
         for query in queries.iter() {
-            let (is_eligible, is_sub_query) = is_eligible_for_histogram(query).unwrap();
+            let (is_eligible, is_sub_query) = is_eligible_for_histogram(query, false).unwrap();
             assert_eq!(is_eligible, false);
             // Note: subqueries return (true, true) but are still not eligible for histogram
             if query.contains("SELECT * FROM (SELECT") {
@@ -1061,5 +1112,17 @@ mod tests {
                 assert_eq!(is_sub_query, false);
             }
         }
+    }
+
+    #[test]
+    fn check_union_all_visitor() {
+        let sql1 = "select * from oly union select * from oly2";
+        let sql2 = "select * from oly union all select * from oly2";
+
+        let is_not_union_all = is_multi_search_eligible_for_histogram(sql1).unwrap();
+        let is_union_all = is_multi_search_eligible_for_histogram(sql2).unwrap();
+
+        assert_eq!(is_not_union_all, false);
+        assert_eq!(is_union_all, true);
     }
 }

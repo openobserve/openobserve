@@ -130,7 +130,7 @@ jobs:
             "enrichment.spec.js",
             "sanity2.spec.js",
             "schemaload.spec.js",
-            "websocket.spec.js",
+            # "websocket.spec.js",
             "alertImportTDA.spec.js",
             # "remotepipeline.spec.js",
 

@@ -63,6 +63,7 @@ pub mod cacher;
 pub mod multi;
 pub mod result_utils;
 
+#[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
 pub async fn search(
     trace_id: &str,
@@ -72,6 +73,7 @@ pub async fn search(
     in_req: &search::Request,
     range_error: String,
     is_http2_streaming: bool,
+    is_multi_stream_search: bool,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
@@ -450,7 +452,7 @@ pub async fn search(
 
     let write_res = deep_copy_response(&res);
     let mut local_res = deep_copy_response(&res);
-    res.is_histogram_eligible = is_eligible_for_histogram(&req.query.sql)
+    res.is_histogram_eligible = is_eligible_for_histogram(&req.query.sql, is_multi_stream_search)
         .ok()
         .map(|(is_eligible, _)| is_eligible);
 

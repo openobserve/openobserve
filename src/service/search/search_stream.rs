@@ -103,6 +103,7 @@ pub async fn process_search_stream_request(
     values_ctx: Option<ValuesEventContext>,
     fallback_order_by_col: Option<String>,
     _audit_ctx: Option<AuditContext>,
+    is_multi_stream_search: bool,
 ) {
     log::info!(
         "[HTTP2_STREAM trace_id {}] Received test HTTP/2 stream request for org_id: {}",
@@ -277,6 +278,7 @@ pub async fn process_search_stream_request(
                 started_at,
                 is_result_array_skip_vrl,
                 backup_query_fn,
+                is_multi_stream_search,
             )
             .instrument(search_span.clone())
             .await
@@ -355,6 +357,7 @@ pub async fn process_search_stream_request(
                 is_result_array_skip_vrl,
                 backup_query_fn,
                 &all_streams,
+                is_multi_stream_search,
             )
             .instrument(search_span.clone())
             .await
@@ -481,6 +484,7 @@ pub async fn process_search_stream_request(
             is_result_array_skip_vrl,
             backup_query_fn,
             &all_streams,
+            is_multi_stream_search,
         )
         .instrument(search_span.clone())
         .await
@@ -587,6 +591,7 @@ pub async fn do_partitioned_search(
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
     stream_name: &str,
+    is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -674,8 +679,16 @@ pub async fn do_partitioned_search(
         } else {
             format!("{trace_id}-{idx}")
         };
-        let mut search_res =
-            do_search(&trace_id, org_id, stream_type, &req, user_id, use_cache).await?;
+        let mut search_res = do_search(
+            &trace_id,
+            org_id,
+            stream_type,
+            &req,
+            user_id,
+            use_cache,
+            is_multi_stream_search,
+        )
+        .await?;
 
         let mut total_hits = search_res.total as i64;
 
@@ -858,7 +871,6 @@ async fn get_partitions(
         query_fn: Default::default(),
         streaming_output: true,
         histogram_interval: req.query.histogram_interval,
-        search_type: req.search_type,
     };
 
     let res = SearchService::search_partition(
@@ -867,6 +879,7 @@ async fn get_partitions(
         Some(user_id),
         stream_type,
         &search_partition_req,
+        false,
         false,
         false,
     )
@@ -886,6 +899,7 @@ async fn do_search(
     req: &config::meta::search::Request,
     user_id: &str,
     use_cache: bool,
+    is_multi_stream_search: bool,
 ) -> Result<Response, infra::errors::Error> {
     let mut req = req.clone();
 
@@ -898,6 +912,7 @@ async fn do_search(
         &req,
         "".to_string(),
         true,
+        is_multi_stream_search,
     )
     .await;
 
@@ -943,6 +958,7 @@ pub async fn handle_cache_responses_and_deltas(
     started_at: i64,
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
+    is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
@@ -1037,6 +1053,7 @@ pub async fn handle_cache_responses_and_deltas(
                     is_result_array_skip_vrl,
                     backup_query_fn.clone(),
                     all_streams,
+                    is_multi_stream_search,
                 )
                 .await?;
                 delta_iter.next(); // Move to the next delta after processing
@@ -1089,6 +1106,7 @@ pub async fn handle_cache_responses_and_deltas(
                 is_result_array_skip_vrl,
                 backup_query_fn.clone(),
                 all_streams,
+                is_multi_stream_search,
             )
             .await?;
             delta_iter.next(); // Move to the next delta after processing
@@ -1151,6 +1169,7 @@ async fn process_delta(
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
     stream_name: &str,
+    is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
     log::info!(
         "[HTTP2_STREAM]: Processing delta for trace_id: {}, delta: {:?}",
@@ -1202,7 +1221,16 @@ async fn process_delta(
         }
 
         // use cache for delta search
-        let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, true).await?;
+        let mut search_res = do_search(
+            trace_id,
+            org_id,
+            stream_type,
+            &req,
+            user_id,
+            true,
+            is_multi_stream_search,
+        )
+        .await?;
 
         let total_hits = search_res.total as i64;
 
