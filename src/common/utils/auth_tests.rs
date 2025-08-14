@@ -3104,7 +3104,6 @@ mod tests {
                 memory_circuit_breaker_ratio: usize::default(),
                 restricted_routes_on_empty_data: bool::default(),
                 inverted_index_enabled: bool::default(),
-                inverted_index_cache_enabled: bool::default(),
                 dashboard_show_symbol_enabled: bool::default(),
                 inverted_index_count_optimizer_enabled: bool::default(),
                 inverted_index_camel_case_tokenizer_disabled: bool::default(),

@@ -79,8 +79,10 @@ use crate::{
     },
     service::{
         db,
-        search::datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
-        tantivy::puffin_directory::reader_cache,
+        search::{
+            datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
+            grpc::tantivy_result_cache,
+        },
     },
 };
 
@@ -405,7 +407,10 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     );
     stats.insert(
         "INVERTED_INDEX",
-        json::json!({"reader_cache": reader_cache::GLOBAL_CACHE.len()}),
+        json::json!({"result_cache": {
+            "file_num": tantivy_result_cache::GLOBAL_CACHE.len(),
+            "mem_size": tantivy_result_cache::GLOBAL_CACHE.memory_size()
+        }}),
     );
 
     #[cfg(feature = "enterprise")]
