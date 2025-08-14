@@ -75,6 +75,7 @@ pub async fn search(
     range_error: String,
     is_http2_streaming: bool,
     dashboard_info: Option<DashboardInfo>,
+    is_multi_stream_search: bool,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
@@ -452,7 +453,7 @@ pub async fn search(
         res.new_end_time = Some(req.query.end_time);
     }
 
-    res.is_histogram_eligible = is_eligible_for_histogram(&req.query.sql)
+    res.is_histogram_eligible = is_eligible_for_histogram(&req.query.sql, is_multi_stream_search)
         .ok()
         .map(|(is_eligible, _)| is_eligible);
 
