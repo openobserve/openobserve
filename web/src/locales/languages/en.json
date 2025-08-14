@@ -171,7 +171,8 @@
     "moreActions": "More Actions",
     "downloadCSV": "CSV",
     "downloadJSON": "JSON",
-    "fileType": "File Type"
+    "fileType": "File Type",
+    "showOnlyInterestingFields": "Interesting Fields"
   },
   "menu": {
     "home": "Home",
