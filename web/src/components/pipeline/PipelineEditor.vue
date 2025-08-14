@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex justify-between items-center q-py-sm">
+  <div class="flex justify-between items-center q-py-sm q-px-sm">
     <div class="flex items-center">
       <div
         data-test="add-pipeline-back-btn"
@@ -81,9 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
 
-  <q-separator class="q-mb-sm" />
+  <q-separator class="q-mb-sm q-px-sm" />
 
-  <div class="flex q-mt-md">
+  <div class="flex q-mt-md q-px-sm">
     <div class="nodes-drag-container q-pr-md">
       <div
         data-test="pipeline-editor-nodes-list-title"
