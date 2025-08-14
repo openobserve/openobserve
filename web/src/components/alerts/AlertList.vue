@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="alert-list-page"
     class="q-pa-none flex"
-    style="height: calc(100vh - 57px)"
+    style="height: calc(100vh - 57px);"
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   >
     <div
@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       class="full-width alert-list-table"
+      style="height: calc(100vh - 138px)"
     >
       <q-splitter
         v-model="splitterModel"
@@ -493,7 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="selectedAlerts.length > 0"
                   data-test="alert-list-move-across-folders-btn"
-                  class="flex items-center q-mr-md no-border o2-secondary-button tw-h-[28px]"
+                  class="flex items-center q-mr-md no-border o2-secondary-button tw-h-[36px]"
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   no-caps
                   dense
@@ -505,7 +506,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-btn
                   v-if="selectedAlerts.length > 0"
                   data-test="alert-list-export-alerts-btn"
-                  class="flex items-center no-border o2-secondary-button tw-h-[28px]"
+                  class="flex items-center no-border o2-secondary-button tw-h-[36px]"
                   :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                   no-caps
                   dense
@@ -2078,33 +2079,6 @@ export default defineComponent({
 }
 
 
-.alerts-tabs {
-  .q-tabs {
-    &--vertical {
-      margin: 1.5rem 1rem 0 0;
-
-      .q-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-
-        &--active {
-          background-color: $accent;
-        }
-      }
-    }
-  }
-}
 .clone-alert-popup {
   width: 400px;
 }
