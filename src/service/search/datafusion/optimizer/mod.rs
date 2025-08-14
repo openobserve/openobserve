@@ -38,13 +38,13 @@ use datafusion::{
 };
 use infra::schema::get_stream_setting_fts_fields;
 use limit_join_right_side::LimitJoinRightSide;
+use remove_index_fields::RemoveIndexFieldsRule;
 use rewrite_histogram::RewriteHistogram;
 use rewrite_match::RewriteMatch;
 #[cfg(feature = "enterprise")]
 use {
     cipher::{RewriteCipherCall, RewriteCipherKey},
     o2_enterprise::enterprise::search::datafusion::optimizer::aggregate_topk::AggregateTopkRule,
-    remove_index_fields::RemoveIndexFieldsRule,
 };
 
 use crate::service::search::{
