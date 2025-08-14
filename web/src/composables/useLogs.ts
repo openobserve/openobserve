@@ -362,6 +362,23 @@ const useLogs = () => {
     // Reset the existing searchObj instead of creating a new one
     // This maintains the same reference so watchers continue to work
     resetSearchObj();
+    searchObj.meta.refreshInterval = 0;
+    clearInterval(store.state.refreshIntervalID);
+    searchObj.loading = false;
+    searchObj.loadingHistogram = false;
+    searchObj.loadingCounter = false;
+    searchObj.loadingStream = false;
+    searchObj.loadingSavedView = false;
+    searchObj.runQuery = false;
+
+    searchObj.meta.histogramDirtyFlag = false;
+    searchObj.meta.logsVisualizeDirtyFlag = false;
+
+    searchObj.data.jobId = "";
+    searchObj.data.hasUserDefinedSchemas = false;
+    searchObj.data.selectedTraceStream = "";
+    searchObj.data.showSearchScheduler = false;
+    searchObj.data.resetPlotChart = false;
   };
 
   /**
