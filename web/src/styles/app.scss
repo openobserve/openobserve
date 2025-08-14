@@ -263,6 +263,25 @@
 }
 
 
+//some times if there are less records or if user tries to search anything the last row of the table is not having border at the bottom
+
+.o2-last-row-border-light{
+  tr:last-child{
+    td{
+      border-bottom: 1px solid #E4E7EC !important;
+    }
+  }
+}
+
+.o2-last-row-border-dark{
+  tr:last-child{
+    td{
+      border-bottom: 1px solid #575A5A !important;
+    }
+  }
+}
+
+
 //this is used to target the table in the app-table component internally it uses q-table component
 //but due to virtual scroll the classes are different so we need to target the classes differently
 //here we have q-virtual-scroll__content and q-table classes to target td and th respectively
