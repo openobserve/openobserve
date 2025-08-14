@@ -41,6 +41,7 @@ pub struct RemoteScanContext {
     pub is_leader: bool,
 }
 
+#[cfg(feature = "enterprise")]
 pub struct StreamingAggregationContext {
     pub streaming_id: String,
     pub start_time: i64,
@@ -49,6 +50,7 @@ pub struct StreamingAggregationContext {
     pub is_complete_cache_hit: Arc<Mutex<bool>>,
 }
 
+#[cfg(feature = "enterprise")]
 impl StreamingAggregationContext {
     pub async fn new(
         request: &Request,
@@ -91,4 +93,17 @@ pub fn generate_streaming_agg_rules(
         context.use_cache,
         context.is_complete_cache_hit,
     )) as _
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub struct StreamingAggregationContext {}
+
+#[cfg(not(feature = "enterprise"))]
+impl StreamingAggregationContext {
+    pub async fn new(
+        _request: &Request,
+        _is_complete_cache_hit: Arc<Mutex<bool>>,
+    ) -> Result<Option<Self>, Error> {
+        Ok(None)
+    }
 }

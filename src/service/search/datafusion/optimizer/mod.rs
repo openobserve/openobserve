@@ -197,9 +197,9 @@ pub fn generate_physical_optimizer_rules(
                 continue;
             }
             PhysicalOptimizerContext::StreamingAggregation(context) => {
-                if let Some(context) = context {
+                if let Some(_context) = context {
                     #[cfg(feature = "enterprise")]
-                    rules.push(generate_streaming_agg_rules(context));
+                    rules.push(generate_streaming_agg_rules(_context));
                     #[cfg(not(feature = "enterprise"))]
                     continue;
                 }
