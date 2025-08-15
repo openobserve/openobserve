@@ -40,9 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-input>
           </div>
           <q-btn
-            class="q-ml-md text-bold no-border"
-            padding="sm lg"
-            color="secondary"
+              class="q-ml-md o2-primary-button tw-h-[36px]"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             no-caps
             :label="t(`function.add`)"
             @click="showAddUpdateFn({})"
