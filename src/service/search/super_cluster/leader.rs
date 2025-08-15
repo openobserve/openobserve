@@ -243,7 +243,7 @@ async fn run_datafusion(
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
-        log::info!("[trace_id {trace_id}] leader physical plan after rewrite");
+        log::info!("[trace_id {trace_id}] super cluster leader: physical plan");
         log::info!(
             "{}",
             config::meta::plan::generate_plan_string(&trace_id, physical_plan.as_ref())
