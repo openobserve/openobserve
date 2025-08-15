@@ -17,33 +17,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none">
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
-      :class="store.state.theme =='dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 57px);">
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
+      :class="store.state.theme =='dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
       style="position: sticky; top: 0; z-index: 1000 ;"
       >
-          <div  class="q-table__title full-width" data-test="organizations-title-text">{{ t("organization.header") }}</div>
+          <div  class="q-table__title full-width tw-font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
           <div class="full-width tw-flex tw-justify-end">
 
             <q-input
               v-model="filterQuery"
-              filled
+              borderless
               dense
-             class="col-6"
+              class="q-ml-auto no-border o2-search-input tw-h-[36px]"
               :placeholder="t('organization.search')"
+              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             >
               <template #prepend>
-                <q-icon name="search" />
+                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
               </template>
             </q-input>
           
             <q-btn
-              class="q-ml-md text-bold no-border"
-              padding="sm lg"
-              color="secondary"
-              style="float: right; cursor: pointer !important"
+              class="q-ml-md o2-primary-button tw-h-[36px]"
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               no-caps
-              dense
               :label="t(`organization.add`)"
               @click="addOrganization"
               data-test="Add Organization"
@@ -60,8 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :filter="filterQuery"
       :filter-method="filterData"
       :loading="loading"
-      class="o2-quasar-table"
-      :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+      class="o2-quasar-table o2-quasar-table-header-sticky"
+      style="height: calc(100vh - 114px); overflow-y: auto;"
+      :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
     >
       <template #no-data><NoData /></template>
 
@@ -81,27 +81,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-td>
       </template> -->
 
-      <template #top="scope">
-        <QTablePagination
-          :scope="scope"
-          :pageTitle="t('organization.header')"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="top"
-          @update:changeRecordPerPage="changePagination"
-        />
-      </template>
 
       <template #bottom="scope">
-        <QTablePagination
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-        />
-        <!-- :maxRecordToReturn="maxRecordToReturn" -->
-        <!-- @update:maxRecordToReturn="changeMaxRecordToReturn" -->
+        <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+          <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+            {{ resultTotal }} {{ t('user.header') }}
+          </div>
+            <QTablePagination
+              :scope="scope"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              position="bottom"
+              @update:changeRecordPerPage="changePagination"
+            />
+        </div>
       </template>
 
       <template #body-cell-actions="props">
