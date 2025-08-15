@@ -20,35 +20,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-pa-none "  :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'" style="min-height: inherit">
-    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-full-width"
-    :class="store.state.theme =='dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-full-width tw-h-[71px] tw-border-b-[1px]"
+    :class="store.state.theme =='dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
     >
 
       <div
-          class="q-table__title full-width"
+          class="q-table__title full-width tw-font-[600]"
           data-test="service-accounts-title-text"
         >
           {{ t("serviceAccounts.header") }}
         </div>
         <div class="full-width tw-flex tw-justify-end">
           <q-input
-            v-model="filterQuery"
-            filled
-            dense
-            class="col-6"
-            :placeholder="t('serviceAccounts.search')"
-          >
-            <template #prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
-            <q-btn
-              class="q-ml-md text-bold no-border"
-              padding="sm lg"
-              style="float: right; cursor: pointer !important"
-              color="secondary"
-              no-caps
+              v-model="filterQuery"
+              borderless
               dense
+              class="q-ml-auto no-border o2-search-input tw-h-[36px]"
+              :placeholder="t('serviceAccounts.search')"
+              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+              </template>
+            </q-input>
+            <q-btn
+              class="q-ml-md o2-primary-button tw-h-[36px]"
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              no-caps
               :label="t(`serviceAccounts.add`)"
               @click="addRoutePush({})"
             />
@@ -56,14 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <q-table
       ref="qTable"
-      class="o2-quasar-table"
-      :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
-      :rows="serviceAccountsState.service_accounts_users"
+      class="o2-quasar-table o2-quasar-table-header-sticky"
+      :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
+      :rows="visibleRows"
       :columns="columns"
       row-key="id"
       :pagination="pagination"
       :filter="filterQuery"
-      :filter-method="filterData"
+      :style="hasVisibleRows ? 'height: calc(100vh - 114px); overflow-y: auto;' : ''"
     >
       <template #no-data>
         <NoData></NoData>
@@ -159,25 +158,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </q-td>
       </template>
-      <template #top="scope">
-        <QTablePagination
-          :scope="scope"
-          :pageTitle="t('serviceAccounts.header')"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="top"
-          @update:changeRecordPerPage="changePagination"
-        />
-      </template>
-
       <template #bottom="scope">
-        <QTablePagination
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-        />
+        <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+          <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+            {{ resultTotal }} {{ t('serviceAccounts.header') }}
+          </div>
+          <QTablePagination
+            :scope="scope"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            position="bottom"
+            @update:changeRecordPerPage="changePagination"
+          />
+        </div>
       </template>
 
       <template v-slot:header="props">
@@ -368,6 +361,7 @@ export default defineComponent({
     const isCurrentUserInternal = ref(false);
     const isShowToken = ref(false);
     const confirmRefresh  = ref(false);
+    const filterQuery = ref("");
     const toBeRefreshed = ref({
 
     });
@@ -725,6 +719,27 @@ export default defineComponent({
       return `${token.slice(0, 4)} **** ${token.slice(-4)}`;
     };
 
+    const filterData = (rows: any, terms: any) => {
+      var filtered = [];
+      terms = terms.toLowerCase();
+      for (var i = 0; i < rows.length; i++) {
+        if (
+          rows[i]["first_name"]?.toLowerCase().includes(terms) ||
+          rows[i]["last_name"]?.toLowerCase().includes(terms) ||
+          rows[i]["email"]?.toLowerCase().includes(terms)
+        ) {
+          filtered.push(rows[i]);
+        }
+      }
+      return filtered;
+    };
+
+    const visibleRows = computed(() => {
+      if (!filterQuery.value) return serviceAccountsState.service_accounts_users || []
+      return filterData(serviceAccountsState.service_accounts_users || [], filterQuery.value)
+    });
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+
     return {
       $q,
       t,
@@ -765,21 +780,8 @@ export default defineComponent({
       confirmRefreshAction,
       getDisplayToken,
       maskToken,
-      filterQuery: ref(""),
-      filterData(rows: any, terms: any) {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["first_name"]?.toLowerCase().includes(terms) ||
-            rows[i]["last_name"]?.toLowerCase().includes(terms) ||
-            rows[i]["email"]?.toLowerCase().includes(terms) 
-          ) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      filterQuery,
+      filterData,
       userEmail,
       selectedRole,
       options,
@@ -790,6 +792,8 @@ export default defineComponent({
       isCurrentUserInternal,
       toBeRefreshed,
       confirmRefresh,
+      visibleRows,
+      hasVisibleRows,
     };
   },
 });
