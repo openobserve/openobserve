@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'tw-bg-zinc-700'
                   : 'tw-bg-zinc-300'
                 : '',
-              'table-row-hover'
+              'table-row-hover',
             ]"
             @click="
               !(formattedRows[virtualRow.index]?.original as any)
@@ -342,14 +342,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <HighLight
                   :content="cell.renderValue()"
-                  :query-string="
-                    highlightQuery
-                  "
+                  :query-string="highlightQuery"
                 />
                 <O2AIContextAddBtn
-                    v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column" class="tw-absolute tw-right-[16px] tw-top-1/2 tw-transform tw-invisible tw--translate-y-1/2 ai-btn" 
-                    @send-to-ai-chat="sendToAiChat(JSON.stringify(cell.row.original),true)"
-                    />
+                  v-if="
+                    cell.column.columnDef.id ===
+                    store.state.zoConfig.timestamp_column
+                  "
+                  class="tw-absolute tw-right-[16px] tw-top-1/2 tw-transform tw-invisible tw--translate-y-1/2 ai-btn"
+                  @send-to-ai-chat="
+                    sendToAiChat(JSON.stringify(cell.row.original), true)
+                  "
+                />
               </td>
             </template>
           </tr>
@@ -434,11 +438,11 @@ const props = defineProps({
     default: "",
     required: false,
   },
-  highlightQuery:{
+  highlightQuery: {
     type: String,
     default: "",
     required: false,
-  }
+  },
 });
 
 const { t } = useI18n();
@@ -478,7 +482,7 @@ const tableRowSize = ref(0);
 
 const columnOrder = ref<any>([]);
 
-const tableRows = ref(props.rows);
+const tableRows = ref([...props.rows]);
 
 const isFunctionErrorOpen = ref(false);
 
@@ -831,25 +835,25 @@ const handleCellMouseLeave = () => {
 const viewTrace = (row: any) => {
   emits("view-trace", row);
 };
-const sendToAiChat = (value: any,isEntireRow: boolean = false) => {
-  if(isEntireRow){
+const sendToAiChat = (value: any, isEntireRow: boolean = false) => {
+  if (isEntireRow) {
     //here we will get the original value of the row
     //and we need to filter the row if props.columns have any filtered cols that user applied
     //the format of the props.columns is like this:
     //if user have not applied any filter then the props.columns will be like this:
-    //it contains _timestamp column and source column 
+    //it contains _timestamp column and source column
     //else we get _timestamp column and other filter columns so if user have applied any filter then we need to filter the row based on the filter columns
     const row = JSON.parse(value);
-    //lets filter based on props.columns so lets ignore _timestamp column as it is always present and now we want to check if source is present we can directly send the row 
+    //lets filter based on props.columns so lets ignore _timestamp column as it is always present and now we want to check if source is present we can directly send the row
     //otherwise we need to filter the row based on the columns that user have applied
-    if(checkIfSourceColumnPresent(props.columns)){
+    if (checkIfSourceColumnPresent(props.columns)) {
       emits("sendToAiChat", JSON.stringify(row));
-    }else{
+    } else {
       //we need to filter the row based on the columns that user have applied
-      const filteredRow = filterRowBasedOnColumns(row,props.columns);
+      const filteredRow = filterRowBasedOnColumns(row, props.columns);
       emits("sendToAiChat", JSON.stringify(filteredRow));
     }
-  }else{
+  } else {
     emits("sendToAiChat", value);
   }
 };
@@ -857,25 +861,26 @@ const sendToAiChat = (value: any,isEntireRow: boolean = false) => {
 const checkIfSourceColumnPresent = (columns: any) => {
   //we need to check if source column is present in the columns
   //if present then we need to return true else false
-  return columns.some((column: any) => column.id === 'source');
-}
+  return columns.some((column: any) => column.id === "source");
+};
 
-const filterRowBasedOnColumns = (row: any,columns: any) => {
+const filterRowBasedOnColumns = (row: any, columns: any) => {
   //we need to filter the row based on the columns that user have applied
   //here we need to filter row not columns based on the columns that user have applied
-  const columnsToFilter = columns.filter((column: any) => column.id !== 'source');
+  const columnsToFilter = columns.filter(
+    (column: any) => column.id !== "source",
+  );
   return columnsToFilter.reduce((acc: any, column: any) => {
     acc[column.id] = row[column.id];
     return acc;
   }, {});
-}
-
+};
 
 defineExpose({
   parentRef,
   virtualRows,
   sendToAiChat,
-  store
+  store,
 });
 </script>
 <style scoped lang="scss">
@@ -969,7 +974,6 @@ td {
     }
   }
 }
-
 
 .table-row-hover {
   &:hover {

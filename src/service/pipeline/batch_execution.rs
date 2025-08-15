@@ -260,7 +260,8 @@ impl ExecutablePipeline {
             channel::<(usize, StreamParams, Value)>(batch_size);
 
         // error_channel
-        let (error_sender, mut error_receiver) = channel::<(String, String, String)>(batch_size);
+        let (error_sender, mut error_receiver) =
+            channel::<(String, String, String, Option<String>)>(batch_size);
 
         let mut node_senders = HashMap::new();
         let mut node_receivers = HashMap::new();
@@ -285,7 +286,7 @@ impl ExecutablePipeline {
                 .collect();
             let result_sender_cp = node.children.is_empty().then_some(result_sender.clone());
             let error_sender_cp = error_sender.clone();
-            let vrl_runtime = self.vrl_map.get(node_id).cloned();
+            let vrl_runtime: Option<(VRLResultResolver, bool)> = self.vrl_map.get(node_id).cloned();
             let pipeline_name = pipeline_name.clone();
             let stream_name = stream_name.clone();
 
@@ -328,8 +329,8 @@ impl ExecutablePipeline {
         let error_task = tokio::spawn(async move {
             log::debug!("[Pipeline]: starts error collecting job");
             let mut count = 0;
-            while let Some((node_id, node_type, error)) = error_receiver.recv().await {
-                pipeline_error.add_node_error(node_id, node_type, error);
+            while let Some((node_id, node_type, error, fn_name)) = error_receiver.recv().await {
+                pipeline_error.add_node_error(node_id, node_type, error, fn_name);
                 count += 1;
             }
             log::debug!("[Pipeline]: collected {count} errors");
@@ -548,7 +549,7 @@ async fn process_node(
     mut child_senders: Vec<Sender<(usize, Value, bool)>>,
     vrl_runtime: Option<(VRLResultResolver, bool)>,
     result_sender: Option<Sender<(usize, StreamParams, Value)>>,
-    error_sender: Sender<(String, String, String)>,
+    error_sender: Sender<(String, String, String, Option<String>)>,
     pipeline_name: String,
     stream_name: Option<String>,
 ) -> Result<()> {
@@ -571,7 +572,7 @@ async fn process_node(
                             Err(e) => {
                                 let err_msg = format!("LeafNode error with flattening: {e}");
                                 if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .send((node.id.to_string(), node.node_type(), err_msg, None))
                                     .await
                                 {
                                     log::error!(
@@ -606,7 +607,7 @@ async fn process_node(
                                 };
                                 log::warn!("{err_msg}");
                                 if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .send((node.id.to_string(), node.node_type(), err_msg, None))
                                     .await
                                 {
                                     log::error!(
@@ -655,7 +656,7 @@ async fn process_node(
                         Err(e) => {
                             let err_msg = format!("ConditionNode error with flattening: {e}");
                             if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .send((node.id.to_string(), node.node_type(), err_msg, None))
                                 .await
                             {
                                 log::error!(
@@ -700,8 +701,14 @@ async fn process_node(
                             Ok(flattened) => flattened,
                             Err(e) => {
                                 let err_msg = format!("FunctionNode error with flattening: {e}");
+                                let err_msg = err_msg.get(0..500).unwrap_or(&err_msg);
                                 if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .send((
+                                        node.id.to_string(),
+                                        node.node_type(),
+                                        err_msg.to_owned(),
+                                        Some(func_params.name.to_owned()),
+                                    ))
                                     .await
                                 {
                                     log::error!(
@@ -723,9 +730,17 @@ async fn process_node(
                         ) {
                             (res, None) => res,
                             (res, Some(error)) => {
-                                let err_msg = format!("FunctionNode error: {error}");
+                                let err_msg = format!(
+                                    "FunctionNode error: {}",
+                                    error.get(0..500).unwrap_or(&error)
+                                );
                                 if let Err(send_err) = error_sender
-                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .send((
+                                        node.id.to_string(),
+                                        node.node_type(),
+                                        err_msg.to_owned(),
+                                        Some(func_params.name.to_owned()),
+                                    ))
                                     .await
                                 {
                                     log::error!(
@@ -761,9 +776,17 @@ async fn process_node(
                 ) {
                     (res, None) => res,
                     (res, Some(error)) => {
-                        let err_msg = format!("FunctionNode error: {error}");
+                        let err_msg = format!(
+                            "FunctionNode error: {}",
+                            error.get(0..500).unwrap_or(&error)
+                        );
                         if let Err(send_err) = error_sender
-                            .send((node.id.to_string(), node.node_type(), err_msg))
+                            .send((
+                                node.id.to_string(),
+                                node.node_type(),
+                                err_msg.to_owned(),
+                                Some(func_params.name.to_owned()),
+                            ))
                             .await
                         {
                             log::error!(
@@ -819,7 +842,7 @@ async fn process_node(
                         Err(e) => {
                             let err_msg = format!("DestinationNode error with flattening: {e}");
                             if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .send((node.id.to_string(), node.node_type(), err_msg, None))
                                 .await
                             {
                                 log::error!(
@@ -836,7 +859,7 @@ async fn process_node(
                 {
                     let err_msg = format!("DestinationNode error handling timestamp: {e}");
                     if let Err(send_err) = error_sender
-                        .send((node.id.to_string(), node.node_type(), err_msg))
+                        .send((node.id.to_string(), node.node_type(), err_msg, None))
                         .await
                     {
                         log::error!(
@@ -927,7 +950,7 @@ async fn process_node(
                                 "DestinationNode error persisting data for batch_key '{batch_key}' to be ingested externally: {e}"
                             );
                             if let Err(send_err) = error_sender
-                                .send((node.id.to_string(), node.node_type(), err_msg))
+                                .send((node.id.to_string(), node.node_type(), err_msg, None))
                                 .await
                             {
                                 log::error!(
@@ -950,7 +973,7 @@ async fn process_node(
             let err_msg = "[Pipeline]: remote destination is not supported in open source version. Records dropped".to_string();
             log::error!("{err_msg}");
             if let Err(send_err) = error_sender
-                .send((node.id.to_string(), node.node_type(), err_msg))
+                .send((node.id.to_string(), node.node_type(), err_msg, None))
                 .await
             {
                 log::error!(

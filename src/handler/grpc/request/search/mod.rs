@@ -156,6 +156,7 @@ impl Search for Searcher {
             "".to_string(),
             false,
             None,
+            false,
         )
         .await;
 
@@ -226,6 +227,7 @@ impl Search for Searcher {
             &request,
             req.skip_max_query_range,
             true,
+            false,
         )
         .await;
 

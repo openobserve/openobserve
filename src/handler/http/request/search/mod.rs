@@ -21,7 +21,9 @@ use chrono::Utc;
 use config::{
     DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
-        search::{SearchEventType, SearchHistoryHitResponse, default_use_cache},
+        search::{
+            ResultSchemaResponse, SearchEventType, SearchHistoryHitResponse, default_use_cache,
+        },
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -44,7 +46,8 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_dashboard_info_from_request, get_is_ui_histogram_from_request,
+                get_dashboard_info_from_request, get_enable_align_histogram_from_request,
+                get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
                 get_or_create_trace_id, get_search_event_context_from_request,
                 get_search_type_from_request, get_stream_type_from_request,
                 get_use_cache_from_request, get_work_group,
@@ -55,7 +58,10 @@ use crate::{
     service::{
         db::enrichment_table,
         metadata::distinct_values::DISTINCT_STREAM_PREFIX,
-        search::{self as SearchService, sql::visitor::pickup_where::pickup_where},
+        search::{
+            self as SearchService, datafusion::plan::projections::get_result_schema,
+            sql::visitor::pickup_where::pickup_where,
+        },
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
 };
@@ -163,6 +169,7 @@ async fn can_use_distinct_stream(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
+        ("is_multi_stream_search" = bool, Query, description = "Indicate is search is for multi stream"),
     ),
     request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
         "query": {
@@ -251,6 +258,7 @@ pub async fn search(
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
+    let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
 
     let dashboard_info = get_dashboard_info_from_request(&query);
 
@@ -282,6 +290,7 @@ pub async fn search(
         match crate::service::search::sql::histogram::convert_to_histogram_query(
             &req.query.sql,
             &stream_names,
+            is_multi_stream_search,
         ) {
             Ok(histogram_query) => {
                 req.query.sql = histogram_query;
@@ -402,6 +411,7 @@ pub async fn search(
         range_error,
         false,
         dashboard_info,
+        is_multi_stream_search,
     )
     .instrument(http_span)
     .await;
@@ -1185,6 +1195,8 @@ async fn values_v1(
             "".to_string(),
             false,
             None,
+            // `is_multi_stream_search` false for values
+            false,
         )
         .instrument(http_span)
         .await;
@@ -1295,8 +1307,8 @@ async fn values_v1(
         ("Authorization"= [])
     ),
     params(
+        ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
         ("org_id" = String, Path, description = "Organization name"),
-        ("search_type" = String, Query, description = "query param with value 'ui', 'dashboards', 'reports', 'alerts' , 'rum' or 'values' allowed"),
     ),
     request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
         "sql": "select * from k8s ",
@@ -1343,9 +1355,7 @@ pub async fn search_partition(
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let search_type = get_search_type_from_request(&query).map_or(SearchEventType::Other, |opt| {
-        opt.unwrap_or(SearchEventType::Other)
-    });
+    let enable_align_histogram = get_enable_align_histogram_from_request(&query);
 
     #[cfg(feature = "cloud")]
     {
@@ -1370,7 +1380,6 @@ pub async fn search_partition(
         Ok(v) => v,
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
-    req.search_type = Some(search_type);
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.sql) {
         req.sql = sql;
     }
@@ -1387,6 +1396,7 @@ pub async fn search_partition(
         &req,
         false,
         true,
+        enable_align_histogram,
     )
     .instrument(http_span)
     .await;
@@ -1624,4 +1634,220 @@ pub async fn search_history(
     .await;
 
     Ok(HttpResponse::Ok().json(search_res))
+}
+
+/// GetResultSchema
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Search",
+    operation_id = "ResultSchema",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
+        "query": {
+            "sql": "select k8s_namespace_name as ns, histogram(_timestamp) from k8s group by k8s_namespace_name, histogram(_timestamp)",
+            "start_time": 1675182660872049i64,
+            "end_time": 1675185660872049i64,
+            "from": 0,
+            "size": 10
+        }
+    })),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
+            "projections": ["ns","histogram(k8s._timestamp)"],
+            "group_by": ["histogram(k8s._timestamp)"],
+            "timeseries_field": "histogram(k8s._timestamp)",
+        })),
+        (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[post("/{org_id}/result_schema")]
+pub async fn result_schema(
+    org_id: web::Path<String>,
+    in_req: HttpRequest,
+    body: web::Bytes,
+) -> Result<HttpResponse, Error> {
+    let org_id = org_id.into_inner();
+
+    #[cfg(feature = "cloud")]
+    {
+        match is_org_in_free_trial_period(&org_id).await {
+            Ok(false) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    format!("org {org_id} has expired its trial period"),
+                )));
+            }
+            Err(e) => {
+                return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                    StatusCode::FORBIDDEN,
+                    e.to_string(),
+                )));
+            }
+            _ => {}
+        }
+    }
+
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+
+    let use_cache = get_use_cache_from_request(&query);
+    let is_streaming = {
+        match query.get("is_streaming") {
+            None => false,
+            Some(v) => v.to_lowercase().as_str().parse::<bool>().unwrap_or(false),
+        }
+    };
+
+    let mut req: config::meta::search::Request = match json::from_slice(&body) {
+        Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
+        req.query.sql = sql;
+    };
+
+    // set search event type
+    if req.search_type.is_none() {
+        req.search_type = match get_search_type_from_request(&query) {
+            Ok(v) => v,
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        };
+    };
+    if req.search_event_context.is_none() {
+        req.search_event_context = req
+            .search_type
+            .as_ref()
+            .and_then(|event_type| get_search_event_context_from_request(event_type, &query));
+    }
+
+    // get stream name
+    let stream_names = match resolve_stream_names(&req.query.sql) {
+        Ok(v) => v.clone(),
+        Err(e) => {
+            return Ok(map_error_to_http_response(&(e.into()), None));
+        }
+    };
+
+    // get stream settings
+    for stream_name in stream_names {
+        if let Some(settings) =
+            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+        {
+            let max_query_range =
+                get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))
+                    .await;
+            if max_query_range > 0
+                && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
+            {
+                req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
+            }
+        }
+
+        // Check permissions on stream
+        #[cfg(feature = "enterprise")]
+        if let Some(res) =
+            check_stream_permissions(&stream_name, &org_id, &user_id, &stream_type).await
+        {
+            return Ok(res);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        use actix_http::StatusCode;
+
+        let keys_used = match get_cipher_key_names(&req.query.sql) {
+            Ok(v) => v,
+            Err(e) => {
+                return Ok(HttpResponse::BadRequest()
+                    .json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)));
+            }
+        };
+        for key in keys_used {
+            // Check permissions on keys
+            {
+                use o2_openfga::meta::mapping::OFGA_MODELS;
+
+                use crate::{
+                    common::utils::auth::{AuthExtractor, is_root_user},
+                    service::users::get_user,
+                };
+
+                if !is_root_user(&user_id) {
+                    let user: config::meta::user::User =
+                        get_user(Some(&org_id), &user_id).await.unwrap();
+
+                    if !crate::handler::http::auth::validator::check_permissions(
+                        &user_id,
+                        AuthExtractor {
+                            auth: "".to_string(),
+                            method: "GET".to_string(),
+                            o2_type: format!(
+                                "{}:{}",
+                                OFGA_MODELS
+                                    .get("cipher_keys")
+                                    .map_or("cipher_keys", |model| model.key),
+                                key
+                            ),
+                            org_id: org_id.clone(),
+                            bypass_check: false,
+                            parent_id: "".to_string(),
+                        },
+                        user.role,
+                        user.is_external,
+                    )
+                    .await
+                    {
+                        return Ok(MetaHttpResponse::forbidden("Unauthorized Access to key"));
+                    }
+                    // Check permissions on key ends
+                }
+            }
+        }
+    }
+
+    let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
+    let sql =
+        match crate::service::search::sql::Sql::new(&query, &org_id, stream_type, req.search_type)
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Error parsing sql: {e}");
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    actix_web::http::StatusCode::BAD_REQUEST,
+                    e,
+                )));
+            }
+        };
+
+    let res_schema = match get_result_schema(sql, is_streaming, use_cache).await {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                actix_web::http::StatusCode::BAD_REQUEST,
+                e,
+            )));
+        }
+    };
+
+    Ok(HttpResponse::Ok().json(ResultSchemaResponse {
+        projections: res_schema.projections,
+        group_by: res_schema.group_by.into_iter().collect(),
+        timeseries_field: res_schema.timeseries,
+    }))
 }

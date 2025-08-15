@@ -71,6 +71,8 @@ export const usePanelDataLoader = (
   runId?: any,
   tabId?: any,
   tabName?: any,
+  searchResponse: any,
+  is_ui_histogram: any,
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -446,8 +448,9 @@ export const usePanelDataLoader = (
             },
             page_type: pageType,
             traceparent,
-            searchType: "dashboards",
-
+            // Using same config for align histogram
+            // in future we can make it seperate for scenarios
+            enable_align_histogram: is_ui_histogram.value ?? false,
           }),
         abortControllerRef.signal,
       );
@@ -541,6 +544,7 @@ export const usePanelDataLoader = (
                   run_id: runId?.value,
                   tab_id: tabId?.value,
                   tab_name: tabName?.value,
+                  is_ui_histogram: is_ui_histogram.value,
                 },
                 searchType.value ?? "dashboards",
               ),
@@ -867,6 +871,7 @@ export const usePanelDataLoader = (
         tab_id: tabId?.value,
         tab_name: tabName?.value,
         fallback_order_by_col: getFallbackOrderByCol(),
+        is_ui_histogram: is_ui_histogram.value,
       },
     });
   };
@@ -1066,6 +1071,7 @@ export const usePanelDataLoader = (
           tab_id: tabId?.value,
           tab_name: tabName?.value,
           fallback_order_by_col: getFallbackOrderByCol(),
+          is_ui_histogram: is_ui_histogram.value,
         },
       };
 
@@ -1434,6 +1440,7 @@ export const usePanelDataLoader = (
                           run_id: runId?.value,
                           tab_id: tabId?.value,
                           tab_name: tabName?.value,
+                          is_ui_histogram: is_ui_histogram.value,
                         },
                         searchType.value ?? "dashboards",
                       ),
@@ -1562,6 +1569,21 @@ export const usePanelDataLoader = (
                   )
                 : [];
               state.annotations = annotations;
+
+              if (searchResponse?.value?.hits?.length > 0) {
+                // Add empty objects to state.resultMetaData for the results of this query
+                state.data.push([]);
+                state.resultMetaData.push({});
+
+                const currentQueryIndex = state.data.length - 1;
+
+                state.data[currentQueryIndex] = searchResponse.value.hits;
+                state.resultMetaData[currentQueryIndex] = searchResponse.value;
+                // set loading to false
+                state.loading = false;
+
+                return;
+              }
 
               if (isStreamingEnabled(store.state)) {
                 await getDataThroughStreaming(
@@ -1880,9 +1902,9 @@ export const usePanelDataLoader = (
         const errorDetailValue =
           error?.response?.data.error_detail ||
           error?.response?.data.message ||
+          error?.error_detail ||
           error?.message ||
-          error?.error ||
-          error?.error_detail;
+          error?.error;
 
         const trimmedErrorMessage =
           errorDetailValue?.length > 300
@@ -1891,10 +1913,15 @@ export const usePanelDataLoader = (
 
         const errorCode =
           isWebSocketEnabled(store.state) || isStreamingEnabled(store.state)
-            ? error?.response?.data?.code || error?.code || error?.status || ""
-            : error?.response?.status ||
+            ? error?.response?.status ||
               error?.status ||
               error?.response?.data?.code ||
+              error?.code ||
+              ""
+            : error?.response?.status ||
+              error?.response?.data?.code ||
+              error?.status ||
+              error?.code ||
               "";
 
         state.errorDetail = {

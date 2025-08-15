@@ -26,7 +26,6 @@ use std::{
 };
 
 use actix_web::{App, HttpServer, dev::ServerHandle, http::KeepAlive, middleware, web};
-use actix_web_lab::middleware::from_fn;
 use actix_web_opentelemetry::RequestTracing;
 use arrow_flight::flight_service_server::FlightServiceServer;
 use config::{get_config, utils::size::bytes_to_human_readable};
@@ -699,7 +698,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     factory
                         .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                        .wrap(from_fn(middlewares::check_keep_alive))
+                        .wrap(middleware::from_fn(middlewares::check_keep_alive))
                         .service(get_metrics)
                         .service(router::http::config)
                         .service(router::http::config_paths)
@@ -715,7 +714,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
                     .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                    .wrap(from_fn(middlewares::check_keep_alive))
+                    .wrap(middleware::from_fn(middlewares::check_keep_alive))
                     .service(get_metrics)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
@@ -806,7 +805,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
                     factory
                         .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                        .wrap(from_fn(middlewares::check_keep_alive))
+                        .wrap(middleware::from_fn(middlewares::check_keep_alive))
                         .service(get_metrics)
                         .service(router::http::config)
                         .service(router::http::config_paths)
@@ -822,7 +821,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
             app = app.service({
                 let scope = web::scope(&cfg.common.base_uri)
                     .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
-                    .wrap(from_fn(middlewares::check_keep_alive))
+                    .wrap(middleware::from_fn(middlewares::check_keep_alive))
                     .service(get_metrics)
                     .configure(get_config_routes)
                     .configure(get_service_routes)
