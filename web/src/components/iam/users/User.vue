@@ -67,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       :pagination="pagination"
       :filter="filterQuery"
-      :filter-method="filterData"
       :style="hasVisibleRows ? 'height: calc(100vh - 114px); overflow-y: auto;' : ''"
       class="o2-quasar-table o2-quasar-table-header-sticky"
       :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
