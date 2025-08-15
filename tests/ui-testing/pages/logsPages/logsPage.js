@@ -1491,6 +1491,10 @@ export class LogsPage {
         return await this.page.locator(this.timestampColumnMenu).first().click({ force: true });
     }
 
+    async toggleVrlEditor() {
+        return await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
+    }
+
     async clickVrlEditor() {
         return await this.page.locator(this.vrlEditor).first().getByRole('textbox').fill('.a=2');
     }
