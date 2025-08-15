@@ -66,13 +66,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-list-search-input"
           v-model="userSearchKey"
           borderless
-          filled
           dense
-          class="q-ml-auto q-mb-xs no-border"
+          class="no-border o2-search-input tw-h-[36px] tw-w-[200px]"
+          :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
           placeholder="Search Roles"
         >
           <template #prepend>
-            <q-icon name="search" class="cursor-pointer" />
+            <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
           </template>
         </q-input>
       </div>
