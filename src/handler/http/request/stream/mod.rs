@@ -93,7 +93,7 @@ async fn schema(
             .settings
             .defined_schema_fields
             .iter()
-            .filter_map(|field| schema_fields.remove(&field.name))
+            .filter_map(|f| schema_fields.remove(f))
             .cloned()
             .collect::<Vec<_>>();
     }

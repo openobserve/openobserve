@@ -552,12 +552,7 @@ pub async fn get_uds_and_original_data_streams(
         );
 
         if !stream_settings.defined_schema_fields.is_empty() {
-            let mut fields = HashSet::<_>::from_iter(
-                stream_settings
-                    .defined_schema_fields
-                    .iter()
-                    .map(|f| f.name.clone()),
-            );
+            let mut fields = HashSet::<_>::from_iter(stream_settings.defined_schema_fields);
             if !fields.contains(TIMESTAMP_COL_NAME) {
                 fields.insert(TIMESTAMP_COL_NAME.to_string());
             }

@@ -36,6 +36,7 @@ use crate::{
 pub enum DataType {
     #[default]
     Utf8,
+    LargeUtf8,
     Int64,
     Uint64,
     Float64,
@@ -46,6 +47,7 @@ impl From<DataType> for arrow_schema::DataType {
     fn from(data_type: DataType) -> Self {
         match data_type {
             DataType::Utf8 => Self::Utf8,
+            DataType::LargeUtf8 => Self::LargeUtf8,
             DataType::Int64 => Self::Int64,
             DataType::Uint64 => Self::UInt64,
             DataType::Float64 => Self::Float64,
@@ -58,6 +60,7 @@ impl Display for DataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DataType::Utf8 => write!(f, "Utf8"),
+            DataType::LargeUtf8 => write!(f, "LargeUtf8"),
             DataType::Int64 => write!(f, "Int64"),
             DataType::Uint64 => write!(f, "Uint64"),
             DataType::Float64 => write!(f, "Float64"),
@@ -72,6 +75,7 @@ impl FromStr for DataType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "utf8" => Ok(DataType::Utf8),
+            "largeutf8" => Ok(DataType::LargeUtf8),
             "int64" => Ok(DataType::Int64),
             "uint64" => Ok(DataType::Uint64),
             "float64" => Ok(DataType::Float64),
@@ -98,11 +102,9 @@ impl DataField {
 
 impl PartialEq for DataField {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
+        self.name == other.name && self.r#type == other.r#type
     }
 }
-
-impl Eq for DataField {}
 
 pub const ALL_STREAM_TYPES: [StreamType; 7] = [
     StreamType::Logs,
@@ -783,7 +785,7 @@ pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub flatten_level: Option<i64>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub defined_schema_fields: Vec<DataField>,
+    pub defined_schema_fields: Vec<String>,
     #[serde(default)]
     pub max_query_range: i64, // hours
     #[serde(default)]
@@ -834,7 +836,10 @@ impl Serialize for StreamSettings {
         state.serialize_field("disable_distinct_fields", &self.enable_distinct_fields)?;
 
         if !self.defined_schema_fields.is_empty() {
-            state.serialize_field("defined_schema_fields", &self.defined_schema_fields)?;
+            let mut fields = self.defined_schema_fields.clone();
+            fields.sort_unstable();
+            fields.dedup();
+            state.serialize_field("defined_schema_fields", &fields)?;
         } else {
             state.skip_field("defined_schema_fields")?;
         }
@@ -915,33 +920,18 @@ impl From<&str> for StreamSettings {
             max_query_range = v.as_i64().unwrap();
         };
 
-        let mut defined_schema_fields = Vec::new();
+        let mut defined_schema_fields = Vec::<String>::new();
         if let Some(value) = settings.get("defined_schema_fields") {
-            defined_schema_fields = value
+            let mut fields = value
                 .as_array()
                 .unwrap()
                 .iter()
-                .filter_map(|v| {
-                    // Handle different formats for backward compatibility
-                    match v {
-                        // Object format: {"name": "field1", "type": "Utf8"}
-                        Value::Object(obj) => {
-                            let name = obj.get("name")?.as_str()?.to_string();
-                            let r#type = obj
-                                .get("type")
-                                .and_then(Value::as_str)
-                                .and_then(|v| DataType::from_str(v).ok())
-                                .unwrap_or(DataType::Utf8); // Default to Utf8 for now, will be updated later
-                            Some(DataField { name, r#type })
-                        }
-                        // String format: "field1" - preserve the field name, default to Utf8 for
-                        // now
-                        Value::String(name) => Some(DataField::new(name, DataType::Utf8)),
-                        // Skip invalid formats
-                        _ => None,
-                    }
-                })
+                .map(|item| item.as_str().unwrap().to_string())
                 .collect::<Vec<_>>();
+
+            fields.sort_unstable();
+            fields.dedup();
+            defined_schema_fields = fields;
         }
 
         let flatten_level = settings.get("flatten_level").map(|v| v.as_i64().unwrap());
