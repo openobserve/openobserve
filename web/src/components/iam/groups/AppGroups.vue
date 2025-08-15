@@ -16,34 +16,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="q-pa-none">
-    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
-      :class="store.state.theme =='dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
+      :class="store.state.theme =='dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
       >
     <div
       data-test="iam-groups-section-title"
-      class="q-table__title"
+      class="q-table__title tw-font-[600]"
     >
       {{ t("iam.groups") }}
     </div>
     <div class=" row items-center justify-end">
         <div data-test="iam-groups-search-input">
           <q-input
-            v-model="filterQuery"
-            filled
-            dense
-            class="col-6"
-            :placeholder="t('iam.searchGroup')"
-          >
-            <template #prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
+              v-model="filterQuery"
+              borderless
+              dense
+              class="q-ml-auto no-border o2-search-input tw-h-[36px]"
+              :placeholder="t('iam.searchGroup')"
+              :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+            >
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+              </template>
+            </q-input>
         </div>
         <q-btn
           data-test="alert-list-add-alert-btn"
-          class="q-ml-md text-bold no-border"
-          padding="sm lg"
-          color="secondary"
+          class="q-ml-md o2-primary-button tw-h-[36px]"
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           no-caps
           :label="t(`iam.addGroup`)"
           @click="addGroup"
@@ -53,9 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <app-table
         data-test="iam-groups-table-section"
-        class="iam-table o2-quasar-app-table"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-app-table-dark': 'o2-quasar-app-table-light'"
-        :rows="rows"
+        class="iam-table o2-quasar-app-table o2-quasar-table-header-sticky"
+        :class="store.state.theme == 'dark' ? 'o2-quasar-app-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-app-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
+        :tableStyle="hasVisibleRows ? 'height: calc(100vh - 114px); overflow-y: auto;' : ''"
+        :rows="visibleRows"
         :columns="columns"
         pagination
         :rows-per-page="25"
@@ -65,6 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
         :bordered="false"
         :title="t('iam.groups')"
+        :hideTopPagination="true"
+        :showBottomPaginationWithTitle="true"
       >
         <template v-slot:actions="slotProps: any">
           <div>
@@ -108,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeMount } from "vue";
+import { ref, onBeforeMount, computed } from "vue";
 import AddGroup from "./AddGroup.vue";
 import { useI18n } from "vue-i18n";
 import AppTable from "@/components/AppTable.vue";
@@ -262,6 +266,13 @@ const _deleteGroup = () => {
   deleteUserGroup(deleteConformDialog.value.data);
   deleteConformDialog.value.data = null;
 };
+
+const visibleRows = computed(() => {
+  if (!filterQuery.value) return rows.value || []
+  return filterGroups(rows.value || [], filterQuery.value)
+})
+
+const hasVisibleRows = computed(() => visibleRows.value.length > 0)
 </script>
 
 <style scoped></style>
