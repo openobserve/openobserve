@@ -62,13 +62,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <q-table
       ref="qTable"
-      :rows="usersState.users"
+      :rows="visibleRows"
       :columns="columns"
       row-key="id"
       :pagination="pagination"
       :filter="filterQuery"
       :filter-method="filterData"
-      style="height: calc(100vh - 114px); overflow-y: auto;"
+      :style="hasVisibleRows ? 'height: calc(100vh - 114px); overflow-y: auto;' : ''"
       class="o2-quasar-table o2-quasar-table-header-sticky"
       :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
     >
@@ -250,6 +250,7 @@ export default defineComponent({
     const { usersState } = usePermissions();
     const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
+    const filterQuery = ref("");
 
     onActivated(() => {
       if (router.currentRoute.value.query.action == "add") {
@@ -837,6 +838,29 @@ export default defineComponent({
         page: "Users",
       });
     };
+
+    const filterData = (rows: any, terms: any) => {
+        var filtered = [];
+        terms = terms.toLowerCase();
+        for (var i = 0; i < rows.length; i++) {
+          if (
+            rows[i]["first_name"]?.toLowerCase().includes(terms) ||
+            rows[i]["last_name"]?.toLowerCase().includes(terms) ||
+            rows[i]["email"]?.toLowerCase().includes(terms) ||
+            rows[i]["role"].toLowerCase().includes(terms)
+          ) {
+            filtered.push(rows[i]);
+          }
+        }
+        return filtered;
+      };
+
+      const visibleRows = computed(() => {
+      if (!filterQuery.value) return usersState.users || []
+      return filterData(usersState.users || [], filterQuery.value)
+    });
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+
     return {
       t,
       qTable,
@@ -868,25 +892,11 @@ export default defineComponent({
       showUpdateUserDialog,
       changeMaxRecordToReturn,
       outlinedDelete,
-      filterQuery: ref(""),
+      filterQuery,
       fetchUserGroups,
       toggleExpand,
       forceCloseRow,
-      filterData(rows: any, terms: any) {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["first_name"]?.toLowerCase().includes(terms) ||
-            rows[i]["last_name"]?.toLowerCase().includes(terms) ||
-            rows[i]["email"]?.toLowerCase().includes(terms) ||
-            rows[i]["role"].toLowerCase().includes(terms)
-          ) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      filterData,
       userEmail,
       selectedRole,
       options,
@@ -905,6 +915,8 @@ export default defineComponent({
       shouldAllowChangeRole,
       shouldAllowDelete,
       fetchUserRoles,
+      visibleRows,
+      hasVisibleRows,
       // showAddUserBtn,
     };
   },
