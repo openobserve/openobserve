@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       flat
       :bordered="bordered"
       ref="qTableRef"
-      :title="title"
       :rows="rows"
       :columns="columns as []"
       :table-colspan="9"
@@ -42,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :filter="filter && filter.value"
       :filter-method="filter && filter.method"
       @virtual-scroll="onScroll"
+      :style="tableStyle"
     >
       <template #no-data>
         <NoData class="q-mb-lg" />
@@ -59,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-th>
         </q-tr>
       </template>
-       <template #top="scope">
-        <div class="tw-flex tw-items-center tw-justify-between tw-w-full q-py-xs  "> 
+       <template #top="scope" v-if="!hideTopPagination">
+        <div v-if="!hideTopPagination" class="tw-flex tw-items-center tw-justify-between tw-w-full q-py-xs  "> 
           <span class="tw-font-bold tw-text-[14px] tw-w-full q-pa-none">
           {{ rows.length }} {{ title }}
         </span>
@@ -111,13 +111,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-tr>
       </template>
       <template  #bottom="scope">
-        <QTablePagination
-          :scope="scope"
-          :position="'bottom'"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          @update:changeRecordPerPage="changePagination"
-        />
+        <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
+          <div v-if="showBottomPaginationWithTitle" class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+            {{ resultTotal }} {{ title }}
+          </div>
+            <QTablePagination
+              :scope="scope"
+              :position="'bottom'"
+              :resultTotal="resultTotal"
+              :perPageOptions="perPageOptions"
+              @update:changeRecordPerPage="changePagination"
+            />
+        </div>
       </template>
     </q-table>
   </div>
@@ -188,6 +193,18 @@ const props = defineProps({
   bordered: {
     type: Boolean,
     default: true,
+  },
+  tableStyle: {
+    type: String,
+    default: "",
+  },
+  hideTopPagination: {
+    type: Boolean,
+    default: false,
+  },
+  showBottomPaginationWithTitle: {
+    type: Boolean,
+    default: false,
   },
 });
 
