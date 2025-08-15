@@ -177,14 +177,18 @@ pub async fn search(
                             &sql.org_id,
                             &stream_names,
                         );
+
                         ret_val
                             .as_array()
-                            .unwrap()
+                            .ok_or(Error::Message("Expected array".to_string()))?
                             .iter()
                             .filter_map(|v| {
-                                (!v.is_null()).then_some(flatten::flatten(v.clone()).unwrap())
+                                (!v.is_null()).then_some(flatten::flatten(v.clone()).map_err(|e| {
+                                    log::error!("Failed to flatten value: {}", e);
+                                    Error::Message(format!("Failed to flatten value: {}", e))
+                                }))
                             })
-                            .collect()
+                            .collect::<Result<Vec<_>, _>>()?
                     } else {
                         json_rows
                             .into_iter()
@@ -200,9 +204,14 @@ pub async fn search(
                                     &sql.org_id,
                                     &stream_names,
                                 );
-                                (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
+                                (!ret_val.is_null()).then_some(flatten::flatten(ret_val).map_err(
+                                    |e| {
+                                        log::error!("Failed to flatten value: {}", e);
+                                        Error::Message(format!("Failed to flatten value: {}", e))
+                                    },
+                                ))
                             })
-                            .collect()
+                            .collect::<Result<Vec<_>, _>>()?
                     }
                 }
                 None => json_rows
