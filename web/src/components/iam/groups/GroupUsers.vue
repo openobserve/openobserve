@@ -100,10 +100,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
     </div>
-    <div data-test="iam-users-selection-table">
+    <div data-test="iam-users-selection-table" style="height: calc(100vh - 250px); overflow-y: auto;">
       <template v-if="rows.length">
         <app-table
-          :rows="rows"
+          :rows="visibleRows"
           :columns="columns"
           :dense="true"
           :virtual-scroll="false"
@@ -113,7 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             method: filterUsers,
           }"
           :title="t('iam.users')"
-          class="o2-quasar-table"
+          class="o2-quasar-table o2-quasar-table-header-sticky"
+          :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
+          :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
+          :hideTopPagination="true"
+          :showBottomPaginationWithTitle="true"
         >
           <template v-slot:select="slotProps: any">
             <q-checkbox
@@ -378,6 +382,13 @@ const filterUsers = (rows: any[], term: string) => {
   }
   return filtered;
 };
+
+const visibleRows = computed(() => {
+  if (!userSearchKey.value) return rows.value || [];
+  return filterUsers(rows.value || [], userSearchKey.value);
+});
+
+const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 </script>
 
 <style scoped></style>
