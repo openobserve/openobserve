@@ -877,9 +877,11 @@ export default defineComponent({
         }
       }
 
+      // Purposely converting to microseconds to avoid floating point precision issues
+      // In updateChart method, we are using start and end time to set the time range of trace
       traceTree.value[0].lowestStartTime =
-        convertTimeFromNsToMs(lowestStartTime);
-      traceTree.value[0].highestEndTime = convertTimeFromNsToMs(highestEndTime);
+        convertTimeFromNsToUs(lowestStartTime);
+      traceTree.value[0].highestEndTime = convertTimeFromNsToUs(highestEndTime);
       traceTree.value[0].style.color =
         searchObj.meta.serviceColors[traceTree.value[0].serviceName];
 
@@ -1029,6 +1031,12 @@ export default defineComponent({
       return Number((time / 1000000).toFixed(2));
     };
 
+    const convertTimeFromNsToUs = (time: number) => {
+      const nanoseconds = time;
+      const microseconds = Math.floor(nanoseconds / 1000);
+      return microseconds;
+    };
+
     const convertTimeFromNsToMs = (time: number) => {
       const nanoseconds = time;
       const milliseconds = Math.floor(nanoseconds / 1000000);
@@ -1064,15 +1072,15 @@ export default defineComponent({
       for (let i = spanPositionList.value.length - 1; i > -1; i--) {
         const absoluteStartTime =
           spanPositionList.value[i].startTimeMs -
-          traceTree.value[0].lowestStartTime;
+          convertTimeFromNsToMs(traceTree.value[0].lowestStartTime * 1000);
+
+        const x1 = Number(
+          (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(4),
+        );
 
         data.push({
           x0: absoluteStartTime,
-          x1: Number(
-            (absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(
-              4,
-            ),
-          ),
+          x1,
           fillcolor: spanPositionList.value[i].style.color,
         });
       }
@@ -1092,10 +1100,18 @@ export default defineComponent({
       if (typeof data.start !== "number" || typeof data.end !== "number") {
         newStart = 0;
         // Safety check to ensure trace chart data exists
-        newEnd =
-          traceChart.value.data && traceChart.value.data.length > 0
-            ? traceChart.value.data[traceChart.value.data.length - 1].x1
-            : 0;
+        if (
+          traceTree.value[0].highestEndTime > 0 &&
+          traceTree.value[0].lowestStartTime > 0 &&
+          traceTree.value[0].highestEndTime > traceTree.value[0].lowestStartTime
+        ) {
+          newEnd =
+            (traceTree.value[0].highestEndTime -
+              traceTree.value[0].lowestStartTime) /
+            1000;
+        } else {
+          newEnd = 0;
+        }
       } else {
         newStart = data.start || 0;
         newEnd = data.end || 0;
