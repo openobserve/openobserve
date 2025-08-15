@@ -46,6 +46,7 @@ use {
     crate::service::search::datafusion::optimizer::context::generate_streaming_agg_rules,
     cipher::{RewriteCipherCall, RewriteCipherKey},
     o2_enterprise::enterprise::search::datafusion::optimizer::aggregate_topk::AggregateTopkRule,
+    o2_enterprise::enterprise::search::datafusion::optimizer::eliminate_aggregate::EliminateAggregateRule,
 };
 
 use crate::service::search::{
@@ -200,6 +201,8 @@ pub fn generate_physical_optimizer_rules(
                 if let Some(_context) = context {
                     #[cfg(feature = "enterprise")]
                     rules.push(generate_streaming_agg_rules(_context));
+                    #[cfg(feature = "enterprise")]
+                    rules.push(Arc::new(EliminateAggregateRule::new()) as _);
                     #[cfg(not(feature = "enterprise"))]
                     continue;
                 }

@@ -928,9 +928,7 @@ pub async fn search_partition(
                 Ok(v) => v,
                 Err(e) => {
                     log::error!(
-                        "[trace_id {trace_id}] search_partition:
-        convert_histogram_interval_to_seconds error: {:?}",
-                        e
+                        "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {e:?}",
                     );
                     10
                 }
@@ -956,8 +954,7 @@ pub async fn search_partition(
                 }
                 Err(e) => {
                     log::error!(
-                        "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {:?}",
-                        e
+                        "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {e:?}",
                     );
                 }
             }
