@@ -410,10 +410,10 @@ pub async fn run_datafusion(
             context: tracing::Span::current().context(),
             is_leader: false,
         }))
-        .add_context(PhysicalOptimizerContext::AggregateTopk)
         .add_context(PhysicalOptimizerContext::StreamingAggregation(
             StreamingAggregationContext::new(&req, is_complete_cache_hit.clone()).await?,
         ))
+        .add_context(PhysicalOptimizerContext::AggregateTopk)
         .build(&req, &sql)
         .await?;
 
