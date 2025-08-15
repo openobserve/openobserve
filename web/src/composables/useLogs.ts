@@ -436,7 +436,7 @@ const useLogs = () => {
 
   const resetSearchObj = () => {
     // searchObj = reactive(Object.assign({}, defaultObject));
-    searchObj.data.errorMsg = "No stream found in selected organization!";
+    searchObj.data.errorMsg = "";
     searchObj.data.stream.streamLists = [];
     searchObj.data.stream.selectedStream = [];
     searchObj.data.stream.selectedStreamFields = [];
