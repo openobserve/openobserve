@@ -1126,8 +1126,6 @@ pub struct Common {
     pub use_stream_settings_for_partitions_enabled: bool,
     #[env_config(name = "ZO_DASHBOARD_PLACEHOLDER", default = "_o2_all_")]
     pub dashboard_placeholder: String,
-    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
-    pub aggregation_cache_enabled: bool,
     #[env_config(name = "ZO_AGGREGATION_TOPK_ENABLED", default = true)]
     pub aggregation_topk_enabled: bool,
     #[env_config(name = "ZO_SEARCH_INSPECTOR_ENABLED", default = false)]
@@ -1750,6 +1748,12 @@ pub struct Nats {
     pub subscription_capacity: usize,
     #[env_config(name = "ZO_NATS_QUEUE_MAX_AGE", default = 60)] // days
     pub queue_max_age: u64,
+    #[env_config(
+        name = "ZO_NATS_QUEUE_MAX_SIZE",
+        help = "The maximum size of the queue in MB, default is 2048MB",
+        default = 2048
+    )]
+    pub queue_max_size: i64,
 }
 
 #[derive(Debug, Default, EnvConfig)]
@@ -2112,6 +2116,11 @@ pub fn init() -> Config {
     // check pipeline config
     if let Err(e) = check_pipeline_config(&mut cfg) {
         panic!("pipeline config error: {e}");
+    }
+
+    // check nats config
+    if let Err(e) = check_nats_config(&mut cfg) {
+        panic!("nats config error: {e}");
     }
 
     cfg
@@ -2595,7 +2604,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.is_local_storage
         && !cfg.common.result_cache_enabled
         && !cfg.common.metrics_cache_enabled
-        && !cfg.common.aggregation_cache_enabled
+        && !cfg.common.feature_query_streaming_aggs
     {
         cfg.disk_cache.enabled = false;
     }
@@ -2604,7 +2613,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.disk_cache.enabled {
         cfg.common.result_cache_enabled = false;
         cfg.common.metrics_cache_enabled = false;
-        cfg.common.aggregation_cache_enabled = false;
+        cfg.common.feature_query_streaming_aggs = false;
         cfg.cache_latest_files.enabled = false;
         cfg.cache_latest_files.delete_merge_files = false;
     }
@@ -2921,6 +2930,14 @@ pub fn get_parquet_compression(compression: &str) -> parquet::basic::Compression
         "zstd" => parquet::basic::Compression::ZSTD(Default::default()),
         _ => parquet::basic::Compression::ZSTD(Default::default()),
     }
+}
+
+fn check_nats_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.nats.queue_max_size == 0 {
+        cfg.nats.queue_max_size = 2048; // 2GB
+    }
+    cfg.nats.queue_max_size *= 1024 * 1024; // convert to bytes
+    Ok(())
 }
 
 #[cfg(test)]

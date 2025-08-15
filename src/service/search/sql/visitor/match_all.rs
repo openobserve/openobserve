@@ -17,19 +17,20 @@ use std::ops::ControlFlow;
 
 use sqlparser::ast::{Expr, FunctionArguments, VisitorMut};
 
-use crate::service::search::{
-    datafusion::udf::match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
-    utils::trim_quotes,
+use crate::service::search::datafusion::udf::match_all_udf::{
+    FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME,
 };
 
 /// get all item from match_all functions
 pub struct MatchVisitor {
-    pub match_items: Option<Vec<String>>, // filed = value
+    pub has_match_all: bool,
 }
 
 impl MatchVisitor {
     pub fn new() -> Self {
-        Self { match_items: None }
+        Self {
+            has_match_all: false,
+        }
     }
 }
 
@@ -43,11 +44,8 @@ impl VisitorMut for MatchVisitor {
                 && let FunctionArguments::List(list) = &func.args
                 && !list.args.is_empty()
             {
-                let value = trim_quotes(list.args[0].to_string().as_str());
-                match &mut self.match_items {
-                    Some(items) => items.push(value),
-                    None => self.match_items = Some(vec![value]),
-                }
+                self.has_match_all = true;
+                return ControlFlow::Break(());
             }
         }
         ControlFlow::Continue(())
@@ -73,9 +71,6 @@ mod tests {
         let _ = statement.visit(&mut match_visitor);
 
         // Should extract match_all values
-        assert!(match_visitor.match_items.is_some());
-        let items = match_visitor.match_items.unwrap();
-        assert!(items.contains(&"error".to_string()));
-        assert!(items.contains(&"critical".to_string()));
+        assert!(match_visitor.has_match_all);
     }
 }
