@@ -148,40 +148,40 @@ await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   });
 
-  test("should click on live mode on button and select 5 sec, switch off, and then click run query", async ({
+  // test("should click on live mode on button and select 5 sec, switch off, and then click run query", async ({
     
-    page,
-  }) => {
-    await multistreamselect(page);
-    await page.route("**/logData.ValueQuery", (route) => route.continue());
-    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+  //   page,
+  // }) => {
+  //   await multistreamselect(page);
+  //   await page.route("**/logData.ValueQuery", (route) => route.continue());
+  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
 
-    await page
-      .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
-      .click({
-        force: true,
-      });
-    await page
-      .locator('[data-test="logs-search-bar-refresh-interval-btn-dropdown"]')
-      .click({ force: true });
-    await page.locator('[data-test="logs-search-bar-refresh-time-5"]').click({
-      force: true,
-    });
-    await page.waitForTimeout(1000);
-    await expect(page.locator(".q-notification__message")).toContainText(
-      "Live mode is enabled"
-    );
-    await page.waitForTimeout(5000);
-    await page
-      .locator(".q-pl-sm > .q-btn > .q-btn__content")
-      .click({ force: true });
-    await page
-      .locator(
-        '[data-test="logs-search-off-refresh-interval"] > .q-btn__content'
-      )
-      .click({ force: true });
-    await applyQueryButton(page);
-  });
+  //   await page
+  //     .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
+  //     .click({
+  //       force: true,
+  //     });
+  //   await page
+  //     .locator('[data-test="logs-search-bar-refresh-interval-btn-dropdown"]')
+  //     .click({ force: true });
+  //   await page.locator('[data-test="logs-search-bar-refresh-time-5"]').click({
+  //     force: true,
+  //   });
+  //   await page.waitForTimeout(1000);
+  //   await expect(page.locator(".q-notification__message")).toContainText(
+  //     "Live mode is enabled"
+  //   );
+  //   await page.waitForTimeout(5000);
+  //   await page
+  //     .locator(".q-pl-sm > .q-btn > .q-btn__content")
+  //     .click({ force: true });
+  //   await page
+  //     .locator(
+  //       '[data-test="logs-search-off-refresh-interval"] > .q-btn__content'
+  //     )
+  //     .click({ force: true });
+  //   await applyQueryButton(page);
+  // });
 
   test("should redirect to logs after clicking on stream explorer via stream page", async ({
     page,

@@ -26,9 +26,11 @@ use sqlparser::{
 pub fn convert_to_histogram_query(
     original_query: &str,
     stream_names: &[String],
+    is_multi_stream_search: bool,
 ) -> Result<String, Error> {
     let (is_eligible, is_sub_query) =
-        is_eligible_for_histogram(original_query).map_err(|e| Error::Message(e.to_string()))?;
+        is_eligible_for_histogram(original_query, is_multi_stream_search)
+            .map_err(|e| Error::Message(e.to_string()))?;
     if !is_eligible {
         let error = Error::ErrorCode(ErrorCodes::SearchHistogramNotAvailable(
             "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.".to_string(),
@@ -40,6 +42,20 @@ pub fn convert_to_histogram_query(
     let statements = Parser::parse_sql(&PostgreSqlDialect {}, original_query)
         .map_err(|e| anyhow::anyhow!("Failed to parse SQL query: {}", e))?;
 
+    let histogram_query = if is_multi_stream_search {
+        multi_stream_histogram_query(&statements, stream_names)?
+    } else {
+        single_stream_histogram_query(&statements, stream_names, is_sub_query)?
+    };
+
+    Ok(histogram_query)
+}
+
+fn single_stream_histogram_query(
+    statements: &[Statement],
+    stream_names: &[String],
+    is_sub_query: bool,
+) -> Result<String, Error> {
     let statement = statements
         .first()
         .ok_or_else(|| anyhow::anyhow!("No SQL statement found"))?;
@@ -49,10 +65,9 @@ pub fn convert_to_histogram_query(
     let stream_name = stream_names
         .first()
         .ok_or_else(|| anyhow::anyhow!("No stream name found"))?;
-
     // Build histogram query
     let mut histogram_query = format!(
-        "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"{stream_name}\"",
+        "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"{stream_name}\""
     );
 
     // Add WHERE clause if it exists
@@ -63,8 +78,39 @@ pub fn convert_to_histogram_query(
 
     // Add GROUP BY and ORDER BY
     histogram_query.push_str(" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC");
-
     Ok(histogram_query)
+}
+
+fn multi_stream_histogram_query(
+    statements: &[Statement],
+    stream_names: &[String],
+) -> Result<String, Error> {
+    if statements.is_empty() || stream_names.is_empty() {
+        return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+            "No statements or stream names provided".to_string(),
+        )));
+    }
+
+    // Build individual histogram queries for each stream
+    let mut histogram_queries = Vec::new();
+    for stream_name in stream_names {
+        let mut query = format!(
+            "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"{stream_name}\"",
+        );
+
+        query.push_str(" GROUP BY zo_sql_key");
+        histogram_queries.push(query);
+    }
+
+    // Combine all histogram queries with UNION ALL
+    let cte_body = histogram_queries.join(" UNION ALL ");
+
+    // Build the complete query with CTE
+    let final_query = format!(
+        "WITH multistream_histogram AS ({cte_body}) SELECT zo_sql_key, sum(zo_sql_num) AS zo_sql_num FROM multistream_histogram GROUP BY zo_sql_key ORDER BY zo_sql_key",
+    );
+
+    Ok(final_query)
 }
 
 /// Extract WHERE clause from SQL statement
@@ -101,7 +147,7 @@ mod tests {
     fn test_convert_simple_query() {
         let original_query = "SELECT * FROM \"logs\" WHERE status = 500";
         let stream_names = vec!["logs".to_string()];
-        let result = convert_to_histogram_query(original_query, &stream_names).unwrap();
+        let result = convert_to_histogram_query(original_query, &stream_names, false).unwrap();
 
         let expected = "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"logs\" WHERE status = 500 GROUP BY zo_sql_key ORDER BY zo_sql_key DESC";
         assert_eq!(result, expected);
@@ -111,7 +157,7 @@ mod tests {
     fn test_convert_query_without_where() {
         let original_query = "SELECT * FROM \"logs\"";
         let stream_names = vec!["logs".to_string()];
-        let result = convert_to_histogram_query(original_query, &stream_names).unwrap();
+        let result = convert_to_histogram_query(original_query, &stream_names, false).unwrap();
 
         let expected = "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"logs\" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC";
         assert_eq!(result, expected);
@@ -121,7 +167,7 @@ mod tests {
     fn test_convert_complex_where() {
         let original_query = "SELECT * FROM \"api_logs\" WHERE status >= 400 AND level = 'error' AND user_id IS NOT NULL";
         let stream_names = vec!["api_logs".to_string()];
-        let result = convert_to_histogram_query(original_query, &stream_names).unwrap();
+        let result = convert_to_histogram_query(original_query, &stream_names, false).unwrap();
 
         let expected = "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"api_logs\" WHERE status >= 400 AND level = 'error' AND user_id IS NOT NULL GROUP BY zo_sql_key ORDER BY zo_sql_key DESC";
         assert_eq!(result, expected);
@@ -131,9 +177,19 @@ mod tests {
     fn test_convert_query_with_group_by() {
         let original_query = "SELECT * FROM \"api_logs\" GROUP BY level";
         let stream_names = vec!["api_logs".to_string()];
-        let result = convert_to_histogram_query(original_query, &stream_names).unwrap();
+        let result = convert_to_histogram_query(original_query, &stream_names, false).unwrap();
 
         let expected = "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"api_logs\" GROUP BY zo_sql_key ORDER BY zo_sql_key DESC";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_multi_stream_histogram_query_basic() {
+        let original_query = "SELECT * FROM default UNION ALL SELECT * FROM default_enrich";
+        let stream_names = vec!["default".to_string(), "default_enrich".to_string()];
+        let result = convert_to_histogram_query(original_query, &stream_names, true).unwrap();
+
+        let expected = "WITH multistream_histogram AS (SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"default\" GROUP BY zo_sql_key UNION ALL SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"default_enrich\" GROUP BY zo_sql_key) SELECT zo_sql_key, sum(zo_sql_num) AS zo_sql_num FROM multistream_histogram GROUP BY zo_sql_key ORDER BY zo_sql_key";
         assert_eq!(result, expected);
     }
 }

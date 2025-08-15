@@ -220,10 +220,10 @@ fn default_toggle_ingestion_logs() -> bool {
     false
 }
 
-fn default_enable_aggregation_cache() -> bool {
+fn default_enable_streaming_aggregation() -> bool {
     #[cfg(feature = "enterprise")]
     {
-        config::get_config().common.aggregation_cache_enabled
+        config::get_config().common.feature_query_streaming_aggs
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -248,7 +248,7 @@ pub struct OrganizationSettingPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub toggle_ingestion_logs: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub aggregation_cache_enabled: Option<bool>,
+    pub streaming_aggregation_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_streaming_search: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -267,8 +267,8 @@ pub struct OrganizationSetting {
     pub span_id_field_name: String,
     #[serde(default = "default_toggle_ingestion_logs")]
     pub toggle_ingestion_logs: bool,
-    #[serde(default = "default_enable_aggregation_cache")]
-    pub aggregation_cache_enabled: bool,
+    #[serde(default = "default_enable_streaming_aggregation")]
+    pub streaming_aggregation_enabled: bool,
     #[serde(default = "default_enable_streaming_search")]
     pub enable_streaming_search: bool,
     #[serde(default = "default_auto_refresh_interval")]
@@ -286,7 +286,7 @@ impl Default for OrganizationSetting {
             trace_id_field_name: default_trace_id_field_name(),
             span_id_field_name: default_span_id_field_name(),
             toggle_ingestion_logs: default_toggle_ingestion_logs(),
-            aggregation_cache_enabled: default_enable_aggregation_cache(),
+            streaming_aggregation_enabled: default_enable_streaming_aggregation(),
             enable_streaming_search: default_enable_streaming_search(),
             min_auto_refresh_interval: default_auto_refresh_interval(),
             free_trial_expiry: None,

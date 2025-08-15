@@ -527,8 +527,6 @@ pub struct SearchPartitionRequest {
     pub streaming_output: bool,
     #[serde(default)]
     pub histogram_interval: i64,
-    #[serde(default)]
-    pub search_type: Option<SearchEventType>,
 }
 
 impl SearchPartitionRequest {
@@ -562,7 +560,6 @@ impl From<&Request> for SearchPartitionRequest {
             query_fn: req.query.query_fn.clone(),
             streaming_output: req.query.streaming_output,
             histogram_interval: req.query.histogram_interval,
-            search_type: req.search_type,
         }
     }
 }
@@ -1497,7 +1494,6 @@ mod tests {
             query_fn: Some("fn1".to_string()),
             streaming_output: false,
             histogram_interval: 0,
-            search_type: Some(SearchEventType::UI),
         };
 
         req.decode().unwrap();

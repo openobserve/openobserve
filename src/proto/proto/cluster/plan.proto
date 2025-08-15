@@ -75,7 +75,6 @@ message IndexInfo {
     bool                   use_inverted_index = 1;
     string                    index_condition = 2;
     repeated KvItem                equal_keys = 3;
-    repeated string            match_all_keys = 4;
     IdxOptimizeMode       index_optimize_mode = 5;
 }
 

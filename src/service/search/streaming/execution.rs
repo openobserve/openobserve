@@ -62,6 +62,7 @@ pub async fn do_partitioned_search(
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
     stream_name: &str,
+    is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
     // limit the search by max_query_range
     let mut range_error = String::new();
@@ -148,8 +149,16 @@ pub async fn do_partitioned_search(
         } else {
             format!("{trace_id}-{idx}")
         };
-        let mut search_res =
-            do_search(&trace_id, org_id, stream_type, &req, user_id, use_cache).await?;
+        let mut search_res = do_search(
+            &trace_id,
+            org_id,
+            stream_type,
+            &req,
+            user_id,
+            use_cache,
+            is_multi_stream_search,
+        )
+        .await?;
 
         let mut total_hits = search_res.total as i64;
 
@@ -316,7 +325,6 @@ pub async fn get_partitions(
         query_fn: Default::default(),
         streaming_output: true,
         histogram_interval: req.query.histogram_interval,
-        search_type: req.search_type,
     };
 
     let res = SearchService::search_partition(
@@ -325,6 +333,7 @@ pub async fn get_partitions(
         Some(user_id),
         stream_type,
         &search_partition_req,
+        false,
         false,
         false,
     )
@@ -345,6 +354,7 @@ pub async fn do_search(
     req: &config::meta::search::Request,
     user_id: &str,
     use_cache: bool,
+    is_multi_stream_search: bool,
 ) -> Result<Response, infra::errors::Error> {
     let mut req = req.clone();
 
@@ -358,6 +368,7 @@ pub async fn do_search(
         "".to_string(),
         true,
         None,
+        is_multi_stream_search,
     )
     .await;
 
@@ -399,6 +410,7 @@ pub async fn process_delta(
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
     stream_name: &str,
+    is_multi_stream_search: bool,
 ) -> Result<(), infra::errors::Error> {
     log::info!("[HTTP2_STREAM]: Processing delta for trace_id: {trace_id}, delta: {delta:?}");
     let mut req = req.clone();
@@ -446,7 +458,16 @@ pub async fn process_delta(
         }
 
         // use cache for delta search
-        let mut search_res = do_search(trace_id, org_id, stream_type, &req, user_id, true).await?;
+        let mut search_res = do_search(
+            trace_id,
+            org_id,
+            stream_type,
+            &req,
+            user_id,
+            true,
+            is_multi_stream_search,
+        )
+        .await?;
 
         let total_hits = search_res.total as i64;
 

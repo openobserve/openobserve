@@ -24,7 +24,7 @@ use hashbrown::HashSet;
 
 use crate::service::search::{
     cache::cacher::handle_histogram,
-    cluster::flight::{generate_context, register_table},
+    cluster::flight::{SearchContextBuilder, register_table},
     request::Request,
     sql::Sql,
 };
@@ -213,7 +213,9 @@ pub async fn get_result_schema(
     }
 
     let sql_arc = Arc::new(sql.clone());
-    let ctx = generate_context(&Request::default(), &sql_arc, 0).await?;
+    let ctx = SearchContextBuilder::new()
+        .build(&Request::default(), &sql_arc)
+        .await?;
     register_table(&ctx, &sql_arc).await?;
     let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;
 

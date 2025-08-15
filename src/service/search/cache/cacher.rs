@@ -964,7 +964,7 @@ mod tests {
             org_id: "test_org".to_string(),
             stream_type: StreamType::Logs,
             stream_names: vec![TableReference::from("logs")],
-            match_items: None,
+            has_match_all: false,
             equal_items: hashbrown::HashMap::new(),
             prefix_items: hashbrown::HashMap::new(),
             columns: {
