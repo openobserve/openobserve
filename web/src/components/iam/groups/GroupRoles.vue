@@ -83,12 +83,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rows="rows"
           :columns="columns"
           :dense="true"
+          :virtual-scroll="false"
           style="height: fit-content"
           :filter="{
             value: userSearchKey,
             method: filterRoles,
           }"
           :title="t('iam.roles')"
+          class="o2-quasar-table"
         >
           <template v-slot:select="slotProps: any">
             <q-checkbox
