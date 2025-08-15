@@ -303,6 +303,7 @@ pub async fn get_latest_traces(
         "".to_string(),
         false,
         None,
+        false,
     )
     .instrument(http_span.clone())
     .await;
@@ -392,6 +393,7 @@ pub async fn get_latest_traces(
             "".to_string(),
             false,
             None,
+            false,
         )
         .instrument(http_span.clone())
         .await;

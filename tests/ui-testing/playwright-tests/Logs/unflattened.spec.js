@@ -251,9 +251,8 @@ test.describe("Unflattened testcases", () => {
 
     // Update the query editor with 'SELECT * FROM "e2e_automate"'
     await pageManager.unflattenedPage.logsSearchBarQueryEditor.waitFor();
+    await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').first().click();
     await pageManager.unflattenedPage.logsSearchBarQueryEditor.click();
-    await page.keyboard.press("Control+A");
-    await page.keyboard.press("Delete");
     await page.keyboard.type('SELECT * FROM "e2e_automate"');
     await page.waitForTimeout(2000);
 

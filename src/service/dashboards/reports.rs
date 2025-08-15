@@ -394,6 +394,7 @@ impl SendReport for Report {
                             resp.bytes().await,
                         ));
                     }
+                    log::info!("report sent successfully for the report {}", &self.name);
                 }
                 Err(e) => {
                     return Err(SendReportError::ReportServerClientError(e));

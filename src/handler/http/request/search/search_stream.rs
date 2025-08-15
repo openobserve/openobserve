@@ -44,9 +44,10 @@ use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::http::{
-            get_fallback_order_by_col_from_request, get_is_ui_histogram_from_request,
-            get_or_create_trace_id, get_search_event_context_from_request,
-            get_search_type_from_request, get_stream_type_from_request, get_use_cache_from_request,
+            get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
+            get_is_ui_histogram_from_request, get_or_create_trace_id,
+            get_search_event_context_from_request, get_search_type_from_request,
+            get_stream_type_from_request, get_use_cache_from_request,
         },
     },
     handler::http::request::search::{
@@ -67,6 +68,7 @@ use crate::{
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
+        ("is_multi_stream_search" = bool, Query, description = "Indicate is search is for multi stream"),
     ),
     request_body(content = String, description = "Search query", content_type = "application/json", example = json!({
         "sql": "select * from logs LIMIT 10",
@@ -129,6 +131,7 @@ pub async fn search_http2_stream(
     };
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
+    let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
 
     // Parse the search request
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
@@ -255,6 +258,7 @@ pub async fn search_http2_stream(
         match crate::service::search::sql::histogram::convert_to_histogram_query(
             &req.query.sql,
             &stream_names,
+            is_multi_stream_search,
         ) {
             Ok(histogram_query) => {
                 req.query.sql = histogram_query;
@@ -412,6 +416,7 @@ pub async fn search_http2_stream(
         None,
         fallback_order_by_col,
         audit_ctx,
+        is_multi_stream_search,
     ));
 
     // Return streaming response
@@ -723,6 +728,7 @@ pub async fn values_http2_stream(
         Some(values_event_context),
         None,
         audit_ctx,
+        false,
     ));
 
     // Return streaming response

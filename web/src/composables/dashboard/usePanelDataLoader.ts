@@ -448,7 +448,9 @@ export const usePanelDataLoader = (
             },
             page_type: pageType,
             traceparent,
-            searchType: "dashboards",
+            // Using same config for align histogram
+            // in future we can make it seperate for scenarios
+            enable_align_histogram: is_ui_histogram.value ?? false,
           }),
         abortControllerRef.signal,
       );
