@@ -18,10 +18,10 @@ use config::{
     utils::json,
 };
 use proto::cluster_rpc::{
-    CancelQueryRequest, CancelQueryResponse, CuckooFilterQueryRequest, CuckooFilterQueryResponse, DeleteResultRequest, DeleteResultResponse,
-    GetResultRequest, GetResultResponse, QueryStatusRequest, QueryStatusResponse,
-    SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
-    search_server::Search,
+    CancelQueryRequest, CancelQueryResponse, CuckooFilterQueryRequest, CuckooFilterQueryResponse,
+    DeleteResultRequest, DeleteResultResponse, GetResultRequest, GetResultResponse,
+    QueryStatusRequest, QueryStatusResponse, SearchPartitionRequest, SearchPartitionResponse,
+    SearchRequest, SearchResponse, search_server::Search,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;

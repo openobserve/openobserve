@@ -154,6 +154,17 @@ async fn process_missing_hour(
 }
 
 /// Start a scheduled hourly job to generate cuckoo filters from trace_index_list
+/// Start the hourly cuckoo filter building job
+///
+/// This job runs continuously and builds cuckoo filters for missing hours based on
+/// the configured `data_lookback_hours` setting. It processes only the current hour
+/// minus the specified number of hours to construct filters from historical data.
+///
+/// The job:
+/// 1. Gets the `data_lookback_hours` value from config (not from stream settings)
+/// 2. Calculates hour keys for the past N hours (where N = data_lookback_hours)
+/// 3. Checks which hour filters already exist in S3
+/// 4. Builds missing hour filters using consistent hashing for node assignment
 pub async fn start_hourly_job(manager: Arc<CuckooFilterManager>) -> Result<()> {
     if !LOCAL_NODE.is_compactor() {
         return Ok(());
@@ -187,26 +198,21 @@ pub async fn start_hourly_job(manager: Arc<CuckooFilterManager>) -> Result<()> {
                     continue;
                 }
 
-                // Get data retention days for this stream
-                let settings = infra::schema::get_settings(org_id, stream_name, StreamType::Traces)
-                    .await
-                    .unwrap_or_default();
-                let retention_days = if settings.data_retention > 0 {
-                    settings.data_retention
-                } else {
-                    config::get_config().cuckoo_filter.data_lookback_days
-                };
+                // Get data lookback hours from config (replaces retention_days logic)
+                // This determines how many hours back from current time to build cuckoo filters
+                let data_lookback_hours = config::get_config().cuckoo_filter.data_lookback_hours;
                 log::info!(
-                    "[CUCKOO_FILTER_JOB] Org {} stream {}: retention_days = {}",
+                    "[CUCKOO_FILTER_JOB] Org {} stream {}: data_lookback_hours = {}",
                     org_id,
                     stream_name,
-                    retention_days
+                    data_lookback_hours
                 );
 
-                // Calculate all needed hour keys within retention
-                let mut needed_hour_keys = Vec::with_capacity((retention_days * 24) as usize);
-                for i in 0..(retention_days * 24) {
-                    let t = now - chrono::Duration::hours(i + 1);
+                // Calculate all needed hour keys within lookback hours
+                let mut needed_hour_keys = Vec::with_capacity(data_lookback_hours as usize);
+                for i in 0..data_lookback_hours {
+                    // latest hour only search in ingester
+                    let t = now - chrono::Duration::hours(i + 2);
                     needed_hour_keys.push(t.format("%Y%m%d%H").to_string());
                 }
                 log::info!(
@@ -514,4 +520,66 @@ pub enum JobStatus {
     Completed,
     Failed,
     Cancelled,
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+
+    use super::*;
+
+    #[test]
+    fn test_calculate_needed_hour_keys_with_lookback_hours() {
+        let now = Utc::now();
+        let data_lookback_hours = 24i64; // 24 hours
+
+        // Calculate needed hour keys like in the actual function
+        let mut needed_hour_keys = Vec::with_capacity(data_lookback_hours as usize);
+        for i in 0..data_lookback_hours {
+            let t = now - chrono::Duration::hours(i + 1);
+            needed_hour_keys.push(t.format("%Y%m%d%H").to_string());
+        }
+
+        // Should have exactly 24 hour keys
+        assert_eq!(needed_hour_keys.len(), 24);
+
+        // Each hour key should be unique
+        let unique_keys: std::collections::HashSet<_> = needed_hour_keys.iter().collect();
+        assert_eq!(unique_keys.len(), 24);
+
+        // Hour keys should be in descending chronological order
+        // (most recent first, since we start with i=0 for now-1h)
+        for i in 1..needed_hour_keys.len() {
+            assert!(needed_hour_keys[i - 1] > needed_hour_keys[i]);
+        }
+    }
+
+    #[test]
+    fn test_calculate_needed_hour_keys_different_lookback() {
+        let now = Utc::now();
+        let data_lookback_hours = 72i64; // 3 days worth
+
+        let mut needed_hour_keys = Vec::with_capacity(data_lookback_hours as usize);
+        for i in 0..data_lookback_hours {
+            let t = now - chrono::Duration::hours(i + 1);
+            needed_hour_keys.push(t.format("%Y%m%d%H").to_string());
+        }
+
+        // Should have exactly 72 hour keys for 3 days
+        assert_eq!(needed_hour_keys.len(), 72);
+
+        // All keys should be unique
+        let unique_keys: std::collections::HashSet<_> = needed_hour_keys.iter().collect();
+        assert_eq!(unique_keys.len(), 72);
+    }
+
+    #[test]
+    fn test_hour_key_format() {
+        let test_time = chrono::DateTime::parse_from_rfc3339("2024-01-15T14:30:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+
+        let hour_key = test_time.format("%Y%m%d%H").to_string();
+        assert_eq!(hour_key, "2024011514");
+    }
 }

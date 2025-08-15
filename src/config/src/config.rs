@@ -2058,11 +2058,11 @@ pub struct CuckooFilter {
     )]
     pub flush_mode: String,
     #[env_config(
-        name = "ZO_DATA_LOOKBACK_DAYS",
-        default = 7,
-        help = "Enable hourly job to generate cuckoo filters from S3 trace_index_list"
+        name = "ZO_DATA_LOOKBACK_HOURS",
+        default = 2,
+        help = "Number of hours to look back for building cuckoo filters"
     )]
-    pub data_lookback_days: i64,
+    pub data_lookback_hours: i64,
     #[env_config(
         name = "ZO_BUILD_INDEX_INTERVAL",
         default = 3600,

@@ -744,6 +744,7 @@ pub async fn get_trace_detail(
             &req,
             "".to_string(),
             false,
+            None,
         )
         .instrument(http_span.clone())
         .await;
