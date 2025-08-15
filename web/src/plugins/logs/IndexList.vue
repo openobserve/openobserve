@@ -815,6 +815,7 @@ export default defineComponent({
   methods: {
     handleMultiStreamSelection() {
       this.onStreamChange("");
+      this.pagination.page = 1;
     },
     handleSingleStreamSelect(opt: any) {
       if (this.searchObj.data.stream.selectedStream.indexOf(opt.value) == -1) {
@@ -822,6 +823,7 @@ export default defineComponent({
       }
       this.searchObj.data.stream.selectedStream = [opt.value];
       this.onStreamChange("");
+      this.pagination.page = 1;
     },
   },
   setup(props, { emit }) {
