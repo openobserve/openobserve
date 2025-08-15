@@ -75,15 +75,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
         </div>
       </div>
-      <div data-test="iam-service-accounts-selection-table">
+      <div data-test="iam-service-accounts-selection-table" style="height: calc(100vh - 250px); overflow-y: auto;">
         <template v-if="rows.length">
           <app-table
-            :rows="rows"
+            :rows="visibleRows"
             :columns="columns"
             :dense="true"
             :virtual-scroll="false"
             style="height: fit-content"
-            class="o2-quasar-table"
+            class="o2-quasar-table o2-quasar-table-header-sticky"
+            :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
+            :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
+            :hideTopPagination="true"
+            :showBottomPaginationWithTitle="true"
             :filter="{
               value: userSearchKey,
               method: filterUsers,
@@ -116,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import AppTable from "@/components/AppTable.vue";
   import usePermissions from "@/composables/iam/usePermissions";
   import { cloneDeep } from "lodash-es";
-  import { watch } from "vue";
+  import { computed, watch } from "vue";
   import type { Ref } from "vue";
   import { ref, onBeforeMount } from "vue";
   import { useI18n } from "vue-i18n";
@@ -284,6 +288,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }
     return filtered;
   };
+
+  const visibleRows = computed(() => {
+    if (!userSearchKey.value) return rows.value || [];
+    return filterUsers(rows.value || [], userSearchKey.value);
+  });
+
+  const hasVisibleRows = computed(() => visibleRows.value.length > 0);
   </script>
   
   <style scoped></style>
