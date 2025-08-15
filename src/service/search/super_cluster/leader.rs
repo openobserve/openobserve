@@ -239,18 +239,8 @@ async fn run_datafusion(
     register_table(&ctx, &sql).await?;
 
     // create physical plan
-    let plan = match ctx.state().create_logical_plan(&sql.sql).await {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(e.into());
-        }
-    };
-    let physical_plan = match ctx.state().create_physical_plan(&plan).await {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(e.into());
-        }
-    };
+    let plan = ctx.state().create_logical_plan(&sql.sql).await?;
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
     if cfg.common.print_key_sql {
         log::info!("[trace_id {trace_id}] leader physical plan after rewrite");

@@ -422,7 +422,10 @@ pub async fn run_datafusion(
         ctx.state().config().target_partitions(),
     );
 
+    // register table
     register_table(&ctx, &sql).await?;
+
+    // create physical plan
     let plan = ctx.state().create_logical_plan(&sql.sql).await?;
     let physical_plan = ctx.state().create_physical_plan(&plan).await?;
 
