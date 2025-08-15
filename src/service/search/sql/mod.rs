@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod histogram;
 use std::sync::Arc;
 
 use arrow_schema::{DataType, Field};
@@ -49,9 +50,12 @@ use crate::service::search::sql::{
     },
     schema::{generate_schema_fields, generate_select_star_schema, has_original_column},
     visitor::{
-        column::ColumnVisitor, histogram_interval::HistogramIntervalVisitor,
-        index_optimize::IndexOptimizeModeVisitor, match_all::MatchVisitor,
-        partition_column::PartitionColumnVisitor, prefix_column::PrefixColumnVisitor,
+        column::ColumnVisitor,
+        histogram_interval::{HistogramIntervalVisitor, validate_and_adjust_histogram_interval},
+        index_optimize::IndexOptimizeModeVisitor,
+        match_all::MatchVisitor,
+        partition_column::PartitionColumnVisitor,
+        prefix_column::PrefixColumnVisitor,
         utils::is_complex_query,
     },
 };
@@ -73,9 +77,9 @@ pub struct Sql {
     pub org_id: String,
     pub stream_type: StreamType,
     pub stream_names: Vec<TableReference>,
-    pub match_items: Option<Vec<String>>, // match_all, only for single stream
+    pub has_match_all: bool, // match_all, only for single stream
     pub equal_items: HashMap<TableReference, Vec<(String, String)>>, /* table_name ->
-                                           * [(field_name, value)] */
+                              * [(field_name, value)] */
     pub prefix_items: HashMap<TableReference, Vec<(String, String)>>, /* table_name -> [(field_name, value)] */
     pub columns: HashMap<TableReference, HashSet<String>>,            // table_name -> [field_name]
     pub aliases: Vec<(String, String)>,                               // field_name, alias
@@ -185,7 +189,7 @@ impl Sql {
         // 5. get match_all() value
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
-        let need_fst_fields = match_visitor.match_items.is_some();
+        let need_fst_fields = match_visitor.has_match_all;
 
         // 6. check if have full text search filed in stream
         if stream_names.len() == 1 && need_fst_fields {
@@ -220,8 +224,7 @@ impl Sql {
         } else {
             for (stream, schema) in total_schemas.iter() {
                 let columns = columns.get(stream).cloned().unwrap_or(Default::default());
-                let fields =
-                    generate_schema_fields(columns, schema, match_visitor.match_items.is_some());
+                let fields = generate_schema_fields(columns, schema, match_visitor.has_match_all);
                 let schema = Schema::new(fields).with_metadata(schema.schema().metadata().clone());
                 used_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(schema)));
             }
@@ -240,7 +243,10 @@ impl Sql {
             HistogramIntervalVisitor::new(Some((query.start_time, query.end_time)));
         let _ = statement.visit(&mut histogram_interval_visitor);
         let histogram_interval = if query.histogram_interval > 0 {
-            Some(query.histogram_interval)
+            Some(validate_and_adjust_histogram_interval(
+                query.histogram_interval,
+                Some((query.start_time, query.end_time)),
+            ))
         } else {
             histogram_interval_visitor.interval
         };
@@ -334,25 +340,36 @@ impl Sql {
         let final_schemas = if cfg.common.utf8_view_enabled {
             let mut final_schemas = HashMap::with_capacity(used_schemas.len());
             for (stream, schema) in used_schemas.iter() {
-                let fields = schema
+                let mut fields = schema
                     .schema()
                     .fields()
                     .iter()
                     .map(|f| {
-                        if f.data_type() == &DataType::Utf8 {
+                        if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8
+                        {
                             Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
                         } else {
                             f.clone()
                         }
                     })
                     .collect::<Vec<_>>();
+                fields.sort_by(|a, b| a.name().cmp(b.name()));
                 let new_schema =
                     Schema::new(fields).with_metadata(schema.schema().metadata().clone());
                 final_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(new_schema)));
             }
             final_schemas
         } else {
-            used_schemas.clone()
+            let mut final_schemas = HashMap::with_capacity(used_schemas.len());
+            // sort the schema fields by name
+            for (stream, schema) in used_schemas.iter() {
+                let mut fields = schema.schema().fields().to_vec();
+                fields.sort_by(|a, b| a.name().cmp(b.name()));
+                let new_schema =
+                    Schema::new(fields).with_metadata(schema.schema().metadata().clone());
+                final_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(new_schema)));
+            }
+            final_schemas
         };
 
         let is_complex = is_complex_query(&mut statement);
@@ -363,7 +380,7 @@ impl Sql {
             org_id: org_id.to_string(),
             stream_type,
             stream_names,
-            match_items: match_visitor.match_items,
+            has_match_all: match_visitor.has_match_all,
             equal_items: partition_column_visitor.equal_items,
             prefix_items: prefix_column_visitor.prefix_items,
             columns,
@@ -387,13 +404,13 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, index_optimize_mode: {:?}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, has_match_all: {}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, index_optimize_mode: {:?}",
             self.sql,
             self.time_range,
             self.org_id,
             self.stream_type,
             self.stream_names,
-            self.match_items,
+            self.has_match_all,
             self.equal_items,
             self.prefix_items,
             self.aliases,

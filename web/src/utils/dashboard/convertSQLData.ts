@@ -1613,6 +1613,8 @@ export const convertSQLData = async (
       options.series = getSeries(
         panelSchema.type == "line" || panelSchema.type == "area"
           ? { opacity: 0.8 }
+          : panelSchema.type == "bar"
+          ? { barMinHeight: 1 }
           : {},
       );
 
@@ -1625,11 +1627,6 @@ export const convertSQLData = async (
         breakDownKeys.length
       )
         updateTrellisConfig();
-
-      break;
-    }
-    case "bar": {
-      options.series = getSeries({ barMinHeight: 1 });
 
       break;
     }

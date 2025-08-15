@@ -39,6 +39,16 @@ pub(crate) fn get_stream_type_from_request(
 }
 
 #[inline(always)]
+pub(crate) fn get_enable_align_histogram_from_request(
+    query: &Query<HashMap<String, String>>,
+) -> bool {
+    query
+        .get("enable_align_histogram")
+        .map(|s| s.parse().unwrap_or_default())
+        .unwrap_or_default()
+}
+
+#[inline(always)]
 pub(crate) fn get_ts_from_request_with_key(
     query: &Query<HashMap<String, String>>,
     key: &str,
@@ -108,6 +118,24 @@ pub(crate) fn get_use_cache_from_request(query: &Query<HashMap<String, String>>)
         return true;
     };
     v.to_lowercase().as_str().parse::<bool>().unwrap_or(true)
+}
+
+#[inline(always)]
+pub(crate) fn get_is_ui_histogram_from_request(query: &Query<HashMap<String, String>>) -> bool {
+    let Some(v) = query.get("is_ui_histogram") else {
+        return false;
+    };
+    v.to_lowercase().as_str().parse::<bool>().unwrap_or(false)
+}
+
+#[inline(always)]
+pub(crate) fn get_is_multi_stream_search_from_request(
+    query: &Query<HashMap<String, String>>,
+) -> bool {
+    let Some(v) = query.get("is_multi_stream_search") else {
+        return false;
+    };
+    v.to_lowercase().as_str().parse::<bool>().unwrap_or(false)
 }
 
 #[inline(always)]

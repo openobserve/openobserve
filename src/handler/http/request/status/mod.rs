@@ -75,8 +75,10 @@ use crate::{
     },
     service::{
         db,
-        search::datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
-        tantivy::puffin_directory::reader_cache,
+        search::{
+            datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
+            grpc::tantivy_result_cache,
+        },
     },
 };
 
@@ -125,7 +127,7 @@ struct ConfigResponse<'a> {
     usage_publish_interval: i64,
     ingestion_url: String,
     #[cfg(feature = "enterprise")]
-    aggregation_cache_enabled: bool,
+    streaming_aggregation_enabled: bool,
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
     max_dashboard_series: usize,
@@ -335,7 +337,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         usage_publish_interval: cfg.common.usage_publish_interval,
         ingestion_url: cfg.common.ingestion_url.to_string(),
         #[cfg(feature = "enterprise")]
-        aggregation_cache_enabled: cfg.common.aggregation_cache_enabled,
+        streaming_aggregation_enabled: cfg.common.feature_query_streaming_aggs,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
         max_dashboard_series: cfg.limit.max_dashboard_series,
@@ -356,8 +358,6 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     stats.insert("LOCAL_NODE_UUID", json::json!(LOCAL_NODE.uuid.clone()));
     stats.insert("LOCAL_NODE_NAME", json::json!(&cfg.common.instance_name));
     stats.insert("LOCAL_NODE_ROLE", json::json!(&cfg.common.node_role));
-    let nodes = cluster::get_cached_online_nodes().await;
-    stats.insert("NODE_LIST", json::json!(nodes));
 
     let (stream_num, stream_schema_num, mem_size) = get_stream_schema_status().await;
     stats.insert("STREAM_SCHEMA", json::json!({"stream_num": stream_num,"stream_schema_num": stream_schema_num, "mem_size": mem_size}));
@@ -401,11 +401,17 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     );
     stats.insert(
         "DATAFUSION",
-        json::json!({"file_stat_cache": file_statistics_cache::GLOBAL_CACHE.clone().len()}),
+        json::json!({"file_stat_cache": {
+            "file_num": file_statistics_cache::GLOBAL_CACHE.len(),
+            "mem_size": file_statistics_cache::GLOBAL_CACHE.memory_size()
+        }}),
     );
     stats.insert(
         "INVERTED_INDEX",
-        json::json!({"reader_cache": reader_cache::GLOBAL_CACHE.clone().len()}),
+        json::json!({"result_cache": {
+            "file_num": tantivy_result_cache::GLOBAL_CACHE.len(),
+            "mem_size": tantivy_result_cache::GLOBAL_CACHE.memory_size()
+        }}),
     );
 
     #[cfg(feature = "enterprise")]
@@ -462,14 +468,15 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
 async fn get_stream_schema_status() -> (usize, usize, usize) {
     let mut stream_num = 0;
     let mut stream_schema_num = 0;
-    let mut mem_size = 0;
+    let mut mem_size = std::mem::size_of::<HashMap<String, Vec<Schema>>>();
     let r = STREAM_SCHEMAS.read().await;
     for (key, val) in r.iter() {
         stream_num += 1;
         mem_size += std::mem::size_of::<Vec<Schema>>();
-        mem_size += key.len();
+        mem_size += std::mem::size_of::<String>() + key.len();
         for schema in val.iter() {
             stream_schema_num += 1;
+            mem_size += std::mem::size_of::<i64>();
             mem_size += schema.1.size();
         }
     }
@@ -478,8 +485,8 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
     for (key, schema) in r.iter() {
         stream_num += 1;
         stream_schema_num += 1;
-        mem_size += key.len();
-        mem_size += schema.schema().size();
+        mem_size += std::mem::size_of::<String>() + key.len();
+        mem_size += schema.size();
     }
     drop(r);
     (stream_num, stream_schema_num, mem_size)

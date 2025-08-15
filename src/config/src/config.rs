@@ -33,7 +33,7 @@ use lettre::{
 use once_cell::sync::Lazy;
 
 use crate::{
-    meta::cluster,
+    meta::{cluster, stream::QueryPartitionStrategy},
     utils::{file::get_file_meta, sysinfo},
 };
 
@@ -660,12 +660,34 @@ pub struct TCP {
     pub tcp_tls_ca_cert_path: String,
 }
 
+#[derive(PartialEq, Default)]
+pub enum RouteDispatchStrategy {
+    #[default]
+    Workload,
+    Random,
+    Other,
+}
+
+impl std::str::FromStr for RouteDispatchStrategy {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "random" => Ok(RouteDispatchStrategy::Random),
+            "workload" => Ok(RouteDispatchStrategy::default()),
+            _ => Ok(RouteDispatchStrategy::Other),
+        }
+    }
+}
+
 #[derive(EnvConfig, Default)]
 pub struct Route {
     #[env_config(name = "ZO_ROUTE_TIMEOUT", default = 600)]
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
+    #[env_config(name = "ZO_ROUTE_STRATEGY", parse, default = "workload")]
+    pub dispatch_strategy: RouteDispatchStrategy,
 }
 
 #[derive(EnvConfig, Default)]
@@ -752,8 +774,12 @@ pub struct Common {
     pub feature_filelist_dedup_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
     pub feature_query_queue_enabled: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_PARTITION_STRATEGY", default = "file_num")]
-    pub feature_query_partition_strategy: String,
+    #[env_config(
+        name = "ZO_FEATURE_QUERY_PARTITION_STRATEGY",
+        parse,
+        default = "file_num"
+    )]
+    pub feature_query_partition_strategy: QueryPartitionStrategy,
     #[env_config(name = "ZO_FEATURE_QUERY_INFER_SCHEMA", default = false)]
     pub feature_query_infer_schema: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
@@ -933,12 +959,6 @@ pub struct Common {
     )]
     pub inverted_index_enabled: bool,
     #[env_config(
-        name = "ZO_INVERTED_INDEX_CACHE_ENABLED",
-        default = false,
-        help = "Toggle inverted index cache."
-    )]
-    pub inverted_index_cache_enabled: bool,
-    #[env_config(
         name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
         default = false,
         help = "Toggle tantivy result cache."
@@ -1106,8 +1126,6 @@ pub struct Common {
     pub use_stream_settings_for_partitions_enabled: bool,
     #[env_config(name = "ZO_DASHBOARD_PLACEHOLDER", default = "_o2_all_")]
     pub dashboard_placeholder: String,
-    #[env_config(name = "ZO_AGGREGATION_CACHE_ENABLED", default = true)]
-    pub aggregation_cache_enabled: bool,
     #[env_config(name = "ZO_AGGREGATION_TOPK_ENABLED", default = true)]
     pub aggregation_topk_enabled: bool,
     #[env_config(name = "ZO_SEARCH_INSPECTOR_ENABLED", default = false)]
@@ -1879,7 +1897,7 @@ pub struct Pipeline {
     pub max_connections: usize,
     #[env_config(
         name = "ZO_PIPELINE_BATCH_ENABLED",
-        default = true,
+        default = false,
         help = "Enable batching of entries before sending HTTP requests"
     )]
     pub batch_enabled: bool,
@@ -2020,6 +2038,11 @@ pub fn init() -> Config {
     // check limit config
     if let Err(e) = check_limit_config(&mut cfg) {
         panic!("limit config error: {e}");
+    }
+
+    // check route config
+    if let Err(e) = check_route_config(&cfg) {
+        panic!("route config error: {e}");
     }
 
     // check common config
@@ -2209,6 +2232,15 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.calculate_stats_step_limit = 1000000;
     }
 
+    Ok(())
+}
+
+fn check_route_config(cfg: &Config) -> Result<(), anyhow::Error> {
+    if cfg.route.dispatch_strategy == RouteDispatchStrategy::Other {
+        return Err(anyhow::anyhow!(
+            "You must set ZO_ROUTE_STRATEGY to one of: workload (default) or random."
+        ));
+    }
     Ok(())
 }
 
@@ -2561,7 +2593,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.is_local_storage
         && !cfg.common.result_cache_enabled
         && !cfg.common.metrics_cache_enabled
-        && !cfg.common.aggregation_cache_enabled
+        && !cfg.common.feature_query_streaming_aggs
     {
         cfg.disk_cache.enabled = false;
     }
@@ -2570,7 +2602,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if !cfg.disk_cache.enabled {
         cfg.common.result_cache_enabled = false;
         cfg.common.metrics_cache_enabled = false;
-        cfg.common.aggregation_cache_enabled = false;
+        cfg.common.feature_query_streaming_aggs = false;
         cfg.cache_latest_files.enabled = false;
         cfg.cache_latest_files.delete_merge_files = false;
     }
@@ -2977,5 +3009,15 @@ mod tests {
         assert_eq!(cfg.common.data_stream_dir, "/abc/".to_string());
         assert_eq!(cfg.common.data_dir, "/abc/".to_string());
         assert_eq!(cfg.common.base_uri, "/abc".to_string());
+
+        // Test route dispatch strategies
+        cfg.route.dispatch_strategy = RouteDispatchStrategy::Workload;
+        assert!(check_route_config(&cfg).is_ok());
+
+        cfg.route.dispatch_strategy = RouteDispatchStrategy::Random;
+        assert!(check_route_config(&cfg).is_ok());
+
+        cfg.route.dispatch_strategy = RouteDispatchStrategy::Other;
+        assert!(check_route_config(&cfg).is_err());
     }
 }

@@ -43,9 +43,9 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_dashboard_info_from_request, get_or_create_trace_id,
-                get_search_event_context_from_request, get_search_type_from_request,
-                get_stream_type_from_request,
+                get_dashboard_info_from_request, get_enable_align_histogram_from_request,
+                get_or_create_trace_id, get_search_event_context_from_request,
+                get_search_type_from_request, get_stream_type_from_request,
             },
             stream::get_settings_max_query_range,
         },
@@ -355,6 +355,9 @@ pub async fn search_multi(
             range_error.clone(),
             false,
             dashboard_info.clone(),
+            // `is_multi_stream_search` is false here because search happens for every sql query in
+            // the given array of queries
+            false,
         )
         .instrument(http_span.clone())
         .await;
@@ -634,7 +637,10 @@ pub async fn search_multi(
     context_path = "/api",
     tag = "Search",
     operation_id = "SearchPartitionMulti",
-    params(("org_id" = String, Path, description = "Organization name")),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
+    ),
     request_body(
         content = SearchRequest,
         description = "Search query",
@@ -704,6 +710,7 @@ pub async fn _search_partition_multi(
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
+    let enable_align_histogram = get_enable_align_histogram_from_request(&query);
 
     #[cfg(feature = "cloud")]
     {
@@ -731,8 +738,14 @@ pub async fn _search_partition_multi(
         }
     };
 
-    let search_fut =
-        SearchService::search_partition_multi(&trace_id, &org_id, &user_id, stream_type, &req);
+    let search_fut = SearchService::search_partition_multi(
+        &trace_id,
+        &org_id,
+        &user_id,
+        stream_type,
+        &req,
+        enable_align_histogram,
+    );
     let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
         search_fut.instrument(http_span).await
     } else {

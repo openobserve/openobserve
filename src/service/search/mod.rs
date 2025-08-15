@@ -26,7 +26,7 @@ use config::{
     meta::{
         cluster::RoleGroup,
         function::RESULT_ARRAY,
-        search,
+        search::{self},
         self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, TableReferenceExt, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
@@ -34,7 +34,7 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_simple_distinct_query},
+        sql::{is_aggregate_query, is_eligible_for_histogram, is_simple_distinct_query},
         time::now_micros,
     },
 };
@@ -42,7 +42,7 @@ use hashbrown::HashMap;
 use infra::{
     cache::stats,
     errors::{Error, ErrorCodes},
-    schema::{get_stream_setting_index_fields, unwrap_stream_settings},
+    schema::unwrap_stream_settings,
 };
 use once_cell::sync::Lazy;
 use opentelemetry::trace::TraceContextExt;
@@ -86,7 +86,12 @@ use crate::{
         },
     },
     handler::grpc::request::search::Searcher,
-    service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    service::search::{
+        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+        sql::visitor::histogram_interval::{
+            convert_histogram_interval_to_seconds, generate_histogram_interval,
+        },
+    },
 };
 
 pub(crate) mod cache;
@@ -602,6 +607,7 @@ pub async fn search_multi(
     Ok(multi_res)
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "service:search_partition", skip(req))]
 pub async fn search_partition(
     trace_id: &str,
@@ -611,6 +617,7 @@ pub async fn search_partition(
     req: &search::SearchPartitionRequest,
     skip_max_query_range: bool,
     is_http_req: bool,
+    enable_align_histogram: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -846,6 +853,12 @@ pub async fn search_partition(
     );
 
     let file_list_took = start.elapsed().as_millis() as usize;
+    let (is_histogram_eligible, _) = is_eligible_for_histogram(
+        &req.sql, // `is_multi_stream_search` will always be false for search_partition
+        false,
+    )
+    .unwrap_or((false, false));
+
     log::info!(
         "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, took: {} ms",
         (req.start_time, req.end_time),
@@ -858,6 +871,7 @@ pub async fn search_partition(
         response.partitions.push([req.start_time, req.end_time]);
         response.max_query_range = max_query_range_in_hour;
         response.histogram_interval = sql.histogram_interval;
+        response.is_histogram_eligible = is_histogram_eligible;
         log::info!("[trace_id {trace_id}] search_partition: returning single partition");
         return Ok(response);
     };
@@ -904,6 +918,7 @@ pub async fn search_partition(
         streaming_aggs,
         #[cfg(feature = "enterprise")]
         streaming_id: streaming_id.clone(),
+        is_histogram_eligible,
     };
 
     let mut min_step = Duration::try_seconds(1)
@@ -911,10 +926,44 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        let hist_int = sql.histogram_interval.unwrap_or(0);
+        let hist_int = if let Some(hist_int) = sql.histogram_interval {
+            hist_int
+        } else {
+            let interval = generate_histogram_interval(Some((req.start_time, req.end_time)));
+            match convert_histogram_interval_to_seconds(interval) {
+                Ok(v) => v,
+                Err(e) => {
+                    log::error!(
+                        "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {e:?}",
+                    );
+                    10
+                }
+            }
+        };
         // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
         if hist_int > 0 {
             min_step *= hist_int;
+        }
+    }
+    // Only for UI search or query param is `true`, we need to generate histogram interval
+    else if enable_align_histogram {
+        if let Some(hist_int) = sql.histogram_interval {
+            // convert seconds to microseconds
+            min_step = hist_int * 1_000_000;
+        } else {
+            let time_range = (req.start_time, req.end_time);
+            let interval = generate_histogram_interval(Some(time_range));
+            match convert_histogram_interval_to_seconds(interval) {
+                Ok(v) => {
+                    // convert seconds to microseconds
+                    min_step = v * 1_000_000
+                }
+                Err(e) => {
+                    log::error!(
+                        "[trace_id {trace_id}] search_partition: convert_histogram_interval_to_seconds error: {e:?}",
+                    );
+                }
+            }
         }
     }
 
@@ -964,7 +1013,19 @@ pub async fn search_partition(
         };
     }
 
-    let is_histogram = sql.histogram_interval.is_some();
+    let mut is_histogram = sql.histogram_interval.is_some();
+    let mut add_mini_partition = false;
+    // Set this to true to generate partitions aligned with interval
+    // only for logs page when query is non-histogram
+    // and also with query param `align_histogram` is true,
+    // so that logs can reuse the same partitions
+    // for histogram query
+    if !is_histogram && enable_align_histogram {
+        is_histogram = true;
+        // add mini partition for the histogram aligned partitions in the UI search
+        add_mini_partition = true;
+    }
+
     let sql_order_by = sql
         .order_by
         .first()
@@ -1004,6 +1065,7 @@ pub async fn search_partition(
         sql_order_by,
         is_streaming_aggregate,
         streaming_interval_micros,
+        add_mini_partition,
     );
 
     if sql_order_by == OrderBy::Asc {
@@ -1011,6 +1073,10 @@ pub async fn search_partition(
     }
 
     resp.partitions = partitions;
+    if enable_align_histogram {
+        let min_step_secs = min_step / 1_000_000;
+        resp.histogram_interval = Some(min_step_secs);
+    }
     Ok(resp)
 }
 
@@ -1336,9 +1402,11 @@ pub async fn search_partition_multi(
     user_id: &str,
     stream_type: StreamType,
     req: &search::MultiSearchPartitionRequest,
+    enable_align_histogram: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let mut res = search::SearchPartitionResponse::default();
     let mut total_rec = 0;
+    let mut is_histogram_eligible = true;
     for query in &req.sql {
         match search_partition(
             trace_id,
@@ -1358,12 +1426,16 @@ pub async fn search_partition_multi(
             },
             false,
             true,
+            enable_align_histogram,
         )
         .await
         {
             Ok(resp) => {
                 if resp.partitions.len() > res.partitions.len() {
                     total_rec += resp.records;
+                    if !resp.is_histogram_eligible {
+                        is_histogram_eligible = false;
+                    }
                     res = resp;
                 }
             }
@@ -1373,6 +1445,7 @@ pub async fn search_partition_multi(
         };
     }
     res.records = total_rec;
+    res.is_histogram_eligible = is_histogram_eligible;
     Ok(res)
 }
 
@@ -1416,31 +1489,8 @@ pub fn is_use_inverted_index(sql: &Arc<Sql>) -> bool {
     }
 
     let cfg = get_config();
-    let index_terms = if sql.equal_items.len() == 1 {
-        let schema = sql.schemas.values().next().unwrap().schema();
-        let stream_settings = infra::schema::unwrap_stream_settings(schema);
-        let index_fields = get_stream_setting_index_fields(&stream_settings);
-        filter_index_fields(sql.equal_items.values().next().unwrap(), &index_fields)
-    } else {
-        vec![]
-    };
-
-    sql.stream_type != StreamType::Index
-        && sql.use_inverted_index
+    sql.use_inverted_index
         && cfg.common.inverted_index_enabled
         && !cfg.common.feature_query_without_index
-        && (sql.index_condition.is_some() || sql.match_items.is_some() || !index_terms.is_empty())
-}
-
-pub fn filter_index_fields(
-    items: &[(String, String)],
-    index_fields: &[String],
-) -> Vec<(String, String)> {
-    let mut result = Vec::new();
-    for item in items {
-        if index_fields.contains(&item.0) {
-            result.push(item.clone());
-        }
-    }
-    result
+        && sql.index_condition.is_some()
 }

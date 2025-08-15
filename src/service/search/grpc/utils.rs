@@ -185,6 +185,8 @@ impl TantivyResult {
                     match bucket.key {
                         Key::Str(s) => (s, count),
                         Key::F64(f) => (f.to_string(), count),
+                        Key::I64(i) => (i.to_string(), count),
+                        Key::U64(u) => (u.to_string(), count),
                     }
                 })
                 .collect::<Vec<_>>();
@@ -380,7 +382,7 @@ pub fn change_schema_to_utf8_view(schema: Schema) -> Schema {
         .fields()
         .iter()
         .map(|f| {
-            if f.data_type() == &DataType::Utf8 {
+            if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8 {
                 Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
             } else {
                 f.clone()

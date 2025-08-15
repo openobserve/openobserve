@@ -368,7 +368,7 @@ pub async fn save_stream_settings(
                 format!("field [{key}] not found in schema"),
             )));
         };
-        if field.data_type() != &DataType::Utf8 {
+        if field.data_type() != &DataType::Utf8 && field.data_type() != &DataType::LargeUtf8 {
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST,
                 format!("full text search field [{key}] must be text field"),

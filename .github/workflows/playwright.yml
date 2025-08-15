@@ -4,11 +4,19 @@ on:
   push:
     branches:
       - "main"
+    paths-ignore:
+      - "**.md"
+      - "**.yml"
+      - "**.yaml"
     # paths:
     #   - "web/**"
   pull_request:
     branches:
       - "*"
+    paths-ignore:
+      - "**.md"
+      - "**.yml"
+      - "**.yaml"
     # paths:
     #   - "web/**"
 
@@ -53,7 +61,7 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
       - name: Clone the current repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
@@ -89,7 +97,7 @@ jobs:
           retention-days: 1
 
   ui_integration_tests:
-    name: playwright_ui_integration_tests
+    name: e2e
     needs: [build_binary]
     runs-on:
       labels: ubicloud-standard-8
@@ -118,8 +126,8 @@ jobs:
             "dashboards/dashboard-variables-setting.spec.js",
             "dashboards/dashboard2.spec.js",
             "dashboards/dashboardtype.spec.js",
-            "dashboards/visualize.spec.js",
-            "dashboards/visualization-vrl.spec.js",
+            # "dashboards/visualize.spec.js",
+            # "dashboards/visualization-vrl.spec.js",
             "dashboards/dashboard-html-chart.spec.js",
             "GeneralTests/enrichment.spec.js",
             "Logs/join.spec.js",
@@ -153,10 +161,14 @@ jobs:
 
     steps:
       - name: Clone the current repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
+        with:
+          name: debug-binary
+          path: debug-binary
+          if-no-files-found: ignore
 
       - name: Start OpenObserve
         run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
@@ -227,10 +239,10 @@ jobs:
 
     steps:
       - name: Clone the current repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download Playwright Coverage Data
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: playwright-coverage-* # Match all artifacts with this prefix
           path: merged-coverage

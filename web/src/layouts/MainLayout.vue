@@ -696,7 +696,7 @@ export default defineComponent({
     const { closeSocket } = useSearchWebSocket();
 
     const isMonacoEditorLoaded = ref(false);
-    const showGetStarted = ref(localStorage.getItem('isFirstTimeLogin') == 'true' ?? false);
+    const showGetStarted = ref((localStorage.getItem('isFirstTimeLogin') ?? 'false') === 'true');
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const rowsPerPage = ref(10);
@@ -1252,8 +1252,8 @@ export default defineComponent({
             orgSettings?.data?.data?.enable_websocket_search ?? false,
           enable_streaming_search:
             orgSettings?.data?.data?.enable_streaming_search ?? false,
-          aggregation_cache_enabled:
-            orgSettings?.data?.data?.aggregation_cache_enabled ?? false,
+            streaming_aggregation_enabled:
+            orgSettings?.data?.data?.streaming_aggregation_enabled ?? false,
           free_trial_expiry: orgSettings?.data?.data?.free_trial_expiry ?? "",
         });
 

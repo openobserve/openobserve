@@ -44,6 +44,7 @@ use datafusion::{
     },
     logical_expr::AggregateUDF,
     optimizer::{AnalyzerRule, OptimizerRule},
+    physical_optimizer::PhysicalOptimizerRule,
     physical_plan::execute_stream,
     prelude::{Expr, SessionContext},
 };
@@ -62,7 +63,6 @@ use {
 
 use super::{
     file_type::{FileType, GetExt},
-    optimizer::join_reorder::JoinReorderRule,
     planner::extension_planner::OpenobserveQueryPlanner,
     storage::file_list,
     table_provider::{NewListingTable, uniontable::NewUnionTable},
@@ -144,15 +144,10 @@ pub async fn merge_parquet_files(
     let sort_by_timestamp_desc = true;
     // force use DATAFUSION_MIN_PARTITION for each merge task
     let target_partitions = DATAFUSION_MIN_PARTITION;
-    let ctx = prepare_datafusion_context(
-        "",
-        None,
-        vec![],
-        vec![],
-        sort_by_timestamp_desc,
-        target_partitions,
-    )
-    .await?;
+    let ctx = DataFusionContextBuilder::new()
+        .sorted_by_time(sort_by_timestamp_desc)
+        .build(target_partitions)
+        .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
     ctx.register_table("tbl", union_table)?;
@@ -258,17 +253,10 @@ pub async fn merge_parquet_files_with_downsampling(
     log::debug!("merge_parquet_files_with_downsampling sql: {sql}");
 
     // create datafusion context
-    let sort_by_timestamp_desc = true;
-    let target_partitions = 2; // force use 2 cpu cores for one merge task
-    let ctx = prepare_datafusion_context(
-        "",
-        None,
-        vec![],
-        vec![],
-        sort_by_timestamp_desc,
-        target_partitions,
-    )
-    .await?;
+    let ctx = DataFusionContextBuilder::new()
+        .sorted_by_time(true)
+        .build(DATAFUSION_MIN_PARTITION)
+        .await?;
     // register union table
     let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
     ctx.register_table("tbl", union_table)?;
@@ -487,44 +475,99 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
     builder.build()
 }
 
-pub async fn prepare_datafusion_context(
-    _trace_id: &str,
-    _work_group: Option<String>,
+pub struct DataFusionContextBuilder<'a> {
+    trace_id: &'a str,
+    work_group: Option<String>,
     analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
+    physical_optimizer_rules: Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>>,
     sorted_by_time: bool,
-    target_partitions: usize,
-) -> Result<SessionContext, DataFusionError> {
-    let cfg = get_config();
-    let (target_partitions, memory_size) =
-        (target_partitions, cfg.memory_cache.datafusion_max_size);
-    #[cfg(feature = "enterprise")]
-    let (target_partitions, memory_size) = get_cpu_and_mem_limit(
-        _trace_id,
-        _work_group.clone(),
-        target_partitions,
-        memory_size,
-    )
-    .await?;
+}
 
-    let session_config = create_session_config(sorted_by_time, target_partitions)?;
-    let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
-    let mut builder = SessionStateBuilder::new()
-        .with_config(session_config)
-        .with_runtime_env(runtime_env)
-        .with_default_features();
-    for rule in analyzer_rules {
-        builder = builder.with_analyzer_rule(rule);
+impl<'a> DataFusionContextBuilder<'a> {
+    pub fn new() -> Self {
+        Self {
+            trace_id: "",
+            work_group: None,
+            analyzer_rules: vec![],
+            optimizer_rules: vec![],
+            physical_optimizer_rules: vec![],
+            sorted_by_time: false,
+        }
     }
-    if !optimizer_rules.is_empty() {
-        builder = builder
-            .with_optimizer_rules(optimizer_rules)
-            .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()));
+
+    pub fn trace_id(mut self, trace_id: &'a str) -> Self {
+        self.trace_id = trace_id;
+        self
     }
-    if cfg.common.feature_join_match_one_enabled {
-        builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
+
+    pub fn work_group(mut self, work_group: Option<String>) -> Self {
+        self.work_group = work_group;
+        self
     }
-    Ok(SessionContext::new_with_state(builder.build()))
+
+    pub fn analyzer_rules(
+        mut self,
+        analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
+    ) -> Self {
+        self.analyzer_rules = analyzer_rules;
+        self
+    }
+
+    pub fn optimizer_rules(
+        mut self,
+        optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
+    ) -> Self {
+        self.optimizer_rules = optimizer_rules;
+        self
+    }
+
+    pub fn physical_optimizer_rules(
+        mut self,
+        physical_optimizer_rules: Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>>,
+    ) -> Self {
+        self.physical_optimizer_rules = physical_optimizer_rules;
+        self
+    }
+
+    pub fn sorted_by_time(mut self, sorted_by_time: bool) -> Self {
+        self.sorted_by_time = sorted_by_time;
+        self
+    }
+
+    pub async fn build(self, target_partitions: usize) -> Result<SessionContext, DataFusionError> {
+        let cfg = get_config();
+        let (target_partitions, memory_size) =
+            (target_partitions, cfg.memory_cache.datafusion_max_size);
+        #[cfg(feature = "enterprise")]
+        let (target_partitions, memory_size) = get_cpu_and_mem_limit(
+            self.trace_id,
+            self.work_group.clone(),
+            target_partitions,
+            memory_size,
+        )
+        .await?;
+
+        let session_config = create_session_config(self.sorted_by_time, target_partitions)?;
+        let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
+        let mut builder = SessionStateBuilder::new()
+            .with_config(session_config)
+            .with_runtime_env(runtime_env)
+            .with_default_features();
+        for rule in self.analyzer_rules {
+            builder = builder.with_analyzer_rule(rule);
+        }
+        if !self.optimizer_rules.is_empty() {
+            builder = builder.with_optimizer_rules(self.optimizer_rules)
+        }
+        for rule in self.physical_optimizer_rules {
+            builder = builder.with_physical_optimizer_rule(rule);
+        }
+        if cfg.common.feature_join_match_one_enabled {
+            builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
+        }
+        Ok(SessionContext::new_with_state(builder.build()))
+    }
 }
 
 pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
@@ -592,138 +635,178 @@ pub async fn register_table(
     let sorted_by_time =
         sort_key.len() == 1 && sort_key[0].0 == TIMESTAMP_COL_NAME && sort_key[0].1;
 
-    let ctx = prepare_datafusion_context(
-        &session.id,
-        session.work_group.clone(),
-        vec![],
-        vec![],
-        sorted_by_time,
-        session.target_partitions,
-    )
-    .await?;
+    let ctx = DataFusionContextBuilder::new()
+        .trace_id(&session.id)
+        .work_group(session.work_group.clone())
+        .sorted_by_time(sorted_by_time)
+        .build(session.target_partitions)
+        .await?;
 
-    let table = create_parquet_table(
-        session,
-        schema.clone(),
-        files,
-        rules.clone(),
-        sorted_by_time,
-        ctx.runtime_env().cache_manager.get_file_statistic_cache(),
-        None,
-        vec![],
-        need_optimize_partition,
-    )
-    .await?;
+    let table = TableBuilder::new()
+        .rules(rules)
+        .sorted_by_time(sorted_by_time)
+        .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
+        .need_optimize_partition(need_optimize_partition)
+        .build(session.clone(), files, schema)
+        .await?;
     ctx.register_table(table_name, table)?;
 
     Ok(ctx)
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn create_parquet_table(
-    session: &SearchSession,
-    schema: Arc<Schema>,
-    files: &[FileKey],
+/// Create a datafusion table from a list of files and a schema
+pub struct TableBuilder {
     rules: HashMap<String, DataType>,
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     need_optimize_partition: bool,
-) -> Result<Arc<dyn TableProvider>> {
-    let cfg = get_config();
-    let target_partitions = if session.target_partitions == 0 {
-        cfg.limit.cpu_num
-    } else {
-        session.target_partitions
-    };
-    let target_partitions = max(
-        DATAFUSION_MIN_PARTITION,
-        max(cfg.limit.datafusion_min_partition_num, target_partitions),
-    );
+}
 
-    #[cfg(feature = "enterprise")]
-    let (target_partitions, _) = get_cpu_and_mem_limit(
-        &session.id,
-        session.work_group.clone(),
-        target_partitions,
-        cfg.memory_cache.datafusion_max_size,
-    )
-    .await?;
-
-    // Configure listing options
-    let file_format = ParquetFormat::default();
-    let mut listing_options = ListingOptions::new(Arc::new(file_format))
-        .with_file_extension(FileType::PARQUET.get_ext())
-        .with_target_partitions(target_partitions)
-        .with_collect_stat(true); // current is default to true
-
-    if sorted_by_time {
-        // specify sort columns for parquet file
-        listing_options =
-            listing_options.with_file_sort_order(vec![vec![datafusion::logical_expr::SortExpr {
-                expr: Expr::Column(Column::new_unqualified(TIMESTAMP_COL_NAME.to_string())),
-                asc: false,
-                nulls_first: false,
-            }]]);
-    }
-
-    let schema_key = schema.hash_key();
-    let prefix = if session.storage_type == StorageType::Memory {
-        file_list::set(&session.id, &schema_key, files).await;
-        format!("memory:///{}/schema={}/", session.id, schema_key)
-    } else if session.storage_type == StorageType::Wal {
-        file_list::set(&session.id, &schema_key, files).await;
-        format!("wal:///{}/schema={}/", session.id, schema_key)
-    } else {
-        return Err(DataFusionError::Execution(format!(
-            "Unsupported storage_type {:?}",
-            session.storage_type,
-        )));
-    };
-    let prefix = match ListingTableUrl::parse(prefix) {
-        Ok(url) => url,
-        Err(e) => {
-            return Err(datafusion::error::DataFusionError::Execution(format!(
-                "ListingTableUrl error: {e}",
-            )));
+impl TableBuilder {
+    pub fn new() -> Self {
+        Self {
+            rules: HashMap::new(),
+            sorted_by_time: false,
+            file_stat_cache: None,
+            index_condition: None,
+            fst_fields: vec![],
+            need_optimize_partition: false,
         }
-    };
-
-    let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
-    let timestamp_field = schema.field_with_name(TIMESTAMP_COL_NAME);
-    let schema = if timestamp_field.is_ok() && timestamp_field.unwrap().is_nullable() {
-        let new_fields = schema
-            .fields()
-            .iter()
-            .map(|x| {
-                if x.name() == TIMESTAMP_COL_NAME {
-                    Arc::new(Field::new(
-                        TIMESTAMP_COL_NAME.to_string(),
-                        DataType::Int64,
-                        false,
-                    ))
-                } else {
-                    x.clone()
-                }
-            })
-            .collect::<Vec<_>>();
-        Arc::new(Schema::new(new_fields))
-    } else {
-        schema
-    };
-    config = config.with_schema(schema);
-    let mut table = NewListingTable::try_new(
-        config,
-        rules,
-        index_condition,
-        fst_fields,
-        need_optimize_partition,
-    )?;
-    if file_stat_cache.is_some() {
-        table = table.with_cache(file_stat_cache);
     }
-    Ok(Arc::new(table))
+
+    pub fn rules(mut self, rules: HashMap<String, DataType>) -> Self {
+        self.rules = rules;
+        self
+    }
+
+    pub fn sorted_by_time(mut self, sorted_by_time: bool) -> Self {
+        self.sorted_by_time = sorted_by_time;
+        self
+    }
+
+    pub fn file_stat_cache(mut self, file_stat_cache: Option<FileStatisticsCache>) -> Self {
+        self.file_stat_cache = file_stat_cache;
+        self
+    }
+
+    pub fn index_condition(mut self, index_condition: Option<IndexCondition>) -> Self {
+        self.index_condition = index_condition;
+        self
+    }
+
+    pub fn fst_fields(mut self, fst_fields: Vec<String>) -> Self {
+        self.fst_fields = fst_fields;
+        self
+    }
+
+    pub fn need_optimize_partition(mut self, need_optimize_partition: bool) -> Self {
+        self.need_optimize_partition = need_optimize_partition;
+        self
+    }
+
+    pub async fn build(
+        self,
+        session: SearchSession,
+        files: &[FileKey],
+        schema: Arc<Schema>,
+    ) -> Result<Arc<dyn TableProvider>> {
+        let cfg = get_config();
+        let target_partitions = if session.target_partitions == 0 {
+            cfg.limit.cpu_num
+        } else {
+            session.target_partitions
+        };
+        let target_partitions = max(
+            DATAFUSION_MIN_PARTITION,
+            max(cfg.limit.datafusion_min_partition_num, target_partitions),
+        );
+
+        #[cfg(feature = "enterprise")]
+        let (target_partitions, _) = get_cpu_and_mem_limit(
+            &session.id,
+            session.work_group.clone(),
+            target_partitions,
+            cfg.memory_cache.datafusion_max_size,
+        )
+        .await?;
+
+        // Configure listing options
+        let file_format = ParquetFormat::default();
+        let mut listing_options = ListingOptions::new(Arc::new(file_format))
+            .with_file_extension(FileType::PARQUET.get_ext())
+            .with_target_partitions(target_partitions)
+            .with_collect_stat(true); // current is default to true
+
+        if self.sorted_by_time {
+            // specify sort columns for parquet file
+            listing_options = listing_options.with_file_sort_order(vec![vec![
+                datafusion::logical_expr::SortExpr {
+                    expr: Expr::Column(Column::new_unqualified(TIMESTAMP_COL_NAME.to_string())),
+                    asc: false,
+                    nulls_first: false,
+                },
+            ]]);
+        }
+
+        let schema_key = schema.hash_key();
+        let prefix = if session.storage_type == StorageType::Memory {
+            file_list::set(&session.id, &schema_key, files).await;
+            format!("memory:///{}/schema={}/", session.id, schema_key)
+        } else if session.storage_type == StorageType::Wal {
+            file_list::set(&session.id, &schema_key, files).await;
+            format!("wal:///{}/schema={}/", session.id, schema_key)
+        } else {
+            return Err(DataFusionError::Execution(format!(
+                "Unsupported storage_type {:?}",
+                session.storage_type,
+            )));
+        };
+        let prefix = match ListingTableUrl::parse(prefix) {
+            Ok(url) => url,
+            Err(e) => {
+                return Err(datafusion::error::DataFusionError::Execution(format!(
+                    "ListingTableUrl error: {e}",
+                )));
+            }
+        };
+
+        let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
+        let timestamp_field = schema.field_with_name(TIMESTAMP_COL_NAME);
+        let schema = if timestamp_field.is_ok() && timestamp_field.unwrap().is_nullable() {
+            let new_fields = schema
+                .fields()
+                .iter()
+                .map(|x| {
+                    if x.name() == TIMESTAMP_COL_NAME {
+                        Arc::new(Field::new(
+                            TIMESTAMP_COL_NAME.to_string(),
+                            DataType::Int64,
+                            false,
+                        ))
+                    } else {
+                        x.clone()
+                    }
+                })
+                .collect::<Vec<_>>();
+            Arc::new(Schema::new(new_fields))
+        } else {
+            schema
+        };
+        config = config.with_schema(schema);
+        let mut table = NewListingTable::try_new(
+            config,
+            self.rules,
+            self.index_condition,
+            self.fst_fields,
+            self.need_optimize_partition,
+        )?;
+        if self.file_stat_cache.is_some() {
+            table = table.with_cache(self.file_stat_cache);
+        }
+        Ok(Arc::new(table))
+    }
 }
 
 #[cfg(feature = "enterprise")]
