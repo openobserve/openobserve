@@ -44,6 +44,7 @@ tracing.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true
 reqwest.workspace = true
+cuckoofilter-mmap.workspace = true
 
 [dev-dependencies]
 collapse.workspace = true
