@@ -169,7 +169,7 @@ pub fn stream_res(
         .fields()
         .iter()
         .map(|field| StreamProperty {
-            prop_type: field.data_type().to_string(),
+            r#type: field.data_type().to_string(),
             name: field.name().to_string(),
         })
         .collect::<Vec<_>>();
