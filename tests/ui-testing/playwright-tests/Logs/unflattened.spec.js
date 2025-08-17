@@ -1,6 +1,6 @@
 import { test, expect } from "../baseFixtures.js";
 // pageManager.commonActions is used for streaming flip; no direct import needed
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from '../../pages/page-manager.js';
 // (unused CommonActions import removed)
@@ -102,7 +102,8 @@ test.describe("Unflattened testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
+    const org = process.env["ORGNAME"];
+    const allsearch = page.waitForResponse(`**/api/${org}/_search**`);
     await pageManager.logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
   });

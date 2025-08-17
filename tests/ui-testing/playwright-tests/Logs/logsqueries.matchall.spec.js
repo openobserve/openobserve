@@ -1,6 +1,6 @@
 import { test, expect } from "../baseFixtures";
 import PageManager from "../../pages/page-manager.js";
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 import matchAllLogsData from "../../../test-data/match_all.json";
 // (duplicate import removed)
 

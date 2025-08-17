@@ -1,6 +1,6 @@
 import { test, expect } from "../baseFixtures";
 import PageManager from "../../pages/page-manager.js";
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 // (duplicate import removed)
 
@@ -82,7 +82,8 @@ test.describe("Logs Queries testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
+    const org = process.env["ORGNAME"];
+    const allsearch = page.waitForResponse(`**/api/${org}/_search**`);
     await pageManager.logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
@@ -204,7 +205,7 @@ test.describe("Logs Queries testcases", () => {
   test("should display error when save function is clicked without any VRL function", {
     tag: ['@functionValidation', '@all', '@logs']
   }, async ({ page }) => {
-    await pageManager.logsPage.clickFunctionDropdownSave();
+    await pageManager.logsPage.clickSaveTransformButton();
     await pageManager.logsPage.expectWarningNoFunctionDefinition();
   });
 

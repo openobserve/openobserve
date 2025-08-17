@@ -1,5 +1,5 @@
 import { test, expect } from "../baseFixtures";
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";

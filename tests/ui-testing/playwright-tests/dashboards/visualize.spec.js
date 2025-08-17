@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 import PageManager from "../../pages/page-manager";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
@@ -576,13 +576,14 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.openVisualiseTab();
 
     // Assert that the event-streaming search API call is **not** fired
+    const org = process.env["ORGNAME"];
     const apiCallHappened = await page
       .waitForResponse(
         (response) =>
           response
             .url()
             .includes(
-              "/api/default/_search_stream?type=logs&search_type=dashboards"
+              `/api/${org}/_search_stream?type=logs&search_type=dashboards`
             ),
         { timeout: 5000 }
       )

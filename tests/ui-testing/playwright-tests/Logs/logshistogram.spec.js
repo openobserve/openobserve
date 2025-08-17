@@ -1,6 +1,6 @@
 import { test, expect } from "../baseFixtures.js";
 import PageManager from "../../pages/page-manager.js";
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 // (duplicate import removed)
 
@@ -60,7 +60,8 @@ test.describe("Logs Histogram testcases", () => {
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
+    const org = process.env["ORGNAME"];
+    const allsearch = page.waitForResponse(`**/api/${org}/_search**`);
     await pageManager.logsPage.selectStream("e2e_automate"); 
   });
 
