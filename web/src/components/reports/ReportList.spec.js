@@ -17,7 +17,7 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify, Quasar } from "quasar";
-import { nextTick } from 'vue';
+import { nextTick, ref } from 'vue';
 import ReportList from "./ReportList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -45,6 +45,44 @@ vi.mock("@/services/reports", () => ({
     toggleReportState: vi.fn(),
     deleteReport: vi.fn(),
   },
+}));
+
+// Mock composables that use inject()
+vi.mock("@/composables/useStreams", () => ({
+  default: vi.fn(() => ({
+    streamList: ref([]),
+    loading: ref(false),
+    error: ref(null)
+  }))
+}));
+
+vi.mock("@/composables/useLogs", () => ({
+  default: vi.fn(() => ({
+    searchObj: ref({ loading: false, data: { queryResults: [], aggs: { histogram: [] } } }),
+    searchAggData: ref({ histogram: [], total: 0 }),
+    searchResultData: ref({ list: [] })
+  }))
+}));
+
+vi.mock("@/composables/useDashboard", () => ({
+  default: vi.fn(() => ({
+    dashboards: ref([]),
+    loading: ref(false),
+    error: ref(null)
+  }))
+}));
+
+vi.mock("@/utils/zincutils", () => ({
+  getImageURL: vi.fn(() => ""),
+  verifyOrganizationStatus: vi.fn(() => Promise.resolve(true)),
+  logsErrorMessage: vi.fn((code) => `Error: ${code}`)
+}));
+
+// Mock segment analytics
+vi.mock("@/services/segment_analytics", () => ({
+  default: {
+    track: vi.fn()
+  }
 }));
 
 const node = document.createElement("div");

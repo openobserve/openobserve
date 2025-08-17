@@ -17,7 +17,7 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify, Quasar } from "quasar";
-import { nextTick } from 'vue';
+import { nextTick, ref } from 'vue';
 
 // Mock userService
 vi.mock("@/services/users", () => ({
@@ -34,6 +34,60 @@ vi.mock("@/aws-exports", () => ({
   default: {
     isEnterprise: "true",
     isCloud: false
+  }
+}));
+
+// Mock composables that use inject()
+vi.mock("@/composables/useStreams", () => ({
+  default: vi.fn(() => ({
+    streamList: ref([]),
+    loading: ref(false),
+    error: ref(null)
+  }))
+}));
+
+vi.mock("@/composables/useLogs", () => ({
+  default: vi.fn(() => ({
+    searchObj: ref({ loading: false, data: { queryResults: [], aggs: { histogram: [] } } }),
+    searchAggData: ref({ histogram: [], total: 0 }),
+    searchResultData: ref({ list: [] })
+  }))
+}));
+
+vi.mock("@/composables/useDashboard", () => ({
+  default: vi.fn(() => ({
+    dashboards: ref([]),
+    loading: ref(false),
+    error: ref(null)
+  }))
+}));
+
+vi.mock("@/utils/zincutils", () => ({
+  getImageURL: vi.fn(() => ""),
+  verifyOrganizationStatus: vi.fn(() => Promise.resolve(true)),
+  logsErrorMessage: vi.fn((code) => `Error: ${code}`)
+}));
+
+vi.mock("@/services/auth", () => ({
+  default: {
+    sign_in_user: vi.fn(),
+    sign_out: vi.fn(),
+    get_dex_config: vi.fn()
+  }
+}));
+
+vi.mock("@/services/organizations", () => ({
+  default: {
+    get_organization: vi.fn(),
+    list: vi.fn(),
+    add_members: vi.fn()
+  }
+}));
+
+vi.mock("@/services/billings", () => ({
+  default: {
+    get_billing_info: vi.fn(),
+    get_invoice_history: vi.fn()
   }
 }));
 
