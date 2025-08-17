@@ -33,8 +33,15 @@ export const restHandlers = [
   ),
 
   http.get(
-    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`,
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/functions`,
     ({ request }) => {
+      const url = new URL(request.url);
+      const pageNum = url.searchParams.get("page_num");
+      const pageSize = url.searchParams.get("page_size");
+      const sortBy = url.searchParams.get("sort_by");
+      const desc = url.searchParams.get("desc");
+      const name = url.searchParams.get("name");
+      
       return HttpResponse.json({
         list: [
           {
@@ -57,8 +64,11 @@ export const restHandlers = [
   ),
 
   http.post(
-    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/k8s_json/alerts/?type=logs`,
-    () => {
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/k8s_json/alerts/`,
+    ({ request }) => {
+      const url = new URL(request.url);
+      const type = url.searchParams.get("type");
+      
       return HttpResponse.json({});
     },
   ),
