@@ -212,7 +212,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import {
   ref,
-  defineProps,
   onBeforeMount,
   onActivated,
   computed,
