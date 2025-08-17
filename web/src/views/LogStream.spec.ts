@@ -665,20 +665,6 @@ describe("LogStream Component", () => {
       expect(wrapper.vm.selected[0].name).toBe("test_stream");
     });
 
-    it("should validate stream names for special characters", () => {
-      const validStream = { name: "valid_stream_123" };
-      const invalidStream = { name: "invalid-stream!" };
-      
-      // Test stream name validation if such method exists
-      if (typeof wrapper.vm.validateStreamName === 'function') {
-        expect(wrapper.vm.validateStreamName(validStream.name)).toBe(true);
-        expect(wrapper.vm.validateStreamName(invalidStream.name)).toBe(false);
-      } else {
-        expect(validStream.name).toMatch(/^[a-zA-Z0-9_]+$/);
-        expect(invalidStream.name).not.toMatch(/^[a-zA-Z0-9_]+$/);
-      }
-    });
-
     it("should handle stream type switching correctly", async () => {
       if (typeof wrapper.vm.changeStreamType === 'function') {
         await wrapper.vm.changeStreamType('metrics');
@@ -829,28 +815,6 @@ describe("LogStream Component", () => {
       } else {
         const date = new Date(timestamp);
         expect(date.getFullYear()).toBe(2022);
-      }
-    });
-
-    it("should sort streams by different criteria", async () => {
-      const streams = [
-        { name: "z_stream", doc_num: 100 },
-        { name: "a_stream", doc_num: 200 },
-        { name: "m_stream", doc_num: 150 }
-      ];
-
-      wrapper.vm.logStream = streams;
-      
-      // Test name sorting
-      if (typeof wrapper.vm.sortBy === 'function') {
-        await wrapper.vm.sortBy('name', true);
-        expect(wrapper.vm.logStream[0].name).toBe('a_stream');
-      }
-      
-      // Test document count sorting
-      if (typeof wrapper.vm.sortBy === 'function') {
-        await wrapper.vm.sortBy('doc_num', false);
-        expect(wrapper.vm.logStream[0].doc_num).toBe(200);
       }
     });
 

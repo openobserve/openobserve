@@ -207,7 +207,7 @@ describe("Tickets Service", () => {
         description: "Need help with configuration",
         priority: "medium",
         category: "support",
-        reporter_email: "user@example.com"
+        reporter_email: "`user@example.com`"
       };
 
       const mockResponse = {

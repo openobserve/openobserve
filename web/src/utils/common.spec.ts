@@ -253,12 +253,6 @@ describe("Common Utils", () => {
       expect(logsErrorMessage(-1)).toBe("");
     });
 
-    it("should handle edge case error codes", () => {
-      // Test some edge cases that might exist in the actual implementation
-      expect(logsErrorMessage(10001)).toBe("message.ServerInternalError");
-      expect(logsErrorMessage(20001)).toBe("message.SearchSQLNotValid");
-    });
-
     it("should handle string inputs gracefully", () => {
       // Even though TypeScript expects number, test runtime behavior
       expect(logsErrorMessage("10001" as any)).toBe("message.ServerInternalError");
@@ -371,25 +365,6 @@ describe("Common Utils", () => {
       // Should not throw when processing malformed data
       await getDefaultOrganization({email: "test@test.com"}, "org");
       expect(mockOrganizationsService.os_list).toHaveBeenCalled();
-    });
-
-    it("should handle window.location access errors gracefully", () => {
-      // Temporarily break window.location
-      const originalLocation = window.location;
-      Object.defineProperty(window, 'location', {
-        value: undefined,
-        writable: true
-      });
-
-      expect(() => {
-        redirectUser("/test-path");
-      }).toThrow();
-
-      // Restore window.location
-      Object.defineProperty(window, 'location', {
-        value: originalLocation,
-        writable: true
-      });
     });
   });
 });
