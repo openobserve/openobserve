@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
-import { outlinedDelete, outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 
 const props = defineProps({
