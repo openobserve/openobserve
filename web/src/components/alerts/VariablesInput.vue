@@ -131,7 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { defineProps } from "vue";
 import { useI18n } from "vue-i18n";
 import { outlinedDelete, outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
