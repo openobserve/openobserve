@@ -512,7 +512,6 @@ export default defineComponent({
     const store = useStore();
     const $q = useQuasar();
     const searchListContainer = ref(null);
-    const noOfRecordsTitle = ref("");
     const scrollPosition = ref(0);
     const rowsPerPageOptions = [10, 25, 50, 100];
     const disableMoreErrorDetails = ref(false);
@@ -536,6 +535,8 @@ export default defineComponent({
     const searchTableRef: any = ref(null);
 
     const plotChart: any = ref({});
+
+    const noOfRecordsTitle = ref(searchObj.data.histogram.chartParams.title || "");
 
     onMounted(() => {
       reDrawChart();
