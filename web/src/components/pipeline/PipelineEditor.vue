@@ -200,7 +200,6 @@ import {
   watch,
   ref,
   type Ref,
-  defineEmits,
 } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import AssociateFunction from "@/components/pipeline/NodeForm/AssociateFunction.vue";

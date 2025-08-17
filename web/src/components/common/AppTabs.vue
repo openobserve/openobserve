@@ -40,8 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, defineProps } from "vue";
-
 interface Tab {
   label: string;
   value: string;
