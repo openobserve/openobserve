@@ -1,5 +1,5 @@
 import { test, expect } from "../baseFixtures.js";
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 // import { log } from "console";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
@@ -131,7 +131,7 @@ test.describe("Enrichment data testcases", () => {
     console.log("Generated File Name:", fileName);
 
     // Set the file to be uploaded
-    const fileContentPath = "../test-data/enrichment_info.csv";
+    const fileContentPath = "../../test-data/enrichment_info.csv";
     const inputFile = await page.locator('input[type="file"]');
     await inputFile.setInputFiles(fileContentPath);
 
@@ -171,7 +171,7 @@ test.describe("Enrichment data testcases", () => {
     fileName = fileName.replace(/-/g, "_");
 
     // Set the file to be uploaded
-    const fileContentPath = "../test-data/protocols.csv";
+    const fileContentPath = "../../test-data/protocols.csv";
     const inputFile = await page.locator('input[type="file"]');
     await inputFile.setInputFiles(fileContentPath);
 
@@ -269,7 +269,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     console.log("Generated File Name:", fileName);
   
     // First upload step
-    const fileContentPath = "../test-data/append.csv";
+    const fileContentPath = "../../test-data/append.csv";
     const inputFile = await page.locator('input[type="file"]');
     await inputFile.setInputFiles(fileContentPath);
   
