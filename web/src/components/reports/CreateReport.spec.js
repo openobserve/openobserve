@@ -72,11 +72,18 @@ vi.mock("@/composables/useDashboard", () => ({
   }))
 }));
 
-vi.mock("@/utils/zincutils", () => ({
-  getImageURL: vi.fn(() => ""),
-  verifyOrganizationStatus: vi.fn(() => Promise.resolve(true)),
-  logsErrorMessage: vi.fn((code) => `Error: ${code}`)
-}));
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    getImageURL: vi.fn(() => ""),
+    verifyOrganizationStatus: vi.fn(() => Promise.resolve(true)),
+    logsErrorMessage: vi.fn((code) => `Error: ${code}`),
+    mergeRoutes: vi.fn((route1, route2) => [...(route1 || []), ...(route2 || [])]),
+    getPath: vi.fn(() => "/"),
+    useLocalTimezone: vi.fn(() => "UTC")
+  };
+});
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {
