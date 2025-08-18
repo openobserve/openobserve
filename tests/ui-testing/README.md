@@ -1,9 +1,37 @@
 # zinc-observe-ui-automation
-#Install cypress in project directory
-npm install cypress --save-dev
 
-# To run Tests from local
-npx cypress open
+## Playwright UI Testing
 
-# To run Tests from local and push result in cypress cloud
-./node_modules/.bin/cypress run --record --key cef585a4-1439-4580-bfce-d62230663b22
+### Installation
+```bash
+npm install
+```
+
+### Running Tests
+
+#### Using Playwright Runner UI (Recommended)
+```bash
+cd playwright-runner
+npm start
+```
+Then open http://localhost:3000 to access the test runner interface.
+
+#### Using Command Line
+```bash
+# Run all tests
+npx playwright test
+
+# Run specific test by tag
+npx playwright test -g @alertsImportExport
+
+# Run in headed mode
+npx playwright test --headed
+
+# Run specific test file
+npx playwright test Alerts/alerts-import.spec.js
+```
+
+### Environment Configuration
+Tests can be configured using:
+1. **Playwright Runner UI** - Set environment variables through the web interface
+2. **Environment Variables** - Set variables in terminal or .env file
