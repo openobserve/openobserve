@@ -272,12 +272,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   ref,
   computed,
-  defineProps,
   onBeforeMount,
   onActivated,
-  defineEmits,
   watch,
-  reactive,
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";

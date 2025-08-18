@@ -367,7 +367,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   ref,
   computed,
-  defineEmits,
   watch,
   nextTick,
   onMounted,
