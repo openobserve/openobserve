@@ -1669,11 +1669,9 @@ export default defineComponent({
 
     // Auto-apply config changes that don't require API calls (similar to dashboard)
     const debouncedUpdateChartConfig = debounce((newVal) => {
-      if (searchObj.meta.logsVisualizeToggle === "visualize") {
-        if(shouldUseHistogramQuery.value){
-          visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query;
-        }
-        const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+      if (searchObj.meta.logsVisualizeToggle === "visualize" && shouldUseHistogramQuery.value === false) {
+
+          let configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
           visualizeChartData.value,
           newVal,
         );
