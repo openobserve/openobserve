@@ -2,7 +2,7 @@ import { test, expect } from "../baseFixtures.js";
 import LogsVisualise from "../../pages/dashboardPages/visualise.js";
 import { login } from "./utils/dashLogin.js";
 import { ingestion } from "./utils/dashIngestion.js";
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 import PageManager from "../../pages/page-manager";
 
 test.describe.configure({ mode: "parallel" });
