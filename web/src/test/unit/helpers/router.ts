@@ -13,15 +13,71 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import router from "@/router/routes";
+import { createRouter, createMemoryHistory } from "vue-router";
+import { vi } from "vitest";
 
-// interface RouterMap {
-//   history: any;
-//   routes: any;
-// }
-// const routerMap: RouterMap = {
-//   history: createWebHistory(),
-//   routes: routes,
-// };
+// Mock location.replace for Vue Router
+const mockLocation = {
+  href: 'http://localhost:3000/web/',
+  origin: 'http://localhost:3000',
+  protocol: 'http:',
+  host: 'localhost:3000',
+  hostname: 'localhost',
+  port: '3000',
+  pathname: '/web/',
+  search: '',
+  hash: '',
+  assign: vi.fn(),
+  replace: vi.fn(),
+  reload: vi.fn(),
+};
+
+// Ensure location is properly mocked for Vue Router
+Object.defineProperty(globalThis, 'location', {
+  value: mockLocation,
+  writable: true,
+});
+
+// Create a simple test router with memory history to avoid location issues
+const router = createRouter({
+  history: createMemoryHistory('/web/'),
+  routes: [
+    {
+      path: '/',
+      name: 'home',
+      component: { template: '<div>Home</div>' }
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: { template: '<div>Login</div>' }
+    },
+    {
+      path: '/logs',
+      name: 'logs',
+      component: { template: '<div>Logs</div>' }
+    },
+    {
+      path: '/functions',
+      name: 'functions',
+      component: { template: '<div>Functions</div>' }
+    },
+    {
+      path: '/alerts',
+      name: 'alerts',
+      component: { template: '<div>Alerts</div>' }
+    },
+    {
+      path: '/dashboards',
+      name: 'dashboards',
+      component: { template: '<div>Dashboards</div>' }
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      component: { template: '<div>Not Found</div>' }
+    }
+  ],
+});
 
 export default router;

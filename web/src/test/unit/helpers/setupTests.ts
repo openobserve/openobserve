@@ -77,6 +77,36 @@ if (typeof global !== 'undefined' && global.document) {
   global.document.removeEventListener = vi.fn();
 }
 
+// Additional window.location mock for tests that might not use the global mock
+const mockLocation = {
+  href: 'http://localhost:3000/web/',
+  origin: 'http://localhost:3000',
+  protocol: 'http:',
+  host: 'localhost:3000',
+  hostname: 'localhost',
+  port: '3000',
+  pathname: '/web/',
+  search: '',
+  hash: '',
+  assign: vi.fn(),
+  replace: vi.fn(),
+  reload: vi.fn(),
+};
+
+// Ensure window.location is available in all test contexts
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'location', {
+    value: mockLocation,
+    writable: true,
+  });
+}
+
+// Also set it globally for Node.js environment
+Object.defineProperty(globalThis, 'location', {
+  value: mockLocation,
+  writable: true,
+});
+
 beforeAll(() => server.listen())
 
 // Reset any request handlers after each test (for test isolation)

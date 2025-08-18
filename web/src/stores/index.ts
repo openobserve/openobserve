@@ -22,17 +22,32 @@ import {
 import streams from "./streams";
 import logs from "./logs";
 
-const pos = window.location.pathname.indexOf("/web/");
+// Handle test environment where window.location might not be fully available
+const getLocationPathname = () => {
+  if (typeof window === 'undefined' || !window.location || !window.location.pathname) {
+    return "/";
+  }
+  return window.location.pathname;
+};
+
+const getLocationOrigin = () => {
+  if (typeof window === 'undefined' || !window.location || !window.location.origin) {
+    return "http://localhost:3000";
+  }
+  return window.location.origin;
+};
+
+const pos = getLocationPathname().indexOf("/web/");
 
 const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
   ? import.meta.env.VITE_OPENOBSERVE_ENDPOINT.endsWith("/")
     ? import.meta.env.VITE_OPENOBSERVE_ENDPOINT.slice(0, -1)
     : import.meta.env.VITE_OPENOBSERVE_ENDPOINT
-  : window.location.origin == "http://localhost:8081"
+  : getLocationOrigin() == "http://localhost:8081"
     ? "/"
     : pos > -1
-      ? window.location.origin + window.location.pathname.slice(0, pos)
-      : window.location.origin;
+      ? getLocationOrigin() + getLocationPathname().slice(0, pos)
+      : getLocationOrigin();
 
 const organizationObj = {
   organizationPasscode: "",

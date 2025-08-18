@@ -40,3 +40,26 @@ class ResizeObserver {
 }
 
 vi.stubGlobal("ResizeObserver", ResizeObserver);
+
+// Mock window.location to prevent undefined errors in tests
+const mockLocation = {
+  href: 'http://localhost:3000/web/',
+  origin: 'http://localhost:3000',
+  protocol: 'http:',
+  host: 'localhost:3000',
+  hostname: 'localhost',
+  port: '3000',
+  pathname: '/web/',
+  search: '',
+  hash: '',
+  assign: vi.fn(),
+  replace: vi.fn(),
+  reload: vi.fn(),
+};
+
+// Mock both window.location and global location
+vi.stubGlobal("location", mockLocation);
+Object.defineProperty(window, 'location', {
+  value: mockLocation,
+  writable: true,
+});

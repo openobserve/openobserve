@@ -364,6 +364,11 @@ export const getImageURL = (image_path: string) => {
 };
 
 export const getPath = () => {
+  // Handle test environment where window.location might not be fully available
+  if (typeof window === 'undefined' || !window.location || !window.location.pathname) {
+    return "/";
+  }
+  
   const pos = window.location.pathname.indexOf("/web/");
   const path =
     window.location.origin == "http://localhost:8081"
