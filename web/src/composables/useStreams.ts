@@ -283,7 +283,6 @@ const useStreams = () => {
               streamList.list[streamIndex] = removeSchemaFields(_stream.data);
               updateStreamsInStore(streamType, streamList);
             } catch (err) {
-              console.log(err,'err')
               return reject("Error while fetching schema");
             }
           }

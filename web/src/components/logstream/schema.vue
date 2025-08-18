@@ -741,8 +741,6 @@ const defaultValue: any = () => {
     stats: {},
     defaultFts: false,
     defined_schema_fields: [],
-    defined_schema_fields_original:[],
-    definedSchemaIsObject: false
   };
 };
 
