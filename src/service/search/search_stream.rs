@@ -748,7 +748,6 @@ async fn get_partitions(
         // vrl is not required for _search_partition
         query_fn: Default::default(),
         streaming_output: true,
-        search_type: req.search_type,
     };
 
     let res = SearchService::search_partition(
@@ -757,6 +756,7 @@ async fn get_partitions(
         Some(user_id),
         stream_type,
         &search_partition_req,
+        false,
         false,
         false,
     )

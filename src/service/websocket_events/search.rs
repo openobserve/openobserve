@@ -789,7 +789,6 @@ async fn get_partitions(
         // vrl is not required for _search_partition
         query_fn: Default::default(),
         streaming_output: true,
-        search_type: Some(req.search_type),
     };
 
     let res = SearchService::search_partition(
@@ -800,6 +799,7 @@ async fn get_partitions(
         &search_partition_req,
         false,
         false,
+        false, // websocket deprecated
     )
     .instrument(tracing::info_span!(
         "src::handler::http::request::websocket::search::get_partitions"
