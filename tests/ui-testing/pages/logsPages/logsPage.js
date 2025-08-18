@@ -18,7 +18,7 @@ export class LogsPage {
         this.logsMenuItem = '[data-test="menu-link-\\/logs-item"]';
         this.homeButton = "[name ='home']";
         this.queryButton = "[data-test='logs-search-bar-refresh-btn']";
-        this.queryEditor = '[data-test="logs-search-bar-query-editor"] .cm-content';
+        this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
         this.quickModeToggle = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
         this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
         this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
@@ -1595,7 +1595,7 @@ export class LogsPage {
     }
 
     async expectQueryEditorContainsText(text) {
-        return await expect(this.page.locator(this.queryEditor)).toContainText(text);
+        return await expect(this.page.locator(this.queryEditor).locator('.cm-content')).toContainText(text);
     }
 
     async expectQueryEditorEmpty() {
