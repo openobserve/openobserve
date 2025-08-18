@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-slot:bottom="scope">
         <div class="tw-flex tw-items-center tw-justify-between tw-w-full tw-h-[48px]">
-          <div class="q-table__separator col text-bold tw-text-[14px]">
+          <div class="q-table__separator tw-flex tw-items-center tw-w-full text-bold tw-text-[14px]">
             {{scope.pagination.rowsNumber}} Stream(s)
             <q-btn
             v-if="selected.length > 0"
@@ -223,37 +223,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw-ml-2">{{ isDeleting ? 'Deleting...' : 'Delete' }}</span>
         </q-btn>
           </div>
-
-          <div class="q-table__control tw-font-[600]" v-if="scope.pagination.rowsNumber > 0">
-            <span >
-              Showing {{ ((scope.pagination.page - 1) * scope.pagination.rowsPerPage) + 1 }} - {{((scope.pagination.page * scope.pagination.rowsPerPage) > scope.pagination.rowsNumber) ? scope.pagination.rowsNumber : scope.pagination.page * scope.pagination.rowsPerPage}} of {{scope.pagination.rowsNumber}}
-            </span>
-            <div class=" row no-wrap inline tw-ml-4">
-              <q-btn-group>
-                <q-btn
-                  icon="chevron_left"
-                  :text-color="scope.isFirstPage ? '$light-text2' : '$dark'"
-                  class="pageNav"
-                  color="#FAFBFD"
-                  size="sm"
-                  flat
-                  :disable="scope.isFirstPage"
-                  @click="scope.prevPage"
-                />
-                <q-separator vertical />
-                <q-btn
-                  icon="chevron_right"
-                  :text-color="scope.isLastPage ? '$light-text2' : '$dark'"
-                  class="pageNav"
-                  color="#FAFBFD"
-                  size="sm"
-                  flat
-                  :disable="scope.isLastPage"
-                  @click="scope.nextPage"
-                />
-              </q-btn-group>
-            </div>
-          </div>
+          <QTablePagination
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="pagination.rowsNumber"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
         </div>
 
       </template>
@@ -569,7 +545,7 @@ export default defineComponent({
         });
         logStream.value = [];
 
-        let counter = 1;
+        let counter = 1 + pageOffset.value;
         let streamResponse;
         // if(selectedStreamType.value == "all") {
         //   streamResponse = getStreams(selectedStreamType.value || "", false, false);
@@ -962,6 +938,14 @@ export default defineComponent({
       streamActiveTab.value = tab;
       onChangeStreamFilter(tab);
     };
+    const changePagination = (val: { label: string; value: any }) => {
+      selectedPerPage.value = val.hasOwnProperty("value") ? val.value : val;
+      pagination.value.rowsPerPage = val.hasOwnProperty("value") ? val.value : val;
+      pagination.value.page = 1; // Reset to first page when changing records per page
+      qTable.value?.requestServerInteraction({
+        pagination: pagination.value
+      });
+    };
 
     return {
       t,
@@ -1009,6 +993,7 @@ export default defineComponent({
       deleteAssociatedAlertsPipelines,
       filterLogStreamByTab,
       streamActiveTab,
+      changePagination,
     };
   },
 });
