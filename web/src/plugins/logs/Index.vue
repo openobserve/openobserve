@@ -1683,7 +1683,7 @@ export default defineComponent({
           window.dispatchEvent(new Event("resize"));
         }
       }
-    }, 3000);
+    }, 1000);
 
     watch(() => dashboardPanelData.data, debouncedUpdateChartConfig, {
       deep: true,
