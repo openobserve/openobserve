@@ -97,17 +97,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="config.isEnterprise == 'true'" class="tw-flex tw-justify-between tw-items-center">
             <div class="tw-flex tw-flex-col tw-items-start">
               <span class="individual-setting-title">
-                {{ t('settings.enableAggregationCache') }}
+                {{ t('settings.enableStreamingAggregation') }}
               </span>
               <span class="individual-setting-description">
-                Enabling Aggregation Cache will increase performance.
+                Enabling Streaming Aggregation will increase performance.
               </span>
             </div>
                 <q-toggle
                 style="width: 120px;"
-                v-model="enableAggregationCache"
+                v-model="enableStreamingAggregation"
                 :label="'Enabled'"
-                data-test="general-settings-enable-aggregation-cache"
+                data-test="general-settings-enable-streaming-aggregation"
                 class="q-pb-lg showLabelOnTop"
               />
           </div>
@@ -336,9 +336,9 @@ export default defineComponent({
         ?.enable_streaming_search ?? false,
     );
 
-    const enableAggregationCache = ref(
+    const enableStreamingAggregation = ref(
       store.state?.organizationData?.organizationSettings
-        ?.aggregation_cache_enabled ?? false,
+        ?.streaming_aggregation_enabled ?? false,
     );
 
     const loadingState = ref(false);
@@ -361,9 +361,9 @@ export default defineComponent({
         store.state?.organizationData?.organizationSettings
           ?.enable_streaming_search ?? false;
 
-      enableAggregationCache.value =
+      enableStreamingAggregation.value =
         store.state?.organizationData?.organizationSettings
-          ?.aggregation_cache_enabled ?? false;
+          ?.streaming_aggregation_enabled ?? false;
     });
 
     watch(
@@ -384,7 +384,7 @@ export default defineComponent({
           scrape_interval: scrapeIntereval.value,
           enable_websocket_search: enableWebsocketSearch.value,
           enable_streaming_search: enableStreamingSearch.value,
-          aggregation_cache_enabled: enableAggregationCache.value,
+          streaming_aggregation_enabled: enableStreamingAggregation.value,
         });
 
         //update settings in backend
@@ -610,7 +610,7 @@ export default defineComponent({
       confirmDeleteImage: ref(false),
       sanitizeInput,
       enableStreamingSearch,
-      enableAggregationCache,
+      enableStreamingAggregation,
     };
   },
 });
