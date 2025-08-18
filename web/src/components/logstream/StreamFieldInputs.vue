@@ -122,7 +122,8 @@
             emit-value
             hide-bottom-space
             style="width: 250px"
-            :placeholder="!isDataTypeFocused && (!field.type || field.type.length === 0) ? 'Data Type' : ''"
+            :placeholder="!isDataTypeFocused && (!field.type || field.type.length === 0) ? 'Data Type *' : ''"
+            :rules="[(val: any) => !!val.trim() || 'Data type is required!']"
             @update:model-value="emits('input:update', 'conditions', field)"
             @focus="handleDataTypeFocus"
             @blur="handleDataTypeBlur"
