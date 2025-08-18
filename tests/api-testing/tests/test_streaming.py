@@ -1328,7 +1328,7 @@ def read_response(reader):
     lines = content.split("\n")
     search_metadata_list = []
     search_hits_list = []
-    total_sum = 0
+    final_total = 0
 
     print(f"DEBUG: Raw response content length: {len(content)}")
     print(f"DEBUG: Number of lines: {len(lines)}")
@@ -1350,15 +1350,15 @@ def read_response(reader):
                         metadata_data = json.loads(metadata_json)
                         print(f"DEBUG: Parsed metadata: {metadata_data}")
                         search_metadata_list.append(metadata_data)
-                        # Sum up the total values from all metadata responses
+                        # For streaming responses, use the latest total instead of summing
                         if (
                             "results" in metadata_data
                             and "total" in metadata_data["results"]
                         ):
                             current_total = metadata_data["results"]["total"]
-                            total_sum += current_total
+                            final_total = current_total  # Use latest total, don't sum
                             print(
-                                f"DEBUG: Added total {current_total}, running sum: {total_sum}"
+                                f"DEBUG: Updated final total to: {final_total}"
                             )
                         else:
                             print(f"DEBUG: No 'results' or 'total' found in metadata")
@@ -1384,13 +1384,13 @@ def read_response(reader):
 
     print(f"DEBUG: Final search_metadata_list length: {len(search_metadata_list)}")
     print(f"DEBUG: Final search_hits_list length: {len(search_hits_list)}")
-    print(f"DEBUG: Final total_sum: {total_sum}")
+    print(f"DEBUG: Final total: {final_total}")
 
     if search_metadata_list:
-        # Use the first metadata response as the base, but update the total to be the sum
+        # Use the first metadata response as the base, but update the total to be the final total
         combined_metadata = search_metadata_list[0].copy()
-        combined_metadata["results"]["total"] = total_sum
-        print(f"DEBUG: Returning combined metadata with total: {total_sum}")
+        combined_metadata["results"]["total"] = final_total
+        print(f"DEBUG: Returning combined metadata with total: {final_total}")
 
         # Combine all hits from all hits events
         all_hits = []
