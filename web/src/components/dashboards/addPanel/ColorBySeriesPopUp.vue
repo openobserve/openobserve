@@ -222,25 +222,16 @@ export default defineComponent({
       });
     });
 
-    // Watcher to ensure series.value is always a string
-    watch(
-      editColorBySeries,
-      (newVal) => {
-        newVal.forEach((series: any) => {
-          if (typeof series.value !== "string") {
-            series.value = "";
-          }
-        });
-      },
-      { deep: true },
-    );
-
     // Watch for changes in series.value to ensure proper reactivity
     watch(
       editColorBySeries,
       (newVal) => {
         newVal.forEach((series: any) => {
-          if (series.value === undefined || series.value === null) {
+          if (
+            typeof series.value !== "string" ||
+            series.value === undefined ||
+            series.value === null
+          ) {
             series.value = "";
           }
         });
