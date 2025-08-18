@@ -334,14 +334,14 @@ async fn main() -> Result<(), anyhow::Error> {
             .expect("grpc runtime init failed");
         let _guard = rt.enter();
         rt.block_on(async move {
-            if config::cluster::LOCAL_NODE.is_router() {
-                init_router_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx)
-                    .await
-                    .expect("router gRPC server init failed");
+            let ret = if config::cluster::LOCAL_NODE.is_router() {
+                init_router_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
             } else {
-                init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx)
-                    .await
-                    .expect("router gRPC server init failed");
+                init_common_grpc_server(grpc_init_tx, grpc_shutdown_rx, grpc_stopped_tx).await
+            };
+            if let Err(e) = ret {
+                log::error!("gRPC server init failed: {:?}", e);
+                std::process::exit(1);
             }
         });
     });
@@ -559,6 +559,7 @@ async fn init_common_grpc_server(
         gaddr
     );
     init_tx.send(()).ok();
+
     let builder = if cfg.grpc.tls_enabled {
         let cert = std::fs::read_to_string(&cfg.grpc.tls_cert_path)?;
         let key = std::fs::read_to_string(&cfg.grpc.tls_key_path)?;
@@ -567,7 +568,7 @@ async fn init_common_grpc_server(
     } else {
         tonic::transport::Server::builder()
     };
-    builder
+    let ret = builder
         .layer(tonic::service::interceptor(check_auth))
         .add_service(event_svc)
         .add_service(search_svc)
@@ -585,8 +586,10 @@ async fn init_common_grpc_server(
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
         })
-        .await
-        .expect("gRPC server init failed");
+        .await;
+    if let Err(e) = ret {
+        return Err(anyhow::anyhow!("{:?}", e));
+    }
     stopped_tx.send(()).ok();
     Ok(())
 }
@@ -628,7 +631,7 @@ async fn init_router_grpc_server(
     } else {
         tonic::transport::Server::builder()
     };
-    builder
+    let ret = builder
         .layer(tonic::service::interceptor(check_auth))
         .add_service(logs_svc)
         .add_service(metrics_svc)
@@ -637,8 +640,10 @@ async fn init_router_grpc_server(
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
         })
-        .await
-        .expect("gRPC server init failed");
+        .await;
+    if let Err(e) = ret {
+        return Err(anyhow::anyhow!("{:?}", e));
+    }
     stopped_tx.send(()).ok();
     Ok(())
 }
