@@ -46,13 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
-        <div
-          v-else-if="indexData.schema.length == 0"
-          class="q-pt-md text-center q-w-md q-mx-lg"
-          style="max-width: 450px"
-        >
-          No data available.
-        </div>
         <div v-else class="indexDetailsContainer" style="height: 100vh">
           <div
             class="titleContainer tw-flex tw-flex-col tw-items-flex-start tw-gap-5"
@@ -1052,17 +1045,12 @@ export default defineComponent({
         previousSchemaVersion = JSON.parse(
           JSON.stringify(streamResponse.settings),
         );
-          //after this we need to have a map of pattern_id and according to field as well
-        //so that we can easily access the apply_at value for a pattern if it is undefined or null
-          previousSchemaVersion.pattern_associations && previousSchemaVersion.pattern_associations.forEach((pattern: PatternAssociation) => {
-            patternIdToApplyAtMap.set(pattern.field + pattern.pattern_id, pattern);
-          });
-        //we have already stored the previous defined schema fields before converting the defined_schema_fields to older structure 
-        // in the defined_schema_fields_original in stream response so we need to assign to defined_schema_fiels 
-        //so whenever we send for comparing 2 arrays previous and current we will get the exact output
-        previousSchemaVersion.defined_schema_fields = [...streamResponse.settings.defined_schema_fields_original];
-      }
-
+        //after this we need to have a map of pattern_id and according to field as well
+      //so that we can easily access the apply_at value for a pattern if it is undefined or null
+      
+      previousSchemaVersion.pattern_associations && previousSchemaVersion.pattern_associations.forEach((pattern: PatternAssociation) => {
+        patternIdToApplyAtMap.set(pattern.field + pattern.pattern_id, pattern);
+      });
       if (!streamResponse.schema?.length) {
         streamResponse.schema = [];
         if (streamResponse.settings.defined_schema_fields?.length)
@@ -1118,13 +1106,6 @@ export default defineComponent({
 
       indexData.value.defined_schema_fields =
         streamResponse.settings.defined_schema_fields || [];
-
-        //here we are assiging defined_schema_fields_original to indexData.value so it will be displayed in the UI 
-      indexData.value.defined_schema_fields_original =
-        streamResponse.settings.defined_schema_fields_original || [];
-
-        indexData.value.definedSchemaIsObject = streamResponse.settings.definedSchemaIsObject
-
 
       if (showDataRetention.value)
         dataRetentionDays.value =
@@ -1204,12 +1185,9 @@ export default defineComponent({
         index_fields: [],
         full_text_search_keys: [],
         bloom_filter_fields: [],
-        //so here we are sending the defined_schema_fields_original which is the current defined schema fields to be sent
-        //so while comparing the previous and current we already assigned previous in previousSchema and current is there in defined_schema_fields_original
-        defined_schema_fields: [...indexData.value.defined_schema_fields_original],
+        defined_schema_fields: [...indexData.value.defined_schema_fields],
         extended_retention_days: [...indexData.value.extended_retention_days],
         pattern_associations: [...patternAssociations.value],
-        definedSchemaIsObject: indexData.value.definedSchemaIsObject
       };
 
       if (showDataRetention.value && dataRetentionDays.value < 1) {
@@ -1235,27 +1213,13 @@ export default defineComponent({
       settings["store_original_data"] = storeOriginalData.value;
       settings["approx_partition"] = approxPartition.value;
 
-      //new schema fields are the fields that are added in the newSchemaFields.value by the user manually using add field option
-      //so here we are pushing the new schema fields to the defined_schema_fields_original with name and type instead of just name so that it wouuld be same structure as the previous defined schema fields
-      const isObjectFormat = indexData.value.definedSchemaIsObject;
-
       const newSchemaFieldsSet = new Set(
-        newSchemaFields.value.map((field) => {
-          const transformedName = field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_");
-
-          return isObjectFormat
-            ? { name: transformedName, type: field.type }
-            : transformedName;
-        })
+        newSchemaFields.value.map((field) =>
+          field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
+        ),
       );
-
-      // Add to original
-      indexData.value.defined_schema_fields_original.push(...newSchemaFieldsSet);
-        // Push unique and normalized field names to settings.defined_schema_fields
-
-      settings.defined_schema_fields = [...indexData.value.defined_schema_fields_original];
-
-
+      // Push unique and normalized field names to settings.defined_schema_fields
+      settings.defined_schema_fields.push(...newSchemaFieldsSet);
       redDaysList.value.forEach((field) => {
         settings.extended_retention_days.push({
           start: field.start,
@@ -1576,10 +1540,11 @@ export default defineComponent({
         resultTotal.value = indexData.value.schema.length;
       }
     };
+
     const updateActiveMainTab = (tab) => {
       activeMainTab.value = tab;
     };
-//this funciton mainly runs when user removes / adds from the user defined schema 
+
     const updateDefinedSchemaFields = () => {
       markFormDirty();
 
@@ -1592,8 +1557,6 @@ export default defineComponent({
 
       if (selectedFieldsSet.has(store.state.zoConfig.timestamp_column))
         selectedFieldsSet.delete(store.state.zoConfig.timestamp_column);
-
-        //["test","job"]  -> [{name:"test", type:"utf8"},{name:"job", type:"utf32"}]
 
       if (activeTab.value === "schemaFields") {
         indexData.value.defined_schema_fields =
@@ -1612,28 +1575,10 @@ export default defineComponent({
           ]),
         ];
       }
-        //before
-        //["test","job"]  -> [{name:"test", type:"utf8"},{name:"job", type:"utf32"}]
-        //selected values are ["testing_value"]
-        //after addding / removing 
-        //this needs to get converted right like defined_schema_fields are already in sync with user selection as they are handles above 
-        //to make defined_schema_fields_original sync we need to run syncDefinedSchemaFieldsOriginal this function 
-        const definedNames = new Set(indexData.value.defined_schema_fields);
-
-        const selectedFieldMap = new Map(
-          selectedFields.value.map((field) => [field.name, field.type])
-        );
-        if(indexData.value.definedSchemaIsObject){
-        indexData.value.defined_schema_fields_original = syncDefinedSchemaFieldsOriginal(indexData.value.defined_schema_fields,indexData.value.defined_schema_fields_original,selectedFields.value);
-        }
-        else{
-          indexData.value.defined_schema_fields_original = [...indexData.value.defined_schema_fields]
-        }
 
       selectedFields.value = [];
     };
-    //TODO: 
-    //need to optimize this function as it is running map against schema which might slows down the system when it is more no. of fields
+
     const updateStreamResponse = (streamResponse) => {
       if (streamResponse.settings.hasOwnProperty("defined_schema_fields")) {
         const userDefinedSchema = streamResponse.settings.defined_schema_fields;
@@ -1646,64 +1591,22 @@ export default defineComponent({
 
         // Find fields in userDefinedSchema that are not in the schema
         const additionalFields = userDefinedSchema
-            .filter(
-              (name) =>
-                !streamResponse.schema.some((field) => field.name === name),
-            )
-            .map((name) => {
-              const isObjectFormat = streamResponse.settings.definedSchemaIsObject;
-
-              // Get the matching field only if we have object format
-              let match;
-              if (isObjectFormat) {
-                match = streamResponse.settings.defined_schema_fields_original.find(
-                  (field: any) => field.name === name
-                );
-              }
-
-              return {
-                name,
-                isUserDefined: true,
-                type: match?.type || 'utf8', // fallback in case match not found or string array
-              };
-            });
-
-
+          .filter(
+            (name) =>
+              !streamResponse.schema.some((field) => field.name === name),
+          )
+          .map((name) => ({
+            name,
+            isUserDefined: true,
+            // Optionally, add default values for other properties (e.g., type, index_type, etc.)
+          }));
         // Combine the updated schema with additional fields
         streamResponse.schema = [...updatedSchema, ...additionalFields];
       }
       updateResultTotal(streamResponse);
       return streamResponse;
     };
-    //this function helps to maintain sync defined_schema_fields_original  with the defined_schema_fields so whenever user adds / removes 
-    //we need to run this function so what are we doing in this function we are first getting what we need to remove and what we need to add 
-    //to the defined_schema_fields_original and then we dont have type right in defined_schema_fields so to get that we are referring it from selectedValues.value
-    //because it will have the name and type
-    const syncDefinedSchemaFieldsOriginal = (
-          definedFields: string[],
-          originalFields: { name: string; type: string }[],
-          selectedFields: { name: string; type: string }[]
-        ): { name: string; type: string }[] =>   {
-          const currentSet = new Set(definedFields);
-          const originalSet = new Set(originalFields.map(f => f.name));
-          const selectedMap = new Map(selectedFields.map(f => [f.name, f.type]));
-
-          // Keep only fields that still exist
-          const updatedOriginal = originalFields.filter(f => currentSet.has(f.name));
-
-          // Add newly introduced fields
-          for (const name of definedFields) {
-            if (!originalSet.has(name)) {
-              const type = selectedMap.get(name);
-              if (type) {
-                updatedOriginal.push({ name, type });
-              }
-            }
-          }
-
-          return updatedOriginal
-        }
-
+    
     const closeDialog = () => {
       isDialogOpen.value = false;
       newSchemaFields.value = [];
