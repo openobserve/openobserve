@@ -141,6 +141,53 @@ vi.mock('@/services/alerts', () => {
   };
 });
 
+// Additional composable mocks to prevent inject() warnings
+vi.mock("@/composables/useLogs", () => ({
+  default: vi.fn(() => ({
+    searchObj: { value: { loading: false, data: { queryResults: [], aggs: { histogram: [] } } } },
+    searchAggData: { value: { histogram: [], total: 0 } },
+    searchResultData: { value: { list: [] } },
+    getFunctions: vi.fn().mockResolvedValue([])
+  }))
+}));
+
+vi.mock("@/composables/useDashboard", () => ({
+  default: vi.fn(() => ({
+    dashboards: { value: [] },
+    loading: { value: false },
+    error: { value: null }
+  }))
+}));
+
+vi.mock("@/services/segment_analytics", () => ({
+  default: {
+    track: vi.fn()
+  }
+}));
+
+vi.mock("@/services/auth", () => ({
+  default: {
+    sign_in_user: vi.fn(),
+    sign_out: vi.fn(),
+    get_dex_config: vi.fn()
+  }
+}));
+
+vi.mock("@/services/organizations", () => ({
+  default: {
+    get_organization: vi.fn(),
+    list: vi.fn(),
+    add_members: vi.fn()
+  }
+}));
+
+vi.mock("@/services/billings", () => ({
+  default: {
+    get_billing_info: vi.fn(),
+    get_invoice_history: vi.fn()
+  }
+}));
+
 
 describe("AddAlert Component", () => {
   let wrapper: any;
