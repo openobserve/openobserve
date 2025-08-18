@@ -191,7 +191,7 @@ test.describe("Logs Quickmode testcases", () => {
     await pageManager.logsPage.clickSearchBarRefreshButton();
     await pageManager.logsPage.page.reload();
     await pageManager.logsPage.waitForTimeout(2000);
-    await pageManager.logsPage.expectQueryEditorContainsText('SELECT kubernetes_pod_id FROM "e2e_automate"');
+    await pageManager.logsPage.expectQueryEditorContainsText('SELECT _timestamp,kubernetes_pod_id FROM "e2e_automate"');
   });
 
   test("should display results without adding timestamp in quick mode", {
