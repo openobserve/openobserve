@@ -83,5 +83,4 @@
   "StreamType": "logs",
   "functionUrl" : "/web/functions/",
   "alertUrl" : "/web/alerts/"
-
 }
