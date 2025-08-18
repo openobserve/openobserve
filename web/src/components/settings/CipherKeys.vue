@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit;">
-    <div v-if="!showAddDialog" style="height: calc(100vh - 112px); overflow-y: auto;">
-      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3"
-      :class="store.state.theme == 'dark' ? 'o2-table-header-dark' : 'o2-table-header-light'"
+  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);">
+    <div v-if="!showAddDialog" >
+      <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
+      :class="store.state.theme == 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
       >
             <div
-              class="col q-table__title items-start"
+              class="q-table__title tw-font-[600]"
               data-test="cipher-keys-list-title"
             >
               {{ t("cipherKey.header") }}
@@ -30,23 +30,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="col-auto flex">
               <q-input
                 v-model="filterQuery"
-                filled
+                borderless
                 dense
-                class="q-ml-none"
-                style="width: 400px"
-                :placeholder="t('cipherKey.search')"
-                clearable
+                class="q-ml-auto no-border o2-search-input"
+                :placeholder="t('function.search')"
+                :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
               >
                 <template #prepend>
-                  <q-icon name="search" />
+                  <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
                 </template>
               </q-input>
               <q-btn
-                class="text-bold no-border q-ml-md"
-                padding="sm lg"
-                color="secondary"
+                class="o2-primary-button q-ml-md tw-h-[36px]"
+                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                 no-caps
-                dense
+                flat
                 :label="t(`cipherKey.add`)"
                 @click="addCipherKey"
               />
@@ -54,14 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
       <q-table
         ref="qTable"
-        :rows="tabledata"
+        :rows="visibleRows"
         :columns="columns"
         row-key="id"
         :pagination="pagination"
-        :filter="filterQuery"
-        :filter-method="filterData"
-        class="o2-quasar-table"
-        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark' : 'o2-quasar-table-light'"
+        class="o2-quasar-table o2-quasar-table-header-sticky"
+        :style="hasVisibleRows
+            ? 'width: 100%; height: calc(100vh - 158px); overflow-y: auto;' 
+            : 'width: 100%'"
+        :class="store.state.theme == 'dark' ? 'o2-quasar-table-dark o2-quasar-table-header-sticky-dark o2-last-row-border-dark' : 'o2-quasar-table-light o2-quasar-table-header-sticky-light o2-last-row-border-light'"
       >
         <template #no-data><NoData /></template>
         <template v-slot:body-cell-actions="props">
@@ -92,28 +91,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></q-btn>
           </q-td>
         </template>
-        <template #top="scope">
-          <div class="row full-width">
-            <QTablePagination
-              :scope="scope"
-              :pageTitle="t('cipherKey.header')"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              position="top"
-              @update:changeRecordPerPage="changePagination"
-            />
-          </div>
-        </template>
-
         <template #bottom="scope">
+          <div class="tw-flex tw-items-center tw-justify-end tw-w-full tw-h-[48px]">
+            <div class="o2-table-footer-title tw-flex tw-items-center tw-w-[200px] tw-mr-md">
+                  {{ resultTotal }} {{ t('cipherKey.header') }}
+                </div>
           <QTablePagination
-            v-if="resultTotal > 0"
             :scope="scope"
             :resultTotal="resultTotal"
             :perPageOptions="perPageOptions"
             position="bottom"
             @update:changeRecordPerPage="changePagination"
           />
+          </div>
         </template>
         <template v-slot:header="props">
             <q-tr :props="props">
@@ -145,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onUpdated, watch, Ref } from "vue";
+import { defineComponent, ref, onMounted, onUpdated, watch, Ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, date, copyToClipboard, QTableProps } from "quasar";
@@ -178,6 +168,7 @@ export default defineComponent({
     const showAddDialog = ref(false);
     const qTable: any = ref(null);
     const loading = ref(false);
+    const filterQuery = ref("");
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -393,6 +384,22 @@ export default defineComponent({
       confirmDelete.value.visible = false;
       confirmDelete.value.data = null;
     };
+    const filterData = (rows: string | any[], terms: string) => {
+        const filtered = [];
+        terms = terms.toLowerCase();
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i]["name"].toLowerCase().includes(terms)) {
+            filtered.push(rows[i]);
+          }
+        }
+        return filtered;
+      };
+
+    const visibleRows = computed(() => {
+      if (!filterQuery.value) return tabledata.value || [];
+      return filterData(tabledata.value || [], filterQuery.value);
+    });
+    const hasVisibleRows = computed(() => visibleRows.value.length > 0)
 
     return {
       t,
@@ -411,17 +418,7 @@ export default defineComponent({
       selectedPerPage,
       changePagination,
       maxRecordToReturn,
-      filterQuery: ref(""),
-      filterData(rows: string | any[], terms: string) {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      filterQuery,
       hideAddDialog,
       cancelDeleteCipherKey,
       confirmDeleteCipherKey,
@@ -429,6 +426,9 @@ export default defineComponent({
       outlinedDelete,
       editCipherKey,
       deleteCipherKey,
+      visibleRows,
+      hasVisibleRows,
+      filterData,
     };
   },
 });
