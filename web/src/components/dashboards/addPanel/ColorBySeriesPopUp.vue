@@ -168,7 +168,7 @@
         padding="5px 14px"
         no-caps
         dense
-        :disable="!isFieldEmpty"
+        :disable="!isFormValid"
         data-test="dashboard-addpanel-config-color-by-series-apply-btn"
       />
     </div>
@@ -214,7 +214,7 @@ export default defineComponent({
 
     // Validate for save button click
     // Each series must have both value (series name) and color selected for save it
-    const isFieldEmpty = computed(() => {
+    const isFormValid = computed(() => {
       return editColorBySeries.value.every((series: any) => {
         return (
           series.value && series.value.trim() !== "" && series.color !== null
@@ -287,7 +287,7 @@ export default defineComponent({
 
     const applycolorBySeries = () => {
       // Only save if fields are not empty
-      if (isFieldEmpty.value) {
+      if (isFormValid.value) {
         emit("save", editColorBySeries.value);
       }
     };
@@ -334,7 +334,7 @@ export default defineComponent({
       handleSetColorClick,
       openColorPicker,
       selectColorBySeriesOption,
-      isFieldEmpty,
+      isFormValid,
     };
   },
 });
