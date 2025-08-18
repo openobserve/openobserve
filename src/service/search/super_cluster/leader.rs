@@ -272,7 +272,6 @@ async fn run_datafusion(
     let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
     let streaming_output = req.streaming_output;
     let streaming_id = req.streaming_id.clone();
-    let use_cache = req.use_cache;
     let org_id = req.org_id.clone();
 
     let context = tracing::Span::current().context();
@@ -316,14 +315,14 @@ async fn run_datafusion(
         let org_settings = crate::service::db::organization::get_org_setting(&org_id)
             .await
             .unwrap_or_default();
-        let use_cache = use_cache && org_settings.aggregation_cache_enabled;
+        let streaming_aggregation_enabled = org_settings.streaming_aggregation_enabled;
         let target_partitions = ctx.state().config().target_partitions();
         let (plan, is_complete_cache_hit, is_complete_cache_hit_with_no_data) =
             o2_enterprise::enterprise::search::datafusion::rewrite::rewrite_streaming_agg_plan(
                 streaming_id,
                 start_time,
                 end_time,
-                use_cache,
+                streaming_aggregation_enabled,
                 target_partitions,
                 physical_plan,
             )

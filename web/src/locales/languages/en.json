@@ -1114,7 +1114,7 @@
     "cipherKeys": "Cipher Keys",
     "nodes": "Nodes",
     "enableStreamingSearch": "Enable Streaming Search",
-    "enableAggregationCache": "Enable Aggregation Cache"
+    "enableStreamingAggregation": "Enable Streaming Aggregation"
   },
   "reports": {
     "header": "Reports",
