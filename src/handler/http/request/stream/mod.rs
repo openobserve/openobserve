@@ -20,7 +20,7 @@ use actix_web::{
 };
 use chrono::{TimeZone, Utc};
 use config::{
-    meta::stream::{StreamSettings, StreamType, TimeRange, UpdateStreamSettings},
+    meta::stream::{StreamType, TimeRange, UpdateStreamSettings},
     utils::schema::format_stream_name,
 };
 use hashbrown::HashMap;
@@ -34,7 +34,7 @@ use crate::{
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
-            stream::{ListStream, StreamDeleteFields},
+            stream::{ListStream, StreamCreate, StreamDeleteFields},
         },
         utils::http::{get_stream_type_from_request, get_ts_from_request_with_key},
     },
@@ -127,13 +127,13 @@ async fn schema(
     Ok(HttpResponse::Ok().json(schema))
 }
 
-/// CreateStreamSettings
+/// CreateStream
 ///
 /// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
-    operation_id = "StreamSettings",
+    operation_id = "StreamCreate",
     security(
         ("Authorization"= [])
     ),
@@ -142,16 +142,16 @@ async fn schema(
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
     ),
-    request_body(content = StreamSettings, description = "Stream settings", content_type = "application/json"),
+    request_body(content = StreamCreate, description = "Stream create", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/streams/{stream_name}/settings")]
-async fn settings(
+#[post("/{org_id}/streams/{stream_name}")]
+async fn create(
     path: web::Path<(String, String)>,
-    settings: web::Json<StreamSettings>,
+    stream: web::Json<StreamCreate>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, mut stream_name) = path.into_inner();
@@ -168,7 +168,14 @@ async fn settings(
             )),
         );
     }
-    stream::save_stream_settings(&org_id, &stream_name, stream_type, settings.into_inner()).await
+    match stream::create_stream(&org_id, &stream_name, stream_type, stream.into_inner()).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK,
+            "stream created",
+        ))),
+        Err(e) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))),
+    }
 }
 
 /// UpdateStreamSettings

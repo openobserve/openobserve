@@ -270,7 +270,7 @@ const useStreams = () => {
           const streamIndex =
             store.state.streams.streamsIndexMapping[streamType][streamName];
           const hasSchema =
-            !!streamsCache[streamType].value?.list[streamIndex]?.schema;
+            !!streamsCache[streamType].value?.list[streamIndex]?.schema?.length;
 
           if ((schema && !hasSchema) || force) {
             try {

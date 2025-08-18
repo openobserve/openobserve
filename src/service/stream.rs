@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 
 use actix_web::{HttpResponse, http, http::StatusCode};
 use arrow_schema::DataType;
@@ -26,7 +26,7 @@ use config::{
             UpdateStreamSettings,
         },
     },
-    utils::{json, time::now_micros},
+    utils::{flatten::format_label_name, json, time::now_micros},
 };
 use datafusion::arrow::datatypes::Schema;
 use hashbrown::HashMap;
@@ -49,7 +49,7 @@ use crate::{
     common::meta::{
         authz::Authz,
         http::HttpResponse as MetaHttpResponse,
-        stream::{Stream, StreamProperty},
+        stream::{Stream, StreamCreate, StreamField},
     },
     handler::http::router::ERROR_HEADER,
     service::{
@@ -168,7 +168,7 @@ pub fn stream_res(
     let mappings = schema
         .fields()
         .iter()
-        .map(|field| StreamProperty {
+        .map(|field| StreamField {
             r#type: field.data_type().to_string(),
             name: field.name().to_string(),
         })
@@ -233,6 +233,104 @@ pub fn stream_res(
         pattern_associations,
         is_derived,
     }
+}
+
+pub async fn create_stream(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    mut stream: StreamCreate,
+) -> Result<(), Error> {
+    // check if the stream already exists
+    let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
+        Ok(schema) => schema,
+        Err(e) => {
+            return Err(Error::new(
+                ErrorKind::Other,
+                format!("error in getting schema: {e}"),
+            ));
+        }
+    };
+    if !schema.fields().is_empty() {
+        return Err(Error::new(
+            ErrorKind::AlreadyExists,
+            "stream already exists",
+        ));
+    }
+
+    // create the stream
+    let mut fields = Vec::with_capacity(stream.fields.len() + 1);
+    let schema = std::mem::take(&mut stream.fields);
+    let mut has_timestamp = false;
+    for f in schema {
+        let Ok(data_type) = f.r#type.parse::<DataType>() else {
+            return Err(Error::new(
+                ErrorKind::Other,
+                format!("invalid data type: {}", f.r#type),
+            ));
+        };
+        let name = format_label_name(&f.name);
+        if name == TIMESTAMP_COL_NAME {
+            has_timestamp = true;
+        }
+        fields.push(arrow_schema::Field::new(name, data_type, true));
+    }
+    // add timestamp field if not exists
+    if !has_timestamp {
+        fields.push(arrow_schema::Field::new(
+            TIMESTAMP_COL_NAME,
+            DataType::Int64,
+            false,
+        ));
+    }
+    let schema = Schema::new(fields);
+    let min_ts = now_micros();
+    let new_schema =
+        match infra::schema::merge(org_id, stream_name, stream_type, &schema, Some(min_ts)).await {
+            Ok(Some((s, _))) => s,
+            Ok(None) => {
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    format!("error in creating stream: created schema is empty"),
+                ));
+            }
+            Err(e) => {
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    format!("error in creating stream: {e}"),
+                ));
+            }
+        };
+
+    // check if UDS is enabled, then need add the fields to UDS
+    let cfg = get_config();
+    if cfg.common.allow_user_defined_schemas {
+        stream.settings.defined_schema_fields.extend(
+            new_schema
+                .fields()
+                .iter()
+                .filter_map(|f| {
+                    if f.name() == TIMESTAMP_COL_NAME {
+                        None
+                    } else {
+                        Some(f.name().to_string())
+                    }
+                })
+                .collect::<Vec<_>>(),
+        );
+    }
+    stream.settings.defined_schema_fields.sort();
+    stream.settings.defined_schema_fields.dedup();
+
+    // create the stream settings
+    if let Err(e) = save_stream_settings(org_id, stream_name, stream_type, stream.settings).await {
+        return Err(Error::new(
+            ErrorKind::Other,
+            format!("error in creating stream settings: {e}"),
+        ));
+    }
+
+    Ok(())
 }
 
 #[tracing::instrument(skip(settings))]
@@ -431,6 +529,8 @@ pub async fn update_stream_settings(
                 settings
                     .defined_schema_fields
                     .extend(new_settings.defined_schema_fields.add);
+                settings.defined_schema_fields.sort();
+                settings.defined_schema_fields.dedup();
             }
             if !new_settings.defined_schema_fields.remove.is_empty() {
                 settings
