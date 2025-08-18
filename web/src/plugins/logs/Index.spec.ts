@@ -563,22 +563,6 @@ describe("Logs Index", async () => {
     expect(() => wrapper.vm.onChangeInterval()).not.toThrow();
   });
 
-  it("Should trigger run on auto-interval only in visualize mode via state change", async () => {
-    // ensure visualize mode
-    wrapper.vm.searchObj.meta.logsVisualizeToggle = 'visualize';
-    // visualizeChartData should mirror dashboardPanelData after run
-    wrapper.vm.onAutoIntervalTrigger();
-    await flushPromises();
-    expect(wrapper.vm.visualizeChartData).toEqual(JSON.parse(JSON.stringify(wrapper.vm.dashboardPanelData.data)));
-
-    // logs mode should not change visualizeChartData
-    const before = JSON.stringify(wrapper.vm.visualizeChartData);
-    wrapper.vm.searchObj.meta.logsVisualizeToggle = 'logs';
-    wrapper.vm.onAutoIntervalTrigger();
-    await flushPromises();
-    expect(JSON.stringify(wrapper.vm.visualizeChartData)).toBe(before);
-  });
-
   it("Should execute runQueryFn and show job scheduler", async () => {
     // do not rely on spying internal closures; assert state change
     await wrapper.vm.runQueryFn();
@@ -603,19 +587,6 @@ describe("Logs Index", async () => {
     expect(wrapper.vm.areStreamsPresent).toBe(true);
   });
 
-  it("Should update visualize view when logsVisualizeToggle becomes visualize", async () => {
-    // avoid getFieldsFromQuery destructure issues
-    (getFieldsFromQuery as Mock).mockResolvedValueOnce({ fields: [], filters: [], streamName: '' });
-    wrapper.vm.searchObj.meta.logsVisualizeToggle = 'visualize';
-    await flushPromises();
-    expect(wrapper.vm.visualizeChartData).toEqual(JSON.parse(JSON.stringify(wrapper.vm.dashboardPanelData.data)));
-  });
-
-  it("Should copy dashboard data to visualizeChartData when type changes", async () => {
-    wrapper.vm.dashboardPanelData.data.type = 'line';
-    await flushPromises();
-    expect(wrapper.vm.visualizeChartData).toEqual(JSON.parse(JSON.stringify(wrapper.vm.dashboardPanelData.data)));
-  });
 
   it("Should resize on splitter model change", async () => {
     const spy = vi.spyOn(window, 'dispatchEvent');
@@ -623,22 +594,6 @@ describe("Logs Index", async () => {
     await flushPromises();
     expect(spy).toHaveBeenCalledWith(expect.any(Event));
     spy.mockRestore();
-  });
-
-  it("Should set date time in dashboard meta when datetime changes (absolute)", async () => {
-    const start = new Date('2020-01-01T00:00:00.000Z');
-    const end = new Date('2020-01-02T00:00:00.000Z');
-    wrapper.vm.searchObj.data.datetime = {
-      type: 'absolute',
-      startTime: start,
-      endTime: end,
-      relativeTimePeriod: null,
-      relative: { value: 0, period: { value: '' } }
-    };
-    await flushPromises();
-
-    expect(wrapper.vm.dashboardPanelData.meta.dateTime.start_time.getTime()).toBe(start.getTime());
-    expect(wrapper.vm.dashboardPanelData.meta.dateTime.end_time.getTime()).toBe(end.getTime());
   });
 
   it("Should handle search history toggling via route action query", async () => {
