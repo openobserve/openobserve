@@ -1096,7 +1096,8 @@ async fn search_tantivy_index(
                     parquet_file.meta.records,
                 ));
             }
-            let mut res = BitVec::repeat(false, max_doc_id as usize + 1);
+            // NOTE: the BitVec's length should equal to the number of records in the parquet file
+            let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
             let num_rows = row_ids.len();
             for id in row_ids {
                 res.set(id as usize, true);
