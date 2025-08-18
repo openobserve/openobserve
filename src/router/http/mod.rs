@@ -196,7 +196,7 @@ async fn get_url(path: &str, base_uri: &str) -> URLDetails {
     // we strip it here
     let mut api_path = path;
     if !base_uri.is_empty() {
-        api_path = path.strip_prefix(&base_uri).unwrap_or(path);
+        api_path = path.strip_prefix(base_uri).unwrap_or(path);
     }
     let is_querier_path = is_querier_route(api_path);
 
