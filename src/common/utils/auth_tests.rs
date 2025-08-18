@@ -3465,6 +3465,8 @@ mod tests {
                 batch_retry_initial_delay_ms: u64::default(),
                 pipeline_max_file_retention_time_seconds: u64::default(),
                 pipeline_max_file_size_on_disk_mb: usize::default(),
+                pipeline_file_push_back_interval: u64::default(),
+                pipeline_sink_task_spawn_interval_ms: u64::default(),
             },
             encryption: config::Encryption {
                 algorithm: String::default(),
