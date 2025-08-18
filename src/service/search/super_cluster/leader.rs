@@ -39,7 +39,7 @@ use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
-    DATAFUSION_RUNTIME, SearchResult,
+    DATAFUSION_RUNTIME, SEARCH_SERVER, SearchResult,
     cluster::flight::{SearchContextBuilder, register_table},
     datafusion::optimizer::context::{
         PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext,
@@ -125,7 +125,7 @@ pub async fn search(
     });
 
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-    if super::super::SEARCH_SERVER
+    if SEARCH_SERVER
         .insert_sender(trace_id, abort_sender, true)
         .await
         .is_err()
