@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("logStream.header") }}
       </div>
       <div class="flex items-start">
-        <div class="flex justify-between items-end q-px-md">
+        <div class="flex justify-between items-end">
 
             <div class="app-tabs-container tw-h-[36px] q-mr-md" :class="store.state.theme === 'dark' ? 'app-tabs-container-dark' : 'app-tabs-container-light'">
                 <app-tabs
