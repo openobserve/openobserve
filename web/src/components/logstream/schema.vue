@@ -1044,11 +1044,11 @@ export default defineComponent({
           JSON.stringify(streamResponse.settings),
         );
         //after this we need to have a map of pattern_id and according to field as well
-      //so that we can easily access the apply_at value for a pattern if it is undefined or null
-      
-      previousSchemaVersion.pattern_associations && previousSchemaVersion.pattern_associations.forEach((pattern: PatternAssociation) => {
-        patternIdToApplyAtMap.set(pattern.field + pattern.pattern_id, pattern);
-      });
+        //so that we can easily access the apply_at value for a pattern if it is undefined or null
+        previousSchemaVersion.pattern_associations && previousSchemaVersion.pattern_associations.forEach((pattern: PatternAssociation) => {
+          patternIdToApplyAtMap.set(pattern.field + pattern.pattern_id, pattern);
+        });
+      }
       if (!streamResponse.schema?.length) {
         streamResponse.schema = [];
         if (streamResponse.settings.defined_schema_fields?.length)
