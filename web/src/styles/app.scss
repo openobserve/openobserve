@@ -683,6 +683,21 @@
     }
 }
 
+.o2-toggle-button-sm-dark{
+  .q-toggle__track{
+    background-color: #2B2D30;
+    opacity: 100%;
+  }
+  .q-toggle__thumb:after{
+  }
+  .q-toggle__inner--truthy{
+    color: #ffffff;
+    .q-toggle__track{
+      background-color: #6B76E3;
+    }
+    }
+}
+
 //q-toggle in large size
 .o2-toggle-button-lg{
 
@@ -722,6 +737,21 @@
     color: #ffffff;
     .q-toggle__track{
       background-color: #575FC5;
+    }
+    }
+}
+
+.o2-toggle-button-lg-dark{
+  .q-toggle__track{
+    background-color: #2B2D30;
+    opacity: 100%;
+  }
+  .q-toggle__thumb:after{
+  }
+  .q-toggle__inner--truthy{
+    color: #ffffff;
+    .q-toggle__track{
+      background-color: #6B76E3;
     }
     }
 }
