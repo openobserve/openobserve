@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t('settings.enableStreamingSearch') }}
               </span>
               <span class="individual-setting-description">
-                Enabling Search Streaming will increase performance.
+                Enabling search streaming will increase performance.
               </span>
             </div>
               <q-toggle
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t('settings.enableStreamingAggregation') }}
               </span>
               <span class="individual-setting-description">
-                Enabling Streaming Aggregation will increase performance.
+                Enabling streaming aggregates will help improve the performance of aggregate queries.
               </span>
             </div>
                 <q-toggle
