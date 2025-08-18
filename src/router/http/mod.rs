@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ::config::{
-    Config, META_ORG_ID, RouteDispatchStrategy, get_config,
+    META_ORG_ID, RouteDispatchStrategy, get_config,
     meta::{
         cluster::{Node, Role, RoleGroup},
         promql::RequestRangeQuery,
@@ -164,7 +164,7 @@ async fn dispatch(
         });
     }
 
-    let new_url = get_url(&path, &cfg).await;
+    let new_url = get_url(&path, &cfg.common.base_uri).await;
     if new_url.is_error {
         log::error!(
             "dispatch: {} to {}, get url details error: {:?}, took: {} ms",
@@ -189,14 +189,14 @@ async fn dispatch(
     default_proxy(req, payload, client, new_url, start).await
 }
 
-async fn get_url(path: &str, cfg: &Config) -> URLDetails {
+async fn get_url(path: &str, base_uri: &str) -> URLDetails {
     let node_type;
     // all the path handling after this is based on
     // path starting with /api, so if we have any base_uri
     // we strip it here
     let mut api_path = path;
-    if !cfg.common.base_uri.is_empty() {
-        api_path = path.strip_prefix(&cfg.common.base_uri).unwrap_or(path);
+    if !base_uri.is_empty() {
+        api_path = path.strip_prefix(&base_uri).unwrap_or(path);
     }
     let is_querier_path = is_querier_route(api_path);
 
@@ -606,5 +606,17 @@ mod tests {
             "/prometheus/api/v1/query_exemplars"
         ));
         assert!(!is_querier_route_by_body("/prometheus/api/v1/query"));
+    }
+
+    #[tokio::test]
+    async fn test_with_base_uri() {
+        let url_data = get_url("/base/api/default/summary", "/base").await;
+        assert_eq!(url_data.error.unwrap(), "No online querier nodes");
+        let url_data = get_url("/api/default/default/_json", "/base").await;
+        assert_eq!(url_data.error.unwrap(), "No online ingester nodes");
+        let url_data = get_url("/base/api/default/summary", "").await;
+        assert_eq!(url_data.error.unwrap(), "No online ingester nodes");
+        let url_data = get_url("/api/default/summary", "").await;
+        assert_eq!(url_data.error.unwrap(), "No online querier nodes");
     }
 }
