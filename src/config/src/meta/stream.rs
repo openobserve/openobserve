@@ -638,8 +638,16 @@ pub struct PatternAssociation {
     pub apply_at: String,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
+pub struct StreamField {
+    pub name: String,
+    pub r#type: String,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct UpdateStreamSettings {
+    #[serde(skip_serializing, default)]
+    pub fields: UpdateSettingsWrapper<StreamField>,
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]

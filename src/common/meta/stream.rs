@@ -19,7 +19,7 @@ use arrow_schema::Field;
 use config::{
     meta::{
         promql::Metadata,
-        stream::{PatternAssociation, StreamSettings, StreamStats, StreamType},
+        stream::{PatternAssociation, StreamField, StreamSettings, StreamStats, StreamType},
     },
     utils::json,
 };
@@ -46,11 +46,6 @@ pub struct Stream {
     pub is_derived: Option<bool>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct StreamField {
-    pub name: String,
-    pub r#type: String,
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct StreamCreate {

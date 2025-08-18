@@ -22,7 +22,7 @@ use config::{
     meta::{
         promql,
         stream::{
-            DistinctField, StreamParams, StreamSettings, StreamStats, StreamType,
+            DistinctField, StreamField, StreamParams, StreamSettings, StreamStats, StreamType,
             UpdateStreamSettings,
         },
     },
@@ -49,7 +49,7 @@ use crate::{
     common::meta::{
         authz::Authz,
         http::HttpResponse as MetaHttpResponse,
-        stream::{Stream, StreamCreate, StreamField},
+        stream::{Stream, StreamCreate},
     },
     handler::http::router::ERROR_HEADER,
     service::{
