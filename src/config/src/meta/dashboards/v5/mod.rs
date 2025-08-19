@@ -419,6 +419,8 @@ pub struct Config {
 pub struct Value {
     unit: String,
     custom_unit: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    auto_color: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]

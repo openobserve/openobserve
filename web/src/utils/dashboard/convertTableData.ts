@@ -64,6 +64,20 @@ export const convertTableData = (
   const histogramFields: string[] = [];
 
   const overrideConfigs = panelSchema.config.override_config || [];
+  const colorConfigMap: Record<string, any> = {};
+  try {
+    // Build a map of field alias -> { autoColor: boolean }
+    overrideConfigs.forEach((o: any) => {
+      const alias = o?.field?.value;
+      // Check for autoColor in the value object (supports both camelCase and snake_case)
+      const autoColor =
+        o?.config?.[0]?.value?.autoColor === true ||
+        o?.config?.[0]?.value?.auto_color === true;
+      if (alias) {
+        colorConfigMap[alias] = { autoColor };
+      }
+    });
+  } catch (e) {}
 
   // use all response keys if tableDynamicColumns is true
   if (panelSchema?.config?.table_dynamic_columns == true) {
@@ -150,6 +164,10 @@ export const convertTableData = (
       obj["label"] = it.label;
       obj["align"] = !isNumber ? "left" : "right";
       obj["sortable"] = true;
+      // pass color mode info for renderer
+      if (colorConfigMap?.[it.alias]?.autoColor) {
+        obj["colorMode"] = "auto";
+      }
 
       obj["format"] = (val: any) => {
         // value mapping
@@ -324,6 +342,10 @@ export const convertTableData = (
         obj["label"] = it;
         obj["align"] = !isNumber ? "left" : "right";
         obj["sortable"] = true;
+        // pass color mode info for renderer
+        if (colorConfigMap?.[it]?.autoColor) {
+          obj["colorMode"] = "auto";
+        }
 
         obj["format"] = (val: any) => {
           // value mapping

@@ -59,6 +59,12 @@
           dense
           class="tw-flex-1"
         />
+        <q-checkbox
+          v-model="overrideConfig.config[0].value.autoColor"
+          :label="'Auto color'"
+          :disable="!overrideConfig.field.value"
+          dense
+        />
         <q-input
           v-if="overrideConfig.config[0].value.unit === 'custom'"
           v-model="overrideConfig.config[0].value.customUnit"
