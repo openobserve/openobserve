@@ -86,7 +86,10 @@ function rateLimitMiddleware(req, res, next) {
 }
 
 // Apply rate limiting to ALL requests
+// Global rate limiting for all requests (including static files and non-API routes)
 app.use(rateLimitMiddleware);
+
+// Additional explicit rate limiting on routes with expensive operations for CodeQL traceability
 
 // Body parsing
 app.use(express.json({ limit: '1mb' }));
@@ -115,8 +118,8 @@ const SAFE_TESTS_PATH = path.resolve(__dirname, '..', 'playwright-tests');
 
 // API Endpoints - each explicitly rate limited and with safe paths
 
-app.get('/api/environments', (req, res) => {
-  // This route is rate limited by global middleware
+app.get('/api/environments', rateLimitMiddleware, (req, res) => {
+  // This route is rate limited by explicit middleware
   res.json(SAFE_ENVIRONMENTS);
 });
 
