@@ -34,7 +34,10 @@ installQuasar({
 
 describe("Alert List", async () => {
   let wrapper: any;
+  let deleteAlert: any;
+  
   beforeEach(async () => {
+    deleteAlert = vi.spyOn(templateService, "delete");
     
     wrapper = mount(TemplateList, {
       attachTo: "#app",
@@ -50,6 +53,7 @@ describe("Alert List", async () => {
 
   afterEach(() => {
     wrapper.unmount();
+    vi.restoreAllMocks();
   });
 
   it("Should render alerts title", () => {
@@ -109,7 +113,6 @@ describe("Alert List", async () => {
 
   describe("When user clicks on delete alert", () => {
     const template_name = "Template2";
-    const deleteAlert = vi.spyOn(templateService, "delete");
     beforeEach(async () => {
       global.server.use(
         http.delete(

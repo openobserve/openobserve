@@ -1230,13 +1230,12 @@ export default defineComponent({
           if (field.streams.length > 0) {
             let localFieldIndex = -1;
             for (const selectedStream of field.streams) {
-              localFieldIndex = localStreamFields[
-                searchObj.organizationIdentifier + "_" + selectedStream
-              ].indexOf(field.name);
-              if (localFieldIndex > -1) {
-                localStreamFields[
-                  searchObj.organizationIdentifier + "_" + selectedStream
-                ].splice(localFieldIndex, 1);
+              const streamKey = searchObj.organizationIdentifier + "_" + selectedStream;
+              if (localStreamFields[streamKey] && Array.isArray(localStreamFields[streamKey])) {
+                localFieldIndex = localStreamFields[streamKey].indexOf(field.name);
+                if (localFieldIndex > -1) {
+                  localStreamFields[streamKey].splice(localFieldIndex, 1);
+                }
               }
             }
           }
