@@ -9,6 +9,9 @@ const { promisify } = require('util');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy for proper IP detection (adjust based on your setup)
+app.set('trust proxy', true);
+
 // Security headers middleware
 app.use((req, res, next) => {
   // Prevent clickjacking
@@ -106,6 +109,24 @@ setInterval(() => {
     }
   }
 }, 60 * 60 * 1000);
+
+// Rate limiting middleware with robust IP detection
+function rateLimitMiddleware(req, res, next) {
+  // More robust IP detection
+  const clientIP = req.ip || 
+                  req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+                  req.headers['x-real-ip'] ||
+                  req.socket?.remoteAddress ||
+                  'unknown';
+  
+  if (!checkRateLimit(clientIP)) {
+    return res.status(429).json({
+      error: 'Rate limit exceeded. Maximum 20 requests per hour allowed.'
+    });
+  }
+  
+  next();
+}
 
 /**
  * Helper function to execute shell commands with streaming output
@@ -343,7 +364,7 @@ app.get('/api/environments', (req, res) => {
   res.json(ENVIRONMENTS);
 });
 
-app.get('/api/credentials', (req, res) => {
+app.get('/api/credentials', rateLimitMiddleware, (req, res) => {
   try {
     const credentialsPath = path.join(__dirname, 'credentials.json');
     const credentials = require(credentialsPath);
@@ -354,7 +375,7 @@ app.get('/api/credentials', (req, res) => {
   }
 });
 
-app.get('/api/modules', (req, res) => {
+app.get('/api/modules', rateLimitMiddleware, (req, res) => {
   try {
     const testsPath = path.join(__dirname, '..', 'playwright-tests');
     
@@ -385,7 +406,7 @@ app.get('/api/modules', (req, res) => {
   }
 });
 
-app.get('/api/spec-files', (req, res) => {
+app.get('/api/spec-files', rateLimitMiddleware, (req, res) => {
   try {
     const testsPath = path.join(__dirname, '..', 'playwright-tests');
     
@@ -486,17 +507,9 @@ function validateNumber(value, name, min = 1, max = 50) {
   return value;
 }
 
-app.post('/api/run', async (req, res) => {
+app.post('/api/run', rateLimitMiddleware, async (req, res) => {
   try {
-    // Rate limiting checks
-    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
-    
-    if (!checkRateLimit(clientIP)) {
-      return res.status(429).json({
-        error: 'Rate limit exceeded. Maximum 20 runs per hour allowed.'
-      });
-    }
-    
+    // Check concurrent runs limit (rate limiting is handled by middleware)
     if (!checkConcurrentRuns()) {
       return res.status(503).json({
         error: 'Server busy. Maximum concurrent runs exceeded. Please try again later.'
@@ -600,30 +613,58 @@ app.post('/api/run', async (req, res) => {
       broadcastMessage('log', 'stdout', setupMessage);
     }
 
-    // Verify project path exists
-    if (!fs.existsSync(actualProjectPath)) {
-      throw new Error(`Project path does not exist: ${actualProjectPath}`);
+    // Validate and resolve project path to prevent path traversal
+    let resolvedProjectPath;
+    try {
+      resolvedProjectPath = path.resolve(actualProjectPath);
+      
+      // Additional validation for local paths (non-GitHub repos)
+      if (!isGitHubRepo) {
+        // Ensure path is absolute and doesn't contain traversal attempts
+        if (!path.isAbsolute(resolvedProjectPath) || resolvedProjectPath.includes('..')) {
+          throw new Error('Invalid project path: must be absolute and not contain path traversal');
+        }
+      }
+      
+      // Verify project path exists
+      if (!fs.existsSync(resolvedProjectPath)) {
+        throw new Error(`Project path does not exist: ${path.basename(resolvedProjectPath)}`);
+      }
+      
+      actualProjectPath = resolvedProjectPath;
+    } catch (pathError) {
+      throw new Error(`Invalid project path: ${pathError.message}`);
     }
 
-    // Search for playwright.config.js in the path and subdirectories
+    // Search for playwright.config.js in the path and subdirectories with safe path construction
     let playwrightConfigPath = null;
-    const possibleConfigLocations = [
-      path.join(actualProjectPath, 'playwright.config.js'),
-      path.join(actualProjectPath, 'tests', 'playwright.config.js'),
-      path.join(actualProjectPath, 'tests', 'ui-testing', 'playwright.config.js'),
-      path.join(actualProjectPath, 'ui-testing', 'playwright.config.js'),
-      path.join(actualProjectPath, 'e2e', 'playwright.config.js')
-    ];
-
-    for (const configPath of possibleConfigLocations) {
-      if (fs.existsSync(configPath)) {
-        playwrightConfigPath = configPath;
-        // Update actualProjectPath to the directory containing the config
-        actualProjectPath = path.dirname(configPath);
-        console.log(`Found playwright.config.js at: ${configPath}`);
-        console.log(`Using project path: ${actualProjectPath}`);
-        break;
+    const configFilenames = ['playwright.config.js'];
+    const searchDirectories = ['', 'tests', 'tests/ui-testing', 'ui-testing', 'e2e'];
+    
+    for (const dir of searchDirectories) {
+      for (const filename of configFilenames) {
+        try {
+          const configPath = dir ? path.resolve(actualProjectPath, dir, filename) : path.resolve(actualProjectPath, filename);
+          
+          // Ensure the config path is within the project directory
+          if (!configPath.startsWith(actualProjectPath + path.sep) && configPath !== actualProjectPath) {
+            continue; // Skip if path escapes project directory
+          }
+          
+          if (fs.existsSync(configPath)) {
+            playwrightConfigPath = configPath;
+            // Update actualProjectPath to the directory containing the config
+            actualProjectPath = path.dirname(configPath);
+            console.log(`Found playwright.config.js at: ${path.relative(process.cwd(), configPath)}`);
+            console.log(`Using project path: ${path.relative(process.cwd(), actualProjectPath)}`);
+            break;
+          }
+        } catch (pathError) {
+          // Skip invalid paths
+          continue;
+        }
       }
+      if (playwrightConfigPath) break;
     }
 
     if (!playwrightConfigPath) {
@@ -632,7 +673,13 @@ app.post('/api/run', async (req, res) => {
 
     // Install dependencies if package.json exists and this is a cloned repo
     if (isGitHubRepo) {
-      const packageJsonPath = path.join(actualProjectPath, 'package.json');
+      const packageJsonPath = path.resolve(actualProjectPath, 'package.json');
+      
+      // Validate package.json path is within project directory
+      if (!packageJsonPath.startsWith(actualProjectPath + path.sep) && packageJsonPath !== actualProjectPath) {
+        throw new Error('Invalid package.json path: outside project directory');
+      }
+      
       if (fs.existsSync(packageJsonPath)) {
         const installMessage = `📦 Installing dependencies in ${actualProjectPath}...\n`;
         broadcastMessage('log', 'stdout', installMessage);
@@ -785,8 +832,15 @@ app.post('/api/run', async (req, res) => {
 /**
  * Stream logs from a run via Server-Sent Events
  */
-app.get('/api/run/:runId/stream', (req, res) => {
+app.get('/api/run/:runId/stream', rateLimitMiddleware, (req, res) => {
   const { runId } = req.params;
+  
+  // Validate runId format to prevent injection
+  if (!runId || typeof runId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(runId)) {
+    res.status(400).json({ error: 'Invalid run ID format' });
+    return;
+  }
+  
   const run = activeRuns.get(runId);
   if (!run) {
     res.status(404).end();
@@ -863,8 +917,14 @@ app.get('/api/run/:runId/stream', (req, res) => {
 /**
  * Stop a run
  */
-app.post('/api/run/:runId/stop', (req, res) => {
+app.post('/api/run/:runId/stop', rateLimitMiddleware, (req, res) => {
   const { runId } = req.params;
+  
+  // Validate runId format to prevent injection
+  if (!runId || typeof runId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(runId)) {
+    return res.status(400).json({ error: 'Invalid run ID format' });
+  }
+  
   const run = activeRuns.get(runId);
   if (!run) {
     return res.status(404).json({ error: 'Run not found' });
