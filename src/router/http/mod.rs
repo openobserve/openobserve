@@ -14,8 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ::config::{
-    get_config,
-    Config,
+    Config, get_config,
     meta::{
         cluster::{Role, RoleGroup},
         promql::RequestRangeQuery,
