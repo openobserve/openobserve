@@ -272,9 +272,11 @@ describe('MemberSubscription.vue', () => {
       wrapper = createWrapper('#sub_key=test-token&org_id=test-org-id', true);
       mockOrganizationsService.process_subscription.mockResolvedValue(mockResponse);
 
-      // Get the spy that was created in createWrapper and restore it
-      const processSubscriptionSpy = vi.spyOn(wrapper.vm, 'ProcessSubscription');
-      processSubscriptionSpy.mockRestore();
+      // Mock the router access in the component instance
+      wrapper.vm.$router = {
+        resolve: vi.fn().mockReturnValue({ href: '/organizations' }),
+        push: vi.fn(),
+      };
 
       await wrapper.vm.ProcessSubscription('test-token', 'confirm');
 
@@ -300,9 +302,11 @@ describe('MemberSubscription.vue', () => {
       wrapper = createWrapper('#sub_key=test-token&org_id=test-org-id', true);
       mockOrganizationsService.process_subscription.mockResolvedValue(mockResponse);
 
-      // Get the spy that was created in createWrapper and restore it
-      const processSubscriptionSpy = vi.spyOn(wrapper.vm, 'ProcessSubscription');
-      processSubscriptionSpy.mockRestore();
+      // Mock the router access in the component instance
+      wrapper.vm.$router = {
+        resolve: vi.fn().mockReturnValue({ href: '/organizations' }),
+        push: vi.fn(),
+      };
 
       await wrapper.vm.ProcessSubscription('test-token', 'confirm');
 
@@ -321,9 +325,11 @@ describe('MemberSubscription.vue', () => {
 
       mockOrganizationsService.process_subscription.mockRejectedValue(mockError);
 
-      // Get the spy that was created in createWrapper and restore it
-      const processSubscriptionSpy = vi.spyOn(wrapper.vm, 'ProcessSubscription');
-      processSubscriptionSpy.mockRestore();
+      // Mock the router access in the component instance
+      wrapper.vm.$router = {
+        resolve: vi.fn().mockReturnValue({ href: '/organizations' }),
+        push: vi.fn(),
+      };
 
       await wrapper.vm.ProcessSubscription('test-token', 'confirm');
 
@@ -342,9 +348,11 @@ describe('MemberSubscription.vue', () => {
 
       mockOrganizationsService.process_subscription.mockRejectedValue(mockError);
 
-      // Get the spy that was created in createWrapper and restore it
-      const processSubscriptionSpy = vi.spyOn(wrapper.vm, 'ProcessSubscription');
-      processSubscriptionSpy.mockRestore();
+      // Mock the router access in the component instance
+      wrapper.vm.$router = {
+        resolve: vi.fn().mockReturnValue({ href: '/organizations' }),
+        push: vi.fn(),
+      };
 
       await wrapper.vm.ProcessSubscription('test-token', 'confirm');
 
@@ -379,11 +387,12 @@ describe('MemberSubscription.vue', () => {
       mockOrganizationsService.process_subscription.mockRejectedValue(networkError);
       wrapper = createWrapper('#token=test-token-123', true); // Prevent auto processing
 
-      // Create a spy on the actual component instance method
-      const processSubscriptionSpy = vi.spyOn(wrapper.vm, 'ProcessSubscription');
+      // Mock the router access in the component instance
+      wrapper.vm.$router = {
+        resolve: vi.fn().mockReturnValue({ href: '/organizations' }),
+        push: vi.fn(),
+      };
       
-      // Call the original implementation
-      processSubscriptionSpy.mockRestore();
       await wrapper.vm.ProcessSubscription('test-token', 'confirm');
 
       expect(wrapper.vm.status).toBe('error');

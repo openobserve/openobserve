@@ -115,6 +115,7 @@ describe("Alert List", async () => {
     beforeEach(async () => {
       // Ensure we have a fresh spy before each test in this nested describe
       deleteAlert.mockClear();
+      deleteAlert.mockResolvedValue({ data: {} });
       
       global.server.use(
         http.delete(

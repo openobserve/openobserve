@@ -85,10 +85,16 @@ class MockReadableStream {
 }
 let httpStreaming: any;
 let mockFetch: any;
-let mockWorker: any;vi.stubGlobal('Worker', vi.fn(() => mockWorker));
+let mockWorker: any;
 const mockWorkerInstance = new MockWorker();
-global.Worker = vi.fn().mockImplementation(() => mockWorkerInstance);
 mockWorker = mockWorkerInstance;
+
+// Mock both global.Worker and window.Worker
+global.Worker = vi.fn().mockImplementation(() => mockWorkerInstance);
+Object.defineProperty(window, 'Worker', {
+  value: vi.fn().mockImplementation(() => mockWorkerInstance),
+  writable: true
+});
 import useHttpStreaming from "./useStreamingSearch";
 
 describe("useHttpStreaming", () => {
@@ -97,12 +103,14 @@ let onDataSpy: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Reset the mock worker
+    mockWorker.onmessage = null;
+    mockWorker.postMessage.mockClear();
   
     mockFetch = vi.fn();
     global.fetch = mockFetch;
 
-
-  
     // Initialize composable
     httpStreaming = useHttpStreaming();
   
@@ -178,21 +186,25 @@ let onDataSpy: any;
           })
         );
       
-        mockWorker.onmessage?.({
-          data: {
-            type: "search_response_hits",
-            traceId: mockData.traceId,
-            data: { some: "mock-data" },
-          },
-        });
-      
-        mockWorker.onmessage?.({
-          data: {
-            type: "end",
-            traceId: mockData.traceId,
-            data: "end",
-          },
-        });
+        // Simulate worker messages by calling the handler that was set by the composable
+        const workerHandler = mockWorker.onmessage;
+        if (workerHandler) {
+          workerHandler({
+            data: {
+              type: "search_response_hits",
+              traceId: mockData.traceId,
+              data: { some: "mock-data" },
+            },
+          } as any);
+        
+          workerHandler({
+            data: {
+              type: "end",
+              traceId: mockData.traceId,
+              data: "end",
+            },
+          } as any);
+        }
 
         await flushPromises();
         await new Promise((resolve) => setTimeout(resolve, 20)); 
@@ -309,10 +321,16 @@ let onDataSpy: any;
         const mockAbortController = { abort: abortFn };
         httpStreaming.abortControllers.value[traceId] = mockAbortController as any;
       
-        // Add to traceMap
-        httpStreaming.traceMap.value[traceId] = { some: "metadata" } as any;
-      
-        // Stream worker is initialized automatically when needed
+        // Need to trigger worker creation first by calling fetchQueryDataWithHttpStream
+        const mockStream = new MockReadableStream([]);
+        const mockResponse = { ok: true, body: mockStream as any };
+        mockFetch.mockResolvedValueOnce(mockResponse);
+        
+        // Start a stream to create the worker
+        httpStreaming.fetchQueryDataWithHttpStream(
+          { traceId, queryReq: {}, org_id: orgId }, 
+          { data: vi.fn(), error: vi.fn(), complete: vi.fn() }
+        );
         
         // Call the cancel function
         httpStreaming.cancelStreamQueryBasedOnRequestId({
@@ -347,13 +365,19 @@ let onDataSpy: any;
         const mockAbortController = { abort: abortFn };
         httpStreaming.abortControllers.value[traceId1] = mockAbortController as any;
         httpStreaming.abortControllers.value[traceId2] = mockAbortController as any;
-        httpStreaming.traceMap.value[traceId1] = {some: 'metadata'};
-        httpStreaming.traceMap.value[traceId2] = {some: 'metadata'};
       
         // Set active stream ID
         httpStreaming.activeStreamId.value = traceId1;
       
-        // Stream worker is initialized automatically when needed
+        // Need to create the worker first
+        const mockStream = new MockReadableStream([]);
+        const mockResponse = { ok: true, body: mockStream as any };
+        mockFetch.mockResolvedValueOnce(mockResponse);
+        
+        httpStreaming.fetchQueryDataWithHttpStream(
+          { traceId: traceId1, queryReq: {}, org_id: "test-org" }, 
+          { data: vi.fn(), error: vi.fn(), complete: vi.fn() }
+        );
         
         const postMessageSpy = vi.spyOn(mockWorker, 'postMessage');
       
@@ -386,13 +410,18 @@ let onDataSpy: any;
         httpStreaming.abortControllers.value[traceId1] = mockAbortController as any;
         httpStreaming.abortControllers.value[traceId2] = mockAbortController as any;
       
-        httpStreaming.traceMap.value[traceId1] = {some: 'metadata'};
-        httpStreaming.traceMap.value[traceId2] = {some: 'metadata'};
-      
         // Set active stream ID
         httpStreaming.activeStreamId.value = traceId1;
       
-        // Stream worker is initialized automatically when needed
+        // Need to create the worker first
+        const mockStream = new MockReadableStream([]);
+        const mockResponse = { ok: true, body: mockStream as any };
+        mockFetch.mockResolvedValueOnce(mockResponse);
+        
+        httpStreaming.fetchQueryDataWithHttpStream(
+          { traceId: traceId1, queryReq: {}, org_id: "test-org" }, 
+          { data: vi.fn(), error: vi.fn(), complete: vi.fn() }
+        );
         
         const postMessageSpy = vi.spyOn(mockWorker, 'postMessage');
       
