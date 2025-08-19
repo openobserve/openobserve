@@ -46,7 +46,6 @@ pub struct Stream {
     pub is_derived: Option<bool>,
 }
 
-
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct StreamCreate {
     pub fields: Vec<StreamField>,

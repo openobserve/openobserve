@@ -224,7 +224,6 @@ async fn update_settings(
     let main_stream_res =
         stream::update_stream_settings(&org_id, &stream_name, stream_type, stream_settings.clone())
             .await?;
- 
 
     Ok(main_stream_res)
 }

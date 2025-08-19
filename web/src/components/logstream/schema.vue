@@ -1179,6 +1179,7 @@ export default defineComponent({
     const onSubmit = async () => {
       patternAssociations.value = ungroupPatternAssociations(patternAssociations.value);
       let settings = {
+        fields: [], // only used for add new fields
         partition_keys: [],
         index_fields: [],
         full_text_search_keys: [],
@@ -1211,13 +1212,22 @@ export default defineComponent({
       settings["store_original_data"] = storeOriginalData.value;
       settings["approx_partition"] = approxPartition.value;
 
-      const newSchemaFieldsSet = new Set(
+      const newSchemaFieldSet = new Set(
+        newSchemaFields.value.map((field) => {
+          return {
+            name: field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
+            type: field.type,
+          }
+        }),
+      );
+      const newSchemaFieldNameSet = new Set(
         newSchemaFields.value.map((field) =>
-          field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
-        ),
+           field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_")
+         ),
       );
       // Push unique and normalized field names to settings.defined_schema_fields
-      settings.defined_schema_fields.push(...newSchemaFieldsSet);
+      settings.fields.push(...newSchemaFieldSet);
+      settings.defined_schema_fields.push(...newSchemaFieldNameSet);
       redDaysList.value.forEach((field) => {
         settings.extended_retention_days.push({
           start: field.start,
