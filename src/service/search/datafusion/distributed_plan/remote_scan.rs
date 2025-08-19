@@ -27,6 +27,7 @@ use datafusion::{
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
+        metrics::{ExecutionPlanMetricsSet, MetricsSet},
         stream::RecordBatchStreamAdapter,
     },
 };
@@ -54,6 +55,7 @@ pub struct RemoteScanExec {
     pub scan_stats: Arc<Mutex<ScanStats>>,
     pub partial_err: Arc<Mutex<String>>,
     pub enrich_mode_node_idx: usize,
+    pub metrics: ExecutionPlanMetricsSet,
 }
 
 impl RemoteScanExec {
@@ -90,6 +92,7 @@ impl RemoteScanExec {
             scan_stats: Arc::new(Mutex::new(ScanStats::default())),
             partial_err: Arc::new(Mutex::new(String::new())),
             enrich_mode_node_idx,
+            metrics: ExecutionPlanMetricsSet::new(),
         })
     }
 
@@ -188,6 +191,10 @@ impl ExecutionPlan for RemoteScanExec {
 
     fn statistics(&self) -> Result<Statistics> {
         Ok(Statistics::new_unknown(&self.schema()))
+    }
+
+    fn metrics(&self) -> Option<MetricsSet> {
+        Some(self.metrics.clone_inner())
     }
 }
 
