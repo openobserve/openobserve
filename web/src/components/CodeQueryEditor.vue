@@ -264,6 +264,15 @@ export default defineComponent({
       },
     ];
 
+    watch(
+      () => store.state.theme,
+      () => {
+        monaco.editor.setTheme(
+          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
+        );
+      },
+    );
+
     const keywords = computed(() => {
       if (props.language === "sql" && !props.keywords?.length) {
         return defaultKeywords;
@@ -343,7 +352,7 @@ export default defineComponent({
         lineNumbers: "on",
         lineNumbersMinChars: 0,
         overviewRulerLanes: 0,
-        fixedOverflowWidgets: false,
+        fixedOverflowWidgets: true,
         overviewRulerBorder: false,
         lineDecorationsWidth: 3,
         hideCursorInOverviewRuler: true,
