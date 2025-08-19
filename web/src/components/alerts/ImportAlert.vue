@@ -1340,7 +1340,7 @@ export default defineComponent({
     };
 
     const getActiveFolderAlerts = async (folderId: string) => {
-      if (!store.state.organizationData.allAlertsListByNames[folderId]) {
+      if (!store.state.organizationData.allAlertsListByNames || !store.state.organizationData.allAlertsListByNames[folderId]) {
         const response: any = await alertsService.listByFolderId(
           1,
           1000,

@@ -37,7 +37,7 @@ describe("Alert List", async () => {
   let deleteAlert: any;
   
   beforeEach(async () => {
-    deleteAlert = vi.spyOn(templateService, "delete");
+    deleteAlert = vi.spyOn(templateService, "delete").mockResolvedValue({ data: {} });
     
     wrapper = mount(TemplateList, {
       attachTo: "#app",

@@ -832,7 +832,7 @@ const onSubmitPipeline = async () => {
           validationErrors.value = ["Please connect all nodes before saving"];
         }
       } else {
-        if (error.response.status != 403) {
+        if (error.response && error.response.status != 403) {
           q.notify({
             message:
               error.response?.data?.message || "Error while saving pipeline",

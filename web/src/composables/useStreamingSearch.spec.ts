@@ -312,8 +312,7 @@ let onDataSpy: any;
         // Add to traceMap
         httpStreaming.traceMap.value[traceId] = { some: "metadata" } as any;
       
-        // Initialize the streamWorker by calling initializeStreamWorker
-        httpStreaming.initializeStreamWorker();
+        // Stream worker is initialized automatically when needed
         
         // Call the cancel function
         httpStreaming.cancelStreamQueryBasedOnRequestId({
@@ -354,8 +353,7 @@ let onDataSpy: any;
         // Set active stream ID
         httpStreaming.activeStreamId.value = traceId1;
       
-        // Initialize the streamWorker
-        httpStreaming.initializeStreamWorker();
+        // Stream worker is initialized automatically when needed
         
         const postMessageSpy = vi.spyOn(mockWorker, 'postMessage');
       
@@ -394,8 +392,7 @@ let onDataSpy: any;
         // Set active stream ID
         httpStreaming.activeStreamId.value = traceId1;
       
-        // Initialize the streamWorker
-        httpStreaming.initializeStreamWorker();
+        // Stream worker is initialized automatically when needed
         
         const postMessageSpy = vi.spyOn(mockWorker, 'postMessage');
       

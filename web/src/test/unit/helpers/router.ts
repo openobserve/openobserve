@@ -83,6 +83,11 @@ const router = createRouter({
       component: { template: '<div>Alert Destinations</div>' }
     },
     {
+      path: '/pipelines',
+      name: 'pipelines',
+      component: { template: '<div>Pipelines</div>' }
+    },
+    {
       path: '/dashboards',
       name: 'dashboards',
       component: { template: '<div>Dashboards</div>' }
@@ -116,6 +121,16 @@ const router = createRouter({
       path: '/member-subscription',
       name: 'member-subscription',
       component: { template: '<div>Member Subscription</div>' }
+    },
+    {
+      path: '/rum/errors',
+      name: 'rum-errors',
+      component: { template: '<div>RUM Errors</div>' }
+    },
+    {
+      path: '/rum/sessions',
+      name: 'rum-sessions', 
+      component: { template: '<div>RUM Sessions</div>' }
     },
     {
       path: '/:pathMatch(.*)*',

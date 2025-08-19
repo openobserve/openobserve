@@ -56,7 +56,7 @@ describe('MemberSubscription.vue', () => {
 
     // Use existing router helper
     // Push to the route if needed
-    if (routeHash) {
+    if (routeHash && router && router.push) {
       router.push('/member-subscription' + routeHash);
     }
 
@@ -69,7 +69,6 @@ describe('MemberSubscription.vue', () => {
       global: {
         plugins: [
           store,
-          router,
           [Quasar, {
             plugins: {
               Notify,
