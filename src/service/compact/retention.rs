@@ -213,8 +213,8 @@ pub async fn delete_by_stream(
             continue;
         }
 
-        log::debug!(
-            "[COMPACTOR] delete_by_stream {}/{}/{}/{},{}",
+        log::info!(
+            "[COMPACTOR] delete_by_stream: generate job for {}/{}/{}/{},{}",
             org_id,
             stream_type,
             stream_name,
@@ -372,6 +372,13 @@ pub async fn delete_by_date(
     }
 
     // delete from file list
+    log::info!(
+        "[COMPACTOR] delete_by_date: delete_from_file_list {}/{}/{}/{:?}",
+        org_id,
+        stream_type,
+        stream_name,
+        time_range
+    );
     delete_from_file_list(org_id, stream_type, stream_name, time_range)
         .await
         .map_err(|e| {
