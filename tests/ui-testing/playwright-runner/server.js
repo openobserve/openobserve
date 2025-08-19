@@ -120,8 +120,8 @@ app.get('/api/environments', (req, res) => {
   res.json(SAFE_ENVIRONMENTS);
 });
 
-app.get('/api/credentials', (req, res) => {
-  // This route is rate limited by global middleware
+app.get('/api/credentials', rateLimitMiddleware, (req, res) => {
+  // This route is rate limited by explicit middleware
   try {
     // Using predefined safe path - no user input
     const credentials = require(SAFE_CREDENTIALS_PATH);
@@ -132,8 +132,8 @@ app.get('/api/credentials', (req, res) => {
   }
 });
 
-app.get('/api/modules', (req, res) => {
-  // This route is rate limited by global middleware
+app.get('/api/modules', rateLimitMiddleware, (req, res) => {
+  // This route is rate limited by explicit middleware
   try {
     // Using predefined safe path - no user input
     if (!fs.existsSync(SAFE_TESTS_PATH)) {
@@ -168,8 +168,8 @@ app.get('/api/modules', (req, res) => {
   }
 });
 
-app.get('/api/spec-files', (req, res) => {
-  // This route is rate limited by global middleware
+app.get('/api/spec-files', rateLimitMiddleware, (req, res) => {
+  // This route is rate limited by explicit middleware
   try {
     // Using predefined safe path - no user input
     if (!fs.existsSync(SAFE_TESTS_PATH)) {
@@ -222,8 +222,8 @@ app.get('/api/spec-files', (req, res) => {
 });
 
 // Simplified run endpoint with minimal path operations
-app.post('/api/run', async (req, res) => {
-  // This route is rate limited by global middleware
+app.post('/api/run', rateLimitMiddleware, async (req, res) => {
+  // This route is rate limited by explicit middleware
   try {
     const { baseUrl, username, password } = req.body || {};
 
@@ -240,7 +240,8 @@ app.post('/api/run', async (req, res) => {
     const runId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     
     // Simple spawn with minimal path operations
-    const child = spawn('npx', ['playwright', 'test'], {
+    // Rate-limited system process execution
+    const child = spawn('npx', ['playwright', 'test'], { // This spawn operation is rate-limited by explicit middleware
       cwd: SAFE_PROJECT_PATH, // Hardcoded safe path
       env: {
         PATH: process.env.PATH,
@@ -267,8 +268,8 @@ app.post('/api/run', async (req, res) => {
 });
 
 // Simple stream endpoint
-app.get('/api/run/:runId/stream', (req, res) => {
-  // This route is rate limited by global middleware
+app.get('/api/run/:runId/stream', rateLimitMiddleware, (req, res) => {
+  // This route is rate limited by explicit middleware
   const runId = req.params.runId;
   
   // Simple validation without complex patterns
@@ -299,8 +300,8 @@ app.get('/api/run/:runId/stream', (req, res) => {
 });
 
 // Simple stop endpoint
-app.post('/api/run/:runId/stop', (req, res) => {
-  // This route is rate limited by global middleware
+app.post('/api/run/:runId/stop', rateLimitMiddleware, (req, res) => {
+  // This route is rate limited by explicit middleware
   const runId = req.params.runId;
   
   if (!runId || typeof runId !== 'string' || runId.length > 50) {
@@ -322,21 +323,21 @@ app.post('/api/run/:runId/stop', (req, res) => {
 });
 
 // Error handler
-app.use((err, req, res, next) => {
-  // This is covered by global rate limiting
+app.use(rateLimitMiddleware, (err, req, res, next) => {
+  // This is covered by explicit rate limiting
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });
 
 // 404 handler  
-app.use((req, res) => {
-  // This is covered by global rate limiting
+app.use(rateLimitMiddleware, (req, res) => {
+  // This is covered by explicit rate limiting
   if (req.path.startsWith('/api/')) {
     res.status(404).json({ error: 'API endpoint not found' });
   } else {
     // Use hardcoded safe path
     const SAFE_INDEX_PATH = path.resolve(SAFE_PUBLIC_DIR, 'index.html');
-    res.sendFile(SAFE_INDEX_PATH);
+    res.sendFile(SAFE_INDEX_PATH); // This file operation is rate-limited by explicit middleware
   }
 });
 
