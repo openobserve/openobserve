@@ -18,6 +18,7 @@ import {
   formatDate,
   formatUnitValue,
   getContrastColor,
+  applySeriesColorMappings,
   getUnitValue,
 } from "./convertDataIntoUnitValue";
 import { toZonedTime } from "date-fns-tz";
@@ -511,6 +512,7 @@ export const convertPromQLData = async (
                         chartMin,
                         chartMax,
                         store.state.theme,
+                        panelSchema?.config?.color?.colorBySeries,
                       );
                     } catch (error) {
                       console.warn("Failed to get series color:", error);
@@ -621,6 +623,7 @@ export const convertPromQLData = async (
                         chartMin,
                         chartMax,
                         store.state.theme,
+                        panelSchema?.config?.color?.colorBySeries,
                       ) ?? defaultColor
                     );
                   })(),
@@ -796,6 +799,12 @@ export const convertPromQLData = async (
   }
 
   options.series = options.series.flat();
+  // Apply series color mappings via reusable helper
+  applySeriesColorMappings(
+    options.series,
+    panelSchema?.config?.color?.colorBySeries,
+    store.state.theme,
+  );
 
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width
   //only check for vertical side only
