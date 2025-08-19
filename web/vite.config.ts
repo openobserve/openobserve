@@ -39,6 +39,8 @@ if (process.env.NODE_ENV === "production") {
   dotenv.config();
 }
 
+const isTesting = process.env.NODE_ENV === "test";
+
 const enterpriseResolverPlugin = {
   name: "enterprise-resolver",
   async resolveId(source: string) {
@@ -62,6 +64,21 @@ const enterpriseResolverPlugin = {
     }
   },
 };
+
+function monacoEditorTestResolver() {
+  return {
+    name: "monaco-editor-test-resolver",
+    enforce: "post",
+    resolveId(id: string) {
+      if (id === "monaco-editor") {
+        return {
+          id: "monaco-editor/esm/vs/editor/editor.api",
+        };
+      }
+      return null;
+    },
+  };
+}
 
 // let filePath = path.resolve(process.cwd(), "src");
 // if (process.env.VITE_OPENOBSERVE_CLOUD === "true") {
@@ -106,9 +123,10 @@ export default defineConfig({
       }),
     enterpriseResolverPlugin,
     vueJsx(),
-    monacoEditorPlugin.default({
+    (monacoEditorPlugin as any).default({
       customDistPath: () => path.resolve(__dirname, "dist/monacoeditorwork"),
     }),
+    isTesting && monacoEditorTestResolver(),
   ].filter(Boolean),
   resolve: {
     alias: {
