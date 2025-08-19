@@ -439,3 +439,30 @@ export const getSeriesColor = (
     );
   }
 };
+
+export const getColorForTable = [
+  "#FFCDEE",
+  "#FFD2D3",
+  "#C8FCFA",
+  "#B2DAFB",
+  "#C0E9FC",
+  "#FFCDE5",
+  "#C0EFF5",
+  "#FFFDBA",
+  "#FFD2D3",
+  "#F2B9B9",
+  "#A6E8F0",
+  "#C8E5FC",
+  "#E8A3F4",
+  "#C0E5E2",
+  "#C9FFBD",
+  "#F8B1C9",
+  "#BDDFFF",
+  "#D2B9FF",
+  "#D2EBDA",
+  "#C0E3C2",
+  "#C8FCFA",
+  "#FFFDBA",
+  "#FFD2D3",
+  "#F2B9B9",
+];

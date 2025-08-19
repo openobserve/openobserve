@@ -49,7 +49,7 @@ import { exportFile } from "quasar";
 import { defineComponent, ref } from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useStore } from "vuex";
-import { getColorPalette } from "@/utils/dashboard/colorPalette";
+import { getColorForTable } from "@/utils/dashboard/colorPalette";
 
 export default defineComponent({
   name: "TableRenderer",
@@ -165,7 +165,7 @@ export default defineComponent({
 
       // 1) Priority: override config auto color
       if (rowData?.col?.colorMode === "auto") {
-        const palette = getColorPalette(store?.state?.theme);
+        const palette = getColorForTable;
         const key = String(value);
         // cache on column to keep stable mapping across rows
         const cacheKey = `__autoColorMap_${rowData?.col?.field}`;
