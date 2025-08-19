@@ -404,6 +404,7 @@ import { isEqual } from "lodash-es";
 import { onActivated } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import CustomChartEditor from "@/components/dashboards/addPanel/CustomChartEditor.vue";
+import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -493,10 +494,17 @@ export default defineComponent({
     );
 
     const isOutDated = computed(() => {
-      //compare chartdata and dashboardpaneldata
-      return (
-        !isEqual(chartData.value, dashboardPanelData.data)
-      );
+      const configChanged = !isEqual(chartData.value, dashboardPanelData.data);
+
+      // skip outdate check if doesnt require to call api
+      let configNeedsApiCall = false;
+      if (configChanged) {
+        configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+          chartData.value,
+          dashboardPanelData.data,
+        );
+      }
+      return configNeedsApiCall;
     });
 
     watch(isOutDated, () => {
