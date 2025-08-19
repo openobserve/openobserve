@@ -1539,6 +1539,10 @@ export default defineComponent({
             // emit resize event
             // this will rerender/call resize method of already rendered chart to resize
             window.dispatchEvent(new Event("resize"));
+          } else {
+            // reset dashboard panel data as we will rebuild when user came back to visualize
+            // this fixes blank chart issue when user came back to visualize
+            resetDashboardPanelData()
           }
         } catch (err: any) {
           // this will clear dummy trace id
@@ -1849,8 +1853,8 @@ export default defineComponent({
         let extractedFields;
         
         // Check if we have a cached response for this query
-        if (schemaCache.value && schemaCache.value.key === logsPageQuery) {
-          extractedFields = schemaCache.value.response.data;
+        if (schemaCache?.value && schemaCache?.value?.key === logsPageQuery) {
+          extractedFields = schemaCache?.value?.response?.data;
         } else {
           // Use the refactored getResultSchema function
           extractedFields = await getResultSchema(logsPageQuery, signal, startISOTimestamp, endISOTimestamp);
