@@ -22,9 +22,9 @@ app.use(express.static(publicDir));
 const activeRuns = new Map();
 
 /**
- * Helper function to execute shell commands
+ * Helper function to execute shell commands with streaming output
  */
-function executeCommand(command, args = [], options = {}) {
+function executeCommand(command, args = [], options = {}, onOutput = null) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { 
       ...options,
@@ -36,11 +36,15 @@ function executeCommand(command, args = [], options = {}) {
     let stderr = '';
     
     child.stdout.on('data', (data) => {
-      stdout += data.toString();
+      const chunk = data.toString();
+      stdout += chunk;
+      if (onOutput) onOutput('stdout', chunk);
     });
     
     child.stderr.on('data', (data) => {
-      stderr += data.toString();
+      const chunk = data.toString();
+      stderr += chunk;
+      if (onOutput) onOutput('stderr', chunk);
     });
     
     child.on('close', (code) => {
@@ -60,7 +64,7 @@ function executeCommand(command, args = [], options = {}) {
 /**
  * Clone GitHub repository to temporary directory
  */
-async function cloneRepository(repoUrl, branch = 'main', subPath = '') {
+async function cloneRepository(repoUrl, branch = 'main', subPath = '', onOutput = null) {
   const tempDir = path.join(os.tmpdir(), `playwright-repo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   
   try {
@@ -68,31 +72,47 @@ async function cloneRepository(repoUrl, branch = 'main', subPath = '') {
     fs.mkdirSync(tempDir, { recursive: true });
     
     // Clone repository
-    const cloneArgs = ['clone'];
+    const cloneArgs = ['clone', '--progress'];
     if (branch && branch !== 'main' && branch !== 'master') {
       cloneArgs.push('-b', branch);
     }
     cloneArgs.push(repoUrl, tempDir);
     
-    console.log('Cloning repository:', repoUrl, 'to', tempDir);
-    await executeCommand('git', cloneArgs);
+    // Sanitize repo URL for logging (remove credentials if present)
+    const sanitizedRepoUrl = repoUrl.replace(/\/\/.*@/, '//[CREDENTIALS]@');
+    const cloneMessage = `🔄 Cloning repository: ${sanitizedRepoUrl} (branch: ${branch}) to ${tempDir}\n`;
+    console.log(cloneMessage);
+    if (onOutput) onOutput('stdout', cloneMessage);
+    
+    await executeCommand('git', cloneArgs, {}, onOutput);
     
     // Determine the actual project path
     let projectPath = tempDir;
     if (subPath) {
       projectPath = path.join(tempDir, subPath);
       if (!fs.existsSync(projectPath)) {
-        console.log(`Sub-path '${subPath}' does not exist. Available directories:`, 
-          fs.readdirSync(tempDir, { withFileTypes: true })
-            .filter(dirent => dirent.isDirectory())
-            .map(dirent => dirent.name));
+        const availableDirs = fs.readdirSync(tempDir, { withFileTypes: true })
+          .filter(dirent => dirent.isDirectory())
+          .map(dirent => dirent.name);
+        
+        const errorMsg = `❌ Sub-path '${subPath}' does not exist. Available directories: ${availableDirs.join(', ')}\n`;
+        console.log(errorMsg);
+        if (onOutput) onOutput('stderr', errorMsg);
+        
         throw new Error(`Sub-path '${subPath}' does not exist in the repository`);
       }
     }
     
-    console.log('Repository cloned successfully to:', projectPath);
+    const successMsg = `✅ Repository cloned successfully to: ${projectPath}\n`;
+    console.log(successMsg);
+    if (onOutput) onOutput('stdout', successMsg);
+    
     return { tempDir, projectPath };
   } catch (error) {
+    const errorMsg = `❌ Clone failed: ${error.message}\n`;
+    console.error(errorMsg);
+    if (onOutput) onOutput('stderr', errorMsg);
+    
     // Cleanup on error
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
@@ -281,15 +301,40 @@ app.post('/api/run', async (req, res) => {
 
   let actualProjectPath = projectPath;
   let tempDir = null;
+  
+  // Create run metadata first so we can stream to it immediately
+  const runMeta = {
+    childProcess: null,
+    createdAt: Date.now(),
+    status: 'preparing',
+    lastExitCode: null,
+    tempDir: null,
+    streamData: [], // Store stream data for clients that connect late
+  };
+  activeRuns.set(runId, runMeta);
+
+  // Function to broadcast messages to all connected clients
+  const broadcastMessage = (type, stream, chunk) => {
+    const message = { stream, chunk };
+    runMeta.streamData.push({ type, data: message, timestamp: Date.now() });
+    
+    // Broadcast to all connected EventSource clients
+    // We'll implement this by checking for active connections
+  };
 
   try {
     // Handle GitHub repository cloning
     if (isGitHubRepo) {
-      console.log(`Cloning GitHub repository: ${repoUrl}`);
-      const cloneResult = await cloneRepository(repoUrl, repoBranch, repoSubPath);
+      const setupMessage = `🚀 Setting up GitHub repository test run...\n`;
+      broadcastMessage('log', 'stdout', setupMessage);
+      
+      const cloneResult = await cloneRepository(repoUrl, repoBranch, repoSubPath, broadcastMessage);
       actualProjectPath = cloneResult.projectPath;
       tempDir = cloneResult.tempDir;
-      console.log(`Using cloned repository at: ${actualProjectPath}`);
+      runMeta.tempDir = tempDir;
+    } else {
+      const setupMessage = `🚀 Setting up local project test run...\n`;
+      broadcastMessage('log', 'stdout', setupMessage);
     }
 
     // Verify project path exists
@@ -320,6 +365,28 @@ app.post('/api/run', async (req, res) => {
 
     if (!playwrightConfigPath) {
       throw new Error(`playwright.config.js not found in ${actualProjectPath} or common subdirectories (tests/, ui-testing/, e2e/)`);
+    }
+
+    // Install dependencies if package.json exists and this is a cloned repo
+    if (isGitHubRepo) {
+      const packageJsonPath = path.join(actualProjectPath, 'package.json');
+      if (fs.existsSync(packageJsonPath)) {
+        const installMessage = `📦 Installing dependencies in ${actualProjectPath}...\n`;
+        broadcastMessage('log', 'stdout', installMessage);
+        
+        try {
+          await executeCommand('npm', ['install'], { cwd: actualProjectPath }, (stream, chunk) => {
+            broadcastMessage('log', stream, chunk);
+          });
+          
+          const installSuccessMessage = `✅ Dependencies installed successfully\n`;
+          broadcastMessage('log', 'stdout', installSuccessMessage);
+        } catch (installError) {
+          const installErrorMessage = `⚠️ Failed to install dependencies: ${installError.message}\n`;
+          broadcastMessage('log', 'stderr', installErrorMessage);
+          broadcastMessage('log', 'stdout', `🔄 Continuing with existing dependencies...\n`);
+        }
+      }
     }
 
     // Build command args for playwright
@@ -381,7 +448,7 @@ app.post('/api/run', async (req, res) => {
     console.log('Command:', cmd, args.join(' '));
     console.log('Environment variables set:', {
       ZO_BASE_URL: childEnv.ZO_BASE_URL,
-      ZO_ROOT_USER_EMAIL: childEnv.ZO_ROOT_USER_EMAIL,
+      ZO_ROOT_USER_EMAIL: childEnv.ZO_ROOT_USER_EMAIL ? '[REDACTED]' : undefined,
       ORGNAME: childEnv.ORGNAME
     });
 
@@ -392,14 +459,10 @@ app.post('/api/run', async (req, res) => {
       shell: false,
     });
 
-    const runMeta = {
-      childProcess: child,
-      createdAt: Date.now(),
-      status: 'running',
-      lastExitCode: null,
-      tempDir: tempDir, // Store temp dir for cleanup
-    };
-    activeRuns.set(runId, runMeta);
+    // Update run metadata
+    runMeta.childProcess = child;
+    runMeta.status = 'running';
+    runMeta.tempDir = tempDir;
 
     // Respond with run id
     res.json({ runId });
@@ -456,23 +519,55 @@ app.get('/api/run/:runId/stream', (req, res) => {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
-  const onStdout = (chunk) => send('log', { stream: 'stdout', chunk: String(chunk) });
-  const onStderr = (chunk) => send('log', { stream: 'stderr', chunk: String(chunk) });
+  // Send any stored stream data for clients connecting late
+  if (run.streamData && run.streamData.length > 0) {
+    run.streamData.forEach(entry => {
+      send(entry.type, entry.data);
+    });
+  }
+
+  const onStdout = (chunk) => {
+    const data = { stream: 'stdout', chunk: String(chunk) };
+    send('log', data);
+    
+    // Store in streamData for late-connecting clients
+    if (!run.streamData) run.streamData = [];
+    run.streamData.push({ type: 'log', data, timestamp: Date.now() });
+  };
+  
+  const onStderr = (chunk) => {
+    const data = { stream: 'stderr', chunk: String(chunk) };
+    send('log', data);
+    
+    // Store in streamData for late-connecting clients
+    if (!run.streamData) run.streamData = [];
+    run.streamData.push({ type: 'log', data, timestamp: Date.now() });
+  };
+  
   const onClose = (code) => {
-    send('done', { exitCode: code });
+    const data = { exitCode: code };
+    send('done', data);
+    
+    // Store final message
+    if (!run.streamData) run.streamData = [];
+    run.streamData.push({ type: 'done', data, timestamp: Date.now() });
+    
     res.end();
   };
 
-  run.childProcess.stdout.on('data', onStdout);
-  run.childProcess.stderr.on('data', onStderr);
-  run.childProcess.on('close', onClose);
+  // If child process exists, listen to its output
+  if (run.childProcess) {
+    run.childProcess.stdout.on('data', onStdout);
+    run.childProcess.stderr.on('data', onStderr);
+    run.childProcess.on('close', onClose);
+  }
 
   // Heartbeat to keep connection alive on some proxies
   const heartbeat = setInterval(() => send('heartbeat', Date.now()), 15000);
 
   req.on('close', () => {
     clearInterval(heartbeat);
-    if (!run.childProcess.killed) {
+    if (run.childProcess && !run.childProcess.killed) {
       run.childProcess.stdout.off('data', onStdout);
       run.childProcess.stderr.off('data', onStderr);
       run.childProcess.off('close', onClose);

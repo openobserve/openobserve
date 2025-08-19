@@ -626,10 +626,20 @@ document.addEventListener('DOMContentLoaded', function() {
       workers: workersInput.value ? Number(workersInput.value) : undefined,
     };
 
-    console.log('Payload:', payload);
+    // Log payload without sensitive information
+    const sanitizedPayload = {
+      ...payload,
+      password: payload.password ? '[REDACTED]' : undefined,
+      repoUrl: payload.repoUrl ? payload.repoUrl.replace(/\/\/.*@/, '//[CREDENTIALS]@') : payload.repoUrl
+    };
+    console.log('Payload:', sanitizedPayload);
 
     if (!payload.baseUrl || !payload.username || !payload.password) {
-      console.error('Missing required fields:', { baseUrl: payload.baseUrl, username: payload.username, password: !!payload.password });
+      console.error('Missing required fields:', { 
+        baseUrl: !!payload.baseUrl, 
+        username: !!payload.username, 
+        password: !!payload.password 
+      });
       setStatus('error', 'Please fill Base URL, Username and Password');
       return;
     }
