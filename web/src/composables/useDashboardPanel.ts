@@ -2078,7 +2078,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const { sqlParser }: any = useSqlParser.default();
     parser = await sqlParser();
 
-    updateQueryValue();
+    // do not allow to modify custom query fields for logs page
+    updateQueryValue(pageKey == "logs" ? true : false);
   };
 
   /**

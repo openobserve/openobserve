@@ -570,6 +570,13 @@ export default defineComponent({
     provide("hoveredSeriesState", hoveredSeriesState);
 
     const addToDashboard = () => {
+
+      // only copy if is_ui_histogram is true
+      if (resultMetaData.value?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
+        dashboardPanelData.data.queries[0].query =
+          resultMetaData.value?.[0]?.converted_histogram_query;
+      }
+
       const errors: any = [];
       // will push errors in errors array
       validatePanel(errors, true);
@@ -582,12 +589,6 @@ export default defineComponent({
         );
         return;
       } else {
-
-        // only copy if is_ui_histogram is true
-        if (resultMetaData.value?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
-          dashboardPanelData.data.queries[0].query =
-            resultMetaData.value?.[0]?.converted_histogram_query;
-        }
 
         showAddToDashboardDialog.value = true;
       }
