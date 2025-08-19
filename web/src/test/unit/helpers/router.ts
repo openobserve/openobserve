@@ -73,6 +73,26 @@ const router = createRouter({
       component: { template: '<div>Dashboards</div>' }
     },
     {
+      path: '/roles',
+      name: 'roles',
+      component: { template: '<div>Roles</div>' }
+    },
+    {
+      path: '/roles/:role_name/edit',
+      name: 'editRole',
+      component: { template: '<div>Edit Role</div>' }
+    },
+    {
+      path: '/users',
+      name: 'users',
+      component: { template: '<div>Users</div>' }
+    },
+    {
+      path: '/groups',
+      name: 'groups',
+      component: { template: '<div>Groups</div>' }
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
       component: { template: '<div>Not Found</div>' }
