@@ -30,7 +30,7 @@ test.describe("dashboard folder testcases", () => {
     await page.waitForTimeout(2000);
 
     const orgNavigation = page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${process.env["ZO_BASE_URL"]}${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     await orgNavigation;
   });

@@ -53,7 +53,7 @@ test.describe("Alerts E2E Flow", () => {
     
     // Navigate to alerts page
     await page.goto(
-      `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${process.env["ZO_BASE_URL"]}${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
   });
 
@@ -65,7 +65,7 @@ test.describe("Alerts E2E Flow", () => {
     tag: ['@e2eAlerts', '@all', '@alerts']
   }, async ({ page }) => {
     // Test data setup
-    const streamName = 'auto_playwright_stream';
+    const streamName = 'e2e_automate';
     const column = 'job';
     const value = 'test';
 

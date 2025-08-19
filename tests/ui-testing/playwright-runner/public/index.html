@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Playwright Test Runner</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg-primary: #0a0a0f;
+        --bg-secondary: #12121a;
+        --bg-card: #1a1a26;
+        --bg-input: #23232e;
+        --text-primary: #e2e8f0;
+        --text-secondary: #94a3b8;
+        --text-muted: #64748b;
+        --border-primary: #2d3748;
+        --border-secondary: #4a5568;
+        --accent-primary: #00d4ff;
+        --accent-secondary: #0ea5e9;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --glow-cyan: rgba(0, 212, 255, 0.3);
+        --glow-success: rgba(16, 185, 129, 0.3);
+        --glow-danger: rgba(239, 68, 68, 0.3);
+        --tech-gradient: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+        --card-border: 1px solid var(--border-primary);
+        --shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      }
+
+      * { box-sizing: border-box; }
+      body { 
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; 
+        margin: 0; padding: 0; 
+        background: var(--bg-primary);
+        background-image: 
+          radial-gradient(circle at 25% 25%, rgba(0, 212, 255, 0.05) 0%, transparent 50%),
+          radial-gradient(circle at 75% 75%, rgba(14, 165, 233, 0.03) 0%, transparent 50%);
+        color: var(--text-primary); 
+        line-height: 1.5; 
+        font-size: 14px;
+      }
+      
+      /* Header with tech styling */
+      header { 
+        padding: 20px 24px; 
+        background: var(--bg-secondary); 
+        border-bottom: var(--card-border);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      }
+      header h1 { 
+        margin: 0; 
+        font-size: 20px; 
+        font-weight: 700; 
+        color: var(--accent-primary);
+      }
+      .subtitle {
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin-top: 4px;
+        font-weight: 500;
+      }
+      
+      /* Main layout with sidebar */
+      .main-container {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 24px;
+        padding: 24px;
+        max-width: 1600px;
+        margin: 0 auto;
+        min-height: calc(100vh - 80px);
+      }
+      
+      /* Sidebar styling */
+      .sidebar {
+        background: var(--bg-card);
+        border: var(--card-border);
+        border-radius: 16px;
+        padding: 24px;
+        height: fit-content;
+        box-shadow: var(--shadow);
+        position: sticky;
+        top: 24px;
+      }
+      
+      .sidebar h2 {
+        margin: 0 0 16px 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--accent-primary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .help-section {
+        margin-bottom: 24px;
+      }
+      
+      .help-section h3 {
+        margin: 0 0 8px 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      
+      .help-item {
+        background: var(--bg-input);
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-bottom: 6px;
+        font-size: 13px;
+        font-family: 'JetBrains Mono', monospace;
+        color: var(--text-secondary);
+      }
+      
+      .help-item .tag {
+        color: var(--accent-primary);
+        font-weight: 500;
+      }
+      
+      /* Main content area */
+      .main-content {
+        display: grid;
+        gap: 24px;
+      }
+      
+      .card { 
+        background: var(--bg-card); 
+        border: var(--card-border); 
+        border-radius: 16px; 
+        padding: 24px;
+        box-shadow: var(--shadow);
+        transition: all 0.3s ease;
+      }
+      
+      .card:hover {
+        border-color: var(--border-secondary);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+      }
+      
+      .card-title {
+        margin: 0 0 16px 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .form-grid { display: grid; gap: 20px; }
+      .form-row { display: grid; gap: 12px; }
+      .form-row.two-col { grid-template-columns: 1fr 1fr; }
+      
+      label { 
+        font-size: 12px; 
+        font-weight: 600; 
+        color: var(--text-primary); 
+        margin-bottom: 6px; 
+        display: block;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      input, select, textarea { 
+        width: 100%; 
+        padding: 12px 14px; 
+        background: var(--bg-input); 
+        border: 1px solid var(--border-primary); 
+        border-radius: 8px; 
+        color: var(--text-primary); 
+        font-size: 14px;
+        font-family: inherit;
+        transition: all 0.2s ease;
+      }
+      
+      input:focus, select:focus, textarea:focus { 
+        outline: none; 
+        border-color: var(--accent-primary); 
+        box-shadow: 0 0 0 3px var(--glow-cyan);
+        background: var(--bg-secondary);
+      }
+      
+      /* Tag input with autocomplete */
+      .tag-input-container {
+        position: relative;
+      }
+      
+      .tag-suggestions {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--bg-card);
+        border: var(--card-border);
+        border-radius: 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+        box-shadow: var(--shadow);
+      }
+      
+      .tag-suggestion {
+        padding: 12px 16px;
+        cursor: pointer;
+        font-size: 14px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .tag-suggestion:hover {
+        background: var(--bg-input);
+      }
+      
+      .tag-suggestion.selected {
+        background: var(--accent-primary);
+        color: var(--bg-primary);
+      }
+      
+      .tag-category {
+        font-size: 11px;
+        padding: 2px 6px;
+        background: var(--bg-input);
+        border-radius: 4px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      /* Module tree styling */
+      .module-tree {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        line-height: 1.3;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        padding: 12px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      .module-folder {
+        color: var(--accent-primary);
+        font-weight: 600;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .module-folder::before {
+        content: "📁";
+        font-size: 10px;
+      }
+
+      .module-files {
+        margin-left: 16px;
+        margin-bottom: 8px;
+      }
+
+      .module-file {
+        color: var(--text-secondary);
+        padding: 1px 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .module-file::before {
+        content: "├─";
+        color: var(--text-muted);
+      }
+
+      .module-file.last-file::before {
+        content: "└─";
+      }
+
+      .module-count {
+        color: var(--text-muted);
+        font-size: 10px;
+      }
+
+      .loading-text {
+        color: var(--text-muted);
+        font-style: italic;
+        font-size: 12px;
+        text-align: center;
+        padding: 20px;
+      }
+      
+      /* Button styling */
+      .btn { 
+        padding: 12px 24px; 
+        border: none; 
+        border-radius: 8px; 
+        font-size: 14px; 
+        font-weight: 600; 
+        cursor: pointer; 
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .btn-primary { 
+        background: var(--tech-gradient); 
+        color: var(--bg-primary);
+        box-shadow: 0 4px 12px var(--glow-cyan);
+      }
+      .btn-primary:hover:not(:disabled) { 
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px var(--glow-cyan);
+      }
+      .btn-primary:disabled { 
+        background: var(--text-muted); 
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
+      }
+      
+      .btn-secondary { 
+        background: transparent; 
+        color: var(--text-primary); 
+        border: 1px solid var(--border-primary);
+      }
+      .btn-secondary:hover:not(:disabled) { 
+        background: var(--bg-input);
+        border-color: var(--border-secondary);
+      }
+      
+      .btn-danger { 
+        background: var(--danger); 
+        color: white;
+        box-shadow: 0 4px 12px var(--glow-danger);
+      }
+      .btn-danger:hover:not(:disabled) { 
+        background: #dc2626;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px var(--glow-danger);
+      }
+      
+      /* Status indicator */
+      .status { 
+        display: flex; 
+        align-items: center; 
+        gap: 12px; 
+        font-size: 14px;
+        font-weight: 500;
+        padding: 14px 16px;
+        background: var(--bg-input);
+        border-radius: 8px;
+        border: var(--card-border);
+      }
+      .dot { 
+        width: 12px; 
+        height: 12px; 
+        border-radius: 50%; 
+        background: var(--text-muted);
+        transition: all 0.3s ease;
+      }
+      #status[data-state="running"] .dot { 
+        background: var(--accent-primary); 
+        animation: pulse 2s infinite;
+        box-shadow: 0 0 12px var(--glow-cyan);
+      }
+      #status[data-state="error"] .dot { 
+        background: var(--danger);
+        box-shadow: 0 0 12px var(--glow-danger);
+      }
+      #status[data-state="stopping"] .dot { background: var(--warning); }
+      #status[data-state="stopped"] .dot { background: var(--warning); }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.7; transform: scale(1.1); }
+      }
+
+      /* Test Counter with tech styling */
+      .test-counter { 
+        display: flex; 
+        flex-wrap: wrap; 
+        gap: 20px; 
+        padding: 20px; 
+        background: var(--bg-secondary); 
+        border: var(--card-border); 
+        border-radius: 12px;
+        margin-bottom: 20px;
+      }
+      
+      .counter-item { 
+        display: flex; 
+        align-items: center; 
+        gap: 8px;
+        padding: 8px 12px;
+        background: var(--bg-input);
+        border-radius: 8px;
+        border: 1px solid var(--border-primary);
+      }
+      
+      .counter-label { 
+        font-size: 13px; 
+        color: var(--text-secondary); 
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      
+      .counter-value { 
+        font-size: 16px; 
+        font-weight: 700; 
+        padding: 4px 10px; 
+        border-radius: 6px; 
+        min-width: 28px; 
+        text-align: center;
+        font-family: 'JetBrains Mono', monospace;
+      }
+      
+      .counter-value.passed { 
+        color: var(--success); 
+        background: rgba(16, 185, 129, 0.15);
+        box-shadow: 0 0 8px var(--glow-success);
+      }
+      .counter-value.failed { 
+        color: var(--danger); 
+        background: rgba(239, 68, 68, 0.15);
+        box-shadow: 0 0 8px var(--glow-danger);
+      }
+      .counter-value.running { 
+        color: var(--accent-primary); 
+        background: rgba(0, 212, 255, 0.15); 
+        font-size: 14px; 
+        min-width: auto; 
+        max-width: 250px; 
+        overflow: hidden; 
+        text-overflow: ellipsis; 
+        white-space: nowrap;
+        box-shadow: 0 0 8px var(--glow-cyan);
+      }
+      
+      /* Logs area */
+      .logs-wrap { display: grid; gap: 12px; }
+      .logs-toolbar { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center;
+        padding: 12px 16px;
+        background: var(--bg-input);
+        border-radius: 8px;
+        border: var(--card-border);
+      }
+      
+      .logs { 
+        background: var(--bg-primary); 
+        border: var(--card-border); 
+        border-radius: 12px; 
+        padding: 20px; 
+        font-family: 'JetBrains Mono', monospace; 
+        white-space: pre-wrap; 
+        max-height: 60vh; 
+        overflow: auto;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      
+      .muted { color: var(--text-muted); font-size: 14px; font-weight: 500; }
+      
+      /* Color-coded log lines */
+      .log-line-passed { color: var(--success); }
+      .log-line-failed { color: var(--danger); }
+      .log-line-running { color: var(--accent-primary); }
+      .log-line-error { color: var(--danger); font-weight: 600; }
+      .log-line-warning { color: var(--warning); }
+      
+      /* Responsive design */
+      @media (max-width: 1200px) {
+        .main-container {
+          grid-template-columns: 1fr;
+          padding: 16px;
+        }
+        
+        .sidebar {
+          order: 2;
+          position: static;
+        }
+        
+        .main-content {
+          order: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>⚡ Playwright Test Runner</h1>
+      <div class="subtitle">Automated testing interface with real-time monitoring</div>
+    </header>
+
+    <div class="main-container">
+      <!-- Instructions Sidebar -->
+      <aside class="sidebar">
+        <h2>🚀 Quick Guide</h2>
+        
+        <div class="help-section">
+          <h3>Popular Tags</h3>
+          <div class="help-item"><span class="tag">@all</span> - Run all tests</div>
+          <div class="help-item"><span class="tag">@alerts</span> - Alert functionality</div>
+          <div class="help-item"><span class="tag">@logs</span> - Log operations</div>
+          <div class="help-item"><span class="tag">@streams</span> - Stream tests</div>
+          <div class="help-item"><span class="tag">@alertsImportExport</span> - Import/Export</div>
+        </div>
+
+        <div class="help-section" id="modulesHelper">
+          <h3>Available Modules</h3>
+          <div class="module-tree">
+            <div class="loading-text">Loading modules...</div>
+          </div>
+        </div>
+
+        <div class="help-section">
+          <h3>Commands</h3>
+          <div class="help-item">Clear Logs - Reset console</div>
+          <div class="help-item">Copy Logs - Export results</div>
+          <div class="help-item">Stop - Terminate tests</div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <section class="card">
+          <h2 class="card-title">⚙️ Configuration</h2>
+          <div class="form-grid">
+            <div class="form-row">
+              <label for="environment">Environment</label>
+              <select id="environment">
+                <option value="">Select environment...</option>
+              </select>
+            </div>
+
+            <div class="form-row two-col">
+              <div>
+                <label for="baseUrl">Base URL</label>
+                <input type="url" id="baseUrl" placeholder="https://your-domain.com" />
+              </div>
+              <div>
+                <label for="ingestionUrl">Ingestion URL (Optional)</label>
+                <input type="url" id="ingestionUrl" placeholder="Auto-detected from base URL" />
+              </div>
+            </div>
+
+            <div class="form-row two-col">
+              <div>
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="Enter username" />
+              </div>
+              <div>
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Enter password" />
+              </div>
+            </div>
+
+            <div class="form-row two-col">
+              <div>
+                <label for="orgName">Organization</label>
+                <input type="text" id="orgName" placeholder="default" />
+              </div>
+              <div>
+                <label for="workers">Parallel Workers</label>
+                <input type="number" id="workers" placeholder="auto" min="1" />
+              </div>
+            </div>
+
+            <!-- Test Selection Method -->
+            <div class="form-row">
+              <label>Test Selection Method</label>
+              <div style="display: flex; gap: 16px; margin-top: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="radio" id="selectionTags" name="selectionMethod" value="tags" checked style="width: auto; margin: 0;" />
+                  <label for="selectionTags" style="margin: 0; text-transform: none; font-size: 14px;">Use Tags</label>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="radio" id="selectionModule" name="selectionMethod" value="module" style="width: auto; margin: 0;" />
+                  <label for="selectionModule" style="margin: 0; text-transform: none; font-size: 14px;">Use Module</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tags Section -->
+            <div id="tagsSection" class="form-row">
+              <div class="tag-input-container">
+                <label for="tags">Test Tags</label>
+                <input type="text" id="tags" placeholder="e.g., @alerts, @logs" autocomplete="off" />
+                <div class="tag-suggestions" id="tagSuggestions"></div>
+              </div>
+            </div>
+
+            <!-- Module Section -->
+            <div id="moduleSection" class="form-row" style="display: none;">
+              <div class="tag-input-container">
+                <label for="module">Test Module</label>
+                <input type="text" id="module" placeholder="Select a module..." autocomplete="off" readonly />
+                <div class="tag-suggestions" id="moduleSuggestions"></div>
+              </div>
+            </div>
+
+            <!-- Skip Files Section -->
+            <div class="form-row">
+              <div class="tag-input-container">
+                <label for="skipFiles">Skip Spec Files (Optional)</label>
+                <input type="text" id="skipFiles" placeholder="e.g., sanity.spec.js, alerts-e2e.spec.js" autocomplete="off" />
+                <div class="tag-suggestions" id="skipSuggestions"></div>
+              </div>
+            </div>
+
+            <!-- Project Source Selection -->
+            <div class="form-row">
+              <label>Project Source</label>
+              <div style="display: flex; gap: 16px; margin-top: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="radio" id="sourceLocal" name="projectSource" value="local" checked style="width: auto; margin: 0;" />
+                  <label for="sourceLocal" style="margin: 0; text-transform: none; font-size: 14px;">Local Path</label>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="radio" id="sourceGithub" name="projectSource" value="github" style="width: auto; margin: 0;" />
+                  <label for="sourceGithub" style="margin: 0; text-transform: none; font-size: 14px;">GitHub Repository</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Local Path Section -->
+            <div id="localPathSection" class="form-row">
+              <label for="projectPath">Local Project Path</label>
+              <input type="text" id="projectPath" placeholder="/path/to/ui-testing" />
+            </div>
+
+            <!-- GitHub Repository Section -->
+            <div id="githubRepoSection" class="form-row" style="display: none;">
+              <div class="form-row two-col">
+                <div>
+                  <label for="repoUrl">GitHub Repository URL</label>
+                  <input type="url" id="repoUrl" placeholder="https://github.com/user/repo.git" />
+                </div>
+                <div>
+                  <label for="repoBranch">Branch (Optional)</label>
+                  <input type="text" id="repoBranch" placeholder="main" />
+                </div>
+              </div>
+              <div class="form-row">
+                <label for="repoSubPath">Sub-path to tests (Optional)</label>
+                <input type="text" id="repoSubPath" placeholder="tests/ui-testing" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="headless" checked style="width: auto; margin: 0;" />
+                <label for="headless" style="margin: 0; text-transform: none; font-size: 14px;">Run in headless mode</label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 class="card-title">🎮 Test Execution</h2>
+            <div style="display: flex; gap: 12px;">
+              <button id="runBtn" class="btn btn-primary">🚀 Run Tests</button>
+              <button id="stopBtn" class="btn btn-danger" disabled>⏹️ Stop</button>
+            </div>
+          </div>
+
+          <div id="status" class="status" data-state="idle">
+            <span class="dot"></span>
+            <span class="muted">Idle</span>
+          </div>
+          
+          <!-- Test Counter -->
+          <div id="testCounter" class="test-counter" style="display: none;">
+            <div class="counter-item">
+              <span class="counter-label">Total:</span>
+              <span id="totalCount" class="counter-value">0</span>
+            </div>
+            <div class="counter-item">
+              <span class="counter-label">✅ Passed:</span>
+              <span id="passedCount" class="counter-value passed">0</span>
+            </div>
+            <div class="counter-item">
+              <span class="counter-label">❌ Failed:</span>
+              <span id="failedCount" class="counter-value failed">0</span>
+            </div>
+            <div class="counter-item">
+              <span class="counter-label">⏳ Running:</span>
+              <span id="runningTest" class="counter-value running">None</span>
+            </div>
+          </div>
+
+          <div class="logs-wrap">
+            <div class="logs-toolbar">
+              <div class="muted">📊 Live Console Output</div>
+              <div style="display: flex; gap: 8px;">
+                <button id="clearLogsBtn" class="btn btn-secondary" style="padding: 8px 12px; font-size: 13px;">🗑️ Clear</button>
+                <button id="copyLogsBtn" class="btn btn-secondary" style="padding: 8px 12px; font-size: 13px;">📋 Copy</button>
+              </div>
+            </div>
+            <pre id="logs" class="logs">Console output will appear here...</pre>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

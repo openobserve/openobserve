@@ -52,13 +52,13 @@ test.describe("Alerts UI Operations", () => {
     // Skip data ingestion for scheduled alert test
     if (!test.info().title.includes('Scheduled Alert')) {
       // Ingest test data using common actions
-      const streamName = 'auto_playwright_stream';
+      const streamName = 'e2e_automate';
       await pageManager.commonActions.ingestTestData(streamName);
     }
     
     // Navigate to alerts page
     await page.goto(
-      `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${process.env["ZO_BASE_URL"]}${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
   });
 
@@ -108,7 +108,7 @@ test.describe("Alerts UI Operations", () => {
   test('Create and Delete Scheduled Alert with SQL Query', {
     tag: ['@scheduledAlerts', '@all', '@alerts']
   }, async ({ page }) => {
-    const streamName = 'auto_playwright_stream';
+    const streamName = 'e2e_automate';
 
     // Ensure prerequisites exist
     createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
@@ -187,7 +187,7 @@ test.describe("Alerts UI Operations", () => {
     await pageManager.alertsPage.verifyFieldRequiredValidation();
 
     // Create a valid alert using existing function
-    const streamName = 'auto_playwright_stream';
+    const streamName = 'e2e_automate';
     const column = 'job';
     const value = 'test';
     await pageManager.commonActions.navigateToAlerts();

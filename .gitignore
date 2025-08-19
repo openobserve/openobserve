@@ -27,3 +27,4 @@ flamegraph.html
 /web/.env
 
 CLAUDE.md
+tests/ui-testing/playwright-runner/credentials.json

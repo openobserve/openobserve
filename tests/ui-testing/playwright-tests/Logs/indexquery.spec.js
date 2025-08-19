@@ -92,7 +92,7 @@ test.describe("Compare SQL query execution times", () => {
 
     console.log(response);
 
-    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${process.env["ZO_BASE_URL"]}${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
     await selectStream(page, logData.Stream);
     await applyQueryButton(page);
   });

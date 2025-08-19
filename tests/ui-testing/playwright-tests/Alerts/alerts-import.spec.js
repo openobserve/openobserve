@@ -48,7 +48,7 @@ test.describe("Alerts Import/Export", () => {
     }
 
     // Ingest test data using common actions
-    const streamName = 'auto_playwright_stream';
+    const streamName = 'e2e_automate';
     await pageManager.commonActions.ingestTestData(streamName);
     
     // Navigate to alerts page
@@ -84,7 +84,7 @@ test.describe("Alerts Import/Export", () => {
     console.log('Created folder:', folderName);
 
     // Create alert
-    const streamName = 'auto_playwright_stream';
+    const streamName = 'e2e_automate';
     const column = 'job';
     const value = 'test';
     await pageManager.alertsPage.navigateToFolder(folderName);

@@ -240,7 +240,7 @@ test.describe("Pipeline testcases", () => {
 
     await ingestion(page);
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${process.env["ZO_BASE_URL"]}${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     await pageManager.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
