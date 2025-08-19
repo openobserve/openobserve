@@ -197,12 +197,10 @@ export default defineComponent({
       });
 
       editorObj.onDidChangeModelContent(
-        // debounce((e: any) => {
-        (e: any) => {
-          console.log("e", editorObj.getValue()?.trim(), props.editorId);
+        debounce((e: any) => {
           emit("update-query", editorObj.getValue()?.trim());
           emit("update:query", editorObj.getValue()?.trim());
-        },
+        }, props.debounceTime),
       );
 
       editorObj.createContextKey("ctrlenter", true);
@@ -247,15 +245,22 @@ export default defineComponent({
         emit("blur");
       });
 
-      window.addEventListener("click", () => {
+      const handleWindowClick = () => {
         editorObj?.layout();
-      });
+      };
 
-      window.addEventListener("resize", async () => {
+      const handleWindowResize = async () => {
         await nextTick();
         editorObj?.layout();
         // queryEditorRef.value.resetEditorLayout();
-      });
+      };
+
+      window.addEventListener("click", handleWindowClick);
+      window.addEventListener("resize", handleWindowResize);
+
+      // Store references for cleanup
+      editorObj._windowClickHandler = handleWindowClick;
+      editorObj._windowResizeHandler = handleWindowResize;
     };
 
     onMounted(async () => {
@@ -324,7 +329,20 @@ export default defineComponent({
 
     onUnmounted(() => {
       provider.value?.dispose();
-      console.log("onUnmounted", props.editorId);
+
+      // Clean up global event listeners
+      if (editorObj) {
+        if (editorObj._windowClickHandler) {
+          window.removeEventListener("click", editorObj._windowClickHandler);
+        }
+        if (editorObj._windowResizeHandler) {
+          window.removeEventListener("resize", editorObj._windowResizeHandler);
+        }
+
+        // Dispose the editor
+        editorObj.dispose();
+        editorObj = null;
+      }
     });
 
     const enableCodeFolding = computed(() => {
@@ -335,7 +353,7 @@ export default defineComponent({
     watch(
       () => props.readOnly,
       () => {
-        editorObj.updateOptions({ readOnly: props.readOnly });
+        editorObj?.updateOptions({ readOnly: props.readOnly });
       },
     );
 
@@ -480,10 +498,7 @@ export default defineComponent({
         };
       });
 
-      console.log("decorations", decorations);
-
       const decorationIds = editorObj.deltaDecorations([], decorations);
-      console.log("decorationIds", decorationIds);
     };
 
     function addErrorDiagnostics(ranges: any) {
