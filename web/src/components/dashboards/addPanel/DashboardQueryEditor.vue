@@ -597,7 +597,7 @@ export default defineComponent({
   border-radius: 50%;
 }
 
-.empty-function .cm-content {
+.empty-function .monaco-editor-background {
   background-image: url("../../../assets/images/common/vrl-function.png");
   background-repeat: no-repeat;
   background-size: 170px;
