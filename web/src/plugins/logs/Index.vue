@@ -1608,7 +1608,7 @@ export default defineComponent({
           } else {
             // reset dashboard panel data as we will rebuild when user came back to visualize
             // this fixes blank chart issue when user came back to visualize
-            resetDashboardPanelData()
+            resetDashboardPanelData();
           }
         } catch (err: any) {
           // this will clear dummy trace id

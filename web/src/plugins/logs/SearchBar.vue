@@ -864,7 +864,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-
     <div class="row query-editor-container">
       <div
         class="col"
@@ -925,6 +924,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       searchObj.meta.functionEditorPlaceholderFlag
                         ? 'empty-function'
                         : ''
+                    "
+                    :readOnly="
+                      searchObj.meta.logsVisualizeToggle === 'visualize'
                     "
                     @keydown="handleKeyDown"
                     language="vrl"
@@ -1423,6 +1425,7 @@ import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { json2csv } from "json-2-csv";
 import {
   mergeDeep,
   b64DecodeUnicode,
@@ -1825,6 +1828,7 @@ export default defineComponent({
     );
 
     onBeforeUnmount(() => {
+      console.log("onBeforeUnmount");
       queryEditorRef.value = null;
       fnEditorRef.value = null;
     });
@@ -1912,6 +1916,7 @@ export default defineComponent({
       //   searchObj.meta.jobId = "";
       //   getQueryData(false);
       // }
+      console.log("value", value);
       searchObj.data.editorValue = value;
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
@@ -3416,7 +3421,6 @@ export default defineComponent({
           searchObj.data?.queryResults?.hits?.length == 0
         ) {
           searchObj.loading = true;
-          searchObj.meta.refreshHistogram = true;
           if (searchObj.meta.sqlMode) {
             searchObj.data.queryResults.aggs = undefined;
           }
@@ -3442,15 +3446,9 @@ export default defineComponent({
         let logsPageQuery = searchObj.data.query;
 
         // handle sql mode
-        if (!searchObj.meta.sqlMode) {
-          //if user click on run query button then use customDownloadQueryObj else use build search
-          //because if user didn't clicked on run query button then build search will be used
-          if (searchObj.data.customDownloadQueryObj?.query?.sql) {
-            logsPageQuery = searchObj.data.customDownloadQueryObj?.query?.sql;
-          } else {
-            const queryBuild = buildSearch();
-            logsPageQuery = queryBuild?.query?.sql ?? "";
-          }
+        if (!searchObj.data.sqlMode) {
+          const queryBuild = buildSearch();
+          logsPageQuery = queryBuild?.query?.sql ?? "";
         }
 
         // if multiple sql, then do not allow to visualize
@@ -4090,25 +4088,16 @@ export default defineComponent({
     height: 100%; /* or any other height you want to set */
   }
 
-  .empty-query .cm-scroller {
+  .empty-query .monaco-editor-background {
     background-image: url("../../assets/images/common/query-editor.png");
     background-repeat: no-repeat;
     background-size: 115px;
-    background-position: 5px 5px;
-  }
-  .empty-query .cm-gutters {
-    display: none;
   }
 
-  .empty-function .cm-scroller {
+  .empty-function .monaco-editor-background {
     background-image: url("../../assets/images/common/vrl-function.png");
     background-repeat: no-repeat;
     background-size: 170px;
-    background-position: 5px 5px;
-  }
-
-  .empty-function .cm-gutters {
-    display: none;
   }
 
   .function-dropdown {
@@ -4508,7 +4497,6 @@ export default defineComponent({
   font-weight: 600;
   border: 0px solid rgba(255, 255, 255, 0.2);
 }
-
 .q-dark .file-type label,
 .q-dark .file-type .q-btn {
   color: rgba(255, 255, 255, 0.7);
