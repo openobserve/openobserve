@@ -53,7 +53,7 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-const publicDir = path.join(__dirname, 'public');
+const publicDir = safePath(__dirname, 'public');
 app.use(express.static(publicDir));
 
 /**
@@ -109,6 +109,23 @@ setInterval(() => {
     }
   }
 }, 60 * 60 * 1000);
+
+// Safe path construction function
+function safePath(basePath, ...pathComponents) {
+  if (!basePath || typeof basePath !== 'string') {
+    throw new Error('Invalid base path');
+  }
+  
+  const resolvedBasePath = path.resolve(basePath);
+  const joinedPath = path.resolve(resolvedBasePath, ...pathComponents);
+  
+  // Ensure the joined path is within the base path
+  if (!joinedPath.startsWith(resolvedBasePath + path.sep) && joinedPath !== resolvedBasePath) {
+    throw new Error('Path traversal attempt detected');
+  }
+  
+  return joinedPath;
+}
 
 // Rate limiting middleware with robust IP detection
 function rateLimitMiddleware(req, res, next) {
@@ -188,7 +205,7 @@ async function cloneRepository(repoUrl, branch = 'main', subPath = '', onOutput 
     throw new Error('Invalid branch name. Branch names cannot contain special characters.');
   }
   
-  const tempDir = path.join(os.tmpdir(), `playwright-repo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const tempDir = safePath(os.tmpdir(), `playwright-repo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   
   try {
     // Create temp directory
@@ -223,12 +240,20 @@ async function cloneRepository(repoUrl, branch = 'main', subPath = '', onOutput 
         throw new Error(`Invalid sub-path: Path traversal detected`);
       }
       
-      // Safely join the paths
-      projectPath = path.resolve(tempDir, normalizedSubPath);
+      // Safely join the paths using safePath function
+      try {
+        projectPath = safePath(tempDir, normalizedSubPath);
+      } catch (safePathError) {
+        const errorMsg = `❌ Invalid sub-path: Path traversal detected in '${subPath}'\n`;
+        console.error(errorMsg);
+        if (onOutput) onOutput('stderr', errorMsg);
+        throw new Error(`Invalid sub-path: Path traversal detected`);
+      }
       
       // Double-check that the resolved path is still within tempDir
       const tempDirResolved = path.resolve(tempDir) + path.sep;
-      if (!projectPath.startsWith(tempDirResolved) && projectPath !== path.resolve(tempDir)) {
+      const resolvedProjectPath = path.resolve(projectPath);
+      if (!resolvedProjectPath.startsWith(tempDirResolved) && resolvedProjectPath !== path.resolve(tempDir)) {
         const errorMsg = `❌ Invalid sub-path: Resolved path outside repository boundary\n`;
         console.error(errorMsg);
         if (onOutput) onOutput('stderr', errorMsg);
@@ -360,13 +385,13 @@ const ENVIRONMENTS = [
   { key: 'usertest', url: 'https://usertest.internal.zinclabs.dev' },
 ];
 
-app.get('/api/environments', (req, res) => {
+app.get('/api/environments', rateLimitMiddleware, (req, res) => {
   res.json(ENVIRONMENTS);
 });
 
 app.get('/api/credentials', rateLimitMiddleware, (req, res) => {
   try {
-    const credentialsPath = path.join(__dirname, 'credentials.json');
+    const credentialsPath = safePath(__dirname, 'credentials.json');
     const credentials = require(credentialsPath);
     res.json(credentials);
   } catch (err) {
@@ -377,7 +402,7 @@ app.get('/api/credentials', rateLimitMiddleware, (req, res) => {
 
 app.get('/api/modules', rateLimitMiddleware, (req, res) => {
   try {
-    const testsPath = path.join(__dirname, '..', 'playwright-tests');
+    const testsPath = safePath(__dirname, '..', 'playwright-tests');
     
     if (!fs.existsSync(testsPath)) {
       return res.status(404).json({ error: 'Tests directory not found' });
@@ -408,7 +433,7 @@ app.get('/api/modules', rateLimitMiddleware, (req, res) => {
 
 app.get('/api/spec-files', rateLimitMiddleware, (req, res) => {
   try {
-    const testsPath = path.join(__dirname, '..', 'playwright-tests');
+    const testsPath = safePath(__dirname, '..', 'playwright-tests');
     
     if (!fs.existsSync(testsPath)) {
       return res.status(404).json({ error: 'Tests directory not found' });
@@ -419,17 +444,23 @@ app.get('/api/spec-files', rateLimitMiddleware, (req, res) => {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
       
       for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-        const relativePath = path.join(basePath, entry.name);
-        
-        if (entry.isDirectory()) {
-          files.push(...getAllSpecFiles(fullPath, relativePath));
-        } else if (entry.name.endsWith('.spec.js')) {
-          files.push({
-            name: entry.name,
-            path: relativePath,
-            module: basePath || 'root'
-          });
+        try {
+          const fullPath = safePath(dir, entry.name);
+          const relativePath = basePath ? safePath(basePath, entry.name) : entry.name;
+          
+          if (entry.isDirectory()) {
+            files.push(...getAllSpecFiles(fullPath, relativePath));
+          } else if (entry.name.endsWith('.spec.js')) {
+            files.push({
+              name: entry.name,
+              path: relativePath,
+              module: basePath || 'root'
+            });
+          }
+        } catch (pathError) {
+          // Skip files with invalid paths (potential path traversal)
+          console.warn(`Skipping file with invalid path: ${entry.name}`);
+          continue;
         }
       }
       
@@ -477,6 +508,29 @@ function validateString(value, name, maxLength = 500) {
     throw new Error(`Invalid ${name}: must be a string with max length ${maxLength}`);
   }
   return value;
+}
+
+function validateUrlParameter(param, name) {
+  if (!param || typeof param !== 'string') {
+    throw new Error(`Invalid ${name}: must be a non-empty string`);
+  }
+  
+  // Check for path traversal attempts
+  if (param.includes('..') || param.includes('/') || param.includes('\\')) {
+    throw new Error(`Invalid ${name}: contains illegal characters`);
+  }
+  
+  // Check for URL encoding attempts to bypass validation
+  if (param.includes('%2e') || param.includes('%2f') || param.includes('%5c')) {
+    throw new Error(`Invalid ${name}: contains encoded path traversal characters`);
+  }
+  
+  // Length limit for safety
+  if (param.length > 100) {
+    throw new Error(`Invalid ${name}: exceeds maximum length`);
+  }
+  
+  return param;
 }
 
 function validateUrl(value, name) {
@@ -614,26 +668,42 @@ app.post('/api/run', rateLimitMiddleware, async (req, res) => {
     }
 
     // Validate and resolve project path to prevent path traversal
-    let resolvedProjectPath;
-    try {
-      resolvedProjectPath = path.resolve(actualProjectPath);
+    if (!isGitHubRepo) {
+      // For local paths, implement strict validation
+      if (!actualProjectPath || typeof actualProjectPath !== 'string') {
+        throw new Error('Invalid project path: must be a string');
+      }
       
-      // Additional validation for local paths (non-GitHub repos)
-      if (!isGitHubRepo) {
-        // Ensure path is absolute and doesn't contain traversal attempts
-        if (!path.isAbsolute(resolvedProjectPath) || resolvedProjectPath.includes('..')) {
-          throw new Error('Invalid project path: must be absolute and not contain path traversal');
+      // Resolve and validate local project path
+      const resolvedPath = path.resolve(actualProjectPath);
+      
+      // Additional validation to prevent path traversal
+      if (actualProjectPath.includes('..') || actualProjectPath.includes('~')) {
+        throw new Error('Invalid project path: contains path traversal sequences');
+      }
+      
+      // Strict validation for local paths - must be absolute and safe
+      if (!path.isAbsolute(resolvedPath) || 
+          resolvedPath.includes('..') ||
+          resolvedPath.includes('~') ||
+          resolvedPath.startsWith('/etc') ||
+          resolvedPath.startsWith('/root') ||
+          resolvedPath.startsWith('/sys') ||
+          resolvedPath.startsWith('/proc')) {
+        throw new Error('Invalid project path: unsafe or restricted path');
+      }
+      
+      // Verify project path exists using the resolved path
+      try {
+        const stats = fs.statSync(resolvedPath);
+        if (!stats.isDirectory()) {
+          throw new Error('Project path must be a directory');
         }
+      } catch (fsError) {
+        throw new Error(`Project path does not exist or is not accessible`);
       }
       
-      // Verify project path exists
-      if (!fs.existsSync(resolvedProjectPath)) {
-        throw new Error(`Project path does not exist: ${path.basename(resolvedProjectPath)}`);
-      }
-      
-      actualProjectPath = resolvedProjectPath;
-    } catch (pathError) {
-      throw new Error(`Invalid project path: ${pathError.message}`);
+      actualProjectPath = resolvedPath;
     }
 
     // Search for playwright.config.js in the path and subdirectories with safe path construction
@@ -644,12 +714,7 @@ app.post('/api/run', rateLimitMiddleware, async (req, res) => {
     for (const dir of searchDirectories) {
       for (const filename of configFilenames) {
         try {
-          const configPath = dir ? path.resolve(actualProjectPath, dir, filename) : path.resolve(actualProjectPath, filename);
-          
-          // Ensure the config path is within the project directory
-          if (!configPath.startsWith(actualProjectPath + path.sep) && configPath !== actualProjectPath) {
-            continue; // Skip if path escapes project directory
-          }
+          const configPath = dir ? safePath(actualProjectPath, dir, filename) : safePath(actualProjectPath, filename);
           
           if (fs.existsSync(configPath)) {
             playwrightConfigPath = configPath;
@@ -673,29 +738,29 @@ app.post('/api/run', rateLimitMiddleware, async (req, res) => {
 
     // Install dependencies if package.json exists and this is a cloned repo
     if (isGitHubRepo) {
-      const packageJsonPath = path.resolve(actualProjectPath, 'package.json');
-      
-      // Validate package.json path is within project directory
-      if (!packageJsonPath.startsWith(actualProjectPath + path.sep) && packageJsonPath !== actualProjectPath) {
-        throw new Error('Invalid package.json path: outside project directory');
-      }
-      
-      if (fs.existsSync(packageJsonPath)) {
-        const installMessage = `📦 Installing dependencies in ${actualProjectPath}...\n`;
-        broadcastMessage('log', 'stdout', installMessage);
+      try {
+        const packageJsonPath = safePath(actualProjectPath, 'package.json');
         
-        try {
-          await executeCommand('npm', ['install'], { cwd: actualProjectPath }, (stream, chunk) => {
-            broadcastMessage('log', stream, chunk);
-          });
+        if (fs.existsSync(packageJsonPath)) {
+          const installMessage = `📦 Installing dependencies in ${actualProjectPath}...\n`;
+          broadcastMessage('log', 'stdout', installMessage);
           
-          const installSuccessMessage = `✅ Dependencies installed successfully\n`;
-          broadcastMessage('log', 'stdout', installSuccessMessage);
-        } catch (installError) {
-          const installErrorMessage = `⚠️ Failed to install dependencies: ${installError.message}\n`;
-          broadcastMessage('log', 'stderr', installErrorMessage);
-          broadcastMessage('log', 'stdout', `🔄 Continuing with existing dependencies...\n`);
+          try {
+            await executeCommand('npm', ['install'], { cwd: actualProjectPath }, (stream, chunk) => {
+              broadcastMessage('log', stream, chunk);
+            });
+            
+            const installSuccessMessage = `✅ Dependencies installed successfully\n`;
+            broadcastMessage('log', 'stdout', installSuccessMessage);
+          } catch (installError) {
+            const installErrorMessage = `⚠️ Failed to install dependencies: ${installError.message}\n`;
+            broadcastMessage('log', 'stderr', installErrorMessage);
+            broadcastMessage('log', 'stdout', `🔄 Continuing with existing dependencies...\n`);
+          }
         }
+      } catch (pathError) {
+        // Skip package.json if path is invalid
+        console.warn('Could not access package.json:', pathError.message);
       }
     }
 
@@ -835,9 +900,16 @@ app.post('/api/run', rateLimitMiddleware, async (req, res) => {
 app.get('/api/run/:runId/stream', rateLimitMiddleware, (req, res) => {
   const { runId } = req.params;
   
-  // Validate runId format to prevent injection
-  if (!runId || typeof runId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(runId)) {
-    res.status(400).json({ error: 'Invalid run ID format' });
+  try {
+    // Enhanced validation for runId parameter
+    validateUrlParameter(runId, 'runId');
+    
+    // Additional format validation
+    if (!/^[a-zA-Z0-9_-]+$/.test(runId)) {
+      throw new Error('Invalid run ID format: only alphanumeric characters, underscores, and hyphens allowed');
+    }
+  } catch (validationError) {
+    res.status(400).json({ error: validationError.message });
     return;
   }
   
@@ -920,9 +992,16 @@ app.get('/api/run/:runId/stream', rateLimitMiddleware, (req, res) => {
 app.post('/api/run/:runId/stop', rateLimitMiddleware, (req, res) => {
   const { runId } = req.params;
   
-  // Validate runId format to prevent injection
-  if (!runId || typeof runId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(runId)) {
-    return res.status(400).json({ error: 'Invalid run ID format' });
+  try {
+    // Enhanced validation for runId parameter
+    validateUrlParameter(runId, 'runId');
+    
+    // Additional format validation
+    if (!/^[a-zA-Z0-9_-]+$/.test(runId)) {
+      throw new Error('Invalid run ID format: only alphanumeric characters, underscores, and hyphens allowed');
+    }
+  } catch (validationError) {
+    return res.status(400).json({ error: validationError.message });
   }
   
   const run = activeRuns.get(runId);
@@ -951,12 +1030,18 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
-app.use((req, res) => {
+// 404 handler with light rate limiting
+app.use(rateLimitMiddleware, (req, res) => {
   if (req.path.startsWith('/api/')) {
     res.status(404).json({ error: 'API endpoint not found' });
   } else {
-    res.sendFile(path.join(publicDir, 'index.html'));
+    // Use safePath for serving static files
+    try {
+      const safeFilePath = safePath(publicDir, 'index.html');
+      res.sendFile(safeFilePath);
+    } catch (pathError) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
 });
 
