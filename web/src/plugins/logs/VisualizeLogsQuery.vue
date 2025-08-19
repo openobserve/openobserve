@@ -466,6 +466,7 @@ export default defineComponent({
     const { dashboardPanelData, resetAggregationFunction, validatePanel } =
       useDashboardPanelData(dashboardPanelDataPageKey);
     const metaData = ref(null);
+    const resultMetaData = ref(null);
     const seriesData = ref([] as any[]);
     const seriesDataUpdate = (data: any) => {
       seriesData.value = data;
@@ -581,6 +582,13 @@ export default defineComponent({
         );
         return;
       } else {
+
+        // only copy if is_ui_histogram is true
+        if (resultMetaData.value?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
+          dashboardPanelData.data.queries[0].query =
+            resultMetaData.value?.[0]?.converted_histogram_query;
+        }
+
         showAddToDashboardDialog.value = true;
       }
     };
@@ -767,15 +775,15 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
-    const onResultMetadataUpdate = (resultMetaData: any) => {
+    const onResultMetadataUpdate = (resultMetaDataParam: any) => {
+      // Store the result metadata
+      resultMetaData.value = resultMetaDataParam;
+
       // only copy if is_ui_histogram is true
-      if (
-        resultMetaData?.[0]?.converted_histogram_query &&
-        is_ui_histogram.value === true
-      ) {
-        dashboardPanelData.data.queries[0].query =
-          resultMetaData?.[0]?.converted_histogram_query;
-      }
+      // if (resultMetaDataParam?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
+      //   dashboardPanelData.data.queries[0].query =
+      //     resultMetaDataParam?.[0]?.converted_histogram_query;
+      // }
     };
 
     return {
