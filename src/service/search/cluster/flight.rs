@@ -43,6 +43,8 @@ use parking_lot::Mutex;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
+#[cfg(feature = "enterprise")]
+use crate::service::search::SEARCH_SERVER;
 use crate::{
     common::infra::cluster as infra_cluster,
     service::{
@@ -290,20 +292,12 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
     );
 
     #[cfg(feature = "enterprise")]
-    super::super::SEARCH_SERVER
-        .add_file_stats(
-            trace_id,
-            scan_stats.files,
-            scan_stats.records,
-            scan_stats.original_size + scan_stats.idx_scan_size,
-            scan_stats.compressed_size,
-        )
-        .await;
+    SEARCH_SERVER.add_file_stats(trace_id, &scan_stats).await;
 
     #[cfg(feature = "enterprise")]
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
     #[cfg(feature = "enterprise")]
-    if super::super::SEARCH_SERVER
+    if SEARCH_SERVER
         .insert_sender(trace_id, abort_sender, true)
         .await
         .is_err()
@@ -566,7 +560,7 @@ pub async fn check_work_group(
         o2_enterprise::enterprise::search::work_group::predict(nodes, file_id_list_vec),
     );
 
-    super::super::SEARCH_SERVER
+    SEARCH_SERVER
         .add_work_group(trace_id, work_group.clone())
         .await;
 

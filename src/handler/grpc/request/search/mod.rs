@@ -27,6 +27,7 @@ use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
+    config::meta::search::ScanStats,
     config::metrics,
     o2_enterprise::enterprise::search::{QueryManager, TaskStatus, WorkGroup},
 };
@@ -89,16 +90,9 @@ impl Searcher {
     }
 
     // add file stats
-    pub async fn add_file_stats(
-        &self,
-        trace_id: &str,
-        files: i64,
-        records: i64,
-        original_size: i64,
-        compressed_size: i64,
-    ) {
+    pub async fn add_file_stats(&self, trace_id: &str, scan_stats: &ScanStats) {
         self.query_manager
-            .add_file_stats(trace_id, files, records, original_size, compressed_size)
+            .add_file_stats(trace_id, scan_stats)
             .await;
     }
 

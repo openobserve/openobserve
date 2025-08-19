@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineProps, defineEmits, computed, nextTick, watch } from "vue";
+import { ref, computed, nextTick, watch } from "vue";
 
 const props = defineProps<{
   name: string;
