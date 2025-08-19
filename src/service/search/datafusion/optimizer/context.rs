@@ -46,7 +46,6 @@ pub struct StreamingAggregationContext {
     pub streaming_id: String,
     pub start_time: i64,
     pub end_time: i64,
-    pub use_cache: bool,
     pub is_complete_cache_hit: Arc<Mutex<bool>>,
 }
 
@@ -56,7 +55,14 @@ impl StreamingAggregationContext {
         request: &Request,
         is_complete_cache_hit: Arc<Mutex<bool>>,
     ) -> Result<Option<Self>, Error> {
-        if !request.streaming_output {
+        if !request.streaming_output || !config::get_config().common.feature_query_streaming_aggs {
+            return Ok(None);
+        }
+
+        let org_settings = crate::service::db::organization::get_org_setting(&request.org_id)
+            .await
+            .unwrap_or_default();
+        if !org_settings.streaming_aggregation_enabled {
             return Ok(None);
         }
 
@@ -67,16 +73,10 @@ impl StreamingAggregationContext {
             ));
         };
 
-        let org_settings = crate::service::db::organization::get_org_setting(&request.org_id)
-            .await
-            .unwrap_or_default();
-        let use_cache = request.use_cache && org_settings.streaming_aggregation_enabled;
-
         Ok(Some(Self {
             streaming_id,
             start_time: request.time_range.unwrap_or((0, 0)).0,
             end_time: request.time_range.unwrap_or((0, 0)).1,
-            use_cache,
             is_complete_cache_hit,
         }))
     }
@@ -90,7 +90,6 @@ pub fn generate_streaming_agg_rules(
         context.streaming_id,
         context.start_time,
         context.end_time,
-        context.use_cache,
         context.is_complete_cache_hit,
     )) as _
 }
