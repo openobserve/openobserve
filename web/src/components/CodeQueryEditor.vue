@@ -79,6 +79,14 @@ export default defineComponent({
       type: String,
       default: "sql",
     },
+    functions: {
+      type: Array,
+      default: () => [],
+    },
+    fields: {
+      type: Array,
+      default: () => [],
+    },
   },
   emits: ["update-query", "run-query", "update:query", "focus", "blur"],
   setup(props, { emit }) {
@@ -109,8 +117,169 @@ export default defineComponent({
       None: monaco.languages.CompletionItemInsertTextRule.None,
     };
 
+    const defaultKeywords = [
+      {
+        label: "and",
+        kind: "Keyword",
+        insertText: "and ",
+      },
+      {
+        label: "or",
+        kind: "Keyword",
+        insertText: "or ",
+      },
+      {
+        label: "like",
+        kind: "Keyword",
+        insertText: "like '%${1:params}%' ",
+        insertTextRules: "InsertAsSnippet",
+      },
+      {
+        label: "in",
+        kind: "Keyword",
+        insertText: "in ('${1:params}') ",
+        insertTextRules: "InsertAsSnippet",
+      },
+      {
+        label: "not in",
+        kind: "Keyword",
+        insertText: "not in ('${1:params}') ",
+        insertTextRules: "InsertAsSnippet",
+      },
+      {
+        label: "between",
+        kind: "Keyword",
+        insertText: "between '${1:params}' and '${1:params}' ",
+        insertTextRules: "InsertAsSnippet",
+      },
+      {
+        label: "not between",
+        kind: "Keyword",
+        insertText: "not between '${1:params}' and '${1:params}' ",
+        insertTextRules: "InsertAsSnippet",
+      },
+      {
+        label: "is null",
+        kind: "Keyword",
+        insertText: "is null ",
+      },
+      {
+        label: "is not null",
+        kind: "Keyword",
+        insertText: "is not null ",
+      },
+      {
+        label: ">",
+        kind: "Operator",
+        insertText: "> ",
+      },
+      {
+        label: "<",
+        kind: "Operator",
+        insertText: "< ",
+      },
+      {
+        label: ">=",
+        kind: "Operator",
+        insertText: ">= ",
+      },
+      {
+        label: "<=",
+        kind: "Operator",
+        insertText: "<= ",
+      },
+      {
+        label: "<>",
+        kind: "Operator",
+        insertText: "<> ",
+      },
+      {
+        label: "=",
+        kind: "Operator",
+        insertText: "= ",
+      },
+      {
+        label: "!=",
+        kind: "Operator",
+        insertText: "!= ",
+      },
+      {
+        label: "()",
+        kind: "Keyword",
+        insertText: "(${1:condition}) ",
+        insertTextRules: "InsertAsSnippet",
+      },
+    ];
+    const defaultSuggestions = [
+      {
+        label: (_keyword: string) => `match_all('${_keyword}')`,
+        kind: "Text",
+        insertText: (_keyword: string) => `match_all('${_keyword}')`,
+      },
+      {
+        label: (_keyword: string) => `match_all_raw('${_keyword}')`,
+        kind: "Text",
+        insertText: (_keyword: string) => `match_all_raw('${_keyword}')`,
+      },
+      {
+        label: (_keyword: string) => `match_all_raw_ignore_case('${_keyword}')`,
+        kind: "Text",
+        insertText: (_keyword: string) =>
+          `match_all_raw_ignore_case('${_keyword}')`,
+      },
+      {
+        label: (_keyword: string) =>
+          `re_match(fieldname: string, regular_expression: string)`,
+        kind: "Text",
+        insertText: (_keyword: string) => `re_match(fieldname, '')`,
+      },
+      {
+        label: (_keyword: string) =>
+          `re_not_match(fieldname: string, regular_expression: string)`,
+        kind: "Text",
+        insertText: (_keyword: string) => `re_not_match(fieldname, '')`,
+      },
+      {
+        label: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
+        kind: "Text",
+        insertText: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
+      },
+      {
+        label: (_keyword: string) =>
+          `str_match_ignore_case(fieldname, '${_keyword}')`,
+        kind: "Text",
+        insertText: (_keyword: string) =>
+          `str_match_ignore_case(fieldname, '${_keyword}')`,
+      },
+      {
+        label: (_keyword: string) => `fuzzy_match(fieldname, '${_keyword}', 1)`,
+        kind: "Text",
+        insertText: (_keyword: string) =>
+          `fuzzy_match(fieldname, '${_keyword}', 1)`,
+      },
+      {
+        label: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
+        kind: "Text",
+        insertText: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
+      },
+    ];
+
+    const keywords = computed(() => {
+      if (props.language === "sql" && !props.keywords?.length) {
+        return defaultKeywords;
+      }
+      return props.keywords;
+    });
+
+    const suggestions = computed(() => {
+      if (props.language === "sql" && !props.suggestions?.length) {
+        return defaultSuggestions;
+      }
+      return props.suggestions;
+    });
+
     const createDependencyProposals = (range: any) => {
-      return props.keywords.map((keyword: any) => {
+      return keywords.value.map((keyword: any) => {
         const itemObj: any = {
           ...keyword,
           label: keyword["label"],
@@ -413,7 +582,7 @@ export default defineComponent({
             });
 
             const lastElement = arr.pop();
-            props.suggestions.forEach((suggestion: any) => {
+            suggestions.value.forEach((suggestion: any) => {
               filteredSuggestions.push({
                 label: suggestion.label(lastElement),
                 kind: monaco.languages.CompletionItemKind[
