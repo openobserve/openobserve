@@ -3,10 +3,27 @@ const { defineConfig, devices } = require('@playwright/test');
 require('dotenv').config();
 
 /**
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
+ * Fallback to .env file if environment variables are not set
+ * This allows both UI runner (which sets env vars) and terminal usage (which uses .env)
  */
-// require('dotenv').config();
+function loadEnvironmentVariables() {
+  // Check if essential env vars are already set (from UI runner)
+  if (process.env.ZO_BASE_URL && process.env.ZO_ROOT_USER_EMAIL && process.env.ZO_ROOT_USER_PASSWORD) {
+    console.log('Using environment variables from UI runner');
+    return;
+  }
+
+  // Fallback to .env file for terminal usage
+  try {
+    require('dotenv').config();
+    console.log('Using environment variables from .env file');
+  } catch (error) {
+    console.warn('dotenv not available, using existing environment variables');
+  }
+}
+
+// Load environment variables
+loadEnvironmentVariables();
 
 /**
  * @see https://playwright.dev/docs/test-configuration

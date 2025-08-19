@@ -21,6 +21,7 @@ use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {
     super::request::Request,
+    crate::service::search::SEARCH_SERVER,
     config::metrics,
     infra::dist_lock,
     infra::errors::{Error, ErrorCodes, Result},
@@ -42,7 +43,7 @@ pub async fn work_group_checking(
     user_id: Option<&str>,
 ) -> Result<()> {
     let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-    if super::SEARCH_SERVER
+    if SEARCH_SERVER
         .insert_sender(trace_id, abort_sender, false)
         .await
         .is_err()

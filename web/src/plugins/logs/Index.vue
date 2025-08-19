@@ -389,6 +389,7 @@ import {
   getFieldsFromQuery,
 } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
+import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
@@ -1579,6 +1580,10 @@ export default defineComponent({
             // emit resize event
             // this will rerender/call resize method of already rendered chart to resize
             window.dispatchEvent(new Event("resize"));
+          } else {
+            // reset dashboard panel data as we will rebuild when user came back to visualize
+            // this fixes blank chart issue when user came back to visualize
+            resetDashboardPanelData()
           }
         } catch (err: any) {
           // this will clear dummy trace id
@@ -1661,6 +1666,26 @@ export default defineComponent({
         window.dispatchEvent(new Event("resize"));
       },
     );
+
+    // Auto-apply config changes that don't require API calls (similar to dashboard)
+    const debouncedUpdateChartConfig = debounce((newVal) => {
+      if (searchObj.meta.logsVisualizeToggle === "visualize") {
+
+          let configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+          visualizeChartData.value,
+          newVal,
+        );
+
+        if (!configNeedsApiCall) {
+          visualizeChartData.value = JSON.parse(JSON.stringify(newVal));
+          window.dispatchEvent(new Event("resize"));
+        }
+      }
+    }, 1000);
+
+    watch(() => dashboardPanelData.data, debouncedUpdateChartConfig, {
+      deep: true,
+    });
 
     watch(
       () => [
@@ -1887,8 +1912,8 @@ export default defineComponent({
         let extractedFields;
         
         // Check if we have a cached response for this query
-        if (schemaCache.value && schemaCache.value.key === logsPageQuery) {
-          extractedFields = schemaCache.value.response.data;
+        if (schemaCache?.value && schemaCache?.value?.key === logsPageQuery) {
+          extractedFields = schemaCache?.value?.response?.data;
         } else {
           // Use the refactored getResultSchema function
           extractedFields = await getResultSchema(logsPageQuery, signal, startISOTimestamp, endISOTimestamp);

@@ -1,5 +1,5 @@
 import { test, expect } from "../baseFixtures";
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 import PageManager from '../../pages/page-manager.js';
 
 /**
@@ -53,7 +53,7 @@ test.describe("Alerts Import/Export", () => {
     
     // Navigate to alerts page
     await page.goto(
-      `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${process.env["ZO_BASE_URL"]}${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
   });
 
