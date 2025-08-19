@@ -64,12 +64,10 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, inject, ref, computed } from "vue";
+import { defineComponent, inject, ref, computed, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import ColorBySeriesPopUp from "./ColorBySeriesPopUp.vue";
-import { onBeforeMount } from "vue";
-
 export default defineComponent({
   name: "ColorBySeries",
   components: { ColorBySeriesPopUp },

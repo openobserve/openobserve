@@ -27,7 +27,6 @@ import {
   ColorModeWithoutMinMax,
   getMetricMinMaxValue,
   getSeriesColor,
-  getColorPalette,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 

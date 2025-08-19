@@ -130,7 +130,7 @@
                     flat
                     dense
                     class="tw-text-blue-700 tw-font-semibold tw-w-full"
-                    @click="handleSetColorClick(index)"
+                    @click="setColorByIndex(index)"
                   />
                 </div>
               </div>
@@ -272,7 +272,7 @@ export default defineComponent({
 
     onMounted(() => {
       // if editColorBySeries is empty, add default color
-      if (editColorBySeries.value.length == 0) {
+      if (editColorBySeries.value.length === 0) {
         addcolorBySeries();
       }
     });
@@ -296,23 +296,6 @@ export default defineComponent({
       emit("close");
     };
 
-    // Method to set color and focus input for color picker
-    const handleSetColorClick = (index: number) => {
-      setColorByIndex(index);
-      // Use nextTick to ensure DOM is updated before trying to focus
-      nextTick(() => {
-        if (typeof window !== "undefined" && window.document) {
-          // Find the colorize icon and click it to open the color picker
-          const colorizeIcons = window.document.querySelectorAll(
-            '.color-section .q-icon[name="colorize"]',
-          );
-          if (colorizeIcons && colorizeIcons[index]) {
-            (colorizeIcons[index] as HTMLElement).click();
-          }
-        }
-      });
-    };
-
     // Method to open color picker directly
     const openColorPicker = (index: number) => {
       // This method is called when the colorize icon is clicked
@@ -331,7 +314,6 @@ export default defineComponent({
       editColorBySeries,
       outlinedCancel,
       seriesDataItems,
-      handleSetColorClick,
       openColorPicker,
       selectColorBySeriesOption,
       isFormValid,
