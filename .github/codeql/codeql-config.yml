@@ -5,15 +5,3 @@ queries:
 paths-ignore:
   - "tests/ui-testing/playwright-runner/node_modules/**"
   - "tests/ui-testing/playwright-runner/test-results/**"
-query-filters:
-  # Suppress false positive missing rate limiting alerts for internal functions
-  - exclude:
-      id: js/missing-rate-limiting
-      # Only exclude for specific patterns that are not actual route handlers
-      locations:
-        - "tests/ui-testing/playwright-runner/server.js"
-  # Suppress false positive uncontrolled data alerts for validated paths  
-  - exclude:
-      id: js/path-injection
-      locations:
-        - "tests/ui-testing/playwright-runner/server.js"

@@ -621,45 +621,6 @@
               </div>
             </div>
 
-            <!-- Project Source Selection -->
-            <div class="form-row">
-              <label>Project Source</label>
-              <div style="display: flex; gap: 16px; margin-top: 8px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <input type="radio" id="sourceLocal" name="projectSource" value="local" checked style="width: auto; margin: 0;" />
-                  <label for="sourceLocal" style="margin: 0; text-transform: none; font-size: 14px;">Local Path</label>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <input type="radio" id="sourceGithub" name="projectSource" value="github" style="width: auto; margin: 0;" />
-                  <label for="sourceGithub" style="margin: 0; text-transform: none; font-size: 14px;">GitHub Repository</label>
-                </div>
-              </div>
-            </div>
-
-            <!-- Local Path Section -->
-            <div id="localPathSection" class="form-row">
-              <label for="projectPath">Local Project Path</label>
-              <input type="text" id="projectPath" placeholder="/path/to/ui-testing" />
-            </div>
-
-            <!-- GitHub Repository Section -->
-            <div id="githubRepoSection" class="form-row" style="display: none;">
-              <div class="form-row two-col">
-                <div>
-                  <label for="repoUrl">GitHub Repository URL</label>
-                  <input type="url" id="repoUrl" placeholder="https://github.com/user/repo.git" />
-                </div>
-                <div>
-                  <label for="repoBranch">Branch (Optional)</label>
-                  <input type="text" id="repoBranch" placeholder="main" />
-                </div>
-              </div>
-              <div class="form-row">
-                <label for="repoSubPath">Sub-path to tests (Optional)</label>
-                <input type="text" id="repoSubPath" placeholder="tests/ui-testing" />
-              </div>
-            </div>
-
             <div class="form-row">
               <div style="display: flex; align-items: center; gap: 8px;">
                 <input type="checkbox" id="headless" checked style="width: auto; margin: 0;" />

@@ -16,7 +16,6 @@ document.addEventListener('DOMContentLoaded', function() {
   const tagsInput = document.getElementById('tags');
   const workersInput = document.getElementById('workers');
   const headlessCheckbox = document.getElementById('headless');
-  const projectPathInput = document.getElementById('projectPath');
   const runBtn = document.getElementById('runBtn');
   const stopBtn = document.getElementById('stopBtn');
   const logsEl = document.getElementById('logs');
@@ -99,9 +98,6 @@ document.addEventListener('DOMContentLoaded', function() {
   ];
 
   let selectedSuggestionIndex = -1;
-
-  const DEFAULT_PROJECT_PATH = '/Users/shrinathrao/Documents/Work Files/Project/myProject-openobserve/tests/ui-testing';
-  projectPathInput.value = DEFAULT_PROJECT_PATH;
 
   let credentialsData = {};
   let availableModules = [];
@@ -293,7 +289,6 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
       localPathSection.style.display = 'none';
       githubRepoSection.style.display = 'block';
-      projectPathInput.value = '';
     }
   }
 
@@ -608,7 +603,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const payload = {
       // Project source fields
       isGitHubRepo: isGitHubRepo,
-      projectPath: !isGitHubRepo ? (projectPathInput.value || DEFAULT_PROJECT_PATH) : undefined,
       repoUrl: isGitHubRepo ? repoUrlInput.value.trim() : undefined,
       repoBranch: isGitHubRepo ? (repoBranchInput.value.trim() || 'main') : undefined,
       repoSubPath: isGitHubRepo ? repoSubPathInput.value.trim() : undefined,
@@ -646,11 +640,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (isGitHubRepo && !payload.repoUrl) {
       setStatus('error', 'Please provide GitHub repository URL');
-      return;
-    }
-
-    if (!isGitHubRepo && !payload.projectPath) {
-      setStatus('error', 'Please provide local project path');
       return;
     }
 

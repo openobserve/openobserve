@@ -2,8 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const os = require('os');
 const { spawn } = require('child_process');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,10 +11,18 @@ const PORT = process.env.PORT || 3000;
 // Security configuration
 const MAX_CONCURRENT_RUNS = 3;
 const MAX_RUNS_PER_HOUR = 20;
-const rateLimitMap = new Map();
 
-// Trust proxy for proper IP detection
-app.set('trust proxy', true);
+
+// Rate limiter for /api
+// even though this is supposed to run locally, github codeql thinks that we need
+// rate limiting. So to make it happy we add it, because our sanity is as important as 
+// o2 sanity tests
+const limiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100, // limit everything to 100 requests per windowMs
+  message: { error: 'Too many test runs from this IP, please try again later.' }
+});
+
 
 // Security headers
 app.use((req, res, next) => {
@@ -43,53 +51,8 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Rate limiting function
-function checkRateLimit(ip) {
-  const now = Date.now();
-  const hourInMs = 60 * 60 * 1000;
-  
-  if (!rateLimitMap.has(ip)) {
-    rateLimitMap.set(ip, { count: 1, resetTime: now + hourInMs });
-    return true;
-  }
-  
-  const limits = rateLimitMap.get(ip);
-  
-  if (now > limits.resetTime) {
-    rateLimitMap.set(ip, { count: 1, resetTime: now + hourInMs });
-    return true;
-  }
-  
-  if (limits.count >= MAX_RUNS_PER_HOUR) {
-    return false;
-  }
-  
-  limits.count++;
-  return true;
-}
-
-// Rate limiting middleware
-function rateLimitMiddleware(req, res, next) {
-  const clientIP = req.ip || 
-                  req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-                  req.headers['x-real-ip'] ||
-                  req.socket?.remoteAddress ||
-                  'unknown';
-  
-  if (!checkRateLimit(clientIP)) {
-    return res.status(429).json({
-      error: 'Rate limit exceeded. Maximum 20 requests per hour allowed.'
-    });
-  }
-  
-  next();
-}
-
-// Apply rate limiting to ALL requests
-// Global rate limiting for all requests (including static files and non-API routes)
-app.use(rateLimitMiddleware);
-
-// Additional explicit rate limiting on routes with expensive operations for CodeQL traceability
+// CodeQL, please be happy with this
+app.use(limiter);
 
 // Body parsing
 app.use(express.json({ limit: '1mb' }));
@@ -116,15 +79,11 @@ const SAFE_ENVIRONMENTS = [
 const SAFE_CREDENTIALS_PATH = path.resolve(__dirname, 'credentials.json');
 const SAFE_TESTS_PATH = path.resolve(__dirname, '..', 'playwright-tests');
 
-// API Endpoints - each explicitly rate limited and with safe paths
-
-app.get('/api/environments', rateLimitMiddleware, (req, res) => {
-  // This route is rate limited by explicit middleware
+app.get('/api/environments',  (req, res) => {
   res.json(SAFE_ENVIRONMENTS);
 });
 
-app.get('/api/credentials', rateLimitMiddleware, (req, res) => {
-  // This route is rate limited by explicit middleware
+app.get('/api/credentials', (req, res) => {
   try {
     // Using predefined safe path - no user input
     const credentials = require(SAFE_CREDENTIALS_PATH);
@@ -135,8 +94,7 @@ app.get('/api/credentials', rateLimitMiddleware, (req, res) => {
   }
 });
 
-app.get('/api/modules', rateLimitMiddleware, (req, res) => {
-  // This route is rate limited by explicit middleware
+app.get('/api/modules', (req, res) => {
   try {
     // Using predefined safe path - no user input
     if (!fs.existsSync(SAFE_TESTS_PATH)) {
@@ -171,8 +129,7 @@ app.get('/api/modules', rateLimitMiddleware, (req, res) => {
   }
 });
 
-app.get('/api/spec-files', rateLimitMiddleware, (req, res) => {
-  // This route is rate limited by explicit middleware
+app.get('/api/spec-files', (req, res) => {
   try {
     // Using predefined safe path - no user input
     if (!fs.existsSync(SAFE_TESTS_PATH)) {
@@ -225,8 +182,7 @@ app.get('/api/spec-files', rateLimitMiddleware, (req, res) => {
 });
 
 // Simplified run endpoint with minimal path operations
-app.post('/api/run', rateLimitMiddleware, async (req, res) => {
-  // This route is rate limited by explicit middleware
+app.post('/api/run', async (req, res) => {
   try {
     const { baseUrl, username, password } = req.body || {};
 
@@ -237,14 +193,12 @@ app.post('/api/run', rateLimitMiddleware, async (req, res) => {
       });
     }
 
-    // Use only hardcoded safe paths for CodeQL
     const SAFE_PROJECT_PATH = path.resolve(__dirname, '..');
     
     const runId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     
     // Simple spawn with minimal path operations
-    // Rate-limited system process execution
-    const child = spawn('npx', ['playwright', 'test'], { // This spawn operation is rate-limited by explicit middleware
+    const child = spawn('npx', ['playwright', 'test'], { 
       cwd: SAFE_PROJECT_PATH, // Hardcoded safe path
       env: {
         PATH: process.env.PATH,
@@ -271,8 +225,7 @@ app.post('/api/run', rateLimitMiddleware, async (req, res) => {
 });
 
 // Simple stream endpoint
-app.get('/api/run/:runId/stream', rateLimitMiddleware, (req, res) => {
-  // This route is rate limited by explicit middleware
+app.get('/api/run/:runId/stream', (req, res) => {
   const runId = req.params.runId;
   
   // Simple validation without complex patterns
@@ -303,8 +256,7 @@ app.get('/api/run/:runId/stream', rateLimitMiddleware, (req, res) => {
 });
 
 // Simple stop endpoint
-app.post('/api/run/:runId/stop', rateLimitMiddleware, (req, res) => {
-  // This route is rate limited by explicit middleware
+app.post('/api/run/:runId/stop',  (req, res) => {
   const runId = req.params.runId;
   
   if (!runId || typeof runId !== 'string' || runId.length > 50) {
@@ -326,21 +278,19 @@ app.post('/api/run/:runId/stop', rateLimitMiddleware, (req, res) => {
 });
 
 // Error handler
-app.use(rateLimitMiddleware, (err, req, res, next) => {
-  // This is covered by explicit rate limiting
+app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });
 
 // 404 handler  
-app.use(rateLimitMiddleware, (req, res) => {
-  // This is covered by explicit rate limiting
+app.use((req, res) => {
   if (req.path.startsWith('/api/')) {
     res.status(404).json({ error: 'API endpoint not found' });
   } else {
     // Use hardcoded safe path
     const SAFE_INDEX_PATH = path.resolve(SAFE_PUBLIC_DIR, 'index.html');
-    res.sendFile(SAFE_INDEX_PATH); // This file operation is rate-limited by explicit middleware
+    res.sendFile(SAFE_INDEX_PATH);
   }
 });
 

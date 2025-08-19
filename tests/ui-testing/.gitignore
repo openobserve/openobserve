@@ -16,3 +16,5 @@ cypress/screenshots
 /playwright/.cache/
 coverage/
 .nyc_output/
+.last-run.json
+*.log
