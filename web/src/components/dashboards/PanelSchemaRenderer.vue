@@ -406,6 +406,8 @@ export default defineComponent({
     "updated:vrlFunctionFieldList",
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
+    "is-partial-data-update",
+    "series-data-update",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -685,6 +687,11 @@ export default defineComponent({
       },
       { deep: true },
     );
+
+    watch(panelData, () => {
+      emit("series-data-update", panelData.value);
+    },
+    { deep: true });
 
     // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
     watch(
