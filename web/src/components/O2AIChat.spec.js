@@ -274,6 +274,14 @@ describe('O2AIChat - sendMessage and streaming', () => {
 // 5. Clipboard
 describe('O2AIChat - clipboard', () => {
   it('copyToClipboard notifies positive on success', async () => {
+    // Mock successful clipboard operation
+    const mockWriteText = vi.fn().mockResolvedValue();
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: mockWriteText,
+      },
+    });
+    
     const wrapper = await mountChat({ isOpen: true });
     const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
     await wrapper.vm.copyToClipboard('abc');

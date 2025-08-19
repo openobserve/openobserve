@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
-import { createRouter, createWebHistory } from 'vue-router';
+import router from '@/test/unit/helpers/router';
 import { Quasar, Notify } from 'quasar';
 import MemberSubscription from './MemberSubscription.vue';
 import organizationsService from '@/services/organizations';
@@ -54,18 +54,11 @@ describe('MemberSubscription.vue', () => {
       },
     });
 
-    // Create router
-    router = createRouter({
-      history: createWebHistory(),
-      routes: [
-        { path: '/', name: 'home', component: { template: '<div>Home</div>' } },
-        { path: '/organizations', name: 'organizations', component: { template: '<div>Organizations</div>' } },
-        { path: '/member-subscription', name: 'member-subscription', component: MemberSubscription },
-      ],
-    });
-
-    // Push to the route
-    router.push('/member-subscription' + routeHash);
+    // Use existing router helper
+    // Push to the route if needed
+    if (routeHash) {
+      router.push('/member-subscription' + routeHash);
+    }
 
     const mockNotify = vi.fn();
     const mockQuasar = {

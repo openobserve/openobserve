@@ -205,9 +205,6 @@ describe("AddAlert Component", () => {
         },
         plugins: [i18n, router],
       },
-      props: {
-        title: "Add Alert",
-      },
       mocks: {
         updateStreams: updateStreamsMock,
       },
@@ -257,7 +254,7 @@ describe("AddAlert Component", () => {
           timezone: "UTC",
         },
         destinations: [],
-        context_attributes: {},
+        context_attributes: [],
         enabled: true,
         description: "",
         lastTriggeredAt: 0,
@@ -1002,7 +999,7 @@ describe("AddAlert Component", () => {
             query_condition: { type: 'custom', conditions: { or: [] }, aggregation: null },
             trigger_condition: { period: 1, operator: '>=', frequency: 1, cron: '', threshold: 1, silence: 1, frequency_type: 'minutes', timezone: 'UTC' },
             destinations: [],
-            context_attributes: {},
+            context_attributes: [],
             enabled: true,
           },
           destinations: [{ name: 'email' }],

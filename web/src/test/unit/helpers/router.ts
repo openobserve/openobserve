@@ -108,6 +108,16 @@ const router = createRouter({
       component: { template: '<div>Groups</div>' }
     },
     {
+      path: '/organizations',
+      name: 'organizations',
+      component: { template: '<div>Organizations</div>' }
+    },
+    {
+      path: '/member-subscription',
+      name: 'member-subscription',
+      component: { template: '<div>Member Subscription</div>' }
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
       component: { template: '<div>Not Found</div>' }

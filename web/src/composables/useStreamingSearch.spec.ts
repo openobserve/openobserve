@@ -150,7 +150,10 @@ let onDataSpy: any;
     it("should successfully initiate a stream connection", async () => {
         const onErrorSpy = vi.spyOn(httpStreaming, "onError");
       
-        const mockStream = new MockReadableStream();
+        // Add sample data chunks to simulate stream data
+        const mockStream = new MockReadableStream([
+          new TextEncoder().encode('{"test": "data"}\n')
+        ]);
         const mockResponse = {
           ok: true,
           body: mockStream as any,
@@ -309,7 +312,9 @@ let onDataSpy: any;
         // Add to traceMap
         httpStreaming.traceMap.value[traceId] = { some: "metadata" } as any;
       
-        // Attach streamWorker mock      
+        // Initialize the streamWorker by calling initializeStreamWorker
+        httpStreaming.initializeStreamWorker();
+        
         // Call the cancel function
         httpStreaming.cancelStreamQueryBasedOnRequestId({
           trace_id: traceId,
@@ -349,6 +354,9 @@ let onDataSpy: any;
         // Set active stream ID
         httpStreaming.activeStreamId.value = traceId1;
       
+        // Initialize the streamWorker
+        httpStreaming.initializeStreamWorker();
+        
         const postMessageSpy = vi.spyOn(mockWorker, 'postMessage');
       
         // Call the function
@@ -386,6 +394,9 @@ let onDataSpy: any;
         // Set active stream ID
         httpStreaming.activeStreamId.value = traceId1;
       
+        // Initialize the streamWorker
+        httpStreaming.initializeStreamWorker();
+        
         const postMessageSpy = vi.spyOn(mockWorker, 'postMessage');
       
         // Call the function under test
