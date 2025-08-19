@@ -389,6 +389,7 @@ import {
   getFieldsFromQuery,
 } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
+import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
@@ -1665,6 +1666,26 @@ export default defineComponent({
         window.dispatchEvent(new Event("resize"));
       },
     );
+
+    // Auto-apply config changes that don't require API calls (similar to dashboard)
+    const debouncedUpdateChartConfig = debounce((newVal) => {
+      if (searchObj.meta.logsVisualizeToggle === "visualize") {
+
+          let configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+          visualizeChartData.value,
+          newVal,
+        );
+
+        if (!configNeedsApiCall) {
+          visualizeChartData.value = JSON.parse(JSON.stringify(newVal));
+          window.dispatchEvent(new Event("resize"));
+        }
+      }
+    }, 1000);
+
+    watch(() => dashboardPanelData.data, debouncedUpdateChartConfig, {
+      deep: true,
+    });
 
     watch(
       () => [

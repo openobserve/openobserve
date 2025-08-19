@@ -522,12 +522,13 @@ import DashboardErrorsComponent from "@/components/dashboards/addPanel/Dashboard
 import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
-import { isEqual } from "lodash-es";
+import { isEqual, debounce } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import CustomChartEditor from "@/components/dashboards/addPanel/CustomChartEditor.vue";
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
@@ -778,6 +779,25 @@ export default defineComponent({
       },
       { deep: true },
     );
+
+    // Auto-apply config changes that don't require API calls (similar to dashboard)
+    const debouncedUpdateChartConfig = debounce((newVal, oldVal) => {
+      if (!isEqual(chartData.value, newVal)) {
+        const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+          chartData.value,
+          newVal,
+        );
+
+        if (!configNeedsApiCall) {
+          chartData.value = JSON.parse(JSON.stringify(newVal));
+          window.dispatchEvent(new Event("resize"));
+        }
+      }
+    }, 1000);
+
+    watch(() => dashboardPanelData.data, debouncedUpdateChartConfig, {
+      deep: true,
+    });
 
     //validate the data
     const isValid = (onlyChart = false, isFieldsValidationRequired = true) => {
