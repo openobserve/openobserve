@@ -494,9 +494,7 @@ export default defineComponent({
 
     const isOutDated = computed(() => {
       //compare chartdata and dashboardpaneldata
-      // ignore histogram query comparison
       return (
-        !is_ui_histogram.value &&
         !isEqual(chartData.value, dashboardPanelData.data)
       );
     });
