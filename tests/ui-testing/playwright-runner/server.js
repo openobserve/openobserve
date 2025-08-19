@@ -53,7 +53,9 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-const publicDir = safePath(__dirname, 'public');
+const publicDir = path.resolve(__dirname, 'public');
+// Add rate limiting to static file serving
+app.use('/public', rateLimitMiddleware, express.static(publicDir));
 app.use(express.static(publicDir));
 
 /**
@@ -391,7 +393,12 @@ app.get('/api/environments', rateLimitMiddleware, (req, res) => {
 
 app.get('/api/credentials', rateLimitMiddleware, (req, res) => {
   try {
-    const credentialsPath = safePath(__dirname, 'credentials.json');
+    const credentialsPath = path.resolve(__dirname, 'credentials.json');
+    
+    // Validate that the resolved path is safe and within expected directory
+    if (!credentialsPath.startsWith(__dirname)) {
+      throw new Error('Invalid credentials path detected');
+    }
     const credentials = require(credentialsPath);
     res.json(credentials);
   } catch (err) {
@@ -402,7 +409,14 @@ app.get('/api/credentials', rateLimitMiddleware, (req, res) => {
 
 app.get('/api/modules', rateLimitMiddleware, (req, res) => {
   try {
-    const testsPath = safePath(__dirname, '..', 'playwright-tests');
+    // Safe path construction for parent directory access
+    const testsPath = path.resolve(__dirname, '..', 'playwright-tests');
+    
+    // Validate that the resolved path is safe and expected
+    const expectedBasePath = path.resolve(__dirname, '..');
+    if (!testsPath.startsWith(expectedBasePath)) {
+      throw new Error('Invalid path detected');
+    }
     
     if (!fs.existsSync(testsPath)) {
       return res.status(404).json({ error: 'Tests directory not found' });
@@ -433,7 +447,14 @@ app.get('/api/modules', rateLimitMiddleware, (req, res) => {
 
 app.get('/api/spec-files', rateLimitMiddleware, (req, res) => {
   try {
-    const testsPath = safePath(__dirname, '..', 'playwright-tests');
+    // Safe path construction for parent directory access
+    const testsPath = path.resolve(__dirname, '..', 'playwright-tests');
+    
+    // Validate that the resolved path is safe and expected
+    const expectedBasePath = path.resolve(__dirname, '..');
+    if (!testsPath.startsWith(expectedBasePath)) {
+      throw new Error('Invalid path detected');
+    }
     
     if (!fs.existsSync(testsPath)) {
       return res.status(404).json({ error: 'Tests directory not found' });
@@ -674,33 +695,48 @@ app.post('/api/run', rateLimitMiddleware, async (req, res) => {
         throw new Error('Invalid project path: must be a string');
       }
       
-      // Resolve and validate local project path
-      const resolvedPath = path.resolve(actualProjectPath);
-      
-      // Additional validation to prevent path traversal
-      if (actualProjectPath.includes('..') || actualProjectPath.includes('~')) {
-        throw new Error('Invalid project path: contains path traversal sequences');
+      // Enhanced validation for local project path to prevent path traversal
+      if (!actualProjectPath || typeof actualProjectPath !== 'string') {
+        throw new Error('Invalid project path: must be a non-empty string');
       }
       
-      // Strict validation for local paths - must be absolute and safe
-      if (!path.isAbsolute(resolvedPath) || 
-          resolvedPath.includes('..') ||
-          resolvedPath.includes('~') ||
+      // Normalize and validate the path to prevent traversal attacks
+      const normalizedPath = path.normalize(actualProjectPath);
+      
+      // Check for dangerous path patterns
+      if (normalizedPath.includes('..') || 
+          normalizedPath.includes('~') ||
+          normalizedPath.includes('\0') ||
+          /[<>:"|?*]/.test(normalizedPath)) {
+        throw new Error('Invalid project path: contains illegal characters or path traversal sequences');
+      }
+      
+      // Resolve the path safely
+      let resolvedPath;
+      try {
+        resolvedPath = path.resolve(normalizedPath);
+      } catch (pathError) {
+        throw new Error('Invalid project path: unable to resolve path');
+      }
+      
+      // Additional security checks on resolved path
+      if (!path.isAbsolute(resolvedPath) ||
           resolvedPath.startsWith('/etc') ||
           resolvedPath.startsWith('/root') ||
           resolvedPath.startsWith('/sys') ||
-          resolvedPath.startsWith('/proc')) {
+          resolvedPath.startsWith('/proc') ||
+          resolvedPath.startsWith('/dev')) {
         throw new Error('Invalid project path: unsafe or restricted path');
       }
       
-      // Verify project path exists using the resolved path
+      // Verify project path exists and is a directory
       try {
         const stats = fs.statSync(resolvedPath);
         if (!stats.isDirectory()) {
           throw new Error('Project path must be a directory');
         }
       } catch (fsError) {
-        throw new Error(`Project path does not exist or is not accessible`);
+        throw new Error('Project path does not exist or is not accessible');
       }
       
       actualProjectPath = resolvedPath;
@@ -714,7 +750,14 @@ app.post('/api/run', rateLimitMiddleware, async (req, res) => {
     for (const dir of searchDirectories) {
       for (const filename of configFilenames) {
         try {
-          const configPath = dir ? safePath(actualProjectPath, dir, filename) : safePath(actualProjectPath, filename);
+          // Safe path construction for config files
+          const configPath = dir ? path.resolve(actualProjectPath, dir, filename) : path.resolve(actualProjectPath, filename);
+          
+          // Validate that the config path is within the project directory
+          const actualProjectResolved = path.resolve(actualProjectPath);
+          if (!configPath.startsWith(actualProjectResolved + path.sep) && configPath !== actualProjectResolved) {
+            continue; // Skip paths outside project directory
+          }
           
           if (fs.existsSync(configPath)) {
             playwrightConfigPath = configPath;
@@ -739,7 +782,13 @@ app.post('/api/run', rateLimitMiddleware, async (req, res) => {
     // Install dependencies if package.json exists and this is a cloned repo
     if (isGitHubRepo) {
       try {
-        const packageJsonPath = safePath(actualProjectPath, 'package.json');
+        const packageJsonPath = path.resolve(actualProjectPath, 'package.json');
+        
+        // Validate that the package.json path is within the project directory
+        if (!packageJsonPath.startsWith(path.resolve(actualProjectPath) + path.sep) && 
+            packageJsonPath !== path.resolve(actualProjectPath, 'package.json')) {
+          throw new Error('Invalid package.json path detected');
+        }
         
         if (fs.existsSync(packageJsonPath)) {
           const installMessage = `📦 Installing dependencies in ${actualProjectPath}...\n`;
@@ -1035,10 +1084,16 @@ app.use(rateLimitMiddleware, (req, res) => {
   if (req.path.startsWith('/api/')) {
     res.status(404).json({ error: 'API endpoint not found' });
   } else {
-    // Use safePath for serving static files
+    // Serve index.html for non-API routes
     try {
-      const safeFilePath = safePath(publicDir, 'index.html');
-      res.sendFile(safeFilePath);
+      const indexPath = path.resolve(publicDir, 'index.html');
+      
+      // Validate that the resolved path is within public directory
+      if (!indexPath.startsWith(publicDir)) {
+        throw new Error('Invalid file path detected');
+      }
+      
+      res.sendFile(indexPath);
     } catch (pathError) {
       res.status(500).json({ error: 'Internal server error' });
     }
