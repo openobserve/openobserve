@@ -45,9 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, defineEmits } from "vue";
+import { ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { defineProps } from "vue";
 import AppTable from "@/components/AppTable.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import type { Entity } from "@/ts/interfaces";

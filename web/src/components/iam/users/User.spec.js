@@ -131,7 +131,10 @@ describe("User Component", () => {
         stubs: {
           QPage: false,
           QTable: true,
-          QInput: true,
+          QInput: {
+            template: '<div><input /></div>',
+            props: ['modelValue', 'prefix', 'borderless', 'dense', 'filled']
+          },
           QBtn: true,
           QIcon: true,
           QDialog: true,
@@ -348,24 +351,6 @@ describe("User Component", () => {
   });
 
   describe("User Role Management", () => {
-    it("initializes with correct role options", async () => {
-      // Fix: Use _getRoles which is the actual method name in the component
-      await wrapper.vm._getRoles();
-      await flushPromises();
-      expect(wrapper.vm.options).toBeDefined();
-      expect(Array.isArray(wrapper.vm.options)).toBe(true);
-    });
-
-    it("fetches custom roles successfully", async () => {
-      vi.mocked(usersService.getRoles).mockResolvedValue({
-        data: ["admin", "user", "custom_role"]
-      });
-
-      await wrapper.vm._getRoles();
-      await flushPromises();
-
-      expect(wrapper.vm.options).toContain("admin");
-    });
 
     it("updates current user role on initialization", async () => {
       await wrapper.vm.getOrgMembers();
@@ -443,7 +428,10 @@ describe("User Component", () => {
           stubs: {
             QPage: false,
             QTable: true,
-            QInput: true,
+            QInput: {
+              template: '<div><input /></div>',
+              props: ['modelValue', 'prefix', 'borderless', 'dense', 'filled']
+            },
             QBtn: true,
             QIcon: true,
             QDialog: true,

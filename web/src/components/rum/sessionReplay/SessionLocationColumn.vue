@@ -34,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts" setup>
-import { defineProps } from "vue";
 import "flag-icons/css/flag-icons.min.css";
 
 defineProps({
