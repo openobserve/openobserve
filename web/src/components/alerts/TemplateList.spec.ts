@@ -53,7 +53,6 @@ describe("Alert List", async () => {
 
   afterEach(() => {
     wrapper.unmount();
-    vi.restoreAllMocks();
   });
 
   it("Should render alerts title", () => {
@@ -114,6 +113,9 @@ describe("Alert List", async () => {
   describe("When user clicks on delete alert", () => {
     const template_name = "Template2";
     beforeEach(async () => {
+      // Ensure we have a fresh spy before each test in this nested describe
+      deleteAlert.mockClear();
+      
       global.server.use(
         http.delete(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates/${template_name}`,

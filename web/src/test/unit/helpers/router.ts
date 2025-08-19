@@ -73,6 +73,16 @@ const router = createRouter({
       component: { template: '<div>Alert List</div>' }
     },
     {
+      path: '/alerts/templates',
+      name: 'alertTemplates',
+      component: { template: '<div>Alert Templates</div>' }
+    },
+    {
+      path: '/alerts/destinations',
+      name: 'alertDestinations',
+      component: { template: '<div>Alert Destinations</div>' }
+    },
+    {
       path: '/dashboards',
       name: 'dashboards',
       component: { template: '<div>Dashboards</div>' }
