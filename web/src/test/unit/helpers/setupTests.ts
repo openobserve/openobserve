@@ -145,10 +145,6 @@ afterAll(async () => {
   // Force cleanup of any hanging promises
   await Promise.resolve();
   
-  // Force process exit if in test environment
-  if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
-    setTimeout(() => {
-      process.exit(0);
-    }, 100);
-  }
+  // Note: Removed forced process.exit as it causes Vitest to exit unexpectedly
+  // The test runner will handle cleanup automatically
 })

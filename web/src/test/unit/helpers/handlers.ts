@@ -129,6 +129,20 @@ export const restHandlers = [
     },
   ),
 
+  http.post(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search_partition`,
+    ({ request }) => {
+      return HttpResponse.json(logs.search);
+    },
+  ),
+
+  http.options(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search_partition`,
+    ({ request }) => {
+      return new HttpResponse(null, { status: 200 });
+    },
+  ),
+
   http.get(
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/organizations`,
     ({ request }) => {

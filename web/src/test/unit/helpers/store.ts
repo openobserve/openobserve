@@ -402,6 +402,119 @@ const store = createStore({
       context.commit("setChatUpdated", payload);
     },
   },
+  modules: {
+    logs: {
+      namespaced: true,
+      state: {
+        isInitialized: false,
+        streamLists: [],
+        searchObj: {
+          data: [],
+          loading: false,
+          errorMsg: "",
+          errorCode: 0,
+          errorDetail: "",
+          total: 0,
+          from: 0,
+          size: 0,
+          scan_size: 0,
+          took: 0,
+          columns: [],
+          hits: [],
+          aggs: {},
+          function_error: "",
+          new_start_time: null,
+          new_end_time: null,
+          histogram_interval: null,
+          response_type: "",
+          trace_id: "",
+          additional: {},
+          partitionDetail: {
+            partitions: [],
+            paginations: [],
+            partitionTotal: []
+          }
+        },
+        streamFields: [],
+        queryResults: [],
+        histogramData: [],
+        sqlMode: false,
+        meta: {
+          refreshInterval: 0,
+          refreshIntervalLabel: "Off",
+          showDetailTab: false,
+          showHistogram: true,
+          sqlMode: false,
+          quickMode: false,
+          toggleFunction: false,
+          toggleSourceWrap: false,
+          resultGrid: {
+            wrapCells: false,
+            manualRemoveFields: false,
+            rowsPerPage: 150,
+            chartInterval: "1 second",
+            chartKeyFormat: "HH:mm:ss",
+            navigation: {
+              currentRowIndex: 0,
+            },
+          },
+          scrollInfo: {},
+        },
+      },
+      mutations: {
+        setIsInitialized(state, payload) {
+          state.isInitialized = payload;
+        },
+        setStreamLists(state, payload) {
+          state.streamLists = payload;
+        },
+        setSearchObj(state, payload) {
+          state.searchObj = payload;
+        },
+        setStreamFields(state, payload) {
+          state.streamFields = payload;
+        },
+        setQueryResults(state, payload) {
+          state.queryResults = payload;
+        },
+        setHistogramData(state, payload) {
+          state.histogramData = payload;
+        },
+        setSqlMode(state, payload) {
+          state.sqlMode = payload;
+        },
+        setMeta(state, payload) {
+          state.meta = { ...state.meta, ...payload };
+        },
+      },
+      actions: {
+        setIsInitialized(context, payload) {
+          context.commit("setIsInitialized", payload);
+        },
+        setStreamLists(context, payload) {
+          context.commit("setStreamLists", payload);
+        },
+        setSearchObj(context, payload) {
+          context.commit("setSearchObj", payload);
+        },
+        setStreamFields(context, payload) {
+          context.commit("setStreamFields", payload);
+        },
+        setQueryResults(context, payload) {
+          context.commit("setQueryResults", payload);
+        },
+        setHistogramData(context, payload) {
+          context.commit("setHistogramData", payload);
+        },
+        setSqlMode(context, payload) {
+          context.commit("setSqlMode", payload);
+        },
+        setMeta(context, payload) {
+          context.commit("setMeta", payload);
+        },
+      },
+    },
+  },
 });
 
 export default store;
