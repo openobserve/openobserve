@@ -28,3 +28,4 @@ flamegraph.html
 
 CLAUDE.md
 tests/ui-testing/playwright-runner/credentials.json
+test-results/.last-run.json
