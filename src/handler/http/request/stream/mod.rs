@@ -146,6 +146,7 @@ async fn schema(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[post("/{org_id}/streams/{stream_name}")]
@@ -168,14 +169,7 @@ async fn create(
             )),
         );
     }
-    match stream::create_stream(&org_id, &stream_name, stream_type, stream.into_inner()).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK,
-            "stream created",
-        ))),
-        Err(e) => Ok(HttpResponse::BadRequest()
-            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))),
-    }
+    stream::create_stream(&org_id, &stream_name, stream_type, stream.into_inner()).await
 }
 
 /// UpdateStreamSettings
@@ -197,6 +191,8 @@ async fn create(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[put("/{org_id}/streams/{stream_name}/settings")]
@@ -221,11 +217,8 @@ async fn update_settings(
         );
     }
     let stream_settings: UpdateStreamSettings = stream_settings.into_inner();
-    let main_stream_res =
-        stream::update_stream_settings(&org_id, &stream_name, stream_type, stream_settings.clone())
-            .await?;
-
-    Ok(main_stream_res)
+    stream::update_stream_settings(&org_id, &stream_name, stream_type, stream_settings.clone())
+        .await
 }
 
 /// DeleteStreamFields
@@ -247,6 +240,7 @@ async fn update_settings(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[put("/{org_id}/streams/{stream_name}/delete_fields")]

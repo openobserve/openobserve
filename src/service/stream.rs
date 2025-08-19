@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 use actix_web::{HttpResponse, http, http::StatusCode};
 use arrow_schema::DataType;
@@ -240,19 +240,26 @@ pub async fn create_stream(
     stream_name: &str,
     stream_type: StreamType,
     mut stream: StreamCreate,
-) -> Result<(), Error> {
+) -> Result<HttpResponse, Error> {
     // check if the stream already exists
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
         Err(e) => {
-            return Err(Error::other(format!("error in getting schema: {e}")));
+            return Ok(HttpResponse::InternalServerError()
+                .append_header((ERROR_HEADER, format!("error in getting schema: {e}")))
+                .json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("error in getting schema: {e}"),
+                )));
         }
     };
     if !schema.fields().is_empty() {
-        return Err(Error::new(
-            ErrorKind::AlreadyExists,
-            "stream already exists",
-        ));
+        return Ok(HttpResponse::BadRequest()
+            .append_header((ERROR_HEADER, "stream already exists"))
+            .json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST,
+                "stream already exists",
+            )));
     }
 
     // create the stream
@@ -261,7 +268,12 @@ pub async fn create_stream(
     let mut has_timestamp = false;
     for f in schema {
         let Ok(data_type) = f.r#type.parse::<DataType>() else {
-            return Err(Error::other(format!("invalid data type: {}", f.r#type)));
+            return Ok(HttpResponse::BadRequest()
+                .append_header((ERROR_HEADER, format!("invalid data type: {}", f.r#type)))
+                .json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST,
+                    format!("invalid data type: {}", f.r#type),
+                )));
         };
         let name = format_label_name(&f.name);
         if name == TIMESTAMP_COL_NAME {
@@ -283,12 +295,23 @@ pub async fn create_stream(
         match infra::schema::merge(org_id, stream_name, stream_type, &schema, Some(min_ts)).await {
             Ok(Some((s, _))) => s,
             Ok(None) => {
-                return Err(Error::other(
-                    "error in creating stream: created schema is empty".to_string(),
-                ));
+                return Ok(HttpResponse::InternalServerError()
+                    .append_header((
+                        ERROR_HEADER,
+                        "error in creating stream: created schema is empty",
+                    ))
+                    .json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        "error in creating stream: created schema is empty",
+                    )));
             }
             Err(e) => {
-                return Err(Error::other(format!("error in creating stream: {e}")));
+                return Ok(HttpResponse::InternalServerError()
+                    .append_header((ERROR_HEADER, format!("error in creating stream: {e}")))
+                    .json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("error in creating stream: {e}"),
+                    )));
             }
         };
 
@@ -313,13 +336,15 @@ pub async fn create_stream(
     stream.settings.defined_schema_fields.dedup();
 
     // create the stream settings
-    if let Err(e) = save_stream_settings(org_id, stream_name, stream_type, stream.settings).await {
-        return Err(Error::other(format!(
-            "error in creating stream settings: {e}"
-        )));
+    let resp = save_stream_settings(org_id, stream_name, stream_type, stream.settings).await?;
+    if resp.status() == http::StatusCode::OK {
+        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK,
+            "stream created",
+        )))
+    } else {
+        Ok(resp)
     }
-
-    Ok(())
 }
 
 #[tracing::instrument(skip(settings))]
