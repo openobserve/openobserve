@@ -9,8 +9,46 @@ const { promisify } = require('util');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
-app.use(express.json());
+// Security headers middleware
+app.use((req, res, next) => {
+  // Prevent clickjacking
+  res.setHeader('X-Frame-Options', 'DENY');
+  
+  // Prevent MIME sniffing
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  
+  // XSS protection
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  
+  // Referrer policy
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  // Content Security Policy (restrictive but functional)
+  res.setHeader('Content-Security-Policy', 
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline'; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com; " +
+    "img-src 'self' data:; " +
+    "connect-src 'self'; " +
+    "frame-ancestors 'none';"
+  );
+  
+  next();
+});
+
+// CORS with specific origins (adjust as needed)
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' ? false : true, // In production, specify allowed origins
+  credentials: false, // Don't allow credentials
+  optionsSuccessStatus: 200,
+  maxAge: 86400 // 24 hours
+};
+app.use(cors(corsOptions));
+
+// Body parsing with size limits
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 const publicDir = path.join(__dirname, 'public');
 app.use(express.static(publicDir));
@@ -20,6 +58,54 @@ app.use(express.static(publicDir));
  * runId -> { childProcess, createdAt, status, lastExitCode }
  */
 const activeRuns = new Map();
+
+/**
+ * Rate limiting and resource management
+ */
+const MAX_CONCURRENT_RUNS = 3;
+const MAX_RUNS_PER_HOUR = 20;
+const rateLimitMap = new Map(); // IP -> { count, resetTime }
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const hourInMs = 60 * 60 * 1000;
+  
+  if (!rateLimitMap.has(ip)) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + hourInMs });
+    return true;
+  }
+  
+  const limits = rateLimitMap.get(ip);
+  
+  // Reset counter if hour has passed
+  if (now > limits.resetTime) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + hourInMs });
+    return true;
+  }
+  
+  // Check if under limit
+  if (limits.count >= MAX_RUNS_PER_HOUR) {
+    return false;
+  }
+  
+  limits.count++;
+  return true;
+}
+
+function checkConcurrentRuns() {
+  const runningCount = Array.from(activeRuns.values()).filter(run => run.status === 'running' || run.status === 'preparing').length;
+  return runningCount < MAX_CONCURRENT_RUNS;
+}
+
+// Cleanup old rate limit entries every hour
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, limits] of rateLimitMap.entries()) {
+    if (now > limits.resetTime) {
+      rateLimitMap.delete(ip);
+    }
+  }
+}, 60 * 60 * 1000);
 
 /**
  * Helper function to execute shell commands with streaming output
@@ -65,14 +151,30 @@ function executeCommand(command, args = [], options = {}, onOutput = null) {
  * Clone GitHub repository to temporary directory
  */
 async function cloneRepository(repoUrl, branch = 'main', subPath = '', onOutput = null) {
+  // Validate and sanitize inputs to prevent command injection
+  if (!repoUrl || typeof repoUrl !== 'string') {
+    throw new Error('Invalid repository URL');
+  }
+  
+  // Validate repository URL format
+  const repoUrlPattern = /^https:\/\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=%]+\.git$/;
+  if (!repoUrlPattern.test(repoUrl)) {
+    throw new Error('Invalid repository URL format. Only HTTPS git URLs are allowed.');
+  }
+  
+  // Validate branch name to prevent command injection
+  if (branch && (typeof branch !== 'string' || /[;\|&`$(){}[\]\\]/.test(branch))) {
+    throw new Error('Invalid branch name. Branch names cannot contain special characters.');
+  }
+  
   const tempDir = path.join(os.tmpdir(), `playwright-repo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   
   try {
     // Create temp directory
     fs.mkdirSync(tempDir, { recursive: true });
     
-    // Clone repository
-    const cloneArgs = ['clone', '--progress'];
+    // Clone repository with validated parameters
+    const cloneArgs = ['clone', '--progress', '--depth', '1']; // Add shallow clone for security
     if (branch && branch !== 'main' && branch !== 'master') {
       cloneArgs.push('-b', branch);
     }
@@ -86,10 +188,32 @@ async function cloneRepository(repoUrl, branch = 'main', subPath = '', onOutput 
     
     await executeCommand('git', cloneArgs, {}, onOutput);
     
-    // Determine the actual project path
+    // Determine the actual project path with path traversal protection
     let projectPath = tempDir;
     if (subPath) {
-      projectPath = path.join(tempDir, subPath);
+      // Sanitize subPath to prevent path traversal attacks
+      const normalizedSubPath = path.normalize(subPath);
+      
+      // Check for path traversal attempts
+      if (normalizedSubPath.includes('..') || path.isAbsolute(normalizedSubPath)) {
+        const errorMsg = `❌ Invalid sub-path: Path traversal detected in '${subPath}'\n`;
+        console.error(errorMsg);
+        if (onOutput) onOutput('stderr', errorMsg);
+        throw new Error(`Invalid sub-path: Path traversal detected`);
+      }
+      
+      // Safely join the paths
+      projectPath = path.resolve(tempDir, normalizedSubPath);
+      
+      // Double-check that the resolved path is still within tempDir
+      const tempDirResolved = path.resolve(tempDir) + path.sep;
+      if (!projectPath.startsWith(tempDirResolved) && projectPath !== path.resolve(tempDir)) {
+        const errorMsg = `❌ Invalid sub-path: Resolved path outside repository boundary\n`;
+        console.error(errorMsg);
+        if (onOutput) onOutput('stderr', errorMsg);
+        throw new Error(`Invalid sub-path: Path traversal detected`);
+      }
+      
       if (!fs.existsSync(projectPath)) {
         const availableDirs = fs.readdirSync(tempDir, { withFileTypes: true })
           .filter(dirent => dirent.isDirectory())
@@ -134,6 +258,76 @@ function cleanupTempDir(tempDir) {
     console.warn('Failed to cleanup temporary directory:', tempDir, error.message);
   }
 }
+
+/**
+ * Cleanup stale runs and enforce timeouts
+ */
+const MAX_RUN_DURATION = 30 * 60 * 1000; // 30 minutes
+const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+function cleanupStaleRuns() {
+  const now = Date.now();
+  
+  for (const [runId, runMeta] of activeRuns.entries()) {
+    const runAge = now - runMeta.createdAt;
+    
+    // Kill runs that have been running too long
+    if (runAge > MAX_RUN_DURATION && runMeta.childProcess && !runMeta.childProcess.killed) {
+      console.log(`Killing stale run ${runId} (running for ${Math.round(runAge/1000/60)} minutes)`);
+      
+      try {
+        runMeta.childProcess.kill('SIGTERM');
+        setTimeout(() => {
+          if (runMeta.childProcess && !runMeta.childProcess.killed) {
+            runMeta.childProcess.kill('SIGKILL');
+          }
+        }, 5000);
+      } catch (error) {
+        console.warn(`Failed to kill stale run ${runId}:`, error.message);
+      }
+      
+      runMeta.status = 'timeout';
+    }
+    
+    // Clean up old finished runs
+    if (runMeta.status === 'finished' || runMeta.status === 'timeout' || runMeta.status === 'stopped') {
+      if (runAge > 60 * 60 * 1000) { // 1 hour
+        if (runMeta.tempDir) {
+          cleanupTempDir(runMeta.tempDir);
+        }
+        activeRuns.delete(runId);
+        console.log(`Cleaned up old run ${runId}`);
+      }
+    }
+  }
+}
+
+// Run cleanup every 5 minutes
+setInterval(cleanupStaleRuns, CLEANUP_INTERVAL);
+
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM, cleaning up...');
+  
+  // Kill all active processes
+  for (const [runId, runMeta] of activeRuns.entries()) {
+    if (runMeta.childProcess && !runMeta.childProcess.killed) {
+      console.log(`Killing run ${runId} for shutdown`);
+      runMeta.childProcess.kill('SIGTERM');
+    }
+    
+    if (runMeta.tempDir) {
+      cleanupTempDir(runMeta.tempDir);
+    }
+  }
+  
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('Received SIGINT, cleaning up...');
+  process.emit('SIGTERM');
+});
 
 // Predefined environments (can be overridden by user input)
 const ENVIRONMENTS = [
@@ -256,24 +450,93 @@ app.get('/api/spec-files', (req, res) => {
  *  workers?: number
  * }
  */
+// Input validation helper functions
+function validateString(value, name, maxLength = 500) {
+  if (value !== undefined && (typeof value !== 'string' || value.length > maxLength)) {
+    throw new Error(`Invalid ${name}: must be a string with max length ${maxLength}`);
+  }
+  return value;
+}
+
+function validateUrl(value, name) {
+  if (value && (typeof value !== 'string' || !value.match(/^https?:\/\/[^\s/$.?#].[^\s]*$/))) {
+    throw new Error(`Invalid ${name}: must be a valid HTTP/HTTPS URL`);
+  }
+  return value;
+}
+
+function validateArray(value, name, maxItems = 50) {
+  if (value !== undefined && (!Array.isArray(value) || value.length > maxItems)) {
+    throw new Error(`Invalid ${name}: must be an array with max ${maxItems} items`);
+  }
+  return value || [];
+}
+
+function validateBoolean(value, name) {
+  if (value !== undefined && typeof value !== 'boolean') {
+    throw new Error(`Invalid ${name}: must be a boolean`);
+  }
+  return Boolean(value);
+}
+
+function validateNumber(value, name, min = 1, max = 50) {
+  if (value !== undefined && (typeof value !== 'number' || value < min || value > max || !Number.isInteger(value))) {
+    throw new Error(`Invalid ${name}: must be an integer between ${min} and ${max}`);
+  }
+  return value;
+}
+
 app.post('/api/run', async (req, res) => {
-  const {
-    projectPath,
-    repoUrl,
-    repoBranch = 'main',
-    repoSubPath = '',
-    isGitHubRepo = false,
-    baseUrl,
-    ingestionUrl,
-    username,
-    password,
-    orgName = 'default',
-    tags,
-    module,
-    skipFiles = [],
-    headless = true,
-    workers,
-  } = req.body || {};
+  try {
+    // Rate limiting checks
+    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+    
+    if (!checkRateLimit(clientIP)) {
+      return res.status(429).json({
+        error: 'Rate limit exceeded. Maximum 20 runs per hour allowed.'
+      });
+    }
+    
+    if (!checkConcurrentRuns()) {
+      return res.status(503).json({
+        error: 'Server busy. Maximum concurrent runs exceeded. Please try again later.'
+      });
+    }
+    
+    const {
+      projectPath,
+      repoUrl,
+      repoBranch = 'main',
+      repoSubPath = '',
+      isGitHubRepo = false,
+      baseUrl,
+      ingestionUrl,
+      username,
+      password,
+      orgName = 'default',
+      tags,
+      module,
+      skipFiles = [],
+      headless = true,
+      workers,
+    } = req.body || {};
+
+    // Comprehensive input validation
+    validateString(projectPath, 'projectPath', 1000);
+    validateUrl(repoUrl, 'repoUrl');
+    validateString(repoBranch, 'repoBranch', 100);
+    validateString(repoSubPath, 'repoSubPath', 500);
+    validateBoolean(isGitHubRepo, 'isGitHubRepo');
+    validateUrl(baseUrl, 'baseUrl');
+    validateUrl(ingestionUrl, 'ingestionUrl');
+    validateString(username, 'username', 100);
+    validateString(password, 'password', 100);
+    validateString(orgName, 'orgName', 50);
+    validateString(tags, 'tags', 500);
+    validateString(module, 'module', 100);
+    validateArray(skipFiles, 'skipFiles', 20);
+    validateBoolean(headless, 'headless');
+    validateNumber(workers, 'workers', 1, 20);
 
   // Validation
   if (!baseUrl || !username || !password) {
@@ -433,14 +696,20 @@ app.post('/api/run', async (req, res) => {
       args.push(`--workers=${Number(workers)}`);
     }
 
+    // Create clean environment with only necessary variables
     const childEnv = {
-      ...process.env,
+      // Essential system variables
+      PATH: process.env.PATH,
+      HOME: process.env.HOME,
+      USER: process.env.USER,
+      NODE_ENV: process.env.NODE_ENV,
+      
+      // Application-specific variables
       ZO_ROOT_USER_EMAIL: String(username),
       ZO_ROOT_USER_PASSWORD: String(password),
       ZO_BASE_URL: String(baseUrl),
       INGESTION_URL: String(resolvedIngestionUrl),
       ORGNAME: String(orgName || 'default'),
-      // Respect headless via environment too for frameworks that read it
       PLAYWRIGHT_HEADLESS: headless ? '1' : '0',
     };
 
@@ -491,8 +760,24 @@ app.post('/api/run', async (req, res) => {
       cleanupTempDir(tempDir);
     }
     
+    // Sanitize error messages to prevent information disclosure
+    let errorMessage = 'Failed to start test run';
+    if (error.message.includes('Invalid repository URL') || 
+        error.message.includes('Invalid branch name') ||
+        error.message.includes('playwright.config.js not found') ||
+        error.message.includes('Path traversal detected') ||
+        error.message.includes('Sub-path') && error.message.includes('does not exist')) {
+      errorMessage = error.message;
+    }
+    
     return res.status(500).json({
-      error: error.message || 'Failed to start test run'
+      error: errorMessage
+    });
+  }
+  } catch (validationError) {
+    console.error('Validation error:', validationError.message);
+    return res.status(400).json({
+      error: validationError.message // Validation errors are safe to expose
     });
   }
 });
@@ -593,13 +878,33 @@ app.post('/api/run/:runId/stop', (req, res) => {
   }
 });
 
-// Fallback to index.html for any non-API route (Express 5 compatible)
-app.get(/.*/, (req, res) => {
-  res.sendFile(path.join(publicDir, 'index.html'));
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  
+  // Don't expose internal errors in production
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  const errorMessage = isDevelopment ? err.message : 'Internal server error';
+  
+  res.status(500).json({
+    error: errorMessage
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  if (req.path.startsWith('/api/')) {
+    res.status(404).json({ error: 'API endpoint not found' });
+  } else {
+    res.sendFile(path.join(publicDir, 'index.html'));
+  }
 });
 
 app.listen(PORT, () => {
   console.log(`Playwright Runner listening on http://localhost:${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Security headers enabled: ✅`);
+  console.log(`Rate limiting enabled: ✅ (${MAX_RUNS_PER_HOUR}/hour, ${MAX_CONCURRENT_RUNS} concurrent)`);
 });
 
 
