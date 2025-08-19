@@ -244,7 +244,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 
 const props = defineProps({

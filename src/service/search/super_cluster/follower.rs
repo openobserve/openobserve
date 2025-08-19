@@ -39,6 +39,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::service::{
     db::enrichment_table,
     search::{
+        SEARCH_SERVER,
         cluster::flight::{check_work_group, get_online_querier_nodes, partition_filt_list},
         datafusion::{
             distributed_plan::{
@@ -261,15 +262,7 @@ pub async fn search(
     );
 
     // update search session scan stats
-    super::super::SEARCH_SERVER
-        .add_file_stats(
-            &trace_id,
-            scan_stats.files,
-            scan_stats.records,
-            scan_stats.original_size + scan_stats.idx_scan_size,
-            scan_stats.compressed_size,
-        )
-        .await;
+    SEARCH_SERVER.add_file_stats(&trace_id, &scan_stats).await;
 
     let search_infos = SearchInfos {
         plan: vec![],
