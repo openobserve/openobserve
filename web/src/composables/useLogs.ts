@@ -85,6 +85,17 @@ import useActions from "./useActions";
 import useStreamingSearch from "./useStreamingSearch";
 import useQuery from "./useQuery";
 
+// Import all our new composables
+import useLogsStateManagement from "./useLogsStateManagement";
+import useLogsStreamManagement from "./useLogsStreamManagement";
+import useLogsQueryProcessing from "./useLogsQueryProcessing";
+import useLogsDataFetching from "./useLogsDataFetching";
+import useLogsHistogramManagement from "./useLogsHistogramManagement";
+import useLogsWebSocketHandling from "./useLogsWebSocketHandling";
+import useLogsPagination from "./useLogsPagination";
+import useLogsGridManagement from "./useLogsGridManagement";
+import useLogsURLManagement from "./useLogsURLManagement";
+
 const defaultObject = {
   organizationIdentifier: "",
   runQuery: false,
@@ -270,6 +281,8 @@ const searchReconnectDelay = 1000; // 1 second
 // useQueryProcessing for query-related functions
 // useDataVisualization for histogram and data display functions
 
+// Use the shared searchObj from stateManagement composable
+// Note: Will be replaced with stateManagement.searchObj after composables initialization
 let searchObj: any = reactive(Object.assign({}, defaultObject));
 
 
@@ -348,6 +361,22 @@ const useLogs = () => {
   const notificationMsg = ref("");
 
   const { updateFieldKeywords } = useSqlSuggestions();
+
+  // Initialize all composables
+  const stateManagement = useLogsStateManagement();
+  
+  // Replace the local searchObj with the one from stateManagement immediately
+  searchObj = stateManagement.searchObj;
+  
+  // Now initialize other composables with the correct searchObj reference
+  const streamManagement = useLogsStreamManagement(searchObj);
+  const queryProcessing = useLogsQueryProcessing(searchObj);
+  const dataFetching = useLogsDataFetching(searchObj);
+  const histogramManagement = useLogsHistogramManagement(searchObj);
+  const webSocketHandling = useLogsWebSocketHandling(searchObj);
+  const pagination = useLogsPagination(searchObj);
+  const gridManagement = useLogsGridManagement(searchObj, pagination);
+  const urlManagement = useLogsURLManagement(searchObj);
 
   onBeforeMount(async () => {
     if (router.currentRoute.value.query?.quick_mode == "true") {
@@ -814,253 +843,29 @@ const useLogs = () => {
     return columns;
   }
 
-  const validateFilterForMultiStream = () => {
-    const filterCondition = searchObj.data.query;
-    const parsedSQL: any = fnParsedSQL(
-      "select * from stream where " + filterCondition,
-    );
-    searchObj.data.stream.filteredField = extractFilterColumns(
-      parsedSQL?.where,
-    );
 
-    searchObj.data.filterErrMsg = "";
-    searchObj.data.missingStreamMessage = "";
-    searchObj.data.stream.missingStreamMultiStreamFilter = [];
-    for (const fieldObj of searchObj.data.stream.filteredField) {
-      const fieldName = fieldObj.expr.value;
-      const filteredFields: any =
-        searchObj.data.stream.selectedStreamFields.filter(
-          (field: any) => field.name === fieldName,
-        );
-      if (filteredFields.length > 0) {
-        const streamsCount = filteredFields[0].streams.length;
-        const allStreamsEqual = filteredFields.every(
-          (field: any) => field.streams.length === streamsCount,
-        );
-        if (!allStreamsEqual) {
-          searchObj.data.filterErrMsg += `Field '${fieldName}' exists in different number of streams.\n`;
-        }
-      } else {
-        searchObj.data.filterErrMsg += `Field '${fieldName}' does not exist in the one or more stream.\n`;
-      }
-
-      const fieldStreams: any = searchObj.data.stream.selectedStreamFields
-        .filter((field: any) => field.name === fieldName)
-        .map((field: any) => field.streams)
-        .flat();
-
-      searchObj.data.stream.missingStreamMultiStreamFilter =
-        searchObj.data.stream.selectedStream.filter(
-          (stream: any) => !fieldStreams.includes(stream),
-        );
-
-      if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
-        searchObj.data.missingStreamMessage = `One or more filter fields do not exist in "${searchObj.data.stream.missingStreamMultiStreamFilter.join(
-          ", ",
-        )}", hence no search is performed in the mentioned stream.\n`;
-      }
-    }
-
-    return searchObj.data.filterErrMsg === "" ? true : false;
-  };
-
+  // Use the queryProcessing composable for building search queries
   function buildSearch() {
-    try {
-      // Clear previous error messages
-      searchObj.data.filterErrMsg = "";
-      searchObj.data.missingStreamMessage = "";
-      searchObj.data.stream.missingStreamMultiStreamFilter = [];
-
-      // Get timestamps and validate date range
-      const timestamps: any = searchObj.data.datetime.type === "relative"
-        ? getConsumableRelativeTime(searchObj.data.datetime.relativeTimePeriod)
-        : cloneDeep(searchObj.data.datetime);
-
-      // Update datetime for relative time types
-      if (searchObj.data.datetime.type === "relative") {
-        searchObj.data.datetime.startTime = timestamps.startTime;
-        searchObj.data.datetime.endTime = timestamps.endTime;
-      }
-
-      // Validate timestamps
-      if (timestamps.startTime === "Invalid Date" || timestamps.endTime === "Invalid Date") {
-        notificationMsg.value = "Invalid date format";
-        return false;
-      }
-
-      if (timestamps.startTime > timestamps.endTime) {
-        notificationMsg.value = "Start time cannot be greater than end time";
-        return false;
-      }
-
-      // Calculate time interval and chart format based on time range
-      const timeIntervalData = getTimeInterval(timestamps.startTime, timestamps.endTime);
-      searchObj.meta.resultGrid.chartInterval = timeIntervalData.interval;
-      searchObj.meta.resultGrid.chartKeyFormat = timeIntervalData.keyFormat;
-
-      // Process and validate SQL query for SQL mode
-      let processedQuery = searchObj.data.query.trim();
-      let parsedQueryParams: any = {
-        queryFunctions: "",
-        whereClause: "",
-        limit: 0,
-        query: processedQuery,
-        offset: 0
-      };
-
-      if (searchObj.meta.sqlMode) {
-        searchObj.data.query = processedQuery;
-        const parsedSQL: any = fnParsedSQL();
-        
-        // Validate SQL query
-        if (parsedSQL !== undefined) {
-          if (Array.isArray(parsedSQL) && parsedSQL.length === 0) {
-            notificationMsg.value = "SQL query is missing or invalid. Please submit a valid SQL statement.";
-            return false;
-          }
-
-          if (!parsedSQL?.columns?.length && !searchObj.meta.sqlMode) {
-            notificationMsg.value = "No column found in selected stream.";
-            return false;
-          }
-
-          // Handle LIMIT and OFFSET clauses
-          if (parsedSQL.limit?.value?.length > 0) {
-            parsedQueryParams.limit = parsedSQL.limit.value[0].value;
-            parsedQueryParams.offset = parsedSQL.limit.separator === "offset" ? parsedSQL.limit.value[1]?.value || 0 : 0;
-            parsedQueryParams.query = fnUnparsedSQL(parsedSQL).replace(/`/g, '"');
-            
-            searchObj.data.queryResults.hits = [];
-          }
-        }
-
-        // Clean up SQL query by removing comments
-        processedQuery = processedQuery
-          .split("\n")
-          .filter((line: string) => !line.trim().startsWith("--"))
-          .join("\n");
-          
-        parsedQueryParams.query = processedQuery;
-      } else {
-        // Parse query for non-SQL mode
-        const parseQuery = processedQuery.split("|");
-        const queryFunctions = parseQuery.length > 1 ? "," + parseQuery[0].trim() : "";
-        let whereClause = parseQuery.length > 1 ? parseQuery[1].trim() : parseQuery[0].trim();
-
-        // Clean up where clause by removing comments
-        whereClause = whereClause
-          .split("\n")
-          .filter((line: string) => !line.trim().startsWith("--"))
-          .join("\n");
-
-        if (whereClause.trim() !== "") {
-          whereClause = addSpacesToOperators(whereClause);
-          
-          // Quote field names in the where clause
-          const parsedSQL = whereClause.split(" ");
-          for (const field of searchObj.data.stream.selectedStreamFields) {
-            for (const [index, node] of parsedSQL.entries()) {
-              if (node === field.name) {
-                parsedSQL[index] = '"' + node.replace(/"/g, "") + '"';
-              }
-            }
-          }
-          whereClause = parsedSQL.join(" ");
-        }
-
-        parsedQueryParams.queryFunctions = queryFunctions.trim();
-        parsedQueryParams.whereClause = whereClause.trim() !== "" ? "WHERE " + whereClause : "";
-        parsedQueryParams.query = processedQuery;
-      }
-
-      // Validate multi-stream filters
-      if (searchObj.data.stream.selectedStream.length > 1 && !searchObj.meta.sqlMode && parsedQueryParams?.whereClause) {
-        const validationFlag = validateFilterForMultiStream();
-        if (!validationFlag) {
-          return false;
-        }
-      }
-
-      // Prepare data for buildQueryPayload
-      const queryPayloadData = {
-        from: searchObj.meta.resultGrid.rowsPerPage * (searchObj.data.resultGrid.currentPage - 1) || 0,
-        size: parsedQueryParams.limit > 0 ? parsedQueryParams.limit : searchObj.meta.resultGrid.rowsPerPage,
-        timestamp_column: store.state.zoConfig.timestamp_column,
-        timestamps: {
-          startTime: timestamps.startTime,
-          endTime: timestamps.endTime
-        },
-        timeInterval: timeIntervalData.interval,
-        sqlMode: searchObj.meta.sqlMode,
-        currentPage: searchObj.data.resultGrid.currentPage,
-        selectedStream: searchObj.data.stream.selectedStream[0],
-        parsedQuery: parsedQueryParams,
-        streamName: searchObj.data.stream.selectedStream[0]
-      };
-
-      // Use buildQueryPayload to construct the request
-      const req = buildQueryPayload(queryPayloadData);
-      
-      if (!req) {
-        notificationMsg.value = "Failed to build search query payload";
-        return false;
-      }
-
-      // Add enterprise features if enabled
-      if (config.isEnterprise === "true" && store.state.zoConfig.super_cluster_enabled) {
-        req.regions = searchObj.meta.regions;
-        req.clusters = searchObj.meta.clusters;
-      }
-
-      // Set quick mode flag
-      req.query.quick_mode = searchObj.meta.quickMode;
-
-      // Handle SQL mode specific settings
-      if (searchObj.meta.sqlMode) {
-        req.query.sql = processedQuery;
-        req.query.sql_mode = "full";
-        
-        if (parsedQueryParams.limit > 0) {
-          req.query.size = parsedQueryParams.limit;
-        }
-        if (parsedQueryParams.offset > 0) {
-          req.query.from = parsedQueryParams.offset;
-        }
-      }
-
-      // Handle histogram settings
-      if (searchObj.data.resultGrid.currentPage > 1 || searchObj.meta.showHistogram === false) {
-        if (searchObj.meta.showHistogram === false) {
-          searchObj.data.histogram = {
-            xData: [],
-            yData: [],
-            chartParams: { title: "", unparsed_x_data: [], timezone: "" },
-            errorCode: 0,
-            errorMsg: "",
-            errorDetail: "",
-          };
-          searchObj.meta.histogramDirtyFlag = true;
-        } else {
-          searchObj.meta.histogramDirtyFlag = false;
-        }
-      }
-
-      // Update URL parameters
-      updateUrlQueryParams();
-
-      return req;
-    } catch (e: any) {
-      notificationMsg.value = "An error occurred while constructing the search query.";
-      return false;
-    }
+    return queryProcessing.buildSearch();
   }
 
+  // Use the queryProcessing composable for query analysis
   const isLimitQuery = (parsedSQL: any = null) => {
-    return parsedSQL?.limit && parsedSQL?.limit.value?.length > 0;
+    return queryProcessing.isLimitQuery(parsedSQL);
   };
 
   const isDistinctQuery = (parsedSQL: any = null) => {
-    return parsedSQL?.distinct?.type === "DISTINCT";
+    return queryProcessing.isDistinctQuery(parsedSQL);
+  };
+
+  // Use the queryProcessing composable for SQL parsing
+  const fnParsedSQL = (query?: string) => {
+    return queryProcessing.fnParsedSQL(query);
+  };
+
+  // Use the validateFilterForMultiStream composable function
+  const validateFilterForMultiStream = () => {
+    return queryProcessing.validateFilterForMultiStream();
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -2218,36 +2023,6 @@ const useLogs = () => {
     return false; // No aggregation function or non-null groupby property found
   }
 
-  const fnParsedSQL = (queryString: string = "") => {
-    try {
-      queryString = queryString || searchObj.data.query;
-      const filteredQuery = queryString
-        .split("\n")
-        .filter((line: string) => !line.trim().startsWith("--"))
-        .join("\n");
-
-      const parsedQuery: any = parser?.astify(filteredQuery);
-      return parsedQuery || {
-        columns: [],
-        from: [],
-        orderby: null,
-        limit: null,
-        groupby: null,
-        where: null,
-      };
-
-      // return convertPostgreToMySql(parser.astify(filteredQuery));
-    } catch (e: any) {
-      return {
-        columns: [],
-        from: [],
-        orderby: null,
-        limit: null,
-        groupby: null,
-        where: null,
-      };
-    }
-  };
 
   // TODO OK : Replace backticks with double quotes, as stream name from sqlify is coming with backticks
   const fnUnparsedSQL = (parsedObj: any) => {
@@ -6930,73 +6705,94 @@ const useLogs = () => {
   });
   
   return {
-    searchObj,
+    // Core state from stateManagement composable
+    searchObj: stateManagement.searchObj,
     searchAggData,
+    
+    // State Management functions
+    resetSearchObj: stateManagement.resetSearchObj,
+    resetStreamData: stateManagement.resetStreamData,
+    initialLogsState: stateManagement.initialLogsState,
+    clearSearchObj: stateManagement.clearSearchObj,
+    enableRefreshInterval: stateManagement.enableRefreshInterval,
+    
+    // Stream Management functions
     getStreams,
-    resetSearchObj,
-    resetStreamData,
+    getStreamList: streamManagement.loadStreamLists,
+    loadStreamLists: streamManagement.loadStreamLists,
+    extractFields: streamManagement.extractFields,
+    extractFTSFields: streamManagement.extractFTSFields,
+    onStreamChange: streamManagement.onStreamChange,
+    updateStreams: streamManagement.updateStreams,
+    reorderSelectedFields: streamManagement.reorderSelectedFields,
+    setSelectedStreams: streamManagement.setSelectedStreams,
+    
+    // Query Processing functions
+    buildSearch,
+    fnParsedSQL,
+    fnUnparsedSQL: queryProcessing.fnUnparsedSQL,
+    validateFilterForMultiStream,
+    isLimitQuery,
+    isDistinctQuery,
+    hasAggregation: (parsedSQL: any) => queryProcessing.hasAggregation(parsedSQL?.columns),
+    
+    // Data Fetching functions
+    getQueryData: (isPagination = false) => dataFetching.executeSearchQuery(queryProcessing.buildSearch(), isPagination),
+    getJobData: (jobId: string, isPagination = false) => dataFetching.fetchJobData(jobId, isPagination),
+    searchAroundData: (record: any) => dataFetching.executeSearchAround(record),
+    cancelQuery: dataFetching.cancelCurrentRequest,
+    
+    // Histogram Management functions
+    generateHistogramData: histogramManagement.generateHistogramData,
+    generateHistogramSkeleton: histogramManagement.generateHistogramSkeleton,
+    getHistogramQueryData: (queryReq: any) => histogramManagement.buildHistogramQuery(queryReq),
+    resetHistogramWithError: histogramManagement.resetHistogramWithError,
+    
+    // WebSocket Handling functions
+    buildWebSocketPayload: webSocketHandling.buildWebSocketPayload,
+    initializeSearchConnection: webSocketHandling.initializeSearchConnection,
+    sendCancelSearchMessage: webSocketHandling.sendCancelSearchMessage,
+    setCommunicationMethod,
+    
+    // Pagination functions
+    refreshPartitionPagination: pagination.refreshPartitionPagination,
+    refreshPagination: pagination.refreshPagination,
+    refreshJobPagination: pagination.refreshJobPagination,
+    loadJobData: pagination.refreshJobPagination,
+    
+    // Grid Management functions
+    updateGridColumns: gridManagement.updateGridColumns,
+    filterHitsColumns: gridManagement.filterHitsColumns,
+    fieldValues: gridManagement.fieldValues,
+    
+    // URL Management functions
+    updateUrlQueryParams: urlManagement.updateUrlQueryParams,
+    restoreUrlQueryParams: urlManagement.restoreUrlQueryParams,
+    generateURLQuery: urlManagement.generateURLQuery,
+    routeToSearchSchedule: urlManagement.routeToSearchSchedule,
+    extractTimestamps: urlManagement.extractTimestamps,
+    getVisualizationConfig: urlManagement.getVisualizationConfig,
+    encodeVisualizationConfig: urlManagement.encodeVisualizationConfig,
+    decodeVisualizationConfig: urlManagement.decodeVisualizationConfig,
+    
+    // Legacy functions (keeping for backward compatibility)
     updatedLocalLogFilterField,
     getFunctions,
-    getStreamList,
-    fieldValues,
-    extractFields,
-    getQueryData,
-    getJobData,
-    searchAroundData,
-    updateGridColumns,
     refreshData,
-    updateUrlQueryParams,
     loadLogsData,
-    restoreUrlQueryParams,
     handleQueryData,
-    updateStreams,
     handleRunQuery,
-    generateHistogramData,
-    extractFTSFields,
     getSavedViews,
-    onStreamChange,
-    generateURLQuery,
-    buildSearch,
-    loadStreamLists,
-    refreshPartitionPagination,
-    filterHitsColumns,
-    getHistogramQueryData,
-    generateHistogramSkeleton,
-    fnParsedSQL,
-    fnUnparsedSQL,
     getRegionInfo,
-    validateFilterForMultiStream,
-    cancelQuery,
-    reorderSelectedFields,
-    resetHistogramWithError,
-    isLimitQuery,
-    extractTimestamps,
     getFilterExpressionByFieldType,
-    setSelectedStreams,
     extractValueQuery,
     initialQueryPayload,
-    refreshPagination,
-    loadJobData,
-    refreshJobPagination,
-    enableRefreshInterval,
-    buildWebSocketPayload,
-    initializeSearchConnection,
     addTraceId,
-    routeToSearchSchedule,
     isActionsEnabled,
-    sendCancelSearchMessage,
-    isDistinctQuery,
     getStream,
-    initialLogsState,
-    clearSearchObj,
-    setCommunicationMethod,
-    hasAggregation,
     streamSchemaFieldsIndexMapping,
     loadVisualizeData,
-    processHttpHistogramResults,
-    getVisualizationConfig,
-    encodeVisualizationConfig,
-    decodeVisualizationConfig
+    processHttpHistogramResults
   };
 };
 
