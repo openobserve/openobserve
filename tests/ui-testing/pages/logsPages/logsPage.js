@@ -401,7 +401,7 @@ export class LogsPage {
     async typeQuery(query) {
         await this.page.locator(this.queryEditor).click();
         await this.page.locator(this.queryEditor).press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await this.page.keyboard.type(query);
+        await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
     }
 
     async executeQueryWithKeyboardShortcut() {
