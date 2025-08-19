@@ -124,7 +124,8 @@ test.describe("Streaming for logs", () => {
         await pageManager.streamsPage.navigateToLogs();
         await pageManager.streamsPage.selectIndexAndStreamJoin();
         await pageManager.streamsPage.enableSQLMode();
-        await pageManager.streamsPage.clickQuickModeToggle();
+        // await pageManager.streamsPage.clickQuickModeToggle();
+        await pageManager.streamsPage.clickAllFieldsButton();
         await pageManager.streamsPage.selectRunQuery();
         await pageManager.streamsPage.clickInterestingFields();
         await pageManager.streamsPage.validateInterestingFields();
@@ -136,7 +137,8 @@ test.describe("Streaming for logs", () => {
         await pageManager.streamsPage.navigateToLogs();
         await pageManager.streamsPage.selectIndexAndStreamJoin();
         await pageManager.streamsPage.enableSQLMode();
-        await pageManager.streamsPage.clickQuickModeToggle();
+        // await pageManager.streamsPage.clickQuickModeToggle();
+        await pageManager.streamsPage.clickAllFieldsButton();
         await pageManager.streamsPage.selectRunQuery();
         await pageManager.streamsPage.clickInterestingFields();
         await pageManager.streamsPage.validateInterestingFieldsQuery();
@@ -148,7 +150,8 @@ test.describe("Streaming for logs", () => {
         await pageManager.streamsPage.navigateToLogs();
         await pageManager.streamsPage.selectIndexAndStreamJoin();
        // await pageManager.streamsPage.enableSQLMode();
-        await pageManager.streamsPage.clickQuickModeToggle();
+        // await pageManager.streamsPage.clickQuickModeToggle();
+        await pageManager.streamsPage.clickAllFieldsButton();
         await pageManager.streamsPage.selectRunQuery();
         await pageManager.streamsPage.clickInterestingFields();
         await pageManager.streamsPage.addRemoveInteresting();
