@@ -139,9 +139,8 @@ fn generate_time_ranges_for_deletion(
     time_ranges_for_deletion
 }
 
-/// Creates delete jobs for the stream based on the stream settings
-/// Returns the number of jobs created
-pub async fn delete_by_stream(
+/// Generate delete jobs for the stream based on the stream settings
+pub async fn generate_retention_job(
     lifecycle_end: &DateTime<Utc>,
     org_id: &str,
     stream_type: StreamType,
@@ -161,7 +160,7 @@ pub async fn delete_by_stream(
     }
 
     log::debug!(
-        "[COMPACTOR] delete_by_stream {}/{}/{}/{},{}",
+        "[COMPACTOR] generate_retention_job {}/{}/{}/{},{}",
         org_id,
         stream_type,
         stream_name,
@@ -225,7 +224,7 @@ pub async fn delete_by_stream(
             .await?;
             if created {
                 log::info!(
-                    "[COMPACTOR] delete_by_stream: generate job for {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end}",
+                    "[COMPACTOR] generate_retention_job: generate job for {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end}",
                 );
             }
         }
@@ -473,7 +472,7 @@ pub async fn delete_from_file_list(
     }
     // generate a new array and sort by key
     let mut hours_files = hours_files.into_iter().collect::<Vec<_>>();
-    hours_files.sort_by(|(k1, _), (k2, _)| k1.cmp(&k2));
+    hours_files.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
 
     // write file list to storage
     write_file_list(org_id, hours_files).await?;
@@ -622,7 +621,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_delete_by_stream() {
+    async fn test_generate_retention_job() {
         infra_file_list::create_table().await.unwrap();
         let org_id = "test";
         let stream_name = "test";
@@ -630,7 +629,8 @@ mod tests {
         let lifecycle_end = DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
             .unwrap()
             .to_utc();
-        let res = delete_by_stream(&lifecycle_end, org_id, stream_type, stream_name, &[]).await;
+        let res =
+            generate_retention_job(&lifecycle_end, org_id, stream_type, stream_name, &[]).await;
         assert!(res.is_ok());
     }
 
