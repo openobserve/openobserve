@@ -21,7 +21,10 @@ use config::{
     cluster::LOCAL_NODE,
     meta::{cluster::NodeInfo, search::ScanStats},
 };
-use datafusion::physical_plan::{ExecutionPlan, display::DisplayableExecutionPlan};
+use datafusion::{
+    self,
+    physical_plan::{ExecutionPlan, display::DisplayableExecutionPlan},
+};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
@@ -41,9 +44,9 @@ pub enum CustomMessage {
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Metrics {
-    stage: i32,
-    node: String,
-    metrics: String,
+    pub stage: i32,
+    pub node: String,
+    pub metrics: String,
 }
 
 /// the CustomMessage is not ready, so we need to use this struct to store

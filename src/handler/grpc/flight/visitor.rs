@@ -23,6 +23,7 @@ use datafusion::{
     },
     physical_plan::ExecutionPlan,
 };
+use flight::common::Metrics;
 use parking_lot::Mutex;
 
 use crate::service::search::datafusion::distributed_plan::remote_scan::RemoteScanExec;
@@ -51,6 +52,37 @@ impl<'n> TreeNodeVisitor<'n> for RemoteScanVisitor {
         if name == "RemoteScanExec" {
             let remote_scan_exec = node.as_any().downcast_ref::<RemoteScanExec>().unwrap();
             self.scan_stats = Some(remote_scan_exec.scan_stats());
+            Ok(TreeNodeRecursion::Stop)
+        } else {
+            Ok(TreeNodeRecursion::Continue)
+        }
+    }
+}
+
+pub fn get_cluster_metrics(plan: Arc<dyn ExecutionPlan>) -> Option<Arc<Mutex<Vec<Metrics>>>> {
+    let mut visitor = MetricsVisitor::new();
+    let _ = plan.visit(&mut visitor);
+    visitor.metrics
+}
+
+struct MetricsVisitor {
+    metrics: Option<Arc<Mutex<Vec<Metrics>>>>,
+}
+
+impl MetricsVisitor {
+    pub fn new() -> Self {
+        Self { metrics: None }
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for MetricsVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        let name = node.name();
+        if name == "RemoteScanExec" {
+            let remote_scan_exec = node.as_any().downcast_ref::<RemoteScanExec>().unwrap();
+            self.metrics = Some(remote_scan_exec.cluster_metrics());
             Ok(TreeNodeRecursion::Stop)
         } else {
             Ok(TreeNodeRecursion::Continue)

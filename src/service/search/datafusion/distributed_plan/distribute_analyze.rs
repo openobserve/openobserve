@@ -21,17 +21,24 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use arrow_schema::{DataType, Field, Schema};
+use config::{cluster::LOCAL_NODE, meta::cluster::NodeInfo};
 use datafusion::{
     common::{DataFusionError, Result, internal_err},
     execution::TaskContext,
     physical_expr::EquivalenceProperties,
     physical_plan::{
         DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, ExecutionPlanProperties,
-        Partitioning, PlanProperties, SendableRecordBatchStream, display::DisplayableExecutionPlan,
-        execute_stream, stream::RecordBatchStreamAdapter,
+        Partitioning, PlanProperties, SendableRecordBatchStream, execute_stream,
+        stream::RecordBatchStreamAdapter,
     },
 };
+use flight::common::Metrics;
 use futures::StreamExt;
+
+use crate::{
+    handler::grpc::flight::visitor::get_cluster_metrics,
+    service::search::datafusion::distributed_plan::display::DisplayableExecutionPlan,
+};
 
 /// query EXPLAIN ANALYZE in distributed mode
 /// the output recordbatch's schema is
@@ -167,41 +174,40 @@ impl ExecutionPlan for DistributeAnalyzeExec {
 
 fn create_output_batch(
     verbose: bool,
-    show_statistics: bool,
+    _show_statistics: bool,
     total_rows: usize,
     duration: std::time::Duration,
     input: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
 ) -> Result<RecordBatch> {
     let mut phase_builder = Int32Builder::new();
-    let mut type_builder = StringBuilder::with_capacity(1, 1024);
+    let mut node_builder = StringBuilder::with_capacity(1, 1024);
     let mut plan_builder = StringBuilder::with_capacity(1, 1024);
 
     phase_builder.append_value(0); // Phase 0 for the main plan
-    type_builder.append_value("Plan with Metrics");
+    node_builder.append_value(LOCAL_NODE.get_grpc_addr());
 
-    let annotated_plan = DisplayableExecutionPlan::with_metrics(input.as_ref())
-        .set_show_statistics(show_statistics)
+    let annotated_plan = DisplayableExecutionPlan::new(input.as_ref())
         .indent(verbose)
         .to_string();
     plan_builder.append_value(annotated_plan);
 
+    // add metrics from remote scan
+    let metrics = collect_metrics(input);
+
+    for m in metrics {
+        phase_builder.append_value(m.stage);
+        node_builder.append_value(m.node);
+        plan_builder.append_value(m.metrics);
+    }
+
     if verbose {
         phase_builder.append_value(0); // Phase 0 for the main plan
-        type_builder.append_value("Plan with Full Metrics");
-
-        let annotated_plan = DisplayableExecutionPlan::with_full_metrics(input.as_ref())
-            .set_show_statistics(show_statistics)
-            .indent(verbose)
-            .to_string();
-        plan_builder.append_value(annotated_plan);
-
-        phase_builder.append_value(0); // Phase 0 for the main plan
-        type_builder.append_value("Output Rows");
+        node_builder.append_value("Output Rows");
         plan_builder.append_value(total_rows.to_string());
 
         phase_builder.append_value(0); // Phase 0 for the main plan
-        type_builder.append_value("Duration");
+        node_builder.append_value("Duration");
         plan_builder.append_value(format!("{duration:?}"));
     }
 
@@ -209,9 +215,18 @@ fn create_output_batch(
         schema,
         vec![
             Arc::new(phase_builder.finish()),
-            Arc::new(type_builder.finish()),
+            Arc::new(node_builder.finish()),
             Arc::new(plan_builder.finish()),
         ],
     )
     .map_err(DataFusionError::from)
+}
+
+fn collect_metrics(plan: Arc<dyn ExecutionPlan>) -> Vec<Metrics> {
+    let metrics = get_cluster_metrics(plan);
+    if let Some(metrics) = metrics {
+        metrics.lock().clone()
+    } else {
+        vec![]
+    }
 }

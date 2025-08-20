@@ -49,7 +49,7 @@ use crate::{
 };
 
 mod stream;
-mod visitor;
+pub mod visitor;
 
 #[derive(Default)]
 pub struct FlightServiceImpl;

@@ -28,6 +28,7 @@ use crate::service::search::datafusion::distributed_plan::empty_exec::NewEmptyEx
 pub mod codec;
 mod common;
 mod decoder_stream;
+pub mod display;
 pub mod distribute_analyze;
 pub mod empty_exec;
 pub mod enrich_exec;
