@@ -18,9 +18,8 @@ use config::{
     get_config,
     meta::{cluster::CompactionJobType, stream::ALL_STREAM_TYPES},
     metrics,
+    spawn_pausable_job,
 };
-#[cfg(feature = "enterprise")]
-use config::spawn_pausable_job;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use tokio::sync::mpsc;
@@ -70,11 +69,56 @@ pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { run_merge(scheduler.tx()).await });
     tokio::task::spawn(async move { run_retention().await });
     tokio::task::spawn(async move { run_delay_deletion().await });
-    tokio::task::spawn(async move { run_sync_to_db().await });
+    spawn_pausable_job!(
+        "compactor_sync_to_db",
+        get_config().compact.sync_to_db_interval,
+        {
+            log::debug!("[COMPACTOR::JOB] Running sync cached compact offset to db");
+            if let Err(e) = crate::service::db::compact::files::sync_cache_to_db().await {
+                log::error!("[COMPACTOR::JOB] run sync cached compact offset to db error: {e}");
+            }
+        }
+    );
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { run_downsampling_sync_to_db().await });
-    tokio::task::spawn(async move { run_check_running_jobs().await });
-    tokio::task::spawn(async move { run_clean_done_jobs().await });
+    spawn_pausable_job!(
+        "compactor_downsampling_sync_to_db",
+        get_config().compact.sync_to_db_interval,
+        {
+            if get_o2_config().downsampling.metrics_downsampling_rules.is_empty() {
+                return;
+            }
+            log::debug!("[COMPACTOR::JOB] Running sync cached downsampling offset to db");
+            if let Err(e) = crate::service::db::compact::downsampling::sync_cache_to_db().await {
+                log::error!("[COMPACTOR::JOB] run sync cached downsampling offset to db error: {e}");
+            }
+        }
+    );
+    spawn_pausable_job!(
+        "compactor_check_running_jobs",
+        get_config().compact.job_run_timeout,
+        {
+            log::debug!("[COMPACTOR::JOB] Running check running jobs");
+            let timeout = get_config().compact.job_run_timeout;
+            let updated_at = config::utils::time::now_micros() - (timeout * 1000 * 1000);
+            if let Err(e) = infra::file_list::check_running_jobs(updated_at).await {
+                log::error!("[COMPACTOR::JOB] run check running jobs error: {e}");
+            }
+        },
+        sleep_after
+    );
+    spawn_pausable_job!(
+        "compactor_clean_done_jobs",
+        get_config().compact.job_clean_wait_time,
+        {
+            log::debug!("[COMPACTOR::JOB] Running clean done jobs");
+            let wait_time = get_config().compact.job_clean_wait_time;
+            let updated_at = config::utils::time::now_micros() - (wait_time * 1000 * 1000);
+            if let Err(e) = infra::file_list::clean_done_jobs(updated_at).await {
+                log::error!("[COMPACTOR::JOB] run clean done jobs error: {e}");
+            }
+        },
+        sleep_after
+    );
     tokio::task::spawn(async move { run_compactor_pending_jobs_metric().await });
     tokio::task::spawn(async move { run_enrichment_table_merge().await });
 
@@ -214,63 +258,9 @@ async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     }
 }
 
-async fn run_sync_to_db() -> Result<(), anyhow::Error> {
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.sync_to_db_interval,
-        ))
-        .await;
-        log::debug!("[COMPACTOR::JOB] Running sync cached compact offset to db");
-        if let Err(e) = crate::service::db::compact::files::sync_cache_to_db().await {
-            log::error!("[COMPACTOR::JOB] run sync cached compact offset to db error: {e}");
-        }
-    }
-}
 
-#[cfg(feature = "enterprise")]
-async fn run_downsampling_sync_to_db() -> Result<(), anyhow::Error> {
-    if get_o2_config()
-        .downsampling
-        .metrics_downsampling_rules
-        .is_empty()
-    {
-        return Ok(());
-    }
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.sync_to_db_interval,
-        ))
-        .await;
-        log::debug!("[COMPACTOR::JOB] Running sync cached downsampling offset to db");
-        if let Err(e) = crate::service::db::compact::downsampling::sync_cache_to_db().await {
-            log::error!("[COMPACTOR::JOB] run sync cached downsampling offset to db error: {e}");
-        }
-    }
-}
 
-async fn run_check_running_jobs() -> Result<(), anyhow::Error> {
-    loop {
-        let time = get_config().compact.job_run_timeout;
-        log::debug!("[COMPACTOR::JOB] Running check running jobs");
-        let updated_at = config::utils::time::now_micros() - (time * 1000 * 1000);
-        if let Err(e) = infra::file_list::check_running_jobs(updated_at).await {
-            log::error!("[COMPACTOR::JOB] run check running jobs error: {e}");
-        }
-        tokio::time::sleep(tokio::time::Duration::from_secs(time as u64)).await;
-    }
-}
 
-async fn run_clean_done_jobs() -> Result<(), anyhow::Error> {
-    loop {
-        let time = get_config().compact.job_clean_wait_time;
-        log::debug!("[COMPACTOR::JOB] Running clean done jobs");
-        let updated_at = config::utils::time::now_micros() - (time * 1000 * 1000);
-        if let Err(e) = infra::file_list::clean_done_jobs(updated_at).await {
-            log::error!("[COMPACTOR::JOB] run clean done jobs error: {e}");
-        }
-        tokio::time::sleep(tokio::time::Duration::from_secs(time as u64)).await;
-    }
-}
 
 async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
     log::info!("[COMPACTOR::JOB] Running enrichment table merge");
