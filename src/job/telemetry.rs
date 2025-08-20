@@ -22,7 +22,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         let cfg = config::get_config();
         if !cfg.common.telemetry_enabled {
             // Sleep for a short time and check again if telemetry gets enabled
-            tokio::time::sleep(time::Duration::from_secs(30)).await;
+            tokio::time::sleep(time::Duration::from_secs(60)).await;
             continue;
         }
 
