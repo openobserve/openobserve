@@ -75,7 +75,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     for i in 0..cfg.limit.search_job_workers {
         spawn_pausable_job!(
-            &format!("search_job_worker_{}", i),
+            format!("search_job_worker_{}", i),
             get_config().limit.search_job_scheduler_interval,
             {
                 if let Err(e) = service::search_jobs::run(i).await {

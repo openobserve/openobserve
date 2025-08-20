@@ -100,7 +100,7 @@ macro_rules! spawn_pausable_job {
     
     // Full syntax with all options
     ($job_name:expr, $interval_expr:expr, $job_logic:block, $sleep_timing:ident, pause_if: $pause_condition:expr) => {{
-        let job_name = $job_name;
+        let job_name = $job_name.to_string();
         tokio::task::spawn(async move {
             log::info!("[{}] pausable job started", job_name);
             
