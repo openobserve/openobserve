@@ -268,10 +268,33 @@ describe("LogStream Component", () => {
     });
 
     it("should have correct stream filter values", () => {
-      expect(wrapper.vm.streamFilterValues).toHaveLength(5);
-      expect(wrapper.vm.streamFilterValues[0].value).toBe("logs");
-      expect(wrapper.vm.streamFilterValues[1].value).toBe("metrics");
-      expect(wrapper.vm.streamFilterValues[2].value).toBe("traces");
+      // Debug: log actual values to understand what we're getting
+      const actualValues = wrapper.vm.streamFilterValues;
+      
+      // First verify we have an array
+      expect(Array.isArray(actualValues)).toBe(true);
+      
+      // Check length with better error message
+      expect(actualValues).toHaveLength(5);
+      
+      // Verify the expected values exist
+      const expectedValues = ["logs", "metrics", "traces", "metadata", "index"];
+      const actualValuesList = actualValues.map((item: any) => item.value);
+      
+      expectedValues.forEach((expectedValue, index) => {
+        expect(actualValuesList).toContain(expectedValue);
+      });
+      
+      // Verify first few items for order (if they exist)
+      if (actualValues.length > 0) {
+        expect(actualValues[0].value).toBe("logs");
+      }
+      if (actualValues.length > 1) {
+        expect(actualValues[1].value).toBe("metrics");
+      }
+      if (actualValues.length > 2) {
+        expect(actualValues[2].value).toBe("traces");
+      }
     });
   });
 

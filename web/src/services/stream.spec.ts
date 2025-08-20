@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import stream from "@/services/stream";
 import http from "@/services/http";
 
@@ -39,6 +39,10 @@ describe("stream service", () => {
       delete: vi.fn(),
     };
     (http as any).mockReturnValue(mockHttpInstance);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe("nameList", () => {
@@ -293,6 +297,10 @@ describe("stream service", () => {
 
   describe("createSettings", () => {
     it("should make POST request to create stream settings with type", async () => {
+      // Ensure the function exists before testing
+      expect(stream.createSettings).toBeDefined();
+      expect(typeof stream.createSettings).toBe('function');
+      
       const params = {
         org_identifier: "org123",
         stream_name: "test_stream",
@@ -316,6 +324,10 @@ describe("stream service", () => {
     });
 
     it("should make POST request to create stream settings without type", async () => {
+      // Ensure the function exists before testing
+      expect(stream.createSettings).toBeDefined();
+      expect(typeof stream.createSettings).toBe('function');
+      
       const params = {
         org_identifier: "org123",
         stream_name: "test_stream",
