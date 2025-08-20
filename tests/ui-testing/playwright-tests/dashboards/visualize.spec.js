@@ -687,21 +687,31 @@ test.describe(" visualize UI testcases", () => {
       await expect(locator).not.toHaveClass(/bg-grey-[35]/);
     }
   }
-  async function addPanelToNewDashboard(page, dashboardName, panelName) {
-    // Click "Add To Dashboard" button
+  async function addPanelToNewDashboard(page, randomDashboardName, panelName) {
+    //add to dashboard and submit it
     await page.getByRole("button", { name: "Add To Dashboard" }).click();
+    await page
+      .locator('[data-test="dashboard-dashboard-new-add"]')
+      .waitFor({ state: "visible" });
 
-    // Create a new dashboard
+    //Adding dashboard
     await page.locator('[data-test="dashboard-dashboard-new-add"]').click();
-    await page.locator('[data-test="add-dashboard-name"]').fill(dashboardName);
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
     await page.locator('[data-test="dashboard-add-submit"]').click();
 
-    // Set panel title
+    await page.waitForTimeout(3000);
+    await page
+      .locator('[data-test="metrics-new-dashboard-panel-title"]')
+      .waitFor({ state: "visible" });
+    await page
+      .locator('[data-test="metrics-new-dashboard-panel-title"]')
+      .click();
     await page
       .locator('[data-test="metrics-new-dashboard-panel-title"]')
       .fill(panelName);
-
-    // Save panel settings
     await page
       .locator('[data-test="metrics-schema-update-settings-button"]')
       .click();
