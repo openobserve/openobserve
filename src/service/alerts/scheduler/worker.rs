@@ -238,7 +238,7 @@ impl SchedulerJobPuller {
                 let trace_id_keep_alive = trace_id.clone();
                 tokio::task::spawn(async move {
                     loop {
-                        let cfg = crate::config::get_config();
+                        let cfg = config::get_config();
                         let ttl = std::cmp::max(
                             std::cmp::min(
                                 cfg.limit.alert_schedule_timeout,
