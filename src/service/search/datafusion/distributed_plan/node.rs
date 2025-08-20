@@ -71,7 +71,7 @@ impl RemoteScanNodes {
             stream_type: table_name.get_stream_type(self.req.stream_type).to_string(),
             partition: 0,           // set in FlightSearchRequest
             job_id: "".to_string(), // set in FlightSearchRequest
-            enrich_mode: false,
+            enrich_mode: false,     // set in RemoteScanExec
         };
 
         let search_infos = SearchInfos {
@@ -86,6 +86,7 @@ impl RemoteScanNodes {
             timeout: self.req.timeout as u64,
             use_cache: self.req.use_cache,
             histogram_interval: self.req.histogram_interval,
+            is_analyze: false, // set in distribute Analyze
         };
 
         let index_condition = match &self.index_condition {
@@ -189,6 +190,7 @@ pub struct SearchInfos {
     pub timeout: u64,
     pub use_cache: bool,
     pub histogram_interval: i64,
+    pub is_analyze: bool,
 }
 
 impl SearchInfos {
@@ -206,6 +208,7 @@ impl SearchInfos {
             timeout: self.timeout as i64,
             use_cache: self.use_cache,
             histogram_interval: self.histogram_interval,
+            is_analyze: self.is_analyze,
         }
     }
 }
