@@ -26,7 +26,7 @@ use datafusion::{
     common::{DataFusionError, Result},
     physical_plan::execute_stream,
 };
-use flight::common::PreCustomMessage;
+use flight::common::{MetricsInfo, PreCustomMessage};
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;
@@ -168,11 +168,11 @@ impl FlightService for FlightServiceImpl {
         let scan_stats_ref = get_scan_stats(physical_plan.clone());
 
         // used for EXPLAIN ANALYZE to collect metrics after stream is done
-        let metrics_ref = req.search_info.is_analyze.then_some((
-            physical_plan.clone(),
+        let metrics_ref = req.search_info.is_analyze.then_some(MetricsInfo {
+            plan: physical_plan.clone(),
             is_super_cluster,
-            Box::new(super_cluster_enabled) as Box<dyn Fn() -> bool + Send>,
-        ));
+            func: Box::new(super_cluster_enabled),
+        });
 
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
             // clear session data

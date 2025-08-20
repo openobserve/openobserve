@@ -55,7 +55,13 @@ pub enum PreCustomMessage {
     ScanStats(ScanStats),
     ScanStatsRef(Option<Arc<Mutex<ScanStats>>>),
     // physical plan, is_super_cluster
-    Metrics(Option<(Arc<dyn ExecutionPlan>, bool, Box<dyn Fn() -> bool + Send>)>),
+    Metrics(Option<MetricsInfo>),
+}
+
+pub struct MetricsInfo {
+    pub plan: Arc<dyn ExecutionPlan>,
+    pub is_super_cluster: bool,
+    pub func: Box<dyn Fn() -> bool + Send>,
 }
 
 impl PreCustomMessage {
@@ -72,23 +78,18 @@ impl PreCustomMessage {
             PreCustomMessage::ScanStatsRef(stats_ref) => stats_ref
                 .as_ref()
                 .map(|stats| CustomMessage::ScanStats(*stats.lock())),
-            PreCustomMessage::Metrics(metrics_ref) => {
-                metrics_ref
-                    .as_ref()
-                    .map(|(metrics, is_super_cluster, func)| {
-                        CustomMessage::Metrics(collect_metrics(metrics, *is_super_cluster, func))
-                    })
-            }
+            PreCustomMessage::Metrics(metrics_ref) => metrics_ref
+                .as_ref()
+                .map(|metrics_info| CustomMessage::Metrics(collect_metrics(metrics_info))),
         }
     }
 }
 
 // TODO: support collect the metrics from remote scan(for super cluster)
-fn collect_metrics(
-    plan: &Arc<dyn ExecutionPlan>,
-    is_super_cluster: bool,
-    func: impl Fn() -> bool,
-) -> Vec<Metrics> {
+fn collect_metrics(metrics_info: &MetricsInfo) -> Vec<Metrics> {
+    let plan = &metrics_info.plan;
+    let is_super_cluster = metrics_info.is_super_cluster;
+    let func = &metrics_info.func;
     let plan_with_metrics = DisplayableExecutionPlan::with_metrics(plan.as_ref())
         .set_show_statistics(false)
         .indent(true)
