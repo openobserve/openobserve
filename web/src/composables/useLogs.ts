@@ -5352,7 +5352,7 @@ const useLogs = () => {
         withObj.forEach((obj: any) => {
           // Recursively extract table names from the WITH statement with depth protection
           const MAX_RECURSION_DEPTH = 50; // Prevent stack overflow
-          const visited = new Set(); // Prevent circular references
+          const visitedNodes = new WeakSet(); // Prevent circular references - more efficient for objects
           
           const extractTablesFromNode = (node: any, depth: number = 0) => {
             if (!node || depth > MAX_RECURSION_DEPTH) {
@@ -5362,12 +5362,13 @@ const useLogs = () => {
               return;
             }
             
-            // Create a unique identifier for this node to detect circular references
-            const nodeId = JSON.stringify(node).substring(0, 100) + depth;
-            if (visited.has(nodeId)) {
-              return; // Skip already visited nodes
+            // Use WeakSet for efficient circular reference detection
+            if (typeof node === 'object' && node !== null) {
+              if (visitedNodes.has(node)) {
+                return; // Skip already visited nodes
+              }
+              visitedNodes.add(node);
             }
-            visited.add(nodeId);
             
             // Check if current node has a from clause
             if (node.from && Array.isArray(node.from)) {
