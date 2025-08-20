@@ -291,15 +291,25 @@ export const applySeriesColorMappings = (
     }
   });
 
-  // Generate a unique non-conflicting color
+  /**
+   * Generates a unique color not present in the set of used colors, using the
+   * theme's color palette. If the palette is exhausted, falls back to an HSL
+   * color.
+   *
+   * @param {Set<string>} used set of colors already used
+   * @param {string} themeName name of the theme to use
+   * @returns {string} a unique color as an HSL string
+   */
   const generateUniqueColor = (
     used: Set<string>,
     themeName: string,
   ): string => {
     const palette = getColorPalette(themeName);
+    // Try using a color from the theme palette
     for (const c of palette) {
       if (!used.has(c)) return c;
     }
+    // If the palette is exhausted, use an HSL color
     const hue = (used.size * 137.508) % 360;
     const saturation = 70 + (used.size % 20);
     const lightness = 45 + (used.size % 20);
