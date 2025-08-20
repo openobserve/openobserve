@@ -89,7 +89,6 @@
             dense
             use-input
             fill-input
-            hide-bottom-space
             style="width: 250px"
             :placeholder="!isFocused && (!field.index_type || field.index_type.length === 0) ? 'Index Type' : ''"
             @update:model-value="emits('input:update', 'conditions', field)"
@@ -120,10 +119,9 @@
             fill-input
             hide-selected
             emit-value
-            hide-bottom-space
             style="width: 250px"
             :placeholder="!isDataTypeFocused && (!field.type || field.type.length === 0) ? 'Data Type *' : ''"
-            :rules="[(val: any) => !!val.trim() || 'Data type is required!']"
+            :rules="[(val: any) => !!val || 'Data Type is required!']"
             @update:model-value="emits('input:update', 'conditions', field)"
             @focus="handleDataTypeFocus"
             @blur="handleDataTypeBlur"
@@ -172,6 +170,7 @@
 import { useI18n } from "vue-i18n";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
+import { ref } from "vue";
 
 defineProps({
   fields: {

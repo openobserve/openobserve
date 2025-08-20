@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-card-section
 
                   class="q-pa-none"
-                  style="flex: 1; overflow-y: auto; padding: 4px 16px 6px 16px;"
+                  style="flex: 1; overflow-y: auto; padding: 4px 16px 6px 16px; margin-bottom: 4px;"
                 >
                   <StreamFieldsInputs
                     :fields="newSchemaFields"
