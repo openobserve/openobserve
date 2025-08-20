@@ -3702,7 +3702,7 @@ const useLogs = () => {
               fieldObj = {
                 name: field,
                 ftsKey:
-                  stream.settings.full_text_search_keys.indexOf > -1
+                  stream.settings.full_text_search_keys.indexOf(field) > -1
                     ? true
                     : false,
                 isSchemaField: true,

@@ -2479,10 +2479,10 @@ export default defineComponent({
     updateSelectedColumns() {
       this.searchObj.meta.resultGrid.manualRemoveFields = true;
       // Clear any existing timeout
-      if (updateColumnsTimeout.value) {
-        clearTimeout(updateColumnsTimeout.value);
+      if (this.updateColumnsTimeout) {
+        clearTimeout(this.updateColumnsTimeout);
       }
-      updateColumnsTimeout.value = setTimeout(() => {
+      this.updateColumnsTimeout = setTimeout(() => {
         this.updateGridColumns();
       }, 50);
     },
