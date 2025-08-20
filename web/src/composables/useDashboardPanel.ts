@@ -108,10 +108,12 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
       wrap_table_cells: false,
       table_transpose: false,
       table_dynamic_columns: false,
+      mappings: [],
       color: {
         mode: "palette-classic-by-series",
         fixedColor: ["#53ca53"],
         seriesBy: "last",
+        colorBySeries: [],
       },
       background: null,
     },
@@ -1048,6 +1050,49 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           if (query.fields.y.length > 1) {
             query.fields.y = [query.fields.y[0]];
           }
+        });
+        if (dashboardPanelData.data.queryType === "sql") {
+          dashboardPanelData.layout.currentQueryIndex = 0;
+          dashboardPanelData.data.queries =
+            dashboardPanelData.data.queries.slice(0, 1);
+        }
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
+
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
+        break;
+      case "metric":
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.x = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.y.forEach((itemY: any) => {
+          if (itemY.aggregationFunction === null && !itemY.isDerived) {
+            itemY.aggregationFunction = "count";
+          }
+        });
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.z = [];
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].fields.breakdown = [];
+        // we have multiple queries for geomap, so if we are moving away, we need to reset
+        // the values of lat, lng and weight in all the queries
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.latitude = null;
+          query.fields.longitude = null;
+          query.fields.weight = null;
+          query.fields.name = null;
+          query.fields.value_for_maps = null;
+          query.fields.source = null;
+          query.fields.target = null;
+          query.fields.value = null;
         });
         if (dashboardPanelData.data.queryType === "sql") {
           dashboardPanelData.layout.currentQueryIndex = 0;
@@ -2033,7 +2078,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const { sqlParser }: any = useSqlParser.default();
     parser = await sqlParser();
 
-    updateQueryValue();
+    // do not allow to modify custom query fields for logs page
+    updateQueryValue(pageKey == "logs" ? true : false);
   };
 
   /**

@@ -27,6 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       style="display: flex; flex-direction: row; width: 100%"
       class="q-pl-md"
+      v-if="
+        dashboardPanelData.data.type != 'metric'
+      "
     >
       <div style="flex: 1">
         <div style="display: flex; flex-direction: row">

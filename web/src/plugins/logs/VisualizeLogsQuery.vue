@@ -29,7 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <ChartSelection
-          :allowedchartstype="['area', 'bar', 'h-bar', 'line', 'scatter', 'table']"
+          :allowedchartstype="[
+            'area',
+            'bar',
+            'h-bar',
+            'line',
+            'scatter',
+            'table',
+          ]"
           v-model:selectedChartType="dashboardPanelData.data.type"
           @update:selected-chart-type="resetAggregationFunction"
         />
@@ -158,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @error="handleChartApiError"
                         :searchResponse="searchResponse"
                         :is_ui_histogram="is_ui_histogram"
+                        @series-data-update="seriesDataUpdate"
                       />
                     </div>
                     <div
@@ -194,7 +202,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
                 >
-                  <ConfigPanel :dashboardPanelData="dashboardPanelData" />
+                  <ConfigPanel
+                    :dashboardPanelData="dashboardPanelData"
+                    :panelData="seriesData"
+                  />
                 </PanelSidebar>
               </div>
             </div>
@@ -331,6 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @error="handleChartApiError"
                         :searchResponse="searchResponse"
                         :is_ui_histogram="is_ui_histogram"
+                        @series-data-update="seriesDataUpdate"
                       />
                     </template>
                   </q-splitter>
@@ -347,7 +359,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
                 >
-                  <ConfigPanel :dashboardPanelData="dashboardPanelData" />
+                  <ConfigPanel
+                    :dashboardPanelData="dashboardPanelData"
+                    :panelData="seriesData"
+                  />
                 </PanelSidebar>
               </div>
             </div>
@@ -389,6 +404,7 @@ import { isEqual } from "lodash-es";
 import { onActivated } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import CustomChartEditor from "@/components/dashboards/addPanel/CustomChartEditor.vue";
+import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ConfigPanel.vue");
@@ -451,6 +467,11 @@ export default defineComponent({
     const { dashboardPanelData, resetAggregationFunction, validatePanel } =
       useDashboardPanelData(dashboardPanelDataPageKey);
     const metaData = ref(null);
+    const resultMetaData = ref(null);
+    const seriesData = ref([] as any[]);
+    const seriesDataUpdate = (data: any) => {
+      seriesData.value = data;
+    };
     const splitterModel = ref(50);
 
     const metaDataValue = (metadata: any) => {
@@ -468,13 +489,22 @@ export default defineComponent({
       async () => {
         // await nextTick();
         chartData.value = JSON.parse(JSON.stringify(visualizeChartData.value));
-      },{deep: true}
+      },
+      { deep: true },
     );
 
     const isOutDated = computed(() => {
-      //compare chartdata and dashboardpaneldata
-      // ignore histogram query comparison
-      return !is_ui_histogram.value && !isEqual(chartData.value, dashboardPanelData.data);
+      const configChanged = !isEqual(chartData.value, dashboardPanelData.data);
+
+      // skip outdate check if doesnt require to call api
+      let configNeedsApiCall = false;
+      if (configChanged) {
+        configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
+          chartData.value,
+          dashboardPanelData.data,
+        );
+      }
+      return configNeedsApiCall;
     });
 
     watch(isOutDated, () => {
@@ -547,6 +577,12 @@ export default defineComponent({
 
     const addToDashboard = () => {
 
+      // only copy if is_ui_histogram is true
+      if (resultMetaData.value?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
+        dashboardPanelData.data.queries[0].query =
+          resultMetaData.value?.[0]?.converted_histogram_query;
+      }
+
       const errors: any = [];
       // will push errors in errors array
       validatePanel(errors, true);
@@ -559,6 +595,7 @@ export default defineComponent({
         );
         return;
       } else {
+
         showAddToDashboardDialog.value = true;
       }
     };
@@ -745,12 +782,15 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
-    const onResultMetadataUpdate = (resultMetaData: any) => {
+    const onResultMetadataUpdate = (resultMetaDataParam: any) => {
+      // Store the result metadata
+      resultMetaData.value = resultMetaDataParam;
+
       // only copy if is_ui_histogram is true
-      if (resultMetaData?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
-        dashboardPanelData.data.queries[0].query =
-          resultMetaData?.[0]?.converted_histogram_query;
-      }
+      // if (resultMetaDataParam?.[0]?.converted_histogram_query && is_ui_histogram.value === true) {
+      //   dashboardPanelData.data.queries[0].query =
+      //     resultMetaDataParam?.[0]?.converted_histogram_query;
+      // }
     };
 
     return {
@@ -764,6 +804,8 @@ export default defineComponent({
       metaDataValue,
       metaData,
       chartData,
+      seriesData,
+      seriesDataUpdate,
       showAddToDashboardDialog,
       addPanelToDashboard,
       addToDashboard,
