@@ -59,6 +59,13 @@ pub enum PreCustomMessage {
 }
 
 impl PreCustomMessage {
+    pub fn is_scan_stats(&self) -> bool {
+        matches!(
+            self,
+            PreCustomMessage::ScanStats(_) | PreCustomMessage::ScanStatsRef(_)
+        )
+    }
+
     pub fn get_custom_message(&self) -> Option<CustomMessage> {
         match self {
             PreCustomMessage::ScanStats(stats) => Some(CustomMessage::ScanStats(*stats)),

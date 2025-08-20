@@ -77,6 +77,7 @@ impl FlightEncoderStreamBuilder {
             trace_id: self.trace_id,
             defer: self.defer,
             start: self.start,
+            first_batch: true,
         }
     }
 }
@@ -86,6 +87,7 @@ pub struct FlightEncoderStream {
     encoder: FlightDataEncoder,
     queue: VecDeque<FlightData>,
     done: bool,
+    first_batch: bool,
     custom_messages: Vec<PreCustomMessage>,
     // query context
     trace_id: String,
@@ -110,6 +112,24 @@ impl FlightEncoderStream {
                 self.queue.push_back(flight_data);
             }
         }
+        Ok(())
+    }
+
+    fn encode_costom_scan_stats(&mut self) -> Result<(), FlightError> {
+        let custom_messages = std::mem::take(&mut self.custom_messages);
+        let mut remainder_messages = Vec::new();
+        for message in custom_messages.into_iter() {
+            if message.is_scan_stats() {
+                let message = message.get_custom_message();
+                if let Some(message) = message {
+                    let flight_data = self.encoder.encode_custom(&message)?;
+                    self.queue.push_back(flight_data);
+                }
+            } else {
+                remainder_messages.push(message);
+            }
+        }
+        self.custom_messages = remainder_messages;
         Ok(())
     }
 }
@@ -156,6 +176,15 @@ impl Stream for FlightEncoderStream {
                     return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
                 }
                 Some(Ok(batch)) => {
+                    // before send the first batch, second the scan_stats first
+                    if self.first_batch && !self.custom_messages.is_empty() {
+                        if let Err(e) = self.encode_costom_scan_stats() {
+                            self.done = true;
+                            self.queue.clear();
+                            return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
+                        }
+                        self.first_batch = false;
+                    }
                     if let Err(e) = self.encode_batch(batch) {
                         self.done = true;
                         self.queue.clear();
