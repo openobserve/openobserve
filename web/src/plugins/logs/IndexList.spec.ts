@@ -24,6 +24,11 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { nextTick, ref } from "vue";
 
+// Define mock functions outside of the mock factory
+const mockExtractFields = vi.fn();
+const mockGetValuesPartition = vi.fn();
+const mockGetFilterExpressionByFieldType = vi.fn(() => "field = 'value'");
+
 vi.mock("@/services/search", () => ({
   default: {
     partition: vi.fn((...args) => {
@@ -41,7 +46,9 @@ vi.mock("@/services/search", () => ({
 }));
 
 vi.mock("@/composables/useLogs", () => {
-  const mockSearchObj = {
+  return {
+    default: () => {
+      const mockSearchObj = {
     config: {
       splitterModel: 20,
       lastSplitterPosition: 0,
@@ -209,24 +216,25 @@ vi.mock("@/composables/useLogs", () => {
     loadingStream: false,
     loadingSavedView: false,
     shouldIgnoreWatcher: false,
-    communicationMethod: "http",
-    // ...add any other properties your component expects
-  };
-  return {
-    default: () => ({
-      extractFields: mockExtractFields,
-      getValuesPartition: mockGetValuesPartition,
-      getFilterExpressionByFieldType: mockGetFilterExpressionByFieldType,
-      searchObj: mockSearchObj,
-      onStreamChange: vi.fn(),
-      updatedLocalLogFilterField: vi.fn(),
-      reorderSelectedFields: vi.fn(() => []),
-      filterHitsColumns: vi.fn(),
-      openedFilterFields: ref([]),
-      streamFieldValues: ref({}),
-      streamOptions: ref([]),
-      streamSchemaFieldsIndexMapping: ref({}),
-    }),
+        communicationMethod: "http",
+        // ...add any other properties your component expects
+      };
+      
+      return {
+        extractFields: mockExtractFields,
+        getValuesPartition: mockGetValuesPartition,
+        getFilterExpressionByFieldType: mockGetFilterExpressionByFieldType,
+        searchObj: mockSearchObj,
+        onStreamChange: vi.fn(),
+        updatedLocalLogFilterField: vi.fn(),
+        reorderSelectedFields: vi.fn(() => []),
+        filterHitsColumns: vi.fn(),
+        openedFilterFields: ref([]),
+        streamFieldValues: ref({}),
+        streamOptions: ref([]),
+        streamSchemaFieldsIndexMapping: ref({}),
+      };
+    },
   };
 });
 
@@ -257,10 +265,7 @@ vi.mock("@/services/stream", () => {
   };
 });
 
-const mockExtractFields = vi.fn();
-const mockGetValuesPartition = vi.fn();
 
-const mockGetFilterExpressionByFieldType = vi.fn(() => "field = 'value'");
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -296,6 +301,9 @@ describe("Index List", async () => {
     wrapper.vm.openedFilterFields = ref([]);
     wrapper.vm.streamFieldValues = ref({});
     wrapper.vm.streamOptions = ref([]);
+    
+    // Initialize streamSchemaFieldsIndexMapping as a reactive object
+    wrapper.vm.streamSchemaFieldsIndexMapping = {};
   });
 
   afterEach(() => {
@@ -303,10 +311,13 @@ describe("Index List", async () => {
       wrapper.unmount();
     }
     vi.restoreAllMocks();
-    wrapper.vm.openedFilterFields = ref([]);
-    wrapper.vm.streamFieldValues = ref({});
-    wrapper.vm.streamOptions = ref([]);
-    wrapper.vm.fieldValues = [];
+    if (wrapper && wrapper.vm) {
+      wrapper.vm.openedFilterFields = ref([]);
+      wrapper.vm.streamFieldValues = ref({});
+      wrapper.vm.streamOptions = ref([]);
+      wrapper.vm.fieldValues = [];
+      wrapper.vm.streamSchemaFieldsIndexMapping = {};
+    }
     // vi.clearAllMocks();
   });
 
