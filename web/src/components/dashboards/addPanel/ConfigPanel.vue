@@ -1538,7 +1538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="space"></div>
     <ColorPaletteDropDown v-if="showColorPalette" />
     <div class="space"></div>
-
+    <ColorBySeries :colorBySeriesData="panelData" v-if="showColorPalette" />
     <div class="space"></div>
     <OverrideConfig
       v-if="dashboardPanelData.data.type == 'table'"
@@ -1552,10 +1552,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount } from "vue";
+import { computed, defineComponent, inject, onBeforeMount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
+import ColorBySeries from "./ColorBySeries.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
@@ -1576,6 +1577,7 @@ export default defineComponent({
   components: {
     Drilldown,
     ValueMapping,
+    ColorBySeries,
     CommonAutoComplete,
     MarkLineConfig,
     CustomDateTimePicker,
@@ -1589,7 +1591,7 @@ export default defineComponent({
     StepAfter,
     StepMiddle,
   },
-  props: ["dashboardPanelData", "variablesData"],
+  props: ["dashboardPanelData", "variablesData", "panelData"],
   setup(props) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",

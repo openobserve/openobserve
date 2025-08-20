@@ -56,7 +56,8 @@ import {
   arraysMatch,
   isWebSocketEnabled,
   isStreamingEnabled,
-  addSpacesToOperators
+  addSpacesToOperators,
+  deepCopy
 } from "@/utils/zincutils";
 import {
   convertDateToTimestamp,
@@ -200,6 +201,9 @@ const defaultObject = {
       filteredField: <any>[],
       missingStreamMultiStreamFilter: <any>[],
       pipelineQueryStream: <any>[],
+      selectedInterestingStreamFields: <string[]>[],
+      interestingExpandedGroupRows: <any>{},
+      interestingExpandedGroupRowsFieldCount: <any>{},
     },
     resultGrid: {
       currentDateTime: new Date(),
@@ -297,6 +301,8 @@ const searchAggData = reactive({
 });
 
 const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
+
+const streamSchemaFieldsIndexMapping = ref<{ [key: string]: number }>({});
 
 let histogramResults: any = [];
 let histogramMappedData: any = [];
@@ -1976,7 +1982,86 @@ const useLogs = () => {
             searchObj.meta.sqlMode == false &&
             searchObj.meta.refreshHistogram == true)
         ) {
-          await processHttpHistogramResults(queryReq);
+          searchObj.meta.refreshHistogram = false;
+          if (searchObj.data.queryResults.hits.length > 0) {
+            if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == true) {
+              searchObj.data.histogram = {
+                xData: [],
+                yData: [],
+                chartParams: {
+                  title: getHistogramTitle(),
+                  unparsed_x_data: [],
+                  timezone: "",
+                },
+                errorCode: 0,
+                errorMsg: "Histogram is not available for multi-stream SQL mode search.",
+                errorDetail: "",
+              };
+
+              // get page count for multi stream sql mode search
+              setTimeout(async () => {
+                getPageCount(queryReq);
+              }, 0);
+              searchObj.meta.histogramDirtyFlag = false;
+            } else {
+              if(searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false) {
+                searchObj.data.histogramQuery.query.sql = setMultiStreamHistogramQuery(searchObj.data.histogramQuery.query);
+              }
+              searchObjDebug["histogramStartTime"] = performance.now();
+              searchObj.data.histogram.errorMsg = "";
+              searchObj.data.histogram.errorCode = 0;
+              searchObj.data.histogram.errorDetail = "";
+              searchObj.loadingHistogram = true;
+
+              const parsedSQL: any = fnParsedSQL();
+              searchObj.data.queryResults.aggs = [];
+
+              const partitions = JSON.parse(
+                JSON.stringify(
+                  searchObj.data.queryResults.partitionDetail.partitions,
+                ),
+              );
+
+              // is _timestamp orderby ASC then reverse the partition array
+              if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
+                partitions.reverse();
+              }
+
+              await generateHistogramSkeleton();
+              for (const partition of partitions) {
+                searchObj.data.histogramQuery.query.start_time = partition[0];
+                searchObj.data.histogramQuery.query.end_time = partition[1];
+                //to improve the cancel query UI experience we add additional check here and further we need to remove it
+                if (searchObj.data.isOperationCancelled) {
+                  searchObj.loadingHistogram = false;
+                  searchObj.data.isOperationCancelled = false;
+
+                  if (!searchObj.data.histogram?.xData?.length) {
+                    notificationMsg.value = "Search query was cancelled";
+                    searchObj.data.histogram.errorMsg =
+                      "Search query was cancelled";
+                    searchObj.data.histogram.errorDetail =
+                      "Search query was cancelled";
+                  }
+
+                  showCancelSearchNotification();
+                  break;
+                }
+                await getHistogramQueryData(searchObj.data.histogramQuery);
+                if (partitions.length > 1) {
+                  setTimeout(async () => {
+                    await generateHistogramData();
+                    if(!queryReq.query?.streaming_output)  refreshPartitionPagination(true);
+                  }, 100);
+                }
+              }
+              searchObj.loadingHistogram = false;
+            }
+          }
+          if (searchObj.data.stream.selectedStream.length == 1 || (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false)) {
+            await generateHistogramData();
+          }
+          if(!queryReq.query?.streaming_output) refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
           resetHistogramWithError(
             "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
@@ -3343,6 +3428,17 @@ const useLogs = () => {
     fieldValues.value = {};
   };
 
+  const hasInterestingFieldsInLocal = function(streamName: string) {
+    const localInterestingFields: any = useLocalInterestingFields();
+    return localInterestingFields.value != null &&
+    localInterestingFields.value[
+      searchObj.organizationIdentifier + "_" + streamName
+    ] !== undefined &&
+    localInterestingFields.value[
+      searchObj.organizationIdentifier + "_" + streamName
+    ].length > 0;
+  };
+
   async function extractFields() {
     try {
       searchObjDebug["extractFieldsStartTime"] = performance.now();
@@ -3361,6 +3457,9 @@ const useLogs = () => {
         let userDefineSchemaSettings: any = [];
         const schemaMaps: any = [];
         const commonSchemaMaps: any = [];
+        const interestingSchemaMaps: any = [];
+        const interestingCommonSchemaMaps: any = [];
+
         let schemaFieldsIndex: number = -1;
         let commonSchemaFieldsIndex: number = -1;
         let fieldObj: any = {};
@@ -3395,8 +3494,21 @@ const useLogs = () => {
           ),
         };
 
+        searchObj.data.stream.interestingExpandedGroupRows = deepCopy(searchObj.data.stream.expandGroupRows);
+        searchObj.data.stream.interestingExpandedGroupRowsFieldCount = deepCopy(searchObj.data.stream.expandGroupRowsFieldCount);
+
         searchObj.data.datetime.queryRangeRestrictionMsg = "";
         searchObj.data.datetime.queryRangeRestrictionInHour = -1;
+
+        const interestingFieldsMapping: {[key: string]: string[]} = {
+          "common": [],
+          ...Object.fromEntries(
+            selectedStreamValues.sort().map((stream: any) => [stream, []]),
+          ),
+        }
+
+        const interestingFieldsMap: {[key: string]: boolean} = {}
+
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
             if (searchObj.data.stream.selectedStream.length > 1) {
@@ -3412,27 +3524,28 @@ const useLogs = () => {
                 isInterestingField: false,
               });
 
+              interestingSchemaMaps.push(schemaMaps[schemaMaps.length - 1]);
+
               schemaFields.push("dummylabel");
               // searchObj.data.stream.expandGroupRowsFieldCount[stream.name] = searchObj.data.stream.expandGroupRowsFieldCount[stream.name] + 1;
             }
 
-            userDefineSchemaSettings =
-              stream.settings?.defined_schema_fields?.slice() || [];
             // check for schema exist in the object or not
             // if not pull the schema from server.
-            if (!stream.hasOwnProperty("schema")) {
-              searchObjDebug["extractFieldsWithAPI"] = " with API ";
-              const streamData: any = await loadStreamFields(stream.name);
-              const streamSchema: any = streamData.schema;
-              if (streamSchema == undefined) {
-                searchObj.loadingStream = false;
-                searchObj.data.errorMsg = t("search.noFieldFound");
-                throw new Error(searchObj.data.errorMsg);
-                return;
-              }
-              stream.settings = streamData.settings;
-              stream.schema = streamSchema;
+            const streamData = await loadStreamFields(stream.name);
+            if (streamData.schema === undefined) {
+              searchObj.loadingStream = false;
+              searchObj.data.errorMsg = t("search.noFieldFound");
+              throw new Error(searchObj.data.errorMsg);
+              return;
             }
+
+            stream.settings =  { ...streamData.settings };
+            stream.schema = [ ...streamData.schema ];
+
+            userDefineSchemaSettings =
+              stream.settings?.defined_schema_fields?.slice() || [];
+              
             if (
               (stream.settings.max_query_range > 0 || store.state.zoConfig.max_query_range > 0) &&
               (searchObj.data.datetime.queryRangeRestrictionInHour >
@@ -3457,12 +3570,12 @@ const useLogs = () => {
               );
             }
 
-            let environmentInterestingFields = [];
+            let environmentInterestingFields = new Set();
             if (
               store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")
             ) {
               environmentInterestingFields =
-                store.state?.zoConfig?.default_quick_mode_fields;
+                 new Set(store.state?.zoConfig?.default_quick_mode_fields);
             }
 
             if (
@@ -3487,36 +3600,83 @@ const useLogs = () => {
                 searchObj.data.stream.selectedStream.length > 1;
             }
 
-            streamInterestingFieldsLocal =
-              localInterestingFields.value != null &&
-              localInterestingFields.value[
+            // remove timestamp field from the local interesting fields and update the local interesting fields. As timestamp field is default interesting field, we don't need to add it to the local storage
+            if(hasInterestingFieldsInLocal(stream.name)) {
+             const hasTimestampField = localInterestingFields.value[
                 searchObj.organizationIdentifier + "_" + stream.name
-              ] !== undefined &&
+              ].some((field: any) => field === store.state.zoConfig?.timestamp_column);
+
+              // remove timestamp field from the local interesting fields and update the local interesting fields
+              if(hasTimestampField) {
+                localInterestingFields.value[
+                  searchObj.organizationIdentifier + "_" + stream.name
+                ] = localInterestingFields.value[
+                  searchObj.organizationIdentifier + "_" + stream.name
+                ].filter((field: any) => field !== store.state.zoConfig?.timestamp_column);
+              }
+
+              useLocalInterestingFields(localInterestingFields.value);
+            }            
+
+            const deselectedFields = localInterestingFields.value?.[
+              "deselect" +
+                "_" +
+                searchObj.organizationIdentifier +
+                "_" +
+                stream.name
+            ];
+
+
+            // Check if all deselected fields are present in the environment interesting fields
+            if(deselectedFields && deselectedFields.length > 0) {
               localInterestingFields.value[
-                searchObj.organizationIdentifier + "_" + stream.name
-              ].length > 0
-                ? localInterestingFields.value[
+                "deselect" +
+                  "_" +
+                  searchObj.organizationIdentifier +
+                  "_" +
+                  stream.name
+              ] = Array.from(deselectedFields).filter((field: any) => environmentInterestingFields.has(field));
+            }
+
+            const filteredDeselectedFields =
+              new Set(localInterestingFields.value?.[
+              "deselect" +
+                "_" +
+                searchObj.organizationIdentifier +
+                "_" +
+                stream.name
+            ] || []);
+
+            const filteredEnvironmentInterestingFields = Array.from(environmentInterestingFields).filter((field: any) => !filteredDeselectedFields.has(field));
+
+            streamInterestingFieldsLocal = hasInterestingFieldsInLocal(stream.name)
+                ? [...localInterestingFields.value?.[
                     searchObj.organizationIdentifier + "_" + stream.name
-                  ]
-                : environmentInterestingFields.length > 0
-                  ? [...environmentInterestingFields]
-                  : [...schemaInterestingFields];
+                  ], ...filteredEnvironmentInterestingFields]
+                : [...filteredEnvironmentInterestingFields]
 
-            searchObj.data.stream.interestingFieldList.push(
-              ...streamInterestingFieldsLocal,
-            );
+            
 
+            // Add timestamp column to the interesting field list if it is not present in the interesting field list
             const intField = new Set(
-              searchObj.data.stream.interestingFieldList,
+              [...searchObj.data.stream.interestingFieldList, ...streamInterestingFieldsLocal, store.state.zoConfig?.timestamp_column],
             );
-            searchObj.data.stream.interestingFieldList = [...intField];
+
+            searchObj.data.stream.interestingFieldList = Array.from(intField);
+
+            searchObj.data.stream.interestingFieldList.forEach((field: any) => {
+              if(interestingFieldsMap[field] === undefined) {
+                interestingFieldsMap[field] = false;
+              }
+            });
+
 
             // create a schema field mapping based on field name to avoid iteration over object.
             // in case of user defined schema consideration, loop will be break once all defined fields are mapped.
             let UDSFieldCount = 0;
             const fields: [string] =
               stream.settings?.defined_schema_fields &&
-              searchObj.meta.useUserDefinedSchemas != "all_fields"
+              searchObj.meta.useUserDefinedSchemas === "user_defined_schema"
                 ? [
                     store.state.zoConfig?.timestamp_column,
                     ...stream.settings?.defined_schema_fields,
@@ -3539,6 +3699,7 @@ const useLogs = () => {
                     ? true
                     : false,
               };
+
               if (
                 store.state.zoConfig.user_defined_schemas_enabled &&
                 searchObj.meta.useUserDefinedSchemas == "user_defined_schema" &&
@@ -3567,6 +3728,20 @@ const useLogs = () => {
                     }
 
                     commonSchemaMaps.push(fieldObj);
+
+                    if(fieldObj.isInterestingField) {
+                      interestingCommonSchemaMaps.push(fieldObj);
+                      interestingFieldsMapping["common"].push(fieldObj.name);
+                      interestingFieldsMap[fieldObj.name] = true;
+                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
+                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
+
+                      if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0 && interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].includes(fieldObj.name)) {
+                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] =
+                          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] - 1;
+                      }
+                    }
+
                     commonSchemaFields.push(field);
                     searchObj.data.stream.expandGroupRowsFieldCount["common"] =
                       searchObj.data.stream.expandGroupRowsFieldCount[
@@ -3576,6 +3751,10 @@ const useLogs = () => {
                     //remove the element from the index
                     schemaFields.splice(schemaFieldsIndex, 1);
                     schemaMaps.splice(schemaFieldsIndex, 1);
+                    const index = interestingSchemaMaps.findIndex((item: any) => item.name == field);
+                    if(index > -1) {
+                      interestingSchemaMaps.splice(index, 1);
+                    }
                   } else if (commonSchemaFieldsIndex > -1) {
                     commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
                       stream.name,
@@ -3586,6 +3765,13 @@ const useLogs = () => {
                     //   ] + 1;
                   } else {
                     schemaMaps.push(fieldObj);
+                    if(fieldObj.isInterestingField) {
+                      interestingSchemaMaps.push(fieldObj);
+                      interestingFieldsMapping[stream.name].push(fieldObj.name);
+                      interestingFieldsMap[fieldObj.name] = true;
+                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
+                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
+                    }
                     schemaFields.push(field);
                     searchObj.data.stream.expandGroupRowsFieldCount[
                       stream.name
@@ -3617,15 +3803,36 @@ const useLogs = () => {
                     fieldObj.streams.push(
                       ...schemaMaps[schemaFieldsIndex].streams,
                     );
+
                     searchObj.data.stream.expandGroupRowsFieldCount[
                       schemaMaps[schemaFieldsIndex].streams[0]
                     ] =
                       searchObj.data.stream.expandGroupRowsFieldCount[
                         schemaMaps[schemaFieldsIndex].streams[0]
                       ] - 1;
+
+
+                    if(fieldObj.isInterestingField) {
+                      if(searchObj.data.stream.interestingExpandedGroupRowsFieldCount[schemaMaps[schemaFieldsIndex].streams[0]] > 0 && interestingFieldsMapping[schemaMaps[schemaFieldsIndex].streams[0]].includes(fieldObj.name)) {
+                        searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+                          schemaMaps[schemaFieldsIndex].streams[0]
+                        ] =
+                          searchObj.data.stream.interestingExpandedGroupRowsFieldCount[
+                            schemaMaps[schemaFieldsIndex].streams[0]
+                          ] - 1;
+                      }
+                    }
                   }
 
                   commonSchemaMaps.push(fieldObj);
+
+                  if(fieldObj.isInterestingField) {
+                    interestingCommonSchemaMaps.push(fieldObj);
+                    interestingFieldsMapping["common"].push(fieldObj.name);
+                    interestingFieldsMap[fieldObj.name] = true;
+                    searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] =
+                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount["common"] + 1;
+                  }
                   commonSchemaFields.push(field);
                   searchObj.data.stream.expandGroupRowsFieldCount["common"] =
                     searchObj.data.stream.expandGroupRowsFieldCount["common"] +
@@ -3634,6 +3841,10 @@ const useLogs = () => {
                   //remove the element from the index
                   schemaFields.splice(schemaFieldsIndex, 1);
                   schemaMaps.splice(schemaFieldsIndex, 1);
+                  const index = interestingSchemaMaps.findIndex((item: any) => item.name == field);
+                  if(index > -1) {                      
+                    interestingSchemaMaps.splice(index, 1);
+                  }
                 } else if (commonSchemaFieldsIndex > -1) {
                   commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
                     stream.name,
@@ -3643,6 +3854,14 @@ const useLogs = () => {
                   //   1;
                 } else {
                   schemaMaps.push(fieldObj);
+
+                  if(fieldObj.isInterestingField) {
+                    interestingSchemaMaps.push(fieldObj);
+                    interestingFieldsMapping[stream.name].push(fieldObj.name);
+                    interestingFieldsMap[fieldObj.name] = true;
+                    searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] =
+                      searchObj.data.stream.interestingExpandedGroupRowsFieldCount[stream.name] + 1;
+                  }
                   schemaFields.push(field);
                   searchObj.data.stream.expandGroupRowsFieldCount[stream.name] =
                     searchObj.data.stream.expandGroupRowsFieldCount[
@@ -3667,6 +3886,9 @@ const useLogs = () => {
                 streams: [stream.name],
                 isInterestingField: false,
               });
+
+              interestingCommonSchemaMaps.unshift(commonSchemaMaps[0]);
+              interestingFieldsMapping["common"].unshift(commonSchemaMaps[0]);
 
               commonSchemaFields.unshift("dummylabel");
               // searchObj.data.stream.expandGroupRowsFieldCount["common"] = searchObj.data.stream.expandGroupRowsFieldCount["common"] + 1;
@@ -3741,6 +3963,12 @@ const useLogs = () => {
                     streams: [],
                   };
                   schemaMaps.push(fieldObj);
+
+                  if(fieldObj.isInterestingField) {
+                    interestingSchemaMaps.push(fieldObj);
+                    interestingFieldsMapping[stream.name].push(fieldObj);
+                    interestingFieldsMap[fieldObj.name] = true;
+                  }
                   schemaFields.push(key);
                 }
               }
@@ -3749,17 +3977,29 @@ const useLogs = () => {
               userDefineSchemaSettings || [];
           }
         }
+        searchObj.data.stream.interestingFieldList = Object.keys(interestingFieldsMap).filter((field: any) => interestingFieldsMap[field]);
+
 
         // searchObj.data.stream.selectedStreamFields = schemaMaps;
         searchObj.data.stream.selectedStreamFields = [
           ...commonSchemaMaps,
           ...schemaMaps,
         ];
+        
+
+        searchObj.data.stream.selectedInterestingStreamFields = [
+          ...interestingCommonSchemaMaps,
+          ...interestingSchemaMaps,
+        ];
+
         if (
           searchObj.data.stream.selectedStreamFields != undefined &&
           searchObj.data.stream.selectedStreamFields.length
         )
           updateFieldKeywords(searchObj.data.stream.selectedStreamFields);
+
+
+        createFieldIndexMapping();
       }
       searchObjDebug["extractFieldsEndTime"] = performance.now();
     } catch (e: any) {
@@ -3767,6 +4007,15 @@ const useLogs = () => {
       console.log("Error while extracting fields.", e);
       notificationMsg.value = "Error while extracting stream fields.";
     }
+  }
+
+  const createFieldIndexMapping = async () => {
+    Promise.resolve().then(() => {
+      streamSchemaFieldsIndexMapping.value = {};
+      for (let i = 0; i < searchObj.data.stream.selectedStreamFields.length; i++) {
+        streamSchemaFieldsIndexMapping.value[searchObj.data.stream.selectedStreamFields[i].name] = i;
+      }
+    });
   }
 
   const updateGridColumns = () => {
@@ -6937,7 +7186,8 @@ const useLogs = () => {
     processHttpHistogramResults,
     getVisualizationConfig,
     encodeVisualizationConfig,
-    decodeVisualizationConfig
+    decodeVisualizationConfig,
+    streamSchemaFieldsIndexMapping
   };
 };
 
