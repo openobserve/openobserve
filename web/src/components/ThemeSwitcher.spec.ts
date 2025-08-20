@@ -131,7 +131,7 @@ describe('ThemeSwitcher', () => {
       expect(wrapper.vm.darkMode).toBe(!initialMode);
     });
 
-    it('should save theme to localStorage when changed', () => {
+    it('should save theme to localStorage when changed', async () => {
       localStorageMock.getItem.mockReturnValue('light');
       
       const wrapper = mountComponent();
@@ -139,6 +139,9 @@ describe('ThemeSwitcher', () => {
       localStorageMock.setItem.mockClear();
       
       wrapper.vm.toggleDarkMode();
+      
+      // Wait for Vue's reactivity to process
+      await wrapper.vm.$nextTick();
       
       expect(localStorageMock.setItem).toHaveBeenCalledWith('theme', 'dark');
     });
