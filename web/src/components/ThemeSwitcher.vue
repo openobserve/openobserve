@@ -44,14 +44,21 @@ export default defineComponent({
     };
 
     onMounted(() => {
-      const savedTheme = localStorage.getItem("theme");
-      if (savedTheme !== null) {
-        darkMode.value = savedTheme == "dark";
-      } else {
-        // Default to light theme if no saved theme is found
+      try {
+        const savedTheme = localStorage.getItem("theme");
+        if (savedTheme !== null) {
+          darkMode.value = savedTheme == "dark";
+        } else {
+          // Default to light theme if no saved theme is found
+          darkMode.value = false;
+        }
+        setTheme(darkMode.value ? "dark" : "light");
+      } catch (error) {
+        // Handle localStorage not available
+        console.warn("localStorage not available:", error);
         darkMode.value = false;
+        setTheme("light");
       }
-      setTheme(darkMode.value ? "dark" : "light");
     });
 
     const DarkModeIcon = computed(() => {
@@ -67,7 +74,12 @@ export default defineComponent({
     );
 
     const setTheme = (theme: any) => {
-      localStorage.setItem("theme", theme);
+      try {
+        localStorage.setItem("theme", theme);
+      } catch (error) {
+        // Handle localStorage not available
+        console.warn("localStorage not available for theme storage:", error);
+      }
       $q.dark.set(theme == "dark");
       store.dispatch("appTheme", theme);
     };
