@@ -115,7 +115,7 @@ impl FlightEncoderStream {
         Ok(())
     }
 
-    fn encode_costom_scan_stats(&mut self) -> Result<(), FlightError> {
+    fn encode_custom_scan_stats(&mut self) -> Result<(), FlightError> {
         let custom_messages = std::mem::take(&mut self.custom_messages);
         let mut remainder_messages = Vec::new();
         for message in custom_messages.into_iter() {
@@ -176,9 +176,9 @@ impl Stream for FlightEncoderStream {
                     return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
                 }
                 Some(Ok(batch)) => {
-                    // before send the first batch, second the scan_stats first
+                    // before send the first batch, send the scan_stats first
                     if self.first_batch && !self.custom_messages.is_empty() {
-                        if let Err(e) = self.encode_costom_scan_stats() {
+                        if let Err(e) = self.encode_custom_scan_stats() {
                             self.done = true;
                             self.queue.clear();
                             return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
