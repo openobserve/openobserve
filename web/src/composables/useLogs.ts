@@ -4575,8 +4575,7 @@ const useLogs = () => {
       console.log("Error while loading logs data");
     }
   };
-  const saveColumnSizes = () => {};
-
+  
   const handleRunQuery = async () => {
     try {
       searchObj.loading = true;
@@ -4767,23 +4766,6 @@ const useLogs = () => {
     );
   };
 
-  const showNotification = () => {
-    return $q.notify({
-      type: "positive",
-      message: "Waiting for response...",
-      timeout: 10000,
-      actions: [
-        {
-          icon: "cancel",
-          color: "white",
-          handler: () => {
-            /* ... */
-          },
-        },
-      ],
-    });
-  };
-
   const updateStreams = async () => {
     if (searchObj.data.streamResults?.list?.length) {
       const streamType = searchObj.data.stream.streamType || "logs";
@@ -4944,18 +4926,6 @@ const useLogs = () => {
     }
   };
 
-  function quoteTableNameDirectly(sql: string, streamName: string) {
-    // This regular expression looks for the FROM keyword followed by
-    // an optional schema name, a table name, and handles optional spaces.
-    // It captures the table name to be replaced with double quotes.
-    const regex = new RegExp(`FROM\\s+${streamName}`, "gi");
-
-    // Replace the captured table name with the same name enclosed in double quotes
-    const modifiedSql = sql.replace(regex, `FROM "${streamName}"`);
-
-    return modifiedSql;
-  }
-
   const getRegionInfo = () => {
     searchService.get_regions().then((res) => {
       const clusterData = [];
@@ -5103,29 +5073,6 @@ const useLogs = () => {
 
     return selectedFields;
   };
-
-  function getFieldsWithStreamNames() {
-    const fieldMap: any = {};
-
-    searchObj.data.streamResults.list
-      .filter((stream: any) =>
-        searchObj.data.stream.selectedStream.includes(stream.name),
-      )
-      .forEach((stream: any) => {
-        stream.schema.forEach((field: any) => {
-          const fieldKey = field.name;
-          const fieldValue = `${stream.name}`;
-
-          // Add the fieldValue to the corresponding fieldKey in the map
-          if (!fieldMap[fieldKey]) {
-            fieldMap[fieldKey] = [];
-          }
-          fieldMap[fieldKey].push(fieldValue);
-        });
-      });
-
-    return fieldMap;
-  }
 
   const getFilterExpressionByFieldType = (
     field: string | number,
@@ -5705,15 +5652,6 @@ const useLogs = () => {
     return null;
   };
 
-  const initializeStreamingConnection = (payload: any): Promise<void> => {
-    return fetchQueryDataWithHttpStream(payload, {
-      data: handleSearchResponse,
-      error: handleSearchError,
-      complete: handleSearchClose,
-      reset: handleSearchReset,
-    }) as Promise<void>;
-  };
-
   const handleSearchReset = async (data: any, traceId?: string) => {
     // reset query data
     try {
@@ -5963,17 +5901,6 @@ const useLogs = () => {
       }
     } catch(e: any) {
       console.error("Error while trimming page count extra hit", e);
-    }
-  }
-
-  const updatePageCountSearchSize = (queryReq: SearchRequestPayload) => {
-    try{
-      if(shouldGetPageCount(queryReq, fnParsedSQL())) {
-        queryReq.query.size = queryReq.query.size + 1;
-      }
-    } catch(e: any) {
-      console.error("Error while updating page count search size", e);
-      return queryReq.query.size;
     }
   }
 
@@ -6637,10 +6564,6 @@ const useLogs = () => {
     );
   }
 
-  function isSingleStreamSelected(searchObj: any) {
-    return searchObj.data.stream.selectedStream.length <= 1;
-  }
-
   function isNonAggregatedSQLMode(searchObj: any, parsedSQL: any) {
     return !(
       searchObj.meta.sqlMode &&
@@ -6959,37 +6882,6 @@ const useLogs = () => {
     ) {
       searchObj.data.histogram.errorMsg =
         "Histogram search query was cancelled";
-    }
-  };
-
-  const handlePageCountError = (err: any) => {
-    searchObj.loading = false;
-    let trace_id = "";
-    searchObj.data.countErrorMsg = "Error while retrieving total events: ";
-    if (err.response != undefined) {
-      if (err.response.data.hasOwnProperty("trace_id")) {
-        trace_id = err.response.data?.trace_id;
-      }
-    } else {
-      if (err.hasOwnProperty("trace_id")) {
-        trace_id = err?.trace_id;
-      }
-    }
-
-    const customMessage = logsErrorMessage(err?.response?.data.code);
-    searchObj.data.errorCode = err?.response?.data.code;
-
-    notificationMsg.value = searchObj.data.countErrorMsg;
-
-    if (err?.request?.status >= 429) {
-      notificationMsg.value = err?.response?.data?.message;
-      searchObj.data.countErrorMsg += err?.response?.data?.message;
-    }
-
-    if (trace_id) {
-      searchObj.data.countErrorMsg += " TraceID:" + trace_id;
-      notificationMsg.value += " TraceID:" + trace_id;
-      trace_id = "";
     }
   };
 
