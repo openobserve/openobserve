@@ -42,12 +42,13 @@ pub fn mk_key(
 // delete data from stream
 // if date_range is empty, delete all data
 // date_range is a tuple of (start, end), eg: (2023-01-02, 2023-01-03)
+// return (key, created)
 pub async fn delete_stream(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     date_range: Option<(&str, &str)>,
-) -> Result<String, anyhow::Error> {
+) -> Result<(String, bool), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name, date_range);
     let db_key = format!("/compact/delete/{key}");
 
@@ -55,12 +56,12 @@ pub async fn delete_stream(
     if let Some(v) = CACHE.get(&key)
         && v.value() + hour_micros(1) > now_micros()
     {
-        return Ok(db_key); // already in cache, don't create same task in one hour
+        return Ok((db_key, false)); // already in cache, don't create same task in one hour
     }
 
     CACHE.insert(key.clone(), now_micros());
     db::put(&db_key, "OK".into(), db::NEED_WATCH, None).await?;
-    Ok(key) // return the key
+    Ok((key, true)) // return the key and true
 }
 
 // set the stream is processing by the node
