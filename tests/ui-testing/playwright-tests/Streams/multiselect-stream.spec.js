@@ -137,9 +137,9 @@ async function multistreamselect(page) {
   
 
   test("should add a function and display it in streams", async ({ page }) => {
-await multistreamselect(page);
-await page.locator('#fnEditor').getByRole('textbox').fill('.a=2');
-await page.waitForTimeout(1000);
+    await multistreamselect(page);
+    await page.locator('#fnEditor').getByRole('textbox').fill('.a=2');
+    await page.waitForTimeout(1000);
     await applyQueryButton(page);
     await page
       .locator('[data-test="table-row-expand-menu"]')
@@ -152,13 +152,13 @@ await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
   });
 
-  // test("should click on live mode on button and select 5 sec, switch off, and then click run query", async ({
-    
-  //   page,
-  // }) => {
-  //   await multistreamselect(page);
-  //   await page.route("**/logData.ValueQuery", (route) => route.continue());
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
+  test("should click on live mode on button and select 5 sec, switch off, and then click run query", async ({
+    page,
+  }) => {
+    await page.route("**/logData.ValueQuery", (route) => route.continue());
+    await multistreamselect(page);
+    await page.route("**/logData.ValueQuery", (route) => route.continue());
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
 
     await page
       .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
