@@ -1903,8 +1903,11 @@ export default defineComponent({
       }
 
       if (parsedSQL?._next) {
-        columnNames = getColumnNames(parsedSQL._next);
+        columnNames = [
+          ...new Set([...columnNames, ...getColumnNames(parsedSQL._next)]),
+        ];
       }
+
       return columnNames;
     };
 
@@ -1929,6 +1932,11 @@ export default defineComponent({
           const columnNames = getColumnNames(parsedSQL);
 
           searchObj.data.stream.interestingFieldList = [];
+
+          const defaultInterestingFields = new Set(
+            store.state?.zoConfig?.default_quick_mode_fields || [],
+          );
+
           for (const col of columnNames) {
             if (
               !searchObj.data.stream.interestingFieldList.includes(col) &&
@@ -1941,21 +1949,38 @@ export default defineComponent({
                 localFields = localInterestingFields.value;
               }
               for (const stream of searchObj.data.stream.selectedStreamFields) {
+                // If the field is not the timestamp column, add it to the interesting field list
+                // As timestamp column is default interesting field, we don't need to add it to the local storage
                 if (
                   stream.name == col &&
-                  !searchObj.data.stream.interestingFieldList.includes(col)
+                  !searchObj.data.stream.interestingFieldList.includes(col) &&
+                  col !== store.state.zoConfig?.timestamp_column
                 ) {
+                  const interestingFieldsCopy = [
+                    ...searchObj.data.stream.interestingFieldList,
+                  ];
+
                   searchObj.data.stream.interestingFieldList.push(col);
+
+                  if (!defaultInterestingFields.has(col)) {
+                    interestingFieldsCopy.push(col);
+                  }
+
                   localFields[
                     searchObj.organizationIdentifier +
                       "_" +
                       searchObj.data.stream.selectedStream[0]
-                  ] = searchObj.data.stream.interestingFieldList;
+                  ] = interestingFieldsCopy;
                 }
               }
               useLocalInterestingFields(localFields);
             }
           }
+
+          // Add timestamp column to the interesting field list, as it is default interesting field
+          searchObj.data.stream.interestingFieldList.unshift(
+            store.state.zoConfig?.timestamp_column,
+          );
 
           for (const item of searchObj.data.stream.selectedStreamFields) {
             if (
@@ -2863,17 +2888,27 @@ export default defineComponent({
           )
           .then((res) => {
             //remove it from localstorage as well
-            const localStoredSavedViews = JSON.parse(localStorage.getItem("savedViews") || "[]");
+            const localStoredSavedViews = JSON.parse(
+              localStorage.getItem("savedViews") || "[]",
+            );
             delete localStoredSavedViews[deleteViewID.value];
             favoriteViews.value.forEach((item: any) => {
               //remove it from favorite views list because we dont need to show it in the favorite views list
               if (item == deleteViewID.value) {
-                favoriteViews.value.splice(favoriteViews.value.indexOf(item), 1);
+                favoriteViews.value.splice(
+                  favoriteViews.value.indexOf(item),
+                  1,
+                );
               }
             });
             //remove it from local saved views list because we dont need to show it in the local saved views list
-            localSavedViews.value = localSavedViews.value.filter((item: any) => item.view_id !== deleteViewID.value);
-            localStorage.setItem("savedViews", JSON.stringify(localStoredSavedViews));
+            localSavedViews.value = localSavedViews.value.filter(
+              (item: any) => item.view_id !== deleteViewID.value,
+            );
+            localStorage.setItem(
+              "savedViews",
+              JSON.stringify(localStoredSavedViews),
+            );
             //we are deleting the local storage item and also we are removing the item from the favoriteViews array
             if (res.status == 200) {
               $q.notify({
