@@ -82,7 +82,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
 
                 let extended_retention_days = &stream_settings.extended_retention_days;
                 // creates jobs to delete data
-                if let Err(e) = retention::delete_by_stream(
+                if let Err(e) = retention::generate_retention_job(
                     &stream_data_retention_end,
                     &org_id,
                     stream_type,
@@ -92,7 +92,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
                 .await
                 {
                     log::error!(
-                        "[COMPACTOR] lifecycle: delete_by_stream [{}/{}/{}] error: {}",
+                        "[COMPACTOR] lifecycle: generate_retention_job [{}/{}/{}] error: {}",
                         org_id,
                         stream_type,
                         stream_name,
@@ -112,8 +112,9 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         let stream_name = columns[2];
         let retention = columns[3];
 
-        let Some(node_name) =
-            get_node_from_consistent_hash(stream_name, &Role::Compactor, None).await
+        // here we use job to get the compactor node, so that we can use different compactor for
+        // different job
+        let Some(node_name) = get_node_from_consistent_hash(&job, &Role::Compactor, None).await
         else {
             continue; // no compactor node
         };

@@ -595,6 +595,22 @@ SELECT date
             .collect())
     }
 
+    async fn get_min_date(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+    ) -> Result<String> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+        let pool = CLIENT_RO.clone();
+        let ret: Option<String> =
+            sqlx::query_scalar(r#"SELECT MIN(date) AS date FROM file_list WHERE stream = $1;"#)
+                .bind(stream_key)
+                .fetch_one(&pool)
+                .await?;
+        Ok(ret.unwrap_or_default())
+    }
+
     async fn get_min_ts(
         &self,
         org_id: &str,

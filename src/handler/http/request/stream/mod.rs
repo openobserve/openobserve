@@ -623,7 +623,7 @@ async fn delete_stream_data_by_time_range(
     );
 
     // Create a job to delete the data by the time range
-    let key = match crate::service::db::compact::retention::delete_stream(
+    let (key, _created) = match crate::service::db::compact::retention::delete_stream(
         &org_id,
         stream_type,
         &stream_name,
