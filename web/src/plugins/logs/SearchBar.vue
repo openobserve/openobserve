@@ -1444,8 +1444,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
-import { json2csv } from 'json-2-csv';
-
+import { json2csv } from "json-2-csv";
 
 const defaultValue: any = () => {
   return {
@@ -1918,7 +1917,8 @@ export default defineComponent({
               if (localInterestingFields.value != null) {
                 localFields = localInterestingFields.value;
               }
-              for (const stream of searchObj.data.stream.selectedStreamFields) {
+              for (const stream of searchObj.data.stream
+                ?.selectedStreamFields || []) {
                 if (
                   stream.name == col &&
                   !searchObj.data.stream.interestingFieldList.includes(col)
@@ -1935,7 +1935,8 @@ export default defineComponent({
             }
           }
 
-          for (const item of searchObj.data.stream.selectedStreamFields) {
+          for (const item of searchObj.data.stream?.selectedStreamFields ||
+            []) {
             if (
               searchObj.data.stream.interestingFieldList.includes(item.name)
             ) {
@@ -2134,20 +2135,19 @@ export default defineComponent({
         queryEditorRef.value.setValue(searchObj.data.query);
     };
 
-
     const downloadLogs = async (data, format) => {
       //here we are using a package json2csv which converts json to csv data
       //why package because we faced one issue where user has , in some of the fields so
-      //it is treating it as seperate fields 
+      //it is treating it as seperate fields
       //eg: {body:"hey this is the email body , with some info in it "}
       //after converting it will treat hey this is the email body this as the body and remaining will be the next column
       //to solve this issue we are using json2csv package
       try {
-          let filename = "logs-data";
-          let dataobj;
-          const options = {
-            emptyFieldValue: "",
-          };
+        let filename = "logs-data";
+        let dataobj;
+        const options = {
+          emptyFieldValue: "",
+        };
 
         if (format === "csv") {
           filename += ".csv";
@@ -3350,13 +3350,17 @@ export default defineComponent({
 
     const onLogsVisualizeToggleUpdate = (value: any) => {
       // prevent action if visualize is disabled (SQL mode disabled with multiple streams)
-      if (value === "visualize" && !searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1) {
+      if (
+        value === "visualize" &&
+        !searchObj.meta.sqlMode &&
+        searchObj.data.stream.selectedStream.length > 1
+      ) {
         showErrorNotification(
-          "Please enable SQL mode or select a single stream to visualize"
+          "Please enable SQL mode or select a single stream to visualize",
         );
         return;
       }
-      
+
       // confirm with user on toggle from visualize to logs
       if (
         value == "logs" &&
@@ -3377,7 +3381,10 @@ export default defineComponent({
           getQueryData();
           searchObj.meta.logsVisualizeDirtyFlag = false;
         }
-      } else if (value == "visualize" && searchObj.meta.logsVisualizeToggle == "logs") {
+      } else if (
+        value == "visualize" &&
+        searchObj.meta.logsVisualizeToggle == "logs"
+      ) {
         // validate query
         // return if query is emptry and stream is not selected
         if (
@@ -3405,7 +3412,11 @@ export default defineComponent({
         }
 
         // if multiple sql, then do not allow to visualize
-        if(logsPageQuery && Array.isArray(logsPageQuery) && logsPageQuery.length > 1){
+        if (
+          logsPageQuery &&
+          Array.isArray(logsPageQuery) &&
+          logsPageQuery.length > 1
+        ) {
           showErrorNotification(
             "Multiple SQL queries are not allowed to visualize",
           );
@@ -3805,10 +3816,16 @@ export default defineComponent({
   },
   computed: {
     isVisualizeDisabled() {
-      return !this.searchObj.meta.sqlMode && this.searchObj.data.stream.selectedStream.length > 1;
+      return (
+        !this.searchObj.meta.sqlMode &&
+        this.searchObj.data.stream.selectedStream.length > 1
+      );
     },
     isSqlModeDisabled() {
-      return this.searchObj.meta.logsVisualizeToggle === 'visualize' && this.searchObj.data.stream.selectedStream.length > 1;
+      return (
+        this.searchObj.meta.logsVisualizeToggle === "visualize" &&
+        this.searchObj.data.stream.selectedStream.length > 1
+      );
     },
     addSearchTerm() {
       return this.searchObj.data.stream.addToFilter;
