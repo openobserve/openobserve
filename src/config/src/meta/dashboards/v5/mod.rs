@@ -404,21 +404,18 @@ pub struct Field {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(untagged, rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum Config {
     #[serde(rename = "unit")]
-    Unit(UnitConfig),
+    Unit {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<Value>,
+    },
     #[serde(rename = "unique_value_color")]
-    UniqueValueColor(UniqueValueColorConfig),
-}
-
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct UnitConfig {
-    #[serde(rename = "type")]
-    typee: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    value: Option<Value>,
+    UniqueValueColor {
+        #[serde(rename = "autoColor")]
+        auto_color: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -427,15 +424,6 @@ pub struct UnitConfig {
 pub struct Value {
     unit: String,
     custom_unit: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct UniqueValueColorConfig {
-    #[serde(rename = "type")]
-    pub type_field: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub auto_color: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
