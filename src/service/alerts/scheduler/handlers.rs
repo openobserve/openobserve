@@ -1330,8 +1330,7 @@ async fn handle_derived_stream_triggers(
         trigger_data_stream.next_run_at = new_trigger.next_run_at;
         trigger_data_stream.start_time = start_time;
         trigger_data_stream.error = Some(format!(
-            "Invalid timerange - start: {}, end: {}, should be fixed in the next run",
-            start_time, end,
+            "Invalid timerange - start: {start_time}, end: {end}, should be fixed in the next run"
         ));
         db::scheduler::update_trigger(new_trigger).await?;
         publish_triggers_usage(trigger_data_stream).await;
