@@ -403,10 +403,18 @@ pub struct Field {
     value: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
-#[serde(default)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(untagged, rename_all = "camelCase")]
+pub enum Config {
+    #[serde(rename = "unit")]
+    Unit(UnitConfig),
+    #[serde(rename = "unique_value_color")]
+    UniqueValueColor(UniqueValueColorConfig),
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct Config {
+pub struct UnitConfig {
     #[serde(rename = "type")]
     typee: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -419,6 +427,13 @@ pub struct Config {
 pub struct Value {
     unit: String,
     custom_unit: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UniqueValueColorConfig {
+    #[serde(rename = "type")]
+    pub type_field: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     auto_color: Option<bool>,
 }
