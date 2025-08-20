@@ -8,7 +8,10 @@ export default class DateTimeHelper {
     this.applyQueryBtn = page.locator('[data-test="dashboard-apply"]');
     this.timePickerBtn = page.locator('[data-test="date-time-btn"]');
     this.applyTimeBtn = page.locator('[data-test="date-time-apply-btn"]');
-    this.waitForDateTimeButtonToBeEnabled = page.waitForSelector(
+  }
+
+  async waitForDateTimeButtonToBeEnabled() {
+    return await this.page.waitForSelector(
       '[data-test="date-time-btn"]:not([disabled])',
       { timeout: 15000 }
     );
