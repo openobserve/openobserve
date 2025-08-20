@@ -112,8 +112,6 @@ export default defineComponent({
     return {
       store,
       dashboardPanelData,
-      // colorBySeries:
-      //   dashboardPanelData?.data?.config?.color?.colorBySeries || [],
       showColorBySeriesPopUp,
       openColorBySeriesPopUp,
       saveColorBySeriesconfig,
