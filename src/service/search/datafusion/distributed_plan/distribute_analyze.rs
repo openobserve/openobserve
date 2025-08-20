@@ -29,6 +29,10 @@ use datafusion::{
 use futures::StreamExt;
 
 /// query EXPLAIN ANALYZE in distributed mode
+/// the output recordbatch's schema is
+/// phase: current we have three phase
+/// node: the ip or partition id
+/// plan: plan with metrics
 #[derive(Debug)]
 pub struct DistributeAnalyzeExec {
     /// Control how much extra to print
