@@ -43,40 +43,69 @@
       />
       <div class="tw-flex items-center" style="width: 50%; gap: 10px">
         <q-select
-          v-model="overrideConfig.config[0].value.unit"
-          :label="'Unit'"
-          :error="duplicateErrors[index]"
-          :error-message="'This field has already been selected. Please choose a different field.'"
-          :options="filteredUnitOptions(index)"
+          v-model="overrideConfig.config[0].type"
+          :label="'Type'"
+          :options="configTypeOptions"
           :disable="!overrideConfig.field.value"
-          style="flex-grow: 1"
-          :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"
+          style="width: 150px"
+          :data-test="`dashboard-addpanel-config-type-select-${index}`"
           input-debounce="0"
           filled
           emit-value
           map-options
           borderless
           dense
-          class="tw-flex-1"
+          @update:model-value="onConfigTypeChange(index)"
         />
-        <q-checkbox
-          v-model="overrideConfig.config[0].value.autoColor"
-          :label="'Auto color'"
-          :disable="!overrideConfig.field.value"
-          dense
-        />
-        <q-input
-          v-if="overrideConfig.config[0].value.unit === 'custom'"
-          v-model="overrideConfig.config[0].value.customUnit"
-          :label="t('dashboard.customunitLabel')"
-          color="input-border"
-          bg-color="input-bg"
-          stack-label
-          filled
-          dense
-          label-slot
-          data-test="dashboard-config-unit"
-        />
+
+        <div
+          v-if="overrideConfig.config[0].type === 'unit'"
+          class="tw-flex items-center"
+          style="gap: 10px; flex-grow: 1"
+        >
+          <q-select
+            v-model="overrideConfig.config[0].value.unit"
+            :label="'Unit'"
+            :options="filteredUnitOptions(index)"
+            :disable="!overrideConfig.field.value"
+            style="flex-grow: 1"
+            :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"
+            input-debounce="0"
+            filled
+            emit-value
+            map-options
+            borderless
+            dense
+            class="tw-flex-1"
+          />
+          <q-input
+            v-if="overrideConfig.config[0].value.unit === 'custom'"
+            v-model="overrideConfig.config[0].value.customUnit"
+            :label="t('dashboard.customunitLabel')"
+            color="input-border"
+            bg-color="input-bg"
+            stack-label
+            filled
+            dense
+            label-slot
+            data-test="dashboard-config-unit"
+            style="width: 150px"
+          />
+        </div>
+
+        <div
+          v-else-if="overrideConfig.config[0].type === 'unique_value_color'"
+          class="tw-flex items-center"
+          style="gap: 10px; flex-grow: 1"
+        >
+          <q-checkbox
+            v-model="overrideConfig.config[0].autoColor"
+            :label="'Unique Value Color'"
+            :disable="!overrideConfig.field.value"
+            dense
+          />
+        </div>
+
         <q-btn
           @click="removeOverrideConfig(index)"
           icon="close"
@@ -120,7 +149,11 @@ export default defineComponent({
       type: Object as PropType<{
         overrideConfigs?: Array<{
           field: { matchBy: string; value: string };
-          config: Array<{ type: string; value: { unit: string; customUnit: string } }>;
+          config: Array<{
+            type: string;
+            value?: { unit: string; customUnit: string };
+            autoColor?: boolean;
+          }>;
         }>;
       }>,
       required: true
@@ -132,6 +165,17 @@ export default defineComponent({
     const duplicateErrors = ref<Array<boolean>>(
       props.overrideConfig.overrideConfigs?.map(() => false) || [],
     );
+
+    const configTypeOptions = [
+      {
+        label: "Unit",
+        value: "unit",
+      },
+      {
+        label: "Unique Value Color",
+        value: "unique_value_color",
+      },
+    ];
 
     const unitOptions = [
       {
@@ -216,15 +260,77 @@ export default defineComponent({
     const overrideConfigs = ref(
       JSON.parse(
         JSON.stringify(
-          props.overrideConfig || [
-            {
-              field: { matchBy: "name", value: "" },
-              config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
-            },
-          ],
+          normalizeOverrideConfigs(props.overrideConfig.overrideConfigs || []),
         ),
       ),
     );
+
+    function normalizeOverrideConfigs(configs: any[]) {
+      if (configs.length === 0) {
+        return [
+          {
+            field: { matchBy: "name", value: "" },
+            config: [
+              {
+                type: "unit",
+                value: { unit: "", customUnit: "" },
+              },
+            ],
+          },
+        ];
+      }
+
+      return configs.map((config) => {
+        const normalizedConfig = {
+          field: {
+            matchBy: config.field?.matchBy || config.field?.match_by || "name",
+            value: config.field?.value || "",
+          },
+          config: [],
+        };
+
+        if (config.config && config.config.length > 0) {
+          const configItem = config.config[0];
+
+          if (configItem.type === "unit" || configItem.typee === "unit") {
+            normalizedConfig.config.push({
+              type: "unit",
+              value: {
+                unit: configItem.value?.unit || "",
+                customUnit:
+                  configItem.value?.customUnit ||
+                  configItem.value?.custom_unit ||
+                  "",
+              },
+            });
+          } else if (
+            configItem.type === "unique_value_color" ||
+            configItem.typee === "unique_value_color"
+          ) {
+            normalizedConfig.config.push({
+              type: "unique_value_color",
+              autoColor: Boolean(
+                configItem.autoColor ?? configItem.auto_color ?? false,
+              ),
+            });
+          } else {
+            // Default to unit type if type is not recognized
+            normalizedConfig.config.push({
+              type: "unit",
+              value: { unit: "", customUnit: "" },
+            });
+          }
+        } else {
+          // Default config if no config found
+          normalizedConfig.config.push({
+            type: "unit",
+            value: { unit: "", customUnit: "" },
+          });
+        }
+
+        return normalizedConfig;
+      });
+    }
 
     const columnsOptions = computed(() =>
       props.columns.map((column: any) => ({
@@ -249,6 +355,19 @@ export default defineComponent({
       duplicateErrors.value.push(false);
     };
 
+    const onConfigTypeChange = (index: number) => {
+      const config = overrideConfigs.value[index].config[0];
+      if (config.type === "unit") {
+        // Initialize unit config
+        config.value = { unit: "", customUnit: "" };
+        delete config.autoColor;
+      } else if (config.type === "unique_value_color") {
+        // Initialize color config
+        config.autoColor = Boolean(config.autoColor ?? false);
+        delete config.value;
+      }
+    };
+
     const removeOverrideConfig = (index: number) => {
       overrideConfigs.value.splice(index, 1);
       duplicateErrors.value.splice(index, 1);
@@ -268,11 +387,42 @@ export default defineComponent({
         return;
       }
 
+      // Transform data to match backend expectations
+      const transformedConfigs = overrideConfigs.value
+        .filter((config: any) => config.field.value) // Only include configs with field values
+        .map((config: any) => {
+          const transformedConfig = {
+            field: {
+              matchBy: config.field.matchBy,
+              value: config.field.value,
+            },
+            config: [],
+          };
+
+          const configItem = config.config[0];
+          if (configItem.type === "unit") {
+            transformedConfig.config.push({
+              type: "unit",
+              value: {
+                unit: configItem.value?.unit || "",
+                customUnit: configItem.value?.customUnit || "",
+              },
+            });
+          } else if (configItem.type === "unique_value_color") {
+            transformedConfig.config.push({
+              type: "unique_value_color",
+              autoColor: configItem.autoColor === true,
+            });
+          }
+
+          return transformedConfig;
+        });
+
       originalOverrideConfigs.value = JSON.parse(
-        JSON.stringify(overrideConfigs.value),
+        JSON.stringify(transformedConfigs),
       );
-      props.overrideConfig.overrideConfigs = overrideConfigs.value;
-      emit("save", overrideConfigs.value);
+      props.overrideConfig.overrideConfigs = transformedConfigs;
+      emit("save", transformedConfigs);
       emit("close");
     };
 
@@ -285,13 +435,22 @@ export default defineComponent({
 
     watch(
       () =>
-        overrideConfigs.value.map(
-          (config: any) => config.config[0].value.unit,
+        overrideConfigs.value.map((config: any) =>
+          config.config[0].type === "unit"
+            ? config.config[0].value?.unit
+            : null,
         ),
       (newUnits, oldUnits) => {
         newUnits.forEach((newUnit: any, index: any) => {
-          if (newUnit !== "custom" && oldUnits[index] === "custom") {
-            overrideConfigs.value[index].config[0].value.customUnit = "";
+          const config = overrideConfigs.value[index].config[0];
+          if (
+            config.type === "unit" &&
+            newUnit !== "custom" &&
+            oldUnits[index] === "custom"
+          ) {
+            if (config.value) {
+              config.value.customUnit = "";
+            }
           }
         });
       },
@@ -299,6 +458,7 @@ export default defineComponent({
     );
 
     return {
+      configTypeOptions,
       unitOptions,
       columnsOptions,
       overrideConfigs,
@@ -308,6 +468,8 @@ export default defineComponent({
       filteredUnitOptions,
       saveOverrides,
       duplicateErrors,
+      onConfigTypeChange,
+      normalizeOverrideConfigs,
       t,
     };
   },

@@ -65,16 +65,22 @@ export const convertTableData = (
 
   const overrideConfigs = panelSchema.config.override_config || [];
   const colorConfigMap: Record<string, any> = {};
+  const unitConfigMap: Record<string, any> = {};
   try {
-    // Build a map of field alias -> { autoColor: boolean }
+    // Build maps for both color and unit configs
     overrideConfigs.forEach((o: any) => {
       const alias = o?.field?.value;
-      // Check for autoColor in the value object (supports both camelCase and snake_case)
-      const autoColor =
-        o?.config?.[0]?.value?.autoColor === true ||
-        o?.config?.[0]?.value?.auto_color === true;
-      if (alias) {
-        colorConfigMap[alias] = { autoColor };
+      const config = o?.config?.[0];
+
+      if (alias && config) {
+        if (config.type === "unique_value_color") {
+          const autoColor = config.autoColor === true;
+          colorConfigMap[alias] = { autoColor };
+        } else if (config.type === "unit") {
+          const unit = config.value?.unit;
+          const customUnit = config.value?.customUnit;
+          unitConfigMap[alias] = { unit, customUnit };
+        }
       }
     });
   } catch (e) {}
@@ -199,14 +205,10 @@ export const convertTableData = (
           let unitToUse = null;
           let customUnitToUse = null;
 
-          if (overrideConfigs.length > 0) {
-            const overrideConfig = overrideConfigs.find(
-              (override: any) => override.field?.value === it.alias,
-            );
-            if (overrideConfig) {
-              unitToUse = overrideConfig.config[0].value.unit;
-              customUnitToUse = overrideConfig.config[0].value.customUnit;
-            }
+          // Check unit config map first
+          if (unitConfigMap[it.alias]) {
+            unitToUse = unitConfigMap[it.alias].unit;
+            customUnitToUse = unitConfigMap[it.alias].customUnit;
           }
 
           if (!unitToUse) {
