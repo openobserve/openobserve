@@ -17,6 +17,8 @@
 pub const PAUSE_SLEEP_DURATION: u64 = 60;
 
 /// Macro for spawning pausable jobs with flexible configuration
+/// Prefer using this macro for jobs that need to execute at some interval as its
+/// reactive to the changes in the configuration
 ///
 /// This macro standardizes the pattern used across multiple jobs where:
 /// 1. A job gets an interval from config and checks if it should be paused
@@ -32,10 +34,10 @@ pub const PAUSE_SLEEP_DURATION: u64 = 60;
 ///         // job logic here
 ///     }
 /// );
-/// 
+///
 /// // With options:
 /// spawn_pausable_job!(
-///     "job_name", 
+///     "job_name",
 ///     interval_expression,
 ///     {
 ///         // job logic here
@@ -74,7 +76,7 @@ pub const PAUSE_SLEEP_DURATION: u64 = 60;
 /// // Custom pause condition
 /// spawn_pausable_job!(
 ///     "compactor",
-///     get_config().compact.interval, 
+///     get_config().compact.interval,
 ///     {
 ///         run_compaction().await;
 ///     },
@@ -87,53 +89,53 @@ macro_rules! spawn_pausable_job {
     ($job_name:expr, $interval_expr:expr, $job_logic:block) => {
         spawn_pausable_job!($job_name, $interval_expr, $job_logic, sleep_before, pause_if: $interval_expr <= 0)
     };
-    
+
     // With sleep_after option
     ($job_name:expr, $interval_expr:expr, $job_logic:block, sleep_after) => {
         spawn_pausable_job!($job_name, $interval_expr, $job_logic, sleep_after, pause_if: $interval_expr <= 0)
     };
-    
+
     // With custom pause condition, default sleep_before
     ($job_name:expr, $interval_expr:expr, $job_logic:block, pause_if: $pause_condition:expr) => {
         spawn_pausable_job!($job_name, $interval_expr, $job_logic, sleep_before, pause_if: $pause_condition)
     };
-    
+
     // Full syntax with all options
     ($job_name:expr, $interval_expr:expr, $job_logic:block, $sleep_timing:ident, pause_if: $pause_condition:expr) => {{
         let job_name = $job_name.to_string();
         tokio::task::spawn(async move {
             log::info!("[{}] pausable job started", job_name);
-            
+
             loop {
                 let interval = $interval_expr;
-                
+
                 // Check pause condition (default: interval <= 0, or custom condition)
                 if $pause_condition {
                     log::debug!("[{}] job is paused, checking again in {}s", job_name, $crate::utils::pausable_job::PAUSE_SLEEP_DURATION);
                     tokio::time::sleep(tokio::time::Duration::from_secs($crate::utils::pausable_job::PAUSE_SLEEP_DURATION)).await;
                     continue;
                 }
-                
+
                 // Sleep before job logic (default behavior)
                 spawn_pausable_job!(@sleep_before, $sleep_timing, interval);
-                
+
                 // Execute job logic
                 log::debug!("[{}] executing job", job_name);
                 $job_logic
-                
+
                 // Sleep after job logic (if specified)
                 spawn_pausable_job!(@sleep_after, $sleep_timing, interval);
             }
         })
     }};
-    
+
     // Internal helper for sleep before
     (@sleep_before, sleep_before, $interval:expr) => {
         tokio::time::sleep(tokio::time::Duration::from_secs($interval as u64)).await;
     };
     (@sleep_before, sleep_after, $interval:expr) => {};
-    
-    // Internal helper for sleep after  
+
+    // Internal helper for sleep after
     (@sleep_after, sleep_after, $interval:expr) => {
         tokio::time::sleep(tokio::time::Duration::from_secs($interval as u64)).await;
     };

@@ -659,7 +659,7 @@ pub async fn search_partition(
     let is_http_distinct = is_simple_distinct && is_http_req;
 
     #[cfg(feature = "enterprise")]
-    let org_settings = crate::service::db::organization::get_org_setting(&org_id)
+    let org_settings = crate::service::db::organization::get_org_setting(org_id)
         .await
         .unwrap_or_default();
 

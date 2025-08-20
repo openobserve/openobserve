@@ -17,8 +17,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{cluster::CompactionJobType, stream::ALL_STREAM_TYPES},
-    metrics,
-    spawn_pausable_job,
+    metrics, spawn_pausable_job,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
@@ -57,7 +56,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
         "compactor_downsampling",
         get_o2_config().downsampling.downsampling_interval,
         {
-            if get_o2_config().downsampling.metrics_downsampling_rules.is_empty() {
+            if get_o2_config()
+                .downsampling
+                .metrics_downsampling_rules
+                .is_empty()
+            {
                 continue;
             }
             log::debug!("[COMPACTOR::JOB] Running generate downsampling job");
@@ -84,12 +87,18 @@ pub async fn run() -> Result<(), anyhow::Error> {
         "compactor_downsampling_sync_to_db",
         get_config().compact.sync_to_db_interval,
         {
-            if get_o2_config().downsampling.metrics_downsampling_rules.is_empty() {
+            if get_o2_config()
+                .downsampling
+                .metrics_downsampling_rules
+                .is_empty()
+            {
                 return;
             }
             log::debug!("[COMPACTOR::JOB] Running sync cached downsampling offset to db");
             if let Err(e) = crate::service::db::compact::downsampling::sync_cache_to_db().await {
-                log::error!("[COMPACTOR::JOB] run sync cached downsampling offset to db error: {e}");
+                log::error!(
+                    "[COMPACTOR::JOB] run sync cached downsampling offset to db error: {e}"
+                );
             }
         }
     );
@@ -215,7 +224,6 @@ async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
     }
 }
 
-
 /// Merge small files
 async fn run_merge(tx: mpsc::Sender<compact::worker::MergeJob>) -> Result<(), anyhow::Error> {
     loop {
@@ -257,10 +265,6 @@ async fn run_delay_deletion() -> Result<(), anyhow::Error> {
         }
     }
 }
-
-
-
-
 
 async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
     log::info!("[COMPACTOR::JOB] Running enrichment table merge");

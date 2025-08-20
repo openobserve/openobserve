@@ -465,15 +465,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         LOADING_FROM_DISK_DONE.store(true, Ordering::SeqCst);
     });
 
-    spawn_pausable_job!(
-        "disk_cache_gc",
-        get_config().disk_cache.gc_interval,
-        {
-            if let Err(e) = gc().await {
-                log::error!("disk cache gc error: {}", e);
-            }
+    spawn_pausable_job!("disk_cache_gc", get_config().disk_cache.gc_interval, {
+        if let Err(e) = gc().await {
+            log::error!("disk cache gc error: {}", e);
         }
-    );
+    });
     Ok(())
 }
 

@@ -92,7 +92,9 @@ pub async fn run() -> Result<(), anyhow::Error> {
             log::debug!("[SEARCH JOB] Running check on running jobs");
             let now = config::utils::time::now_micros();
             let updated_at = now - (get_config().limit.search_job_run_timeout as i64 * 1_000_000);
-            if let Err(e) = service::db::search_job::search_jobs::check_running_jobs(updated_at).await {
+            if let Err(e) =
+                service::db::search_job::search_jobs::check_running_jobs(updated_at).await
+            {
                 log::error!("[SEARCH JOB] Error checking running jobs: {e}");
             }
         }
@@ -130,9 +132,3 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
     service::alerts::scheduler::run().await
 }
-
-
-
-
-
-

@@ -286,12 +286,13 @@ pub async fn run_audit_publish() {
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
             continue;
         }
-        
+
         log::debug!("Audit ingestion loop running");
         tokio::time::sleep(tokio::time::Duration::from_secs(
             o2cfg.common.audit_publish_interval.try_into().unwrap(),
-        )).await;
-        
+        ))
+        .await;
+
         o2_enterprise::enterprise::common::auditor::publish_existing_audits(
             META_ORG_ID,
             publish_audit,

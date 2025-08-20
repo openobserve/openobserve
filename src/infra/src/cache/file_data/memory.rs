@@ -220,15 +220,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         _ = file.read().await.get("", None).await;
     }
 
-    spawn_pausable_job!(
-        "memory_cache_gc",
-        get_config().memory_cache.gc_interval,
-        {
-            if let Err(e) = gc().await {
-                log::error!("memory cache gc error: {}", e);
-            }
+    spawn_pausable_job!("memory_cache_gc", get_config().memory_cache.gc_interval, {
+        if let Err(e) = gc().await {
+            log::error!("memory cache gc error: {}", e);
         }
-    );
+    });
     Ok(())
 }
 

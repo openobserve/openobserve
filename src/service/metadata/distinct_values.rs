@@ -23,8 +23,9 @@ use std::{
 
 use arrow_schema::{DataType, Field, Schema};
 use config::{
-    FxIndexMap, TIMESTAMP_COL_NAME, get_config, spawn_pausable_job,
+    FxIndexMap, TIMESTAMP_COL_NAME, get_config,
     meta::stream::StreamType,
+    spawn_pausable_job,
     utils::{json, schema::infer_json_schema_from_map, time::now_micros},
 };
 use infra::{
@@ -342,4 +343,3 @@ impl Metadata for DistinctValues {
         Ok(())
     }
 }
-
