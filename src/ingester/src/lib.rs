@@ -126,7 +126,8 @@ async fn run() -> errors::Result<()> {
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(
             config::get_config().limit.mem_persist_interval,
-        )).await;
+        ))
+        .await;
         // persist immutable data to disk
         if let Err(e) = immutable::persist(tx.clone()).await {
             log::error!("immutable persist error: {}", e);

@@ -78,7 +78,10 @@ async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
             continue;
         }
-        tokio::time::sleep(tokio::time::Duration::from_secs(cfg.compact.pending_jobs_metric_interval)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            cfg.compact.pending_jobs_metric_interval,
+        ))
+        .await;
 
         log::debug!("[COMPACTOR::JOB] Running compactor pending jobs to report metric");
         let job_status = match infra::file_list::get_pending_jobs_count().await {
@@ -125,8 +128,7 @@ async fn run_generate_job() -> Result<(), anyhow::Error> {
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
             continue;
         }
-        tokio::time::sleep(tokio::time::Duration::from_secs(cfg.compact.interval))
-            .await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(cfg.compact.interval)).await;
         log::debug!("[COMPACTOR::JOB] Running generate merge job");
         if let Err(e) = compact::run_generate_job(CompactionJobType::Current).await {
             log::error!("[COMPACTOR::JOB] run generate merge job error: {e}");

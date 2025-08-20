@@ -28,7 +28,8 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
         tokio::time::sleep(time::Duration::from_secs(
             cfg.common.telemetry_heartbeat.try_into().unwrap(),
-        )).await;
+        ))
+        .await;
         Telemetry::new()
             .heart_beat("OpenObserve - heartbeat", None)
             .await;

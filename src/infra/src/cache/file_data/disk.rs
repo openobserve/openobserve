@@ -471,7 +471,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             if gc_interval == 0 {
                 // interval 0 is treated as pause.
                 // in pause state, we keep checking the env for changes every minute.
-                tokio::time::sleep(tokio::time::Duration::from_secs(60));
+                tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
                 continue;
             }
             tokio::time::sleep(tokio::time::Duration::from_secs(gc_interval)).await;

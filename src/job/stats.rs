@@ -36,7 +36,8 @@ async fn file_list_update_stats() -> Result<(), anyhow::Error> {
         tokio::time::sleep(time::Duration::from_secs(std::cmp::max(
             10,
             get_config().limit.calculate_stats_interval,
-        ))).await;
+        )))
+        .await;
         match update_stats_from_file_list().await {
             Err(e) => {
                 log::error!(
@@ -71,14 +72,16 @@ async fn cache_stream_stats() -> Result<(), anyhow::Error> {
         tokio::time::sleep(time::Duration::from_secs(std::cmp::max(
             60,
             get_config().limit.calculate_stats_interval,
-        ))).await;
+        )))
+        .await;
     }
 
     loop {
         tokio::time::sleep(time::Duration::from_secs(std::cmp::max(
             60,
             get_config().limit.calculate_stats_interval,
-        ))).await;
+        )))
+        .await;
         if let Err(e) = db::file_list::cache_stats().await {
             log::error!("[STATS] run cached stream stats error: {}", e);
         } else {

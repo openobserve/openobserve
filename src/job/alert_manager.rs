@@ -96,7 +96,10 @@ async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
 #[cfg(feature = "enterprise")]
 async fn run_search_jobs(id: i64) -> Result<(), anyhow::Error> {
     loop {
-        tokio::time::sleep(time::Duration::from_secs(get_config().limit.search_job_scheduler_interval as u64)).await;
+        tokio::time::sleep(time::Duration::from_secs(
+            get_config().limit.search_job_scheduler_interval as u64,
+        ))
+        .await;
         if let Err(e) = service::search_jobs::run(id).await {
             log::error!("[SEARCH JOB {id}] run search jobs error: {}", e);
         }
@@ -106,7 +109,10 @@ async fn run_search_jobs(id: i64) -> Result<(), anyhow::Error> {
 #[cfg(feature = "enterprise")]
 async fn run_check_running_search_jobs() -> Result<(), anyhow::Error> {
     loop {
-        tokio::time::sleep(time::Duration::from_secs(get_config().limit.search_job_run_timeout as u64)).await;
+        tokio::time::sleep(time::Duration::from_secs(
+            get_config().limit.search_job_run_timeout as u64,
+        ))
+        .await;
         log::debug!("[SEARCH JOB] Running check on running jobs");
         let now = config::utils::time::now_micros();
         let updated_at = now - (time * 1_000_000);

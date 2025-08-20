@@ -342,7 +342,8 @@ async fn run_flush() {
     loop {
         tokio::time::sleep(time::Duration::from_secs(
             get_config().limit.distinct_values_interval,
-        )).await;
+        ))
+        .await;
         if let Err(e) = INSTANCE.flush().await {
             log::error!("[DISTINCT_VALUES] error flush data to wal: {}", e);
         }
