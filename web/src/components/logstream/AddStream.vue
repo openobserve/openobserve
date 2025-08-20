@@ -148,7 +148,7 @@ const props = defineProps<{
 }>();
 
 
-const { addStream, getStream, getUpdatedSettings } = useStreams();
+const { addStream, getStream } = useStreams();
 
 const fields: Ref<any[]> = ref([]);
 
@@ -211,7 +211,7 @@ const saveStream = async () => {
 
   const payload = getStreamPayload();
   streamService
-    .createSettings(
+    .createStream(
       store.state.selectedOrganization.identifier,
       streamInputs.value.name,
       streamInputs.value.stream_type,
@@ -250,19 +250,25 @@ const saveStream = async () => {
 };
 
 const getStreamPayload = () => {
-  let settings: {
-    partition_keys: any[];
-    index_fields: any[];
-    full_text_search_keys: any[];
-    bloom_filter_fields: any[];
-    data_retention?: number;
-    defined_schema_fields: any[];
+  let stream: {
+    fields: any[];
+    settings: {
+      partition_keys: any[];
+      index_fields: any[];
+      full_text_search_keys: any[];
+      bloom_filter_fields: any[];
+      data_retention?: number;
+      defined_schema_fields: any[];
+    }
   } = {
-    partition_keys: [],
-    index_fields: [],
-    full_text_search_keys: [],
-    bloom_filter_fields: [],
-    defined_schema_fields: [],
+    fields: [],
+    settings: {
+      partition_keys: [],
+      index_fields: [],
+      full_text_search_keys: [],
+      bloom_filter_fields: [],
+      defined_schema_fields: [],
+    }
   };
 
   if (showDataRetention.value && streamInputs.value.dataRetentionDays < 1) {
@@ -276,33 +282,38 @@ const getStreamPayload = () => {
   }
 
   if (showDataRetention.value) {
-    settings["data_retention"] = Number(streamInputs.value.dataRetentionDays);
+    stream.settings["data_retention"] = Number(streamInputs.value.dataRetentionDays);
   }
 
   fields.value.forEach((field) => {
+
     field.name = field.name
       .trim()
       .toLowerCase()
       .replace(/ /g, "_")
       .replace(/-/g, "_");
+    
+    // add to field list
+    stream.fields.push(field);
 
+    // process index types
     field.index_type?.forEach((index: string) => {
       if (index === "fullTextSearchKey") {
-        settings.full_text_search_keys.push(field.name);
+        stream.settings.full_text_search_keys.push(field.name);
       }
 
       if (index === "secondaryIndexKey") {
-        settings.index_fields.push(field.name);
+        stream.settings.index_fields.push(field.name);
       }
 
       if (index === "keyPartition") {
-        settings.partition_keys.push({
+        stream.settings.partition_keys.push({
           field: field.name,
           types: "value",
         });
       }
       if (index === "prefixPartition") {
-        settings.partition_keys.push({
+        stream.settings.partition_keys.push({
           field: field.name,
           types: "prefix",
         });
@@ -310,7 +321,7 @@ const getStreamPayload = () => {
 
       if (index.includes("hashPartition")) {
         const [, buckets] = index.split("_");
-        settings.partition_keys.push({
+        stream.settings.partition_keys.push({
           field: field.name,
           types: {
             hash: Number(buckets),
@@ -319,15 +330,16 @@ const getStreamPayload = () => {
       }
 
       if (index === "bloomFilterKey") {
-        settings.bloom_filter_fields.push(field.name);
+        stream.settings.bloom_filter_fields.push(field.name);
       }
     });
 
-    if (isSchemaUDSEnabled.value)
-      settings.defined_schema_fields.push(field.name);
+    if (isSchemaUDSEnabled.value) {
+      stream.settings.defined_schema_fields.push(field.name);
+    }
   });
 
-  return settings;
+  return stream;
 };
 
 const addField = () => {

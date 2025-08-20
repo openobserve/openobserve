@@ -19,7 +19,7 @@ use arrow_schema::Field;
 use config::{
     meta::{
         promql::Metadata,
-        stream::{PatternAssociation, StreamSettings, StreamStats, StreamType},
+        stream::{PatternAssociation, StreamField, StreamSettings, StreamStats, StreamType},
     },
     utils::json,
 };
@@ -33,10 +33,9 @@ pub struct Stream {
     pub storage_type: String,
     pub stream_type: StreamType,
     pub stats: StreamStats,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub schema: Vec<StreamProperty>,
+    pub schema: Vec<StreamField>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub uds_schema: Vec<StreamProperty>,
+    pub uds_schema: Vec<StreamField>,
     pub settings: StreamSettings,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metrics_meta: Option<Metadata>,
@@ -48,10 +47,9 @@ pub struct Stream {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct StreamProperty {
-    pub name: String,
-    #[serde(rename = "type")]
-    pub prop_type: String,
+pub struct StreamCreate {
+    pub fields: Vec<StreamField>,
+    pub settings: StreamSettings,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -105,14 +103,14 @@ mod tests {
     }
 
     #[test]
-    fn test_stream_property() {
-        let property = StreamProperty {
+    fn test_stream_field() {
+        let field = StreamField {
             name: "test_field".to_string(),
-            prop_type: "string".to_string(),
+            r#type: "string".to_string(),
         };
 
-        assert_eq!(property.name, "test_field");
-        assert_eq!(property.prop_type, "string");
+        assert_eq!(field.name, "test_field");
+        assert_eq!(field.r#type, "string");
     }
 
     #[test]
@@ -149,9 +147,9 @@ mod tests {
             storage_type: "local".to_string(),
             stream_type: StreamType::Logs,
             stats: StreamStats::default(),
-            schema: vec![StreamProperty {
+            schema: vec![StreamField {
                 name: "field1".to_string(),
-                prop_type: "string".to_string(),
+                r#type: "string".to_string(),
             }],
             uds_schema: vec![],
             settings: StreamSettings::default(),
@@ -231,9 +229,9 @@ mod tests {
             stream_type: StreamType::Logs,
             stats: StreamStats::default(),
             schema: vec![],
-            uds_schema: vec![StreamProperty {
+            uds_schema: vec![StreamField {
                 name: "uds_field".to_string(),
-                prop_type: "string".to_string(),
+                r#type: "string".to_string(),
             }],
             settings: StreamSettings::default(),
             metrics_meta: None,

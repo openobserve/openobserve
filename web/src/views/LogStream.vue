@@ -435,7 +435,6 @@ export default defineComponent({
       { label: t("logStream.labelMetrics"), value: "metrics" },
       { label: t("logStream.labelTraces"), value: "traces" },
       { label: t("logStream.labelMetadata"), value: "metadata" },
-      { label: t("logStream.labelIndex"), value: "index" },
     ];
     const {
       getStreams,

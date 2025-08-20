@@ -28,7 +28,12 @@ use config::{
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
     metrics,
-    utils::{flatten, json, schema_ext::SchemaExt, time::now_micros},
+    utils::{
+        flatten::{self, format_label_name},
+        json,
+        schema_ext::SchemaExt,
+        time::now_micros,
+    },
 };
 use hashbrown::HashSet;
 use infra::schema::{SchemaCache, unwrap_partition_time_level};
@@ -51,7 +56,7 @@ use crate::{
             grpc::{get_exemplar_val, get_metric_val, get_val},
             write_file,
         },
-        metrics::{format_label_name, get_exclude_labels},
+        metrics::get_exclude_labels,
         pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
         self_reporting::report_request_usage_stats,
