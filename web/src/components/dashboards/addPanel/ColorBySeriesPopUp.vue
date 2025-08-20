@@ -106,7 +106,6 @@
                         name="colorize"
                         class="cursor-pointer"
                         :ref="`colorize-icon-${index}`"
-                        @click="openColorPicker(index)"
                       >
                         <q-popup-proxy cover transition-show="scale">
                           <q-color v-model="series.color" />
@@ -296,11 +295,6 @@ export default defineComponent({
       emit("close");
     };
 
-    // Method to open color picker directly
-    const openColorPicker = (index: number) => {
-      // This method is called when the colorize icon is clicked
-      // The color picker should open automatically due to q-popup-proxy
-    };
 
     return {
       t,
@@ -314,7 +308,6 @@ export default defineComponent({
       editColorBySeries,
       outlinedCancel,
       seriesDataItems,
-      openColorPicker,
       selectColorBySeriesOption,
       isFormValid,
     };
