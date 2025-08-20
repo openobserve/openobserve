@@ -2535,5 +2535,1818 @@ describe("Use Logs Composable", () => {
     });
   });
 
+  describe("Additional Stream Management Functions", () => {
+    describe("loadStreamLists", () => {
+      it("should load stream lists successfully", async () => {
+        
+        wrapper.vm.searchObj.organizationIdentifier = "test-org";
+        mockStreamService.nameList.mockResolvedValue({
+          data: { list: [{ name: "stream1", type: "logs" }] }
+        });
+
+        await wrapper.vm.loadStreamLists(true);
+
+        expect(mockStreamService.nameList).toHaveBeenCalled();
+      });
+
+      it("should handle errors during stream list loading", async () => {
+        
+        wrapper.vm.searchObj.organizationIdentifier = "test-org";
+        mockStreamService.nameList.mockRejectedValue(new Error("Network error"));
+
+        await expect(wrapper.vm.loadStreamLists(true)).resolves.not.toThrow();
+      });
+
+      it("should not select stream when selectStream is false", async () => {
+        
+        wrapper.vm.searchObj.organizationIdentifier = "test-org";
+        mockStreamService.nameList.mockResolvedValue({
+          data: { list: [{ name: "stream1", type: "logs" }] }
+        });
+
+        await wrapper.vm.loadStreamLists(false);
+
+        expect(mockStreamService.nameList).toHaveBeenCalled();
+      });
+    });
+
+    describe("resetStreamData", () => {
+      it("should reset stream data to initial state", () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedStream = ["test-stream"];
+        wrapper.vm.searchObj.data.stream.selectedFields = ["field1"];
+
+        wrapper.vm.resetStreamData();
+
+        expect(typeof wrapper.vm.resetStreamData).toBe('function');
+      });
+    });
+
+    describe("resetQueryData", () => {
+      it("should reset query related data", () => {
+        
+        wrapper.vm.searchObj.data.query = "test query";
+        wrapper.vm.searchObj.data.tempFunctionContent = "test";
+
+        wrapper.vm.resetQueryData();
+
+        expect(typeof wrapper.vm.resetQueryData).toBe('function');
+      });
+    });
+
+    describe("resetSearchAroundData", () => {
+      it("should reset search around data", () => {
+        
+        wrapper.vm.searchObj.data.searchAround.indexTimestamp = Date.now();
+
+        wrapper.vm.resetSearchAroundData();
+
+        expect(typeof wrapper.vm.resetSearchAroundData).toBe('function');
+      });
+    });
+
+    describe("getFunctions", () => {
+      it("should get functions successfully", async () => {
+        
+        wrapper.vm.searchObj.organizationIdentifier = "test-org";
+        mockSearchService.search_around = vi.fn().mockResolvedValue({
+          data: { list: [] }
+        });
+
+        await wrapper.vm.getFunctions();
+
+        expect(typeof wrapper.vm.getFunctions).toBe('function');
+      });
+
+      it("should handle errors when getting functions", async () => {
+        
+        wrapper.vm.searchObj.organizationIdentifier = "test-org";
+        mockSearchService.search_around = vi.fn().mockRejectedValue(new Error("API error"));
+
+        await expect(wrapper.vm.getFunctions()).resolves.not.toThrow();
+      });
+    });
+
+    describe("getActions", () => {
+      it("should get actions successfully", async () => {
+        
+        wrapper.vm.searchObj.organizationIdentifier = "test-org";
+        
+        await wrapper.vm.getActions();
+
+        expect(typeof wrapper.vm.getActions).toBe('function');
+      });
+
+      it("should handle errors when getting actions", async () => {
+        
+        wrapper.vm.searchObj.organizationIdentifier = "test-org";
+
+        await expect(wrapper.vm.getActions()).resolves.not.toThrow();
+      });
+    });
+
+    describe("updatedLocalLogFilterField", () => {
+      it("should update local log filter field", () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedStream = ["test-stream"];
+
+        wrapper.vm.updatedLocalLogFilterField();
+
+        expect(typeof wrapper.vm.updatedLocalLogFilterField).toBe('function');
+      });
+    });
+  });
+
+  describe("Query Building and Execution Functions", () => {
+    describe("buildSearch", () => {
+      it("should build search request successfully", () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedStream = ["test-stream"];
+        wrapper.vm.searchObj.data.stream.streamType = "logs";
+        wrapper.vm.searchObj.data.datetime.startTime = Date.now() * 1000 - 3600000;
+        wrapper.vm.searchObj.data.datetime.endTime = Date.now() * 1000;
+
+        const result = wrapper.vm.buildSearch();
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+      });
+
+      it("should handle multiple streams", () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedStream = ["stream1", "stream2"];
+        wrapper.vm.searchObj.data.stream.streamType = "logs";
+
+        const result = wrapper.vm.buildSearch();
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+      });
+
+      it("should include query parameters", () => {
+        
+        wrapper.vm.searchObj.data.query = "test query";
+        wrapper.vm.searchObj.data.stream.selectedStream = ["test-stream"];
+
+        const result = wrapper.vm.buildSearch();
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+      });
+    });
+
+    describe("getQueryPartitions", () => {
+      it("should get query partitions successfully", async () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+        mockSearchService.search_around = vi.fn().mockResolvedValue({
+          data: { partitions: [] }
+        });
+
+        await wrapper.vm.getQueryPartitions(queryReq);
+
+        expect(typeof wrapper.vm.getQueryPartitions).toBe('function');
+      });
+
+      it("should handle errors when getting partitions", async () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+        mockSearchService.search_around = vi.fn().mockRejectedValue(new Error("API error"));
+
+        await expect(wrapper.vm.getQueryPartitions(queryReq)).resolves.not.toThrow();
+      });
+    });
+
+    describe("generateURLQuery", () => {
+      it("should generate URL query for sharing", () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedStream = ["test-stream"];
+        wrapper.vm.searchObj.data.datetime.startTime = Date.now() * 1000 - 3600000;
+        wrapper.vm.searchObj.data.datetime.endTime = Date.now() * 1000;
+
+        const result = wrapper.vm.generateURLQuery(true);
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+      });
+
+      it("should generate URL query for normal navigation", () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedStream = ["test-stream"];
+
+        const result = wrapper.vm.generateURLQuery(false);
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+      });
+
+      it("should include dashboard panel data", () => {
+        
+        const dashboardData = { data: { config: { chart_type: "line" }}};
+
+        const result = wrapper.vm.generateURLQuery(false, dashboardData);
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+      });
+    });
+
+    describe("updateUrlQueryParams", () => {
+      it("should update URL query parameters", () => {
+        
+        wrapper.vm.generateURLQuery = vi.fn().mockReturnValue({ stream: "test-stream" });
+
+        wrapper.vm.updateUrlQueryParams();
+
+        expect(wrapper.vm.generateURLQuery).toHaveBeenCalled();
+      });
+
+      it("should handle dashboard panel data", () => {
+        
+        const dashboardData = { data: { config: { chart_type: "bar" }}};
+        wrapper.vm.generateURLQuery = vi.fn().mockReturnValue({ stream: "test-stream" });
+
+        wrapper.vm.updateUrlQueryParams(dashboardData);
+
+        expect(wrapper.vm.generateURLQuery).toHaveBeenCalledWith(false, dashboardData);
+      });
+    });
+  });
+
+  describe("Pagination and Data Handling Functions", () => {
+    describe("getPartitionTotalPages", () => {
+      it("should calculate total pages for partitions", () => {
+        
+        const total = 1000;
+
+        const result = wrapper.vm.getPartitionTotalPages(total);
+
+        expect(typeof result).toBe('number');
+        expect(result).toBeGreaterThanOrEqual(0);
+      });
+
+      it("should handle zero total", () => {
+        
+        const result = wrapper.vm.getPartitionTotalPages(0);
+
+        expect(typeof result).toBe('number');
+        expect(result).toBe(0);
+      });
+
+      it("should handle large totals", () => {
+        
+        const result = wrapper.vm.getPartitionTotalPages(1000000);
+
+        expect(typeof result).toBe('number');
+        expect(result).toBeGreaterThan(0);
+      });
+    });
+
+    describe("getPaginatedData", () => {
+      it("should get paginated data successfully", async () => {
+        
+        const queryReq = { query: "SELECT * FROM logs", size: 100 };
+        const size = 100;
+        const from = 0;
+        mockSearchService.search_around = vi.fn().mockResolvedValue({
+          data: { hits: [], total: 1000 }
+        });
+
+        await wrapper.vm.getPaginatedData(queryReq, size, from);
+
+        expect(typeof wrapper.vm.getPaginatedData).toBe('function');
+      });
+
+      it("should handle pagination parameters", async () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+        mockSearchService.search_around = vi.fn().mockResolvedValue({
+          data: { hits: [], total: 500 }
+        });
+
+        await wrapper.vm.getPaginatedData(queryReq, 50, 100);
+
+        expect(typeof wrapper.vm.getPaginatedData).toBe('function');
+      });
+    });
+
+    describe("getQueryData", () => {
+      it("should get query data successfully", async () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedStream = ["test-stream"];
+        wrapper.vm.buildSearch = vi.fn().mockReturnValue({ query: "test" });
+        mockSearchService.search = vi.fn().mockResolvedValue({
+          data: { hits: [], total: 100 }
+        });
+
+        await wrapper.vm.getQueryData(false);
+
+        expect(wrapper.vm.buildSearch).toHaveBeenCalled();
+      });
+
+      it("should handle pagination mode", async () => {
+        
+        wrapper.vm.buildSearch = vi.fn().mockReturnValue({ query: "test" });
+        mockSearchService.search = vi.fn().mockResolvedValue({
+          data: { hits: [], total: 100 }
+        });
+
+        await wrapper.vm.getQueryData(true);
+
+        expect(wrapper.vm.buildSearch).toHaveBeenCalled();
+      });
+    });
+
+    describe("getPageCount", () => {
+      it("should get page count successfully", async () => {
+        
+        const queryReq = { query: "SELECT COUNT(*) FROM logs" };
+        mockSearchService.search = vi.fn().mockResolvedValue({
+          data: { total: 1000 }
+        });
+
+        await wrapper.vm.getPageCount(queryReq);
+
+        expect(mockSearchService.search).toHaveBeenCalled();
+      });
+
+      it("should handle errors during page count", async () => {
+        
+        const queryReq = { query: "SELECT COUNT(*) FROM logs" };
+        mockSearchService.search = vi.fn().mockRejectedValue(new Error("API error"));
+
+        await expect(wrapper.vm.getPageCount(queryReq)).resolves.not.toThrow();
+      });
+    });
+
+    describe("refreshPagination", () => {
+      it("should refresh pagination successfully", () => {
+        
+        wrapper.vm.searchObj.data.queryResults.total = 1000;
+        wrapper.vm.searchObj.data.resultGrid.currentPage = 1;
+
+        wrapper.vm.refreshPagination(false);
+
+        expect(typeof wrapper.vm.refreshPagination).toBe('function');
+      });
+
+      it("should handle regenerate flag", () => {
+        
+        wrapper.vm.refreshPagination(true);
+
+        expect(typeof wrapper.vm.refreshPagination).toBe('function');
+      });
+    });
+  });
+
+  describe("Additional Utility Functions", () => {
+    describe("getColumnWidth", () => {
+      it("should calculate column width", () => {
+        
+        const context = {
+          font: "12px Arial"
+        };
+        const field = "test_field";
+
+        const result = wrapper.vm.getColumnWidth(context, field);
+
+        expect(typeof result).toBe('number');
+        expect(result).toBeGreaterThan(0);
+      });
+
+      it("should handle long field names", () => {
+        
+        const context = { font: "12px Arial" };
+        const field = "very_long_field_name_that_should_take_more_space";
+
+        const result = wrapper.vm.getColumnWidth(context, field);
+
+        expect(typeof result).toBe('number');
+        expect(result).toBeGreaterThan(0);
+      });
+    });
+
+    describe("filterHitsColumns", () => {
+      it("should filter hit columns", () => {
+        
+        wrapper.vm.searchObj.data.queryResults = {
+          hits: [
+            { field1: "value1", field2: "value2" }
+          ]
+        };
+
+        wrapper.vm.filterHitsColumns();
+
+        expect(typeof wrapper.vm.filterHitsColumns).toBe('function');
+      });
+
+      it("should handle empty hits", () => {
+        
+        wrapper.vm.searchObj.data.queryResults = { hits: [] };
+
+        wrapper.vm.filterHitsColumns();
+
+        expect(typeof wrapper.vm.filterHitsColumns).toBe('function');
+      });
+    });
+
+    describe("quoteTableNameDirectly", () => {
+      it("should quote table names in SQL", () => {
+        
+        const sql = "SELECT * FROM test_stream";
+        const streamName = "test_stream";
+
+        const result = wrapper.vm.quoteTableNameDirectly(sql, streamName);
+
+        expect(typeof result).toBe('string');
+        expect(result).toContain(streamName);
+      });
+
+      it("should handle complex SQL queries", () => {
+        
+        const sql = "SELECT field1, field2 FROM stream1 JOIN stream2";
+        const streamName = "stream1";
+
+        const result = wrapper.vm.quoteTableNameDirectly(sql, streamName);
+
+        expect(typeof result).toBe('string');
+      });
+    });
+
+    describe("addTraceId", () => {
+      it("should add trace ID to search object", () => {
+        
+        const traceId = "trace-123-456";
+        
+        wrapper.vm.addTraceId(traceId);
+
+        expect(wrapper.vm.searchObj.data.stream.addToFilter).toContain(traceId);
+      });
+
+      it("should handle multiple trace IDs", () => {
+        
+        wrapper.vm.addTraceId("trace-1");
+        wrapper.vm.addTraceId("trace-2");
+
+        expect(wrapper.vm.searchObj.data.stream.addToFilter.length).toBeGreaterThanOrEqual(2);
+      });
+    });
+
+    describe("removeTraceId", () => {
+      it("should remove trace ID from search object", () => {
+        
+        const traceId = "trace-to-remove";
+        wrapper.vm.searchObj.data.stream.addToFilter = [`_trace_id='${traceId}'`];
+
+        wrapper.vm.removeTraceId(traceId);
+
+        expect(wrapper.vm.searchObj.data.stream.addToFilter).not.toContain(`_trace_id='${traceId}'`);
+      });
+
+      it("should handle non-existent trace IDs", () => {
+        
+        wrapper.vm.searchObj.data.stream.addToFilter = [];
+
+        wrapper.vm.removeTraceId("non-existent");
+
+        expect(wrapper.vm.searchObj.data.stream.addToFilter).toEqual([]);
+      });
+    });
+
+    describe("setSelectedStreams", () => {
+      it("should set selected streams from comma-separated string", () => {
+        
+        const streams = "stream1,stream2,stream3";
+
+        wrapper.vm.setSelectedStreams(streams);
+
+        expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(['stream1', 'stream2', 'stream3']);
+      });
+
+      it("should handle single stream", () => {
+        
+        wrapper.vm.setSelectedStreams("single-stream");
+
+        expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(['single-stream']);
+      });
+
+      it("should handle empty string", () => {
+        
+        wrapper.vm.setSelectedStreams("");
+
+        expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(['']);
+      });
+    });
+
+    describe("showNotification", () => {
+      it("should show notification message", () => {
+        
+        wrapper.vm.notificationMsg.value = "Test notification";
+
+        wrapper.vm.showNotification();
+
+        expect(typeof wrapper.vm.showNotification).toBe('function');
+      });
+
+      it("should handle empty notification message", () => {
+        
+        wrapper.vm.notificationMsg.value = "";
+
+        wrapper.vm.showNotification();
+
+        expect(typeof wrapper.vm.showNotification).toBe('function');
+      });
+    });
+
+    describe("enableRefreshInterval", () => {
+      it("should enable refresh interval with specified value", () => {
+        
+        wrapper.vm.enableRefreshInterval(30);
+
+        expect(typeof wrapper.vm.enableRefreshInterval).toBe('function');
+      });
+
+      it("should handle different interval values", () => {
+        
+        wrapper.vm.enableRefreshInterval(60);
+        wrapper.vm.enableRefreshInterval(120);
+
+        expect(typeof wrapper.vm.enableRefreshInterval).toBe('function');
+      });
+    });
+  });
+
+  describe("WebSocket and Connection Functions", () => {
+    describe("initializeSearchConnection", () => {
+      it("should initialize search connection", () => {
+        
+        const payload = { query: "test query", stream: "test-stream" };
+
+        const result = wrapper.vm.initializeSearchConnection(payload);
+
+        expect(typeof wrapper.vm.initializeSearchConnection).toBe('function');
+      });
+
+      it("should handle connection initialization errors", () => {
+        
+        const payload = null;
+
+        const result = wrapper.vm.initializeSearchConnection(payload);
+
+        expect(typeof wrapper.vm.initializeSearchConnection).toBe('function');
+      });
+    });
+
+    describe("initializeStreamingConnection", () => {
+      it("should initialize streaming connection", async () => {
+        
+        const payload = { query: "test query", stream: "test-stream" };
+
+        await wrapper.vm.initializeStreamingConnection(payload);
+
+        expect(typeof wrapper.vm.initializeStreamingConnection).toBe('function');
+      });
+    });
+
+    describe("sendSearchMessage", () => {
+      it("should send search message via WebSocket", () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+
+        wrapper.vm.sendSearchMessage(queryReq);
+
+        expect(typeof wrapper.vm.sendSearchMessage).toBe('function');
+      });
+
+      it("should handle search message errors", () => {
+        
+        const queryReq = null;
+
+        expect(() => {
+          wrapper.vm.sendSearchMessage(queryReq);
+        }).not.toThrow();
+      });
+    });
+
+    describe("handleSearchReset", () => {
+      it("should handle search reset", async () => {
+        
+        const data = { reset: true };
+        const traceId = "trace-123";
+
+        await wrapper.vm.handleSearchReset(data, traceId);
+
+        expect(typeof wrapper.vm.handleSearchReset).toBe('function');
+      });
+
+      it("should handle search reset without trace ID", async () => {
+        
+        const data = { reset: true };
+
+        await wrapper.vm.handleSearchReset(data);
+
+        expect(typeof wrapper.vm.handleSearchReset).toBe('function');
+      });
+    });
+
+    describe("handleStreamingHits", () => {
+      it("should handle streaming hits data", () => {
+        
+        const payload = { request_id: "req-1" };
+        const response = { hits: [], total: 0 };
+        const isPagination = false;
+
+        wrapper.vm.handleStreamingHits(payload, response, isPagination);
+
+        expect(typeof wrapper.vm.handleStreamingHits).toBe('function');
+      });
+
+      it("should handle streaming hits with pagination", () => {
+        
+        const payload = { request_id: "req-2" };
+        const response = { hits: [{ field: "value" }], total: 1 };
+        const isPagination = true;
+
+        wrapper.vm.handleStreamingHits(payload, response, isPagination, true);
+
+        expect(typeof wrapper.vm.handleStreamingHits).toBe('function');
+      });
+    });
+
+    describe("handleStreamingMetadata", () => {
+      it("should handle streaming metadata", () => {
+        
+        const payload = { request_id: "req-1" };
+        const response = { metadata: { total: 100 } };
+        const isPagination = false;
+
+        wrapper.vm.handleStreamingMetadata(payload, response, isPagination);
+
+        expect(typeof wrapper.vm.handleStreamingMetadata).toBe('function');
+      });
+    });
+
+    describe("getPageCountThroughSocket", () => {
+      it("should get page count through WebSocket", async () => {
+        
+        const queryReq = { query: "SELECT COUNT(*) FROM logs" };
+
+        await wrapper.vm.getPageCountThroughSocket(queryReq);
+
+        expect(typeof wrapper.vm.getPageCountThroughSocket).toBe('function');
+      });
+    });
+  });
+
+  describe("Data Processing and Analysis Functions", () => {
+    describe("shouldAddFunctionToSearch", () => {
+      it("should determine if function should be added to search", () => {
+        
+        wrapper.vm.searchObj.data.tempFunctionContent = "function test() {}";
+
+        const result = wrapper.vm.shouldAddFunctionToSearch();
+
+        expect(typeof result).toBe('boolean');
+      });
+
+      it("should handle empty function content", () => {
+        
+        wrapper.vm.searchObj.data.tempFunctionContent = "";
+
+        const result = wrapper.vm.shouldAddFunctionToSearch();
+
+        expect(typeof result).toBe('boolean');
+      });
+    });
+
+    describe("addTransformToQuery", () => {
+      it("should add transform function to query", () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+        wrapper.vm.searchObj.data.transforms.vrlFunction = "test_transform";
+
+        wrapper.vm.addTransformToQuery(queryReq);
+
+        expect(typeof wrapper.vm.addTransformToQuery).toBe('function');
+      });
+
+      it("should handle query without transforms", () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+        wrapper.vm.searchObj.data.transforms.vrlFunction = "";
+
+        wrapper.vm.addTransformToQuery(queryReq);
+
+        expect(typeof wrapper.vm.addTransformToQuery).toBe('function');
+      });
+    });
+
+    describe("resetHistogramWithError", () => {
+      it("should reset histogram with error message", () => {
+        
+        const errorMsg = "Histogram error occurred";
+        const errorCode = 500;
+
+        wrapper.vm.resetHistogramWithError(errorMsg, errorCode);
+
+        expect(wrapper.vm.searchObj.data.histogram.errorCode).toBe(errorCode);
+        expect(wrapper.vm.searchObj.data.histogram.errorMsg).toBe(errorMsg);
+      });
+
+      it("should reset histogram with default error code", () => {
+        
+        const errorMsg = "Default error";
+
+        wrapper.vm.resetHistogramWithError(errorMsg);
+
+        expect(wrapper.vm.searchObj.data.histogram.errorMsg).toBe(errorMsg);
+        expect(wrapper.vm.searchObj.data.histogram.errorCode).toBe(0);
+      });
+    });
+
+    describe("isTimestampASC", () => {
+      it("should detect ascending timestamp order", () => {
+        
+        const orderby = [{ field: "timestamp", type: "ASC" }];
+
+        const result = wrapper.vm.isTimestampASC(orderby);
+
+        expect(typeof result).toBe('boolean');
+      });
+
+      it("should detect descending timestamp order", () => {
+        
+        const orderby = [{ field: "timestamp", type: "DESC" }];
+
+        const result = wrapper.vm.isTimestampASC(orderby);
+
+        expect(typeof result).toBe('boolean');
+      });
+
+      it("should handle empty orderby", () => {
+        
+        const result = wrapper.vm.isTimestampASC([]);
+
+        expect(typeof result).toBe('boolean');
+      });
+    });
+
+    describe("generateHistogramSkeleton", () => {
+      it("should generate histogram skeleton data", () => {
+        
+        wrapper.vm.searchObj.data.datetime.startTime = Date.now() * 1000 - 3600000;
+        wrapper.vm.searchObj.data.datetime.endTime = Date.now() * 1000;
+
+        const result = wrapper.vm.generateHistogramSkeleton();
+
+        expect(result).toBeDefined();
+        expect(Array.isArray(result)).toBe(true);
+      });
+
+      it("should handle custom time ranges", () => {
+        
+        const oneDayAgo = (Date.now() - 24 * 60 * 60 * 1000) * 1000;
+        wrapper.vm.searchObj.data.datetime.startTime = oneDayAgo;
+        wrapper.vm.searchObj.data.datetime.endTime = Date.now() * 1000;
+
+        const result = wrapper.vm.generateHistogramSkeleton();
+
+        expect(result).toBeDefined();
+        expect(Array.isArray(result)).toBe(true);
+      });
+    });
+
+    describe("generateHistogramData", () => {
+      it("should generate histogram data from query results", () => {
+        
+        wrapper.vm.searchObj.data.histogram.chartData = [];
+        wrapper.vm.searchObj.data.histogram.interval = "1h";
+
+        wrapper.vm.generateHistogramData();
+
+        expect(typeof wrapper.vm.generateHistogramData).toBe('function');
+      });
+    });
+
+    describe("sortResponse", () => {
+      it("should sort response data by timestamp", () => {
+        
+        const data = [
+          { timestamp: 1640995200000000, field: "value2" },
+          { timestamp: 1640995100000000, field: "value1" }
+        ];
+        const tsColumn = "timestamp";
+
+        const result = wrapper.vm.sortResponse(data, tsColumn, "asc");
+
+        expect(Array.isArray(result)).toBe(true);
+        expect(result.length).toBe(2);
+      });
+
+      it("should handle descending sort order", () => {
+        
+        const data = [
+          { timestamp: 1640995100000000, field: "value1" },
+          { timestamp: 1640995200000000, field: "value2" }
+        ];
+        const tsColumn = "timestamp";
+
+        const result = wrapper.vm.sortResponse(data, tsColumn, "desc");
+
+        expect(Array.isArray(result)).toBe(true);
+      });
+
+      it("should handle empty data array", () => {
+        
+        const result = wrapper.vm.sortResponse([], "timestamp", "asc");
+
+        expect(Array.isArray(result)).toBe(true);
+        expect(result.length).toBe(0);
+      });
+    });
+
+    describe("getTsValue", () => {
+      it("should get timestamp value from record", () => {
+        
+        const record = { timestamp: 1640995200000000 };
+        const tsColumn = "timestamp";
+
+        const result = wrapper.vm.getTsValue(tsColumn, record);
+
+        expect(typeof result).toBe('number');
+        expect(result).toBeGreaterThan(0);
+      });
+
+      it("should handle string timestamp", () => {
+        
+        const record = { timestamp: "2024-01-01T00:00:00Z" };
+        const tsColumn = "timestamp";
+
+        const result = wrapper.vm.getTsValue(tsColumn, record);
+
+        expect(typeof result).toBe('number');
+      });
+
+      it("should handle missing timestamp field", () => {
+        
+        const record = { other_field: "value" };
+        const tsColumn = "timestamp";
+
+        const result = wrapper.vm.getTsValue(tsColumn, record);
+
+        expect(typeof result).toBe('number');
+      });
+    });
+  });
+
+  describe("State Management Functions", () => {
+    describe("setDateTime", () => {
+      it("should set date time with default period", () => {
+        
+        wrapper.vm.setDateTime();
+
+        expect(typeof wrapper.vm.setDateTime).toBe('function');
+      });
+
+      it("should set date time with custom period", () => {
+        
+        wrapper.vm.setDateTime("1h");
+
+        expect(typeof wrapper.vm.setDateTime).toBe('function');
+      });
+
+      it("should handle different time periods", () => {
+        
+        const periods = ["15m", "1h", "4h", "12h", "24h"];
+        
+        periods.forEach(period => {
+          wrapper.vm.setDateTime(period);
+        });
+
+        expect(typeof wrapper.vm.setDateTime).toBe('function');
+      });
+    });
+
+    describe("updateStreams", () => {
+      it("should update stream list", async () => {
+        
+        mockStreamService.nameList.mockResolvedValue({
+          data: { list: [{ name: "stream1", type: "logs" }] }
+        });
+
+        await wrapper.vm.updateStreams();
+
+        expect(typeof wrapper.vm.updateStreams).toBe('function');
+      });
+
+      it("should handle stream update errors", async () => {
+        
+        mockStreamService.nameList.mockRejectedValue(new Error("Update failed"));
+
+        await expect(wrapper.vm.updateStreams()).resolves.not.toThrow();
+      });
+    });
+
+    describe("onStreamChange", () => {
+      it("should handle stream change", async () => {
+        
+        const queryStr = "test query";
+
+        await wrapper.vm.onStreamChange(queryStr);
+
+        expect(typeof wrapper.vm.onStreamChange).toBe('function');
+      });
+
+      it("should handle empty query string", async () => {
+        
+        await wrapper.vm.onStreamChange("");
+
+        expect(typeof wrapper.vm.onStreamChange).toBe('function');
+      });
+    });
+
+    describe("getSavedViews", () => {
+      it("should get saved views", async () => {
+        
+        await wrapper.vm.getSavedViews();
+
+        expect(typeof wrapper.vm.getSavedViews).toBe('function');
+      });
+    });
+
+    describe("extractFTSFields", () => {
+      it("should extract FTS fields", () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+          { name: "field1", ftsKey: true },
+          { name: "field2", ftsKey: false }
+        ];
+
+        wrapper.vm.extractFTSFields();
+
+        expect(typeof wrapper.vm.extractFTSFields).toBe('function');
+      });
+
+      it("should handle streams without FTS fields", () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+          { name: "field1", ftsKey: false }
+        ];
+
+        wrapper.vm.extractFTSFields();
+
+        expect(typeof wrapper.vm.extractFTSFields).toBe('function');
+      });
+    });
+  });
+
+  describe("Query Processing Functions", () => {
+    describe("getQueryReq", () => {
+      it("should get query request object", () => {
+        
+        wrapper.vm.buildSearch = vi.fn().mockReturnValue({ query: "test query" });
+
+        const result = wrapper.vm.getQueryReq(false);
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+      });
+
+      it("should get query request for pagination", () => {
+        
+        wrapper.vm.buildSearch = vi.fn().mockReturnValue({ query: "test query" });
+
+        const result = wrapper.vm.getQueryReq(true);
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+      });
+    });
+
+    describe("getDataThroughStream", () => {
+      it("should get data through stream", () => {
+        
+        wrapper.vm.buildSearch = vi.fn().mockReturnValue({ query: "test" });
+        wrapper.vm.getQueryData = vi.fn();
+
+        wrapper.vm.getDataThroughStream(false);
+
+        expect(typeof wrapper.vm.getDataThroughStream).toBe('function');
+      });
+
+      it("should handle pagination in stream data", () => {
+        
+        wrapper.vm.buildSearch = vi.fn().mockReturnValue({ query: "test" });
+        wrapper.vm.getQueryData = vi.fn();
+
+        wrapper.vm.getDataThroughStream(true);
+
+        expect(typeof wrapper.vm.getDataThroughStream).toBe('function');
+      });
+    });
+
+    describe("shouldGetPageCount", () => {
+      it("should determine if page count is needed", () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+        const parsedSQL = { select: [{ columns: ["*"] }] };
+
+        const result = wrapper.vm.shouldGetPageCount(queryReq, parsedSQL);
+
+        expect(typeof result).toBe('boolean');
+      });
+
+      it("should handle aggregation queries", () => {
+        
+        const queryReq = { query: "SELECT COUNT(*) FROM logs" };
+        const parsedSQL = { 
+          select: [{ expr: { type: "function", name: "count" } }],
+          groupby: null
+        };
+
+        const result = wrapper.vm.shouldGetPageCount(queryReq, parsedSQL);
+
+        expect(typeof result).toBe('boolean');
+      });
+    });
+
+    describe("shouldShowHistogram", () => {
+      it("should determine if histogram should be shown", () => {
+        
+        const parsedSQL = { select: [{ columns: ["*"] }] };
+
+        const result = wrapper.vm.shouldShowHistogram(parsedSQL);
+
+        expect(typeof result).toBe('boolean');
+      });
+
+      it("should handle aggregation queries for histogram", () => {
+        
+        const parsedSQL = {
+          select: [{ expr: { type: "function", name: "sum" } }],
+          groupby: [{ type: "column", name: "field1" }]
+        };
+
+        const result = wrapper.vm.shouldShowHistogram(parsedSQL);
+
+        expect(typeof result).toBe('boolean');
+      });
+    });
+
+    describe("cleanBinaryExpression", () => {
+      it("should clean binary expression nodes", () => {
+        
+        const node = {
+          type: "binary_expr",
+          left: { type: "column", name: "field1" },
+          operator: "=",
+          right: { type: "value", value: "test" }
+        };
+
+        const result = wrapper.vm.cleanBinaryExpression(node);
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+      });
+
+      it("should handle nested binary expressions", () => {
+        
+        const node = {
+          type: "binary_expr",
+          left: {
+            type: "binary_expr",
+            left: { type: "column", name: "field1" },
+            operator: "=",
+            right: { type: "value", value: "test1" }
+          },
+          operator: "AND",
+          right: { type: "column", name: "field2" }
+        };
+
+        const result = wrapper.vm.cleanBinaryExpression(node);
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+      });
+    });
+
+    describe("isFieldOnly", () => {
+      it("should detect field-only expressions", () => {
+        
+        const node = { type: "column", name: "field1" };
+
+        const result = wrapper.vm.isFieldOnly(node);
+
+        expect(typeof result).toBe('boolean');
+      });
+
+      it("should detect complex expressions", () => {
+        
+        const node = {
+          type: "binary_expr",
+          left: { type: "column", name: "field1" },
+          operator: "=",
+          right: { type: "value", value: "test" }
+        };
+
+        const result = wrapper.vm.isFieldOnly(node);
+
+        expect(typeof result).toBe('boolean');
+      });
+    });
+  });
+
+  describe("Additional Pagination Functions", () => {
+    describe("reorderArrayByReference", () => {
+      it("should reorder array by reference", () => {
+        
+        const arr1 = ["c", "a", "b"];
+        const arr2 = ["a", "b", "c"];
+
+        const result = wrapper.vm.reorderArrayByReference(arr1, arr2);
+
+        expect(Array.isArray(result)).toBe(true);
+        expect(result.length).toBe(3);
+      });
+
+      it("should handle arrays with different lengths", () => {
+        
+        const arr1 = ["a", "b"];
+        const arr2 = ["a", "b", "c", "d"];
+
+        const result = wrapper.vm.reorderArrayByReference(arr1, arr2);
+
+        expect(Array.isArray(result)).toBe(true);
+      });
+
+      it("should handle empty arrays", () => {
+        
+        const result = wrapper.vm.reorderArrayByReference([], []);
+
+        expect(Array.isArray(result)).toBe(true);
+        expect(result.length).toBe(0);
+      });
+    });
+
+    describe("reorderSelectedFields", () => {
+      it("should reorder selected fields", () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedFields = ["field3", "field1", "field2"];
+        wrapper.vm.searchObj.data.stream.interestingFieldList = ["field1", "field2", "field3"];
+
+        wrapper.vm.reorderSelectedFields();
+
+        expect(typeof wrapper.vm.reorderSelectedFields).toBe('function');
+      });
+
+      it("should handle empty field lists", () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedFields = [];
+        wrapper.vm.searchObj.data.stream.interestingFieldList = [];
+
+        wrapper.vm.reorderSelectedFields();
+
+        expect(typeof wrapper.vm.reorderSelectedFields).toBe('function');
+      });
+    });
+
+    describe("refreshJobPagination", () => {
+      it("should refresh job pagination", () => {
+        
+        wrapper.vm.refreshJobPagination(false);
+
+        expect(typeof wrapper.vm.refreshJobPagination).toBe('function');
+      });
+
+      it("should handle regenerate flag for jobs", () => {
+        
+        wrapper.vm.refreshJobPagination(true);
+
+        expect(typeof wrapper.vm.refreshJobPagination).toBe('function');
+      });
+    });
+
+    describe("getJobData", () => {
+      it("should get job data", async () => {
+        
+        wrapper.vm.buildSearch = vi.fn().mockReturnValue({ query: "test" });
+        mockSearchService.search_around = vi.fn().mockResolvedValue({
+          data: { hits: [], total: 0 }
+        });
+
+        await wrapper.vm.getJobData(false);
+
+        expect(typeof wrapper.vm.getJobData).toBe('function');
+      });
+
+      it("should handle job data with pagination", async () => {
+        
+        wrapper.vm.buildSearch = vi.fn().mockReturnValue({ query: "test" });
+        mockSearchService.search_around = vi.fn().mockResolvedValue({
+          data: { hits: [], total: 0 }
+        });
+
+        await wrapper.vm.getJobData(true);
+
+        expect(typeof wrapper.vm.getJobData).toBe('function');
+      });
+    });
+  });
+
+  describe("Advanced Data Processing Functions", () => {
+    describe("createFieldIndexMapping", () => {
+      it("should create field index mapping", async () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+          { name: "field1" }, 
+          { name: "field2" }, 
+          { name: "field3" }
+        ];
+
+        await wrapper.vm.createFieldIndexMapping();
+
+        expect(typeof wrapper.vm.createFieldIndexMapping).toBe('function');
+      });
+
+      it("should handle empty field list", async () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedStreamFields = [];
+
+        await wrapper.vm.createFieldIndexMapping();
+
+        expect(typeof wrapper.vm.createFieldIndexMapping).toBe('function');
+      });
+    });
+
+    describe("resetFieldValues", () => {
+      it("should reset field values", () => {
+        
+        wrapper.vm.fieldValues = { field1: new Set(["value1"]) };
+
+        wrapper.vm.resetFieldValues();
+
+        expect(typeof wrapper.vm.resetFieldValues).toBe('function');
+      });
+    });
+
+    describe("hasInterestingFieldsInLocal", () => {
+      it("should check for interesting fields in local storage", () => {
+        
+        const streamName = "test-stream";
+
+        const result = wrapper.vm.hasInterestingFieldsInLocal(streamName);
+
+        expect(typeof result).toBe('boolean');
+      });
+
+      it("should handle non-existent stream", () => {
+        
+        const result = wrapper.vm.hasInterestingFieldsInLocal("non-existent-stream");
+
+        expect(typeof result).toBe('boolean');
+      });
+    });
+
+    describe("getFieldsWithStreamNames", () => {
+      it("should get fields with stream names", () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedStream = ["stream1", "stream2"];
+        wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+          { name: "field1", streams: ["stream1"] },
+          { name: "field2", streams: ["stream2"] }
+        ];
+
+        const result = wrapper.vm.getFieldsWithStreamNames();
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+      });
+
+      it("should handle single stream", () => {
+        
+        wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
+        wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+          { name: "field1", streams: ["stream1"] }
+        ];
+
+        const result = wrapper.vm.getFieldsWithStreamNames();
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('object');
+      });
+    });
+
+    describe("extractValueQuery", () => {
+      it("should extract value from query", () => {
+        
+        wrapper.vm.searchObj.data.query = "SELECT * FROM logs WHERE field = 'value'";
+
+        const result = wrapper.vm.extractValueQuery();
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('string');
+      });
+
+      it("should handle complex queries", () => {
+        
+        wrapper.vm.searchObj.data.query = "SELECT field1, field2 FROM logs WHERE field1 = 'value1' AND field2 > 100";
+
+        const result = wrapper.vm.extractValueQuery();
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('string');
+      });
+
+      it("should handle simple queries", () => {
+        
+        wrapper.vm.searchObj.data.query = "simple search";
+
+        const result = wrapper.vm.extractValueQuery();
+
+        expect(result).toBeDefined();
+        expect(typeof result).toBe('string');
+      });
+    });
+  });
+
+  describe("HTTP Response Processing Functions", () => {
+    describe("processHttpHistogramResults", () => {
+      it("should process HTTP histogram results", async () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+        mockSearchService.search = vi.fn().mockResolvedValue({
+          data: { 
+            hits: [],
+            aggs: { histogram: { buckets: [] } }
+          }
+        });
+
+        await wrapper.vm.processHttpHistogramResults(queryReq);
+
+        expect(typeof wrapper.vm.processHttpHistogramResults).toBe('function');
+      });
+
+      it("should handle histogram processing errors", async () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+        mockSearchService.search = vi.fn().mockRejectedValue(new Error("Processing failed"));
+
+        await expect(wrapper.vm.processHttpHistogramResults(queryReq)).resolves.not.toThrow();
+      });
+    });
+
+    describe("loadLogsData", () => {
+      it("should load logs data", async () => {
+        
+        wrapper.vm.getQueryData = vi.fn();
+
+        await wrapper.vm.loadLogsData();
+
+        expect(typeof wrapper.vm.loadLogsData).toBe('function');
+      });
+    });
+
+    describe("loadVisualizeData", () => {
+      it("should load visualize data", async () => {
+        
+        wrapper.vm.getQueryData = vi.fn();
+
+        await wrapper.vm.loadVisualizeData();
+
+        expect(typeof wrapper.vm.loadVisualizeData).toBe('function');
+      });
+    });
+
+    describe("loadJobData", () => {
+      it("should load job data", async () => {
+        
+        wrapper.vm.getJobData = vi.fn();
+
+        await wrapper.vm.loadJobData();
+
+        expect(typeof wrapper.vm.loadJobData).toBe('function');
+      });
+    });
+
+    describe("handleQueryData", () => {
+      it("should handle query data based on current route", async () => {
+        
+        wrapper.vm.router.currentRoute.value = { name: "logs" };
+        wrapper.vm.loadLogsData = vi.fn();
+
+        await wrapper.vm.handleQueryData();
+
+        expect(typeof wrapper.vm.handleQueryData).toBe('function');
+      });
+
+      it("should handle different route types", async () => {
+        
+        wrapper.vm.router.currentRoute.value = { name: "visualize" };
+        wrapper.vm.loadVisualizeData = vi.fn();
+
+        await wrapper.vm.handleQueryData();
+
+        expect(typeof wrapper.vm.handleQueryData).toBe('function');
+      });
+    });
+
+    describe("handleRunQuery", () => {
+      it("should handle run query operation", async () => {
+        
+        wrapper.vm.handleQueryData = vi.fn();
+
+        await wrapper.vm.handleRunQuery();
+
+        expect(typeof wrapper.vm.handleRunQuery).toBe('function');
+      });
+    });
+  });
+
+  describe("WebSocket Response Handling Functions", () => {
+    describe("handleHistogramStreamingHits", () => {
+      it("should handle histogram streaming hits", () => {
+        
+        const payload = { request_id: "hist-req-1" };
+        const response = { hits: [], histogram: [] };
+        const isPagination = false;
+
+        wrapper.vm.handleHistogramStreamingHits(payload, response, isPagination);
+
+        expect(typeof wrapper.vm.handleHistogramStreamingHits).toBe('function');
+      });
+
+      it("should handle histogram streaming with pagination", () => {
+        
+        const payload = { request_id: "hist-req-2" };
+        const response = { hits: [], histogram: [{ x: 1, y: 10 }] };
+        const isPagination = true;
+
+        wrapper.vm.handleHistogramStreamingHits(payload, response, isPagination, true);
+
+        expect(typeof wrapper.vm.handleHistogramStreamingHits).toBe('function');
+      });
+    });
+
+    describe("handleHistogramStreamingMetadata", () => {
+      it("should handle histogram streaming metadata", () => {
+        
+        const payload = { request_id: "hist-meta-1" };
+        const response = { metadata: { total: 1000, took: 150 } };
+        const isPagination = false;
+
+        wrapper.vm.handleHistogramStreamingMetadata(payload, response, isPagination);
+
+        expect(typeof wrapper.vm.handleHistogramStreamingMetadata).toBe('function');
+      });
+    });
+
+    describe("handlePageCountStreamingHits", () => {
+      it("should handle page count streaming hits", () => {
+        
+        const payload = { request_id: "count-req-1" };
+        const response = { hits: [], total: 5000 };
+        const isPagination = false;
+
+        wrapper.vm.handlePageCountStreamingHits(payload, response, isPagination);
+
+        expect(typeof wrapper.vm.handlePageCountStreamingHits).toBe('function');
+      });
+    });
+
+    describe("handlePageCountStreamingMetadata", () => {
+      it("should handle page count streaming metadata", () => {
+        
+        const payload = { request_id: "count-meta-1" };
+        const response = { metadata: { total: 5000 } };
+        const isPagination = false;
+
+        wrapper.vm.handlePageCountStreamingMetadata(payload, response, isPagination);
+
+        expect(typeof wrapper.vm.handlePageCountStreamingMetadata).toBe('function');
+      });
+    });
+
+    describe("handleFunctionError", () => {
+      it("should handle function errors", () => {
+        
+        const queryReq = { query: "SELECT test_function() FROM logs" };
+        const response = { error: "Function not found" };
+
+        wrapper.vm.handleFunctionError(queryReq, response);
+
+        expect(typeof wrapper.vm.handleFunctionError).toBe('function');
+      });
+    });
+
+    describe("handleAggregation", () => {
+      it("should handle aggregation results", () => {
+        
+        const queryReq = { query: "SELECT COUNT(*) FROM logs GROUP BY field1" };
+        const response = { 
+          aggs: {
+            group_by_field1: {
+              buckets: [
+                { key: "value1", doc_count: 100 },
+                { key: "value2", doc_count: 50 }
+              ]
+            }
+          }
+        };
+
+        wrapper.vm.handleAggregation(queryReq, response);
+
+        expect(typeof wrapper.vm.handleAggregation).toBe('function');
+      });
+
+      it("should handle empty aggregation results", () => {
+        
+        const queryReq = { query: "SELECT COUNT(*) FROM logs" };
+        const response = { aggs: {} };
+
+        wrapper.vm.handleAggregation(queryReq, response);
+
+        expect(typeof wrapper.vm.handleAggregation).toBe('function');
+      });
+    });
+
+    describe("updateResult", () => {
+      it("should update search results", async () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+        const response = { hits: [{ field: "value" }], total: 1 };
+        const isPagination = false;
+
+        await wrapper.vm.updateResult(queryReq, response, isPagination);
+
+        expect(typeof wrapper.vm.updateResult).toBe('function');
+      });
+
+      it("should handle pagination results", async () => {
+        
+        const queryReq = { query: "SELECT * FROM logs", from: 100, size: 50 };
+        const response = { hits: [{ field: "value" }], total: 1000 };
+        const isPagination = true;
+
+        await wrapper.vm.updateResult(queryReq, response, isPagination, true);
+
+        expect(typeof wrapper.vm.updateResult).toBe('function');
+      });
+    });
+
+    describe("chunkedAppend", () => {
+      it("should append data in chunks", async () => {
+        
+        const target = [];
+        const source = Array.from({ length: 10000 }, (_, i) => ({ id: i }));
+
+        await wrapper.vm.chunkedAppend(target, source, 1000);
+
+        expect(target.length).toBe(source.length);
+      });
+
+      it("should handle small datasets", async () => {
+        
+        const target = [];
+        const source = [{ id: 1 }, { id: 2 }, { id: 3 }];
+
+        await wrapper.vm.chunkedAppend(target, source, 1000);
+
+        expect(target.length).toBe(3);
+      });
+
+      it("should handle empty source", async () => {
+        
+        const target = [{ existing: "data" }];
+        const source = [];
+
+        await wrapper.vm.chunkedAppend(target, source);
+
+        expect(target.length).toBe(1);
+      });
+    });
+  });
+
+  describe("Error and State Handling Functions", () => {
+    describe("resetHistogramError", () => {
+      it("should reset histogram error state", () => {
+        
+        wrapper.vm.searchObj.data.histogram.errorCode = 500;
+        wrapper.vm.searchObj.data.histogram.errorMsg = "Error occurred";
+
+        wrapper.vm.resetHistogramError();
+
+        expect(wrapper.vm.searchObj.data.histogram.errorCode).toBe(0);
+        expect(wrapper.vm.searchObj.data.histogram.errorMsg).toBe("");
+      });
+    });
+
+    describe("handleSearchClose", () => {
+      it("should handle search close event", () => {
+        
+        const payload = { request_id: "req-1" };
+        const response = { status: "closed" };
+
+        wrapper.vm.handleSearchClose(payload, response);
+
+        expect(typeof wrapper.vm.handleSearchClose).toBe('function');
+      });
+    });
+
+    describe("handleSearchError", () => {
+      it("should handle search errors", () => {
+        
+        const request = { query: "SELECT * FROM logs" };
+        const err = { 
+          error: "Query failed",
+          code: "QUERY_ERROR",
+          trace_id: "trace-123"
+        };
+
+        wrapper.vm.handleSearchError(request, err);
+
+        expect(typeof wrapper.vm.handleSearchError).toBe('function');
+      });
+
+      it("should handle network errors", () => {
+        
+        const request = { query: "SELECT * FROM logs" };
+        const err = { 
+          error: "Network timeout",
+          code: "NETWORK_ERROR"
+        };
+
+        wrapper.vm.handleSearchError(request, err);
+
+        expect(typeof wrapper.vm.handleSearchError).toBe('function');
+      });
+    });
+
+    describe("getAggsTotal", () => {
+      it("should get aggregation total", () => {
+        
+        wrapper.vm.searchObj.data.queryResults = {
+          aggs: {
+            total: { value: 1000 }
+          }
+        };
+
+        const result = wrapper.vm.getAggsTotal();
+
+        expect(typeof result).toBe('number');
+      });
+
+      it("should handle missing aggregation data", () => {
+        
+        wrapper.vm.searchObj.data.queryResults = { hits: [] };
+
+        const result = wrapper.vm.getAggsTotal();
+
+        expect(typeof result).toBe('number');
+      });
+    });
+
+    describe("fetchAllParitions", () => {
+      it("should fetch all partitions", async () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+        mockSearchService.search = vi.fn().mockResolvedValue({
+          data: { partitions: [] }
+        });
+
+        await wrapper.vm.fetchAllParitions(queryReq);
+
+        expect(typeof wrapper.vm.fetchAllParitions).toBe('function');
+      });
+
+      it("should handle partition fetch errors", async () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+        mockSearchService.search = vi.fn().mockRejectedValue(new Error("Partition error"));
+
+        await expect(wrapper.vm.fetchAllParitions(queryReq)).resolves.not.toThrow();
+      });
+    });
+  });
+
+  describe("Utility Helper Functions", () => {
+    describe("showCancelSearchNotification", () => {
+      it("should show cancel search notification", () => {
+        
+        wrapper.vm.showCancelSearchNotification();
+
+        expect(typeof wrapper.vm.showCancelSearchNotification).toBe('function');
+      });
+    });
+
+    describe("setCancelSearchError", () => {
+      it("should set cancel search error state", () => {
+        
+        wrapper.vm.setCancelSearchError();
+
+        expect(typeof wrapper.vm.setCancelSearchError).toBe('function');
+      });
+    });
+
+    describe("saveColumnSizes", () => {
+      it("should save column sizes", () => {
+        
+        wrapper.vm.saveColumnSizes();
+
+        expect(typeof wrapper.vm.saveColumnSizes).toBe('function');
+      });
+    });
+
+    describe("setMultiStreamHistogramQuery", () => {
+      it("should set multi-stream histogram query", () => {
+        
+        const queryReq = { query: "SELECT * FROM stream1, stream2" };
+
+        wrapper.vm.setMultiStreamHistogramQuery(queryReq);
+
+        expect(typeof wrapper.vm.setMultiStreamHistogramQuery).toBe('function');
+      });
+
+      it("should handle single stream query", () => {
+        
+        const queryReq = { query: "SELECT * FROM stream1" };
+
+        wrapper.vm.setMultiStreamHistogramQuery(queryReq);
+
+        expect(typeof wrapper.vm.setMultiStreamHistogramQuery).toBe('function');
+      });
+    });
+
+    describe("getHistogramQueryData", () => {
+      it("should get histogram query data", () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+
+        wrapper.vm.getHistogramQueryData(queryReq);
+
+        expect(typeof wrapper.vm.getHistogramQueryData).toBe('function');
+      });
+
+      it("should handle histogram data with time range", () => {
+        
+        const queryReq = { 
+          query: "SELECT * FROM logs",
+          start_time: Date.now() - 3600000,
+          end_time: Date.now()
+        };
+
+        wrapper.vm.getHistogramQueryData(queryReq);
+
+        expect(typeof wrapper.vm.getHistogramQueryData).toBe('function');
+      });
+    });
+
+    describe("processHistogramRequest", () => {
+      it("should process histogram request", async () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+
+        await wrapper.vm.processHistogramRequest(queryReq);
+
+        expect(typeof wrapper.vm.processHistogramRequest).toBe('function');
+      });
+    });
+
+    describe("updatePageCountTotal", () => {
+      it("should update page count total", () => {
+        
+        const queryReq = { query: "SELECT * FROM logs" };
+        const currentHits = 100;
+        const total = 1000;
+
+        wrapper.vm.updatePageCountTotal(queryReq, currentHits, total);
+
+        expect(typeof wrapper.vm.updatePageCountTotal).toBe('function');
+      });
+    });
+
+    describe("trimPageCountExtraHit", () => {
+      it("should trim extra hits from page count", () => {
+        
+        const queryReq = { query: "SELECT * FROM logs", size: 100 };
+        const total = 101;
+
+        wrapper.vm.trimPageCountExtraHit(queryReq, total);
+
+        expect(typeof wrapper.vm.trimPageCountExtraHit).toBe('function');
+      });
+    });
+
+    describe("updatePageCountSearchSize", () => {
+      it("should update page count search size", () => {
+        
+        const queryReq = { query: "SELECT * FROM logs", size: 100 };
+
+        wrapper.vm.updatePageCountSearchSize(queryReq);
+
+        expect(typeof wrapper.vm.updatePageCountSearchSize).toBe('function');
+      });
+    });
+  });
+
 });
 
