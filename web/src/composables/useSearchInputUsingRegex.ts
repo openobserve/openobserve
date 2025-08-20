@@ -37,8 +37,12 @@ export const useSearchInputUsingRegex = (
 
     filteredOptions.value = options.value?.filter((option: any) => {
       const value =
-        typeof option === "object" ? option[searchKey] : option.toString();
-      const lowerCaseValue = value.toLowerCase();
+      typeof option === "object" ? option[searchKey] : option.toString();
+
+      const lowerCaseValue = value?.toLowerCase();
+
+      if (!lowerCaseValue || typeof lowerCaseValue !== "string") return false;
+
       return lowerCaseValue.includes(needle);
     });
   };
