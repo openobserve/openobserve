@@ -5350,9 +5350,24 @@ const useLogs = () => {
       if (parsedSQL?.with) {
         let withObj = parsedSQL.with;
         withObj.forEach((obj: any) => {
-          // Recursively extract table names from the WITH statement
-          const extractTablesFromNode = (node: any) => {
-            if (!node) return;
+          // Recursively extract table names from the WITH statement with depth protection
+          const MAX_RECURSION_DEPTH = 50; // Prevent stack overflow
+          const visited = new Set(); // Prevent circular references
+          
+          const extractTablesFromNode = (node: any, depth: number = 0) => {
+            if (!node || depth > MAX_RECURSION_DEPTH) {
+              if (depth > MAX_RECURSION_DEPTH) {
+                console.warn("Maximum recursion depth reached while parsing SQL query");
+              }
+              return;
+            }
+            
+            // Create a unique identifier for this node to detect circular references
+            const nodeId = JSON.stringify(node).substring(0, 100) + depth;
+            if (visited.has(nodeId)) {
+              return; // Skip already visited nodes
+            }
+            visited.add(nodeId);
             
             // Check if current node has a from clause
             if (node.from && Array.isArray(node.from)) {
@@ -5362,21 +5377,21 @@ const useLogs = () => {
                 }
                 // Handle subquery in FROM clause
                 if (stream.expr && stream.expr.ast) {
-                  extractTablesFromNode(stream.expr.ast);
+                  extractTablesFromNode(stream.expr.ast, depth + 1);
                 }
               });
             }
             
             // Check for nested subqueries in WHERE clause
             if (node.where && node.where.right && node.where.right.ast) {
-              extractTablesFromNode(node.where.right.ast);
+              extractTablesFromNode(node.where.right.ast, depth + 1);
             }
             
             // Check for nested subqueries in SELECT expressions
             if (node.columns && Array.isArray(node.columns)) {
               node.columns.forEach((col: any) => {
                 if (col.expr && col.expr.ast) {
-                  extractTablesFromNode(col.expr.ast);
+                  extractTablesFromNode(col.expr.ast, depth + 1);
                 }
               });
             }
