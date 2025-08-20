@@ -659,9 +659,15 @@ pub async fn search_partition(
     let is_http_distinct = is_simple_distinct && is_http_req;
 
     #[cfg(feature = "enterprise")]
+    let org_settings = crate::service::db::organization::get_org_setting(&org_id)
+        .await
+        .unwrap_or_default();
+
+    #[cfg(feature = "enterprise")]
     let mut is_streaming_aggregate = ts_column.is_none()
         && is_cachable_aggs
         && cfg.common.feature_query_streaming_aggs
+        && org_settings.streaming_aggregation_enabled
         && !is_http_distinct;
 
     #[cfg(not(feature = "enterprise"))]

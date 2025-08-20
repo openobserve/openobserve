@@ -59,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <q-toggle
           v-if="config.isEnterprise == 'true'"
-          v-model="enableAggregationCache"
-          :label="t('settings.enableAggregationCache')"
+          v-model="enableStreamingAggregation"
+          :label="t('settings.enableStreamingAggregation')"
           data-test="general-settings-enable-aggregation-cache"
           class="q-pb-lg showLabelOnTop"
         />
@@ -285,9 +285,9 @@ export default defineComponent({
         ?.enable_streaming_search ?? false,
     );
 
-    const enableAggregationCache = ref(
+    const enableStreamingAggregation = ref(
       store.state?.organizationData?.organizationSettings
-        ?.aggregation_cache_enabled ?? false,
+        ?.streaming_aggregation_enabled ?? false,
     );
 
     const loadingState = ref(false);
@@ -310,9 +310,9 @@ export default defineComponent({
         store.state?.organizationData?.organizationSettings
           ?.enable_streaming_search ?? false;
 
-      enableAggregationCache.value =
+      enableStreamingAggregation.value =
         store.state?.organizationData?.organizationSettings
-          ?.aggregation_cache_enabled ?? false;
+          ?.streaming_aggregation_enabled ?? false;
     });
 
     watch(
@@ -333,7 +333,7 @@ export default defineComponent({
           scrape_interval: scrapeIntereval.value,
           enable_websocket_search: enableWebsocketSearch.value,
           enable_streaming_search: enableStreamingSearch.value,
-          aggregation_cache_enabled: enableAggregationCache.value,
+          streaming_aggregation_enabled: enableStreamingAggregation.value,
         });
 
         //update settings in backend
@@ -559,7 +559,7 @@ export default defineComponent({
       confirmDeleteImage: ref(false),
       sanitizeInput,
       enableStreamingSearch,
-      enableAggregationCache,
+      enableStreamingAggregation,
     };
   },
 });
