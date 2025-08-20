@@ -159,6 +159,12 @@ describe("PipelineEditor", () => {
   });
 
   afterEach(() => {
+    if (wrapper) {
+      wrapper.unmount();
+    }
+    // Clear any pending timers to prevent "document is not defined" errors
+    vi.clearAllTimers();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
   });
 
