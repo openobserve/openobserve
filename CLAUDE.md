@@ -217,3 +217,4 @@ Key environment variables for development:
 - Use conventional commit messages (feat:, fix:, docs:, etc.)
 - okay one important thing you need to remember is we have enterprise version as well which can be build using `cre` on this machine and you can use `cchk` to run cargo check. so whenever working on an enterprise feature use `cre` to build. enterprise version actually links a o2-enterprise crate which is at `../o2-enterprise`. Usually the workflow is to create branches with same name on both repos when working with enterprise features. Now when making any changes to Cargo.toml you have to make changes in the `Cargo.toml.openobserve` as well, because when building enterprise we copy this toml from enterprise repo to opensource repo and then build.
 - /add-dir ../o2-enterprise
+- always prefer `cchk` over `cargo build`
