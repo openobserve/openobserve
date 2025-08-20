@@ -184,9 +184,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].vrlFunctionQuery
                     "
                     :class="
-                      dashboardPanelData.data.queries[
+                      (!dashboardPanelData.data.queries[
                         dashboardPanelData.layout.currentQueryIndex
-                      ]?.vrlFunctionQuery === '' &&
+                      ]?.vrlFunctionQuery ||
+                        dashboardPanelData.data.queries[
+                          dashboardPanelData.layout.currentQueryIndex
+                        ]?.vrlFunctionQuery === '') &&
                       functionEditorPlaceholderFlag
                         ? 'empty-function'
                         : ''
