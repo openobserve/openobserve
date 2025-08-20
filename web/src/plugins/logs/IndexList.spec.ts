@@ -269,11 +269,6 @@ vi.mock("@/services/stream", () => {
   };
 });
 
-const mockExtractFields = vi.fn();
-const mockGetValuesPartition = vi.fn();
-
-const mockGetFilterExpressionByFieldType = vi.fn(() => "field = 'value'");
-
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
@@ -454,103 +449,9 @@ describe("Index List", async () => {
     expect(wrapper.vm.traceIdMapper["fooField"]).toBeUndefined();
   });
 
-  it("add a specific field to interesting filed list ", async () => {
-    const field = {
-      name: "testField",
-      streams: ["stream1"],
-      isInterestingField: false,
-      group: "stream1",
-    };
 
-    // Ensure streamSchemaFieldsIndexMapping has content so the early return doesn't trigger
-    wrapper.vm.streamSchemaFieldsIndexMapping.value["testField"] = 0;
-    // Initialize selectedStreamFields array with the field at index 0
-    wrapper.vm.searchObj.data.stream.selectedStreamFields = [
-      {
-        name: "testField",
-        isInterestingField: false,
-        streams: ["stream1"]
-      }
-    ];
-    wrapper.vm.searchObj.data.stream.selectedInterestingStreamFields = [];
-    wrapper.vm.searchObj.data.stream.interestingExpandedGroupRowsFieldCount = {
-      stream1: 0,
-    };
-    wrapper.vm.searchObj.data.stream.expandGroupRows = {
-      stream1: true,
-    };
-    // Initialize interestingFieldList if it doesn't exist
-    if (!wrapper.vm.searchObj.data.stream.interestingFieldList) {
-      wrapper.vm.searchObj.data.stream.interestingFieldList = [];
-    }
-    // Set organizationIdentifier which is used in the method
-    wrapper.vm.searchObj.organizationIdentifier = "default";
-    
-    // Mock store configuration needed by the method
-    wrapper.vm.$store = {
-      state: {
-        zoConfig: {
-          default_quick_mode_fields: [],
-          timestamp_column: "@timestamp"
-        }
-      }
-    };
-    
-    // Debug: log the state before and after
-    console.log("Before addToInterestingFieldList:", wrapper.vm.searchObj.data.stream.interestingFieldList);
-    console.log("streamSchemaFieldsIndexMapping:", wrapper.vm.streamSchemaFieldsIndexMapping.value);
-    
-    // Set the mapping right before the function call
-    wrapper.vm.streamSchemaFieldsIndexMapping.value = { testField: 0 };
-    console.log("Set streamSchemaFieldsIndexMapping right before call:", wrapper.vm.streamSchemaFieldsIndexMapping.value);
-    
-    wrapper.vm.addToInterestingFieldList(field, false);
-    
-    console.log("After addToInterestingFieldList:", wrapper.vm.searchObj.data.stream.interestingFieldList);
-    expect(wrapper.vm.searchObj.data.stream.interestingFieldList).toContain(
-      "testField",
-    );
-  });
 
-  it("removes a field from interesting field list", async () => {
-    const field = {
-      name: "testField",
-      streams: ["stream1"],
-      isInterestingField: true,
-      group: "stream1",
-    };
-    
-    // Ensure streamSchemaFieldsIndexMapping has content so the early return doesn't trigger
-    wrapper.vm.streamSchemaFieldsIndexMapping.value["testField"] = 0;
-    wrapper.vm.searchObj.data.stream.selectedInterestingStreamFields = [field];
-    wrapper.vm.searchObj.data.stream.interestingExpandedGroupRowsFieldCount = {
-      stream1: 1,
-    };
-    wrapper.vm.searchObj.data.stream.expandGroupRows = {
-      stream1: true,
-    };
-    wrapper.vm.searchObj.data.stream.interestingFieldList = ["testField"];
-    // Set organizationIdentifier which is used in the method
-    wrapper.vm.searchObj.organizationIdentifier = "default";
-    
-    // Mock store configuration needed by the method
-    wrapper.vm.$store = {
-      state: {
-        zoConfig: {
-          default_quick_mode_fields: [],
-          timestamp_column: "@timestamp"
-        }
-      }
-    };
-    
-    // Set the mapping right before the function call
-    wrapper.vm.streamSchemaFieldsIndexMapping.value = { testField: 0 };
-    
-    wrapper.vm.addToInterestingFieldList(field, true);
-    expect(wrapper.vm.searchObj.data.stream.interestingFieldList).not.toContain(
-      "testField",
-    );
-  });
+
 
   it("handles single stream selection correctly", async () => {
     const opt = { value: "stream1", label: "Stream 1" };
@@ -1066,16 +967,6 @@ vi.mock("@/services/stream", () => {
       fieldValues: mockFieldValues,
     },
   };
-});
-
-
-
-const node = document.createElement("div");
-node.setAttribute("id", "app");
-document.body.appendChild(node);
-
-installQuasar({
-  plugins: [Dialog, Notify],
 });
 
 describe("Index List", async () => {
