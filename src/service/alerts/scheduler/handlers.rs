@@ -1085,11 +1085,13 @@ async fn handle_derived_stream_triggers(
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
             log::info!(
-                "skipping pipeline {} id {} in org {} because free trial expiry",
+                "[Scheduler trace_id {scheduler_trace_id}] Skipping pipeline {} id {} in org {} because free trial expiry",
                 pipeline.name,
                 pipeline_id,
                 trigger.org
             );
+            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
+            db::scheduler::update_trigger(new_trigger).await?;
             return Ok(());
         }
     }
