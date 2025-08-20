@@ -49,8 +49,28 @@ pub async fn run() -> Result<(), anyhow::Error> {
         log::error!("[COMPACTOR::JOB] start merge job scheduler error: {e}");
     }
 
-    tokio::task::spawn(async move { run_generate_job().await });
-    tokio::task::spawn(async move { run_generate_old_data_job().await });
+    spawn_pausable_job!(
+        "run_generate_job",
+        get_config().compact.interval,
+        {
+            log::debug!("[COMPACTOR::JOB] Running generate merge job");
+            if let Err(e) = compact::run_generate_job(CompactionJobType::Current).await {
+                log::error!("[COMPACTOR::JOB] run generate merge job error: {e}");
+            }
+        }
+    );
+
+    spawn_pausable_job!(
+        "run_generate_old_data_job",
+        get_config().compact.old_data_interval + 1,
+        {
+            log::debug!("[COMPACTOR::JOB] Running generate merge job for old data");
+            if let Err(e) = compact::run_generate_job(CompactionJobType::Historical).await {
+                log::error!("[COMPACTOR::JOB] run generate merge job for old data error: {e}");
+            }
+        }
+    );
+
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "compactor_downsampling",
@@ -69,9 +89,40 @@ pub async fn run() -> Result<(), anyhow::Error> {
             }
         }
     );
-    tokio::task::spawn(async move { run_merge(scheduler.tx()).await });
-    tokio::task::spawn(async move { run_retention().await });
-    tokio::task::spawn(async move { run_delay_deletion().await });
+
+    spawn_pausable_job!(
+        "run_merge",
+        get_config().compact.interval + 2,
+        {
+            log::debug!("[COMPACTOR::JOB] Running data merge");
+            if let Err(e) = compact::run_merge(scheduler.tx().clone()).await {
+                log::error!("[COMPACTOR::JOB] run data merge error: {e}");
+            }
+        }
+    );
+
+    spawn_pausable_job!(
+        "run_retention",
+        get_config().compact.interval + 3,
+        {
+            log::debug!("[COMPACTOR::JOB] Running data retention");
+            if let Err(e) = compact::run_retention().await {
+                log::error!("[COMPACTOR::JOB] run data retention error: {e}");
+            }
+        }
+    );
+
+    spawn_pausable_job!(
+        "run_delay_deletion",
+        get_config().compact.interval + 4,
+        {
+            log::debug!("[COMPACTOR::JOB] Running data delay deletion");
+            if let Err(e) = compact::run_delay_deletion().await {
+                log::error!("[COMPACTOR::JOB] run data delay deletion error: {e}");
+            }
+        }
+    );
+
     spawn_pausable_job!(
         "compactor_sync_to_db",
         get_config().compact.sync_to_db_interval,
@@ -82,6 +133,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             }
         }
     );
+
     #[cfg(feature = "enterprise")]
     spawn_pausable_job!(
         "compactor_downsampling_sync_to_db",
@@ -102,6 +154,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             }
         }
     );
+
     spawn_pausable_job!(
         "compactor_check_running_jobs",
         get_config().compact.job_run_timeout,
@@ -115,6 +168,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         },
         sleep_after
     );
+
     spawn_pausable_job!(
         "compactor_clean_done_jobs",
         get_config().compact.job_clean_wait_time,
@@ -128,7 +182,47 @@ pub async fn run() -> Result<(), anyhow::Error> {
         },
         sleep_after
     );
-    tokio::task::spawn(async move { run_compactor_pending_jobs_metric().await });
+
+    spawn_pausable_job!(
+        "run_compactor_pending_jobs_metric",
+        get_config().compact.pending_jobs_metric_interval,
+        {
+            log::debug!("[COMPACTOR::JOB] Running compactor pending jobs to report metric");
+            let job_status = match infra::file_list::get_pending_jobs_count().await {
+                Ok(status) => status,
+                Err(e) => {
+                    log::error!("[COMPACTOR::JOB] run compactor pending jobs metric error: {e}");
+                    continue;
+                }
+            };
+
+            // reset all metrics
+            let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+            for org in orgs {
+                for stream_type in ALL_STREAM_TYPES {
+                    if metrics::COMPACT_PENDING_JOBS
+                        .with_label_values(&[org.as_str(), stream_type.as_str()])
+                        .get()
+                        > 0
+                    {
+                        metrics::COMPACT_PENDING_JOBS
+                            .with_label_values(&[org.as_str(), stream_type.as_str()])
+                            .set(0);
+                    }
+                }
+            }
+
+            // set new metrics
+            for (org, inner_map) in job_status {
+                for (stream_type, counter) in inner_map {
+                    metrics::COMPACT_PENDING_JOBS
+                        .with_label_values(&[org.as_str(), stream_type.as_str()])
+                        .set(counter);
+                }
+            }
+        }
+    );
+
     tokio::task::spawn(async move { run_enrichment_table_merge().await });
 
     Ok(())
@@ -139,63 +233,18 @@ async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
     log::info!("[COMPACTOR::JOB] start run_compactor_pending_jobs_metric job");
 
     loop {
-        let cfg = get_config();
-        if !cfg.compact.enabled {
-            // Sleep and check again if compaction gets enabled
-            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-            continue;
-        }
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            cfg.compact.pending_jobs_metric_interval,
+            get_config().compact.pending_jobs_metric_interval,
         ))
         .await;
 
-        log::debug!("[COMPACTOR::JOB] Running compactor pending jobs to report metric");
-        let job_status = match infra::file_list::get_pending_jobs_count().await {
-            Ok(status) => status,
-            Err(e) => {
-                log::error!("[COMPACTOR::JOB] run compactor pending jobs metric error: {e}");
-                continue;
-            }
-        };
-
-        // reset all metrics
-        let orgs = crate::service::db::schema::list_organizations_from_cache().await;
-        for org in orgs {
-            for stream_type in ALL_STREAM_TYPES {
-                if metrics::COMPACT_PENDING_JOBS
-                    .with_label_values(&[org.as_str(), stream_type.as_str()])
-                    .get()
-                    > 0
-                {
-                    metrics::COMPACT_PENDING_JOBS
-                        .with_label_values(&[org.as_str(), stream_type.as_str()])
-                        .set(0);
-                }
-            }
-        }
-
-        // set new metrics
-        for (org, inner_map) in job_status {
-            for (stream_type, counter) in inner_map {
-                metrics::COMPACT_PENDING_JOBS
-                    .with_label_values(&[org.as_str(), stream_type.as_str()])
-                    .set(counter);
-            }
-        }
     }
 }
 
 /// Generate merging jobs
 async fn run_generate_job() -> Result<(), anyhow::Error> {
     loop {
-        let cfg = get_config();
-        if !cfg.compact.enabled {
-            // Sleep and check again if compaction gets enabled
-            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-            continue;
-        }
-        tokio::time::sleep(tokio::time::Duration::from_secs(cfg.compact.interval)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(get_config().compact.interval)).await;
         log::debug!("[COMPACTOR::JOB] Running generate merge job");
         if let Err(e) = compact::run_generate_job(CompactionJobType::Current).await {
             log::error!("[COMPACTOR::JOB] run generate merge job error: {e}");
@@ -206,15 +255,9 @@ async fn run_generate_job() -> Result<(), anyhow::Error> {
 /// Generate merging jobs for old data
 async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
     loop {
-        let cfg = get_config();
-        if !cfg.compact.enabled {
-            // Sleep and check again if compaction gets enabled
-            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-            continue;
-        }
         // run every 1 hour at least
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            cfg.compact.old_data_interval + 1,
+            get_config().compact.old_data_interval + 1,
         ))
         .await;
         log::debug!("[COMPACTOR::JOB] Running generate merge job for old data");
