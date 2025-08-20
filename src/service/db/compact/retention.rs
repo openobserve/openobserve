@@ -47,7 +47,7 @@ pub async fn delete_stream(
     stream_type: StreamType,
     stream_name: &str,
     date_range: Option<(&str, &str)>,
-) -> Result<String, anyhow::Error> {
+) -> Result<(String, bool), anyhow::Error> {
     let key = mk_key(org_id, stream_type, stream_name, date_range);
     let db_key = format!("/compact/delete/{key}");
 
@@ -55,12 +55,12 @@ pub async fn delete_stream(
     if let Some(v) = CACHE.get(&key)
         && v.value() + hour_micros(1) > now_micros()
     {
-        return Ok(key); // already in cache, don't create same task in one hour
+        return Ok((key, false)); // already in cache, don't create same task in one hour
     }
 
     CACHE.insert(key.clone(), now_micros());
     db::put(&db_key, "OK".into(), db::NEED_WATCH, None).await?;
-    Ok(key) // return the key
+    Ok((key, true)) // return the key
 }
 
 // set the stream is processing by the node

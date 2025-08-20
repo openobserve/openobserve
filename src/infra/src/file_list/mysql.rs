@@ -582,7 +582,7 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
         let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
         let sql = r#"
 SELECT date
-    FROM file_list 
+    FROM file_list
     WHERE stream = ? AND max_ts >= ? AND max_ts <= ? AND min_ts <= ? AND records < ?
     GROUP BY date HAVING count(*) >= ?;
             "#;
@@ -797,6 +797,25 @@ SELECT date
             .collect())
     }
 
+    async fn get_min_date(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+    ) -> Result<String> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "file_list"])
+            .inc();
+        let ret: Option<String> =
+            sqlx::query_scalar(r#"SELECT MIN(date) AS date FROM file_list WHERE stream = ?;"#)
+                .bind(stream_key)
+                .fetch_one(&pool)
+                .await?;
+        Ok(ret.unwrap_or_default())
+    }
+
     async fn get_min_ts(
         &self,
         org_id: &str,
@@ -868,9 +887,9 @@ SELECT date
         };
         let mut sql = format!(
             r#"
-SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SIGNED) AS file_num, 
+SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SIGNED) AS file_num,
     CAST(SUM(records) AS SIGNED) AS records, CAST(SUM(original_size) AS SIGNED) AS original_size, CAST(SUM(compressed_size) AS SIGNED) AS compressed_size, CAST(SUM(index_size) AS SIGNED) AS index_size
-    FROM file_list 
+    FROM file_list
     WHERE {field} = '{value}'
             "#,
         );
@@ -984,7 +1003,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SI
                 .inc();
             if let Err(e) = sqlx::query(
                 r#"
-INSERT INTO stream_stats 
+INSERT INTO stream_stats
     (org, stream, file_num, min_ts, max_ts, records, original_size, compressed_size, index_size)
     VALUES (?, ?, 0, 0, 0, 0, 0, 0, 0);
                 "#,
@@ -1013,7 +1032,7 @@ INSERT INTO stream_stats
                 .inc();
             if let Err(e) = sqlx::query(
                 r#"
-UPDATE stream_stats 
+UPDATE stream_stats
     SET file_num = file_num + ?, min_ts = ?, max_ts = ?, records = records + ?, original_size = original_size + ?, compressed_size = compressed_size + ?, index_size = index_size + ?
     WHERE stream = ?;
                 "#,
@@ -1280,10 +1299,10 @@ UPDATE stream_stats
         let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(
             r#"
 SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
-    FROM file_list_jobs 
-    WHERE status = ? 
-    GROUP BY stream 
-    ORDER BY num DESC 
+    FROM file_list_jobs
+    WHERE status = ?
+    GROUP BY stream
+    ORDER BY num DESC
     LIMIT ?;"#,
         )
         .bind(super::FileListJobStatus::Pending)
