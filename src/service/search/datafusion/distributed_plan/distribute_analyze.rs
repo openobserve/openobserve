@@ -60,21 +60,6 @@ impl DistributeAnalyzeExec {
         }
     }
 
-    /// Access to verbose
-    pub fn verbose(&self) -> bool {
-        self.verbose
-    }
-
-    /// Access to show_statistics
-    pub fn show_statistics(&self) -> bool {
-        self.show_statistics
-    }
-
-    /// The input plan
-    pub fn input(&self) -> &Arc<dyn ExecutionPlan> {
-        &self.input
-    }
-
     /// This function creates the cache object that stores the plan properties such as schema,
     /// equivalence properties, ordering, partitioning, etc.
     fn compute_properties(input: &Arc<dyn ExecutionPlan>, schema: SchemaRef) -> PlanProperties {

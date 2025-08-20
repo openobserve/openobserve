@@ -135,9 +135,8 @@ impl PhysicalOptimizerRule for RemoteScanRule {
         }
 
         // if not single node, rewrite physical plan to add remote scan
-        let mut plan = plan;
         let mut rewrite = RemoteScanRewriter::new(self.remote_scan_nodes.clone());
-        plan = plan.rewrite(&mut rewrite)?.data;
+        let mut plan = plan.rewrite(&mut rewrite)?.data;
         if !rewrite.is_changed {
             plan = remote_scan_to_top_if_needed(plan, self.remote_scan_nodes.clone())?;
         }

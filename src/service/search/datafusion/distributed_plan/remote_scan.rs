@@ -46,7 +46,7 @@ use crate::service::search::datafusion::distributed_plan::{
 };
 
 /// Execution plan for empty relation with produce_one_row=false
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RemoteScanExec {
     input: Arc<dyn ExecutionPlan>,
     remote_scan_node: RemoteScanNode,
@@ -121,6 +121,11 @@ impl RemoteScanExec {
             EmissionType::Incremental,
             Boundedness::Bounded,
         )
+    }
+
+    pub fn set_analyze(mut self) -> Self {
+        self.remote_scan_node.search_infos.is_analyze = true;
+        self
     }
 }
 
