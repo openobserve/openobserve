@@ -601,7 +601,6 @@ export default defineComponent({
   background-image: url("../../../assets/images/common/vrl-function.png");
   background-repeat: no-repeat;
   background-size: 170px;
-  background-position: 5px 5px;
 }
 
 // .query-tabs-container {
