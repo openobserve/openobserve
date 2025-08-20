@@ -375,12 +375,11 @@ export default defineComponent({
       value: number | String;
     }
     const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
       { label: "20", value: 20 },
       { label: "50", value: 50 },
       { label: "100", value: 100 },
-      { label: "All", value: 0 },
+      { label: "250", value: 250 },
+      { label: "500", value: 500 },
     ];
     const resultTotal = ref<number>(0);
     const maxRecordToReturn = ref<number>(100);

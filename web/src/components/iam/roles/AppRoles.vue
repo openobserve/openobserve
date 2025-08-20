@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :rows="visibleRows"
       :columns="columns"
       pagination
-      :rows-per-page="25"
+      :rows-per-page="20"
       :filter="{
         value: filterQuery,
         method: filterRoles,

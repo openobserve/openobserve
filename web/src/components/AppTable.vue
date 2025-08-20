@@ -176,7 +176,7 @@ const props = defineProps({
   },
   rowsPerPage: {
     type: Number,
-    default: 25,
+    default: 20,
   },
   dense: {
     type: Boolean,
@@ -211,7 +211,7 @@ const props = defineProps({
 const emit = defineEmits(["event-emitted"]);
 
 const perPageOptions: any = [
-      { label: "25", value: 25 },
+      { label: "20", value: 20 },
       { label: "50", value: 50 },
       { label: "100", value: 100 },
       { label: "250", value: 250 },
@@ -219,7 +219,7 @@ const perPageOptions: any = [
 ];
 
 const resultTotal = ref<number>(0);
-const selectedPerPage = ref<number>(25);
+const selectedPerPage = ref<number>(20);
 
 const qTableRef: Ref<InstanceType<typeof QTable> | null> = ref(null);
 
