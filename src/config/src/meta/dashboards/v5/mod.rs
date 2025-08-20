@@ -435,7 +435,7 @@ pub struct UniqueValueColorConfig {
     #[serde(rename = "type")]
     pub type_field: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    auto_color: Option<bool>,
+    pub auto_color: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
