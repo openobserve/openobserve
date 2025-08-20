@@ -87,7 +87,7 @@ fn collect_metrics(plan: &Arc<dyn ExecutionPlan>, is_super_cluster: bool) -> Vec
         .set_show_statistics(false)
         .indent(true)
         .to_string();
-    let stage = if is_super_cluster { 2 } else { 3 };
+    let stage = if is_super_cluster { 1 } else { 2 };
     vec![Metrics {
         stage,
         node: LOCAL_NODE.get_grpc_addr().to_string(),
