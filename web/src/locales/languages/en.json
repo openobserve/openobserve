@@ -1100,7 +1100,8 @@
     "output_format": "Output Format"
   },
   "pipeline_destinations": {
-    "header": "Pipeline Destinations"
+    "header": "Pipeline Destinations",
+    "search": "Search destination"
   },
   "metrics": {
     "searchMetric": "Search for a Metric",

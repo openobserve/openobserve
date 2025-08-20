@@ -26,13 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("iam.roles") }}
       </div>
       <div class="row items-center justify-end">
-          <div date-test="iam-roles-search-input">
+          <div data-test="iam-roles-search-input">
             <q-input
               v-model="filterQuery"
               borderless
               dense
               class="q-ml-auto no-border o2-search-input tw-h-[36px]"
-              :placeholder="t('iam.searchGroup')"
+              :placeholder="t('iam.searchRole')"
               :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             >
               <template #prepend>

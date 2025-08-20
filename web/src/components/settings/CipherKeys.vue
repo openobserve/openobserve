@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 borderless
                 dense
                 class="q-ml-auto no-border o2-search-input"
-                :placeholder="t('function.search')"
+                :placeholder="t('cipherKey.search')"
                 :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
               >
                 <template #prepend>
