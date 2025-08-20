@@ -40,29 +40,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('pipeline.pipelineName')"
           style="border: 1px solid #eaeaea; width: calc(30vw)"
           filled
-          dense    
+          dense
         />
       </div>
     </div>
 
     <div class="flex justify-end">
+      <!-- this is normal secondary button but only icon is there without label -->
         <q-btn
-
-              outline
-              class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode"
-              size="sm"
-              no-caps
-              icon="code"
-              data-test="pipeline-json-edit-btn"
-              @click="openJsonEditor"
-            >
+          class="pipeline-icons q-px-sm q-ml-sm hideOnPrintMode tw-h-[36px] o2-secondary-button"
+          style="min-width: 0px !important;"
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          no-caps
+          flat
+          icon="code"
+          data-test="pipeline-json-edit-btn"
+          @click="openJsonEditor"
+        >
               <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
             </q-btn>
       <q-btn
         data-test="add-pipeline-cancel-btn"
         label="Cancel"
-        class="text-bold border q-ml-md"
-        padding="sm xl"
+        flat
+        class="q-ml-md o2-secondary-button tw-h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         no-caps
         @click="openCancelDialog"
       />
@@ -70,10 +72,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-btn
         data-test="add-pipeline-save-btn"
         label="Save"
-        class="text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
+        class="q-ml-md o2-primary-button tw-h-[36px]"
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         no-caps
+        flat
         :loading="isPipelineSaving"
         :disable="isPipelineSaving"
         @click="savePipeline"
