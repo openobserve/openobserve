@@ -469,7 +469,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         loop {
             let gc_interval = get_config().disk_cache.gc_interval;
             if gc_interval == 0 {
-                return;
+                // interval 0 is treated as pause.
+                // in pause state, we keep checking the env for changes every minute.
+                tokio::time::sleep(tokio::time::Duration::from_secs(60));
+                continue;
             }
             tokio::time::sleep(tokio::time::Duration::from_secs(gc_interval)).await;
             if let Err(e) = gc().await {

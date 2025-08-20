@@ -239,6 +239,8 @@ impl SchedulerJobPuller {
                 tokio::task::spawn(async move {
                     loop {
                         let cfg = config::get_config();
+                        let alert_timeout = cfg.limit.alert_schedule_timeout;
+                        let report_timeout = cfg.limit.report_schedule_timeout;
                         let ttl = std::cmp::max(
                             std::cmp::min(
                                 cfg.limit.alert_schedule_timeout,
@@ -258,8 +260,6 @@ impl SchedulerJobPuller {
                                 return;
                             }
                         }
-                        let alert_timeout = cfg.limit.alert_schedule_timeout;
-                        let report_timeout = cfg.limit.report_schedule_timeout;
                         if let Err(e) =
                             infra::scheduler::keep_alive(&[job_id], alert_timeout, report_timeout)
                                 .await
