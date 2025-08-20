@@ -155,8 +155,7 @@ mod tests {
 
     #[test]
     fn test_string_to_array_v2_impl_basic() {
-        use datafusion::arrow::array::StringArray;
-        use datafusion::logical_expr::ColumnarValue;
+        use datafusion::{arrow::array::StringArray, logical_expr::ColumnarValue};
 
         // Test basic splitting
         let string_array = Arc::new(StringArray::from(vec!["a,b,c"]));
@@ -177,8 +176,7 @@ mod tests {
 
     #[test]
     fn test_string_to_array_v2_impl_edge_cases() {
-        use datafusion::arrow::array::StringArray;
-        use datafusion::logical_expr::ColumnarValue;
+        use datafusion::{arrow::array::StringArray, logical_expr::ColumnarValue};
 
         // Test empty delimiter - should return the whole string
         let string_array = Arc::new(StringArray::from(vec!["hello"]));
@@ -216,8 +214,7 @@ mod tests {
 
     #[test]
     fn test_string_to_array_v2_impl_multiple_delimiters() {
-        use datafusion::arrow::array::StringArray;
-        use datafusion::logical_expr::ColumnarValue;
+        use datafusion::{arrow::array::StringArray, logical_expr::ColumnarValue};
 
         // Test multiple delimiter characters
         let string_array = Arc::new(StringArray::from(vec!["a,b;c:d"]));
@@ -234,8 +231,7 @@ mod tests {
 
     #[test]
     fn test_string_to_array_v2_impl_empty_parts() {
-        use datafusion::arrow::array::StringArray;
-        use datafusion::logical_expr::ColumnarValue;
+        use datafusion::{arrow::array::StringArray, logical_expr::ColumnarValue};
 
         // Test string with consecutive delimiters (should skip empty parts)
         let string_array = Arc::new(StringArray::from(vec!["a,,b,,,c"]));
@@ -252,8 +248,7 @@ mod tests {
 
     #[test]
     fn test_string_to_array_v2_impl_wrong_arg_count() {
-        use datafusion::arrow::array::StringArray;
-        use datafusion::logical_expr::ColumnarValue;
+        use datafusion::{arrow::array::StringArray, logical_expr::ColumnarValue};
 
         // Test with too many arguments (4 args instead of 2-3)
         let string_array = Arc::new(StringArray::from(vec!["a,b,c"]));
@@ -269,7 +264,12 @@ mod tests {
 
         let result = string_to_array_v2_impl(&args);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Expect string_to_array_v2 function to take two or three parameters"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Expect string_to_array_v2 function to take two or three parameters")
+        );
     }
 
     // Note: Testing insufficient arguments (< 2) would cause a panic due to index out of bounds
@@ -278,8 +278,7 @@ mod tests {
 
     #[test]
     fn test_string_to_array_v2_impl_unicode() {
-        use datafusion::arrow::array::StringArray;
-        use datafusion::logical_expr::ColumnarValue;
+        use datafusion::{arrow::array::StringArray, logical_expr::ColumnarValue};
 
         // Test with Unicode characters
         let string_array = Arc::new(StringArray::from(vec!["α,β,γ"]));
@@ -306,22 +305,11 @@ mod tests {
 
     #[test]
     fn test_string_to_array_v2_impl_batch_processing() {
-        use datafusion::arrow::array::StringArray;
-        use datafusion::logical_expr::ColumnarValue;
+        use datafusion::{arrow::array::StringArray, logical_expr::ColumnarValue};
 
         // Test processing multiple strings in batch
-        let string_array = Arc::new(StringArray::from(vec![
-            "a,b,c",
-            "x:y:z",
-            "single",
-            "",
-        ]));
-        let delimiter_array = Arc::new(StringArray::from(vec![
-            ",",
-            ":",
-            ",",
-            ",",
-        ]));
+        let string_array = Arc::new(StringArray::from(vec!["a,b,c", "x:y:z", "single", ""]));
+        let delimiter_array = Arc::new(StringArray::from(vec![",", ":", ",", ","]));
         let args = vec![
             ColumnarValue::Array(string_array),
             ColumnarValue::Array(delimiter_array),
@@ -329,7 +317,7 @@ mod tests {
 
         let result = string_to_array_v2_impl(&args);
         assert!(result.is_ok());
-        
+
         if let ColumnarValue::Array(array) = result.unwrap() {
             assert_eq!(array.len(), 4); // Should have 4 result arrays
         }

@@ -39,7 +39,9 @@ mod tests {
 
     // Helper function to create RangeValue for testing
     fn create_range_value(values: Vec<f64>) -> RangeValue {
-        let samples = values.into_iter().enumerate()
+        let samples = values
+            .into_iter()
+            .enumerate()
             .map(|(i, v)| Sample::new(i as i64 * 1000, v))
             .collect();
         RangeValue {
@@ -161,15 +163,15 @@ mod tests {
         let data = create_range_value(vec![
             1000.0, 1100.0, 1200.0, 1300.0, // Normal increase
             100.0,  // Counter reset/overflow
-            200.0, 300.0, 400.0             // Continue from new base
+            200.0, 300.0, 400.0, // Continue from new base
         ]);
         assert_eq!(exec(data), Some(1.0)); // Only 1300 → 100
 
         // Multiple counter overflows
         let data = create_range_value(vec![
             100.0, 200.0, // First period
-            50.0, 150.0,  // Reset and continue
-            25.0, 125.0   // Another reset
+            50.0, 150.0, // Reset and continue
+            25.0, 125.0, // Another reset
         ]);
         assert_eq!(exec(data), Some(2.0)); // 200→50 and 150→25
     }
