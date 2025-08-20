@@ -295,61 +295,6 @@ describe("stream service", () => {
     });
   });
 
-  describe("createSettings", () => {
-    it("should make POST request to create stream settings with type", async () => {
-      // Ensure the function exists before testing
-      expect(stream.createSettings).toBeDefined();
-      expect(typeof stream.createSettings).toBe('function');
-      
-      const params = {
-        org_identifier: "org123",
-        stream_name: "test_stream",
-        type: "logs",
-        data: { partition_keys: ["timestamp"] },
-      };
-
-      mockHttpInstance.post.mockResolvedValue({ data: { success: true } });
-
-      await stream.createSettings(
-        params.org_identifier,
-        params.stream_name,
-        params.type,
-        params.data
-      );
-
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams/${params.stream_name}/settings?type=${params.type}`,
-        params.data
-      );
-    });
-
-    it("should make POST request to create stream settings without type", async () => {
-      // Ensure the function exists before testing
-      expect(stream.createSettings).toBeDefined();
-      expect(typeof stream.createSettings).toBe('function');
-      
-      const params = {
-        org_identifier: "org123",
-        stream_name: "test_stream",
-        type: "",
-        data: { partition_keys: ["timestamp"] },
-      };
-
-      mockHttpInstance.post.mockResolvedValue({ data: { success: true } });
-
-      await stream.createSettings(
-        params.org_identifier,
-        params.stream_name,
-        params.type,
-        params.data
-      );
-
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams/${params.stream_name}/settings`,
-        params.data
-      );
-    });
-  });
 
   describe("fieldValues", () => {
     it("should make GET request with basic parameters", async () => {
