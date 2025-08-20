@@ -376,8 +376,8 @@ export default defineComponent({
 
       editorObj.onDidChangeModelContent(
         debounce((e: any) => {
-          emit("update-query", editorObj.getValue()?.trim());
-          emit("update:query", editorObj.getValue()?.trim());
+          emit("update-query", editorObj.getValue()?.trim(), e);
+          emit("update:query", editorObj.getValue()?.trim(), e);
         }, props.debounceTime),
       );
 

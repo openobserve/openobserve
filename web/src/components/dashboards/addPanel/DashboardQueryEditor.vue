@@ -418,7 +418,7 @@ export default defineComponent({
         dashboardPanelData.data.queries.length - 1;
     };
 
-    const updatePromQLQuery = async (event, value) => {
+    const updatePromQLQuery = async (value, event) => {
       promqlAutoCompleteData.value.query = value;
       // promqlAutoCompleteData.value.text = event.changes[0].text;
 
@@ -443,9 +443,9 @@ export default defineComponent({
       promqlGetSuggestions();
     };
 
-    const updateQuery = (query, fields) => {
+    const updateQuery = (query, event) => {
       if (dashboardPanelData.data.queryType === "promql") {
-        updatePromQLQuery(query, fields);
+        updatePromQLQuery(query, event);
       } else {
         sqlGetSuggestions();
         sqlUpdateFieldKeywords(
