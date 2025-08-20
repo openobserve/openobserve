@@ -5350,13 +5350,40 @@ const useLogs = () => {
       if (parsedSQL?.with) {
         let withObj = parsedSQL.with;
         withObj.forEach((obj: any) => {
-          // Map through each "from" array in the _next object, as it can contain multiple tables
-          if (obj?.stmt?.from) {
-            obj?.stmt?.from.forEach((stream: { table: string }) => {
-              newSelectedStreams.push(stream.table);
+          // Recursively extract table names from the WITH statement
+          const extractTablesFromNode = (node: any) => {
+            if (!node) return;
+            
+            // Check if current node has a from clause
+            if (node.from && Array.isArray(node.from)) {
+              node.from.forEach((stream: any) => {
+                if (stream.table) {
+                  newSelectedStreams.push(stream.table);
+                }
+                // Handle subquery in FROM clause
+                if (stream.expr && stream.expr.ast) {
+                  extractTablesFromNode(stream.expr.ast);
+                }
+              });
             }
-            );
-          }
+            
+            // Check for nested subqueries in WHERE clause
+            if (node.where && node.where.right && node.where.right.ast) {
+              extractTablesFromNode(node.where.right.ast);
+            }
+            
+            // Check for nested subqueries in SELECT expressions
+            if (node.columns && Array.isArray(node.columns)) {
+              node.columns.forEach((col: any) => {
+                if (col.expr && col.expr.ast) {
+                  extractTablesFromNode(col.expr.ast);
+                }
+              });
+            }
+          };
+          
+          // Start extraction from the WITH statement
+          extractTablesFromNode(obj?.stmt);
         });
       }
       // additionally, if union is there then it will have _next object which will have the table name it should check recursuvely as user can write multiple union
