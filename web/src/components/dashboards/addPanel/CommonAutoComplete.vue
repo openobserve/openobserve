@@ -76,7 +76,7 @@ export default defineComponent({
       () => props.modelValue,
       (newValue) => {
         inputValue.value = newValue;
-      }
+      },
     );
 
     watch(inputValue, (newValue) => {
@@ -89,7 +89,6 @@ export default defineComponent({
     };
 
     const itemsRef = toRef(props, "items");
-
     // apply filter on label
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
       useSearchInputUsingRegex(itemsRef, "label", props.searchRegex);

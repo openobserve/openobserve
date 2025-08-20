@@ -391,8 +391,19 @@ export const getSeriesColor = (
   chartMin: number,
   chartMax: number,
   theme: string,
+  colorBySeries?: any,
 ): string | null => {
   const colorPalette = getColorPalette(theme);
+
+  // Check for custom color from colorBySeries mappings first
+  if (colorBySeries?.length > 0) {
+    const customMapping = colorBySeries.find(
+      (mapping: any) => mapping.value === seriesName && mapping.color
+    );
+    if (customMapping) {
+      return customMapping.color;
+    }
+  }
 
   if (!colorCfg) {
     return colorPalette[

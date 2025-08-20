@@ -273,6 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             handleLastTriggeredAtUpdate
                           "
                           searchType="dashboards"
+                      @series-data-update="seriesDataUpdate"
                         />
                         <q-dialog v-model="showViewPanel">
                           <QueryInspector
@@ -314,6 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ConfigPanel
                     :dashboardPanelData="dashboardPanelData"
                     :variablesData="updatedVariablesData"
+                    :panelData="seriesData"
                   />
                 </PanelSidebar>
               </div>
@@ -488,6 +490,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               handleLastTriggeredAtUpdate
                             "
                             searchType="dashboards"
+                        @series-data-update="seriesDataUpdate"
                           />
                         </template>
                       </q-splitter>
@@ -524,6 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ConfigPanel
                     :dashboardPanelData="dashboardPanelData"
                     :variablesData="updatedVariablesData"
+                    :panelData="seriesData"
                   />
                 </PanelSidebar>
               </div>
@@ -652,6 +656,11 @@ export default defineComponent({
     let variablesData: any = reactive({});
     const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
     const { getStream } = useStreams();
+    const seriesData = ref([]);
+
+    const seriesDataUpdate = (data: any) => {
+      seriesData.value = data;
+    };
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
@@ -1003,7 +1012,6 @@ export default defineComponent({
 
         // copy the data object excluding the reactivity
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-
         // refresh the date time based on current time if relative date is selected
         dateTimePickerRef.value && dateTimePickerRef.value.refresh();
         updateDateTime(selectedDate.value);
@@ -1679,6 +1687,8 @@ export default defineComponent({
       collapseFieldList,
       splitterModel,
       inputStyle,
+      seriesDataUpdate,
+      seriesData,
     };
   },
   methods: {
