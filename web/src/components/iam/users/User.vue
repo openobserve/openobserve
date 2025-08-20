@@ -451,16 +451,16 @@ export default defineComponent({
       value: number | String;
     }
     const perPageOptions: any = [
-      { label: "25", value: 25 },
+      { label: "20", value: 20 },
       { label: "50", value: 50 },
       { label: "100", value: 100 },
       { label: "250", value: 250 },
       { label: "500", value: 500 },
     ];
     const maxRecordToReturn = ref<number>(500);
-    const selectedPerPage = ref<number>(25);
+    const selectedPerPage = ref<number>(20);
     const pagination: any = ref({
-      rowsPerPage: 25,
+      rowsPerPage: 20,
     });
 
     const changePagination = (val: { label: string; value: any }) => {
