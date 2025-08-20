@@ -20,7 +20,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
     meta::stream::{FileKey, FileListDeleted, PartitionTimeLevel, StreamType, TimeRange},
-    utils::time::{BASE_TIME, hour_micros},
+    utils::time::{BASE_TIME, day_micros, hour_micros},
 };
 use infra::{
     cache, dist_lock, file_list as infra_file_list,
@@ -147,16 +147,16 @@ pub async fn delete_by_stream(
     stream_type: StreamType,
     stream_name: &str,
     extended_retentions: &[TimeRange],
-) -> Result<u32, anyhow::Error> {
-    // get schema
-    let stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
-    let created_at = stats.doc_time_min;
-    if created_at == 0 {
-        return Ok(0); // no data, just skip
+) -> Result<(), anyhow::Error> {
+    // get min date from file_list
+    let min_date = infra::file_list::get_min_date(org_id, stream_type, stream_name).await?;
+    if min_date.is_empty() {
+        return Ok(()); // no data, just skip
     }
-    let created_at: DateTime<Utc> = Utc.timestamp_nanos(created_at * 1000);
+    let created_at =
+        DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", min_date))?.with_timezone(&Utc);
     if created_at >= *lifecycle_end {
-        return Ok(0); // created_at is after lifecycle end, just skip
+        return Ok(()); // created_at is after lifecycle end, just skip
     }
 
     log::debug!(
@@ -169,7 +169,7 @@ pub async fn delete_by_stream(
     );
 
     if created_at.ge(lifecycle_end) {
-        return Ok(0); // created_at is after lifecycle end, just skip
+        return Ok(()); // created_at is after lifecycle end, just skip
     }
 
     // last extended retention time
@@ -198,35 +198,39 @@ pub async fn delete_by_stream(
         ranges
     };
 
-    let job_nos = final_deletion_time_ranges.len();
-
     for time_range in final_deletion_time_ranges {
-        let time_range_start = Utc
-            .timestamp_nanos(time_range.start * 1000)
-            .format("%Y-%m-%d")
-            .to_string();
-        let time_range_end = Utc
-            .timestamp_nanos(time_range.end * 1000)
-            .format("%Y-%m-%d")
-            .to_string();
-        if time_range_start >= time_range_end {
-            continue;
+        // generate jobs by date
+        let mut start = time_range.start;
+        while start < time_range.end {
+            let time_range_start = Utc
+                .timestamp_nanos(start * 1000)
+                .format("%Y-%m-%d")
+                .to_string();
+            start += day_micros(1); // increase one day
+            let time_range_end = Utc
+                .timestamp_nanos(start * 1000)
+                .format("%Y-%m-%d")
+                .to_string();
+            if time_range_start >= time_range_end {
+                continue;
+            }
+
+            let (_key, created) = db::compact::retention::delete_stream(
+                org_id,
+                stream_type,
+                stream_name,
+                Some((time_range_start.as_str(), time_range_end.as_str())),
+            )
+            .await?;
+            if created {
+                log::info!(
+                    "[COMPACTOR] delete_by_stream: generate job for {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end}",
+                );
+            }
         }
-
-        log::info!(
-            "[COMPACTOR] delete_by_stream: generate job for {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end}",
-        );
-
-        db::compact::retention::delete_stream(
-            org_id,
-            stream_type,
-            stream_name,
-            Some((time_range_start.as_str(), time_range_end.as_str())),
-        )
-        .await?;
     }
 
-    Ok(job_nos as u32)
+    Ok(())
 }
 
 pub async fn delete_all(
