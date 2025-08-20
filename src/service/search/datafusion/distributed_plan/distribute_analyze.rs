@@ -15,7 +15,12 @@
 
 use std::{any::Any, sync::Arc};
 
-use arrow::{array::StringBuilder, datatypes::SchemaRef, record_batch::RecordBatch};
+use arrow::{
+    array::{Int32Builder, StringBuilder},
+    datatypes::SchemaRef,
+    record_batch::RecordBatch,
+};
+use arrow_schema::{DataType, Field, Schema};
 use datafusion::{
     common::{DataFusionError, Result, internal_err},
     execution::TaskContext,
@@ -48,12 +53,13 @@ pub struct DistributeAnalyzeExec {
 
 impl DistributeAnalyzeExec {
     /// Create a new AnalyzeExec
-    pub fn new(
-        verbose: bool,
-        show_statistics: bool,
-        input: Arc<dyn ExecutionPlan>,
-        schema: SchemaRef,
-    ) -> Self {
+    pub fn new(verbose: bool, show_statistics: bool, input: Arc<dyn ExecutionPlan>) -> Self {
+        let fields = vec![
+            Field::new("phase", DataType::Int32, false),
+            Field::new("node", DataType::Utf8, false),
+            Field::new("plan", DataType::Utf8, false),
+        ];
+        let schema = Arc::new(Schema::new(fields));
         let cache = Self::compute_properties(&input, Arc::clone(&schema));
         DistributeAnalyzeExec {
             verbose,
@@ -113,7 +119,6 @@ impl ExecutionPlan for DistributeAnalyzeExec {
             self.verbose,
             self.show_statistics,
             children.pop().unwrap(),
-            Arc::clone(&self.schema),
         )))
     }
 
@@ -160,7 +165,6 @@ impl ExecutionPlan for DistributeAnalyzeExec {
     }
 }
 
-/// Creates the output of DistributeAnalyzeExec as a RecordBatch
 fn create_output_batch(
     verbose: bool,
     show_statistics: bool,
@@ -169,10 +173,11 @@ fn create_output_batch(
     input: Arc<dyn ExecutionPlan>,
     schema: SchemaRef,
 ) -> Result<RecordBatch> {
+    let mut phase_builder = Int32Builder::new();
     let mut type_builder = StringBuilder::with_capacity(1, 1024);
     let mut plan_builder = StringBuilder::with_capacity(1, 1024);
 
-    // TODO use some sort of enum rather than strings?
+    phase_builder.append_value(0); // Phase 0 for the main plan
     type_builder.append_value("Plan with Metrics");
 
     let annotated_plan = DisplayableExecutionPlan::with_metrics(input.as_ref())
@@ -181,9 +186,8 @@ fn create_output_batch(
         .to_string();
     plan_builder.append_value(annotated_plan);
 
-    // Verbose output
-    // TODO make this more sophisticated
     if verbose {
+        phase_builder.append_value(0); // Phase 0 for the main plan
         type_builder.append_value("Plan with Full Metrics");
 
         let annotated_plan = DisplayableExecutionPlan::with_full_metrics(input.as_ref())
@@ -192,9 +196,11 @@ fn create_output_batch(
             .to_string();
         plan_builder.append_value(annotated_plan);
 
+        phase_builder.append_value(0); // Phase 0 for the main plan
         type_builder.append_value("Output Rows");
         plan_builder.append_value(total_rows.to_string());
 
+        phase_builder.append_value(0); // Phase 0 for the main plan
         type_builder.append_value("Duration");
         plan_builder.append_value(format!("{duration:?}"));
     }
@@ -202,6 +208,7 @@ fn create_output_batch(
     RecordBatch::try_new(
         schema,
         vec![
+            Arc::new(phase_builder.finish()),
             Arc::new(type_builder.finish()),
             Arc::new(plan_builder.finish()),
         ],

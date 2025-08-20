@@ -34,7 +34,6 @@ pub fn optimize_distribute_analyze(plan: Arc<dyn ExecutionPlan>) -> Result<Arc<d
             analyze.verbose(),
             analyze.show_statistics(),
             analyze.input().clone(),
-            analyze.schema().clone(),
         )) as Arc<dyn ExecutionPlan>;
         let mut rewriter = AnalyzeRewrite::new();
         let plan = distribute_analyze.rewrite(&mut rewriter)?.data;
