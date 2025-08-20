@@ -33,7 +33,10 @@ use prost::Message;
 use tonic::{Request, Response, Status, Streaming};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
-use {crate::service::search::SEARCH_SERVER, o2_enterprise::enterprise::search::TaskStatus};
+use {
+    crate::service::search::SEARCH_SERVER,
+    o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
+};
 
 use crate::{
     handler::grpc::{
@@ -165,10 +168,11 @@ impl FlightService for FlightServiceImpl {
         let scan_stats_ref = get_scan_stats(physical_plan.clone());
 
         // used for EXPLAIN ANALYZE to collect metrics after stream is done
-        let metrics_ref = req
-            .search_info
-            .is_analyze
-            .then_some((physical_plan.clone(), is_super_cluster));
+        let metrics_ref = req.search_info.is_analyze.then_some((
+            physical_plan.clone(),
+            is_super_cluster,
+            Box::new(super_cluster_enabled) as Box<dyn Fn() -> bool + Send>,
+        ));
 
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
             // clear session data
@@ -313,4 +317,12 @@ fn clear_session_data(trace_id: &str) {
     crate::service::search::datafusion::storage::file_list::clear(trace_id);
     // release wal lock files
     crate::common::infra::wal::release_request(trace_id);
+}
+
+fn super_cluster_enabled() -> bool {
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        return true;
+    }
+    false
 }

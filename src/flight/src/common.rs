@@ -55,7 +55,7 @@ pub enum PreCustomMessage {
     ScanStats(ScanStats),
     ScanStatsRef(Option<Arc<Mutex<ScanStats>>>),
     // physical plan, is_super_cluster
-    Metrics(Option<(Arc<dyn ExecutionPlan>, bool)>),
+    Metrics(Option<(Arc<dyn ExecutionPlan>, bool, Box<dyn Fn() -> bool + Send>)>),
 }
 
 impl PreCustomMessage {
@@ -73,21 +73,31 @@ impl PreCustomMessage {
                 .as_ref()
                 .map(|stats| CustomMessage::ScanStats(*stats.lock())),
             PreCustomMessage::Metrics(metrics_ref) => {
-                metrics_ref.as_ref().map(|(metrics, is_super_cluster)| {
-                    CustomMessage::Metrics(collect_metrics(metrics, *is_super_cluster))
-                })
+                metrics_ref
+                    .as_ref()
+                    .map(|(metrics, is_super_cluster, func)| {
+                        CustomMessage::Metrics(collect_metrics(metrics, *is_super_cluster, func))
+                    })
             }
         }
     }
 }
 
 // TODO: support collect the metrics from remote scan(for super cluster)
-fn collect_metrics(plan: &Arc<dyn ExecutionPlan>, is_super_cluster: bool) -> Vec<Metrics> {
+fn collect_metrics(
+    plan: &Arc<dyn ExecutionPlan>,
+    is_super_cluster: bool,
+    func: impl Fn() -> bool,
+) -> Vec<Metrics> {
     let plan_with_metrics = DisplayableExecutionPlan::with_metrics(plan.as_ref())
         .set_show_statistics(false)
         .indent(true)
         .to_string();
-    let stage = if is_super_cluster { 1 } else { 2 };
+    let stage = if func() {
+        if is_super_cluster { 1 } else { 2 }
+    } else {
+        1
+    };
     vec![Metrics {
         stage,
         node: LOCAL_NODE.get_grpc_addr().to_string(),
