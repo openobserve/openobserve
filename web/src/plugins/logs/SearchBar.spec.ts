@@ -17,14 +17,14 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
-import { AxiosHeaders } from 'axios';
+import { AxiosHeaders } from "axios";
 import DateTime from "@/components/DateTime.vue";
-import { nextTick } from 'vue';
+import { nextTick } from "vue";
 import { defineComponent, ref } from "vue";
 
 // Create a mock DateTime component
 const mockDateTime = defineComponent({
-  name: 'DateTime',
+  name: "DateTime",
   template: '<div class="mock-date-time"></div>',
   setup() {
     return {
@@ -36,25 +36,25 @@ const mockDateTime = defineComponent({
       getDateTimeRange: vi.fn().mockReturnValue({
         startTime: 1749023371191000,
         endTime: 1749024271191000,
-        type: 'relative'
-      })
-    }
-  }
+        type: "relative",
+      }),
+    };
+  },
 });
 
 // Mock jsTransformService before any imports
-vi.mock('../../services/jstransform', () => ({
+vi.mock("../../services/jstransform", () => ({
   default: {
     create: vi.fn(),
-    update: vi.fn()
-  }
+    update: vi.fn(),
+  },
 }));
-vi.mock('../../services/saved_views', () => ({
+vi.mock("../../services/saved_views", () => ({
   default: {
     getViewDetail: vi.fn(),
     post: vi.fn(),
-    delete: vi.fn()
-  }
+    delete: vi.fn(),
+  },
 }));
 
 import Index from "@/plugins/logs/Index.vue";
@@ -84,14 +84,16 @@ global.CSS = {
 
 // @ts-expect-error - Partial ClipboardItem mock for testing
 global.ClipboardItem = class ClipboardItem {
-  static supports(type: string) { return true; }
+  static supports(type: string) {
+    return true;
+  }
   constructor(data: any) {
     return data;
   }
 };
 
 // Mock clipboard
-Object.defineProperty(global.navigator, 'clipboard', {
+Object.defineProperty(global.navigator, "clipboard", {
   value: {
     write: vi.fn().mockResolvedValue(undefined),
   },
@@ -103,8 +105,7 @@ vi.mock("@/composables/useSuggestions", () => {
   return {
     default: () => {
       // Create mock functions and refs
-      const mockGetSuggestions = vi.fn().mockImplementation(() => {
-      });
+      const mockGetSuggestions = vi.fn().mockImplementation(() => {});
       const mockOpen = vi.fn();
       const mockClose = vi.fn();
 
@@ -126,11 +127,11 @@ vi.mock("@/composables/useSuggestions", () => {
         loading: ref(false),
         getSuggestions: mockGetSuggestions,
         updateFieldKeywords: vi.fn(),
-        updateFunctionKeywords: vi.fn()
+        updateFunctionKeywords: vi.fn(),
       };
 
       return instance;
-    }
+    },
   };
 });
 
@@ -149,13 +150,13 @@ describe("SearchBar Component", () => {
 
     // Mock QueryEditor component with auto-complete capabilities
     mockQueryEditor = {
-      name: 'QueryEditor',
+      name: "QueryEditor",
       template: '<div class="mock-editor"></div>',
       methods: {
         setValue: vi.fn(),
         getCursorIndex: vi.fn().mockReturnValue(5),
-        triggerAutoComplete: true
-      }
+        triggerAutoComplete: true,
+      },
     };
 
     // Create a mock DateTime instance
@@ -168,13 +169,13 @@ describe("SearchBar Component", () => {
       getDateTimeRange: vi.fn().mockReturnValue({
         startTime: 1749023371191000,
         endTime: 1749024271191000,
-        type: 'relative'
-      })
+        type: "relative",
+      }),
     };
 
     wrapper = mount(SearchBar, {
-      props: {  
-        fieldValues: ['field1', 'field2']
+      props: {
+        fieldValues: ["field1", "field2"],
       },
       attachTo: document.body,
       global: {
@@ -183,25 +184,24 @@ describe("SearchBar Component", () => {
         stubs: {
           QueryEditor: mockQueryEditor,
           IndexList: true,
-          DateTime: mockDateTime
-        }
+          DateTime: mockDateTime,
+        },
       },
     });
 
     // Directly set the dateTimeRef with our mock
     wrapper.vm.dateTimeRef = ref({
       ...dateTimeMock,
-      value: dateTimeMock
+      value: dateTimeMock,
     });
     wrapper.vm.fnEditorRef = ref({
       setValue: vi.fn(),
     });
-    createSavedViewsSpy = vi.spyOn(wrapper.vm, 'createSavedViews');
+    createSavedViewsSpy = vi.spyOn(wrapper.vm, "createSavedViews");
 
     wrapper.vm.router.currentRoute.value.name = "logs";
     await flushPromises();
   });
-
 
   afterEach(async () => {
     if (wrapper && wrapper.unmount) {
@@ -211,14 +211,13 @@ describe("SearchBar Component", () => {
     await flushPromises(); // finish any remaining promises
     vi.clearAllTimers(); // stop intervals/timeouts
     wrapper = null; // Clear the wrapper reference
-
   });
 
   it("Should render show histogram toggle btn", () => {
     expect(
       wrapper
         .find('[data-test="logs-search-bar-show-histogram-toggle-btn"]')
-        .exists()
+        .exists(),
     ).toBeTruthy();
   });
 
@@ -226,7 +225,7 @@ describe("SearchBar Component", () => {
     expect(
       wrapper
         .find('[data-test="logs-search-bar-sql-mode-toggle-btn"]')
-        .exists()
+        .exists(),
     ).toBeTruthy();
   });
 
@@ -235,32 +234,40 @@ describe("SearchBar Component", () => {
   });
 
   it("toggles SQL mode when the button is clicked", async () => {
-    const sqlModeToggle = wrapper.find('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
+    const sqlModeToggle = wrapper.find(
+      '[data-test="logs-search-bar-sql-mode-toggle-btn"]',
+    );
     expect(wrapper.vm.searchObj.meta.sqlMode).toBe(false); // Assuming default is false
 
-    await sqlModeToggle.trigger('click');
+    await sqlModeToggle.trigger("click");
     expect(wrapper.vm.searchObj.meta.sqlMode).toBe(true); // Check if toggled
   });
 
   it("resets filters when the reset button is clicked", async () => {
-    const resetButton = wrapper.find('[data-test="logs-search-bar-reset-filters-btn"]');
-    await resetButton.trigger('click');
+    const resetButton = wrapper.find(
+      '[data-test="logs-search-bar-reset-filters-btn"]',
+    );
+    await resetButton.trigger("click");
     // Add assertions to check if filters are reset
   });
 
   it("toggles histogram when the button is clicked", async () => {
-    const histogramToggle = wrapper.find('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
+    const histogramToggle = wrapper.find(
+      '[data-test="logs-search-bar-show-histogram-toggle-btn"]',
+    );
     const initialState = wrapper.vm.searchObj.meta.showHistogram;
-    
-    await histogramToggle.trigger('click');
+
+    await histogramToggle.trigger("click");
     expect(wrapper.vm.searchObj.meta.showHistogram).toBe(!initialState);
   });
 
   it("handles quick mode toggle", async () => {
-    const quickModeToggle = wrapper.find('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+    const quickModeToggle = wrapper.find(
+      '[data-test="logs-search-bar-quick-mode-toggle-btn"]',
+    );
     const initialState = wrapper.vm.searchObj.meta.quickMode;
-    
-    await quickModeToggle.trigger('click');
+
+    await quickModeToggle.trigger("click");
     expect(wrapper.vm.searchObj.meta.quickMode).toBe(!initialState);
   });
 
@@ -268,100 +275,104 @@ describe("SearchBar Component", () => {
     const transformType = "function";
     wrapper.vm.searchObj.data.transformType = transformType;
     await wrapper.vm.$nextTick();
-    
+
     expect(wrapper.vm.searchObj.data.transformType).toBe(transformType);
   });
 
   it("shows saved view dialog when save button is clicked", async () => {
     // Setup stream selection to avoid validation error
-      wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
-    
+    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
+
     // Trigger fnSavedView directly since the button might be conditionally rendered
     await wrapper.vm.fnSavedView();
-    
+
     expect(store.state.savedViewDialog).toBe(true);
   });
 
   // New test cases for additional methods
   it("should trigger searchData method", async () => {
-    const searchDataSpy = vi.spyOn(wrapper.vm, 'searchData');
+    const searchDataSpy = vi.spyOn(wrapper.vm, "searchData");
     wrapper.vm.searchData();
     expect(searchDataSpy).toHaveBeenCalled();
   });
 
   it("should trigger changeFunctionName method", () => {
-    const changeFunctionNameSpy = vi.spyOn(wrapper.vm, 'changeFunctionName');
-    wrapper.vm.changeFunctionName('newFunction');
-    expect(changeFunctionNameSpy).toHaveBeenCalledWith('newFunction');
+    const changeFunctionNameSpy = vi.spyOn(wrapper.vm, "changeFunctionName");
+    wrapper.vm.changeFunctionName("newFunction");
+    expect(changeFunctionNameSpy).toHaveBeenCalledWith("newFunction");
   });
 
   it("should trigger createNewValue method", () => {
     const doneFn = vi.fn();
-    wrapper.vm.createNewValue('newValue', doneFn);
-    expect(doneFn).toHaveBeenCalledWith('newValue');
+    wrapper.vm.createNewValue("newValue", doneFn);
+    expect(doneFn).toHaveBeenCalledWith("newValue");
   });
 
   it("should trigger updateSelectedValue method", () => {
-    wrapper.vm.functionModel = 'newFunction';
-    wrapper.vm.functionOptions = ['existingFunction'];
+    wrapper.vm.functionModel = "newFunction";
+    wrapper.vm.functionOptions = ["existingFunction"];
     wrapper.vm.updateSelectedValue();
-    expect(wrapper.vm.functionOptions).toContain('newFunction');
+    expect(wrapper.vm.functionOptions).toContain("newFunction");
   });
 
   it("should trigger handleDeleteSavedView method", () => {
-    const item = { view_id: '123' };
+    const item = { view_id: "123" };
     wrapper.vm.handleDeleteSavedView(item);
-    expect(wrapper.vm.deleteViewID).toBe('123');
+    expect(wrapper.vm.deleteViewID).toBe("123");
     expect(wrapper.vm.confirmDelete).toBe(true);
   });
 
   it("should trigger handleUpdateSavedView method", () => {
-    const item = { view_id: '123', view_name: 'Test View' };
-    wrapper.vm.searchObj.data.stream.selectedStream = ['stream1'];
+    const item = { view_id: "123", view_name: "Test View" };
+    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     wrapper.vm.handleUpdateSavedView(item);
     expect(wrapper.vm.updateViewObj).toEqual(item);
     expect(wrapper.vm.confirmUpdate).toBe(true);
   });
 
   it("should trigger downloadRangeData method", async () => {
-    const searchServiceMock = vi.spyOn(searchService, 'search').mockResolvedValue({
-      data: { hits: ['log1', 'log2'] },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    });
+    const searchServiceMock = vi
+      .spyOn(searchService, "search")
+      .mockResolvedValue({
+        data: { hits: ["log1", "log2"] },
+        status: 200,
+        statusText: "OK",
+        headers: {},
+        config: {} as any,
+      });
 
     // Mock the downloadLogs method to avoid URL.createObjectURL issues
-    const downloadLogsSpy = vi.spyOn(wrapper.vm, 'downloadLogs').mockImplementation(() => {
-      // Mock implementation that doesn't actually create files
-    });
+    const downloadLogsSpy = vi
+      .spyOn(wrapper.vm, "downloadLogs")
+      .mockImplementation(() => {
+        // Mock implementation that doesn't actually create files
+      });
 
     wrapper.vm.searchObj = {
       data: {
-        query: 'some query',
+        query: "some query",
         datetime: {
-          startTime: '2023-01-01T00:00:00Z',
-          endTime: '2023-01-02T00:00:00Z',
-          type: 'absolute'
+          startTime: "2023-01-01T00:00:00Z",
+          endTime: "2023-01-02T00:00:00Z",
+          type: "absolute",
         },
         stream: {
-          selectedStream: ['stream1']
+          selectedStream: ["stream1"],
         },
         customDownloadQueryObj: {
           query: {
             from: 0,
-            size: 10
-          }
-        }
+            size: 10,
+          },
+        },
       },
       meta: {
-        sqlMode: false
-      }
+        sqlMode: false,
+      },
     };
 
-    wrapper.vm.downloadCustomInitialNumber = '0';
-    wrapper.vm.downloadCustomRange = '10';
+    wrapper.vm.downloadCustomInitialNumber = "0";
+    wrapper.vm.downloadCustomRange = "10";
 
     await wrapper.vm.downloadRangeData();
 
@@ -370,27 +381,35 @@ describe("SearchBar Component", () => {
   });
 
   it("should handle downloadLogs method with mocked URL APIs", async () => {
-    const testData = [{ field1: 'value1', field2: 'value2' }];
-    const format = 'csv';
-    
+    const testData = [{ field1: "value1", field2: "value2" }];
+    const format = "csv";
+
     // Mock json2csv function
-    const mockJson2csv = vi.fn().mockResolvedValue('field1,field2\nvalue1,value2');
+    const mockJson2csv = vi
+      .fn()
+      .mockResolvedValue("field1,field2\nvalue1,value2");
     wrapper.vm.json2csv = mockJson2csv;
-    
+
     // Mock document methods
     const mockLink = {
       click: vi.fn(),
-      href: '',
-      download: ''
+      href: "",
+      download: "",
     };
-    const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(mockLink as any);
-    const appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockLink as any);
-    const removeChildSpy = vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockLink as any);
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockReturnValue(mockLink as any);
+    const appendChildSpy = vi
+      .spyOn(document.body, "appendChild")
+      .mockImplementation(() => mockLink as any);
+    const removeChildSpy = vi
+      .spyOn(document.body, "removeChild")
+      .mockImplementation(() => mockLink as any);
 
     await wrapper.vm.downloadLogs(testData, format);
 
     expect(global.URL.createObjectURL).toHaveBeenCalled();
-    expect(createElementSpy).toHaveBeenCalledWith('a');
+    expect(createElementSpy).toHaveBeenCalledWith("a");
     expect(mockLink.click).toHaveBeenCalled();
     expect(global.URL.revokeObjectURL).toHaveBeenCalled();
 
@@ -401,171 +420,174 @@ describe("SearchBar Component", () => {
   });
 
   it("should trigger handleKeyDown method", () => {
-    const handleRunQueryFnSpy = vi.spyOn(wrapper.vm, 'handleRunQueryFn');
-    const event = new KeyboardEvent('keydown', { ctrlKey: true, key: 'Enter' });
+    const handleRunQueryFnSpy = vi.spyOn(wrapper.vm, "handleRunQueryFn");
+    const event = new KeyboardEvent("keydown", { ctrlKey: true, key: "Enter" });
     wrapper.vm.handleKeyDown(event);
     expect(handleRunQueryFnSpy).toHaveBeenCalled();
   });
 
-
   it("should update SQL query when addSearchTerm watcher is triggered in SQL mode", async () => {
-    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"]
+    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     await wrapper.vm.$nextTick();
-    const sqlModeToggle = wrapper.find('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
-    await sqlModeToggle.trigger('click');
+    const sqlModeToggle = wrapper.find(
+      '[data-test="logs-search-bar-sql-mode-toggle-btn"]',
+    );
+    await sqlModeToggle.trigger("click");
     await wrapper.vm.$nextTick();
-    wrapper.vm.searchObj.data.query = "SELECT * FROM stream1"
+    wrapper.vm.searchObj.data.query = "SELECT * FROM stream1";
     await wrapper.vm.$nextTick();
-    wrapper.vm.searchObj.data.stream.addToFilter = "field='value'"
+    wrapper.vm.searchObj.data.stream.addToFilter = "field='value'";
 
-
     await wrapper.vm.$nextTick();
-    expect(wrapper.vm.searchObj.data.query).toBe("SELECT * FROM stream1 where field='value'");
+    expect(wrapper.vm.searchObj.data.query).toBe(
+      "SELECT * FROM stream1 where field='value'",
+    );
   });
 
-  describe('getColumnNames function test cases', () => {
-    it('should extract column names from simple column references', () => {
+  describe("getColumnNames function test cases", () => {
+    it("should extract column names from simple column references", () => {
       const parsedSQL = {
         columns: [
-          { expr: { type: 'column_ref', column: { expr: { value: 'name' } } } },
-          { expr: { type: 'column_ref', column: { expr: { value: 'age' } } } }
-        ]
+          { expr: { type: "column_ref", column: { expr: { value: "name" } } } },
+          { expr: { type: "column_ref", column: { expr: { value: "age" } } } },
+        ],
       };
-      
-      expect(wrapper.vm.getColumnNames(parsedSQL)).toEqual(['name', 'age']);
+
+      expect(wrapper.vm.getColumnNames(parsedSQL)).toEqual(["name", "age"]);
     });
 
-    it('should extract column names from aggregate functions', () => {
+    it("should extract column names from aggregate functions", () => {
       const parsedSQL = {
         columns: [
-          { 
-            expr: { 
-              type: 'aggr_func',
-              args: { expr: { column: { value: 'count' } } }
-            }
+          {
+            expr: {
+              type: "aggr_func",
+              args: { expr: { column: { value: "count" } } },
+            },
           },
           {
             expr: {
-              type: 'aggr_func',
-              args: { expr: { value: 'sum' } }
-            }
-          }
-        ]
+              type: "aggr_func",
+              args: { expr: { value: "sum" } },
+            },
+          },
+        ],
       };
-      
-      expect(wrapper.vm.getColumnNames(parsedSQL)).toEqual(['count', 'sum']);
+
+      expect(wrapper.vm.getColumnNames(parsedSQL)).toEqual(["count", "sum"]);
     });
 
-    it('should extract column names from regular functions', () => {
+    it("should extract column names from regular functions", () => {
       const parsedSQL = {
         columns: [
           {
             expr: {
-              type: 'function',
+              type: "function",
               args: {
                 value: [
-                  { type: 'column_ref', column: { expr: { value: 'timestamp' } } }
-                ]
-              }
-            }
-          }
-        ]
+                  {
+                    type: "column_ref",
+                    column: { expr: { value: "timestamp" } },
+                  },
+                ],
+              },
+            },
+          },
+        ],
       };
-      
-      expect(wrapper.vm.getColumnNames(parsedSQL)).toEqual(['timestamp']);
+
+      expect(wrapper.vm.getColumnNames(parsedSQL)).toEqual(["timestamp"]);
     });
 
-    it('should handle nested queries with _next property', () => {
+    it("should handle nested queries with _next property", () => {
       const parsedSQL = {
         columns: [
-          { expr: { type: 'column_ref', column: { expr: { value: 'name' } } } }
+          { expr: { type: "column_ref", column: { expr: { value: "name" } } } },
         ],
         _next: {
           columns: [
-            { expr: { type: 'column_ref', column: { expr: { value: 'age' } } } }
-          ]
-        }
+            {
+              expr: { type: "column_ref", column: { expr: { value: "age" } } },
+            },
+          ],
+        },
       };
-      
-      expect(wrapper.vm.getColumnNames(parsedSQL)).toEqual(['age']);
+
+      expect(wrapper.vm.getColumnNames(parsedSQL)).toEqual(["name", "age"]);
     });
 
-    it('should handle empty or invalid column data', () => {
+    it("should handle empty or invalid column data", () => {
       const parsedSQL = {
-        columns: []
+        columns: [],
       };
-      
+
       expect(wrapper.vm.getColumnNames(parsedSQL)).toEqual([]);
     });
-
   });
 
-  describe('updateQueryValue', () => {
+  describe("updateQueryValue", () => {
     beforeEach(() => {
       wrapper.vm.searchObj.data.stream.selectedStreamFields = [
-        { name: 'field1', isInterestingField: false },
-        { name: 'field2', isInterestingField: false }
+        { name: "field1", isInterestingField: false },
+        { name: "field2", isInterestingField: false },
       ];
-      wrapper.vm.searchObj.data.stream.selectedStream = ['stream1'];
-      wrapper.vm.searchObj.organizationIdentifier = 'test-org';
+      wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
+      wrapper.vm.searchObj.organizationIdentifier = "test-org";
     });
 
-    it('should update editor value', () => {
-      const value = 'SELECT * FROM stream1';
+    it("should update editor value", () => {
+      const value = "SELECT * FROM stream1";
       wrapper.vm.updateQueryValue(value);
       expect(wrapper.vm.searchObj.data.editorValue).toBe(value);
     });
 
-    it('should auto-enable SQL mode when query contains SELECT and FROM', () => {
+    it("should auto-enable SQL mode when query contains SELECT and FROM", () => {
       wrapper.vm.searchObj.meta.sqlMode = false;
-      wrapper.vm.updateQueryValue('SELECT * FROM stream1');
+      wrapper.vm.updateQueryValue("SELECT * FROM stream1");
       expect(wrapper.vm.searchObj.meta.sqlMode).toBe(true);
       expect(wrapper.vm.searchObj.meta.sqlModeManualTrigger).toBe(true);
     });
 
-    it('should not enable SQL mode for non-SQL queries', () => {
+    it("should not enable SQL mode for non-SQL queries", () => {
       wrapper.vm.searchObj.meta.sqlMode = false;
       wrapper.vm.updateQueryValue('field1="value"');
       expect(wrapper.vm.searchObj.meta.sqlMode).toBe(false);
     });
 
-
-    it('should handle stream selection in SQL mode', async () => {
+    it("should handle stream selection in SQL mode", async () => {
       wrapper.vm.searchObj.meta.sqlMode = true;
-      wrapper.vm.searchObj.data.streamResults.list = [
-        { name: 'stream2' }
-      ];
+      wrapper.vm.searchObj.data.streamResults.list = [{ name: "stream2" }];
 
       // Mock parser.astify
-      wrapper.vm.parser = { 
+      wrapper.vm.parser = {
         astify: vi.fn().mockReturnValue({
-          from: [{ table: 'stream2' }]
-        })
+          from: [{ table: "stream2" }],
+        }),
       };
 
-      wrapper.vm.updateQueryValue('SELECT * FROM stream2');
+      wrapper.vm.updateQueryValue("SELECT * FROM stream2");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.searchObj.data.stream.selectedStream).toContain('stream2');
+      expect(wrapper.vm.searchObj.data.stream.selectedStream).toContain(
+        "stream2",
+      );
       wrapper.vm.searchObj.meta.sqlMode = false;
     });
 
-    it('should show error notification when stream is not found', async () => {
+    it("should show error notification when stream is not found", async () => {
       wrapper.vm.searchObj.meta.sqlMode = true;
-      wrapper.vm.searchObj.data.streamResults.list = [
-        { name: 'stream1' }
-      ];
+      wrapper.vm.searchObj.data.streamResults.list = [{ name: "stream1" }];
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
       // Mock parser.astify
-      wrapper.vm.parser = { 
+      wrapper.vm.parser = {
         astify: vi.fn().mockReturnValue({
-          from: [{ table: 'nonexistent_stream' }]
-        })
+          from: [{ table: "nonexistent_stream" }],
+        }),
       };
 
-      wrapper.vm.updateQueryValue('SELECT * FROM nonexistent_stream');
+      wrapper.vm.updateQueryValue("SELECT * FROM nonexistent_stream");
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual([]);
@@ -573,54 +595,56 @@ describe("SearchBar Component", () => {
       wrapper.vm.searchObj.meta.sqlMode = false;
     });
 
-    it('should handle job context removal', async () => {
-      wrapper.vm.searchObj.meta.jobId = 'test-job';
+    it("should handle job context removal", async () => {
+      wrapper.vm.searchObj.meta.jobId = "test-job";
       wrapper.vm.searchObj.meta.queryEditorPlaceholderFlag = true;
       wrapper.vm.checkQuery = vi.fn().mockReturnValue(false);
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
-      wrapper.vm.updateQueryValue('SELECT * FROM stream1');
+      wrapper.vm.updateQueryValue("SELECT * FROM stream1");
       await wrapper.vm.$nextTick();
 
-      expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({
-        message: 'Job Context have been removed',
-        color: 'warning'
-      }));
-      expect(wrapper.vm.searchObj.meta.jobId).toBe('');
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Job Context have been removed",
+          color: "warning",
+        }),
+      );
+      expect(wrapper.vm.searchObj.meta.jobId).toBe("");
       expect(wrapper.vm.searchObj.data.queryResults.hits).toEqual([]);
     });
   });
 
-  describe('updateDateTime', () => {
+  describe("updateDateTime", () => {
     beforeEach(async () => {
       // Reset searchObj datetime related properties
       wrapper.vm.searchObj.data.datetime = {
         startTime: 0,
         endTime: 0,
-        relativeTimePeriod: '',
-        type: 'absolute',
-        queryRangeRestrictionMsg: '',
-        queryRangeRestrictionInHour: 0
+        relativeTimePeriod: "",
+        type: "absolute",
+        queryRangeRestrictionMsg: "",
+        queryRangeRestrictionInHour: 0,
       };
       wrapper.vm.searchObj.loading = false;
       wrapper.vm.searchObj.runQuery = false;
-      wrapper.vm.searchObj.data.stream.selectedStream = ['stream1'];
+      wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
 
       // Mock the dateTimeRef
       wrapper.vm.dateTimeRef = {
         value: {
           setAbsoluteTime: vi.fn(),
-          setDateType: vi.fn()
-        }
+          setDateType: vi.fn(),
+        },
       };
 
       // Mock store state
-      store.state.timezone = 'UTC';
+      store.state.timezone = "UTC";
       store.state.zoConfig = {
-        version: '1.0.0',
-        commit_hash: 'abc123',
-        build_date: '2024-01-01',
+        version: "1.0.0",
+        commit_hash: "abc123",
+        build_date: "2024-01-01",
         default_fts_keys: [],
         show_stream_stats_doc_num: true,
         data_retention_days: true,
@@ -628,33 +652,34 @@ describe("SearchBar Component", () => {
         user_defined_schemas_enabled: true,
         super_cluster_enabled: true,
         query_on_stream_selection: false,
-        default_functions: []
+        default_functions: [],
       };
     });
 
-    it('should handle absolute time with query range restriction', async () => {
+    it("should handle absolute time with query range restriction", async () => {
       const value = {
-        valueType: 'absolute',
+        valueType: "absolute",
         startTime: 1000000000,
         endTime: 2000000000,
-        selectedDate: { from: '2023/01/01' },
-        selectedTime: { startTime: '10:00' }
+        selectedDate: { from: "2023/01/01" },
+        selectedTime: { startTime: "10:00" },
       };
 
       wrapper.vm.searchObj.data.datetime.queryRangeRestrictionInHour = 2;
       await wrapper.vm.updateDateTime(value);
 
-      expect(wrapper.vm.searchObj.data.datetime.startTime).toBe(value.startTime);
+      expect(wrapper.vm.searchObj.data.datetime.startTime).toBe(
+        value.startTime,
+      );
       expect(wrapper.vm.searchObj.data.datetime.endTime).toBe(value.endTime);
-      expect(wrapper.vm.searchObj.data.datetime.type).toBe('absolute');
+      expect(wrapper.vm.searchObj.data.datetime.type).toBe("absolute");
     });
 
-
-    it('should update loading state when conditions are met', async () => {
+    it("should update loading state when conditions are met", async () => {
       const value = {
-        valueType: 'absolute',
+        valueType: "absolute",
         startTime: 1000000000,
-        endTime: 2000000000
+        endTime: 2000000000,
       };
 
       await wrapper.vm.updateDateTime(value);
@@ -662,12 +687,12 @@ describe("SearchBar Component", () => {
       expect(wrapper.vm.searchObj.runQuery).toBe(true);
     });
 
-    it('should not update loading state when query_on_stream_selection is true', async () => {
+    it("should not update loading state when query_on_stream_selection is true", async () => {
       store.state.zoConfig.query_on_stream_selection = true;
       const value = {
-        valueType: 'absolute',
+        valueType: "absolute",
         startTime: 1000000000,
-        endTime: 2000000000
+        endTime: 2000000000,
       };
 
       await wrapper.vm.updateDateTime(value);
@@ -676,122 +701,120 @@ describe("SearchBar Component", () => {
     });
   });
 
-  describe('saveFunction', () => {
+  describe("saveFunction", () => {
     beforeEach(() => {
       // Reset component state
       wrapper.vm.saveFunctionLoader = false;
-      wrapper.vm.savedFunctionSelectedName = ref({ name: '', function: '' });
-      wrapper.vm.searchObj.data.tempFunctionContent = '';
+      wrapper.vm.savedFunctionSelectedName = ref({ name: "", function: "" });
+      wrapper.vm.searchObj.data.tempFunctionContent = "";
       wrapper.vm.functionOptions = ref([]);
       wrapper.vm.formData = ref({
-        params: '',
-        function: '',
+        params: "",
+        function: "",
         transType: 0,
-        name: ''
+        name: "",
       });
 
       // Mock showConfirmDialog
-      wrapper.vm.showConfirmDialog = vi.fn().mockImplementation(callback => callback());
+      wrapper.vm.showConfirmDialog = vi
+        .fn()
+        .mockImplementation((callback) => callback());
     });
 
-    it('should validate empty function content', async () => {
-      const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
-      wrapper.vm.searchObj.data.tempFunctionContent = '   ';
-      
+    it("should validate empty function content", async () => {
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      wrapper.vm.searchObj.data.tempFunctionContent = "   ";
+
       await wrapper.vm.saveFunction();
-      
+
       expect(notifySpy).toHaveBeenCalledWith({
-        type: 'warning',
-        message: 'The function field must contain a value and cannot be left empty.'
+        type: "warning",
+        message:
+          "The function field must contain a value and cannot be left empty.",
       });
       expect(wrapper.vm.saveFunctionLoader).toBe(false);
     });
 
-    it('should validate function name format', async () => {
-      const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
-      wrapper.vm.searchObj.data.tempFunctionContent = 'valid content';
-      wrapper.vm.savedFunctionName = '123invalid';
-      
+    it("should validate function name format", async () => {
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      wrapper.vm.searchObj.data.tempFunctionContent = "valid content";
+      wrapper.vm.savedFunctionName = "123invalid";
+
       await wrapper.vm.saveFunction();
-      
+
       expect(notifySpy).toHaveBeenCalledWith({
-        type: 'negative',
-        message: 'Function name is not valid.'
+        type: "negative",
+        message: "Function name is not valid.",
       });
       expect(wrapper.vm.saveFunctionLoader).toBe(false);
     });
 
-    it('should create new function successfully', async () => {
+    it("should create new function successfully", async () => {
       vi.mocked(jsTransformService.create).mockResolvedValue({
-        data: { message: 'Function created successfully' },
+        data: { message: "Function created successfully" },
         status: 200,
-        statusText: 'OK',
+        statusText: "OK",
         headers: {},
-        config: {} as any
+        config: {} as any,
       });
 
-      wrapper.vm.searchObj.data.tempFunctionContent = 'function content';
-      wrapper.vm.savedFunctionName = 'validName'
+      wrapper.vm.searchObj.data.tempFunctionContent = "function content";
+      wrapper.vm.savedFunctionName = "validName";
 
-      wrapper.vm.isSavedFunctionAction = 'create';
-      console.log(wrapper.vm.savedFunctionName.value,'wrapper vm')
+      wrapper.vm.isSavedFunctionAction = "create";
 
       await wrapper.vm.saveFunction();
 
       expect(jsTransformService.create).toHaveBeenCalledWith(
         store.state.selectedOrganization.identifier,
         expect.objectContaining({
-          name: 'validName',
-          function: 'function content',
-          params: 'row',
-          transType: 0
-        })
+          name: "validName",
+          function: "function content",
+          params: "row",
+          transType: 0,
+        }),
       );
     });
 
     // it('should reset function content', async () => {
-      
+
     //   wrapper.vm.searchObj.data.tempFunctionContent = 'function content';
     //   wrapper.vm.searchObj.data.tempFunctionName = 'validName';
     //   wrapper.vm.resetFunctionContent();
     //   expect(wrapper.vm.searchObj.data.tempFunctionContent).toBe('');
     //   expect(wrapper.vm.searchObj.data.tempFunctionName).toBe('');
     // });
-
   });
 
-  describe('handleSavedView', () => {
+  describe("handleSavedView", () => {
     beforeEach(() => {
       // Mock savedviewsService.post
       vi.mocked(savedviewsService.post).mockResolvedValue({
         status: 200,
-        data: { message: 'Success' }
+        data: { message: "Success" },
       } as any);
     });
 
-    it('should call createSavedViews for valid view name', async () => {
+    it("should call createSavedViews for valid view name", async () => {
       // Set up valid view name
       // wrapper.vm.isSavedViewAction = 'create';
-      wrapper.vm.savedViewName = 'valid-view-name';
-      
-      const createSavedViewsSpy = vi.spyOn(wrapper.vm, 'createSavedViews');
-      
+      wrapper.vm.savedViewName = "valid-view-name";
+
+      const createSavedViewsSpy = vi.spyOn(wrapper.vm, "createSavedViews");
+
       await wrapper.vm.handleSavedView();
 
       await flushPromises();
 
-      wrapper.vm.createSavedViews('valid-view-name');
-    
+      wrapper.vm.createSavedViews("valid-view-name");
 
       vi.mocked(savedviewsService.post).mockResolvedValue({
         status: 200,
-        data: { message: 'Success' }
+        data: { message: "Success" },
       } as any);
-
-      
     });
 
-    it('should successfully apply saved view with complete response data', async () => {
+    it("should successfully apply saved view with complete response data", async () => {
       // Mock the response data
       const responseData = {
         data: {
@@ -807,25 +830,25 @@ describe("SearchBar Component", () => {
                 [
                   { label: "5 sec", value: 5 },
                   { label: "1 min", value: 60 },
-                  { label: "1 hr", value: 3600 }
+                  { label: "1 hr", value: 3600 },
                 ],
                 [
                   { label: "10 sec", value: 10 },
                   { label: "5 min", value: 300 },
-                  { label: "2 hr", value: 7200 }
+                  { label: "2 hr", value: 7200 },
                 ],
                 [
                   { label: "15 sec", value: 15 },
                   { label: "15 min", value: 900 },
-                  { label: "1 day", value: 86400 }
+                  { label: "1 day", value: 86400 },
                 ],
                 [
                   { label: "30 sec", value: 30 },
-                  { label: "30 min", value: 1800 }
-                ]
+                  { label: "30 min", value: 1800 },
+                ],
               ],
               splitterLimit: [0, 40],
-              splitterModel: 20
+              splitterModel: 20,
             },
             data: {
               actionId: null,
@@ -839,7 +862,7 @@ describe("SearchBar Component", () => {
                 queryRangeRestrictionMsg: "",
                 relativeTimePeriod: "15m",
                 startTime: 1749023371191000,
-                type: "relative"
+                type: "relative",
               },
               editorValue: 'SELECT * FROM "stream1"',
               errorCode: 0,
@@ -860,17 +883,17 @@ describe("SearchBar Component", () => {
                     expr: {
                       column: "*",
                       table: null,
-                      type: "column_ref"
-                    }
-                  }
+                      type: "column_ref",
+                    },
+                  },
                 ],
                 distinct: { type: null },
                 from: [
                   {
                     as: null,
                     db: null,
-                    table: "stream1"
-                  }
+                    table: "stream1",
+                  },
                 ],
                 groupby: null,
                 having: null,
@@ -881,7 +904,7 @@ describe("SearchBar Component", () => {
                 type: "select",
                 where: null,
                 window: null,
-                with: null
+                with: null,
               },
               query: 'SELECT * FROM "stream1"',
               resultGrid: {
@@ -889,13 +912,13 @@ describe("SearchBar Component", () => {
                 colSizes: {},
                 columns: [],
                 currentDateTime: "2025-06-04T08:04:09.069Z",
-                currentPage: 1
+                currentPage: 1,
               },
               savedViewFilterFields: "",
               searchAround: {
                 histogramHide: false,
                 indexTimestamp: -1,
-                size: 0
+                size: 0,
               },
               searchRequestTraceIds: [],
               searchRetriesCount: {},
@@ -905,11 +928,11 @@ describe("SearchBar Component", () => {
                 addToFilter: "",
                 expandGroupRows: {
                   common: true,
-                  stream1: true
+                  stream1: true,
                 },
                 expandGroupRowsFieldCount: {
                   common: 0,
-                  stream1: 4
+                  stream1: 4,
                 },
                 filterField: "",
                 filteredField: [],
@@ -926,13 +949,13 @@ describe("SearchBar Component", () => {
                     isSchemaField: true,
                     name: "_timestamp",
                     showValues: false,
-                    streams: ["stream1"]
-                  }
+                    streams: ["stream1"],
+                  },
                 ],
                 selectedStream: ["stream1"],
                 streamType: "logs",
                 userDefinedSchema: [],
-                functions: []
+                functions: [],
               },
               tempFunctionContent: "",
               tempFunctionLoading: false,
@@ -943,16 +966,16 @@ describe("SearchBar Component", () => {
               histogram: {
                 xData: [],
                 yData: [],
-                chartParams: {}
+                chartParams: {},
               },
               savedViews: [
                 {
                   org_id: "2y1ufyK0yGTUSIXQfOrRxWpFqQs",
                   view_id: "2y2ETfwQVsIYcupzBRFisihBHdg",
-                  view_name: "dd"
-                }
+                  view_name: "dd",
+                },
               ],
-              queryResults: []
+              queryResults: [],
             },
             loading: false,
             loadingCounter: false,
@@ -981,11 +1004,11 @@ describe("SearchBar Component", () => {
                 chartKeyFormat: "HH:mm:ss",
                 manualRemoveFields: false,
                 navigation: {
-                  currentRowIndex: 0
+                  currentRowIndex: 0,
                 },
                 rowsPerPage: 50,
                 showPagination: true,
-                wrapCells: false
+                wrapCells: false,
               },
               searchApplied: false,
               selectedTraceStream: "",
@@ -1000,34 +1023,36 @@ describe("SearchBar Component", () => {
               toggleFunction: false,
               toggleSourceWrap: true,
               useUserDefinedSchemas: "user_defined_schema",
-              scrollInfo: {}
+              scrollInfo: {},
             },
             organizationIdentifier: "2y1ufyK0yGTUSIXQfOrRxWpFqQs",
             runQuery: false,
-            shouldIgnoreWatcher: false
+            shouldIgnoreWatcher: false,
           },
           view_id: "2y2ETfwQVsIYcupzBRFisihBHdg",
-          view_name: "dd"
+          view_name: "dd",
         },
         status: 200,
         statusText: "OK",
         headers: {
-          "content-type": "application/json"
+          "content-type": "application/json",
         },
-        config: {
-        },
-        request: {
-        }
+        config: {},
+        request: {},
       };
-      
 
       // Setup initial state
       wrapper.vm.searchObj.data.stream.selectedStream = [];
-      wrapper.vm.searchObj.data.stream.streamLists.push({ value: 'stream1', label: 'Stream 1' });
+      wrapper.vm.searchObj.data.stream.streamLists.push({
+        value: "stream1",
+        label: "Stream 1",
+      });
 
       // Mock the required services and refs
-      vi.mocked(savedviewsService.getViewDetail).mockResolvedValue(responseData as any);
-      
+      vi.mocked(savedviewsService.getViewDetail).mockResolvedValue(
+        responseData as any,
+      );
+
       wrapper.vm.dateTimeRef = {
         value: {
           setSavedDate: vi.fn(),
@@ -1038,93 +1063,86 @@ describe("SearchBar Component", () => {
           getDateTimeRange: vi.fn().mockReturnValue({
             startTime: 1749023371191000,
             endTime: 1749024271191000,
-            type: 'relative'
-          })
-        }
+            type: "relative",
+          }),
+        },
       };
-
 
       // Call applySavedView with a view item
       await wrapper.vm.applySavedView({
         view_id: "2y2ETfwQVsIYcupzBRFisihBHdg",
-        view_name: "dd"
+        view_name: "dd",
       });
 
-      console.log(wrapper.vm.searchObj.meta.toggleFunction,'togglefunction')
+      console.log(wrapper.vm.searchObj.meta.toggleFunction, "togglefunction");
 
       // Wait for all promises to resolve
       await flushPromises();
 
-
-
       // Verify service was called
       expect(savedviewsService.getViewDetail).toHaveBeenCalledWith(
         store.state.selectedOrganization.identifier,
-        "2y2ETfwQVsIYcupzBRFisihBHdg"
+        "2y2ETfwQVsIYcupzBRFisihBHdg",
       );
-
-
-
     });
   });
 
-  describe('deleteSavedViews', () => {
+  describe("deleteSavedViews", () => {
     beforeEach(() => {
-      wrapper.vm.deleteViewID = 'test-view-id';
+      wrapper.vm.deleteViewID = "test-view-id";
       vi.mocked(savedviewsService.delete).mockResolvedValue({
         status: 200,
-        data: { message: 'Success' }
+        data: { message: "Success" },
       } as any);
     });
 
-    it('should handle delete failure with error detail', async () => {
+    it("should handle delete failure with error detail", async () => {
       // Mock failed delete response with error detail
       vi.mocked(savedviewsService.delete).mockResolvedValue({
         status: 400,
-        data: { error_detail: 'View not found' }
+        data: { error_detail: "View not found" },
       } as any);
 
       await wrapper.vm.deleteSavedViews();
 
       expect(savedviewsService.delete).toHaveBeenCalledWith(
         store.state.selectedOrganization.identifier,
-        'test-view-id'
+        "test-view-id",
       );
     });
-
   });
 
-  describe('resetFilters', () => {
+  describe("resetFilters", () => {
     const initialSearchObj = {
       data: {
-        query: '',
-        editorValue: '',
+        query: "",
+        editorValue: "",
         datetime: {
-          type: 'relative',
+          type: "relative",
           startTime: 1749023371191000,
           endTime: 1749024271191000,
-          relativeTimePeriod: '1h'
+          relativeTimePeriod: "1h",
         },
         searchRequestTraceIds: [],
         searchWebSocketTraceIds: [],
         stream: {
-          selectedStream: ['stream1'],
+          selectedStream: ["stream1"],
           selectedStreamFields: [
-            { name: 'field1', isInterestingField: false },
-            { name: 'field2', isInterestingField: false }
+            { name: "field1", isInterestingField: false },
+            { name: "field2", isInterestingField: false },
           ],
           interestingFieldList: [],
-          addToFilter: '',
-          filterField: '',
+          addToFilter: "",
+          filterField: "",
           filteredField: [],
           loading: false,
-          streamType: 'logs',
+          streamType: "logs",
           userDefinedSchema: [],
-          functions: []
+          functions: [],
         },
         transforms: [],
-        transformType: 'function',
-        queryResults: { hits: [] }
+        transformType: "function",
+        queryResults: { hits: [] },
       },
       meta: {
         sqlMode: false,
@@ -1135,13 +1153,13 @@ describe("SearchBar Component", () => {
         showQuery: true,
         showTransformEditor: true,
         toggleFunction: false,
-        jobId: '',
+        jobId: "",
         searchApplied: false,
-        logsVisualizeToggle: 'logs'
+        logsVisualizeToggle: "logs",
       },
       config: {
         fnSplitterModel: 0,
-        fnSplitterLimit: [0, 100]
+        fnSplitterLimit: [0, 100],
       },
       loading: false,
       runQuery: false,
@@ -1149,15 +1167,14 @@ describe("SearchBar Component", () => {
       loadingCounter: false,
       loadingStream: false,
       loadingSavedView: false,
-      organizationIdentifier: 'test-org'
+      organizationIdentifier: "test-org",
     };
-
 
     beforeEach(async () => {
       // Create a fresh wrapper for each test with reactive data
       wrapper = mount(SearchBar, {
-        props: {  
-          fieldValues: ['field1', 'field2']
+        props: {
+          fieldValues: ["field1", "field2"],
         },
         attachTo: document.body,
         global: {
@@ -1166,29 +1183,38 @@ describe("SearchBar Component", () => {
           stubs: {
             QueryEditor: mockQueryEditor,
             IndexList: true,
-            DateTime: true
-          }
+            DateTime: true,
+          },
         },
       });
 
       // Initialize searchObj with a deep clone of the initial state
       wrapper.vm.searchObj = JSON.parse(JSON.stringify(initialSearchObj));
       await wrapper.vm.$nextTick();
-      
+
       // Mock the specific functions from useLogs that resetFilters uses
       wrapper.vm.fnParsedSQL = vi.fn().mockReturnValue({
-        from: [{ table: 'stream1' }],
-        where: { type: 'binary_expr', operator: '=', left: 'field1', right: 'value' }
+        from: [{ table: "stream1" }],
+        where: {
+          type: "binary_expr",
+          operator: "=",
+          left: "field1",
+          right: "value",
+        },
       });
-      wrapper.vm.fnUnparsedSQL = vi.fn().mockReturnValue('SELECT * FROM stream1');
-      wrapper.vm.buildStreamQuery = vi.fn().mockImplementation((stream, fieldList) => `SELECT * FROM "${stream}"`);
-      wrapper.vm.getFieldList = vi.fn().mockReturnValue(['field1', 'field2']);
+      wrapper.vm.fnUnparsedSQL = vi
+        .fn()
+        .mockReturnValue("SELECT * FROM stream1");
+      wrapper.vm.buildStreamQuery = vi
+        .fn()
+        .mockImplementation((stream, fieldList) => `SELECT * FROM "${stream}"`);
+      wrapper.vm.getFieldList = vi.fn().mockReturnValue(["field1", "field2"]);
 
       // Mock store state
       store.state.zoConfig = {
-        version: '1.0.0',
-        commit_hash: 'abc123',
-        build_date: '2024-01-01',
+        version: "1.0.0",
+        commit_hash: "abc123",
+        build_date: "2024-01-01",
         default_fts_keys: [],
         show_stream_stats_doc_num: true,
         data_retention_days: true,
@@ -1196,7 +1222,7 @@ describe("SearchBar Component", () => {
         user_defined_schemas_enabled: true,
         super_cluster_enabled: true,
         query_on_stream_selection: false,
-        default_functions: []
+        default_functions: [],
       };
 
       // Mock handleRunQuery from useLogs
@@ -1211,16 +1237,16 @@ describe("SearchBar Component", () => {
       vi.clearAllMocks();
     });
 
-    it('should reset query in non-SQL mode', async () => {
+    it("should reset query in non-SQL mode", async () => {
       // Set initial values
-      wrapper.vm.searchObj.data.query = 'initial query';
-      wrapper.vm.searchObj.data.editorValue = 'initial query';
+      wrapper.vm.searchObj.data.query = "initial query";
+      wrapper.vm.searchObj.data.editorValue = "initial query";
       await wrapper.vm.$nextTick();
 
-      console.log('Before resetFilters:', {
+      console.log("Before resetFilters:", {
         query: wrapper.vm.searchObj.data.query,
         editorValue: wrapper.vm.searchObj.data.editorValue,
-        sqlMode: wrapper.vm.searchObj.meta.sqlMode
+        sqlMode: wrapper.vm.searchObj.meta.sqlMode,
       });
 
       // Call resetFilters
@@ -1229,27 +1255,23 @@ describe("SearchBar Component", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      console.log('After resetFilters:', {
+      console.log("After resetFilters:", {
         query: wrapper.vm.searchObj.data.query,
         editorValue: wrapper.vm.searchObj.data.editorValue,
-        sqlMode: wrapper.vm.searchObj.meta.sqlMode
+        sqlMode: wrapper.vm.searchObj.meta.sqlMode,
       });
 
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      console.log('Final state:', {
+      console.log("Final state:", {
         query: wrapper.vm.searchObj.data.query,
         editorValue: wrapper.vm.searchObj.data.editorValue,
-        sqlMode: wrapper.vm.searchObj.meta.sqlMode
+        sqlMode: wrapper.vm.searchObj.meta.sqlMode,
       });
-
-
 
       // Verify the function was called with correct context
       expect(wrapper.vm.handleRunQuery).not.toHaveBeenCalled();
     });
-
-  
   });
 });

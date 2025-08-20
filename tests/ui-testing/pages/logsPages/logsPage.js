@@ -1595,7 +1595,7 @@ export class LogsPage {
     }
 
     async expectQueryEditorContainsText(text) {
-        return await expect(this.page.locator(this.queryEditor)).toContainText(text);
+        return await expect(this.page.locator(this.queryEditor).locator('.cm-content')).toContainText(text);
     }
 
     async expectQueryEditorEmpty() {
@@ -1807,5 +1807,9 @@ export class LogsPage {
         await this.page.waitForSelector(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`, { state: "visible" });
         await this.page.waitForTimeout(2000);
         await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`).first().click();
+    }
+
+    async clickAllFieldsButton() {
+        return await this.page.locator('[data-test="logs-all-fields-btn"]').click();
     }
 } 

@@ -224,6 +224,9 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.relativeTab.click();
     await page.waitForTimeout(2000);
 
+    await pageManager.unflattenedPage.allFieldsButton.waitFor();
+    await pageManager.unflattenedPage.allFieldsButton.click();
+
     // Search for 'kubernetes_pod_id' field
     await pageManager.unflattenedPage.indexFieldSearchInput.waitFor();
     await pageManager.unflattenedPage.indexFieldSearchInput.fill("kubernetes_pod_id");
