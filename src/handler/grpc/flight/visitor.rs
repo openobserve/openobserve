@@ -59,19 +59,21 @@ impl<'n> TreeNodeVisitor<'n> for RemoteScanVisitor {
     }
 }
 
-pub fn get_cluster_metrics(plan: Arc<dyn ExecutionPlan>) -> Option<Arc<Mutex<Vec<Metrics>>>> {
+pub fn get_cluster_metrics(plan: Arc<dyn ExecutionPlan>) -> Vec<Arc<Mutex<Vec<Metrics>>>> {
     let mut visitor = MetricsVisitor::new();
     let _ = plan.visit(&mut visitor);
     visitor.metrics
 }
 
 struct MetricsVisitor {
-    metrics: Option<Arc<Mutex<Vec<Metrics>>>>,
+    metrics: Vec<Arc<Mutex<Vec<Metrics>>>>,
 }
 
 impl MetricsVisitor {
     pub fn new() -> Self {
-        Self { metrics: None }
+        Self {
+            metrics: Vec::new(),
+        }
     }
 }
 
@@ -82,7 +84,7 @@ impl<'n> TreeNodeVisitor<'n> for MetricsVisitor {
         let name = node.name();
         if name == "RemoteScanExec" {
             let remote_scan_exec = node.as_any().downcast_ref::<RemoteScanExec>().unwrap();
-            self.metrics = Some(remote_scan_exec.cluster_metrics());
+            self.metrics.push(remote_scan_exec.cluster_metrics());
             Ok(TreeNodeRecursion::Stop)
         } else {
             Ok(TreeNodeRecursion::Continue)

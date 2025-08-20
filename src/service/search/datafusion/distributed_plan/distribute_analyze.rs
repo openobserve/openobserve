@@ -223,10 +223,10 @@ fn create_output_batch(
 }
 
 fn collect_metrics(plan: Arc<dyn ExecutionPlan>) -> Vec<Metrics> {
-    let metrics = get_cluster_metrics(plan);
-    if let Some(metrics) = metrics {
-        metrics.lock().clone()
-    } else {
-        vec![]
+    let mut metrics = Vec::new();
+    for m in get_cluster_metrics(plan) {
+        let m = m.lock().clone();
+        metrics.extend(m);
     }
+    metrics
 }
