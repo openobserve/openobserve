@@ -13,7 +13,7 @@
                 borderless
                 dense
                 class="q-ml-auto no-border o2-search-input"
-                :placeholder="t('function.search')"
+                :placeholder="t('regex_patterns.search')"
                 :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
               >
                 <template #prepend>
