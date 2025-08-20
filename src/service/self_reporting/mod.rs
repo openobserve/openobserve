@@ -280,17 +280,18 @@ pub async fn flush() {
 // Cron job to frequently publish auditted events
 #[cfg(feature = "enterprise")]
 pub async fn run_audit_publish() {
-    let o2cfg = o2_enterprise::enterprise::common::infra::config::get_config();
-    if !o2cfg.common.audit_enabled {
-        return;
-    }
-    let mut audit_interval = tokio::time::interval(tokio::time::Duration::from_secs(
-        o2cfg.common.audit_publish_interval.try_into().unwrap(),
-    ));
-    audit_interval.tick().await; // trigger the first run
     loop {
+        let o2cfg = o2_enterprise::enterprise::common::infra::config::get_config();
+        if !o2cfg.common.audit_enabled {
+            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+            continue;
+        }
+        
         log::debug!("Audit ingestion loop running");
-        audit_interval.tick().await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            o2cfg.common.audit_publish_interval.try_into().unwrap(),
+        )).await;
+        
         o2_enterprise::enterprise::common::auditor::publish_existing_audits(
             META_ORG_ID,
             publish_audit,
