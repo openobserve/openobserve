@@ -470,9 +470,12 @@ pub async fn delete_from_file_list(
         file.deleted = true;
         entry.push(file);
     }
+    // generate a new array and sort by key
+    let mut hours_files = hours_files.into_iter().collect::<Vec<_>>();
+    hours_files.sort_by(|(k1, _), (k2, _)| k1.cmp(&k2));
 
     // write file list to storage
-    write_file_list(org_id, &hours_files).await?;
+    write_file_list(org_id, hours_files).await?;
 
     Ok(())
 }
@@ -480,23 +483,23 @@ pub async fn delete_from_file_list(
 // write file list to db, all the files should be deleted
 async fn write_file_list(
     org_id: &str,
-    hours_files: &HashMap<String, Vec<FileKey>>,
+    hours_files: Vec<(String, Vec<FileKey>)>,
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    for events in hours_files.values() {
+    for (_, events) in hours_files {
         // set to db, retry 5 times
         let mut success = false;
         let created_at = Utc::now().timestamp_micros();
         for _ in 0..5 {
             // only store the file_list into history, don't delete files
             if cfg.compact.data_retention_history
-                && let Err(e) = infra_file_list::batch_add_history(events).await
+                && let Err(e) = infra_file_list::batch_add_history(&events).await
             {
                 log::error!("[COMPACTOR] file_list batch_add_history failed: {e}");
                 return Err(e.into());
             }
             // delete from file_list table
-            if let Err(e) = infra_file_list::batch_process(events).await {
+            if let Err(e) = infra_file_list::batch_process(&events).await {
                 log::error!("[COMPACTOR] batch_delete to db failed, retrying: {e}");
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
