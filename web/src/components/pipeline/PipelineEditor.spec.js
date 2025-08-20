@@ -158,8 +158,24 @@ describe("PipelineEditor", () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Clean up any pending promises
+    await flushPromises();
+    
+    // Ensure all Quasar dialogs are closed
+    if (wrapper) {
+      // Close any open dialogs
+      wrapper.vm.confirmDialogMeta.show = false;
+      wrapper.vm.showJsonEditorDialog = false;
+      wrapper.vm.confirmDialogBasicPipeline = false;
+      
+      // Unmount the component
+      wrapper.unmount();
+      wrapper = null;
+    }
+    
     vi.clearAllMocks();
+    vi.clearAllTimers();
   });
 
   describe("Functions with input and output as expected", () => {
