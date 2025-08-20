@@ -20,7 +20,7 @@ use std::{
 
 use bytes::Bytes;
 use config::{
-    RwHashMap, get_config, metrics,
+    RwHashMap, get_config, metrics, spawn_pausable_job,
     utils::hash::{Sum64, gxhash},
 };
 use once_cell::sync::Lazy;
@@ -220,21 +220,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         _ = file.read().await.get("", None).await;
     }
 
-    tokio::task::spawn(async move {
-        loop {
-            let gc_interval = get_config().memory_cache.gc_interval;
-            if gc_interval == 0 {
-                // interval 0 is treated as pause.
-                // in pause state, we keep checking the env for changes every minute.
-                tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-                continue;
-            }
-            tokio::time::sleep(tokio::time::Duration::from_secs(gc_interval)).await;
+    spawn_pausable_job!(
+        "memory_cache_gc",
+        get_config().memory_cache.gc_interval,
+        {
             if let Err(e) = gc().await {
                 log::error!("memory cache gc error: {}", e);
             }
         }
-    });
+    );
     Ok(())
 }
 

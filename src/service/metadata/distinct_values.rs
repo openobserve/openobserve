@@ -23,7 +23,7 @@ use std::{
 
 use arrow_schema::{DataType, Field, Schema};
 use config::{
-    FxIndexMap, TIMESTAMP_COL_NAME, get_config,
+    FxIndexMap, TIMESTAMP_COL_NAME, get_config, spawn_pausable_job,
     meta::stream::StreamType,
     utils::{json, schema::infer_json_schema_from_map, time::now_micros},
 };
@@ -34,10 +34,7 @@ use infra::{
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use tokio::{
-    sync::{RwLock, mpsc},
-    time,
-};
+use tokio::sync::{RwLock, mpsc};
 
 use crate::{
     common::meta::stream::SchemaRecords,
@@ -109,7 +106,15 @@ impl Default for DistinctValues {
 
 impl DistinctValues {
     pub fn new() -> Self {
-        tokio::task::spawn(async move { run_flush().await });
+        spawn_pausable_job!(
+            "distinct_values_flush",
+            get_config().limit.distinct_values_interval,
+            {
+                if let Err(e) = INSTANCE.flush().await {
+                    log::error!("[DISTINCT_VALUES] error flush data to wal: {}", e);
+                }
+            }
+        );
         Self {
             channel: handle_channel(),
             shutdown: Arc::new(AtomicBool::new(false)),
@@ -338,14 +343,3 @@ impl Metadata for DistinctValues {
     }
 }
 
-async fn run_flush() {
-    loop {
-        tokio::time::sleep(time::Duration::from_secs(
-            get_config().limit.distinct_values_interval,
-        ))
-        .await;
-        if let Err(e) = INSTANCE.flush().await {
-            log::error!("[DISTINCT_VALUES] error flush data to wal: {}", e);
-        }
-    }
-}

@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::{cluster::LOCAL_NODE, get_config, meta::stream::FileKey};
+use config::{cluster::LOCAL_NODE, get_config, meta::stream::FileKey, spawn_pausable_job};
 use tokio::sync::{Mutex, mpsc};
 
 use crate::service::compact;
@@ -58,24 +58,20 @@ pub async fn run() -> Result<(), anyhow::Error> {
         });
     }
 
-    tokio::task::spawn(async move { run_generate(tx).await });
+    spawn_pausable_job!(
+        "flatten_compactor_generate",
+        get_config().compact.interval,
+        {
+            log::debug!("[COMPACTOR] Running parquet file data flatten");
+            let ret = compact::flatten::run_generate(tx.clone()).await;
+            if ret.is_err() {
+                log::error!(
+                    "[COMPACTOR] run parquet file data flatten error: {}",
+                    ret.err().unwrap()
+                );
+            }
+        }
+    );
     Ok(())
 }
 
-/// Generate flatten data file for parquet files
-async fn run_generate(tx: mpsc::Sender<FileKey>) -> Result<(), anyhow::Error> {
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.interval,
-        ))
-        .await;
-        log::debug!("[COMPACTOR] Running parquet file data flatten");
-        let ret = compact::flatten::run_generate(tx.clone()).await;
-        if ret.is_err() {
-            log::error!(
-                "[COMPACTOR] run parquet file data flatten error: {}",
-                ret.err().unwrap()
-            );
-        }
-    }
-}

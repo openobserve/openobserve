@@ -20,6 +20,8 @@ use config::{
     metrics,
 };
 #[cfg(feature = "enterprise")]
+use config::spawn_pausable_job;
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 use tokio::sync::mpsc;
 
@@ -52,7 +54,19 @@ pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { run_generate_job().await });
     tokio::task::spawn(async move { run_generate_old_data_job().await });
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { run_generate_downsampling_job().await });
+    spawn_pausable_job!(
+        "compactor_downsampling",
+        get_o2_config().downsampling.downsampling_interval,
+        {
+            if get_o2_config().downsampling.metrics_downsampling_rules.is_empty() {
+                continue;
+            }
+            log::debug!("[COMPACTOR::JOB] Running generate downsampling job");
+            if let Err(e) = compact::run_generate_downsampling_job().await {
+                log::error!("[COMPACTOR::JOB] run generate downsampling job error: {e}");
+            }
+        }
+    );
     tokio::task::spawn(async move { run_merge(scheduler.tx()).await });
     tokio::task::spawn(async move { run_retention().await });
     tokio::task::spawn(async move { run_delay_deletion().await });
@@ -157,27 +171,6 @@ async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
     }
 }
 
-/// Generate downsampling job for compactor
-#[cfg(feature = "enterprise")]
-async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
-    if get_o2_config()
-        .downsampling
-        .metrics_downsampling_rules
-        .is_empty()
-    {
-        return Ok(());
-    }
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_o2_config().downsampling.downsampling_interval,
-        ))
-        .await;
-        log::debug!("[COMPACTOR::JOB] Running generate downsampling job");
-        if let Err(e) = compact::run_generate_downsampling_job().await {
-            log::error!("[COMPACTOR::JOB] run generate downsampling job error: {e}");
-        }
-    }
-}
 
 /// Merge small files
 async fn run_merge(tx: mpsc::Sender<compact::worker::MergeJob>) -> Result<(), anyhow::Error> {

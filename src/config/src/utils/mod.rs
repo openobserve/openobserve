@@ -39,3 +39,4 @@ pub mod sysinfo;
 pub mod tantivy;
 pub mod time;
 pub mod util;
+pub mod pausable_job;

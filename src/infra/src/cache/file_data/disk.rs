@@ -24,7 +24,7 @@ use std::{
 use async_recursion::async_recursion;
 use bytes::Bytes;
 use config::{
-    RwAHashMap, get_config, metrics,
+    RwAHashMap, get_config, metrics, spawn_pausable_job,
     utils::{
         file::*,
         hash::{Sum64, gxhash},
@@ -465,21 +465,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         LOADING_FROM_DISK_DONE.store(true, Ordering::SeqCst);
     });
 
-    tokio::task::spawn(async move {
-        loop {
-            let gc_interval = get_config().disk_cache.gc_interval;
-            if gc_interval == 0 {
-                // interval 0 is treated as pause.
-                // in pause state, we keep checking the env for changes every minute.
-                tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-                continue;
-            }
-            tokio::time::sleep(tokio::time::Duration::from_secs(gc_interval)).await;
+    spawn_pausable_job!(
+        "disk_cache_gc",
+        get_config().disk_cache.gc_interval,
+        {
             if let Err(e) = gc().await {
                 log::error!("disk cache gc error: {}", e);
             }
         }
-    });
+    );
     Ok(())
 }
 
