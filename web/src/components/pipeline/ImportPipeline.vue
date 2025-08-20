@@ -15,8 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="q-mt-md " >
-      <div class="flex q-mx-md items-center no-wrap">
+      <div class="flex q-mx-md items-center no-wrap tw-h-[61px]">
         <div class="col">
           <div class="flex">
             <q-btn
@@ -27,35 +26,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="arrow_back_ios_new"
               data-test="pipeline-import-back-btn"
             />
-            <div class="text-h6 q-ml-md">Import Pipeline</div>
+            <div class="tw-font-[600] tw-text-[20px] q-ml-md">Import Pipeline</div>
           </div>
         </div>
         <div class="flex justify-center">
           <q-btn
             v-close-popup
-            class="text-bold q-mr-md"
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
             :label="t('function.cancel')"
-            text-color="light-text"
-            padding="sm xl"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             @click="router.back()"
             data-test="pipeline-import-cancel-btn"
           />
           <q-btn
-            class="text-bold no-border"
+            class="o2-primary-button no-border tw-h-[36px]"
             :label="t('dashboard.import')"
-            color="secondary"
             type="submit"
-            padding="sm xl"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             @click="importJson"
             data-test="pipeline-import-json-btn"
           />
         </div>
       </div>
-  
-      <q-separator class="q-my-sm q-mx-md" />
-    </div>
+    <q-separator class="q-mx-md q-mb-sm" />
     <div class="flex">
       <div class="report-list-tabs flex items-center justify-center q-mx-md">
         <app-tabs
@@ -1425,6 +1422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         getFunctions,
         getAlertDestinations,
         getScheduledPipelines,
+        store,
       };
     },
     components: {
