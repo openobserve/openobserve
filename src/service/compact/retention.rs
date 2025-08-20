@@ -153,8 +153,9 @@ pub async fn delete_by_stream(
     if min_date.is_empty() {
         return Ok(()); // no data, just skip
     }
+    let min_date = format!("{min_date}/00/00+0000");
     let created_at =
-        DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", min_date))?.with_timezone(&Utc);
+        DateTime::parse_from_str(&min_date, "%Y/%m/%d/%H/%M/%S%z")?.with_timezone(&Utc);
     if created_at >= *lifecycle_end {
         return Ok(()); // created_at is after lifecycle end, just skip
     }
