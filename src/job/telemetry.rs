@@ -16,17 +16,18 @@
 use tokio::time;
 
 use crate::common::meta::telemetry::Telemetry;
-use config::get_config;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    let cfg = config::get_config();
-    if !cfg.common.telemetry_enabled {
-        return Ok(());
-    }
-
     loop {
+        let cfg = config::get_config();
+        if !cfg.common.telemetry_enabled {
+            // Sleep for a short time and check again if telemetry gets enabled
+            tokio::time::sleep(time::Duration::from_secs(30)).await;
+            continue;
+        }
+
         tokio::time::sleep(time::Duration::from_secs(
-            get_config().common.telemetry_heartbeat.try_into().unwrap(),
+            cfg.common.telemetry_heartbeat.try_into().unwrap(),
         )).await;
         Telemetry::new()
             .heart_beat("OpenObserve - heartbeat", None)

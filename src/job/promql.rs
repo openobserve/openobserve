@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster::LOCAL_NODE, meta::promql::ClusterLeader, get_config};
+use config::{cluster::LOCAL_NODE, meta::promql::ClusterLeader};
 use hashbrown::HashMap;
 use tokio::time::Duration;
 
@@ -24,15 +24,16 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(()); // not an ingester, no need to init job
     }
 
-    let cfg = config::get_config();
-    if !cfg.common.metrics_dedup_enabled {
-        return Ok(());
-    }
-
     let mut last_leaders: HashMap<String, ClusterLeader> = HashMap::new(); // maintain the last state
 
     loop {
-        tokio::time::sleep(Duration::from_secs(get_config().limit.metrics_leader_push_interval)).await;
+        let cfg = config::get_config();
+        if !cfg.common.metrics_dedup_enabled {
+            // Sleep and check again if metrics dedup gets enabled
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            continue;
+        }
+        tokio::time::sleep(Duration::from_secs(cfg.limit.metrics_leader_push_interval)).await;
         // only update if there's a change
         let map = METRIC_CLUSTER_LEADER.read().await.clone();
         for (key, value) in map.iter() {
