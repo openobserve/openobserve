@@ -25,5 +25,3 @@ flamegraph.html
 # web distribution
 /web/dist
 /web/.env
-
-CLAUDE.md
