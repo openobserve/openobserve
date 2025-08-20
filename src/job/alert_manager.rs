@@ -16,7 +16,6 @@
 use config::{cluster::LOCAL_NODE, get_config};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
-use tokio::time;
 
 use crate::service;
 
@@ -86,10 +85,10 @@ async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
         if scheduler_watch_interval <= 0 {
             // we pause the task here
             // check every 60 seconds
-            tokio::time::sleep(time::Duration::from_secs(60)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
             continue;
         }
-        tokio::time::sleep(time::Duration::from_secs(scheduler_watch_interval as u64)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(scheduler_watch_interval as u64)).await;
         if let Err(e) = infra::scheduler::watch_timeout().await {
             log::error!("[SCHEDULER] watch timeout jobs error: {}", e);
         }
@@ -99,7 +98,7 @@ async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
 #[cfg(feature = "enterprise")]
 async fn run_search_jobs(id: i64) -> Result<(), anyhow::Error> {
     loop {
-        tokio::time::sleep(time::Duration::from_secs(
+        tokio::time::sleep(tokio::time::Duration::from_secs(
             get_config().limit.search_job_scheduler_interval as u64,
         ))
         .await;
@@ -127,13 +126,9 @@ async fn run_check_running_search_jobs() -> Result<(), anyhow::Error> {
 
 #[cfg(feature = "enterprise")]
 async fn run_delete_jobs_by_retention() -> Result<(), anyhow::Error> {
-    let time = get_config().limit.search_job_retention * 24 * 60 * 60;
-    let mut interval = time::interval(time::Duration::from_secs(
-        get_config().limit.search_job_run_timeout as u64,
-    ));
-    interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await;
+        let time = get_config().limit.search_job_retention * 24 * 60 * 60 as u64;
+        tokio::time::sleep(tokio::time::Duration::from_secs(time)).await;
         log::debug!("[SEARCH JOB] Running delete jobs by retention");
         let now = config::utils::time::now_micros();
         let updated_at = now - (time * 1_000_000);
@@ -145,11 +140,8 @@ async fn run_delete_jobs_by_retention() -> Result<(), anyhow::Error> {
 
 #[cfg(feature = "enterprise")]
 async fn run_delete_jobs() -> Result<(), anyhow::Error> {
-    let interval = get_config().limit.search_job_delete_interval;
-    let mut interval = time::interval(time::Duration::from_secs(interval as u64));
-    interval.tick().await; // trigger the first run
     loop {
-        interval.tick().await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(get_config().limit.search_job_delete_interval as u64)).await;
         log::debug!("[SEARCH JOB] Running delete jobs");
         if let Err(e) = service::search_jobs::delete_jobs().await {
             log::error!("[SEARCH JOB] run delete jobs error: {}", e);
