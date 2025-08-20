@@ -20,7 +20,7 @@ use actix_web::{
 };
 use chrono::{TimeZone, Utc};
 use config::{
-    meta::stream::{StreamSettings, StreamType, TimeRange, UpdateStreamSettings},
+    meta::stream::{StreamType, TimeRange, UpdateStreamSettings},
     utils::schema::format_stream_name,
 };
 use hashbrown::HashMap;
@@ -34,7 +34,7 @@ use crate::{
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
-            stream::{ListStream, StreamDeleteFields},
+            stream::{ListStream, StreamCreate, StreamDeleteFields},
         },
         utils::http::{get_stream_type_from_request, get_ts_from_request_with_key},
     },
@@ -127,13 +127,13 @@ async fn schema(
     Ok(HttpResponse::Ok().json(schema))
 }
 
-/// CreateStreamSettings
+/// CreateStream
 ///
 /// #{"ratelimit_module":"Streams", "ratelimit_module_operation":"create"}#
 #[utoipa::path(
     context_path = "/api",
     tag = "Streams",
-    operation_id = "StreamSettings",
+    operation_id = "StreamCreate",
     security(
         ("Authorization"= [])
     ),
@@ -142,16 +142,17 @@ async fn schema(
         ("stream_name" = String, Path, description = "Stream name"),
         ("type" = String, Query, description = "Stream type"),
     ),
-    request_body(content = StreamSettings, description = "Stream settings", content_type = "application/json"),
+    request_body(content = StreamCreate, description = "Stream create", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/streams/{stream_name}/settings")]
-async fn settings(
+#[post("/{org_id}/streams/{stream_name}")]
+async fn create(
     path: web::Path<(String, String)>,
-    settings: web::Json<StreamSettings>,
+    stream: web::Json<StreamCreate>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, mut stream_name) = path.into_inner();
@@ -168,7 +169,7 @@ async fn settings(
             )),
         );
     }
-    stream::save_stream_settings(&org_id, &stream_name, stream_type, settings.into_inner()).await
+    stream::create_stream(&org_id, &stream_name, stream_type, stream.into_inner()).await
 }
 
 /// UpdateStreamSettings
@@ -190,6 +191,8 @@ async fn settings(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[put("/{org_id}/streams/{stream_name}/settings")]
@@ -214,50 +217,8 @@ async fn update_settings(
         );
     }
     let stream_settings: UpdateStreamSettings = stream_settings.into_inner();
-    let main_stream_res =
-        stream::update_stream_settings(&org_id, &stream_name, stream_type, stream_settings.clone())
-            .await?;
-
-    // sync the data retention to index stream
-    if stream_type.is_basic_type() && stream_settings.data_retention.is_some() {
-        #[allow(deprecated)]
-        let index_stream_name =
-            if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
-                stream_name.to_string()
-            } else {
-                format!("{stream_name}_{stream_type}")
-            };
-        if infra::schema::get(&org_id, &index_stream_name, StreamType::Index)
-            .await
-            .is_ok()
-        {
-            let index_stream_settings = UpdateStreamSettings {
-                data_retention: stream_settings.data_retention,
-                ..Default::default()
-            };
-            match stream::update_stream_settings(
-                &org_id,
-                &index_stream_name,
-                StreamType::Index,
-                index_stream_settings,
-            )
-            .await
-            {
-                Ok(_) => {
-                    log::debug!(
-                        "Data retention settings for {stream_name} synced to index stream {index_stream_name}"
-                    );
-                }
-                Err(e) => {
-                    log::error!(
-                        "Failed to sync data retention settings to index stream {index_stream_name}: {e}"
-                    );
-                }
-            }
-        }
-    }
-
-    Ok(main_stream_res)
+    stream::update_stream_settings(&org_id, &stream_name, stream_type, stream_settings.clone())
+        .await
 }
 
 /// DeleteStreamFields
@@ -279,6 +240,7 @@ async fn update_settings(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
 #[put("/{org_id}/streams/{stream_name}/delete_fields")]
@@ -668,7 +630,7 @@ async fn delete_stream_data_by_time_range(
     );
 
     // Create a job to delete the data by the time range
-    let key = match crate::service::db::compact::retention::delete_stream(
+    let (key, _created) = match crate::service::db::compact::retention::delete_stream(
         &org_id,
         stream_type,
         &stream_name,
