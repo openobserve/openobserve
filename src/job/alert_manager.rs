@@ -83,8 +83,11 @@ async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
 async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
     loop {
         let scheduler_watch_interval = get_config().limit.scheduler_watch_interval;
-        if scheduler_watch_interval < 0 {
-            return Ok(());
+        if scheduler_watch_interval <= 0 {
+            // we pause the task here
+            // check every 60 seconds
+            tokio::time::sleep(time::Duration::from_secs(60)).await;
+            continue;
         }
         tokio::time::sleep(time::Duration::from_secs(scheduler_watch_interval as u64)).await;
         if let Err(e) = infra::scheduler::watch_timeout().await {

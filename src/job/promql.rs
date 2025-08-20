@@ -30,7 +30,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         let cfg = config::get_config();
         if !cfg.common.metrics_dedup_enabled {
             // Sleep and check again if metrics dedup gets enabled
-            tokio::time::sleep(Duration::from_secs(30)).await;
+            tokio::time::sleep(Duration::from_secs(60)).await;
             continue;
         }
         tokio::time::sleep(Duration::from_secs(cfg.limit.metrics_leader_push_interval)).await;

@@ -236,18 +236,11 @@ impl SchedulerJobPuller {
                 jobs.push(scheduled_job);
 
                 let trace_id_keep_alive = trace_id.clone();
+                let ttl = self.config.keep_alive_interval_secs;
+                let alert_timeout = self.config.alert_schedule_timeout;
+                let report_timeout = self.config.report_schedule_timeout;
                 tokio::task::spawn(async move {
                     loop {
-                        let cfg = config::get_config();
-                        let alert_timeout = cfg.limit.alert_schedule_timeout;
-                        let report_timeout = cfg.limit.report_schedule_timeout;
-                        let ttl = std::cmp::max(
-                            std::cmp::min(
-                                cfg.limit.alert_schedule_timeout,
-                                cfg.limit.report_schedule_timeout,
-                            ) / 4,
-                            1,
-                        ) as u64;
                         tokio::select! {
                             _ = tokio::time::sleep(tokio::time::Duration::from_secs(ttl)) => {}
                             _ = rx.recv() => {
