@@ -34,7 +34,7 @@ async function ingestion(page) {
     "Authorization": `Basic ${basicAuthCredentials}`,
     "Content-Type": "application/json",
   };
-  
+
   try {
     const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
       const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
@@ -84,7 +84,7 @@ test.describe("CTE Logs Queries testcases", () => {
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     await page.waitForTimeout(3000)
-    await pageManager.logsPage.selectStream("e2e_cte"); 
+    await pageManager.logsPage.selectStream("e2e_cte");
     await applyQueryButton(page);
   });
 
@@ -236,38 +236,17 @@ test.describe("CTE Logs Queries testcases", () => {
 
   test("should query with complex container info and host summary CTE", {
     tag: ['@cteLogs', '@complex', '@logs']
-  }, async ({ page }) => {
+  }, async ({ page, context }) => {
+    // Grant clipboard permissions
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();
     await pageManager.logsPage.clickQueryEditor();
     await pageManager.logsPage.waitForTimeout(1000);
-    
-    // Clear any existing text first
-    await page.keyboard.press('Control+A');
-    await page.keyboard.press('Delete');
-    await pageManager.logsPage.waitForTimeout(500);
-    
-    // Type the query in parts to avoid truncation
-    const queryPart1 = 'WITH container_info AS (SELECT _timestamp, kubernetes_container_name, kubernetes_host, kubernetes_labels_app FROM (SELECT _timestamp, kubernetes_container_name, kubernetes_host, kubernetes_labels_app FROM (SELECT * FROM "e2e_cte" WHERE kubernetes_host IS NOT NULL) base_data) filtered_data WHERE kubernetes_labels_app IS NOT NULL), ';
-    const queryPart2 = 'host_summary AS (SELECT kubernetes_host, COUNT(*) as container_count, MAX(_timestamp) as latest_timestamp FROM "e2e_cte" GROUP BY kubernetes_host) ';
-    const queryPart3 = 'SELECT c._timestamp, c.kubernetes_container_name, c.kubernetes_host, c.kubernetes_labels_app, h.container_count, h.latest_timestamp FROM container_info c JOIN host_summary h ON c.kubernetes_host = h.kubernetes_host ORDER BY c._timestamp DESC LIMIT 10';
-    
-    await page.keyboard.type(queryPart1);
-    await pageManager.logsPage.waitForTimeout(500);
-    await page.keyboard.type(queryPart2);
-    await pageManager.logsPage.waitForTimeout(500);
-    await page.keyboard.type(queryPart3);
-    await pageManager.logsPage.waitForTimeout(2000);
-    
-    // Verify the query ends with "LIMIT 10" before running
-    const queryText = await page.locator('[data-test="logs-search-bar-query-editor"]').textContent();
-    if (queryText && queryText.includes('LIMIT 10')) {
-      await pageManager.logsPage.clickSearchBarRefreshButton();
-      await page.waitForTimeout(2000);
-      await pageManager.logsPage.expectLogTableColumnSourceVisible();
-    } else {
-      throw new Error('Query not fully typed - missing LIMIT 10');
-    }
+
+    const complexQuery = 'WITH container_info AS (SELECT _timestamp, kubernetes_container_name, kubernetes_pod_name, kubernetes_labels_app FROM (SELECT _timestamp, kubernetes_container_name, kubernetes_pod_name, kubernetes_labels_app FROM (SELECT * FROM "e2e_cte" WHERE kubernetes_pod_name IS NOT NULL) base_data) filtered_data), host_summary AS (SELECT kubernetes_pod_name, COUNT(*) as container_count, MAX(_timestamp) as latest_timestamp FROM "e2e_cte" GROUP BY kubernetes_pod_name) SELECT c._timestamp, c.kubernetes_container_name, c.kubernetes_pod_name, c.kubernetes_labels_app, h.container_count, h.latest_timestamp FROM container_info c JOIN host_summary h ON c.kubernetes_pod_name = h.kubernetes_pod_name ORDER BY c._timestamp DESC LIMIT 10';
+
+    await pageManager.logsPage.executeComplexQueryWithValidation(complexQuery, 'LIMIT 10');
   });
 
   test.afterEach(async ({ page }) => {

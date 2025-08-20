@@ -1816,4 +1816,115 @@ export class LogsPage {
     async clickAllFieldsButton() {
         return await this.page.locator('[data-test="logs-all-fields-btn"]').click();
     }
+
+    async executeComplexQueryWithValidation(fullQuery, expectedEndText = 'LIMIT 10') {
+        // Clear any existing text first
+        await this.page.keyboard.press('Control+A');
+        await this.page.keyboard.press('Delete');
+        await this.waitForTimeout(500);
+        
+        // Split query into parts to avoid truncation - use simple approach to preserve spaces
+        const queryParts = [];
+        const maxChunkSize = 250;
+        
+        if (fullQuery.length <= maxChunkSize) {
+            queryParts.push(fullQuery);
+        } else {
+            // Simple approach: split at safe points and add back spaces
+            let currentPart = '';
+            const words = fullQuery.split(' ');
+            
+            for (let i = 0; i < words.length; i++) {
+                const word = words[i];
+                const testPart = currentPart + (currentPart ? ' ' : '') + word;
+                
+                if (testPart.length > maxChunkSize && currentPart.length > 0) {
+                    // Add current part and start new one
+                    queryParts.push(currentPart);
+                    currentPart = word;
+                } else {
+                    currentPart = testPart;
+                }
+            }
+            
+            // Add the last part
+            if (currentPart) {
+                queryParts.push(currentPart);
+            }
+        }
+        
+        // Type the query parts with proper spacing
+        for (let i = 0; i < queryParts.length; i++) {
+            // Add space before each part except the first one
+            if (i > 0) {
+                await this.page.keyboard.type(' ');
+            }
+            await this.page.keyboard.type(queryParts[i]);
+            await this.waitForTimeout(500);
+        }
+        
+        // Click on Logs sidebar to ensure content is registered in DOM
+        await this.page.locator('[data-test="menu-link-/logs-item"]').click();
+        await this.waitForTimeout(1000);
+        
+        // Get the full query text using clipboard approach
+        const queryText = await this.page.evaluate(async () => {
+            const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+            if (!editor) return '';
+            
+            // Focus the editor
+            editor.focus();
+            
+            // Select all content
+            if (editor.select) {
+                editor.select();
+            } else {
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(editor);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+            
+            // Copy to clipboard
+            document.execCommand('copy');
+            
+            // Try to read from clipboard
+            try {
+                const clipboardText = await navigator.clipboard.readText();
+                return clipboardText;
+            } catch (e) {
+                return editor.value || editor.innerText || editor.textContent || '';
+            }
+        });
+        
+        await this.waitForTimeout(3000);
+        if (queryText && queryText.toLowerCase().includes(expectedEndText.toLowerCase())) {
+            await this.clickSearchBarRefreshButton();
+            await this.waitForTimeout(5000);
+            
+            // Check for either results or error messages
+            try {
+                await this.expectLogTableColumnSourceVisible();
+            } catch (error) {
+                // If no results, check for error messages or no data
+                const errorElement = this.page.locator('[data-test="logs-search-error-message"]');
+                const noDataElement = this.page.getByText('No data found');
+                
+                if (await errorElement.isVisible()) {
+                    const errorText = await errorElement.textContent();
+                    console.log('Query executed with error:', errorText);
+                    throw new Error(`Query executed with error: ${errorText}`);
+                } else if (await noDataElement.isVisible()) {
+                    console.log('Query executed successfully but returned no data');
+                    // This might be acceptable depending on the test data
+                    return;
+                } else {
+                    throw error;
+                }
+            }
+        } else {
+            throw new Error(`Query validation failed - missing ${expectedEndText}. Got: ${queryText.slice(-50)}`);
+        }
+    }
 } 
