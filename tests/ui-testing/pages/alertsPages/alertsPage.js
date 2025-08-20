@@ -250,7 +250,7 @@ export class AlertsPage {
     async moveAllAlertsToFolder(targetFolderName) {
         // Select all alerts
         await this.page.getByRole('row', { name: '# Name Owner Period Frequency' }).getByRole('checkbox').click();
-        await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
+        await expect(this.page.getByText('Showing 1 - 2 of')).toBeVisible();
 
         // Click move across folders button
         await this.page.locator(this.moveAcrossFoldersButton).click();
