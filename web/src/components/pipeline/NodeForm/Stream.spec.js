@@ -107,6 +107,15 @@ describe("Stream Component", () => {
       wrapper.vm.$q.notify = notifyMock;
   
     });
+
+    afterEach(() => {
+      if (wrapper) {
+        wrapper.unmount();
+      }
+      // Clear any pending timers to prevent "document is not defined" errors
+      vi.clearAllTimers();
+      vi.restoreAllMocks();
+    });
   
     describe("Stream Name Sanitization", () => {
   
