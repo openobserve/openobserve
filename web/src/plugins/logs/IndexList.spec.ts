@@ -296,6 +296,7 @@ describe("Index List", async () => {
     wrapper.vm.openedFilterFields = ref([]);
     wrapper.vm.streamFieldValues = ref({});
     wrapper.vm.streamOptions = ref([]);
+    wrapper.vm.streamSchemaFieldsIndexMapping = ref({});
   });
 
   afterEach(() => {
@@ -306,6 +307,7 @@ describe("Index List", async () => {
     wrapper.vm.openedFilterFields = ref([]);
     wrapper.vm.streamFieldValues = ref({});
     wrapper.vm.streamOptions = ref([]);
+    wrapper.vm.streamSchemaFieldsIndexMapping = ref({});
     wrapper.vm.fieldValues = [];
     // vi.clearAllMocks();
   });
