@@ -32,6 +32,7 @@ use datafusion::{
     },
 };
 use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
+use flight::common::Metrics;
 use futures::{StreamExt, TryStreamExt};
 use futures_util::pin_mut;
 use parking_lot::Mutex;
@@ -54,6 +55,7 @@ pub struct RemoteScanExec {
     cache: PlanProperties,
     pub scan_stats: Arc<Mutex<ScanStats>>,
     pub partial_err: Arc<Mutex<String>>,
+    pub cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
     pub enrich_mode_node_idx: usize,
     pub metrics: ExecutionPlanMetricsSet,
 }
@@ -91,6 +93,7 @@ impl RemoteScanExec {
             cache,
             scan_stats: Arc::new(Mutex::new(ScanStats::default())),
             partial_err: Arc::new(Mutex::new(String::new())),
+            cluster_metrics: Arc::new(Mutex::new(Vec::new())),
             enrich_mode_node_idx,
             metrics: ExecutionPlanMetricsSet::new(),
         })
@@ -102,6 +105,10 @@ impl RemoteScanExec {
 
     pub fn partial_err(&self) -> Arc<Mutex<String>> {
         self.partial_err.clone()
+    }
+
+    pub fn cluster_metrics(&self) -> Arc<Mutex<Vec<Metrics>>> {
+        self.cluster_metrics.clone()
     }
 
     fn output_partitioning_helper(n_partitions: usize) -> Partitioning {
@@ -186,6 +193,7 @@ impl ExecutionPlan for RemoteScanExec {
             self.input.schema().clone(),
             self.scan_stats(),
             self.partial_err(),
+            self.cluster_metrics(),
         );
         let stream = futures::stream::once(fut).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(
@@ -210,6 +218,7 @@ async fn get_remote_batch(
     schema: SchemaRef,
     scan_stats: Arc<Mutex<ScanStats>>,
     partial_err: Arc<Mutex<String>>,
+    cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
 ) -> Result<SendableRecordBatchStream> {
     let start = std::time::Instant::now();
     let cfg = config::get_config();
@@ -312,6 +321,7 @@ async fn get_remote_batch(
         .with_is_querier(is_querier)
         .with_scan_stats(scan_stats)
         .with_partial_err(partial_err.clone())
+        .with_cluster_metrics(cluster_metrics)
         .with_start_time(start);
 
     let mut stream = FlightDecoderStream::new(stream, schema.clone(), query_context);

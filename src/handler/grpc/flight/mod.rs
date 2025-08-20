@@ -77,7 +77,7 @@ impl FlightService for FlightServiceImpl {
         });
         tracing::Span::current().set_parent(parent_cx.clone());
 
-        // 1. decode ticket to RemoteExecNode
+        // decode ticket to RemoteExecNode
         let ticket = request.into_inner();
         let mut buf = Cursor::new(ticket.ticket);
         let req = proto::cluster_rpc::FlightSearchRequest::decode(&mut buf)
@@ -122,7 +122,7 @@ impl FlightService for FlightServiceImpl {
             SEARCH_SERVER.remove(&trace_id, false).await;
         }
 
-        // 2. prepare dataufion context
+        // prepare dataufion context
         let (ctx, physical_plan, defer, scan_stats) = match result {
             Ok(v) => v,
             Err(e) => {
@@ -164,6 +164,12 @@ impl FlightService for FlightServiceImpl {
         // used for super cluster follower leader to get scan stats
         let scan_stats_ref = get_scan_stats(physical_plan.clone());
 
+        // used for EXPLAIN ANALYZE to collect metrics after stream is done
+        let metrics_ref = req
+            .search_info
+            .is_analyze
+            .then_some((physical_plan.clone(), is_super_cluster));
+
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
             // clear session data
             clear_session_data(&trace_id);
@@ -179,6 +185,7 @@ impl FlightService for FlightServiceImpl {
             .with_start(start)
             .with_custom_message(PreCustomMessage::ScanStats(scan_stats))
             .with_custom_message(PreCustomMessage::ScanStatsRef(scan_stats_ref))
+            .with_custom_message(PreCustomMessage::Metrics(metrics_ref))
             .build(stream);
 
         let stream = async_stream::stream! {
