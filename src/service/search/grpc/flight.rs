@@ -233,10 +233,7 @@ pub async fn search(
         log::info!(
             "{}",
             search_inspector_fields(
-                format!(
-                    "[trace_id {trace_id}] flight->search: handle tantivy optimize, took: {} ms",
-                    tantivy_optimize_start.elapsed().as_millis()
-                ),
+                format!("[trace_id {trace_id}] flight->search: handle tantivy optimize"),
                 SearchInspectorFieldsBuilder::new()
                     .node_name(LOCAL_NODE.name.clone())
                     .component("flight:do_get::search handle tantivy optimize".to_string())
@@ -254,10 +251,7 @@ pub async fn search(
         log::info!(
             "{}",
             search_inspector_fields(
-                format!(
-                    "[trace_id {trace_id}] flight->search: sort file list, took: {} ms",
-                    sort_start.elapsed().as_millis()
-                ),
+                format!("[trace_id {trace_id}] flight->search: sort file list"),
                 SearchInspectorFieldsBuilder::new()
                     .node_name(LOCAL_NODE.name.clone())
                     .component("flight:do_get::search sort file list".to_string())
@@ -296,9 +290,8 @@ pub async fn search(
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {trace_id}] flight->search: storage search completed, {} files, took: {} ms",
-                    file_list.len(),
-                    storage_search_start.elapsed().as_millis()
+                    "[trace_id {trace_id}] flight->search: storage search completed, {} files",
+                    file_list.len()
                 ),
                 SearchInspectorFieldsBuilder::new()
                     .node_name(LOCAL_NODE.name.clone())
@@ -395,10 +388,7 @@ pub async fn search(
     log::info!(
         "{}",
         search_inspector_fields(
-            format!(
-                "[trace_id {trace_id}] flight->search: created union table, took: {} ms",
-                start.elapsed().as_millis()
-            ),
+            format!("[trace_id {trace_id}] flight->search: created union table"),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:do_get::search union table creation".to_string())
@@ -420,10 +410,7 @@ pub async fn search(
     log::info!(
         "{}",
         search_inspector_fields(
-            format!(
-                "[trace_id {trace_id}] flight->search: union table scan, took: {} ms",
-                scan_start.elapsed().as_millis()
-            ),
+            format!("[trace_id {trace_id}] flight->search: union table scan"),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:do_get::search union table scan".to_string())
@@ -439,10 +426,7 @@ pub async fn search(
     log::info!(
         "{}",
         search_inspector_fields(
-            format!(
-                "[trace_id {trace_id}] flight->search: physical plan rewrite, took: {} ms",
-                rewrite_start.elapsed().as_millis()
-            ),
+            format!("[trace_id {trace_id}] flight->search: physical plan rewrite"),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:do_get::search physical plan rewrite".to_string())
@@ -465,10 +449,7 @@ pub async fn search(
         log::info!(
             "{}",
             search_inspector_fields(
-                format!(
-                    "[trace_id {trace_id}] flight->search: tantivy optimize rewrite, took: {} ms",
-                    tantivy_start.elapsed().as_millis()
-                ),
+                format!("[trace_id {trace_id}] flight->search: tantivy optimize rewrite"),
                 SearchInspectorFieldsBuilder::new()
                     .node_name(LOCAL_NODE.name.clone())
                     .component("flight:do_get::search tantivy optimize rewrite".to_string())
