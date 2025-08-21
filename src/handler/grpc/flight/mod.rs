@@ -26,19 +26,25 @@ use datafusion::{
     common::{DataFusionError, Result},
     physical_plan::execute_stream,
 };
-use flight::common::PreCustomMessage;
+use flight::common::{MetricsInfo, PreCustomMessage};
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;
 use tonic::{Request, Response, Status, Streaming};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
-use {crate::service::search::SEARCH_SERVER, o2_enterprise::enterprise::search::TaskStatus};
+use {
+    crate::service::search::SEARCH_SERVER,
+    o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
+};
 
 use crate::{
     handler::grpc::{
         MetadataMap,
-        flight::{stream::FlightEncoderStreamBuilder, visitor::get_scan_stats},
+        flight::{
+            stream::FlightEncoderStreamBuilder,
+            visitor::{get_cluster_metrics, get_scan_stats},
+        },
     },
     service::search::{
         grpc::flight as grpcFlight,
@@ -49,7 +55,7 @@ use crate::{
 };
 
 mod stream;
-mod visitor;
+pub mod visitor;
 
 #[derive(Default)]
 pub struct FlightServiceImpl;
@@ -77,7 +83,7 @@ impl FlightService for FlightServiceImpl {
         });
         tracing::Span::current().set_parent(parent_cx.clone());
 
-        // 1. decode ticket to RemoteExecNode
+        // decode ticket to RemoteExecNode
         let ticket = request.into_inner();
         let mut buf = Cursor::new(ticket.ticket);
         let req = proto::cluster_rpc::FlightSearchRequest::decode(&mut buf)
@@ -122,7 +128,7 @@ impl FlightService for FlightServiceImpl {
             SEARCH_SERVER.remove(&trace_id, false).await;
         }
 
-        // 2. prepare dataufion context
+        // prepare dataufion context
         let (ctx, physical_plan, defer, scan_stats) = match result {
             Ok(v) => v,
             Err(e) => {
@@ -164,6 +170,16 @@ impl FlightService for FlightServiceImpl {
         // used for super cluster follower leader to get scan stats
         let scan_stats_ref = get_scan_stats(physical_plan.clone());
 
+        // used for EXPLAIN ANALYZE to collect metrics after stream is done
+        let metrics = req.search_info.is_analyze.then_some(MetricsInfo {
+            plan: physical_plan.clone(),
+            is_super_cluster,
+            func: Box::new(super_cluster_enabled),
+        });
+
+        // used for super cluster follower leader to get metrics
+        let metrics_ref = get_cluster_metrics(physical_plan.clone());
+
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
             // clear session data
             clear_session_data(&trace_id);
@@ -179,6 +195,8 @@ impl FlightService for FlightServiceImpl {
             .with_start(start)
             .with_custom_message(PreCustomMessage::ScanStats(scan_stats))
             .with_custom_message(PreCustomMessage::ScanStatsRef(scan_stats_ref))
+            .with_custom_message(PreCustomMessage::Metrics(metrics))
+            .with_custom_message(PreCustomMessage::MetricsRef(metrics_ref))
             .build(stream);
 
         let stream = async_stream::stream! {
@@ -306,4 +324,12 @@ fn clear_session_data(trace_id: &str) {
     crate::service::search::datafusion::storage::file_list::clear(trace_id);
     // release wal lock files
     crate::common::infra::wal::release_request(trace_id);
+}
+
+fn super_cluster_enabled() -> bool {
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        return true;
+    }
+    false
 }
