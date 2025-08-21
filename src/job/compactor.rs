@@ -255,11 +255,6 @@ async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
     if let Err(e) = infra::dist_lock::unlock(&locker).await {
         log::error!("[COMPACTOR::JOB] Failed to release lock for enrichment table merge: {e}");
     }
-    let handle = tokio::task::spawn(async move {
-        if let Err(e) = crate::service::enrichment::storage::remote::run_merge_job().await {
-            log::error!("[COMPACTOR::JOB] run enrichment table merge error: {e}");
-        }
-    });
-    handle.await.unwrap();
+    crate::service::enrichment::storage::remote::run_merge_job().await;
     Ok(())
 }
