@@ -413,7 +413,6 @@ pub enum Config {
     },
     #[serde(rename = "unique_value_color")]
     UniqueValueColor {
-        #[serde(rename = "autoColor")]
         auto_color: bool,
     },
 }
