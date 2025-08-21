@@ -187,12 +187,18 @@ export default defineComponent({
     };
 
     const signout = () => {
-      if (config?.isEnterprise == "true") {
+      if (config?.isEnterprise == "true" || config?.isCloud == "true") {
         invlidateLoginData();
       }
 
       store.dispatch("logout");
-      router.push("/logout");
+      useLocalCurrentUser("", true);
+      useLocalUserInfo("", true);
+
+      router.push("/login");
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     };
 
     /**
