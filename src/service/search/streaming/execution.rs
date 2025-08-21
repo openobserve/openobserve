@@ -234,6 +234,13 @@ pub async fn do_partitioned_search(
             let duration = instant.elapsed();
             log::debug!("Top k values for partition {idx} took {duration:?}");
         }
+        crate::service::search::cache::apply_regex_to_response(
+            &req,
+            org_id,
+            stream_name,
+            stream_type,
+            &mut search_res,
+        ).await?;
 
         if is_result_array_skip_vrl {
             search_res.hits = crate::service::search::cache::apply_vrl_to_response(
@@ -549,6 +556,14 @@ pub async fn process_delta(
             search_res.total = hit_count as usize;
             search_res.hits = top_k_values;
         }
+        crate::service::search::cache::apply_regex_to_response(
+            &req,
+            org_id,
+            stream_name,
+            stream_type,
+            &mut search_res,
+        ).await?;
+
         if is_result_array_skip_vrl {
             search_res.hits = crate::service::search::cache::apply_vrl_to_response(
                 backup_query_fn.clone(),
@@ -695,6 +710,13 @@ async fn send_partial_search_resp(
         trace_id: trace_id.to_string(),
         ..Default::default()
     };
+    // crate::service::search::cache::apply_regex_to_response(
+    //     &req,
+    //     org_id,
+    //     &stream_name,
+    //     stream_type,
+    //     &mut s_resp,
+    // ).await?;
     if is_result_array_skip_vrl {
         s_resp.hits = crate::service::search::cache::apply_vrl_to_response(
             backup_query_fn.clone(),
