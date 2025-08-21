@@ -208,7 +208,9 @@ impl From<&OrgInviteStatus> for InviteStatus {
 #[cfg(feature = "cloud")]
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserInvite {
+    pub org_name: String,
     pub org_id: String,
+    pub inviter_id: String,
     pub token: String,
     pub role: String,
     pub status: InviteStatus,

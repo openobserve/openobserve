@@ -1079,16 +1079,23 @@ pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<Http
     let result = db::user::list_user_invites(user_id).await;
     match result {
         Ok(res) => {
-            let mut result: Vec<UserInvite> = res
-                .into_iter()
-                .map(|invite| UserInvite {
+            let mut result: Vec<UserInvite> = Vec::with_capacity(res.len());
+
+            for invite in res {
+                result.push(UserInvite {
+                    org_name: db::organization::get_org(&invite.org_id)
+                        .await
+                        .map(|org| org.name)
+                        .unwrap_or("default".to_string()),
                     role: invite.role,
                     org_id: invite.org_id,
                     token: invite.token,
+                    inviter_id: invite.inviter_id,
                     status: InviteStatus::from(&invite.status),
                     expires_at: invite.expires_at,
-                })
-                .collect();
+                });
+            }
+
             if only_pending {
                 let now = chrono::Utc::now().timestamp_micros();
 
