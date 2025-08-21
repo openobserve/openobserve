@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               self="top middle"
               class="organization-menu-o2"
             >
-              <q-list data-test="organization-menu-list" style="width: 250px">
+              <q-list data-test="organization-menu-list" style="width: 470px">
                 <q-item data-test="organization-menu-item" style="padding: 0">
                   <q-item-section
                     data-test="organization-menu-item-section"
@@ -205,18 +205,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <q-item-section>
                               <q-item-label
-                                data-test="organization-menu-item-label-item-label"
-                                class="tw-overflow-hidden tw-whitespace-nowrap tw-text-ellipsis tw-max-w-[230px]"
-                              >
-                                {{ props.row.label }}
-                                <q-tooltip
-                                  v-if="props.row.label.length > 35"
-                                  anchor="bottom middle"
-                                  self="top start"
+                                  data-test="organization-menu-item-label-item-label"
+                                  class="tw-overflow-hidden tw-whitespace-nowrap tw-text-ellipsis tw-max-w-[450px]"
                                 >
-                                  {{ props.row.label }}
-                                </q-tooltip>
-                              </q-item-label>
+                                  {{ props.row.label.length > 30 ? props.row.label.substring(0, 30) + '... | ' + props.row.identifier : props.row.label + ' | ' + props.row.identifier }}
+                                  <q-tooltip v-if="props.row.label.length > 30"  anchor="bottom middle" self="top start">
+                                    {{ props.row.label }}
+                                  </q-tooltip>
+                                </q-item-label>
                             </q-item-section>
                           </q-item>
                         </q-td>
@@ -733,11 +729,16 @@ export default defineComponent({
     const searchQuery = ref("");
 
     const filteredOrganizations = computed(() => {
+      //we will return all organizations if searchQuery is empty
+      //else we will search based upon label or identifier that we get from the search query 
+      //if anyone of the orgs matches either label or identifier then we will return that orgs
       if (!searchQuery.value) return orgOptions.value;
-      const toBeSearched = searchQuery.value.toLowerCase();
-      return orgOptions.value.filter((org: any) =>
-        org.label?.toLowerCase().includes(toBeSearched),
-      );
+      const toBeSearched = searchQuery.value.toLowerCase().trim();
+      return orgOptions.value.filter((org: any) => {
+        const labelMatch = org.label?.toLowerCase().includes(toBeSearched);
+        const identifierMatch = org.identifier?.toLowerCase().includes(toBeSearched);
+        return labelMatch || identifierMatch;
+      });
     });
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
