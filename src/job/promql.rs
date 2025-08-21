@@ -24,7 +24,7 @@ pub fn run() -> Option<tokio::task::JoinHandle<()>> {
     }
 
     let mut last_leaders: HashMap<String, ClusterLeader> = HashMap::new();
-    
+
     Some(spawn_pausable_job!(
         "promql_metrics_leader",
         config::get_config().limit.metrics_leader_push_interval,
@@ -48,6 +48,6 @@ pub fn run() -> Option<tokio::task::JoinHandle<()>> {
                 }
             }
         },
-        pause_if: config::get_config().limit.metrics_leader_push_interval <= 0 || !config::get_config().common.metrics_dedup_enabled
+        pause_if: config::get_config().limit.metrics_leader_push_interval == 0 || !config::get_config().common.metrics_dedup_enabled
     ))
 }
