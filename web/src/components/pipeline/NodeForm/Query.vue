@@ -556,26 +556,30 @@ const updateDelay = (val: any) => {
 //if there is no limit in the sql query then it will return the sql query as is
 const normalizeLimit = (sql: string, maxLimit = 100): string => {
   try {
-  //regex will detect the LIMIT and OFFSET in the sql query 
-  //it will capture the multiple LIMIT and OFFSET in the sql query
-  const regex = /\bLIMIT\s+(\d+)(\s+OFFSET\s+\d+)?/gi;
-  //here we will test if the sql query has LIMIT and OFFSET
-  //if it has LIMIT then we will replace the LIMIT with the normalized limit
-  //if it has no LIMIT then we will return the sql query as is
-  //if it has LIMIT but no OFFSET then we will return the sql query with the normalized
-  if (regex.test(sql)) {
-    return sql.replace(regex, (match, limit, offset) => {
-      const num = parseInt(limit, 10);
-      return `LIMIT ${num > maxLimit ? maxLimit : num}${offset || ''}`;
-    });
-  }
-  // no LIMIT just return as it is the same query that user have written
-  return sql;
+    // regex will detect the LIMIT and OFFSET in the sql query 
+    // it will capture multiple LIMIT and OFFSET in the sql query
+    const regex = /\bLIMIT\s+(\d+)(\s+OFFSET\s+\d+)?/gi;
+     //here we will test if the sql query has LIMIT and OFFSET
+    //if it has LIMIT then we will replace the LIMIT with the normalized limit
+    //if it has no LIMIT then we will return the sql query as is
+    //if it has LIMIT but no OFFSET then we will return the sql query with the normalized
+    //we have moved to match instead of test because sometimes it fails when there are multiple limit with in the same query 
+    //due to last index effects
+    if (sql.match(regex)) {
+      return sql.replace(regex, (match, limit, offset) => {
+        const num = parseInt(limit, 10);
+        return `LIMIT ${num > maxLimit ? maxLimit : num}${offset || ''}`;
+      });
+    }
+
+    // no LIMIT just return as it is the same query that user have written
+    return sql;
   } catch (error) {
     console.error("Error normalizing SQL limit:", error);
-    return sql; // Return the original SQL if there's an error
+    return sql; // fallback to original SQL
   }
-}
+};
+
 </script>
 
 <style scoped>
