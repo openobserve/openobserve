@@ -676,14 +676,21 @@ const useLogs = () => {
       query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
     }
 
-    // Add visualization data to URL if in visualize mode and dashboardPanelData is provided
+    // Preserve visualization data in URL
+    // - If in visualize mode and panel data is provided, encode the dashboardPanelData
     if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
-      const visualizationConfig = getVisualizationConfig(dashboardPanelData);
-      if (visualizationConfig) {
-        const encodedConfig = encodeVisualizationConfig(visualizationConfig);
-        if (encodedConfig) {
-          query["visualization_data"] = encodedConfig;
+      const visualizationData = getVisualizationConfig(dashboardPanelData);
+      if (visualizationData) {
+        const encoded = encodeVisualizationConfig(visualizationData);
+        if (encoded) {
+          query["visualization_data"] = encoded;
         }
+      }
+    } else {
+      // else preserve existing visualization data from the current URL
+      const existingEncodedConfig = router.currentRoute.value?.query?.visualization_data as string | undefined;
+      if (existingEncodedConfig) {
+        query["visualization_data"] = existingEncodedConfig;
       }
     }
 

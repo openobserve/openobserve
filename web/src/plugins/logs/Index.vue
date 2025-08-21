@@ -1439,68 +1439,68 @@ export default defineComponent({
               dashboardPanelData.layout.currentQueryIndex
             ].customQuery = true;
 
-            // Restore visualization data from URL parameters if available
+            // Apply only visualization config from URL (if present) and rebuild from logs query
             const queryParams = router.currentRoute.value.query;
             if (queryParams.visualization_data) {
               const restoredData = decodeVisualizationConfig(queryParams.visualization_data);
-              if (restoredData && dashboardPanelData.data) {
-                dashboardPanelData.data = {
-                  ...dashboardPanelData.data,
-                  ...restoredData
+              if (restoredData && dashboardPanelData.data && restoredData.config) {
+                dashboardPanelData.data.config = {
+                  ...dashboardPanelData.data.config,
+                  ...restoredData.config,
                 };
               }
-            } else {
+            }
 
-              shouldUseHistogramQuery.value = await extractVisualizationFields(true);
+            // Always rebuild visualization from logs page query and decide feasible chart type
+            shouldUseHistogramQuery.value = await extractVisualizationFields(true);
 
-              // if not able to parse query, do not do anything
-              if (shouldUseHistogramQuery.value === null) {
-                return;
-              }
+            // if not able to parse query, do not do anything
+            if (shouldUseHistogramQuery.value === null) {
+              return;
+            }
 
-              // set logs page data to searchResponseForVisualization
-              if (shouldUseHistogramQuery.value === true) {
+            // set logs page data to searchResponseForVisualization
+            if (shouldUseHistogramQuery.value === true) {
 
-                // only do it if is_histogram_eligible is true on logs page
-                // and showHistogram is true on logs page
-                if (searchObj?.data?.queryResults?.is_histogram_eligible === true && searchObj?.meta?.showHistogram === true) {
+              // only do it if is_histogram_eligible is true on logs page
+              // and showHistogram is true on logs page
+              if (searchObj?.data?.queryResults?.is_histogram_eligible === true && searchObj?.meta?.showHistogram === true) {
 
-                  // replace hits with histogram query data
-                  searchResponseForVisualization.value = {
-                    ...searchObj.data.queryResults,
-                    hits: searchObj.data.queryResults.aggs,
-                    histogram_interval:
-                      searchObj?.data?.queryResults
-                        ?.visualization_histogram_interval,
-                  };
-
-                  // assign converted_histogram_query to dashboardPanelData
-                  if (searchObj.data.queryResults.converted_histogram_query) {
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].query = searchObj.data.queryResults.converted_histogram_query;
-
-                    // assign to visualizeChartData as well
-                    visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query
-                  }
-                }
-
-              } else {
+                // replace hits with histogram query data
                 searchResponseForVisualization.value = {
                   ...searchObj.data.queryResults,
+                  hits: searchObj.data.queryResults.aggs,
                   histogram_interval:
                     searchObj?.data?.queryResults
                       ?.visualization_histogram_interval,
                 };
 
-                // if hits is empty and filteredHit is present, then set hits to filteredHit
-                if (
-                  searchResponseForVisualization?.value?.hits?.length === 0 &&
-                  searchResponseForVisualization?.value?.filteredHit
-                ) {
-                  searchResponseForVisualization.value.hits =
-                    searchResponseForVisualization?.value?.filteredHit ?? [];
+                // assign converted_histogram_query to dashboardPanelData
+                if (searchObj.data.queryResults.converted_histogram_query) {
+                  dashboardPanelData.data.queries[
+                    dashboardPanelData.layout.currentQueryIndex
+                  ].query = searchObj.data.queryResults.converted_histogram_query;
+
+                  // assign to visualizeChartData as well
+                  visualizeChartData.value.queries[0].query = dashboardPanelData.data.queries[0].query
                 }
+              }
+
+            } else {
+              searchResponseForVisualization.value = {
+                ...searchObj.data.queryResults,
+                histogram_interval:
+                  searchObj?.data?.queryResults
+                    ?.visualization_histogram_interval,
+              };
+
+              // if hits is empty and filteredHit is present, then set hits to filteredHit
+              if (
+                searchResponseForVisualization?.value?.hits?.length === 0 &&
+                searchResponseForVisualization?.value?.filteredHit
+              ) {
+                searchResponseForVisualization.value.hits =
+                  searchResponseForVisualization?.value?.filteredHit ?? [];
               }
             }
 
