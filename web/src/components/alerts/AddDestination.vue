@@ -333,11 +333,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   ref,
   computed,
-  defineProps,
   onBeforeMount,
   onActivated,
-  defineEmits,
-  reactive,
 } from "vue";
 import type { Ref, PropType } from "vue";
 import { useI18n } from "vue-i18n";
@@ -353,7 +350,6 @@ import type {
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
-import actionService from "@/services/action_scripts";
 import config from "@/aws-exports";
 import useActions from "@/composables/useActions";
 

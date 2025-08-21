@@ -1,5 +1,5 @@
 import { test, expect } from "../baseFixtures.js";
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
 
@@ -112,6 +112,11 @@ test.describe("Schema testcases", () => {
     // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
     await page.waitForTimeout(1000);
+
+    await page.locator('[data-test="logs-user-defined-fields-btn"]').click();
+    await page.locator('[data-test="log-search-index-list-interesting-_all-field-btn"]').last().click({force: true});
+
+    await applyQueryButton(page);
      await page.getByText(/^arrow_drop_down_all:.*$/).click();
     await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
     await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('_timestamp');

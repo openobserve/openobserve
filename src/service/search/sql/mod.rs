@@ -77,9 +77,9 @@ pub struct Sql {
     pub org_id: String,
     pub stream_type: StreamType,
     pub stream_names: Vec<TableReference>,
-    pub match_items: Option<Vec<String>>, // match_all, only for single stream
+    pub has_match_all: bool, // match_all, only for single stream
     pub equal_items: HashMap<TableReference, Vec<(String, String)>>, /* table_name ->
-                                           * [(field_name, value)] */
+                              * [(field_name, value)] */
     pub prefix_items: HashMap<TableReference, Vec<(String, String)>>, /* table_name -> [(field_name, value)] */
     pub columns: HashMap<TableReference, HashSet<String>>,            // table_name -> [field_name]
     pub aliases: Vec<(String, String)>,                               // field_name, alias
@@ -189,7 +189,7 @@ impl Sql {
         // 5. get match_all() value
         let mut match_visitor = MatchVisitor::new();
         let _ = statement.visit(&mut match_visitor);
-        let need_fst_fields = match_visitor.match_items.is_some();
+        let need_fst_fields = match_visitor.has_match_all;
 
         // 6. check if have full text search filed in stream
         if stream_names.len() == 1 && need_fst_fields {
@@ -224,8 +224,7 @@ impl Sql {
         } else {
             for (stream, schema) in total_schemas.iter() {
                 let columns = columns.get(stream).cloned().unwrap_or(Default::default());
-                let fields =
-                    generate_schema_fields(columns, schema, match_visitor.match_items.is_some());
+                let fields = generate_schema_fields(columns, schema, match_visitor.has_match_all);
                 let schema = Schema::new(fields).with_metadata(schema.schema().metadata().clone());
                 used_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(schema)));
             }
@@ -381,7 +380,7 @@ impl Sql {
             org_id: org_id.to_string(),
             stream_type,
             stream_names,
-            match_items: match_visitor.match_items,
+            has_match_all: match_visitor.has_match_all,
             equal_items: partition_column_visitor.equal_items,
             prefix_items: prefix_column_visitor.prefix_items,
             columns,
@@ -405,13 +404,13 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, index_optimize_mode: {:?}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, has_match_all: {}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}, index_optimize_mode: {:?}",
             self.sql,
             self.time_range,
             self.org_id,
             self.stream_type,
             self.stream_names,
-            self.match_items,
+            self.has_match_all,
             self.equal_items,
             self.prefix_items,
             self.aliases,

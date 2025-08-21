@@ -1,6 +1,6 @@
 import { test, expect } from "../baseFixtures.js";
 // pageManager.commonActions is used for streaming flip; no direct import needed
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from '../../pages/page-manager.js';
 // (unused CommonActions import removed)
@@ -223,6 +223,9 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.relativeTab.waitFor();
     await pageManager.unflattenedPage.relativeTab.click();
     await page.waitForTimeout(2000);
+
+    await pageManager.unflattenedPage.allFieldsButton.waitFor();
+    await pageManager.unflattenedPage.allFieldsButton.click();
 
     // Search for 'kubernetes_pod_id' field
     await pageManager.unflattenedPage.indexFieldSearchInput.waitFor();

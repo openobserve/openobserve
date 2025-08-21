@@ -64,6 +64,10 @@ export class StreamsPage {
         await this.logsPage.clickQuickModeToggle();
     }
 
+    async clickAllFieldsButton() {
+        await this.logsPage.clickAllFieldsButton();
+    }
+
     async clearAndFillQueryEditor(query) {
         await this.logsPage.clearAndFillQueryEditor(query);
     }

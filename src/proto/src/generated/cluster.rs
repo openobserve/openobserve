@@ -3001,8 +3001,6 @@ pub struct IndexInfo {
     pub index_condition: ::prost::alloc::string::String,
     #[prost(message, repeated, tag = "3")]
     pub equal_keys: ::prost::alloc::vec::Vec<KvItem>,
-    #[prost(string, repeated, tag = "4")]
-    pub match_all_keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(message, optional, tag = "5")]
     pub index_optimize_mode: ::core::option::Option<IdxOptimizeMode>,
 }

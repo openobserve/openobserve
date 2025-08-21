@@ -40,7 +40,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { defineProps, ref, onMounted, computed, watch, defineEmits } from "vue";
+import { computed } from "vue";
 import { useStore } from "vuex";
 
 const props = defineProps({

@@ -422,6 +422,7 @@ export default defineComponent({
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
     "is-partial-data-update",
+    "series-data-update",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -615,6 +616,74 @@ export default defineComponent({
       tableRendererRef.value = null;
       parser = null;
     });
+    const convertPanelDataCommon = async () => {
+      if (
+        !errorDetail?.value?.message &&
+        validatePanelData?.value?.length === 0
+      ) {
+        try {
+          panelData.value = await convertPanelData(
+            panelSchema.value,
+            data.value,
+            store,
+            chartPanelRef,
+            hoveredSeriesState,
+            resultMetaData,
+            metadata.value,
+            chartPanelStyle.value,
+            annotations,
+            loading.value,
+          );
+
+          limitNumberOfSeriesWarningMessage.value =
+            panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
+
+          errorDetail.value = {
+            message: "",
+            code: "",
+          };
+        } catch (error: any) {
+          console.error("error", error);
+          errorDetail.value = {
+            message: error?.message,
+            code: error?.code || "",
+          };
+        }
+      } else {
+        // if no data is available, then show the default data
+        // if there is an error config in the panel schema, then show the default data on error
+        // if no default data on error is set, then show the custom error message
+        if (
+          panelSchema.value?.error_config?.custom_error_handeling &&
+          panelSchema.value?.error_config?.default_data_on_error
+        ) {
+          data.value = JSON.parse(
+            panelSchema.value?.error_config?.default_data_on_error,
+          );
+          errorDetail.value = {
+            message: "",
+            code: "",
+          };
+        }
+      }
+    };
+
+    // Watch for panel schema changes to re-convert panel data
+    watch(
+      panelSchema,
+      async () => {
+        // Re-convert panel data when schema changes (for non-whitelisted config changes)
+        if (
+          !errorDetail?.value?.message &&
+          validatePanelData?.value?.length === 0 &&
+          data.value?.length
+        ) {
+          await convertPanelDataCommon();
+        }
+      },
+      { deep: true },
+    );
+
     watch(
       [data, store?.state],
       async () => {
@@ -647,58 +716,8 @@ export default defineComponent({
             code: "",
           };
 
-        // panelData.value = convertPanelData(panelSchema.value, data.value, store);
-        if (
-          !errorDetail?.value?.message &&
-          validatePanelData?.value?.length === 0
-        ) {
-          try {
-            // passing chartpanelref to get width and height of DOM element
-            panelData.value = await convertPanelData(
-              panelSchema.value,
-              data.value,
-              store,
-              chartPanelRef,
-              hoveredSeriesState,
-              resultMetaData,
-              metadata.value,
-              chartPanelStyle.value,
-              annotations,
-              loading.value,
-            );
-
-            limitNumberOfSeriesWarningMessage.value =
-              panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
-
-            errorDetail.value = {
-              message: "",
-              code: "",
-            };
-          } catch (error: any) {
-            console.error("error", error);
-
-            errorDetail.value = {
-              message: error?.message,
-              code: error?.code || "",
-            };
-          }
-        } else {
-          // if no data is available, then show the default data
-          // if there is an error config in the panel schema, then show the default data on error
-          // if no default data on error is set, then show the custom error message
-          if (
-            panelSchema.value?.error_config?.custom_error_handeling &&
-            panelSchema.value?.error_config?.default_data_on_error
-          ) {
-            data.value = JSON.parse(
-              panelSchema.value?.error_config?.default_data_on_error,
-            );
-            errorDetail.value = {
-              message: "",
-              code: "",
-            };
-          }
-        }
+        // Use the common function to convert panel data
+        await convertPanelDataCommon();
       },
       { deep: true },
     );
@@ -715,6 +734,11 @@ export default defineComponent({
       },
       { deep: true },
     );
+
+    watch(panelData, () => {
+      emit("series-data-update", panelData.value);
+    },
+    { deep: true });
 
     // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
     watch(

@@ -1,6 +1,6 @@
 import { test, expect } from "../baseFixtures";
 import PageManager from "../../pages/page-manager.js";
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 // (duplicate import removed)
 
@@ -97,6 +97,8 @@ test.describe("Logs Quickmode testcases", () => {
     if (isSwitchedOff) {
       await toggleButton.click();
     }
+
+    await page.locator('[data-test="logs-all-fields-btn"]').click();
   });
 
   test.afterEach(async ({ page }) => {
@@ -112,7 +114,7 @@ test.describe("Logs Quickmode testcases", () => {
     await pageManager.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
     await pageManager.logsPage.clickSQLModeToggle();
     await pageManager.logsPage.waitForTimeout(2000);
-    await pageManager.logsPage.expectInterestingFieldInEditor("kubernetes_pod_id");
+    await pageManager.logsPage.expectInterestingFieldInEditor("_timestamp,kubernetes_pod_id");
   });
   test("should display quick mode toggle button", {
     tag: ['@quickModeLogs', '@all', '@logs']
@@ -189,7 +191,7 @@ test.describe("Logs Quickmode testcases", () => {
     await pageManager.logsPage.clickSearchBarRefreshButton();
     await pageManager.logsPage.page.reload();
     await pageManager.logsPage.waitForTimeout(2000);
-    await pageManager.logsPage.expectQueryEditorContainsText('SELECT kubernetes_pod_id FROM "e2e_automate"');
+    await pageManager.logsPage.expectQueryEditorContainsText('SELECT _timestamp,kubernetes_pod_id FROM "e2e_automate"');
   });
 
   test("should display results without adding timestamp in quick mode", {

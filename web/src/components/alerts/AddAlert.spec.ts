@@ -42,7 +42,7 @@ vi.mock('@/composables/useStreams', () => {
           { name: 'field2', type: 'int' },
         ]
       }),
-      getStreams: vi.fn(),
+      getStreams: vi.fn().mockResolvedValue({ list: [] }),
     }),
   };
 });
@@ -111,13 +111,13 @@ vi.mock('cron-parser', () => {
     }
   };
 });
-vi.mock('@/utils/zincutils', async (importOriginal) => {
-  const actual = await importOriginal();
-
+vi.mock('@/utils/zincutils', async () => {
+  const actual: any = await vi.importActual('@/utils/zincutils');
   return {
-    ...actual, // include all actual exports
-    getUUID: vi.fn(() => 'mock-uuid'), // override just getUUID
-  };
+    ...actual,
+    getUUID: vi.fn(() => 'mock-uuid'),
+    getTimezonesByOffset: vi.fn(() => Promise.resolve(['UTC'])),
+  } as any;
 });
 vi.mock('@/services/alerts', () => {
   return {
@@ -140,6 +140,53 @@ vi.mock('@/services/alerts', () => {
     }
   };
 });
+
+// Additional composable mocks to prevent inject() warnings
+vi.mock("@/composables/useLogs", () => ({
+  default: vi.fn(() => ({
+    searchObj: { value: { loading: false, data: { queryResults: [], aggs: { histogram: [] } } } },
+    searchAggData: { value: { histogram: [], total: 0 } },
+    searchResultData: { value: { list: [] } },
+    getFunctions: vi.fn().mockResolvedValue([])
+  }))
+}));
+
+vi.mock("@/composables/useDashboard", () => ({
+  default: vi.fn(() => ({
+    dashboards: { value: [] },
+    loading: { value: false },
+    error: { value: null }
+  }))
+}));
+
+vi.mock("@/services/segment_analytics", () => ({
+  default: {
+    track: vi.fn()
+  }
+}));
+
+vi.mock("@/services/auth", () => ({
+  default: {
+    sign_in_user: vi.fn(),
+    sign_out: vi.fn(),
+    get_dex_config: vi.fn()
+  }
+}));
+
+vi.mock("@/services/organizations", () => ({
+  default: {
+    get_organization: vi.fn(),
+    list: vi.fn(),
+    add_members: vi.fn()
+  }
+}));
+
+vi.mock("@/services/billings", () => ({
+  default: {
+    get_billing_info: vi.fn(),
+    get_invoice_history: vi.fn()
+  }
+}));
 
 
 describe("AddAlert Component", () => {
@@ -210,7 +257,7 @@ describe("AddAlert Component", () => {
           timezone: "UTC",
         },
         destinations: [],
-        context_attributes: [],
+        context_attributes: {},
         enabled: true,
         description: "",
         lastTriggeredAt: 0,
@@ -938,4 +985,206 @@ describe("AddAlert Component", () => {
     });
   });
 
-})
+  describe('lifecycle-created and computed handlers', () => {
+    it('sets beingUpdated based on modelValue and normalizes is_real_time', async () => {
+      const wrapper = mount(AddAlert, {
+        global: {
+          provide: { store },
+          plugins: [i18n, router],
+        },
+        props: {
+          isUpdated: true,
+          modelValue: {
+            name: 'n',
+            stream_type: 'logs',
+            stream_name: 's',
+            is_real_time: false,
+            query_condition: { type: 'custom', conditions: { or: [] }, aggregation: null },
+            trigger_condition: { period: 1, operator: '>=', frequency: 1, cron: '', threshold: 1, silence: 1, frequency_type: 'minutes', timezone: 'UTC' },
+            destinations: [],
+            context_attributes: {},
+            enabled: true,
+          },
+          destinations: [{ name: 'email' }],
+        },
+      });
+
+      expect(wrapper.vm.beingUpdated).toBe(true);
+      expect(wrapper.vm.formData.is_real_time).toBe('false');
+      expect(wrapper.vm.getFormattedDestinations).toEqual(['email']);
+    });
+
+  });
+
+  describe('getFormattedCondition and generateWhereClause edge cases', () => {
+    let wrapper: any;
+    beforeEach(() => {
+      wrapper = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      wrapper.vm.streamFieldsMap = { n: { type: 'Int64' }, s: { type: 'String' } };
+    });
+
+    it('formats numeric types without quotes and string with quotes', () => {
+      const group = { label: 'AND', items: [ { column: 'n', operator: '>=', value: 10 }, { column: 's', operator: '=', value: 'x' } ] };
+      expect(wrapper.vm.generateWhereClause(group, wrapper.vm.streamFieldsMap)).toBe("WHERE n >= '10' AND s = 'x'");
+    });
+
+    it('supports not_contains/NotContains variations', () => {
+      const group = { label: 'OR', items: [ { column: 's', operator: 'not_contains', value: 'bad' }, { column: 's', operator: 'NotContains', value: 'worse' } ] };
+      expect(wrapper.vm.generateWhereClause(group, wrapper.vm.streamFieldsMap)).toBe("WHERE s NOT LIKE '%bad%' OR s NOT LIKE '%worse%'");
+    });
+
+    it('returns empty for invalid items', () => {
+      const group = { label: 'AND', items: [ { foo: 1 } ] } as any;
+      expect(wrapper.vm.generateWhereClause(group, wrapper.vm.streamFieldsMap)).toBe('');
+    });
+  });
+
+  describe('generateSqlQuery variations', () => {
+    let wrapper: any;
+    beforeEach(() => {
+      wrapper = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      wrapper.vm.formData.stream_name = '_rundata';
+      wrapper.vm.formData.stream_type = 'logs';
+      wrapper.vm.formData.query_condition.conditions = { label: 'and', items: [ { column: 'status', operator: '=', value: '200' } ] };
+      wrapper.vm.generateWhereClause = vi.fn().mockReturnValue("WHERE status = '200'");
+    });
+
+    it('counts when aggregation invalid/missing', () => {
+      wrapper.vm.isAggregationEnabled = true;
+      wrapper.vm.formData.query_condition.aggregation = { group_by: [], function: '', having: { column: '', operator: '>=', value: 1 } };
+      const q = wrapper.vm.generateSqlQuery();
+      expect(q).toContain('COUNT(*) as zo_sql_val');
+    });
+
+    it('handles multiple group_by concat alias', () => {
+      wrapper.vm.isAggregationEnabled = true;
+      wrapper.vm.formData.query_condition.aggregation = { group_by: ['c1','c2'], function: 'sum', having: { column: 'latency', operator: '>=', value: 1 } };
+      const q = wrapper.vm.generateSqlQuery();
+      expect(q).toContain('GROUP BY zo_sql_key , x_axis_2');
+    });
+
+    it('handles percentile map p50', () => {
+      wrapper.vm.isAggregationEnabled = true;
+      wrapper.vm.formData.query_condition.aggregation = { group_by: [], function: 'p50', having: { column: 'latency', operator: '>=', value: 1 } };
+      const q = wrapper.vm.generateSqlQuery();
+      expect(q).toContain('approx_percentile_cont(latency, 0.5)');
+    });
+  });
+
+
+  describe('getParser reserved word and star', () => {
+    let wrapper: any;
+    beforeEach(async () => {
+      wrapper = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      await flushPromises();
+    });
+    it('rejects SELECT * detection', () => {
+      expect(wrapper.vm.getParser('SELECT * FROM t')).toBe(false);
+      expect(wrapper.vm.sqlQueryErrorMsg).toBe('Selecting all columns is not allowed');
+    });
+    it('ignores parser errors and returns true', () => {
+      expect(wrapper.vm.getParser('SELECT c FROM default')).toBe(true);
+    });
+  });
+
+  describe('getAlertPayload branches', () => {
+    let wrapper: any;
+    beforeEach(() => {
+      wrapper = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+    });
+    it('sets tabs: promql clears sql and conditions', () => {
+      wrapper.vm.scheduledAlertRef = { tab: 'promql' };
+      wrapper.vm.formData.query_condition.promql = 'up';
+      const p = wrapper.vm.getAlertPayload();
+      expect(p.query_condition.sql).toBe('');
+      expect(p.query_condition.conditions).toEqual([]);
+    });
+    it('sql tab keeps sql and nulls promql_condition', () => {
+      wrapper.vm.scheduledAlertRef = { tab: 'sql' };
+      wrapper.vm.formData.query_condition.sql = 'select x';
+      const p = wrapper.vm.getAlertPayload();
+      expect(p.query_condition.promql_condition).toBeNull();
+    });
+    it('custom tab nulls aggregation when disabled', () => {
+      wrapper.vm.scheduledAlertRef = { tab: 'custom' };
+      wrapper.vm.isAggregationEnabled = false;
+      const p = wrapper.vm.getAlertPayload();
+      expect(p.query_condition.aggregation).toBeNull();
+    });
+  });
+
+  describe('routeToCreateDestination builds URL', () => {
+    it('calls window.open with route href', () => {
+      const w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      const spy = vi.spyOn(window, 'open').mockImplementation(() => null);
+      w.vm.routeToCreateDestination();
+      expect(spy).toHaveBeenCalled();
+      spy.mockRestore();
+    });
+  });
+
+
+  describe('expand state and destinations updates', () => {
+    it('updateExpandState replaces object', () => {
+      const w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      const v = { alertSetup: false, queryMode: false, advancedSetup: false, realTimeMode: false, thresholds: false, multiWindowSelection: true };
+      w.vm.updateExpandState(v);
+      expect(w.vm.expandState).toEqual(v);
+    });
+    it('updateDestinations writes list', () => {
+      const w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      w.vm.updateDestinations(['a']);
+      expect(w.vm.formData.destinations).toEqual(['a']);
+    });
+  });
+
+
+  describe('transformFEToBE and retransformBEToFE additional', () => {
+    let w: any;
+    beforeEach(() => {
+      w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+    });
+    it('transformFEToBE returns {} for invalid', () => {
+      expect(w.vm.transformFEToBE(null)).toEqual({});
+      expect(w.vm.transformFEToBE({ label: 'x', items: [] })).toEqual({});
+    });
+    it('retransformBEToFE returns null for invalid keys', () => {
+      expect(w.vm.retransformBEToFE({} as any)).toBeNull();
+    });
+  });
+
+  describe('validateFormAndNavigateToErrorField and navigateToErrorField', () => {
+    it('navigates on invalid and returns false', async () => {
+      const w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      const fakeRef = { validate: vi.fn().mockResolvedValue(false), $el: { querySelector: vi.fn().mockReturnValue({ scrollIntoView: vi.fn() }) } } as any;
+      const spy = vi.spyOn(fakeRef.$el, 'querySelector');
+      const res = await w.vm.validateFormAndNavigateToErrorField(fakeRef);
+      expect(res).toBe(false);
+      expect(spy).toHaveBeenCalled();
+    });
+    it('returns true on valid', async () => {
+      const w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      const fakeRef = { validate: vi.fn().mockResolvedValue(true), $el: { querySelector: vi.fn() } } as any;
+      const res = await w.vm.validateFormAndNavigateToErrorField(fakeRef);
+      expect(res).toBe(true);
+    });
+  });
+
+  describe('openJsonEditor, saveAlertJson, prepareAndSaveAlert', () => {
+    it('opens editor dialog', () => {
+      const w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      w.vm.openJsonEditor();
+      expect(w.vm.showJsonEditorDialog).toBe(true);
+    });
+
+    it('saveAlertJson validates and sets validationErrors on failure', async () => {
+      const w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] }, props: { destinations: [{ name: 'email' }] } });
+      const bad = JSON.stringify({ name: '', stream_type: 'logs', stream_name: 's', is_real_time: false, query_condition: { type: 'sql', sql: '' }, trigger_condition: { period: 0, operator: '>=', frequency: 1, cron: '', threshold: 1, silence: 1, frequency_type: 'minutes', timezone: 'UTC' }, destinations: [], context_attributes: [], enabled: true });
+      await w.vm.saveAlertJson(bad);
+      expect(Array.isArray(w.vm.validationErrors)).toBe(true);
+      expect(w.vm.validationErrors.length).toBeGreaterThan(0);
+    });
+
+  });
+
+});

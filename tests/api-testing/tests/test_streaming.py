@@ -1328,7 +1328,6 @@ def read_response(reader):
     lines = content.split("\n")
     search_metadata_list = []
     search_hits_list = []
-    total_sum = 0
 
     print(f"DEBUG: Raw response content length: {len(content)}")
     print(f"DEBUG: Number of lines: {len(lines)}")
@@ -1350,18 +1349,6 @@ def read_response(reader):
                         metadata_data = json.loads(metadata_json)
                         print(f"DEBUG: Parsed metadata: {metadata_data}")
                         search_metadata_list.append(metadata_data)
-                        # Sum up the total values from all metadata responses
-                        if (
-                            "results" in metadata_data
-                            and "total" in metadata_data["results"]
-                        ):
-                            current_total = metadata_data["results"]["total"]
-                            total_sum += current_total
-                            print(
-                                f"DEBUG: Added total {current_total}, running sum: {total_sum}"
-                            )
-                        else:
-                            print(f"DEBUG: No 'results' or 'total' found in metadata")
                     except json.JSONDecodeError as e:
                         print(f"Error parsing metadata JSON: {e}")
                         continue
@@ -1384,22 +1371,45 @@ def read_response(reader):
 
     print(f"DEBUG: Final search_metadata_list length: {len(search_metadata_list)}")
     print(f"DEBUG: Final search_hits_list length: {len(search_hits_list)}")
-    print(f"DEBUG: Final total_sum: {total_sum}")
 
     if search_metadata_list:
-        # Use the first metadata response as the base, but update the total to be the sum
+        # Use the first metadata response as the base
         combined_metadata = search_metadata_list[0].copy()
-        combined_metadata["results"]["total"] = total_sum
-        print(f"DEBUG: Returning combined metadata with total: {total_sum}")
-
+        
         # Combine all hits from all hits events
         all_hits = []
         for hits_data in search_hits_list:
             if "hits" in hits_data and isinstance(hits_data["hits"], list):
                 all_hits.extend(hits_data["hits"])
 
+        # For streaming responses, use a more nuanced approach to determine total
+        # If there are multiple metadata responses, we need to use the count correctly
+        if len(search_metadata_list) == 1:
+            # Single metadata response - use its total directly
+            if "results" in search_metadata_list[0] and "total" in search_metadata_list[0]["results"]:
+                total_count = search_metadata_list[0]["results"]["total"]
+                print(f"DEBUG: Single metadata response, using total: {total_count}")
+            else:
+                total_count = len(all_hits)
+                print(f"DEBUG: Single metadata response with no total, using hits count: {total_count}")
+        else:
+            # Multiple metadata responses - for aggregation queries, use max total
+            # For histogram queries, use the number of distinct hits/buckets
+            max_total = 0
+            total_sum = 0
+            for metadata in search_metadata_list:
+                if "results" in metadata and "total" in metadata["results"]:
+                    current_total = metadata["results"]["total"]
+                    max_total = max(max_total, current_total)
+                    total_sum += current_total
+            
+            # Use max total for most cases, as it represents the correct count
+            total_count = max_total if max_total > 0 else len(all_hits)
+            print(f"DEBUG: Multiple metadata responses, max_total: {max_total}, total_sum: {total_sum}, using: {total_count}")
+
+        combined_metadata["results"]["total"] = total_count
         combined_metadata["results"]["hits"] = all_hits
-        print(f"DEBUG: Combined {len(all_hits)} total hits")
+        print(f"DEBUG: Returning combined metadata with total: {total_count}, hits: {len(all_hits)}")
 
         return combined_metadata
     else:

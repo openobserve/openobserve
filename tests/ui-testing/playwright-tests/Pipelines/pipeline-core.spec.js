@@ -1,5 +1,5 @@
 import { test, expect } from "../baseFixtures.js";
-import logData from "../../cypress/fixtures/log.json";
+import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
 
@@ -7,6 +7,18 @@ test.describe.configure({ mode: "parallel" });
 
 
 const randomFunctionName = `Pipeline${Math.floor(Math.random() * 1000)}`;
+
+const toggleQuickModeIfOn = async (page) => {
+  const toggleButton = await page.locator(
+    '[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner'
+  );
+  const isSwitchedOn = await toggleButton.evaluate((node) =>
+    node.classList.contains("q-toggle__inner--truthy")
+  );
+  if (isSwitchedOn) {
+    await toggleButton.click();
+  }
+}
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
@@ -73,6 +85,14 @@ async function exploreStreamAndInteractWithLogDetails(page, streamName) {
   await page.getByPlaceholder('Search Stream').fill(streamName);
   await page.waitForTimeout(1000);
   await page.getByRole('button', { name: 'Explore' }).first().click();
+  await page.waitForTimeout(1000);
+  await page.getByRole('button', { name: 'Run query' }).waitFor();
+  await toggleQuickModeIfOn(page);
+  await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
+    force: true,
+  }); 
+  await page.waitForTimeout(1000);
+  await page.waitForSelector('[data-test="log-table-column-1-_timestamp"]');
   await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
   await page.locator('[data-test="log-expand-detail-key-a-text"]').click();
   await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();

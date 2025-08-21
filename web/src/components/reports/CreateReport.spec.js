@@ -46,6 +46,67 @@ vi.mock('vue-router', async () => {
   };
 });
 
+// Mock composables that use inject()
+vi.mock("@/composables/useStreams", () => ({
+  default: vi.fn(() => ({
+    streamList: ref([]),
+    loading: ref(false),
+    error: ref(null)
+  }))
+}));
+
+vi.mock("@/composables/useLogs", () => ({
+  default: vi.fn(() => ({
+    searchObj: ref({ loading: false, data: { queryResults: [], aggs: { histogram: [] } } }),
+    searchAggData: ref({ histogram: [], total: 0 }),
+    searchResultData: ref({ list: [] }),
+    getFunctions: vi.fn().mockResolvedValue([])
+  }))
+}));
+
+vi.mock("@/composables/useDashboard", () => ({
+  default: vi.fn(() => ({
+    dashboards: ref([]),
+    loading: ref(false),
+    error: ref(null)
+  }))
+}));
+
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    getImageURL: vi.fn(() => ""),
+    verifyOrganizationStatus: vi.fn(() => Promise.resolve(true)),
+    logsErrorMessage: vi.fn((code) => `Error: ${code}`),
+    mergeRoutes: vi.fn((route1, route2) => [...(route1 || []), ...(route2 || [])]),
+    getPath: vi.fn(() => "/"),
+    useLocalTimezone: vi.fn(() => "UTC")
+  };
+});
+
+vi.mock("@/services/segment_analytics", () => ({
+  default: {
+    track: vi.fn()
+  }
+}));
+
+vi.mock("@/services/auth", () => ({
+  default: {
+    sign_in_user: vi.fn(),
+    sign_out: vi.fn(),
+    get_dex_config: vi.fn()
+  }
+}));
+
+vi.mock("@/services/organizations", () => ({
+  default: {
+    get_organization: vi.fn(),
+    list: vi.fn(),
+    add_members: vi.fn()
+  }
+}));
+
 // Create platform mock
 const platform = {
   is: {

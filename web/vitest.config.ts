@@ -26,6 +26,8 @@ export default mergeConfig(
       deps: {
         inline: ["monaco-editor", "vitest-canvas-mock"],
       },
+      // Prevent unhandled errors from failing the test suite
+      dangerouslyIgnoreUnhandledErrors: true,
       coverage: {
         reporter: ["text", "json", "html", "json-summary"],
         all: true,

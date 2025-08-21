@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import i18n from "@/locales";
@@ -45,6 +45,15 @@ describe("ConfirmDialog", async () => {
         plugins: [i18n],
       },
     });
+  });
+
+  afterEach(() => {
+    if (wrapper) {
+      wrapper.unmount();
+    }
+    // Clear any pending timers to prevent unhandled errors
+    vi.clearAllTimers();
+    vi.restoreAllMocks();
   });
 
   it("should mount ConfirmDialog component", async () => {

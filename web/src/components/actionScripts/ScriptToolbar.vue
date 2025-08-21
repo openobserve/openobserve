@@ -109,7 +109,6 @@ import {
   onMounted,
   computed,
   watch,
-  defineEmits,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
