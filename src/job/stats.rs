@@ -13,77 +13,86 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster::LOCAL_NODE, get_config};
+use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job};
 use tokio::time;
 
 use crate::service::{compact::stats::update_stats_from_file_list, db};
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    tokio::task::spawn(update_node_memory_usage());
-    tokio::task::spawn(file_list_update_stats());
-    tokio::task::spawn(cache_stream_stats());
+    tokio::task::spawn(async move { update_node_memory_usage().await });
+
+    if file_list_update_stats().is_none() {
+        log::debug!("[STATS] job not started as not a compactor");
+    }
+
+    if cache_stream_stats().is_none() {
+        log::debug!("[STATS] job not started as not a compactor");
+    }
+
     Ok(())
 }
 
 // get stats from file_list to update stream_stats
-async fn file_list_update_stats() -> Result<(), anyhow::Error> {
-    let cfg = get_config();
+fn file_list_update_stats() -> Option<tokio::task::JoinHandle<()>> {
     if !LOCAL_NODE.is_compactor() {
-        return Ok(());
+        return None;
     }
 
     // should run it at least every 10 seconds
-    let mut interval = time::interval(time::Duration::from_secs(std::cmp::max(
-        10,
-        cfg.limit.calculate_stats_interval,
-    )));
-    interval.tick().await; // trigger the first run
-    loop {
-        interval.tick().await;
-        match update_stats_from_file_list().await {
-            Err(e) => {
-                log::error!("[STATS] run update stream stats from file list error: {e}");
+    Some(spawn_pausable_job!(
+        "file_list_update_stats",
+        std::cmp::max(10, get_config().limit.calculate_stats_interval),
+        {
+            match update_stats_from_file_list().await {
+                Err(e) => {
+                    log::error!(
+                        "[STATS] run update stream stats from file list error: {e}"
+                    );
+                }
+                Ok(Some((offset, max_pk))) => {
+                    log::debug!(
+                        "[STATS] run update stream stats success, offset: {offset}, max_pk: {max_pk}"
+                    );
+                }
+                Ok(None) => {}
             }
-            Ok(Some((offset, max_pk))) => {
-                log::debug!(
-                    "[STATS] run update stream stats success, offset: {offset}, max_pk: {max_pk}"
-                );
-            }
-            Ok(None) => {}
         }
-    }
+    ))
 }
 
-async fn cache_stream_stats() -> Result<(), anyhow::Error> {
+fn cache_stream_stats() -> Option<tokio::task::JoinHandle<()>> {
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_compactor() {
-        return Ok(());
+        return None;
     }
 
     // should run it at least every minute
-    let mut interval = time::interval(time::Duration::from_secs(std::cmp::max(
-        60,
-        get_config().limit.calculate_stats_interval,
-    )));
-
     #[cfg(feature = "enterprise")]
     let need_wait_one_around = o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled;
     #[cfg(not(feature = "enterprise"))]
     let need_wait_one_around = false;
-    if need_wait_one_around {
-        // wait one around to make sure the dependent models are ready
-        interval.tick().await;
-    }
 
-    loop {
-        interval.tick().await;
-        if let Err(e) = db::file_list::cache_stats().await {
-            log::error!("[STATS] run cached stream stats error: {e}");
-        } else {
-            log::debug!("[STATS] run cached stream stats success");
+    Some(spawn_pausable_job!(
+        "cache_stream_stats",
+        std::cmp::max(60, get_config().limit.calculate_stats_interval),
+        {
+            // wait one around to make sure the dependent models are ready
+            if need_wait_one_around {
+                tokio::time::sleep(time::Duration::from_secs(std::cmp::max(
+                    60,
+                    get_config().limit.calculate_stats_interval,
+                )))
+                .await;
+            }
+
+            if let Err(e) = db::file_list::cache_stats().await {
+                log::error!("[STATS] run cached stream stats error: {e}");
+            } else {
+                log::debug!("[STATS] run cached stream stats success");
+            }
         }
-    }
+    ))
 }
 
 // update node memory usage metrics every second
