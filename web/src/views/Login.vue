@@ -191,7 +191,9 @@ export default defineComponent({
       store.dispatch("logout");
       useLocalCurrentUser("", true);
       useLocalUserInfo("", true);
-      router.push("/logout");
+      router.push({
+        path: "/logout",
+      });
     };
 
     /**
