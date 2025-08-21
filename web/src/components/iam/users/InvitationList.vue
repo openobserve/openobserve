@@ -201,8 +201,8 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "expires_at",
-        field: "expires_at",
+        name: "expiry",
+        field: "expiry",
         label: t("invitation.expiry"),
         align: "left",
         sortable: true,
