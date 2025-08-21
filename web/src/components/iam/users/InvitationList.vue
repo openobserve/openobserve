@@ -64,22 +64,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-td :props="props" side>
           <q-btn
             color="positive"
-            :label="t('invitation.accept')"
-            class="q-mr-sm"
-            padding="sm lg"
+            :title="t('invitation.accept')"
+            :icon="outlinedCheck"
+            class="q-ml-xs"
+            padding="sm"
             unelevated
             size="sm"
-            no-caps
+            round
+            flat
             @click="acceptInvitation(props.row)"
             :data-test="`accept-invitation-${props.row.token}`"
           />
           <q-btn
             color="negative"
-            :label="t('invitation.reject')"
-            padding="sm lg"
+            :title="t('invitation.reject')"
+            :icon="outlinedDelete"
+            class="q-ml-xs"
+            padding="sm"
             unelevated
             size="sm"
-            no-caps
+            round
+            flat
             @click="rejectInvitation(props.row)"
             :data-test="`reject-invitation-${props.row.token}`"
           />
@@ -159,6 +164,10 @@ import { useI18n } from "vue-i18n";
 import NoData from "@/components/shared/grid/NoData.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
+import {
+  outlinedDelete,
+  outlinedCheck,
+} from "@quasar/extras/material-icons-outlined";
 
 export default defineComponent({
   name: "InvitationList",
@@ -373,6 +382,8 @@ export default defineComponent({
       confirmAcceptInvitation,
       confirmRejectInvitation,
       fetchPendingInvitations,
+      outlinedDelete,
+      outlinedCheck,
     };
   },
 });
