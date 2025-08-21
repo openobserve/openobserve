@@ -180,9 +180,9 @@ export default defineComponent({
 
     const columns: any = ref<QTableProps["columns"]>([
       {
-        name: "organization_name",
-        field: "organization_name",
-        label: t("invitation.org_name"),
+        name: "org_name",
+        field: "org_name",
+        label: t("invitation.organizationName"),
         align: "left",
         sortable: true,
       },
@@ -194,16 +194,16 @@ export default defineComponent({
         sortable: true,
       },
       {
-        name: "invited_by",
-        field: "invited_by",
-        label: t("invitation.inviter_id"),
+        name: "inviter_id",
+        field: "inviter_id",
+        label: t("invitation.invitedBy"),
         align: "left",
         sortable: true,
       },
       {
-        name: "expiry",
-        field: "expiry",
-        label: t("invitation.expires_at"),
+        name: "expires_at",
+        field: "expires_at",
+        label: t("invitation.expiry"),
         align: "left",
         sortable: true,
       },
@@ -233,7 +233,7 @@ export default defineComponent({
 
       try {
         const response = await usersService.getPendingInvites();
-        invitations.value = response.data.map((invitation: any) => ({
+        invitations.value = response.data.data.map((invitation: any) => ({
           ...invitation,
           expiry: formatExpiry(invitation.expires_at),
         }));
@@ -289,8 +289,8 @@ export default defineComponent({
       try {
         await organizationsService.process_subscription(
           selectedInvitation.value.token,
-          selectedInvitation.value.org_id,
           "confirm",
+          selectedInvitation.value.org_id,
         );
         dismiss();
         $q.notify({
