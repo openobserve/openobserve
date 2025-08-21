@@ -21,7 +21,6 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
-use tokio::sync::mpsc;
 
 use crate::{common::infra::cluster::get_node_by_uuid, service::compact};
 
@@ -49,20 +48,16 @@ pub async fn run() -> Result<(), anyhow::Error> {
         log::error!("[COMPACTOR::JOB] start merge job scheduler error: {e}");
     }
 
-    spawn_pausable_job!(
-        "run_generate_job",
-        get_config().compact.interval,
-        {
-            log::debug!("[COMPACTOR::JOB] Running generate merge job");
-            if let Err(e) = compact::run_generate_job(CompactionJobType::Current).await {
-                log::error!("[COMPACTOR::JOB] run generate merge job error: {e}");
-            }
+    spawn_pausable_job!("run_generate_job", get_config().compact.interval, {
+        log::debug!("[COMPACTOR::JOB] Running generate merge job");
+        if let Err(e) = compact::run_generate_job(CompactionJobType::Current).await {
+            log::error!("[COMPACTOR::JOB] run generate merge job error: {e}");
         }
-    );
+    });
 
     spawn_pausable_job!(
         "run_generate_old_data_job",
-        get_config().compact.old_data_interval + 1,
+        get_config().compact.old_data_interval.saturating_add(1),
         {
             log::debug!("[COMPACTOR::JOB] Running generate merge job for old data");
             if let Err(e) = compact::run_generate_job(CompactionJobType::Historical).await {
@@ -90,38 +85,26 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
     );
 
-    spawn_pausable_job!(
-        "run_merge",
-        get_config().compact.interval + 2,
-        {
-            log::debug!("[COMPACTOR::JOB] Running data merge");
-            if let Err(e) = compact::run_merge(scheduler.tx().clone()).await {
-                log::error!("[COMPACTOR::JOB] run data merge error: {e}");
-            }
+    spawn_pausable_job!("run_merge", get_config().compact.interval + 2, {
+        log::debug!("[COMPACTOR::JOB] Running data merge");
+        if let Err(e) = compact::run_merge(scheduler.tx().clone()).await {
+            log::error!("[COMPACTOR::JOB] run data merge error: {e}");
         }
-    );
+    });
 
-    spawn_pausable_job!(
-        "run_retention",
-        get_config().compact.interval + 3,
-        {
-            log::debug!("[COMPACTOR::JOB] Running data retention");
-            if let Err(e) = compact::run_retention().await {
-                log::error!("[COMPACTOR::JOB] run data retention error: {e}");
-            }
+    spawn_pausable_job!("run_retention", get_config().compact.interval + 3, {
+        log::debug!("[COMPACTOR::JOB] Running data retention");
+        if let Err(e) = compact::run_retention().await {
+            log::error!("[COMPACTOR::JOB] run data retention error: {e}");
         }
-    );
+    });
 
-    spawn_pausable_job!(
-        "run_delay_deletion",
-        get_config().compact.interval + 4,
-        {
-            log::debug!("[COMPACTOR::JOB] Running data delay deletion");
-            if let Err(e) = compact::run_delay_deletion().await {
-                log::error!("[COMPACTOR::JOB] run data delay deletion error: {e}");
-            }
+    spawn_pausable_job!("run_delay_deletion", get_config().compact.interval + 4, {
+        log::debug!("[COMPACTOR::JOB] Running data delay deletion");
+        if let Err(e) = compact::run_delay_deletion().await {
+            log::error!("[COMPACTOR::JOB] run data delay deletion error: {e}");
         }
-    );
+    });
 
     spawn_pausable_job!(
         "compactor_sync_to_db",
@@ -226,87 +209,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { run_enrichment_table_merge().await });
 
     Ok(())
-}
-
-/// Report compactor pending jobs as prometheus metric
-async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
-    log::info!("[COMPACTOR::JOB] start run_compactor_pending_jobs_metric job");
-
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.pending_jobs_metric_interval,
-        ))
-        .await;
-
-    }
-}
-
-/// Generate merging jobs
-async fn run_generate_job() -> Result<(), anyhow::Error> {
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(get_config().compact.interval)).await;
-        log::debug!("[COMPACTOR::JOB] Running generate merge job");
-        if let Err(e) = compact::run_generate_job(CompactionJobType::Current).await {
-            log::error!("[COMPACTOR::JOB] run generate merge job error: {e}");
-        }
-    }
-}
-
-/// Generate merging jobs for old data
-async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
-    loop {
-        // run every 1 hour at least
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.old_data_interval + 1,
-        ))
-        .await;
-        log::debug!("[COMPACTOR::JOB] Running generate merge job for old data");
-        if let Err(e) = compact::run_generate_job(CompactionJobType::Historical).await {
-            log::error!("[COMPACTOR::JOB] run generate merge job for old data error: {e}");
-        }
-    }
-}
-
-/// Merge small files
-async fn run_merge(tx: mpsc::Sender<compact::worker::MergeJob>) -> Result<(), anyhow::Error> {
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.interval + 2,
-        ))
-        .await;
-        log::debug!("[COMPACTOR::JOB] Running data merge");
-        if let Err(e) = compact::run_merge(tx.clone()).await {
-            log::error!("[COMPACTOR::JOB] run data merge error: {e}");
-        }
-    }
-}
-
-/// Deletion for data retention
-async fn run_retention() -> Result<(), anyhow::Error> {
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.interval + 3,
-        ))
-        .await;
-        log::debug!("[COMPACTOR::JOB] Running data retention");
-        if let Err(e) = compact::run_retention().await {
-            log::error!("[COMPACTOR::JOB] run data retention error: {e}");
-        }
-    }
-}
-
-/// Delete files based on the file_file_deleted in the database
-async fn run_delay_deletion() -> Result<(), anyhow::Error> {
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.interval + 4,
-        ))
-        .await;
-        log::debug!("[COMPACTOR::JOB] Running data delay deletion");
-        if let Err(e) = compact::run_delay_deletion().await {
-            log::error!("[COMPACTOR::JOB] run data delay deletion error: {e}");
-        }
-    }
 }
 
 async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
