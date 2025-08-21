@@ -52,8 +52,8 @@ const organizations = {
       {},
     );
   },
-  decline_subscription: (s: string, orgIdentifier: string) => {
-    return http().delete(`api/${orgIdentifier}/invite/${s}`, {});
+  decline_subscription: (s: string) => {
+    return http().delete(`api/invites/${s}`, {});
   },
   get_associated_members: (orgIdentifier: string) => {
     return http().get(`api/${orgIdentifier}/organizations/associated_members`);

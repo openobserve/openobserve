@@ -329,7 +329,6 @@ export default defineComponent({
       try {
         await organizationsService.decline_subscription(
           selectedInvitation.value.token,
-          selectedInvitation.value.org_id,
         );
         dismiss();
         $q.notify({
