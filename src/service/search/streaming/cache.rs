@@ -22,6 +22,7 @@ use config::meta::{
     stream::StreamType,
 };
 use log;
+use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use tokio::sync::mpsc;
 
 use super::sorting::order_search_results;
@@ -365,6 +366,47 @@ async fn send_cached_responses(
         cached.cached_response.hits.len(),
         cached.cached_response.result_cache_ratio,
     );
+
+    {
+        let pattern_manager = get_pattern_manager().await?;
+
+        // 1. for each record, resolve regex projections if any
+        // 2. store the regex resolved values in a temp structure
+
+        let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
+        let sql = match crate::service::search::sql::Sql::new(
+            &query,
+            &org_id,
+            stream_type,
+            req.search_type,
+        )
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Error parsing sql: {e}");
+                return Ok(());
+            }
+        };
+
+        let projections = crate::service::search::datafusion::plan::regex_projections::get_columns_from_projections(sql).await?;
+
+        // TODO: store regex projections in the schema
+        match pattern_manager.process_at_search(
+            org_id,
+            StreamType::Logs,
+            all_streams,
+            &mut cached.cached_response.hits,
+            projections,
+        ) {
+            Ok(_) => {}
+            Err(e) => {
+                log::error!(
+                    "error in processing records for patterns for stream {all_streams} : {e}"
+                );
+            }
+        }
+    }
 
     if is_result_array_skip_vrl {
         cached.cached_response.hits = crate::service::search::cache::apply_vrl_to_response(
