@@ -41,7 +41,10 @@ use {
 use crate::{
     handler::grpc::{
         MetadataMap,
-        flight::{stream::FlightEncoderStreamBuilder, visitor::get_scan_stats},
+        flight::{
+            stream::FlightEncoderStreamBuilder,
+            visitor::{get_cluster_metrics, get_scan_stats},
+        },
     },
     service::search::{
         grpc::flight as grpcFlight,
@@ -168,11 +171,14 @@ impl FlightService for FlightServiceImpl {
         let scan_stats_ref = get_scan_stats(physical_plan.clone());
 
         // used for EXPLAIN ANALYZE to collect metrics after stream is done
-        let metrics_ref = req.search_info.is_analyze.then_some(MetricsInfo {
+        let metrics = req.search_info.is_analyze.then_some(MetricsInfo {
             plan: physical_plan.clone(),
             is_super_cluster,
             func: Box::new(super_cluster_enabled),
         });
+
+        // used for super cluster follower leader to get metrics
+        let metrics_ref = get_cluster_metrics(physical_plan.clone());
 
         let stream = execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
             // clear session data
@@ -189,7 +195,8 @@ impl FlightService for FlightServiceImpl {
             .with_start(start)
             .with_custom_message(PreCustomMessage::ScanStats(scan_stats))
             .with_custom_message(PreCustomMessage::ScanStatsRef(scan_stats_ref))
-            .with_custom_message(PreCustomMessage::Metrics(metrics_ref))
+            .with_custom_message(PreCustomMessage::Metrics(metrics))
+            .with_custom_message(PreCustomMessage::MetricsRef(metrics_ref))
             .build(stream);
 
         let stream = async_stream::stream! {

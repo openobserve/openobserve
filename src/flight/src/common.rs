@@ -53,9 +53,12 @@ pub struct Metrics {
 /// the scan stats, and send it to the client when the scan stats is ready
 pub enum PreCustomMessage {
     ScanStats(ScanStats),
+    // use for super cluster follower leader
     ScanStatsRef(Option<Arc<Mutex<ScanStats>>>),
     // physical plan, is_super_cluster
     Metrics(Option<MetricsInfo>),
+    // use for super cluster follower leader
+    MetricsRef(Vec<Arc<Mutex<Vec<Metrics>>>>),
 }
 
 pub struct MetricsInfo {
@@ -81,11 +84,17 @@ impl PreCustomMessage {
             PreCustomMessage::Metrics(metrics_ref) => metrics_ref
                 .as_ref()
                 .map(|metrics_info| CustomMessage::Metrics(collect_metrics(metrics_info))),
+            PreCustomMessage::MetricsRef(metrics) => {
+                let metrics: Vec<Metrics> = metrics.iter().flat_map(|m| m.lock().clone()).collect();
+                metrics
+                    .is_empty()
+                    .then_some(CustomMessage::Metrics(metrics))
+            }
         }
     }
 }
 
-// TODO: support collect the metrics from remote scan(for super cluster)
+// collect metrics from physical plan
 fn collect_metrics(metrics_info: &MetricsInfo) -> Vec<Metrics> {
     let plan = &metrics_info.plan;
     let is_super_cluster = metrics_info.is_super_cluster;
