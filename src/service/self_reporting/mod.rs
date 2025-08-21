@@ -29,6 +29,7 @@ use config::{
         stream::StreamType,
     },
     metrics,
+    spawn_pausable_job,
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::auditor;
@@ -279,26 +280,25 @@ pub async fn flush() {
 
 // Cron job to frequently publish auditted events
 #[cfg(feature = "enterprise")]
-pub async fn run_audit_publish() {
-    loop {
-        let o2cfg = o2_enterprise::enterprise::common::infra::config::get_config();
-        if !o2cfg.common.audit_enabled {
-            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-            continue;
-        }
-
-        log::debug!("Audit ingestion loop running");
-        tokio::time::sleep(tokio::time::Duration::from_secs(
-            o2cfg.common.audit_publish_interval.try_into().unwrap(),
-        ))
-        .await;
-
-        o2_enterprise::enterprise::common::auditor::publish_existing_audits(
-            META_ORG_ID,
-            publish_audit,
-        )
-        .await;
+pub fn run_audit_publish() -> Option<tokio::task::JoinHandle<()>> {
+    let o2cfg = o2_enterprise::enterprise::common::infra::config::get_config();
+    if !o2cfg.common.audit_enabled {
+        return None;
     }
+
+    Some(spawn_pausable_job!(
+        "audit_publish",
+        o2cfg.common.audit_publish_interval,
+        {
+            log::debug!("Audit ingestion loop running");
+            o2_enterprise::enterprise::common::auditor::publish_existing_audits(
+                META_ORG_ID,
+                publish_audit,
+            )
+            .await;
+        },
+        pause_if: o2cfg.common.audit_publish_interval == 0 || !o2_enterprise::enterprise::common::infra::config::get_config().common.audit_enabled
+    ))
 }
 
 #[cfg(feature = "enterprise")]
