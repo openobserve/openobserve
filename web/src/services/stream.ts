@@ -66,13 +66,13 @@ const stream = {
     }
     return http().put(url, data);
   },
-  createSettings: (
+  createStream: (
     org_identifier: string,
     stream_name: string,
     type: string,
     data: any
   ) => {
-    let url = `/api/${org_identifier}/streams/${stream_name}/settings`;
+    let url = `/api/${org_identifier}/streams/${stream_name}`;
 
     if (type != "") {
       url += "?type=" + type;

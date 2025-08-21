@@ -20,7 +20,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
     meta::stream::{FileKey, FileListDeleted, PartitionTimeLevel, StreamType, TimeRange},
-    utils::time::{BASE_TIME, hour_micros},
+    utils::time::{BASE_TIME, day_micros, hour_micros},
 };
 use infra::{
     cache, dist_lock, file_list as infra_file_list,
@@ -139,28 +139,28 @@ fn generate_time_ranges_for_deletion(
     time_ranges_for_deletion
 }
 
-/// Creates delete jobs for the stream based on the stream settings
-/// Returns the number of jobs created
-pub async fn delete_by_stream(
+/// Generate delete jobs for the stream based on the stream settings
+pub async fn generate_retention_job(
     lifecycle_end: &DateTime<Utc>,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     extended_retentions: &[TimeRange],
-) -> Result<u32, anyhow::Error> {
-    // get schema
-    let stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
-    let created_at = stats.doc_time_min;
-    if created_at == 0 {
-        return Ok(0); // no data, just skip
+) -> Result<(), anyhow::Error> {
+    // get min date from file_list
+    let min_date = infra::file_list::get_min_date(org_id, stream_type, stream_name).await?;
+    if min_date.is_empty() {
+        return Ok(()); // no data, just skip
     }
-    let created_at: DateTime<Utc> = Utc.timestamp_nanos(created_at * 1000);
+    let min_date = format!("{min_date}/00/00+0000");
+    let created_at =
+        DateTime::parse_from_str(&min_date, "%Y/%m/%d/%H/%M/%S%z")?.with_timezone(&Utc);
     if created_at >= *lifecycle_end {
-        return Ok(0); // created_at is after lifecycle end, just skip
+        return Ok(()); // created_at is after lifecycle end, just skip
     }
 
     log::debug!(
-        "[COMPACTOR] delete_by_stream {}/{}/{}/{},{}",
+        "[COMPACTOR] generate_retention_job {}/{}/{}/{},{}",
         org_id,
         stream_type,
         stream_name,
@@ -169,7 +169,7 @@ pub async fn delete_by_stream(
     );
 
     if created_at.ge(lifecycle_end) {
-        return Ok(0); // created_at is after lifecycle end, just skip
+        return Ok(()); // created_at is after lifecycle end, just skip
     }
 
     // last extended retention time
@@ -198,35 +198,39 @@ pub async fn delete_by_stream(
         ranges
     };
 
-    let job_nos = final_deletion_time_ranges.len();
-
     for time_range in final_deletion_time_ranges {
-        let time_range_start = Utc
-            .timestamp_nanos(time_range.start * 1000)
-            .format("%Y-%m-%d")
-            .to_string();
-        let time_range_end = Utc
-            .timestamp_nanos(time_range.end * 1000)
-            .format("%Y-%m-%d")
-            .to_string();
-        if time_range_start >= time_range_end {
-            continue;
+        // generate jobs by date
+        let mut start = time_range.start;
+        while start < time_range.end {
+            let time_range_start = Utc
+                .timestamp_nanos(start * 1000)
+                .format("%Y-%m-%d")
+                .to_string();
+            start += day_micros(1); // increase one day
+            let time_range_end = Utc
+                .timestamp_nanos(start * 1000)
+                .format("%Y-%m-%d")
+                .to_string();
+            if time_range_start >= time_range_end {
+                continue;
+            }
+
+            let (_key, created) = db::compact::retention::delete_stream(
+                org_id,
+                stream_type,
+                stream_name,
+                Some((time_range_start.as_str(), time_range_end.as_str())),
+            )
+            .await?;
+            if created {
+                log::info!(
+                    "[COMPACTOR] generate_retention_job: generate job for {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end}",
+                );
+            }
         }
-
-        log::info!(
-            "[COMPACTOR] delete_by_stream: generate job for {org_id}/{stream_type}/{stream_name}/{time_range_start},{time_range_end}",
-        );
-
-        db::compact::retention::delete_stream(
-            org_id,
-            stream_type,
-            stream_name,
-            Some((time_range_start.as_str(), time_range_end.as_str())),
-        )
-        .await?;
     }
 
-    Ok(job_nos as u32)
+    Ok(())
 }
 
 pub async fn delete_all(
@@ -466,9 +470,12 @@ pub async fn delete_from_file_list(
         file.deleted = true;
         entry.push(file);
     }
+    // generate a new array and sort by key
+    let mut hours_files = hours_files.into_iter().collect::<Vec<_>>();
+    hours_files.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
 
     // write file list to storage
-    write_file_list(org_id, &hours_files).await?;
+    write_file_list(org_id, hours_files).await?;
 
     Ok(())
 }
@@ -476,23 +483,23 @@ pub async fn delete_from_file_list(
 // write file list to db, all the files should be deleted
 async fn write_file_list(
     org_id: &str,
-    hours_files: &HashMap<String, Vec<FileKey>>,
+    hours_files: Vec<(String, Vec<FileKey>)>,
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    for events in hours_files.values() {
+    for (_, events) in hours_files {
         // set to db, retry 5 times
         let mut success = false;
         let created_at = Utc::now().timestamp_micros();
         for _ in 0..5 {
             // only store the file_list into history, don't delete files
             if cfg.compact.data_retention_history
-                && let Err(e) = infra_file_list::batch_add_history(events).await
+                && let Err(e) = infra_file_list::batch_add_history(&events).await
             {
                 log::error!("[COMPACTOR] file_list batch_add_history failed: {e}");
                 return Err(e.into());
             }
             // delete from file_list table
-            if let Err(e) = infra_file_list::batch_process(events).await {
+            if let Err(e) = infra_file_list::batch_process(&events).await {
                 log::error!("[COMPACTOR] batch_delete to db failed, retrying: {e}");
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
@@ -614,7 +621,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_delete_by_stream() {
+    async fn test_generate_retention_job() {
         infra_file_list::create_table().await.unwrap();
         let org_id = "test";
         let stream_name = "test";
@@ -622,7 +629,8 @@ mod tests {
         let lifecycle_end = DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
             .unwrap()
             .to_utc();
-        let res = delete_by_stream(&lifecycle_end, org_id, stream_type, stream_name, &[]).await;
+        let res =
+            generate_retention_job(&lifecycle_end, org_id, stream_type, stream_name, &[]).await;
         assert!(res.is_ok());
     }
 
