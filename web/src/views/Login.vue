@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <invitation-list
     v-if="showInvitations"
     :user-email="user.email"
-    :sub-key="user.sub_key"
     @invitations-processed="handleInvitationsProcessed"
   />
 </template>
@@ -221,15 +220,11 @@ export default defineComponent({
           this.store.commit("setZoConfig", res.data);
           const token = getUserInfo(this.$route.hash);
 
-          const propArr = this.$route.hash.substring(1);
-          const params = new URLSearchParams(propArr);
-
           if (token !== null && token.email != null) {
             this.user.email = token.email;
             this.user.cognito_sub = token.sub;
             this.user.first_name = token.given_name ? token.given_name : "";
             this.user.last_name = token.family_name ? token.family_name : "";
-            this.user.sub_key = params.get("sub_key");
           }
           const sessionUserInfo = getDecodedUserInfo();
           const d = new Date();

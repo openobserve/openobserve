@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             no-caps
             @click="acceptInvitation(props.row)"
-            :data-test="`accept-invitation-${props.row.id}`"
+            :data-test="`accept-invitation-${props.row.token}`"
           />
           <q-btn
             color="negative"
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             no-caps
             @click="rejectInvitation(props.row)"
-            :data-test="`reject-invitation-${props.row.id}`"
+            :data-test="`reject-invitation-${props.row.token}`"
           />
         </q-td>
       </template>
@@ -166,10 +166,6 @@ export default defineComponent({
       type: String,
       required: true,
     },
-    subKey: {
-      type: String,
-      required: true,
-    },
   },
   emits: ["invitations-processed"],
   setup(props, { emit }) {
@@ -177,20 +173,7 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const qTable: any = ref(null);
-    const invitations = ref([
-      {
-        organization_name: "Organization 1",
-        role: "Admin",
-        invited_by: "John Doe",
-        expiry: "2025-01-01",
-      },
-      {
-        organization_name: "Organization 2",
-        role: "User",
-        invited_by: "Jane Doe",
-        expiry: "2025-01-01",
-      },
-    ]);
+    const invitations = ref([]);
     const confirmAccept = ref(false);
     const confirmReject = ref(false);
     const selectedInvitation = ref(null);
@@ -199,28 +182,28 @@ export default defineComponent({
       {
         name: "organization_name",
         field: "organization_name",
-        label: t("invitation.organizationName"),
+        label: t("invitation.org_name"),
         align: "left",
         sortable: true,
       },
       {
         name: "role",
         field: "role",
-        label: t("invitation.invitedRole"),
+        label: t("invitation.role"),
         align: "left",
         sortable: true,
       },
       {
         name: "invited_by",
         field: "invited_by",
-        label: t("invitation.invitedBy"),
+        label: t("invitation.inviter_id"),
         align: "left",
         sortable: true,
       },
       {
         name: "expiry",
         field: "expiry",
-        label: t("invitation.expiry"),
+        label: t("invitation.expires_at"),
         align: "left",
         sortable: true,
       },
@@ -246,12 +229,13 @@ export default defineComponent({
         spinner: true,
         message: "Loading pending invitations...",
       });
+      // {"data":[{"org_id":"31b5oGxybSzf61gTGhHhEtsP0K5","token":"7364275578188333056","role":"admin","status":"pending","expires_at":1756384919464570}]}
 
       try {
         const response = await usersService.getPendingInvites();
         invitations.value = response.data.map((invitation: any) => ({
           ...invitation,
-          expiry: formatExpiry(invitation.expiry),
+          expiry: formatExpiry(invitation.expires_at),
         }));
         dismiss();
       } catch {
@@ -263,19 +247,24 @@ export default defineComponent({
       }
     };
 
-    const formatExpiry = (expiryDate: string) => {
-      const expiry = new Date(expiryDate);
-      const now = new Date();
-      const daysLeft = Math.ceil(
-        (expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-      );
+    const formatExpiry = (expiryMicroseconds: number) => {
+      // Convert microseconds to milliseconds for Date constructor
+      try {
+        const expiry = new Date(expiryMicroseconds / 1000);
+        const now = new Date();
+        const daysLeft = Math.ceil(
+          (expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        );
 
-      if (daysLeft < 0) {
+        if (daysLeft < 0) {
+          return t("invitation.expired");
+        } else if (daysLeft === 0) {
+          return t("invitation.expiresToday");
+        } else {
+          return t("invitation.daysLeft", { days: daysLeft });
+        }
+      } catch {
         return t("invitation.expired");
-      } else if (daysLeft === 0) {
-        return t("invitation.expiresToday");
-      } else {
-        return t("invitation.daysLeft", { days: daysLeft });
       }
     };
 
@@ -299,8 +288,8 @@ export default defineComponent({
 
       try {
         await organizationsService.process_subscription(
-          props.subKey,
-          selectedInvitation.value.id,
+          selectedInvitation.value.token,
+          selectedInvitation.value.org_id,
           "confirm",
         );
         dismiss();
