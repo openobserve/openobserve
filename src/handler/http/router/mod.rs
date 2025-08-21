@@ -609,6 +609,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
     let service = service
         .service(organization::org::get_org_invites)
         .service(organization::org::generate_org_invite)
+        .service(organization::org::delete_org_invite)
         .service(organization::org::accept_org_invite)
         .service(cloud::billings::create_checkout_session)
         .service(cloud::billings::process_session_detail)

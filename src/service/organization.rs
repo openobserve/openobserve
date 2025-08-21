@@ -440,6 +440,12 @@ pub async fn get_invitations_for_org(
 }
 
 #[cfg(feature = "cloud")]
+pub async fn delete_invite_by_token(org_id: &str, token: &str) -> Result<(), anyhow::Error> {
+    org_invites::delete_invite_by_token(org_id, token).await?;
+    Ok(())
+}
+
+#[cfg(feature = "cloud")]
 pub async fn generate_invitation(
     org_id: &str,
     user_email: &str,

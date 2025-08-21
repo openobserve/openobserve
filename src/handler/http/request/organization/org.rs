@@ -18,7 +18,7 @@ use std::{
     io::Error,
 };
 
-use actix_web::{HttpRequest, HttpResponse, Result, get, http, post, put, web};
+use actix_web::{HttpRequest, HttpResponse, Result, delete, get, http, post, put, web};
 use config::meta::cluster::NodeInfo;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
@@ -599,7 +599,7 @@ pub async fn get_org_invites(path: web::Path<String>) -> Result<HttpResponse, Er
         Ok(result) => {
             let result: Vec<_> = result
                 .into_iter()
-                .filter(|invite| invite.status != InviteStatus::Accepted)
+                .filter(|invite| invite.status == InviteStatus::Pending)
                 .collect();
             Ok(HttpResponse::Ok().json(result))
         }
@@ -641,6 +641,34 @@ pub async fn generate_org_invite(
     }
 }
 
+/// RemoveOrganizationInvite
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "RemoveOrganizationInvite",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+        ("id" = String, Path, description = "invitation token"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Organization),
+    )
+)]
+#[delete("/{org_id}/invites/{token}")]
+pub async fn delete_org_invite(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let (org_id, token) = path.into_inner();
+
+    let result = organization::delete_invite_by_token(&org_id, &token).await;
+    match result {
+        Ok(_) => Ok(HttpResponse::Ok().json("success")),
+        Err(err) => Ok(HttpResponse::BadRequest()
+            .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, err))),
+    }
+}
 /// AcceptOrganizationInvite
 #[cfg(feature = "cloud")]
 #[utoipa::path(

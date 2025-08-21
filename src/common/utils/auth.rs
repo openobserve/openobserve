@@ -435,6 +435,15 @@ impl FromRequest for AuthExtractor {
                     OFGA_MODELS.get("organizations").unwrap().key,
                     org_id
                 )
+            } else if path_columns[1].eq("invites") && method.eq("DELETE") {
+                // this is specifically for deleting an existing invite
+                let key = "users";
+                let entity = path_columns[0].to_string();
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS.get(key).map_or(key, |model| model.key),
+                    entity
+                )
             } else if (method.eq("PUT") && !path_columns[1].starts_with("ratelimit"))
                 || method.eq("DELETE")
                 || path_columns[1].eq("reports")
