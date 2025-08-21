@@ -85,9 +85,7 @@ impl<'n> TreeNodeVisitor<'n> for MetricsVisitor {
         if name == "RemoteScanExec" {
             let remote_scan_exec = node.as_any().downcast_ref::<RemoteScanExec>().unwrap();
             self.metrics.push(remote_scan_exec.cluster_metrics());
-            Ok(TreeNodeRecursion::Stop)
-        } else {
-            Ok(TreeNodeRecursion::Continue)
-        }
+        } 
+        Ok(TreeNodeRecursion::Continue)
     }
 }

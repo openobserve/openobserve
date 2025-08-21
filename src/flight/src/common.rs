@@ -85,10 +85,9 @@ impl PreCustomMessage {
                 .as_ref()
                 .map(|metrics_info| CustomMessage::Metrics(collect_metrics(metrics_info))),
             PreCustomMessage::MetricsRef(metrics) => {
-                let metrics: Vec<Metrics> = metrics.iter().flat_map(|m| m.lock().clone()).collect();
-                metrics
-                    .is_empty()
-                    .then_some(CustomMessage::Metrics(metrics))
+                let metrics: Vec<Metrics> =
+                    metrics.iter().map(|m| m.lock().clone()).flatten().collect();
+                (!metrics.is_empty()).then_some(CustomMessage::Metrics(metrics))
             }
         }
     }
