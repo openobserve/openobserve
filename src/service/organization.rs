@@ -581,6 +581,30 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     Ok(())
 }
 
+pub async fn decline_invitation(user_email: &str, token: &str) -> Result<(), anyhow::Error> {
+    let invite = org_invites::get_by_token_user(token, user_email)
+        .await
+        .map_err(|e| {
+            log::info!("error getting token {token} for email {user_email} : {e}");
+            anyhow::anyhow!("Provided Token is not valid for this email id")
+        })?;
+
+    let now = chrono::Utc::now().timestamp_micros();
+
+    if invite.expires_at < now {
+        return Err(anyhow::anyhow!("Invalid token"));
+    }
+
+    if let Err(e) =
+        org_invites::update_invite_status(token, user_email, OrgInviteStatus::Rejected).await
+    {
+        log::error!("Error updating the invite status in the db: {e}");
+        return Err(anyhow::anyhow!("Error updating status"));
+    }
+
+    Ok(())
+}
+
 pub async fn get_org(org: &str) -> Option<Organization> {
     db::organization::get_org(org).await.ok()
 }

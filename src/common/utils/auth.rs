@@ -295,13 +295,13 @@ impl FromRequest for AuthExtractor {
                 };
 
                 "org:##user_id##".to_string()
-            } else if path_columns[0].eq("invites") {
+            } else if path_columns[0].eq("invites") && method.eq("GET") {
                 let auth_str = extract_auth_str(req);
                 // because the /invites route is checked by user_id,
                 // and does not return any other info, we can bypass the auth
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
-                    method: "".to_string(),
+                    method: "GET".to_string(),
                     o2_type: "".to_string(),
                     org_id: "".to_string(),
                     bypass_check: true, // bypass check permissions
@@ -322,6 +322,21 @@ impl FromRequest for AuthExtractor {
             } else if method.eq("GET") {
                 method = "LIST".to_string();
             }
+
+            if path_columns[0].eq("invites") && method.eq("DELETE") {
+                let auth_str = extract_auth_str(req);
+                // because the delete /invites/token route is checked by user_id,
+                // and does not return any other info, we can bypass the auth
+                return ready(Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method: "DELETE".to_string(),
+                    o2_type: "".to_string(),
+                    org_id: "".to_string(),
+                    bypass_check: true, // bypass check permissions
+                    parent_id: "".to_string(),
+                }));
+            }
+
             // this will take format of settings:{org_id} or pipelines:{org_id} etc
             let key = if path_columns[1].eq("invites") {
                 "users"

@@ -375,6 +375,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(users::update)
         .service(users::add_user_to_org)
         .service(users::list_invitations)
+        .service(users::decline_invitation)
         .service(users::list_roles)
         .service(organization::org::organizations)
         .service(organization::settings::get)
