@@ -300,10 +300,8 @@ export default defineComponent({
 
         // Set the selected organization and redirect
         const orgData = {
-          id: selectedInvitation.value.organization_id,
-          identifier: selectedInvitation.value.organization_identifier,
-          name: selectedInvitation.value.organization_name,
-          user_email: props.userEmail,
+          identifier: selectedInvitation.value.org_id,
+          name: selectedInvitation.value.org_name,
         };
 
         store.dispatch("setSelectedOrganization", orgData);

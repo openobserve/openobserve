@@ -54,6 +54,10 @@ export default defineComponent({
     const q = useQuasar();
     const router: any = useRouter();
     const showInvitations = ref(false);
+    const invitedOrg = ref<{ identifier: string; name: string }>({
+      identifier: "",
+      name: "",
+    });
 
     onBeforeMount(async () => {
       console.log("router?.currentRoute.value.hash");
@@ -77,74 +81,89 @@ export default defineComponent({
      * redirect user to the page where user was redirected from
      */
     const getDefaultOrganization = () => {
-      organizationsService.list(0, 100000, "id", false, "").then((res: any) => {
-        const localOrg: any = useLocalOrganization();
-        let tempDefaultOrg = {};
-        let localOrgFlag = false;
-        if (
-          localOrg.value != null &&
-          localOrg.value.user_email !== store.state.userInfo.email
-        ) {
-          localOrg.value = null;
-          useLocalOrganization("");
-        }
+      organizationsService
+        .list(0, 100000, "id", false, "")
+        .then((res: any) => {
+          const localOrg: any = useLocalOrganization();
+          let tempDefaultOrg = {};
+          let localOrgFlag = false;
+          if (
+            localOrg.value != null &&
+            localOrg.value.user_email !== store.state.userInfo.email
+          ) {
+            localOrg.value = null;
+            useLocalOrganization("");
+          }
 
-        store.dispatch("setOrganizations", res.data.data);
+          store.dispatch("setOrganizations", res.data.data);
 
-        orgOptions.value = res.data.data.map(
-          (data: {
-            id: any;
-            name: any;
-            type: any;
-            identifier: any;
-            UserObj: any;
-          }) => {
-            let optiondata: any = {
-              label: data.name,
-              id: data.id,
-              identifier: data.identifier,
-              user_email: store.state.userInfo.email,
-            };
+          orgOptions.value = res.data.data.map(
+            (data: {
+              id: any;
+              name: any;
+              type: any;
+              identifier: any;
+              UserObj: any;
+            }) => {
+              let optiondata: any = {
+                label: data.name,
+                id: data.id,
+                identifier: data.identifier,
+                user_email: store.state.userInfo.email,
+              };
 
-            if (
-              (Object.keys(selectedOrg.value).length == 0 &&
-                (data.type == "default" || data.id == "1") &&
-                store.state.userInfo.email == data.UserObj.email) ||
-              res.data.data.length == 1
-            ) {
-              localOrgFlag = true;
-              selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
-              useLocalOrganization(selectedOrg.value);
-              store.dispatch("setSelectedOrganization", selectedOrg.value);
-            }
+              if (
+                invitedOrg.value?.identifier &&
+                invitedOrg.value?.identifier === data.identifier
+              ) {
+                selectedOrg.value = optiondata;
+                useLocalOrganization(optiondata);
+                store.dispatch("setSelectedOrganization", optiondata);
+              } else if (
+                (Object.keys(selectedOrg.value).length == 0 &&
+                  (data.type == "default" || data.id == "1") &&
+                  store.state.userInfo.email == data.UserObj.email) ||
+                res.data.data.length == 1
+              ) {
+                localOrgFlag = true;
+                selectedOrg.value = localOrg.value
+                  ? localOrg.value
+                  : optiondata;
+                useLocalOrganization(selectedOrg.value);
+                store.dispatch("setSelectedOrganization", selectedOrg.value);
+              }
 
-            if (data.type == "default") {
-              tempDefaultOrg = optiondata;
-            }
+              if (data.type == "default") {
+                tempDefaultOrg = optiondata;
+              }
 
-            return optiondata;
-          },
-        );
+              return optiondata;
+            },
+          );
 
-        if (localOrgFlag == false) {
-          selectedOrg.value = tempDefaultOrg;
-          useLocalOrganization(tempDefaultOrg);
-          store.dispatch("setSelectedOrganization", tempDefaultOrg);
-        }
-        //here check if the config.Iscloud is true and the redirectURI is there any new_user_login == true
-        if (
-          config.isCloud == "true" &&
-          checkCallBackValues(
-            router.currentRoute.value.hash,
-            "new_user_login",
-          ) == "true"
-        ) {
-          localStorage.setItem("isFirstTimeLogin", "true");
-        }
+          if (localOrgFlag == false && !invitedOrg.value?.identifier) {
+            selectedOrg.value = tempDefaultOrg;
+            useLocalOrganization(tempDefaultOrg);
+            store.dispatch("setSelectedOrganization", tempDefaultOrg);
+          }
+          //here check if the config.Iscloud is true and the redirectURI is there any new_user_login == true
+          if (
+            config.isCloud == "true" &&
+            checkCallBackValues(
+              router.currentRoute.value.hash,
+              "new_user_login",
+            ) == "true"
+          ) {
+            localStorage.setItem("isFirstTimeLogin", "true");
+          }
 
-        // Check for pending invites
-        redirectUser();
-      });
+          // Check for pending invites
+          redirectUser();
+        })
+        .catch((e: any) => {
+          console.log("Error while fetching organizations", e);
+          redirectUser();
+        });
     };
 
     /**
@@ -169,7 +188,7 @@ export default defineComponent({
       showInvitations.value = false;
       if (data.accepted) {
         // User accepted an invitation, set the organization and follow normal flow
-        selectedOrg.value = data.organization;
+        invitedOrg.value = data.organization;
         getDefaultOrganization();
       } else {
         // User rejected all invitations, proceed with normal flow
