@@ -28,10 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("invitation.pendingInvitations") }}
       </div>
     </div>
-    <div class="tw-text-sm tw-text-grey-500 tw-px-4">
+    <!-- <div class="tw-text-sm tw-text-grey-500 tw-px-4">
       Info: If you decline all invitations and are not part of any organization,
-      a new organization will be created for you.
-    </div>
+      you will be logged out.
+    </div> -->
     <q-table
       ref="qTable"
       :rows="invitations"
