@@ -491,7 +491,7 @@ const validateSqlQuery = () => {
   query.query.start_time = query.query.start_time + 895000000;
 
   //before assigning the sql , we need to check if the sql does limit is applied or not 
-  //if yes we need to change the limit to 10 because for validating we dont need to send the original limit 
+  //if yes we need to change the limit to 100 because for validating we dont need to send the original limit 
   //if no we can directly assign the sql to the query 
   //we dont need to change the actual query instead of we need to change the query that we are sending for validation purpose
 
