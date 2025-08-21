@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import http from "./http";
 import config from "../aws-exports";
 
@@ -63,15 +62,24 @@ const users = {
   logout: () => {
     return http().get(`/config/logout`);
   },
-  getUserGroups:(orgId:any, userEmail:any) => {
+  getUserGroups: (orgId: any, userEmail: any) => {
     return http().get(`api/${orgId}/users/${userEmail}/groups`);
   },
-  getUserRoles:(orgId:any, userEmail:any) => {
+  getUserRoles: (orgId: any, userEmail: any) => {
     return http().get(`api/${orgId}/users/${userEmail}/roles`);
   },
   invitedUsers: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/invites`);
-  }
+  },
+  getPendingInvites: () => {
+    return http().get(`/api/invites`);
+  },
+  acceptInvite: (inviteId: string) => {
+    return http().post(`/api/invites/${inviteId}/accept`);
+  },
+  rejectInvite: (inviteId: string) => {
+    return http().post(`/api/invites/${inviteId}/reject`);
+  },
 };
 
 export default users;

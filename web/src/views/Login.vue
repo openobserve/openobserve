@@ -15,17 +15,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <login v-if="user.email == ''" />
+  <login v-if="user.email == '' && !showInvitations" />
+  <invitation-list
+    v-if="showInvitations"
+    :user-email="user.email"
+    :sub-key="user.sub_key"
+    @invitations-processed="handleInvitationsProcessed"
+  />
 </template>
 
 <script lang="ts">
 import { defineComponent, onBeforeMount, ref } from "vue";
 import { useRouter } from "vue-router";
 import Login from "@/components/login/Login.vue";
+import InvitationList from "@/components/iam/users/InvitationList.vue";
 import config from "@/aws-exports";
 import configService from "@/services/config";
 import { useStore } from "vuex";
-import { getUserInfo, getDecodedUserInfo, checkCallBackValues } from "@/utils/zincutils";
+import {
+  getUserInfo,
+  getDecodedUserInfo,
+  checkCallBackValues,
+} from "@/utils/zincutils";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
@@ -35,6 +46,7 @@ export default defineComponent({
   name: "LoginPage",
   components: {
     Login,
+    InvitationList,
   },
   setup() {
     const store = useStore();
@@ -42,8 +54,10 @@ export default defineComponent({
     const selectedOrg = ref({});
     const q = useQuasar();
     const router: any = useRouter();
+    const showInvitations = ref(false);
 
     onBeforeMount(async () => {
+      console.log("router?.currentRoute.value.hash");
       if (!router?.currentRoute.value.hash) {
         await configService
           .get_config()
@@ -110,7 +124,7 @@ export default defineComponent({
             }
 
             return optiondata;
-          }
+          },
         );
 
         if (localOrgFlag == false) {
@@ -119,11 +133,18 @@ export default defineComponent({
           store.dispatch("setSelectedOrganization", tempDefaultOrg);
         }
         //here check if the config.Iscloud is true and the redirectURI is there any new_user_login == true
-        if(config.isCloud == 'true' && checkCallBackValues(router.currentRoute.value.hash, "new_user_login") == "true"){
+        if (
+          config.isCloud == "true" &&
+          checkCallBackValues(
+            router.currentRoute.value.hash,
+            "new_user_login",
+          ) == "true"
+        ) {
           localStorage.setItem("isFirstTimeLogin", "true");
         }
+
+        // Check for pending invites
         redirectUser();
-        
       });
     };
 
@@ -145,6 +166,18 @@ export default defineComponent({
       }
     };
 
+    const handleInvitationsProcessed = (data: any) => {
+      showInvitations.value = false;
+      if (data.accepted) {
+        // User accepted an invitation, set the organization and follow normal flow
+        selectedOrg.value = data.organization;
+        getDefaultOrganization();
+      } else {
+        // User rejected all invitations, proceed with normal flow
+        getDefaultOrganization();
+      }
+    };
+
     return {
       q,
       store,
@@ -152,6 +185,8 @@ export default defineComponent({
       router,
       redirectUser,
       getDefaultOrganization,
+      showInvitations,
+      handleInvitationsProcessed,
     };
   },
   data() {
@@ -161,6 +196,7 @@ export default defineComponent({
         cognito_sub: "",
         first_name: "",
         last_name: "",
+        sub_key: "",
       },
       userInfo: {
         email: "",
@@ -177,25 +213,45 @@ export default defineComponent({
      * set the user info to the vuex store
      * else call the verify and create user method as user is not registered
      */
+
     if (this.$route.hash) {
       configService
         .get_config()
         .then(async (res) => {
           this.store.commit("setZoConfig", res.data);
           const token = getUserInfo(this.$route.hash);
+
+          const propArr = this.$route.hash.substring(1);
+          const params = new URLSearchParams(propArr);
+
           if (token !== null && token.email != null) {
             this.user.email = token.email;
             this.user.cognito_sub = token.sub;
             this.user.first_name = token.given_name ? token.given_name : "";
             this.user.last_name = token.family_name ? token.family_name : "";
+            this.user.sub_key = params.get("sub_key");
           }
-
           const sessionUserInfo = getDecodedUserInfo();
           const d = new Date();
           this.userInfo =
             sessionUserInfo !== null
               ? JSON.parse(sessionUserInfo as string)
               : null;
+
+          // Check for pending invites before login
+          if (
+            config.isCloud == "true" &&
+            checkCallBackValues(
+              this.router.currentRoute.value.hash,
+              "pending_invites",
+            ) == "true"
+          ) {
+            this.showInvitations = true;
+            return;
+          }
+
+          debugger;
+
           if (
             (this.userInfo !== null &&
               this.userInfo.hasOwnProperty("pgdata")) ||
