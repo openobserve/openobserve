@@ -38,7 +38,12 @@ import {
 } from "@/utils/zincutils";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
-import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
+import {
+  useLocalCurrentUser,
+  useLocalOrganization,
+  invlidateLoginData,
+  useLocalUserInfo,
+} from "@/utils/zincutils";
 import { useQuasar } from "quasar";
 
 export default defineComponent({
@@ -60,7 +65,6 @@ export default defineComponent({
     });
 
     onBeforeMount(async () => {
-      console.log("router?.currentRoute.value.hash");
       if (!router?.currentRoute.value.hash) {
         await configService
           .get_config()
@@ -162,8 +166,18 @@ export default defineComponent({
         })
         .catch((e: any) => {
           console.log("Error while fetching organizations", e);
-          redirectUser();
+          signout();
         });
+    };
+
+    const signout = () => {
+      if (config.isEnterprise == "true") {
+        invlidateLoginData();
+      }
+      store.dispatch("logout");
+      useLocalCurrentUser("", true);
+      useLocalUserInfo("", true);
+      router.push("/logout");
     };
 
     /**
