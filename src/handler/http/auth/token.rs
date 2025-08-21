@@ -110,6 +110,31 @@ pub async fn token_validator(
                     }
                 };
                 match user {
+                    // specifically for list invite call, even if the user is not present
+                    // in db, which can be the case when a new user is joining o2 cloud for first
+                    // time we can get None. if the API call is specifically
+                    // /invite, then it should be ok to allow, because we list
+                    // invite based on the user email got from sso provider, and
+                    // nothing else.
+                    None if is_list_invite_call => {
+                        let mut req = req;
+
+                        if req.method().eq(&Method::POST)
+                            && !req.headers().contains_key("content-type")
+                        {
+                            req.headers_mut().insert(
+                                header::CONTENT_TYPE,
+                                header::HeaderValue::from_static(
+                                    "application/x-www-form-urlencoded",
+                                ),
+                            );
+                        }
+                        req.headers_mut().insert(
+                            header::HeaderName::from_static("user_id"),
+                            header::HeaderValue::from_str(&res.0.user_email).unwrap(),
+                        );
+                        Ok(req)
+                    }
                     Some(user) => {
                         // / Hack for prometheus, need support POST and check the header
                         let mut req = req;
