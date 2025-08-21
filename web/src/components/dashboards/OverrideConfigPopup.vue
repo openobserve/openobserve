@@ -22,15 +22,15 @@
     <div
       v-for="(overrideConfig, index) in overrideConfigs"
       :key="index"
-      class="q-mb-md flex items-center tw-w-full tw-flex"
+      class="q-mb-md flex items-start tw-w-full tw-flex"
       style="gap: 15px"
     >
+    <!-- :error="duplicateErrors[index]"
+    :error-message="'This field has already been selected. Please choose a different field.'" -->
       <q-select
         v-model="overrideConfig.field.value"
         :label="'Field'"
         :options="columnsOptions"
-        :error="duplicateErrors[index]"
-        :error-message="'This field has already been selected. Please choose a different field.'"
         style="width: 50%"
         :data-test="`dashboard-addpanel-config-unit-config-select-column-${index}`"
         input-debounce="0"
@@ -379,13 +379,13 @@ export default defineComponent({
 
     const saveOverrides = () => {
       const names = overrideConfigs.value.map((config: any) => config.field.value);
-      duplicateErrors.value = names.map(
-        (name: any, idx: any) => names.indexOf(name) !== idx,
-      );
+      // duplicateErrors.value = names.map(
+      //   (name: any, idx: any) => names.indexOf(name) !== idx,
+      // );
 
-      if (duplicateErrors.value.some((isDuplicate) => isDuplicate)) {
-        return;
-      }
+      // if (duplicateErrors.value.some((isDuplicate) => isDuplicate)) {
+      //   return;
+      // }
 
       // Transform data to match backend expectations
       const transformedConfigs = overrideConfigs.value
