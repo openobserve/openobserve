@@ -69,10 +69,16 @@ pub async fn token_validator(
                 let is_member_subscription = path_columns
                     .get(1)
                     .is_some_and(|p| p.eq(&"member_subscription"));
+                // this is for /invites call, which is only based on user, similar to
+                // member subscription. Furthermore, because we are listing the invites of
+                // that particular user only, we can skip other checks, and allow listing
+                let is_list_invite_call = path_columns.len() == 1
+                    && path_columns.first().is_some_and(|p| p.eq(&"invites"));
                 let path_suffix = path_columns.last().unwrap_or(&"");
                 if path_suffix.eq(&"organizations")
                     || path_suffix.eq(&"clusters")
                     || is_member_subscription
+                    || is_list_invite_call
                 {
                     let db_user = db::user::get_db_user(user_id).await;
                     user = match db_user {

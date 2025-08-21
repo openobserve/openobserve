@@ -295,6 +295,18 @@ impl FromRequest for AuthExtractor {
                 };
 
                 "org:##user_id##".to_string()
+            } else if path_columns[0].eq("invites") {
+                let auth_str = extract_auth_str(req);
+                // because the /invites route is checked by user_id,
+                // and does not return any other info, we can bypass the auth
+                return ready(Ok(AuthExtractor {
+                    auth: auth_str.to_owned(),
+                    method: "".to_string(),
+                    o2_type: "".to_string(),
+                    org_id: "".to_string(),
+                    bypass_check: true, // bypass check permissions
+                    parent_id: "".to_string(),
+                }));
             } else {
                 path_columns[0].to_string()
             }
