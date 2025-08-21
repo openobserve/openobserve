@@ -1451,7 +1451,6 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
 import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
-import { json2csv } from "json-2-csv";
 
 const defaultValue: any = () => {
   return {
