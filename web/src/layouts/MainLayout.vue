@@ -703,11 +703,16 @@ export default defineComponent({
     const searchQuery = ref('');
     
     const filteredOrganizations = computed(() => {
+      //we will return all organizations if searchQuery is empty
+      //else we will search based upon label or identifier that we get from the search query 
+      //if anyone of the orgs matches either label or identifier then we will return that orgs
       if (!searchQuery.value) return orgOptions.value;
-      const toBeSearched = searchQuery.value.toLowerCase();
-      return orgOptions.value.filter((org: any) => 
-        org.label?.toLowerCase().includes(toBeSearched)
-      );
+      const toBeSearched = searchQuery.value.toLowerCase().trim();
+      return orgOptions.value.filter((org: any) => {
+        const labelMatch = org.label?.toLowerCase().includes(toBeSearched);
+        const identifierMatch = org.identifier?.toLowerCase().includes(toBeSearched);
+        return labelMatch || identifierMatch;
+      });
     });
 
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
