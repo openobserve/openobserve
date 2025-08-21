@@ -319,7 +319,7 @@
   "invitation": {
     "pendingInvitations": "Pending Invitations",
     "organizationName": "Organization Name",
-    "invitedRole": "Invited Role",
+    "role": "Role",
     "invitedBy": "Invited By",
     "expiry": "Expiry",
     "actions": "Actions",
