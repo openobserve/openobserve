@@ -90,7 +90,7 @@ async fn get_bucket_by_key<'a>(
     }
     let kv = jetstream.create_key_value(bucket).await.map_err(|e| {
         Error::Message(format!(
-            "[NATS:get_bucket_by_key] create jetstream kv error: {e}"
+            "[NATS:get_bucket_by_key] create jetstream kv {bucket_name} error: {e}"
         ))
     })?;
     Ok((kv, key.trim_start_matches(bucket_name)))
