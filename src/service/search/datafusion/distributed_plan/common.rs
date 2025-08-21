@@ -22,6 +22,7 @@ use datafusion::{
     common::Result, execution::SendableRecordBatchStream,
     physical_plan::stream::RecordBatchStreamAdapter,
 };
+use flight::common::Metrics;
 use parking_lot::Mutex;
 
 #[derive(Debug)]
@@ -33,6 +34,7 @@ pub struct QueryContext {
     pub is_querier: bool,
     pub scan_stats: Arc<Mutex<ScanStats>>,
     pub partial_err: Arc<Mutex<String>>,
+    pub cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
     pub start: std::time::Instant,
     pub num_rows: usize,
 }
@@ -46,6 +48,7 @@ impl QueryContext {
             is_querier: false,
             scan_stats: Arc::new(Mutex::new(ScanStats::new())),
             partial_err: Arc::new(Mutex::new(String::new())),
+            cluster_metrics: Arc::new(Mutex::new(Vec::new())),
             trace_id: String::new(),
             start: std::time::Instant::now(),
             num_rows: 0,
@@ -74,6 +77,11 @@ impl QueryContext {
 
     pub fn with_partial_err(mut self, partial_err: Arc<Mutex<String>>) -> Self {
         self.partial_err = partial_err;
+        self
+    }
+
+    pub fn with_cluster_metrics(mut self, metrics: Arc<Mutex<Vec<Metrics>>>) -> Self {
+        self.cluster_metrics = metrics;
         self
     }
 

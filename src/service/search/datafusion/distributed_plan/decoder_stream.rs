@@ -56,6 +56,9 @@ impl FlightDecoderStream {
             CustomMessage::ScanStats(stats) => {
                 self.query_context.scan_stats.lock().add(&stats);
             }
+            CustomMessage::Metrics(metrics) => {
+                self.query_context.cluster_metrics.lock().extend(metrics);
+            }
         }
     }
 }

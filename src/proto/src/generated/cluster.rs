@@ -2895,6 +2895,8 @@ pub struct SearchInfo {
     pub use_cache: bool,
     #[prost(int64, tag = "8")]
     pub histogram_interval: i64,
+    #[prost(bool, tag = "9")]
+    pub is_analyze: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
