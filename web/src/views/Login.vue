@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <login v-if="user.email == '' && !showInvitations" />
   <div v-if="showInvitations && config.isCloud == 'true'">
-    <div class="flex relative-position q-mr-sm">
+    <div class="flex relative-position tw-px-3 tw-pt-2">
       <img
         class="appLogo"
         loading="lazy"
@@ -364,9 +364,10 @@ export default defineComponent({
 </script>
 <style lang="scss" scoped>
 .appLogo {
-  width: 120px;
-  max-width: 150px;
-  max-height: 31px;
+  width: auto;
+  max-width: 200px;
+  height: 40px;
+  max-height: 40px;
   cursor: pointer;
 
   &__mini {
