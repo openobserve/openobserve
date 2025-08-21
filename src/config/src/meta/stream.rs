@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, fmt::Display};
+use std::{cmp::max, fmt::Display, str::FromStr};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
@@ -30,6 +30,81 @@ use crate::{
         json::{self, Map, Value},
     },
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "PascalCase")]
+pub enum DataType {
+    #[default]
+    Utf8,
+    LargeUtf8,
+    Int64,
+    Uint64,
+    Float64,
+    Boolean,
+}
+
+impl From<DataType> for arrow_schema::DataType {
+    fn from(data_type: DataType) -> Self {
+        match data_type {
+            DataType::Utf8 => Self::Utf8,
+            DataType::LargeUtf8 => Self::LargeUtf8,
+            DataType::Int64 => Self::Int64,
+            DataType::Uint64 => Self::UInt64,
+            DataType::Float64 => Self::Float64,
+            DataType::Boolean => Self::Boolean,
+        }
+    }
+}
+
+impl Display for DataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DataType::Utf8 => write!(f, "Utf8"),
+            DataType::LargeUtf8 => write!(f, "LargeUtf8"),
+            DataType::Int64 => write!(f, "Int64"),
+            DataType::Uint64 => write!(f, "Uint64"),
+            DataType::Float64 => write!(f, "Float64"),
+            DataType::Boolean => write!(f, "Boolean"),
+        }
+    }
+}
+
+impl FromStr for DataType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "utf8" => Ok(DataType::Utf8),
+            "largeutf8" => Ok(DataType::LargeUtf8),
+            "int64" => Ok(DataType::Int64),
+            "uint64" => Ok(DataType::Uint64),
+            "float64" => Ok(DataType::Float64),
+            "boolean" => Ok(DataType::Boolean),
+            _ => Err(format!("Unknown data type: {s}")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
+pub struct DataField {
+    pub name: String,
+    pub r#type: DataType,
+}
+
+impl DataField {
+    pub fn new(name: &str, r#type: DataType) -> Self {
+        Self {
+            name: name.to_string(),
+            r#type,
+        }
+    }
+}
+
+impl PartialEq for DataField {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.r#type == other.r#type
+    }
+}
 
 pub const ALL_STREAM_TYPES: [StreamType; 7] = [
     StreamType::Logs,
@@ -563,8 +638,16 @@ pub struct PatternAssociation {
     pub apply_at: String,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
+pub struct StreamField {
+    pub name: String,
+    pub r#type: String,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct UpdateStreamSettings {
+    #[serde(skip_serializing, default)]
+    pub fields: UpdateSettingsWrapper<StreamField>,
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -692,6 +775,7 @@ impl TimeRange {
         result
     }
 }
+
 #[derive(Clone, Debug, Default, Deserialize, ToSchema, PartialEq)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]

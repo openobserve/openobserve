@@ -46,13 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
-        <div
-          v-else-if="indexData.schema.length == 0"
-          class="q-pt-md text-center q-w-md q-mx-lg"
-          style="max-width: 450px"
-        >
-          No data available.
-        </div>
         <div v-else class="indexDetailsContainer" style="height: 100vh">
           <div
             class="titleContainer tw-flex tw-flex-col tw-items-flex-start tw-gap-5"
@@ -325,16 +318,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-card-section>
                 <!-- Main Content (Scrollable if necessary) -->
                 <q-card-section
+
                   class="q-pa-none"
-                  style="flex: 1; overflow-y: auto; padding: 4px 16px 6px 16px"
+                  style="flex: 1; overflow-y: auto; padding: 4px 16px 6px 16px; margin-bottom: 4px;"
                 >
                   <StreamFieldsInputs
                     :fields="newSchemaFields"
                     :showHeader="false"
-                    :isInSchema="true"
                     :visibleInputs="{
                       name: true,
-                      type: false,
+                      data_type: true,
                       index_type: false,
                     }"
                     @add="addSchemaField"
@@ -1041,6 +1034,7 @@ export default defineComponent({
     };
 
     const setSchema = (streamResponse) => {
+
       const schemaMapping = new Set([]);
 
       //here lets add the pattern associations to the streamResponse
@@ -1052,7 +1046,6 @@ export default defineComponent({
       }
       //after this we need to have a map of pattern_id and according to field as well
       //so that we can easily access the apply_at value for a pattern if it is undefined or null
-      
       previousSchemaVersion.pattern_associations && previousSchemaVersion.pattern_associations.forEach((pattern: PatternAssociation) => {
         patternIdToApplyAtMap.set(pattern.field + pattern.pattern_id, pattern);
       });
@@ -1186,6 +1179,7 @@ export default defineComponent({
     const onSubmit = async () => {
       patternAssociations.value = ungroupPatternAssociations(patternAssociations.value);
       let settings = {
+        fields: [], // only used for add new fields
         partition_keys: [],
         index_fields: [],
         full_text_search_keys: [],
@@ -1194,6 +1188,7 @@ export default defineComponent({
         extended_retention_days: [...indexData.value.extended_retention_days],
         pattern_associations: [...patternAssociations.value],
       };
+
       if (showDataRetention.value && dataRetentionDays.value < 1) {
         q.notify({
           color: "negative",
@@ -1217,14 +1212,22 @@ export default defineComponent({
       settings["store_original_data"] = storeOriginalData.value;
       settings["approx_partition"] = approxPartition.value;
 
-      const newSchemaFieldsSet = new Set(
+      const newSchemaFieldSet = new Set(
+        newSchemaFields.value.map((field) => {
+          return {
+            name: field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
+            type: field.type,
+          }
+        }),
+      );
+      const newSchemaFieldNameSet = new Set(
         newSchemaFields.value.map((field) =>
-          field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
-        ),
+           field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_")
+         ),
       );
       // Push unique and normalized field names to settings.defined_schema_fields
-      settings.defined_schema_fields.push(...newSchemaFieldsSet);
-
+      settings.fields.push(...newSchemaFieldSet);
+      settings.defined_schema_fields.push(...newSchemaFieldNameSet);
       redDaysList.value.forEach((field) => {
         settings.extended_retention_days.push({
           start: field.start,
@@ -1545,6 +1548,7 @@ export default defineComponent({
         resultTotal.value = indexData.value.schema.length;
       }
     };
+
     const updateActiveMainTab = (tab) => {
       activeMainTab.value = tab;
     };
@@ -1582,6 +1586,7 @@ export default defineComponent({
 
       selectedFields.value = [];
     };
+
     const updateStreamResponse = (streamResponse) => {
       if (streamResponse.settings.hasOwnProperty("defined_schema_fields")) {
         const userDefinedSchema = streamResponse.settings.defined_schema_fields;
@@ -1603,13 +1608,13 @@ export default defineComponent({
             isUserDefined: true,
             // Optionally, add default values for other properties (e.g., type, index_type, etc.)
           }));
-
         // Combine the updated schema with additional fields
         streamResponse.schema = [...updatedSchema, ...additionalFields];
       }
       updateResultTotal(streamResponse);
       return streamResponse;
     };
+    
     const closeDialog = () => {
       isDialogOpen.value = false;
       newSchemaFields.value = [];

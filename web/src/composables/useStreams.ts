@@ -270,7 +270,7 @@ const useStreams = () => {
           const streamIndex =
             store.state.streams.streamsIndexMapping[streamType][streamName];
           const hasSchema =
-            !!streamsCache[streamType].value?.list[streamIndex]?.schema;
+            !!streamsCache[streamType].value?.list[streamIndex]?.schema?.length;
 
           if ((schema && !hasSchema) || force) {
             try {
@@ -281,7 +281,6 @@ const useStreams = () => {
               );
               const streamList = deepCopy(streamsCache[streamType].value || {});
               streamList.list[streamIndex] = removeSchemaFields(_stream.data);
-
               updateStreamsInStore(streamType, streamList);
             } catch (err) {
               return reject("Error while fetching schema");
@@ -620,6 +619,7 @@ const useStreams = () => {
 
   const getUpdatedSettings = (previousSettings: any, currentSettings: any) => {
     const attributesToCompare: Array<string> = [
+      "fields",
       "partition_keys",
       "index_fields",
       "full_text_search_keys",
@@ -652,19 +652,6 @@ const useStreams = () => {
         typeof previousArray === "object" &&
         typeof currentArray === "object"
       ) {
-        // add = currentArray.filter(
-        //   (currentItem: any) =>
-        //     !Object.values(previousArray).some((previousItem: any) =>
-        //       deepEqual(currentItem, previousItem),
-        //     ),
-        // );
-
-        // remove = Object.values(previousArray).filter(
-        //   (previousItem: any) =>
-        //     !Object.values(currentArray).some((currentItem: any) =>
-        //       deepEqual(previousItem, currentItem),
-        //     ),
-        // );
         const result: any = compareArrays(previousArray, currentArray);
         add = result.add;
         remove = result.remove;

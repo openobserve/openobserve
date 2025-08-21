@@ -48,13 +48,6 @@
         >
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
-        <div
-          v-else-if="schemaData.schema.length == 0"
-          class="q-pt-md text-center q-w-md q-mx-lg"
-          style="max-width: 450px"
-        >
-          No data available.
-        </div>
         <div v-else class="indexDetailsContainer" style="height: 100vh">
           <div
             class="titleContainer tw-flex tw-flex-col tw-items-flex-start tw-gap-5"
