@@ -68,8 +68,9 @@ pub(crate) async fn create_tantivy_index(
         return Ok(0);
     };
 
-    // TODO: check the main branch
-    if get_config().cache_latest_files.cache_index {
+    if get_config().cache_latest_files.cache_index
+        && get_config().cache_latest_files.download_from_node
+    {
         infra::cache::file_data::disk::set("", &idx_file_name, Bytes::from(puffin_bytes.clone()))
             .await?;
         log::info!("file: {idx_file_name} file_data::disk::set success");
