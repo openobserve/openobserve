@@ -115,6 +115,7 @@ pub trait FileList: Sync + Send + 'static {
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
+        date_range: Option<(String, String)>,
     ) -> Result<String>;
     // stream stats
     async fn get_min_ts(
@@ -351,8 +352,11 @@ pub async fn get_min_date(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
+    date_range: Option<(String, String)>,
 ) -> Result<String> {
-    CLIENT.get_min_date(org_id, stream_type, stream_name).await
+    CLIENT
+        .get_min_date(org_id, stream_type, stream_name, date_range)
+        .await
 }
 
 #[inline]
