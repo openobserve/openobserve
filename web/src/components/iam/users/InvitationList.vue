@@ -342,7 +342,7 @@ export default defineComponent({
 
         // Remove from list
         invitations.value = invitations.value.filter(
-          (inv: any) => inv.id !== selectedInvitation.value.id,
+          (inv: any) => inv.token !== selectedInvitation.value.token,
         );
 
         // If no more invitations, emit to parent
