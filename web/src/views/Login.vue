@@ -180,20 +180,19 @@ export default defineComponent({
         })
         .catch((e: any) => {
           console.log("Error while fetching organizations", e);
-          signout();
+          if (e.response?.status === 403) {
+            signout();
+          }
         });
     };
 
     const signout = () => {
-      if (config.isEnterprise == "true") {
+      if (config?.isEnterprise == "true") {
         invlidateLoginData();
       }
+
       store.dispatch("logout");
-      useLocalCurrentUser("", true);
-      useLocalUserInfo("", true);
-      router.push({
-        path: "/logout",
-      });
+      router.push("/logout");
     };
 
     /**
