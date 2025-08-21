@@ -255,6 +255,10 @@ impl ExecutablePipeline {
             batch_size
         );
 
+        if batch_size == 0 {
+            return Ok(HashMap::new());
+        }
+
         // result_channel
         let (result_sender, mut result_receiver) =
             channel::<(usize, StreamParams, Value)>(batch_size);
