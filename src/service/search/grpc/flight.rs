@@ -391,20 +391,19 @@ pub async fn search(
 
     // create a Union Plan to merge all tables
     let start = std::time::Instant::now();
-    let union_start = std::time::Instant::now();
     let union_table = Arc::new(NewUnionTable::new(empty_exec.schema().clone(), tables));
     log::info!(
         "{}",
         search_inspector_fields(
             format!(
                 "[trace_id {trace_id}] flight->search: created union table, took: {} ms",
-                union_start.elapsed().as_millis()
+                start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
                 .node_name(LOCAL_NODE.name.clone())
                 .component("flight:do_get::search union table creation".to_string())
                 .search_role("follower".to_string())
-                .duration(union_start.elapsed().as_millis() as usize)
+                .duration(start.elapsed().as_millis() as usize)
                 .build()
         )
     );
