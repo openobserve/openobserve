@@ -116,8 +116,10 @@ pub async fn token_validator(
                     // time we can get None. if the API call is specifically
                     // /invite, then it should be ok to allow, because we list
                     // invite based on the user email got from sso provider, and
-                    // nothing else.
-                    None if is_list_invite_call => {
+                    // nothing else. Similarly for accepting invite, we will not have the
+                    // user in db anymore, and the fn checks based on email and token, so ok to
+                    // bypass
+                    None if is_list_invite_call | is_member_subscription => {
                         let mut req = req;
 
                         if req.method().eq(&Method::POST)
