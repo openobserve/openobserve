@@ -582,7 +582,12 @@ const useLogs = () => {
     if (!dashboardPanelData?.data) {
       return null;
     }
-    return dashboardPanelData.data;
+    
+    // Only store config object and chart type, not the entire dashboardPanelData
+    return {
+      config: dashboardPanelData.data.config || {},
+      type: dashboardPanelData.data.type || 'bar',
+    };
   };
 
   const encodeVisualizationConfig = (config: any) => {
@@ -4517,15 +4522,23 @@ const useLogs = () => {
     }
 
     // Restore visualization data if available and in visualize mode
+    // Note: Only config and type are restored from URL
+    // The query will always be rebuilt from logs page data
     if (queryParams.visualization_data && 
         searchObj.meta.logsVisualizeToggle === "visualize" && 
         dashboardPanelData) {
       const restoredData = decodeVisualizationConfig(queryParams.visualization_data);
       if (restoredData && dashboardPanelData.data) {
-        dashboardPanelData.data = {
-          ...dashboardPanelData.data,
-          ...restoredData
-        };
+        // Only restore config and type - not the entire data object
+        if (restoredData.config) {
+          dashboardPanelData.data.config = {
+            ...dashboardPanelData.data.config,
+            ...restoredData.config
+          };
+        }
+        if (restoredData.type) {
+          dashboardPanelData.data.type = restoredData.type;
+        }
       }
     }
 

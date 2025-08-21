@@ -1439,23 +1439,114 @@ export default defineComponent({
               dashboardPanelData.layout.currentQueryIndex
             ].customQuery = true;
 
-            // Apply only visualization config from URL (if present) and rebuild from logs query
+            // Store current config and chart type to preserve them during rebuild
             const queryParams = router.currentRoute.value.query;
-            if (queryParams.visualization_data) {
-              const restoredData = decodeVisualizationConfig(queryParams.visualization_data);
-              if (restoredData && dashboardPanelData.data && restoredData.config) {
-                dashboardPanelData.data.config = {
-                  ...dashboardPanelData.data.config,
-                  ...restoredData.config,
-                };
+            let preservedConfig = null;
+            let preservedChartType = null;
+            let shouldAutoSelectChartType = true;
+            
+            // First, try to restore config from URL if present
+            const visualizationDataParam = queryParams.visualization_data;
+            if (visualizationDataParam && typeof visualizationDataParam === 'string') {
+              try {
+                const restoredData = decodeVisualizationConfig(visualizationDataParam);
+                
+                if (restoredData && typeof restoredData === 'object') {
+                  // Restore only config and type from URL
+                  if (restoredData.config && typeof restoredData.config === 'object') {
+                    preservedConfig = { ...restoredData.config };
+                  }
+                  
+                  if (restoredData.type && typeof restoredData.type === 'string') {
+                    const validLogsChartTypes = ['area', 'bar', 'h-bar', 'line', 'scatter', 'table'];
+                    if (validLogsChartTypes.includes(restoredData.type)) {
+                      preservedChartType = restoredData.type;
+                      shouldAutoSelectChartType = false;
+                    } else {
+                      console.warn(`Invalid chart type '${restoredData.type}' for logs visualization, using auto-selection`);
+                    }
+                  }
+                }
+              } catch (error) {
+                console.warn('Failed to restore visualization config from URL:', error);
               }
             }
 
-            // Always rebuild visualization from logs page query and decide feasible chart type
-            shouldUseHistogramQuery.value = await extractVisualizationFields(true);
+            // If no config restored from URL, preserve current dashboard panel config
+            if (!preservedConfig && dashboardPanelData?.data?.config) {
+              preservedConfig = { ...dashboardPanelData.data.config };
+            }
+            
+            // If no chart type restored from URL, preserve current dashboard panel chart type
+            if (!preservedChartType) {
+              const currentChartType = dashboardPanelData?.data?.type;
+              const validLogsChartTypes = ['area', 'bar', 'h-bar', 'line', 'scatter', 'table'];
+              
+              if (currentChartType && validLogsChartTypes.includes(currentChartType)) {
+                preservedChartType = currentChartType;
+                shouldAutoSelectChartType = false;
+              }
+            }
 
-            // if not able to parse query, do not do anything
+            // Rebuild visualization from logs page query
+            // Auto-select chart type only if we don't have a valid type from URL or current config
+            shouldUseHistogramQuery.value = await extractVisualizationFields(shouldAutoSelectChartType);
+
+            // if not able to parse query, still set up basic chart data so chart can render
             if (shouldUseHistogramQuery.value === null) {
+              // Set date time for the chart
+              if (searchObj?.data?.customDownloadQueryObj?.query?.end_time && searchObj?.data?.datetime?.startTime) {
+                dashboardPanelData.meta.dateTime = {
+                  start_time: new Date(searchObj.data.customDownloadQueryObj.query.start_time),
+                  end_time: new Date(searchObj.data.customDownloadQueryObj.query.end_time),
+                };
+              } else {
+                const dateTime =
+                  searchObj.data.datetime.type === "relative"
+                    ? getConsumableRelativeTime(
+                      searchObj.data.datetime.relativeTimePeriod,
+                    )
+                    : cloneDeep(searchObj.data.datetime);
+
+                dashboardPanelData.meta.dateTime = {
+                  start_time: new Date(dateTime.startTime),
+                  end_time: new Date(dateTime.endTime),
+                };
+              }
+              
+              // Restore preserved config and chart type even in error case
+              if (preservedConfig) {
+                dashboardPanelData.data.config = {
+                  ...dashboardPanelData.data.config,
+                  ...preservedConfig,
+                };
+              }
+              
+              if (preservedChartType) {
+                dashboardPanelData.data.type = preservedChartType;
+              }
+              
+              // Set basic chart data so chart doesn't fail to render
+              visualizeChartData.value = JSON.parse(
+                JSON.stringify(dashboardPanelData.data),
+              );
+              
+              // Set basic response data from current search results if available
+              if (searchObj.data.queryResults) {
+                searchResponseForVisualization.value = {
+                  ...searchObj.data.queryResults,
+                  histogram_interval:
+                    searchObj?.data?.queryResults
+                      ?.visualization_histogram_interval,
+                };
+              }
+              
+              // Emit resize event for chart rendering
+              window.dispatchEvent(new Event("resize"));
+              
+              // Reset loading state
+              variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+              
               return;
             }
 
@@ -1526,6 +1617,18 @@ export default defineComponent({
                 start_time: new Date(dateTime.startTime),
                 end_time: new Date(dateTime.endTime),
               };
+            }
+
+            // Restore preserved config and chart type after field extraction
+            if (preservedConfig) {
+              dashboardPanelData.data.config = {
+                ...dashboardPanelData.data.config,
+                ...preservedConfig,
+              };
+            }
+            
+            if (preservedChartType) {
+              dashboardPanelData.data.type = preservedChartType;
             }
 
             // run query
