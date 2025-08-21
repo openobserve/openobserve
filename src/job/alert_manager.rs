@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster::LOCAL_NODE, get_config};
+use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
-use tokio::time;
 
 use crate::service;
 
@@ -64,13 +63,67 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     tokio::task::spawn(async move { run_schedule_jobs().await });
-    tokio::task::spawn(async move { watch_timeout_jobs().await });
+    spawn_pausable_job!(
+        "alert_manager_watch_timeout",
+        get_config().limit.scheduler_watch_interval,
+        {
+            if let Err(e) = infra::scheduler::watch_timeout().await {
+                log::error!("[SCHEDULER] watch timeout jobs error: {}", e);
+            }
+        }
+    );
+    #[cfg(feature = "enterprise")]
     for i in 0..cfg.limit.search_job_workers {
-        tokio::task::spawn(async move { run_search_jobs(i).await });
+        spawn_pausable_job!(
+            format!("search_job_worker_{}", i),
+            get_config().limit.search_job_scheduler_interval,
+            {
+                if let Err(e) = service::search_jobs::run(i).await {
+                    log::error!("[SEARCH JOB {}] run search jobs error: {}", i, e);
+                }
+            }
+        );
     }
-    tokio::task::spawn(async move { run_check_running_search_jobs().await });
-    tokio::task::spawn(async move { run_delete_jobs_by_retention().await });
-    tokio::task::spawn(async move { run_delete_jobs().await });
+    #[cfg(feature = "enterprise")]
+    spawn_pausable_job!(
+        "search_job_check_running",
+        get_config().limit.search_job_run_timeout,
+        {
+            log::debug!("[SEARCH JOB] Running check on running jobs");
+            let now = config::utils::time::now_micros();
+            let updated_at = now - (get_config().limit.search_job_run_timeout as i64 * 1_000_000);
+            if let Err(e) =
+                service::db::search_job::search_jobs::check_running_jobs(updated_at).await
+            {
+                log::error!("[SEARCH JOB] Error checking running jobs: {e}");
+            }
+        }
+    );
+    #[cfg(feature = "enterprise")]
+    spawn_pausable_job!(
+        "search_job_delete_by_retention",
+        get_config().limit.search_job_retention * 24 * 60 * 60,
+        {
+            log::debug!("[SEARCH JOB] Running delete jobs by retention");
+            let retention_seconds = get_config().limit.search_job_retention * 24 * 60 * 60;
+            let now = config::utils::time::now_micros();
+            let updated_at = now - (retention_seconds as i64 * 1_000_000);
+            if let Err(e) = service::db::search_job::search_jobs::delete_jobs(updated_at).await {
+                log::error!("[SEARCH JOB] Error deleting jobs: {e}");
+            }
+        }
+    );
+    #[cfg(feature = "enterprise")]
+    spawn_pausable_job!(
+        "search_job_delete",
+        get_config().limit.search_job_delete_interval,
+        {
+            log::debug!("[SEARCH JOB] Running delete jobs");
+            if let Err(e) = service::search_jobs::delete_jobs().await {
+                log::error!("[SEARCH JOB] run delete jobs error: {}", e);
+            }
+        }
+    );
 
     Ok(())
 }
@@ -78,100 +131,4 @@ pub async fn run() -> Result<(), anyhow::Error> {
 /// Runs the schedule jobs
 async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
     service::alerts::scheduler::run().await
-}
-
-async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
-    let scheduler_watch_interval = get_config().limit.scheduler_watch_interval;
-    if scheduler_watch_interval < 0 {
-        return Ok(());
-    }
-    let mut interval = time::interval(time::Duration::from_secs(scheduler_watch_interval as u64));
-    interval.tick().await; // trigger the first run
-    loop {
-        interval.tick().await;
-        if let Err(e) = infra::scheduler::watch_timeout().await {
-            log::error!("[SCHEDULER] watch timeout jobs error: {}", e);
-        }
-    }
-}
-
-#[cfg(feature = "enterprise")]
-async fn run_search_jobs(id: i64) -> Result<(), anyhow::Error> {
-    let interval = get_config().limit.search_job_scheduler_interval;
-    let mut interval = time::interval(time::Duration::from_secs(interval as u64));
-    interval.tick().await; // trigger the first run
-    loop {
-        interval.tick().await;
-        if let Err(e) = service::search_jobs::run(id).await {
-            log::error!("[SEARCH JOB {id}] run search jobs error: {}", e);
-        }
-    }
-}
-
-#[cfg(feature = "enterprise")]
-async fn run_check_running_search_jobs() -> Result<(), anyhow::Error> {
-    let time = get_config().limit.search_job_run_timeout;
-    let mut interval = time::interval(time::Duration::from_secs(time as u64));
-    interval.tick().await; // trigger the first run
-    loop {
-        interval.tick().await;
-        log::debug!("[SEARCH JOB] Running check on running jobs");
-        let now = config::utils::time::now_micros();
-        let updated_at = now - (time * 1_000_000);
-        if let Err(e) = service::db::search_job::search_jobs::check_running_jobs(updated_at).await {
-            log::error!("[SEARCH JOB] Error checking running jobs: {e}");
-        }
-    }
-}
-
-#[cfg(feature = "enterprise")]
-async fn run_delete_jobs_by_retention() -> Result<(), anyhow::Error> {
-    let time = get_config().limit.search_job_retention * 24 * 60 * 60;
-    let mut interval = time::interval(time::Duration::from_secs(
-        get_config().limit.search_job_run_timeout as u64,
-    ));
-    interval.tick().await; // trigger the first run
-    loop {
-        interval.tick().await;
-        log::debug!("[SEARCH JOB] Running delete jobs by retention");
-        let now = config::utils::time::now_micros();
-        let updated_at = now - (time * 1_000_000);
-        if let Err(e) = service::db::search_job::search_jobs::delete_jobs(updated_at).await {
-            log::error!("[SEARCH JOB] Error deleting jobs: {e}");
-        }
-    }
-}
-
-#[cfg(feature = "enterprise")]
-async fn run_delete_jobs() -> Result<(), anyhow::Error> {
-    let interval = get_config().limit.search_job_delete_interval;
-    let mut interval = time::interval(time::Duration::from_secs(interval as u64));
-    interval.tick().await; // trigger the first run
-    loop {
-        interval.tick().await;
-        log::debug!("[SEARCH JOB] Running delete jobs");
-        if let Err(e) = service::search_jobs::delete_jobs().await {
-            log::error!("[SEARCH JOB] run delete jobs error: {}", e);
-        }
-    }
-}
-
-#[cfg(not(feature = "enterprise"))]
-async fn run_search_jobs(_id: i64) -> Result<(), anyhow::Error> {
-    Ok(())
-}
-
-#[cfg(not(feature = "enterprise"))]
-async fn run_check_running_search_jobs() -> Result<(), anyhow::Error> {
-    Ok(())
-}
-
-#[cfg(not(feature = "enterprise"))]
-async fn run_delete_jobs_by_retention() -> Result<(), anyhow::Error> {
-    Ok(())
-}
-
-#[cfg(not(feature = "enterprise"))]
-async fn run_delete_jobs() -> Result<(), anyhow::Error> {
-    Ok(())
 }
