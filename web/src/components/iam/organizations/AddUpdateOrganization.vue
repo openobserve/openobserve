@@ -149,6 +149,16 @@ export default defineComponent({
     const organizationData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
+    const sanitizeInput = (val: string) => {
+      return val
+        .trim()
+        .replace(/&/g, "&amp;")   // escape &
+        .replace(/</g, "&lt;")    // escape <
+        .replace(/>/g, "&gt;")    // escape >
+        .replace(/"/g, "&quot;")  // escape "
+        .replace(/'/g, "&#039;")  // escape '
+        .replace(/\s+/g, " ");    // collapse multiple spaces
+    };
 
     return {
       t,
@@ -160,6 +170,7 @@ export default defineComponent({
       addOrganizationForm,
       store,
       isValidIdentifier,
+      sanitizeInput,
     };
   },
   created() {
@@ -191,7 +202,6 @@ export default defineComponent({
       });
     },
     completeSubscriptionProcess() {
-      console.log(this.store.state);
       // this.store.state.dispatch("setSelectedOrganization",)
       this.router.push(
         `/billings/plans?org_identifier=${this.newOrgIdentifier}`
@@ -211,6 +221,9 @@ export default defineComponent({
 
         const organizationId = this.organizationData.id;
         delete this.organizationData.id;
+
+        //here we will sanitize the input 
+        this.organizationData.name = this.sanitizeInput(this.organizationData.name);
 
         if (organizationId == "") {
           callOrganization = organizationService.create(this.organizationData);
