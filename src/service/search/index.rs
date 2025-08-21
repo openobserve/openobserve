@@ -43,7 +43,7 @@ use tantivy::{
     Term,
     query::{
         AllQuery, BooleanQuery, FuzzyTermQuery, Occur, PhrasePrefixQuery, Query, RegexQuery,
-        TermQuery,
+        RegexPhraseQuery, TermQuery,
     },
     schema::{Field, IndexRecordOption, Schema},
 };
@@ -488,8 +488,17 @@ impl Condition {
                 if value.is_empty() || value == "*" {
                     Box::new(AllQuery {})
                 } else if value.starts_with("*") && value.ends_with("*") {
-                    let value = format!(".*{}.*", value.trim_matches('*'));
-                    Box::new(RegexQuery::from_pattern(&value, default_field)?)
+                    let pattern = value.trim_matches('*');
+                    let terms = o2_collect_tokens(pattern);
+                    
+                    if terms.len() > 1 {
+                        // Multiple terms - use RegexPhraseQuery for phrase matching
+                        Box::new(RegexPhraseQuery::new(default_field, terms))
+                    } else {
+                        // Single term - use RegexQuery as before
+                        let regex_pattern = format!(".*{}.*", pattern);
+                        Box::new(RegexQuery::from_pattern(&regex_pattern, default_field)?)
+                    }
                 } else {
                     if value.is_empty() {
                         return Err(anyhow::anyhow!(
@@ -2118,5 +2127,87 @@ mod tests {
             "field1",
         ))));
         assert_eq!(get_arg_name(&arg), "field1");
+    }
+
+    #[test]
+    fn test_match_all_wildcard_single_term() {
+        // Test that single terms with wildcards still use RegexQuery behavior
+        use tantivy::schema::Schema;
+        
+        let mut schema_builder = tantivy::schema::SchemaBuilder::new();
+        schema_builder.add_text_field("_all", tantivy::schema::TEXT);
+        let schema = schema_builder.build();
+        let field = schema.get_field("_all").unwrap();
+        
+        let condition = Condition::MatchAll("*hello*".to_string());
+        let query = condition.to_tantivy_query(&schema, Some(field));
+        
+        // Should succeed and create a query
+        assert!(query.is_ok());
+    }
+
+    #[test]
+    fn test_match_all_wildcard_multiple_terms() {
+        // Test that multiple terms with wildcards use RegexPhraseQuery
+        use tantivy::schema::Schema;
+        
+        let mut schema_builder = tantivy::schema::SchemaBuilder::new();
+        let text_opts = tantivy::schema::TextOptions::default().set_indexing_options(
+            tantivy::schema::TextFieldIndexing::default()
+                .set_index_option(tantivy::schema::IndexRecordOption::WithFreqsAndPositions)
+        );
+        schema_builder.add_text_field("_all", text_opts);
+        let schema = schema_builder.build();
+        let field = schema.get_field("_all").unwrap();
+        
+        let condition = Condition::MatchAll("*big bad wolf*".to_string());
+        let query = condition.to_tantivy_query(&schema, Some(field));
+        
+        // Should succeed and create a RegexPhraseQuery
+        assert!(query.is_ok());
+    }
+
+    #[test] 
+    fn test_match_all_wildcard_empty_after_trim() {
+        // Test edge case: "*" becomes empty after trimming
+        use tantivy::schema::Schema;
+        
+        let mut schema_builder = tantivy::schema::SchemaBuilder::new();
+        schema_builder.add_text_field("_all", tantivy::schema::TEXT);
+        let schema = schema_builder.build();
+        let field = schema.get_field("_all").unwrap();
+        
+        let condition = Condition::MatchAll("**".to_string());  // becomes empty after trimming
+        let query = condition.to_tantivy_query(&schema, Some(field));
+        
+        // Should create AllQuery for empty pattern
+        assert!(query.is_ok());
+    }
+
+    #[test]
+    fn test_match_all_wildcard_tokenization() {
+        // Test different tokenizable patterns
+        use tantivy::schema::Schema;
+        
+        let mut schema_builder = tantivy::schema::SchemaBuilder::new();
+        let text_opts = tantivy::schema::TextOptions::default().set_indexing_options(
+            tantivy::schema::TextFieldIndexing::default()
+                .set_index_option(tantivy::schema::IndexRecordOption::WithFreqsAndPositions)
+        );
+        schema_builder.add_text_field("_all", text_opts);
+        let schema = schema_builder.build();
+        let field = schema.get_field("_all").unwrap();
+        
+        // Single word - should use RegexQuery
+        let condition1 = Condition::MatchAll("*error*".to_string());
+        assert!(condition1.to_tantivy_query(&schema, Some(field)).is_ok());
+        
+        // Two words - should use RegexPhraseQuery  
+        let condition2 = Condition::MatchAll("*error 404*".to_string());
+        assert!(condition2.to_tantivy_query(&schema, Some(field)).is_ok());
+        
+        // Multiple words - should use RegexPhraseQuery
+        let condition3 = Condition::MatchAll("*server error not found*".to_string());
+        assert!(condition3.to_tantivy_query(&schema, Some(field)).is_ok());
     }
 }

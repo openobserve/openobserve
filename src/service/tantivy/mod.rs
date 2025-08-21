@@ -138,7 +138,7 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     if !full_text_search_fields.is_empty() {
         let fts_opts = tantivy::schema::TextOptions::default().set_indexing_options(
             tantivy::schema::TextFieldIndexing::default()
-                .set_index_option(tantivy::schema::IndexRecordOption::Basic)
+                .set_index_option(tantivy::schema::IndexRecordOption::WithFreqsAndPositions)
                 .set_tokenizer(O2_TOKENIZER)
                 .set_fieldnorms(false),
         );
