@@ -802,17 +802,29 @@ SELECT date
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
+        date_range: Option<(String, String)>,
     ) -> Result<String> {
         let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list"])
             .inc();
-        let ret: Option<String> =
-            sqlx::query_scalar(r#"SELECT MIN(date) AS date FROM file_list WHERE stream = ?;"#)
-                .bind(stream_key)
-                .fetch_one(&pool)
-                .await?;
+        let ret: Option<String> = match date_range {
+            Some((start, end)) => {
+                sqlx::query_scalar(r#"SELECT MIN(date) AS date FROM file_list WHERE stream = ? AND date >= ? AND date < ?;"#)
+                    .bind(stream_key)
+                    .bind(start)
+                    .bind(end)
+                    .fetch_one(&pool)
+                    .await?
+            }
+            None => {
+                sqlx::query_scalar(r#"SELECT MIN(date) AS date FROM file_list WHERE stream = ?;"#)
+                    .bind(stream_key)
+                    .fetch_one(&pool)
+                    .await?
+            }
+        };
         Ok(ret.unwrap_or_default())
     }
 
