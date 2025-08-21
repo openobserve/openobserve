@@ -25,8 +25,6 @@
       class="q-mb-md flex items-start tw-w-full tw-flex"
       style="gap: 15px"
     >
-    <!-- :error="duplicateErrors[index]"
-    :error-message="'This field has already been selected. Please choose a different field.'" -->
       <q-select
         v-model="overrideConfig.field.value"
         :label="'Field'"
@@ -66,7 +64,7 @@
           <q-select
             v-model="overrideConfig.config[0].value.unit"
             :label="'Unit'"
-            :options="filteredUnitOptions(index)"
+            :options="unitOptions"
             :disable="!overrideConfig.field.value"
             style="flex-grow: 1"
             :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"
@@ -162,9 +160,6 @@ export default defineComponent({
   emits: ["close", "save"],
   setup(props: any, { emit }) {
     const { t } = useI18n();
-    const duplicateErrors = ref<Array<boolean>>(
-      props.overrideConfig.overrideConfigs?.map(() => false) || [],
-    );
 
     const configTypeOptions = [
       {
@@ -267,69 +262,29 @@ export default defineComponent({
 
     function normalizeOverrideConfigs(configs: any[]) {
       if (configs.length === 0) {
-        return [
-          {
-            field: { matchBy: "name", value: "" },
-            config: [
-              {
-                type: "unit",
-                value: { unit: "", customUnit: "" },
-              },
-            ],
-          },
-        ];
+        return [];
       }
 
-      return configs.map((config) => {
-        const normalizedConfig = {
-          field: {
-            matchBy: config.field?.matchBy || config.field?.match_by || "name",
-            value: config.field?.value || "",
-          },
-          config: [],
-        };
-
-        if (config.config && config.config.length > 0) {
-          const configItem = config.config[0];
-
-          if (configItem.type === "unit" || configItem.typee === "unit") {
-            normalizedConfig.config.push({
-              type: "unit",
-              value: {
-                unit: configItem.value?.unit || "",
-                customUnit:
-                  configItem.value?.customUnit ||
-                  configItem.value?.custom_unit ||
-                  "",
+      return configs.map((config) => ({
+        field: {
+          matchBy: config.field?.matchBy || "name",
+          value: config.field?.value || "",
+        },
+        config: [
+          config.config?.[0]?.type === "unique_value_color"
+            ? {
+                type: "unique_value_color",
+                autoColor: Boolean(config.config[0].autoColor),
+              }
+            : {
+                type: "unit",
+                value: {
+                  unit: config.config?.[0]?.value?.unit || "",
+                  customUnit: config.config?.[0]?.value?.customUnit || "",
+                },
               },
-            });
-          } else if (
-            configItem.type === "unique_value_color" ||
-            configItem.typee === "unique_value_color"
-          ) {
-            normalizedConfig.config.push({
-              type: "unique_value_color",
-              autoColor: Boolean(
-                configItem.autoColor ?? configItem.auto_color ?? false,
-              ),
-            });
-          } else {
-            // Default to unit type if type is not recognized
-            normalizedConfig.config.push({
-              type: "unit",
-              value: { unit: "", customUnit: "" },
-            });
-          }
-        } else {
-          // Default config if no config found
-          normalizedConfig.config.push({
-            type: "unit",
-            value: { unit: "", customUnit: "" },
-          });
-        }
-
-        return normalizedConfig;
-      });
+        ],
+      }));
     }
 
     const columnsOptions = computed(() =>
@@ -343,7 +298,6 @@ export default defineComponent({
       overrideConfigs.value = JSON.parse(
         JSON.stringify(originalOverrideConfigs.value),
       );
-      duplicateErrors.value.fill(false);
       emit("close");
     };
 
@@ -352,7 +306,6 @@ export default defineComponent({
         field: { matchBy: "name", value: "" },
         config: [{ type: "unit", value: { unit: "", customUnit: "" } }],
       });
-      duplicateErrors.value.push(false);
     };
 
     const onConfigTypeChange = (index: number) => {
@@ -370,57 +323,32 @@ export default defineComponent({
 
     const removeOverrideConfig = (index: number) => {
       overrideConfigs.value.splice(index, 1);
-      duplicateErrors.value.splice(index, 1);
-    };
-
-    const filteredUnitOptions = (index: number) => {
-      return unitOptions;
     };
 
     const saveOverrides = () => {
-      const names = overrideConfigs.value.map((config: any) => config.field.value);
-      // duplicateErrors.value = names.map(
-      //   (name: any, idx: any) => names.indexOf(name) !== idx,
-      // );
-
-      // if (duplicateErrors.value.some((isDuplicate) => isDuplicate)) {
-      //   return;
-      // }
-
-      // Transform data to match backend expectations
       const transformedConfigs = overrideConfigs.value
         .filter((config: any) => config.field.value) // Only include configs with field values
-        .map((config: any) => {
-          const transformedConfig = {
-            field: {
-              matchBy: config.field.matchBy,
-              value: config.field.value,
-            },
-            config: [],
-          };
+        .map((config: any) => ({
+          field: {
+            matchBy: config.field.matchBy,
+            value: config.field.value,
+          },
+          config: [
+            config.config[0].type === "unit"
+              ? {
+                  type: "unit",
+                  value: {
+                    unit: config.config[0].value?.unit || "",
+                    customUnit: config.config[0].value?.customUnit || "",
+                  },
+                }
+              : {
+                  type: "unique_value_color",
+                  autoColor: config.config[0].autoColor === true,
+                },
+          ],
+        }));
 
-          const configItem = config.config[0];
-          if (configItem.type === "unit") {
-            transformedConfig.config.push({
-              type: "unit",
-              value: {
-                unit: configItem.value?.unit || "",
-                customUnit: configItem.value?.customUnit || "",
-              },
-            });
-          } else if (configItem.type === "unique_value_color") {
-            transformedConfig.config.push({
-              type: "unique_value_color",
-              autoColor: configItem.autoColor === true,
-            });
-          }
-
-          return transformedConfig;
-        });
-
-      originalOverrideConfigs.value = JSON.parse(
-        JSON.stringify(transformedConfigs),
-      );
       props.overrideConfig.overrideConfigs = transformedConfigs;
       emit("save", transformedConfigs);
       emit("close");
@@ -465,11 +393,8 @@ export default defineComponent({
       closePopup,
       addOverrideConfig,
       removeOverrideConfig,
-      filteredUnitOptions,
       saveOverrides,
-      duplicateErrors,
       onConfigTypeChange,
-      normalizeOverrideConfigs,
       t,
     };
   },
