@@ -16,11 +16,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <login v-if="user.email == '' && !showInvitations" />
-  <invitation-list
-    v-if="showInvitations"
-    :user-email="user.email"
-    @invitations-processed="handleInvitationsProcessed"
-  />
+  <div v-if="showInvitations && config.isCloud == 'true'">
+    <div class="flex relative-position q-mr-sm">
+      <img
+        class="appLogo"
+        loading="lazy"
+        :src="
+          store?.state?.theme == 'dark'
+            ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+            : getImageURL('images/common/openobserve_latest_light_2.svg')
+        "
+      />
+    </div>
+    <invitation-list
+      v-if="showInvitations"
+      :user-email="user.email"
+      @invitations-processed="handleInvitationsProcessed"
+    />
+  </div>
 </template>
 
 <script lang="ts">
@@ -43,6 +56,7 @@ import {
   useLocalOrganization,
   invlidateLoginData,
   useLocalUserInfo,
+  getImageURL,
 } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
 
@@ -219,6 +233,7 @@ export default defineComponent({
       getDefaultOrganization,
       showInvitations,
       handleInvitationsProcessed,
+      getImageURL,
     };
   },
   data() {
@@ -277,8 +292,6 @@ export default defineComponent({
             this.showInvitations = true;
             return;
           }
-
-          debugger;
 
           if (
             (this.userInfo !== null &&
@@ -342,3 +355,18 @@ export default defineComponent({
   },
 });
 </script>
+<style lang="scss" scoped>
+.appLogo {
+  width: 120px;
+  max-width: 150px;
+  max-height: 31px;
+  cursor: pointer;
+
+  &__mini {
+    margin-right: 0.25rem;
+    // margin-left: 0.25rem;
+    height: 30px;
+    width: 30px;
+  }
+}
+</style>

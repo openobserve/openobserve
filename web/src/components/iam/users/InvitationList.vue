@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw-mx-4 tw-border">
+  <div class="tw-m-4 tw-border">
     <div
       class="tw-flex tw-flex-row tw-justify-between tw-items-center tw-px-4 tw-py-3"
       :class="
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("invitation.pendingInvitations") }}
       </div>
     </div>
-    <div class="tw-text-sm tw-text-grey-500 tw-mb-md tw-pb-3">
+    <div class="tw-text-sm tw-text-grey-500 tw-px-4">
       Info: If you decline all invitations and are not part of any organization,
       a new organization will be created for you.
     </div>
