@@ -782,7 +782,7 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
 #[get("/invites")]
 pub async fn list_invitations(user_email: UserEmail) -> Result<HttpResponse, Error> {
     let user_id = user_email.user_id.as_str();
-    users::list_user_invites(user_id).await
+    users::list_user_invites(user_id, true).await
 }
 
 #[cfg(not(feature = "cloud"))]

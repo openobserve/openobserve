@@ -1075,11 +1075,11 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
 }
 
 #[cfg(feature = "cloud")]
-pub async fn list_user_invites(user_id: &str) -> Result<HttpResponse, Error> {
+pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<HttpResponse, Error> {
     let result = db::user::list_user_invites(user_id).await;
     match result {
         Ok(res) => {
-            let result = res
+            let mut result: Vec<UserInvite> = res
                 .into_iter()
                 .map(|invite| UserInvite {
                     role: invite.role,
@@ -1089,6 +1089,16 @@ pub async fn list_user_invites(user_id: &str) -> Result<HttpResponse, Error> {
                     expires_at: invite.expires_at,
                 })
                 .collect();
+            if only_pending {
+                let now = chrono::Utc::now().timestamp_micros();
+
+                result = result
+                    .into_iter()
+                    .filter(|invite| {
+                        invite.status == InviteStatus::Pending && invite.expires_at > now
+                    })
+                    .collect();
+            }
             Ok(HttpResponse::Ok().json(UserInviteList { data: result }))
         }
         Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
