@@ -1,5 +1,5 @@
 <template>
-  <div style="padding: 0px 10px; min-width: min(800px, 90vw)">
+  <div style="padding: 0px 10px; min-width: min(1000px, 90vw)">
     <div
       class="flex justify-between items-center q-py-md header"
       style="border-bottom: 2px solid gray; margin-bottom: 5px"
@@ -29,7 +29,7 @@
         v-model="overrideConfig.field.value"
         :label="'Field'"
         :options="columnsOptions"
-        style="width: 50%"
+        style="width: 40%"
         :data-test="`dashboard-addpanel-config-unit-config-select-column-${index}`"
         input-debounce="0"
         filled
@@ -39,13 +39,13 @@
         dense
         class="tw-flex-1"
       />
-      <div class="tw-flex items-center" style="width: 50%; gap: 10px">
+      <div class="tw-flex items-center" style="width: 60%; gap: 10px">
         <q-select
           v-model="overrideConfig.config[0].type"
           :label="'Type'"
           :options="configTypeOptions"
           :disable="!overrideConfig.field.value"
-          style="width: 150px"
+          style="width: 40%"
           :data-test="`dashboard-addpanel-config-type-select-${index}`"
           input-debounce="0"
           filled
@@ -59,14 +59,14 @@
         <div
           v-if="overrideConfig.config[0].type === 'unit'"
           class="tw-flex items-center"
-          style="gap: 10px; flex-grow: 1"
+          style="gap: 10px; flex-grow: 1; width: 60%"
         >
           <q-select
             v-model="overrideConfig.config[0].value.unit"
             :label="'Unit'"
             :options="unitOptions"
             :disable="!overrideConfig.field.value"
-            style="flex-grow: 1"
+            style="flex-grow: 1; width: 50%"
             :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"
             input-debounce="0"
             filled
@@ -87,14 +87,14 @@
             dense
             label-slot
             data-test="dashboard-config-unit"
-            style="width: 150px"
+            style="width: 50%"
           />
         </div>
 
         <div
           v-else-if="overrideConfig.config[0].type === 'unique_value_color'"
           class="tw-flex items-center"
-          style="gap: 10px; flex-grow: 1"
+          style="gap: 10px; flex-grow: 1; width: 60%"
         >
           <q-checkbox
             v-model="overrideConfig.config[0].autoColor"
