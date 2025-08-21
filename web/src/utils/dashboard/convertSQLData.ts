@@ -44,7 +44,6 @@ import {
   ColorModeWithoutMinMax,
   getSeriesColor,
   getSQLMinMaxValue,
-  getColorPalette,
 } from "./colorPalette";
 import { deepCopy } from "@/utils/zincutils";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
@@ -2870,10 +2869,10 @@ const largestLabel = (data: any) => {
   return largestlabel;
 };
 
-const showTrellisConfig = (type: string) => {
-  const supportedTypes = new Set(["area", "bar", "h-bar", "line", "scatter"]);
-  return supportedTypes.has(type);
-};
+// const showTrellisConfig = (type: string) => {
+//   const supportedTypes = new Set(["area", "bar", "h-bar", "line", "scatter"]);
+//   return supportedTypes.has(type);
+// };
 
 /**
  * Retrieves the properties for a given chart type and returns them as an object.

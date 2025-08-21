@@ -14,11 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive, computed, watch, onBeforeMount, onUnmounted } from "vue";
-import StreamService from "@/services/stream";
 import { useStore } from "vuex";
 import useNotifications from "./useNotifications";
 import {
-  splitQuotedString,
   escapeSingleQuotes,
   b64EncodeUnicode,
   isStreamingEnabled,
@@ -27,6 +25,15 @@ import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
 import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
 import queryService from "@/services/search";
+import { 
+  getDefaultCustomChartText,
+  getDefaultDashboardPanelData
+} from "@/composables/dashboard/useDashboardPanel/panelDefaults";
+import { formatINValue } from "@/composables/dashboard/useDashboardPanel/queryBuilder";
+import { 
+  convertSchemaToFields,
+  determineChartType
+} from "@/composables/dashboard/useDashboardPanel/panelSchema";
 
 const colors = [
   "#5960b2",
@@ -44,7 +51,8 @@ const colors = [
 ];
 let parser: any;
 
-const getDefaultDashboardPanelData: any = (store: any) => ({
+// moved to utils/dashboard/panelDefaults
+/* const getDefaultDashboardPanelData: any = (store: any) => ({
   data: {
     version: 5,
     id: "",
@@ -201,14 +209,11 @@ const getDefaultDashboardPanelData: any = (store: any) => ({
       filterField: "",
     },
   },
-});
+}); */
 
 const dashboardPanelDataObj: any = {};
 
-const getDefaultCustomChartText = () => {
-  return `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
-  `;
-};
+// getDefaultCustomChartText moved to utils/dashboard/panelDefaults
 
 const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const store = useStore();
@@ -299,7 +304,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   const generateLabelFromName = (name: string) => {
     return name
-      .replace(/[\_\-\s\.]/g, " ")
+      .replace(/[_\-\s.]/g, " ")
       .split(" ")
       .map((string) => string.charAt(0).toUpperCase() + string.slice(1))
       .filter((it) => it)
@@ -323,7 +328,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     return dashboardPanelData.meta.stream.selectedStreamFields ?? [];
   });
 
-  const isAddXAxisNotAllowed = computed((e: any) => {
+  const isAddXAxisNotAllowed = computed(() => {
     switch (dashboardPanelData.data.type) {
       case "pie":
       case "donut":
@@ -359,7 +364,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   });
 
-  const isAddBreakdownNotAllowed = computed((e: any) => {
+  const isAddBreakdownNotAllowed = computed(() => {
     switch (dashboardPanelData.data.type) {
       case "area":
       case "bar":
@@ -374,10 +379,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
             dashboardPanelData.layout.currentQueryIndex
           ].fields.breakdown?.length >= 1
         );
+      default:
+        return false;
     }
   });
 
-  const isAddYAxisNotAllowed = computed((e: any) => {
+  const isAddYAxisNotAllowed = computed(() => {
     switch (dashboardPanelData.data.type) {
       case "pie":
       case "donut":
@@ -2080,21 +2087,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
    * @param value - the value to format
    * @returns the formatted value
    */
-  const formatINValue = (value: any) => {
-    // if variable is present, don't want to use splitQuotedString
-    if (value?.includes("$")) {
-      if (value.startsWith("(") && value.endsWith(")")) {
-        return value.substring(1, value.length - 1);
-      }
-      return value;
-    } else {
-      return splitQuotedString(value ?? "")
-        ?.map((it: any) => {
-          return `'${escapeSingleQuotes(it)}'`;
-        })
-        .join(", ");
-    }
-  };
+  // formatINValue moved to utils/dashboard/queryBuilder
 
   /**
    * Build a WHERE clause from the given filter data.
@@ -2283,7 +2276,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].fields.y,
       ...(dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields?.breakdown
+      ].fields && dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ].fields.breakdown
         ? [
             ...dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -3328,74 +3323,74 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   // Function to determine chart type based on extracted fields
-  const determineChartType = (
-    extractedFields: {
-      group_by: string[];
-      projections: string[];
-      timeseries_field: string | null;
-    }
-  ): string => {
-    if (
-      extractedFields.timeseries_field &&
-      extractedFields.group_by.length <= 2
-    ) {
-      return "line";
-    } else {
-      return "table";
-    }
-  };
+  // const determineChartType = (
+  //   extractedFields: {
+  //     group_by: string[];
+  //     projections: string[];
+  //     timeseries_field: string | null;
+  //   }
+  // ): string => {
+  //   if (
+  //     extractedFields.timeseries_field &&
+  //     extractedFields.group_by.length <= 2
+  //   ) {
+  //     return "line";
+  //   } else {
+  //     return "table";
+  //   }
+  // };
 
   // Function to convert result schema to x, y, breakdown fields
-  const convertSchemaToFields = (extractedFields: {
-    group_by: string[];
-    projections: string[];
-    timeseries_field: string | null;
-  }, chartType: string): {
-    x: string[];
-    y: string[];
-    breakdown: string[];
-  } => {
-    // For table charts, add all projections to x-axis since tables display all fields as columns
-    if (chartType === "table") {
-      return {
-        x: [...extractedFields.projections],
-        y: [],
-        breakdown: [],
-      };
-    }
+  // const convertSchemaToFields = (extractedFields: {
+  //   group_by: string[];
+  //   projections: string[];
+  //   timeseries_field: string | null;
+  // }, chartType: string): {
+  //   x: string[];
+  //   y: string[];
+  //   breakdown: string[];
+  // } => {
+  //   // For table charts, add all projections to x-axis since tables display all fields as columns
+  //   if (chartType === "table") {
+  //     return {
+  //       x: [...extractedFields.projections],
+  //       y: [],
+  //       breakdown: [],
+  //     };
+  //   }
 
-    // For non-table charts, use the original logic
-    // remove group by and timeseries field from projections, while using it on y axis
-    const yAxisFields = extractedFields.projections.filter(
-      (field) =>
-        !extractedFields.group_by.includes(field) &&
-        field !== extractedFields.timeseries_field,
-    );
+  //   // For non-table charts, use the original logic
+  //   // remove group by and timeseries field from projections, while using it on y axis
+  //   const yAxisFields = extractedFields.projections.filter(
+  //     (field) =>
+  //       !extractedFields.group_by.includes(field) &&
+  //       field !== extractedFields.timeseries_field,
+  //   );
 
-    const fields = {
-      x: [] as string[],
-      y: yAxisFields,
-      breakdown: [] as string[],
-    };
+  //   const fields = {
+  //     x: [] as string[],
+  //     y: yAxisFields,
+  //     breakdown: [] as string[],
+  //   };
 
-    // add timestamp as x axis
-    if (extractedFields.timeseries_field) {
-      fields.x.push(extractedFields.timeseries_field);
-    }
+  //   // add timestamp as x axis
+  //   if (extractedFields.timeseries_field) {
+  //     fields.x.push(extractedFields.timeseries_field);
+  //   }
 
-    extractedFields.group_by.forEach((field: any) => {
-      if (field != extractedFields.timeseries_field) {
-        // if x axis is empty then first add group by as x axis
-        if (fields.x.length == 0) {
-          fields.x.push(field);
-        } else {
-          fields.breakdown.push(field);
-        }
-      }
-    });
+  //   extractedFields.group_by.forEach((field: any) => {
+  //     if (field != extractedFields.timeseries_field) {
+  //       // if x axis is empty then first add group by as x axis
+  //       if (fields.x.length == 0) {
+  //         fields.x.push(field);
+  //       } else {
+  //         fields.breakdown.push(field);
+  //       }
+  //     }
+  //   });
 
-    return fields;
-  };
+  //   return fields;
+  // };
 
   // For visualization, we need to set the custom query fields
   const setCustomQueryFields = async (

@@ -292,9 +292,7 @@ import {
 } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
-import { generateDurationLabel } from "../../utils/date";
 import { onBeforeMount } from "vue";
-import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";

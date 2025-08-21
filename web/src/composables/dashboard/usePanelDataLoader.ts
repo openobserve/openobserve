@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 // Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
@@ -94,9 +95,6 @@ export const usePanelDataLoader = (
   const {
     fetchQueryDataWithHttpStream,
     cancelStreamQueryBasedOnRequestId,
-    closeStreamWithError,
-    closeStream,
-    resetAuthToken,
   } = useHttpStreamingSearch();
 
   const { refreshAnnotations } = useAnnotations(
