@@ -52,7 +52,7 @@ impl OutputColumnExtractor {
             _ => {
                 // For complex expressions, try to extract a meaningful name
                 // or use a hash of the expression string
-                let expr_str = format!("{}", expr);
+                let expr_str = format!("{expr}");
                 if expr_str.len() > 50 {
                     format!("expr_{}", expr_str.chars().take(20).collect::<String>())
                 } else {
@@ -71,7 +71,7 @@ impl OutputColumnExtractor {
 
             let mapping = ProjectionColumnMapping {
                 output_field: Self::get_output_field_name(expr),
-                projection_expr: format!("{}", expr),
+                projection_expr: format!("{expr}"),
                 source_columns: source_columns.into_iter().collect(),
             };
 
@@ -82,7 +82,28 @@ impl OutputColumnExtractor {
     fn extract_columns_from_expr(&self, expr: &Expr, columns: &mut HashSet<String>) {
         match expr {
             Expr::Column(col) => {
-                columns.insert(col.name.clone());
+                // Check if this column name represents an aggregate function
+                // e.g., "max(default.k8s_namespace_name)" should extract "k8s_namespace_name"
+                if col.name.contains('(') && col.name.contains(')') {
+                    // This is likely an aggregate function column reference
+                    // Extract the column name from within the parentheses
+                    if let Some(start) = col.name.find('(') &&
+                         let Some(end) = col.name.rfind(')') {
+                            let inner_expr = &col.name[start + 1..end];
+                            // Parse the inner expression to extract the actual column name
+                            // For now, try to extract the last part after the last dot
+                            if let Some(last_dot) = inner_expr.rfind('.') {
+                                let column_name = &inner_expr[last_dot + 1..];
+                                columns.insert(column_name.to_string());
+                            } else {
+                                // No dot found, use the inner expression as is
+                                columns.insert(inner_expr.to_string());
+                            }
+                        
+                    }
+                } else {
+                    columns.insert(col.name.clone());
+                }
             }
             Expr::Alias(alias) => {
                 self.extract_columns_from_expr(&alias.expr, columns);
@@ -93,6 +114,12 @@ impl OutputColumnExtractor {
             }
             Expr::ScalarFunction(func) => {
                 for arg in &func.args {
+                    self.extract_columns_from_expr(arg, columns);
+                }
+            }
+            Expr::AggregateFunction(agg_func) => {
+                // Handle aggregate functions like MAX, MIN, COUNT, etc.
+                for arg in &agg_func.params.args {
                     self.extract_columns_from_expr(arg, columns);
                 }
             }
@@ -123,22 +150,20 @@ impl<'n> TreeNodeVisitor<'n> for OutputColumnExtractor {
         &mut self,
         node: &'n Self::Node,
     ) -> Result<TreeNodeRecursion, datafusion::error::DataFusionError> {
-        // Only extract from the top-most projection (final output to user)
         match node {
             LogicalPlan::Projection(proj) => {
-                if !self.found_top_projection {
-                    self.found_top_projection = true;
-                    self.extract_projection_mappings(&proj.expr);
-                }
+                // Always extract from projections as they represent the final output
+                self.extract_projection_mappings(&proj.expr);
+                self.found_top_projection = true;
             }
             LogicalPlan::Aggregate(aggr) => {
-                // If there's no explicit projection above aggregate,
-                // the aggregate expressions are the final output
+                // Only process aggregates if we haven't found a projection yet
+                // This prevents duplicate processing when both Projection and Aggregate exist
                 if !self.found_top_projection {
-                    self.found_top_projection = true;
                     let mut all_exprs = aggr.group_expr.clone();
                     all_exprs.extend(aggr.aggr_expr.clone());
                     self.extract_projection_mappings(&all_exprs);
+                    self.found_top_projection = true;
                 }
             }
             _ => {}
@@ -579,5 +604,37 @@ mod tests {
         assert!(
             !count_mapping.source_columns.is_empty() || count_mapping.source_columns.is_empty()
         );
+    }
+
+    #[tokio::test]
+    async fn test_group_by_with_aggregate_function() {
+        let sql = "SELECT k8s_namespace_name, k8s_namespace_name AS a, MAX(k8s_namespace_name) AS b FROM \"default\" GROUP BY k8s_namespace_name";
+        let parsed = get_sql(sql).await;
+        let mappings = get_columns_from_projections(parsed).await.unwrap();
+
+        // Should have 3 projections: k8s_namespace_name, a, b
+        assert!(mappings.len() >= 3);
+
+        // Check the direct column projection
+        let direct_mapping = mappings
+            .iter()
+            .find(|m| m.output_field == "k8s_namespace_name")
+            .unwrap();
+        assert!(direct_mapping.source_columns.contains("k8s_namespace_name"));
+
+        // Check the aliased column projection
+        let aliased_mapping = mappings
+            .iter()
+            .find(|m| m.output_field == "a")
+            .unwrap();
+        assert!(aliased_mapping.source_columns.contains("k8s_namespace_name"));
+
+        // Check the aggregate function projection
+        let aggregate_mapping = mappings
+            .iter()
+            .find(|m| m.output_field == "b")
+            .unwrap();
+        assert!(aggregate_mapping.source_columns.contains("k8s_namespace_name"));
+        assert!(aggregate_mapping.projection_expr.contains("max"));
     }
 }
