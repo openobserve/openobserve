@@ -3,6 +3,7 @@
 # Environment Variables
 *.env
 *.env.json
+credentials.json
 
 # Dependency directory
 # https://www.npmjs.org/doc/misc/npm-faq.html#should-i-check-my-node_modules-folder-into-git
@@ -13,3 +14,5 @@ node_modules
 /playwright/.cache/
 coverage/
 .nyc_output/
+.last-run.json
+*.log

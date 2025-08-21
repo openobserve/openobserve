@@ -93,7 +93,7 @@ test.describe("Logs Page testcases", () => {
     await page.waitForTimeout(2000)
 
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${process.env["ZO_BASE_URL"]}${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
     await pageManager.logsPage.selectStream("e2e_automate"); 

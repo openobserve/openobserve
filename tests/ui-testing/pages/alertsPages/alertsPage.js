@@ -23,10 +23,10 @@ export class AlertsPage {
 
         // Alert creation locators
         this.addAlertButton = '[data-test="alert-list-add-alert-btn"]';
-        this.alertNameInput = '[data-test="add-alert-name-input row"]';
+        this.alertNameInput = '[data-test="add-alert-name-input"] div:has-text("Name *") >> nth=0';
         this.alertSubmitButton = '[data-test="add-alert-submit-btn"]';
-        this.streamTypeDropdown = '[data-test="add-alert-stream-type-select-dropdown"]';
-        this.streamNameDropdown = '[data-test="add-alert-stream-name-select-dropdown"]';
+        this.streamTypeDropdown = 'text=Stream Type *arrow_drop_down';
+        this.streamNameDropdown = '[data-test="add-alert-stream-select"] div >> text=/^arrow_drop_down$/';
         this.realtimeAlertRadio = '[data-test="add-alert-realtime-alert-radio"]';
         this.alertDelayInput = '[data-test="add-alert-delay-input"]';
         this.destinationSelect = '[data-test="add-alert-destination-select"]';
@@ -441,7 +441,7 @@ export class AlertsPage {
         await this.page.getByRole('button', { name: 'View Editor' }).click();
         await this.page.locator('.cm-line').first().click();
         await this.page.locator('[data-test="scheduled-alert-sql-editor"]').locator('.cm-content')
-            .fill('SELECT name\n  FROM "auto_playwright_stream"\n  WHERE \n    gender = \'Male\'\n    AND age > 60\n    AND country IN (\'Germany\', \'Japan\', \'USA\')');
+            .fill(`SELECT name\n  FROM "${streamName}"\n  WHERE \n    gender = 'Male'\n    AND age > 60\n    AND country IN ('Germany', 'Japan', 'USA')`);
         await this.page.getByRole('button', { name: 'Run Query' }).click();
         await this.page.waitForTimeout(2000);
 

@@ -86,7 +86,7 @@ test.describe("Sanity testcases", () => {
 
     // ===== NAVIGATE TO LOGS PAGE =====
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${process.env["ZO_BASE_URL"]}${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
     await pm.logsPage.selectStream("e2e_automate"); 

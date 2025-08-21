@@ -21,7 +21,7 @@ test.describe("dashboard multi y axis testcases", () => {
 
     // Navigate to the organization-specific logs URL
     const orgNavigation = page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${process.env["ZO_BASE_URL"]}${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     await orgNavigation;
   });

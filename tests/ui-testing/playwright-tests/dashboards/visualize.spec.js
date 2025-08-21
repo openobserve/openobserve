@@ -45,7 +45,7 @@ test.describe("logs testcases", () => {
     await page.waitForTimeout(2000);
 
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${process.env["ZO_BASE_URL"]}${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
 
     // Instantiate PageManager with the current page

@@ -1,0 +1,7 @@
+name: "CodeQL Config"
+disable-default-queries: false
+queries:
+  - uses: security-and-quality
+paths-ignore:
+  - "tests/ui-testing/playwright-runner/node_modules/**"
+  - "tests/ui-testing/playwright-runner/test-results/**"

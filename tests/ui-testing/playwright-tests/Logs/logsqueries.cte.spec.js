@@ -81,7 +81,7 @@ test.describe("CTE Logs Queries testcases", () => {
     await page.waitForTimeout(2000)
 
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${process.env["ZO_BASE_URL"]}${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     await page.waitForTimeout(3000)
     await pageManager.logsPage.selectStream("e2e_cte"); 
