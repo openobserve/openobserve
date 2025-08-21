@@ -170,7 +170,7 @@ describe("ListOrganizations", () => {
 
     it("should setup columns correctly", () => {
       const columns = wrapper.vm.columns;
-      expect(columns).toHaveLength(5); // Base columns without plan
+      expect(columns).toHaveLength(6); // Base columns without plan
       expect(columns.map(c => c.name)).toContain("name");
       expect(columns.map(c => c.name)).toContain("identifier");
     });
@@ -207,7 +207,7 @@ describe("ListOrganizations", () => {
       });
       
       await wrapperWithCloud.vm.$nextTick();
-      expect(wrapperWithCloud.vm.columns).toHaveLength(5); // Including plan column
+      expect(wrapperWithCloud.vm.columns).toHaveLength(6); // Including plan column
       wrapperWithCloud.unmount();
     });
   });
