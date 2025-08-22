@@ -76,14 +76,14 @@ impl Event for Eventer {
             for item in put_items.iter() {
                 // cache parquet
                 if cfg.cache_latest_files.cache_parquet {
-                    files_to_download.push(item.key.clone());
+                    files_to_download.push((item.key.clone(), item.meta.compressed_size));
                 }
 
                 // cache index for the parquet
                 if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
                     if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
                     {
-                        index_files_to_download.push(ttv_file);
+                        index_files_to_download.push((ttv_file, item.meta.index_size));
                     }
                 }
             }
@@ -116,11 +116,11 @@ impl Event for Eventer {
                 }
 
                 // Fallback to individual downloads for failed files
-                for file in failed_files {
+                for (file, size) in failed_files {
                     if let Err(e) = infra::cache::file_data::download(
                         TRACE_ID_FOR_CACHE_LATEST_FILE,
                         &file,
-                        None,
+                        Some(size as usize),
                     )
                     .await
                     {
@@ -128,11 +128,11 @@ impl Event for Eventer {
                     }
                 }
 
-                for file in failed_index_files {
+                for (file, size) in failed_index_files {
                     if let Err(e) = infra::cache::file_data::download(
                         TRACE_ID_FOR_CACHE_LATEST_FILE,
                         &file,
-                        None,
+                        Some(size as usize),
                     )
                     .await
                     {
@@ -141,11 +141,11 @@ impl Event for Eventer {
                 }
             } else {
                 // Direct download when download_from_node_enabled is false
-                for file in files_to_download {
+                for (file, size) in files_to_download {
                     if let Err(e) = infra::cache::file_data::download(
                         TRACE_ID_FOR_CACHE_LATEST_FILE,
                         &file,
-                        None,
+                        Some(size as usize),
                     )
                     .await
                     {
@@ -153,11 +153,11 @@ impl Event for Eventer {
                     }
                 }
 
-                for file in index_files_to_download {
+                for (file, size) in index_files_to_download {
                     if let Err(e) = infra::cache::file_data::download(
                         TRACE_ID_FOR_CACHE_LATEST_FILE,
                         &file,
-                        None,
+                        Some(size as usize),
                     )
                     .await
                     {
@@ -296,9 +296,12 @@ async fn handle_file_chunked(
     Ok(())
 }
 
-async fn get_files_from_notifier(addr: &str, filekeys: &[String]) -> Result<Vec<String>> {
+async fn get_files_from_notifier(
+    addr: &str,
+    files_meta: &[(String, i64)],
+) -> Result<Vec<(String, i64)>> {
     let start = std::time::Instant::now();
-    log::debug!("get_files_from_notifier start, files: {:?}", filekeys);
+    log::debug!("get_files_from_notifier start, files: {:?}", files_meta);
     let token: MetadataValue<_> = get_internal_grpc_token()
         .parse()
         .map_err(|_| anyhow::anyhow!("Invalid token"))?;
@@ -309,6 +312,10 @@ async fn get_files_from_notifier(addr: &str, filekeys: &[String]) -> Result<Vec<
         Ok(req)
     });
 
+    let filekeys = files_meta
+        .iter()
+        .map(|(path, _)| path.clone())
+        .collect::<Vec<String>>();
     let mut request = Request::new(SimpleFileList {
         paths: filekeys.to_vec(),
     });
@@ -364,9 +371,9 @@ async fn get_files_from_notifier(addr: &str, filekeys: &[String]) -> Result<Vec<
     }
 
     // Return list of failed files
-    let failed_files: Vec<_> = filekeys
+    let failed_files: Vec<_> = files_meta
         .iter()
-        .filter(|f| !downloaded_files.contains(*f))
+        .filter(|(f, _)| !downloaded_files.contains(f))
         .cloned()
         .collect();
     log::debug!(
