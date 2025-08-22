@@ -100,24 +100,28 @@ impl FlightService for FlightServiceImpl {
         let timeout = req.search_info.timeout as u64;
         log::info!("[trace_id {trace_id}] flight->search: do_get, timeout: {timeout}s",);
 
-        let req_move = req.clone();
-        let trace_id_move = trace_id.clone();
-
         // Note: all async should in this place, otherwise it will break tracing
         // https://docs.rs/tracing/latest/tracing/span/struct.Span.html#in-asynchronous-code
+        let req_move = req.clone();
+        let trace_id_move = trace_id.clone();
         let result = async move {
             #[cfg(feature = "enterprise")]
-            if is_super_cluster && !SEARCH_SERVER.contain_key(&trace_id).await {
+            if is_super_cluster && !SEARCH_SERVER.contain_key(&trace_id_move).await {
+                // this is for work_group check in super cluster follower leader
                 SEARCH_SERVER
-                    .insert(trace_id.clone(), TaskStatus::new_follower(vec![], false))
+                    .insert(
+                        trace_id_move.clone(),
+                        TaskStatus::new_follower(vec![], false),
+                    )
                     .await;
             }
 
             let result = get_ctx_and_physical_plan(&trace_id_move, &req_move).await;
 
             #[cfg(feature = "enterprise")]
-            if is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id).await {
-                SEARCH_SERVER.remove(&trace_id, false).await;
+            if is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id_move).await {
+                // this is for work_group check in super cluster follower leader
+                SEARCH_SERVER.remove(&trace_id_move, false).await;
             }
 
             result
