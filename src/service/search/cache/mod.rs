@@ -40,6 +40,7 @@ use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
@@ -1174,6 +1175,7 @@ fn deep_copy_response(res: &config::meta::search::Response) -> config::meta::sea
     serde_json::from_str(&serialized).expect("Failed to deserialize response")
 }
 
+#[cfg(feature = "enterprise")]
 pub async fn apply_regex_to_response(
     req: &config::meta::search::Request,
     org_id: &str,

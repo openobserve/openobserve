@@ -12,24 +12,20 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+#[cfg(feature = "enterprise")]
 use std::sync::Arc;
 
+#[cfg(feature = "enterprise")]
 use config::meta::projections::ProjectionColumnMapping;
+#[cfg(feature = "enterprise")]
 use datafusion::common::tree_node::TreeNode;
 
+#[cfg(feature = "enterprise")]
 use crate::service::search::{
     cluster::flight::{SearchContextBuilder, register_table},
     request::Request,
     sql::Sql,
 };
-
-#[cfg(not(feature = "enterprise"))]
-pub async fn get_columns_from_projections(
-    sql: Sql,
-) -> Result<Vec<ProjectionColumnMapping>, anyhow::Error> {
-    Ok(vec![])
-}
 
 #[cfg(feature = "enterprise")]
 pub async fn get_columns_from_projections(

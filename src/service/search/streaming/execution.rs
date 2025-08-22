@@ -611,7 +611,6 @@ pub async fn process_delta(
             );
             // pass original start_time and end_time partition end time
             let _ = send_partial_search_resp(
-                &req,
                 trace_id,
                 "reached max query range limit",
                 new_start_time,
@@ -625,6 +624,7 @@ pub async fn process_delta(
                 org_id,
                 stream_name,
                 stream_type,
+                &req,
             )
             .await;
             break;
@@ -688,7 +688,6 @@ pub fn calc_queried_range(start_time: i64, end_time: i64, result_cache_ratio: us
 /// Send a partial search response
 #[allow(clippy::too_many_arguments)]
 async fn send_partial_search_resp(
-    req: &config::meta::search::Request,
     trace_id: &str,
     error: &str,
     new_start_time: i64,
@@ -702,6 +701,7 @@ async fn send_partial_search_resp(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
+    _req: &config::meta::search::Request,
 ) -> Result<(), infra::errors::Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
@@ -720,7 +720,7 @@ async fn send_partial_search_resp(
     };
     #[cfg(feature = "enterprise")]
     crate::service::search::cache::apply_regex_to_response(
-        req,
+        _req,
         org_id,
         stream_name,
         stream_type,
@@ -746,7 +746,9 @@ async fn send_partial_search_resp(
             end_time: new_end_time,
         },
     };
-    log::info!("[HTTP2_STREAM]: trace_id: {trace_id} Sending partial search response");
+    log::info!(
+        "[HTTP2_STREAM]: trace_id: {trace_id} Sending partial search response for {stream_name}{stream_type}"
+    );
 
     if sender.send(Ok(response)).await.is_err() {
         log::warn!("[trace_id {trace_id}] Sender is closed, stop sending partial search response");
