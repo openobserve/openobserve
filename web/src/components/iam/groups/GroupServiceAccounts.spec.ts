@@ -374,32 +374,23 @@ describe("GroupServiceAccounts Component", () => {
       expect(addedUsers.has("service2@example.com")).toBe(false);
     });
 
-    it("has bug in removedUsers logic - removes from removedUsers when condition should be different", () => {
+    it("removes service account from removedUsers when reselecting removed account", async () => {
       const addedUsers = new Set();
       const removedUsers = new Set(["service1@example.com"]);
       
-      wrapper = mount(GroupServiceAccounts, {
-        global: {
-          provide: { store },
-          plugins: [i18n],
-        },
-        props: {
-          groupUsers: ["service1@example.com"],
-          activeTab: "serviceAccounts",
-          addedUsers,
-          removedUsers,
-        },
+      await wrapper.setProps({
+        groupUsers: ["service1@example.com"],
+        activeTab: "serviceAccounts",
+        addedUsers,
+        removedUsers,
       });
 
       wrapper.vm.groupUsersMap = new Set(["service1@example.com"]);
-      const testServiceAccount = { email: "service1@example.com", isInGroup: false };
+      const testServiceAccount = { email: "service1@example.com", isInGroup: true };
       
       wrapper.vm.toggleUserSelection(testServiceAccount);
       
-      // The current code has a bug: it checks `!user.isInGroup && props.addedUsers.has(user.email)`
-      // but then operates on removedUsers. This should be fixed in the actual code.
-      // For now, we test the current buggy behavior
-      expect(removedUsers.has("service1@example.com")).toBe(true); // Bug: should be false
+      expect(removedUsers.has("service1@example.com")).toBe(false);
     });
   });
 

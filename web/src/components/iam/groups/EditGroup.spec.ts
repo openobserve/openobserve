@@ -77,7 +77,7 @@ vi.mock("./GroupServiceAccounts.vue", () => ({
   default: {
     name: "GroupServiceAccounts",
     template: `<div data-test="group-service-accounts-mock">GroupServiceAccounts</div>`,
-    props: ["groupUsers", "activeTab", "addedUsers", "removedUsers"],
+    props: ["groupServiceAccounts", "activeTab", "addedServiceAccounts", "removedServiceAccounts"],
   },
 }));
 
@@ -153,8 +153,8 @@ describe("EditGroup Component", () => {
     });
 
     it("renders cancel and save buttons", () => {
-      const cancelButton = wrapper.find('[data-test="add-alert-cancel-btn"]');
-      const saveButton = wrapper.find('[data-test="add-alert-submit-btn"]');
+      const cancelButton = wrapper.find('[data-test="edit-group-cancel-btn"]');
+      const saveButton = wrapper.find('[data-test="edit-group-submit-btn"]');
       
       expect(cancelButton.exists()).toBe(true);
       expect(saveButton.exists()).toBe(true);
@@ -405,7 +405,7 @@ describe("EditGroup Component", () => {
       }
 
       // Give time for async operations
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await flushPromises();
 
       expect(mockNotify).toHaveBeenCalledWith({
         type: "negative",
@@ -437,7 +437,7 @@ describe("EditGroup Component", () => {
     });
 
     it("triggers navigation when cancel button is clicked", async () => {
-      const cancelButton = wrapper.find('[data-test="add-alert-cancel-btn"]');
+      const cancelButton = wrapper.find('[data-test="edit-group-cancel-btn"]');
       
       expect(cancelButton.exists()).toBe(true);
       expect(cancelButton.text()).toContain("Cancel");

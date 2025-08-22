@@ -129,8 +129,8 @@ describe("AddGroup Component", () => {
 
   describe("Button Actions", () => {
     it("renders cancel and save buttons", () => {
-      const cancelButton = wrapper.find('[data-test="add-alert-cancel-btn"]');
-      const saveButton = wrapper.find('[data-test="add-alert-submit-btn"]');
+      const cancelButton = wrapper.find('[data-test="add-group-cancel-btn"]');
+      const saveButton = wrapper.find('[data-test="add-group-submit-btn"]');
       
       expect(cancelButton.exists()).toBe(true);
       expect(saveButton.exists()).toBe(true);
@@ -145,7 +145,7 @@ describe("AddGroup Component", () => {
     });
 
     it("emits cancel event when cancel button is clicked", async () => {
-      const cancelButton = wrapper.find('[data-test="add-alert-cancel-btn"]');
+      const cancelButton = wrapper.find('[data-test="add-group-cancel-btn"]');
       await cancelButton.trigger("click");
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
@@ -323,8 +323,8 @@ describe("AddGroup Component", () => {
   describe("Accessibility", () => {
     it("has proper button attributes", () => {
       const closeButton = wrapper.find('[data-test="add-group-close-dialog-btn"]');
-      const cancelButton = wrapper.find('[data-test="add-alert-cancel-btn"]');
-      const saveButton = wrapper.find('[data-test="add-alert-submit-btn"]');
+      const cancelButton = wrapper.find('[data-test="add-group-cancel-btn"]');
+      const saveButton = wrapper.find('[data-test="add-group-submit-btn"]');
 
       expect(closeButton.exists()).toBe(true);
       expect(cancelButton.exists()).toBe(true);

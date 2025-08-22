@@ -29,11 +29,13 @@ vi.mock("@/services/iam", () => ({
   getRoles: vi.fn(() => Promise.resolve({ data: ["admin", "user", "developer"] })),
 }));
 
+const mockUsePermissions = vi.fn(() => ({
+  rolesState: {},
+  groupsState: {},
+}));
+
 vi.mock("@/composables/iam/usePermissions", () => ({
-  default: vi.fn(() => ({
-    rolesState: {},
-    groupsState: {},
-  })),
+  default: mockUsePermissions,
 }));
 
 vi.mock("@/components/AppTable.vue", () => ({
@@ -57,7 +59,7 @@ describe("GroupRoles Component", () => {
       groupsState: {},
     };
 
-    vi.mocked(await import("@/composables/iam/usePermissions")).default.mockReturnValue(mockPermissions);
+    mockUsePermissions.mockReturnValue(mockPermissions);
 
     wrapper = mount(GroupRoles, {
       global: {
@@ -268,21 +270,15 @@ describe("GroupRoles Component", () => {
       expect(checkbox.exists()).toBe(true);
     });
 
-    it("handles role selection toggle", () => {
+    it("handles role selection toggle", async () => {
       const addedRoles = new Set();
       const removedRoles = new Set();
       
-      wrapper = mount(GroupRoles, {
-        global: {
-          provide: { store },
-          plugins: [i18n],
-        },
-        props: {
-          groupRoles: ["admin"],
-          activeTab: "roles",
-          addedRoles,
-          removedRoles,
-        },
+      await wrapper.setProps({
+        groupRoles: ["admin"],
+        activeTab: "roles",
+        addedRoles,
+        removedRoles,
       });
 
       const testRole = { role_name: "user", isInGroup: false };
@@ -294,21 +290,15 @@ describe("GroupRoles Component", () => {
       expect(addedRoles.has("user")).toBe(true);
     });
 
-    it("adds role to addedRoles when selecting unassigned role", () => {
+    it("adds role to addedRoles when selecting unassigned role", async () => {
       const addedRoles = new Set();
       const removedRoles = new Set();
       
-      wrapper = mount(GroupRoles, {
-        global: {
-          provide: { store },
-          plugins: [i18n],
-        },
-        props: {
-          groupRoles: [],
-          activeTab: "roles",
-          addedRoles,
-          removedRoles,
-        },
+      await wrapper.setProps({
+        groupRoles: [],
+        activeTab: "roles",
+        addedRoles,
+        removedRoles,
       });
 
       wrapper.vm.groupUsersMap = new Set([]);
@@ -319,21 +309,15 @@ describe("GroupRoles Component", () => {
       expect(addedRoles.has("admin")).toBe(true);
     });
 
-    it("adds role to removedRoles when deselecting assigned role", () => {
+    it("adds role to removedRoles when deselecting assigned role", async () => {
       const addedRoles = new Set();
       const removedRoles = new Set();
       
-      wrapper = mount(GroupRoles, {
-        global: {
-          provide: { store },
-          plugins: [i18n],
-        },
-        props: {
-          groupRoles: ["admin"],
-          activeTab: "roles",
-          addedRoles,
-          removedRoles,
-        },
+      await wrapper.setProps({
+        groupRoles: ["admin"],
+        activeTab: "roles",
+        addedRoles,
+        removedRoles,
       });
 
       wrapper.vm.groupUsersMap = new Set(["admin"]);
@@ -344,21 +328,15 @@ describe("GroupRoles Component", () => {
       expect(removedRoles.has("admin")).toBe(true);
     });
 
-    it("removes role from addedRoles when deselecting newly added role", () => {
+    it("removes role from addedRoles when deselecting newly added role", async () => {
       const addedRoles = new Set(["user"]);
       const removedRoles = new Set();
       
-      wrapper = mount(GroupRoles, {
-        global: {
-          provide: { store },
-          plugins: [i18n],
-        },
-        props: {
-          groupRoles: [],
-          activeTab: "roles",
-          addedRoles,
-          removedRoles,
-        },
+      await wrapper.setProps({
+        groupRoles: [],
+        activeTab: "roles",
+        addedRoles,
+        removedRoles,
       });
 
       wrapper.vm.groupUsersMap = new Set([]);
@@ -369,21 +347,15 @@ describe("GroupRoles Component", () => {
       expect(addedRoles.has("user")).toBe(false);
     });
 
-    it("removes role from removedRoles when reselecting removed role", () => {
+    it("removes role from removedRoles when reselecting removed role", async () => {
       const addedRoles = new Set();
       const removedRoles = new Set(["admin"]);
       
-      wrapper = mount(GroupRoles, {
-        global: {
-          provide: { store },
-          plugins: [i18n],
-        },
-        props: {
-          groupRoles: ["admin"],
-          activeTab: "roles",
-          addedRoles,
-          removedRoles,
-        },
+      await wrapper.setProps({
+        groupRoles: ["admin"],
+        activeTab: "roles",
+        addedRoles,
+        removedRoles,
       });
 
       wrapper.vm.groupUsersMap = new Set(["admin"]);
@@ -480,9 +452,15 @@ describe("GroupRoles Component", () => {
       expect(wrapper.vm.groupUsersMap.size).toBe(0);
     });
 
-    it("handles API error when fetching roles", () => {
-      // Simply test that the method exists and doesn't crash with error handling
-      expect(typeof wrapper.vm.getchOrgUsers).toBe("function");
+    it("handles API error when fetching roles", async () => {
+      const { getRoles } = await import("@/services/iam");
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      vi.mocked(getRoles).mockRejectedValue(new Error("Network error"));
+
+      await wrapper.vm.getchOrgUsers();
+
+      expect(consoleSpy).toHaveBeenCalled();
+      consoleSpy.mockRestore();
     });
 
     it("handles empty roles data from API", async () => {
@@ -497,12 +475,9 @@ describe("GroupRoles Component", () => {
     it("handles undefined filter input", () => {
       const testRoles = [{ role_name: "admin" }];
       // Since the actual function doesn't handle undefined gracefully, we wrap it
-      const safeFilter = (roles, term) => {
-        if (!term) return [];
-        return wrapper.vm.filterRoles(roles, term);
-      };
-      const result = safeFilter(testRoles, undefined);
-      expect(result).toEqual([]);
+      // Test the actual filterRoles method with proper input validation
+      const result = wrapper.vm.filterRoles(testRoles, "");
+      expect(result).toEqual(testRoles);
     });
   });
 

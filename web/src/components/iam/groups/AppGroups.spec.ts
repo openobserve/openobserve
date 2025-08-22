@@ -117,7 +117,7 @@ describe("AppGroups Component", () => {
     });
 
     it("renders search input", () => {
-      const searchInput = wrapper.find('[date-test="iam-groups-search-input"] .q-input');
+      const searchInput = wrapper.find('[data-test="iam-groups-search-input"] .q-input');
       expect(searchInput.exists()).toBe(true);
     });
 
@@ -239,7 +239,7 @@ describe("AppGroups Component", () => {
 
     it("refreshes groups list when group is added", async () => {
       const setupGroupsSpy = vi.spyOn(wrapper.vm, "setupGroups");
-      await wrapper.vm.setupGroups({ data: { name: "new_group" } });
+      await wrapper.vm.setupGroups();
       expect(setupGroupsSpy).toHaveBeenCalled();
     });
   });
@@ -295,7 +295,7 @@ describe("AppGroups Component", () => {
         store.state.selectedOrganization.identifier
       );
       expect(mockNotify).toHaveBeenCalledWith({
-        message: "Role deleted successfully!",
+        message: "Group deleted successfully!",
         color: "positive",
         position: "bottom",
       });
