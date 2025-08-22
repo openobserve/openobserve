@@ -513,7 +513,7 @@ pub async fn search(
         return Ok(local_res);
     }
 
-    Ok(res)
+    Ok(local_res)
 }
 
 // based on _timestamp of first record in config::meta::search::Response either add it in start
