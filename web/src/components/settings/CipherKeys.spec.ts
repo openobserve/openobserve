@@ -326,7 +326,7 @@ describe("CipherKeys", () => {
     it("should populate table data after successful fetch", async () => {
       const wrapper = createWrapper();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await wrapper.vm.$nextTick();
       
       expect(wrapper.vm.tabledata).toHaveLength(2);
       expect(wrapper.vm.tabledata[0]).toEqual({
@@ -348,6 +348,12 @@ describe("CipherKeys", () => {
       await nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
+      // Should be called at least twice - loading notification first, then error
+      expect(mockNotify).toHaveBeenCalledTimes(2);
+      expect(mockNotify).toHaveBeenCalledWith({
+        message: "Please wait while loading data...",
+        spinner: true,
+      });
       expect(mockNotify).toHaveBeenCalledWith({
         type: "negative",
         message: "Server error",
@@ -365,7 +371,12 @@ describe("CipherKeys", () => {
       await nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      expect(mockNotify).not.toHaveBeenCalled();
+      // Should only be called once with loading notification for 403 errors
+      expect(mockNotify).toHaveBeenCalledTimes(1);
+      expect(mockNotify).toHaveBeenCalledWith({
+        message: "Please wait while loading data...",
+        spinner: true,
+      });
     });
   });
 
@@ -427,7 +438,7 @@ describe("CipherKeys", () => {
       wrapper.vm.showAddDialog = true;
       await nextTick();
 
-      expect(mockRouter.push).toHaveBeenCalledWith({
+      expect(router.push).toHaveBeenCalledWith({
         name: "cipherKeys",
         query: {
           org_identifier: "test-org",
@@ -761,7 +772,7 @@ describe("CipherKeys", () => {
       
       const wrapper = createWrapper();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await wrapper.vm.$nextTick();
 
       // The component should handle missing properties gracefully
       if (wrapper.vm.tabledata.length > 0) {
