@@ -111,6 +111,12 @@ pub trait FileList: Sync + Send + 'static {
         limit: i64,
     ) -> Result<Vec<FileListDeleted>>;
     async fn list_deleted(&self) -> Result<Vec<FileListDeleted>>;
+    async fn get_min_ts(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+    ) -> Result<i64>;
     async fn get_min_date(
         &self,
         org_id: &str,
@@ -118,16 +124,11 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         date_range: Option<(String, String)>,
     ) -> Result<String>;
-    // stream stats
-    async fn get_min_ts(
-        &self,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-    ) -> Result<i64>;
-    async fn get_max_pk_value(&self) -> Result<i64>;
-    async fn get_min_pk_value(&self) -> Result<i64>;
-    async fn clean_by_min_pk_value(&self, val: i64) -> Result<()>;
+    async fn get_max_update_at(&self) -> Result<i64>;
+    async fn get_min_update_at(&self) -> Result<i64>;
+    async fn clean_by_min_update_at(&self, val: i64) -> Result<()>;
+
+    // stream stats table
     async fn stats(
         &self,
         org_id: &str,
@@ -363,6 +364,12 @@ pub async fn list_deleted() -> Result<Vec<FileListDeleted>> {
     CLIENT.list_deleted().await
 }
 
+
+#[inline]
+pub async fn get_min_ts(org_id: &str, stream_type: StreamType, stream_name: &str) -> Result<i64> {
+    CLIENT.get_min_ts(org_id, stream_type, stream_name).await
+}
+
 #[inline]
 pub async fn get_min_date(
     org_id: &str,
@@ -375,19 +382,15 @@ pub async fn get_min_date(
         .await
 }
 
+
 #[inline]
-pub async fn get_min_ts(org_id: &str, stream_type: StreamType, stream_name: &str) -> Result<i64> {
-    CLIENT.get_min_ts(org_id, stream_type, stream_name).await
+pub async fn get_max_update_at() -> Result<i64> {
+    CLIENT.get_max_update_at().await
 }
 
 #[inline]
-pub async fn get_max_pk_value() -> Result<i64> {
-    CLIENT.get_max_pk_value().await
-}
-
-#[inline]
-pub async fn get_min_pk_value() -> Result<i64> {
-    CLIENT.get_min_pk_value().await
+pub async fn get_min_update_at() -> Result<i64> {
+    CLIENT.get_min_update_at().await
 }
 
 #[inline]
@@ -537,18 +540,16 @@ pub async fn local_cache_gc() -> Result<()> {
         }
 
         // gc every hour
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
-        interval.tick().await; // the first tick is immediate
         loop {
-            if let Ok(min_id) = get_min_pk_value().await
-                && min_id > 0
+            if let Ok(min_update_at) = get_min_update_at().await
+                && min_update_at > 0
             {
-                match LOCAL_CACHE.clean_by_min_pk_value(min_id).await {
+                match LOCAL_CACHE.clean_by_min_update_at(min_update_at).await {
                     Ok(_) => log::info!("[file_list] local cache gc done"),
                     Err(e) => log::error!("[file_list] local cache gc failed: {e}"),
                 }
-            }
-            interval.tick().await;
+            } 
+            tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
         }
     });
 

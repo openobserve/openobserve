@@ -23,7 +23,7 @@ use config::{
     },
     utils::{
         parquet::parse_file_key_columns,
-        time::{DAY_MICRO_SECS, end_of_the_day},
+        time::{DAY_MICRO_SECS, end_of_the_day, now_micros},
     },
 };
 use hashbrown::HashMap;
@@ -71,6 +71,7 @@ impl super::FileList for SqliteFileList {
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
+        let now_ts = now_micros();
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         let pool = client.clone();
@@ -78,8 +79,9 @@ impl super::FileList for SqliteFileList {
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
 
         sqlx::query(
-            r#"UPDATE file_list SET deleted = true WHERE stream = $1 AND date = $2 AND file = $3;"#,
+            r#"UPDATE file_list SET deleted = true, updated_at = $1 WHERE stream = $2 AND date = $3 AND file = $4;"#,
         )
+        .bind(now_ts)
         .bind(stream_key)
         .bind(date_key)
         .bind(file_name)
@@ -659,6 +661,25 @@ SELECT date
             .collect())
     }
 
+    async fn get_min_ts(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+    ) -> Result<i64> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+        let min_ts = config::utils::time::BASE_TIME.timestamp_micros();
+        let pool = CLIENT_RO.clone();
+        let ret: Option<i64> = sqlx::query_scalar(
+            r#"SELECT MIN(min_ts) AS num FROM file_list WHERE stream = $1 AND min_ts > $2;"#,
+        )
+        .bind(stream_key)
+        .bind(min_ts)
+        .fetch_one(&pool)
+        .await?;
+        Ok(ret.unwrap_or_default())
+    }
+
     async fn get_min_date(
         &self,
         org_id: &str,
@@ -670,7 +691,7 @@ SELECT date
         let pool = CLIENT_RO.clone();
         let ret: Option<String> = match date_range {
             Some((start, end)) => {
-                sqlx::query_scalar(r#"SELECT MIN(date) AS date FROM file_list WHERE stream = $1 AND date >= $2 AND date < $3;"#)
+                sqlx::query_scalar(r#"SELECT MIN(date) AS num FROM file_list WHERE stream = $1 AND date >= $2 AND date < $3;"#)
                     .bind(stream_key)
                     .bind(start)
                     .bind(end)
@@ -678,7 +699,7 @@ SELECT date
                     .await?
             }
             None => {
-                sqlx::query_scalar(r#"SELECT MIN(date) AS date FROM file_list WHERE stream = $1;"#)
+                sqlx::query_scalar(r#"SELECT MIN(date) AS num FROM file_list WHERE stream = $1;"#)
                     .bind(stream_key)
                     .fetch_one(&pool)
                     .await?
@@ -687,45 +708,28 @@ SELECT date
         Ok(ret.unwrap_or_default())
     }
 
-    async fn get_min_ts(
-        &self,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-    ) -> Result<i64> {
-        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-        let min_ts = config::utils::time::BASE_TIME.timestamp_micros();
+    async fn get_max_update_at(&self) -> Result<i64> {
         let pool = CLIENT_RO.clone();
-        let ret: Option<i64> = sqlx::query_scalar(
-            r#"SELECT MIN(min_ts) AS id FROM file_list WHERE stream = $1 AND min_ts > $2;"#,
-        )
-        .bind(stream_key)
-        .bind(min_ts)
-        .fetch_one(&pool)
-        .await?;
+        let ret: Option<i64> =
+            sqlx::query_scalar(r#"SELECT MAX(updated_at) AS num FROM file_list;"#)
+                .fetch_one(&pool)
+                .await?;
         Ok(ret.unwrap_or_default())
     }
 
-    async fn get_max_pk_value(&self) -> Result<i64> {
+    async fn get_min_update_at(&self) -> Result<i64> {
         let pool = CLIENT_RO.clone();
-        let ret: Option<i64> = sqlx::query_scalar(r#"SELECT MAX(id) AS id FROM file_list;"#)
-            .fetch_one(&pool)
-            .await?;
+        let ret: Option<i64> =
+            sqlx::query_scalar(r#"SELECT MIN(updated_at) AS num FROM file_list;"#)
+                .fetch_one(&pool)
+                .await?;
         Ok(ret.unwrap_or_default())
     }
 
-    async fn get_min_pk_value(&self) -> Result<i64> {
-        let pool = CLIENT_RO.clone();
-        let ret: Option<i64> = sqlx::query_scalar(r#"SELECT MIN(id) AS id FROM file_list;"#)
-            .fetch_one(&pool)
-            .await?;
-        Ok(ret.unwrap_or_default())
-    }
-
-    async fn clean_by_min_pk_value(&self, val: i64) -> Result<()> {
+    async fn clean_by_min_update_at(&self, val: i64) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        sqlx::query("DELETE FROM file_list WHERE id < $1;")
+        sqlx::query("DELETE FROM file_list WHERE updated_at < $1;")
             .bind(val)
             .execute(&*client)
             .await?;
@@ -1393,6 +1397,7 @@ impl SqliteFileList {
         file: &str,
         meta: &FileMeta,
     ) -> Result<i64> {
+        let now_ts = now_micros();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
@@ -1400,8 +1405,8 @@ impl SqliteFileList {
         let client = client.lock().await;
         match  sqlx::query(
             format!(r#"
-INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);
+INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16);
         "#).as_str(),
     )
         .bind(id)
@@ -1418,6 +1423,7 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
         .bind(meta.compressed_size)
         .bind(meta.index_size)
         .bind(meta.flattened)
+        .bind(now_ts)
         .execute(&*client)
         .await {
             Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
@@ -1443,8 +1449,9 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
         if !add_items.is_empty() {
             let chunks = add_items.chunks(100);
             for files in chunks {
+                let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-                format!("INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)").as_str(),
+                format!("INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)").as_str(),
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let id = if item.id > 0 { Some(item.id) } else { None };
@@ -1464,7 +1471,8 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                         .push_bind(item.meta.original_size)
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
-                        .push_bind(item.meta.flattened);
+                        .push_bind(item.meta.flattened)
+                        .push_bind(now_ts);
                 });
                 query_builder.push(" ON CONFLICT(id) DO NOTHING");
                 if let Err(e) = query_builder.build().execute(&mut *tx).await {
@@ -1513,8 +1521,9 @@ INSERT INTO {table} (id, account, org, stream, date, file, deleted, min_ts, max_
                 }
                 // delete files by ids
                 if !ids.is_empty() {
+                    let now_ts = now_micros();
                     let sql = format!(
-                        "UPDATE file_list SET deleted = true WHERE id IN({});",
+                        "UPDATE file_list SET deleted = true, updated_at = {now_ts} WHERE id IN({});",
                         ids.join(",")
                     );
                     if let Err(e) = sqlx::query(sql.as_str()).execute(&mut *tx).await {

@@ -25,7 +25,7 @@ use config::{
     utils::{
         hash::Sum64,
         parquet::parse_file_key_columns,
-        time::{DAY_MICRO_SECS, end_of_the_day},
+        time::{DAY_MICRO_SECS, end_of_the_day, now_micros},
     },
 };
 use hashbrown::HashMap;
@@ -73,6 +73,7 @@ impl super::FileList for PostgresFileList {
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
+        let now_ts = now_micros();
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
@@ -81,8 +82,9 @@ impl super::FileList for PostgresFileList {
             .with_label_values(&["delete", "file_list"])
             .inc();
         sqlx::query(
-            r#"UPDATE file_list SET deleted = true WHERE stream = $1 AND date = $2 AND file = $3;"#,
+            r#"UPDATE file_list SET deleted = true, updated_at = $1 WHERE stream = $2 AND date = $3 AND file = $4;"#,
         )
+        .bind(now_ts)
         .bind(stream_key)
         .bind(date_key)
         .bind(file_name)
@@ -813,6 +815,29 @@ SELECT date
             .collect())
     }
 
+    async fn get_min_ts(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+    ) -> Result<i64> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+        let min_ts = config::utils::time::BASE_TIME.timestamp_micros();
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "file_list"])
+            .inc();
+        let ret: Option<i64> = sqlx::query_scalar(
+            r#"SELECT MIN(min_ts)::BIGINT AS num FROM file_list WHERE stream = $1 AND min_ts > $2;"#,
+        )
+        .bind(stream_key)
+        .bind(min_ts)
+        .fetch_one(&pool)
+        .await?;
+        Ok(ret.unwrap_or_default())
+    }
+
+
     async fn get_min_date(
         &self,
         org_id: &str,
@@ -827,7 +852,7 @@ SELECT date
             .inc();
         let ret: Option<String> = match date_range {
             Some((start, end)) => {
-                sqlx::query_scalar(r#"SELECT MIN(date) AS date FROM file_list WHERE stream = $1 AND date >= $2 AND date < $3;"#)
+                sqlx::query_scalar(r#"SELECT MIN(date) AS num FROM file_list WHERE stream = $1 AND date >= $2 AND date < $3;"#)
                     .bind(stream_key)
                     .bind(start)
                     .bind(end)
@@ -835,7 +860,7 @@ SELECT date
                     .await?
             }
             None => {
-                sqlx::query_scalar(r#"SELECT MIN(date) AS date FROM file_list WHERE stream = $1;"#)
+                sqlx::query_scalar(r#"SELECT MIN(date) AS num FROM file_list WHERE stream = $1;"#)
                     .bind(stream_key)
                     .fetch_one(&pool)
                     .await?
@@ -844,53 +869,31 @@ SELECT date
         Ok(ret.unwrap_or_default())
     }
 
-    async fn get_min_ts(
-        &self,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-    ) -> Result<i64> {
-        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-        let min_ts = config::utils::time::BASE_TIME.timestamp_micros();
-        let pool = CLIENT_RO.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list"])
-            .inc();
-        let ret: Option<i64> = sqlx::query_scalar(
-            r#"SELECT MIN(min_ts)::BIGINT AS id FROM file_list WHERE stream = $1 AND min_ts > $2;"#,
-        )
-        .bind(stream_key)
-        .bind(min_ts)
-        .fetch_one(&pool)
-        .await?;
-        Ok(ret.unwrap_or_default())
-    }
-
-    async fn get_max_pk_value(&self) -> Result<i64> {
+    async fn get_max_update_at(&self) -> Result<i64> {
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list"])
             .inc();
         let ret: Option<i64> =
-            sqlx::query_scalar(r#"SELECT MAX(id)::BIGINT AS id FROM file_list;"#)
+            sqlx::query_scalar(r#"SELECT MAX(updated_at)::BIGINT AS num FROM file_list;"#)
                 .fetch_one(&pool)
                 .await?;
         Ok(ret.unwrap_or_default())
     }
 
-    async fn get_min_pk_value(&self) -> Result<i64> {
+    async fn get_min_update_at(&self) -> Result<i64> {
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list"])
             .inc();
         let ret: Option<i64> =
-            sqlx::query_scalar(r#"SELECT MIN(id)::BIGINT AS id FROM file_list;"#)
+            sqlx::query_scalar(r#"SELECT MIN(updated_at)::BIGINT AS num FROM file_list;"#)
                 .fetch_one(&pool)
                 .await?;
         Ok(ret.unwrap_or_default())
     }
 
-    async fn clean_by_min_pk_value(&self, _val: i64) -> Result<()> {
+    async fn clean_by_min_update_at(&self, _val: i64) -> Result<()> {
         Ok(()) // do nothing
     }
 
@@ -1632,6 +1635,7 @@ impl PostgresFileList {
         file: &str,
         meta: &FileMeta,
     ) -> Result<i64> {
+        let now_ts = now_micros();
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
@@ -1640,8 +1644,8 @@ impl PostgresFileList {
         let ret: std::result::Result<Option<i64>, sea_orm::SqlxError> = sqlx::query_scalar(
             format!(
                 r#"
-INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     ON CONFLICT DO NOTHING
     RETURNING id;
                 "#
@@ -1660,6 +1664,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
             .bind(meta.compressed_size)
             .bind(meta.index_size)
             .bind(meta.flattened)
+            .bind(now_ts)
             .fetch_one(&pool).await;
         match ret {
             Err(sqlx::Error::Database(e)) => {
@@ -1686,8 +1691,9 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
         if !add_items.is_empty() {
             let chunks = add_items.chunks(100);
             for files in chunks {
+                let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)").as_str()
+                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)").as_str()
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let (stream_key, date_key, file_name) =
@@ -1705,7 +1711,8 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                         .push_bind(item.meta.original_size)
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
-                        .push_bind(item.meta.flattened);
+                        .push_bind(item.meta.flattened)
+                        .push_bind(now_ts);
                 });
                 DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
                 if let Err(e) = query_builder.build().execute(&mut *tx).await {
@@ -1762,11 +1769,12 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                 }
                 // delete files by ids
                 if !ids.is_empty() {
+                    let now_ts = now_micros();
                     DB_QUERY_NUMS
                         .with_label_values(&["delete_id", "file_list"])
                         .inc();
                     let sql = format!(
-                        "UPDATE file_list SET deleted = true WHERE id IN({});",
+                        "UPDATE file_list SET deleted = true, updated_at = {now_ts} WHERE id IN({});",
                         ids.join(",")
                     );
                     let start = std::time::Instant::now();

@@ -73,6 +73,7 @@ impl super::FileList for MysqlFileList {
     }
 
     async fn remove(&self, file: &str) -> Result<()> {
+        let now_ts = now_micros();
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
@@ -80,8 +81,9 @@ impl super::FileList for MysqlFileList {
             .with_label_values(&["delete", "file_list"])
             .inc();
         sqlx::query(
-            r#"UPDATE file_list SET deleted = true WHERE stream = ? AND date = ? AND file = ?;"#,
+            r#"UPDATE file_list SET deleted = true, updated_at = ? WHERE stream = ? AND date = ? AND file = ?;"#,
         )
+        .bind(now_ts)
         .bind(stream_key)
         .bind(date_key)
         .bind(file_name)
@@ -870,6 +872,28 @@ SELECT date
             .collect())
     }
 
+    async fn get_min_ts(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+    ) -> Result<i64> {
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+        let min_ts = config::utils::time::BASE_TIME.timestamp_micros();
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "file_list"])
+            .inc();
+        let ret: Option<i64> = sqlx::query_scalar(
+            r#"SELECT MIN(min_ts) AS num FROM file_list WHERE stream = ? AND min_ts > ?;"#,
+        )
+        .bind(stream_key)
+        .bind(min_ts)
+        .fetch_one(&pool)
+        .await?;
+        Ok(ret.unwrap_or_default())
+    }
+
     async fn get_min_date(
         &self,
         org_id: &str,
@@ -884,7 +908,7 @@ SELECT date
             .inc();
         let ret: Option<String> = match date_range {
             Some((start, end)) => {
-                sqlx::query_scalar(r#"SELECT MIN(date) AS date FROM file_list WHERE stream = ? AND date >= ? AND date < ?;"#)
+                sqlx::query_scalar(r#"SELECT MIN(date) AS num FROM file_list WHERE stream = ? AND date >= ? AND date < ?;"#)
                     .bind(stream_key)
                     .bind(start)
                     .bind(end)
@@ -892,7 +916,7 @@ SELECT date
                     .await?
             }
             None => {
-                sqlx::query_scalar(r#"SELECT MIN(date) AS date FROM file_list WHERE stream = ?;"#)
+                sqlx::query_scalar(r#"SELECT MIN(date) AS num FROM file_list WHERE stream = ?;"#)
                     .bind(stream_key)
                     .fetch_one(&pool)
                     .await?
@@ -901,51 +925,31 @@ SELECT date
         Ok(ret.unwrap_or_default())
     }
 
-    async fn get_min_ts(
-        &self,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-    ) -> Result<i64> {
-        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
-        let min_ts = config::utils::time::BASE_TIME.timestamp_micros();
+    async fn get_max_update_at(&self) -> Result<i64> {
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list"])
             .inc();
-        let ret: Option<i64> = sqlx::query_scalar(
-            r#"SELECT MIN(min_ts) AS id FROM file_list WHERE stream = ? AND min_ts > ?;"#,
-        )
-        .bind(stream_key)
-        .bind(min_ts)
-        .fetch_one(&pool)
-        .await?;
+        let ret: Option<i64> =
+            sqlx::query_scalar(r#"SELECT MAX(updated_at) AS num FROM file_list;"#)
+                .fetch_one(&pool)
+                .await?;
         Ok(ret.unwrap_or_default())
     }
 
-    async fn get_max_pk_value(&self) -> Result<i64> {
+    async fn get_min_update_at(&self) -> Result<i64> {
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list"])
             .inc();
-        let ret: Option<i64> = sqlx::query_scalar(r#"SELECT MAX(id) AS id FROM file_list;"#)
-            .fetch_one(&pool)
-            .await?;
+        let ret: Option<i64> =
+            sqlx::query_scalar(r#"SELECT MIN(updated_at) AS num FROM file_list;"#)
+                .fetch_one(&pool)
+                .await?;
         Ok(ret.unwrap_or_default())
     }
 
-    async fn get_min_pk_value(&self) -> Result<i64> {
-        let pool = CLIENT_RO.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list"])
-            .inc();
-        let ret: Option<i64> = sqlx::query_scalar(r#"SELECT MIN(id) AS id FROM file_list;"#)
-            .fetch_one(&pool)
-            .await?;
-        Ok(ret.unwrap_or_default())
-    }
-
-    async fn clean_by_min_pk_value(&self, _val: i64) -> Result<()> {
+    async fn clean_by_min_update_at(&self, _val: i64) -> Result<()> {
         Ok(()) // do nothing
     }
 
@@ -1767,7 +1771,7 @@ impl MysqlFileList {
         match  sqlx::query(
             format!(r#"
 INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             "#).as_str(),
         )
         .bind(account)
@@ -1801,7 +1805,6 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
             return Ok(());
         }
 
-        let now_ts = now_micros();
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
 
@@ -1809,6 +1812,7 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
         if !add_items.is_empty() {
             let chunks = add_items.chunks(100);
             for files in chunks {
+                let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
                 format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)").as_str(),
                 );
@@ -1886,20 +1890,16 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
                 }
                 // delete files by ids
                 if !ids.is_empty() {
+                    let now_ts = now_micros();
                     let sql = format!(
-                        "UPDATE file_list SET deleted = true AND updated_at = ? WHERE id IN({});",
+                        "UPDATE file_list SET deleted = true, updated_at = {now_ts} WHERE id IN({});",
                         ids.join(",")
                     );
                     DB_QUERY_NUMS
                         .with_label_values(&["delete_id", "file_list"])
                         .inc();
-                    let now_ts = now_micros();
                     let start = std::time::Instant::now();
-                    if let Err(e) = sqlx::query(sql.as_str())
-                        .bind(now_ts)
-                        .execute(&mut *tx)
-                        .await
-                    {
+                    if let Err(e) = sqlx::query(sql.as_str()).execute(&mut *tx).await {
                         if let Err(e) = tx.rollback().await {
                             log::error!(
                                 "[MYSQL] rollback {table} batch process for delete error: {e}"
@@ -2078,7 +2078,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     let data_type = "BIGINT default 0 not null";
     add_column("file_list", column, data_type).await?;
     add_column("file_list_history", column, data_type).await?;
- 
+
     Ok(())
 }
 
