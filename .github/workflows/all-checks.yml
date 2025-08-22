@@ -1,0 +1,84 @@
+name: All Checks
+
+on:
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  all-checks:
+    name: All checks passed
+    runs-on: ubuntu-latest
+    needs:
+      # Wait for all critical check workflows to complete
+      - unit-tests
+      - security-audit
+      - licenses-checker
+      - js-licenses-checker
+      - pr-title-checker
+      - playwright-tests
+      - api-integration-tests
+    if: always()
+    
+    steps:
+      - name: Check all required jobs status
+        run: |
+          # Check if any of the required jobs failed
+          if [[ "${{ needs.unit-tests.result }}" != "success" ]]; then
+            echo "❌ Unit tests failed or were cancelled"
+            exit 1
+          fi
+          
+          if [[ "${{ needs.security-audit.result }}" != "success" ]]; then
+            echo "❌ Security audit failed or was cancelled"
+            exit 1
+          fi
+          
+          if [[ "${{ needs.licenses-checker.result }}" != "success" ]]; then
+            echo "❌ License checker failed or was cancelled"
+            exit 1
+          fi
+          
+          if [[ "${{ needs.js-licenses-checker.result }}" != "success" ]]; then
+            echo "❌ JS License checker failed or was cancelled"
+            exit 1
+          fi
+          
+          if [[ "${{ needs.pr-title-checker.result }}" != "success" ]]; then
+            echo "❌ PR title checker failed or was cancelled"
+            exit 1
+          fi
+          
+          if [[ "${{ needs.playwright-tests.result }}" != "success" ]]; then
+            echo "❌ Playwright tests failed or were cancelled"
+            exit 1
+          fi
+          
+          if [[ "${{ needs.api-integration-tests.result }}" != "success" ]]; then
+            echo "❌ API integration tests failed or were cancelled"
+            exit 1
+          fi
+          
+          echo "✅ All required checks passed successfully!"
+
+  # Reference the existing workflow jobs
+  unit-tests:
+    uses: ./.github/workflows/unit-tests.yml
+
+  security-audit:
+    uses: ./.github/workflows/audit-checker.yml
+
+  licenses-checker:
+    uses: ./.github/workflows/cargo-deny.yml
+
+  js-licenses-checker:
+    uses: ./.github/workflows/js-license-checker.yml
+
+  pr-title-checker:
+    uses: ./.github/workflows/pr-title-checker.yml
+
+  playwright-tests:
+    uses: ./.github/workflows/playwright.yml
+
+  api-integration-tests:
+    uses: ./.github/workflows/api-testing.yml
