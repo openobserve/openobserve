@@ -29,6 +29,7 @@
         v-model="overrideConfig.field.value"
         :label="'Field'"
         :options="columnsOptions"
+        :display-value="getFieldDisplayValue(overrideConfig.field.value)"
         style="width: 40%"
         :data-test="`dashboard-addpanel-config-unit-config-select-column-${index}`"
         input-debounce="0"
@@ -385,6 +386,21 @@ export default defineComponent({
       { deep: true },
     );
 
+    const getFieldDisplayValue = (fieldValue: string) => {
+      if (!fieldValue) return "";
+
+      const option = columnsOptions.value.find(
+        (option) => option.value === fieldValue,
+      );
+
+      if (option) {
+        return option.label;
+      } else {
+        // Field not found, show with error message
+        return `${fieldValue} (Field not found)`;
+      }
+    };
+
     return {
       configTypeOptions,
       unitOptions,
@@ -395,6 +411,7 @@ export default defineComponent({
       removeOverrideConfig,
       saveOverrides,
       onConfigTypeChange,
+      getFieldDisplayValue,
       t,
     };
   },
