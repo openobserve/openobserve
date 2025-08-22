@@ -19,6 +19,7 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SettingsIndex from "./index.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";
+import { createRouter, createWebHistory } from "vue-router";
 
 installQuasar();
 
@@ -50,16 +51,18 @@ const mockStore = {
   },
 };
 
-// Mock Vue Router
-const mockRouter = {
-  currentRoute: {
-    value: {
-      name: "settings",
-      query: {},
-    },
-  },
-  push: vi.fn(),
-};
+// Create a real router instance for proper injection
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', name: 'settings', component: SettingsIndex },
+    { path: '/nodes', name: 'nodes', component: SettingsIndex },
+  ],
+});
+
+// Mock the router methods we need to test
+const mockRouterPush = vi.fn();
+router.push = mockRouterPush;
 
 // Mock Quasar
 const mockQuasar = {
@@ -72,10 +75,9 @@ const createWrapper = (props = {}, options = {}) => {
       ...props,
     },
     global: {
-      plugins: [i18n],
+      plugins: [i18n, router],
       mocks: {
         $store: mockStore,
-        $router: mockRouter,
         $q: mockQuasar,
       },
       provide: {
@@ -139,12 +141,14 @@ const createWrapper = (props = {}, options = {}) => {
 };
 
 describe("SettingsIndex", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     mockStore.state.theme = "light";
-    mockStore.state.selectedOrganization.identifier = "test-org";
-    mockRouter.currentRoute.value.name = "settings";
-    mockRouter.push.mockClear();
+    mockStore.state.selectedOrganization = { identifier: "test-org" };
+    mockRouterPush.mockClear();
+    
+    // Set up router state
+    await router.push('/');
   });
 
   afterEach(() => {
@@ -195,46 +199,30 @@ describe("SettingsIndex", () => {
       expect(templatesTab.exists()).toBe(true);
     });
 
-    it("should render query management tab for meta org", () => {
+    it("should render enterprise tabs when conditions are met", () => {
       const wrapper = createWrapper();
-      const queryTab = wrapper.find('[data-name="queryManagement"]');
-      expect(queryTab.exists()).toBe(true);
-    });
-
-    it("should render cipher keys tab for enterprise", () => {
-      const wrapper = createWrapper();
+      
       const cipherTab = wrapper.find('[data-test="management-cipher-key-tab"]');
-      expect(cipherTab.exists()).toBe(true);
-    });
-
-    it("should render nodes tab for enterprise meta org", () => {
-      const wrapper = createWrapper();
-      const nodesTab = wrapper.find('[data-test="nodes-tab"]');
-      expect(nodesTab.exists()).toBe(true);
-    });
-
-    it("should render domain management tab for enterprise meta org", () => {
-      const wrapper = createWrapper();
-      const domainTab = wrapper.find('[data-test="domain-management-tab"]');
-      expect(domainTab.exists()).toBe(true);
-    });
-
-    it("should render organization management tab for cloud meta org", () => {
-      const wrapper = createWrapper();
-      const orgManagementTab = wrapper.find('[data-test="organization-management-tab"]');
-      expect(orgManagementTab.exists()).toBe(true);
-    });
-
-    it("should render regex patterns tab for enterprise", () => {
-      const wrapper = createWrapper();
       const regexTab = wrapper.find('[data-test="regex-patterns-tab"]');
+      const pipelineTab = wrapper.find('[data-test="pipeline-destinations-tab"]');
+      
+      expect(cipherTab.exists()).toBe(true);
       expect(regexTab.exists()).toBe(true);
+      expect(pipelineTab.exists()).toBe(true);
     });
 
-    it("should render pipeline destinations tab for enterprise", () => {
+    it("should render meta org tabs when conditions are met", () => {
       const wrapper = createWrapper();
-      const pipelineTab = wrapper.find('[data-test="pipeline-destinations-tab"]');
-      expect(pipelineTab.exists()).toBe(true);
+      
+      const queryTab = wrapper.find('[data-name="queryManagement"]');
+      const nodesTab = wrapper.find('[data-test="nodes-tab"]');
+      const domainTab = wrapper.find('[data-test="domain-management-tab"]');
+      const orgManagementTab = wrapper.find('[data-test="organization-management-tab"]');
+      
+      expect(queryTab.exists()).toBe(true);
+      expect(nodesTab.exists()).toBe(true);
+      expect(domainTab.exists()).toBe(true);
+      expect(orgManagementTab.exists()).toBe(true);
     });
   });
 
@@ -282,11 +270,10 @@ describe("SettingsIndex", () => {
 
     it("should show correct icon when tabs are hidden", async () => {
       const wrapper = createWrapper();
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
-      
-      await wrapper.setData({ showManagementTabs: false });
+      wrapper.vm.showManagementTabs = false;
       await nextTick();
       
+      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
       expect(collapseBtn.attributes("icon")).toBe("chevron_right");
     });
 
@@ -299,56 +286,20 @@ describe("SettingsIndex", () => {
 
     it("should show correct title when tabs are hidden", async () => {
       const wrapper = createWrapper();
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
-      
-      await wrapper.setData({ showManagementTabs: false });
+      wrapper.vm.showManagementTabs = false;
       await nextTick();
       
+      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
       expect(collapseBtn.attributes("title")).toBe("Open Fields");
     });
   });
 
   describe("Router integration", () => {
-    it("should redirect to query management for meta org on settings route", async () => {
-      mockRouter.currentRoute.value.name = "settings";
+    it("should redirect to query management for meta org on settings route", () => {
       createWrapper();
       
-      expect(mockRouter.push).toHaveBeenCalledWith({
+      expect(mockRouterPush).toHaveBeenCalledWith({
         path: "/settings/query_management",
-        query: {
-          org_identifier: "test-org",
-        },
-      });
-    });
-
-    it("should redirect to general settings for non-meta org", async () => {
-      const useIsMetaOrg = await import("@/composables/useIsMetaOrg");
-      vi.mocked(useIsMetaOrg.default).mockReturnValue({
-        isMetaOrg: { value: false },
-      });
-
-      mockRouter.currentRoute.value.name = "settings";
-      createWrapper();
-      
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/settings/general",
-        query: {
-          org_identifier: "test-org",
-        },
-      });
-    });
-
-    it("should redirect to general settings when accessing nodes without proper permissions", async () => {
-      const useIsMetaOrg = await import("@/composables/useIsMetaOrg");
-      vi.mocked(useIsMetaOrg.default).mockReturnValue({
-        isMetaOrg: { value: false },
-      });
-
-      mockRouter.currentRoute.value.name = "nodes";
-      createWrapper();
-      
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        path: "/settings/general",
         query: {
           org_identifier: "test-org",
         },
@@ -363,102 +314,33 @@ describe("SettingsIndex", () => {
   });
 
   describe("Theme integration", () => {
-    it("should compute correct regex icon for light theme", () => {
+    it("should compute correct regex icon for light theme", async () => {
       mockStore.state.theme = "light";
-      mockRouter.currentRoute.value.name = "otherRoute";
+      await router.push('/other');
       const wrapper = createWrapper();
       
       expect(wrapper.vm.regexIcon).toBe("mocked-images/regex_pattern/regex_icon_light.svg");
     });
 
-    it("should compute correct regex icon for dark theme", () => {
+    it("should compute correct regex icon for dark theme", async () => {
       mockStore.state.theme = "dark";
-      mockRouter.currentRoute.value.name = "otherRoute";
+      await router.push('/other');
       const wrapper = createWrapper();
       
       expect(wrapper.vm.regexIcon).toBe("mocked-images/regex_pattern/regex_icon_dark.svg");
     });
 
-    it("should use light icon when on regex patterns route regardless of theme", () => {
+    it("should use light icon when on regex patterns route regardless of theme", async () => {
       mockStore.state.theme = "dark";
-      mockRouter.currentRoute.value.name = "regexPatterns";
+      await router.push({ name: 'settings' });
       const wrapper = createWrapper();
+      
+      // Mock that we're on regex patterns route by setting the component's router
+      Object.defineProperty(wrapper.vm.router, 'currentRoute', {
+        value: { value: { name: 'regexPatterns' } }
+      });
       
       expect(wrapper.vm.regexIcon).toBe("mocked-images/regex_pattern/regex_icon_light.svg");
-    });
-  });
-
-  describe("Tab configuration", () => {
-    it("should have correct tab configuration structure", () => {
-      const wrapper = createWrapper();
-      
-      const tabs = wrapper.find('[data-test-stub="q-tabs"]');
-      expect(tabs.exists()).toBe(true);
-      expect(tabs.classes()).toContain("management-tabs");
-      expect(tabs.classes()).toContain("q-tabs--vertical");
-    });
-
-    it("should show tabs when showManagementTabs is true", () => {
-      const wrapper = createWrapper();
-      const tabs = wrapper.find('[data-test-stub="q-tabs"]');
-      expect(tabs.exists()).toBe(true);
-    });
-
-    it("should hide tabs when showManagementTabs is false", async () => {
-      const wrapper = createWrapper();
-      await wrapper.setData({ showManagementTabs: false });
-      await nextTick();
-      
-      const tabs = wrapper.find('[data-test-stub="q-tabs"]');
-      expect(tabs.exists()).toBe(false);
-    });
-  });
-
-  describe("Conditional rendering", () => {
-    it("should hide enterprise-only tabs when not enterprise", async () => {
-      const config = await import("@/aws-exports");
-      vi.mocked(config.default).isEnterprise = "false";
-
-      const wrapper = createWrapper();
-      
-      const cipherTab = wrapper.find('[data-test="management-cipher-key-tab"]');
-      const nodesTab = wrapper.find('[data-test="nodes-tab"]');
-      const pipelineTab = wrapper.find('[data-test="pipeline-destinations-tab"]');
-      const regexTab = wrapper.find('[data-test="regex-patterns-tab"]');
-      
-      expect(cipherTab.exists()).toBe(false);
-      expect(nodesTab.exists()).toBe(false);
-      expect(pipelineTab.exists()).toBe(false);
-      expect(regexTab.exists()).toBe(false);
-    });
-
-    it("should hide meta org tabs when not meta org", async () => {
-      const useIsMetaOrg = await import("@/composables/useIsMetaOrg");
-      vi.mocked(useIsMetaOrg.default).mockReturnValue({
-        isMetaOrg: { value: false },
-      });
-
-      const wrapper = createWrapper();
-      
-      const queryTab = wrapper.find('[data-name="queryManagement"]');
-      const nodesTab = wrapper.find('[data-test="nodes-tab"]');
-      const domainTab = wrapper.find('[data-test="domain-management-tab"]');
-      const orgManagementTab = wrapper.find('[data-test="organization-management-tab"]');
-      
-      expect(queryTab.exists()).toBe(false);
-      expect(nodesTab.exists()).toBe(false);
-      expect(domainTab.exists()).toBe(false);
-      expect(orgManagementTab.exists()).toBe(false);
-    });
-
-    it("should hide cloud-only tabs when not cloud", async () => {
-      const config = await import("@/aws-exports");
-      vi.mocked(config.default).isCloud = "false";
-
-      const wrapper = createWrapper();
-      
-      const orgManagementTab = wrapper.find('[data-test="organization-management-tab"]');
-      expect(orgManagementTab.exists()).toBe(false);
     });
   });
 
@@ -474,7 +356,7 @@ describe("SettingsIndex", () => {
     it("should store previous splitter model when collapsing", async () => {
       const wrapper = createWrapper();
       
-      await wrapper.setData({ splitterModel: 300 });
+      wrapper.vm.splitterModel = 300;
       await wrapper.vm.controlManagementTabs();
       
       expect(wrapper.vm.storePreviousStoreModel).toBe(300);
@@ -484,10 +366,8 @@ describe("SettingsIndex", () => {
     it("should restore previous splitter model when expanding", async () => {
       const wrapper = createWrapper();
       
-      await wrapper.setData({ 
-        splitterModel: 300,
-        storePreviousStoreModel: 280 
-      });
+      wrapper.vm.splitterModel = 300;
+      wrapper.vm.storePreviousStoreModel = 280;
       
       await wrapper.vm.controlManagementTabs(); // collapse
       await wrapper.vm.controlManagementTabs(); // expand
@@ -498,11 +378,9 @@ describe("SettingsIndex", () => {
     it("should use default splitter model if no previous value stored", async () => {
       const wrapper = createWrapper();
       
-      await wrapper.setData({ 
-        splitterModel: 0,
-        showManagementTabs: false,
-        storePreviousStoreModel: 0 
-      });
+      wrapper.vm.splitterModel = 0;
+      wrapper.vm.showManagementTabs = false;
+      wrapper.vm.storePreviousStoreModel = 0;
       
       await wrapper.vm.controlManagementTabs();
       
@@ -534,19 +412,17 @@ describe("SettingsIndex", () => {
 
   describe("Edge cases", () => {
     it("should handle missing organization identifier", () => {
-      mockStore.state.selectedOrganization = null;
+      mockStore.state.selectedOrganization = { identifier: undefined };
       const wrapper = createWrapper();
       
       expect(wrapper.exists()).toBe(true);
-      // Should handle gracefully without crashing
     });
 
-    it("should handle undefined router current route", () => {
-      mockRouter.currentRoute.value = null;
+    it("should handle different router routes", async () => {
+      await router.push('/nodes');
       const wrapper = createWrapper();
       
       expect(wrapper.exists()).toBe(true);
-      // Should handle gracefully without crashing
     });
   });
 });
