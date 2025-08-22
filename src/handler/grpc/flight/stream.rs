@@ -22,6 +22,8 @@ use datafusion::execution::SendableRecordBatchStream;
 use flight::{common::PreCustomMessage, encoder::FlightDataEncoder};
 use futures::{Stream, StreamExt};
 use futures_core::ready;
+use tracing::info_span;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{handler::grpc::flight::clear_session_data, service::search::utils::AsyncDefer};
 
@@ -67,7 +69,13 @@ impl FlightEncoderStreamBuilder {
         self
     }
 
-    pub fn build(self, inner: SendableRecordBatchStream) -> FlightEncoderStream {
+    pub fn build(
+        self,
+        inner: SendableRecordBatchStream,
+        span: tracing::Span,
+    ) -> FlightEncoderStream {
+        let child_span = info_span!("grpc:search:flight:execute_physical_plan");
+        child_span.set_parent(span.context());
         FlightEncoderStream {
             inner,
             encoder: self.encoder,
@@ -78,6 +86,8 @@ impl FlightEncoderStreamBuilder {
             defer: self.defer,
             start: self.start,
             first_batch: true,
+            span,
+            child_span,
         }
     }
 }
@@ -93,6 +103,8 @@ pub struct FlightEncoderStream {
     trace_id: String,
     defer: Option<AsyncDefer>,
     start: std::time::Instant,
+    span: tracing::Span,
+    child_span: tracing::Span,
 }
 
 impl FlightEncoderStream {
@@ -201,6 +213,11 @@ impl Drop for FlightEncoderStream {
         let trace_id = &self.trace_id;
         let took = self.start.elapsed().as_millis();
         log::info!("[trace_id {trace_id}] flight->search: stream end, took: {took} ms",);
+
+        let _child_enter = self.child_span.enter();
+        let _enter = self.span.enter();
+        drop(_child_enter);
+        drop(_enter);
 
         // metrics
         let time = self.start.elapsed().as_secs_f64();
