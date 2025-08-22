@@ -68,7 +68,7 @@ test.describe("dashboard Import testcases", () => {
     await page.waitForTimeout(2000);
 
     await expect(
-      page.locator('.cm-content').filter({ hasText: '"dashboardId": "' })
+      page.locator('[data-test="dashboard-import-url-editor"]').filter({ hasText: '"dashboardId": "' })
     ).toBeVisible();
   
     //is used for setting the file to be imported
@@ -358,11 +358,11 @@ test.describe("dashboard Import testcases", () => {
 
     await page.waitForTimeout(2000);
 
-    await page.waitForSelector('.cm-content');
+    await page.waitForSelector('.monaco-editor');
     await expect(
       page
-        .locator(".cm-content")
-        .locator(".cm-line")
+        .locator(".monaco-editor")
+        .locator(".view-line")
         .filter({ hasText: '"dashboardId": "' })
         .nth(0)
     ).toBeVisible();

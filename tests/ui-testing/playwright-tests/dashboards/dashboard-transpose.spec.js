@@ -403,11 +403,11 @@ test.describe("dashboard UI testcases", () => {
     await page
       .locator(
         "[data-test='dashboard-vrl-function-editor']"
-      ).locator(".cm-content")
+      ).locator(".monaco-editor")
       .click();
     await page
       .locator('[data-test="dashboard-vrl-function-editor"]')
-      .getByRole("textbox")
+      .locator(".inputarea")
       .fill(".vrl=100");
 
     await page.waitForTimeout(2000);
@@ -482,12 +482,12 @@ test.describe("dashboard UI testcases", () => {
 
     await page
       .locator('[data-test="dashboard-vrl-function-editor"]')
-      .locator(".cm-content")
+      .locator(".monaco-editor")
       .click();
 
     await page
       .locator('[data-test="dashboard-vrl-function-editor"]')
-      .getByRole("textbox")
+      .locator(".inputarea")
       .fill(".vrl=100");
 
     await page.locator('[data-test="selected-chart-table-item"] img').click();

@@ -228,17 +228,20 @@ test.describe("Sanity testcases", () => {
   test("should only display 5 result if limit 5 added", async ({ page }) => {
     await page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
     
-    await page
+   const lines = await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".cm-content")
-      .locator(".cm-line")
-      .filter({ hasText: 'SELECT * FROM "e2e_automate"' })
+      .locator(".view-lines");
+
+    lines.filter({ hasText: 'SELECT * FROM "e2e_automate"' })
       .nth(0)
       .click();
 
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .locator(".cm-content")
+      .locator(".inputarea").fill("")
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .locator(".inputarea")
       .fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
 
     await page.waitForTimeout(2000);
@@ -265,11 +268,11 @@ test.describe("Sanity testcases", () => {
       .filter({ hasText: "save" })
       .click();
     await page
-      .locator('#fnEditor').getByRole('textbox')
+      .locator('#fnEditor').locator('.monaco-editor')
       .click();
     await page
       .locator("#fnEditor")
-      .locator(".cm-content")
+      .locator(".inputarea")
       .fill(".a=2");
     await page.waitForTimeout(1000);
     await page
@@ -304,13 +307,13 @@ test.describe("Sanity testcases", () => {
     await page.getByLabel("Name").click();
     await page.getByLabel("Name").fill("sanitytest");
     await page.locator('[data-test="logs-vrl-function-editor"]').click();
-    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".cm-content").fill("sanity=1");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".inputarea").fill("sanity=1");
     await page.locator('[data-test="logs-vrl-function-editor"]').getByText("sanity=").click();
-    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".cm-content").press("ArrowLeft");
-    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".cm-content").press("ArrowLeft");
-    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".cm-content").press("ArrowLeft");
-    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".cm-content").press("ArrowLeft");
-    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".cm-content").fill(".sanity=1");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".monaco-editor").press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".monaco-editor").press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".monaco-editor").press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".monaco-editor").press("ArrowLeft");
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".inputarea").fill(".sanity=1");
     await page.getByRole("button", { name: "Save" }).click();
     await page.getByPlaceholder("Search Function").click();
     await page.getByPlaceholder("Search Function").fill("sanity");
@@ -373,7 +376,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="add-template-name-input"]').fill(templateName);
   
     const jsonString = '{"text": "{alert_name} is active"}';
-    await page.locator(".cm-line").click();
+    await page.locator(".view-lines").click();
     await page.keyboard.type(jsonString);
     await page.waitForTimeout(500); // Ensure typing completes before submit
   

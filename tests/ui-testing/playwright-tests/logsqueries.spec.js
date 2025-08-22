@@ -161,14 +161,14 @@ test.describe("Logs Queries testcases", () => {
   test("should reset the editor on clicking reset filter button", async ({ page }) => {
     await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-    await page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox').click();
+    await page.locator('[data-test="logs-search-bar-query-editor"]').locator('.monaco-editor').click();
     await page.keyboard.type("match_all('provide_credentials')");
     await page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content').waitFor({ state: "visible" });
     await page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
     await page.locator('[data-test="logs-search-bar-reset-filters-btn"]').click({ force: true });
-    await page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox').waitFor({ state: "visible" });
+    await page.locator('[data-test="logs-search-bar-query-editor"]').locator(".monaco-editor").waitFor({ state: "visible" });
     const text = await page.evaluate(() => {
-      const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]').querySelector('.cm-content');
+      const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]').querySelector('.inputarea');
       return editor ? editor.textContent : null;
     });
     await expect(text).toEqual("");
@@ -252,7 +252,7 @@ test.describe("Logs Queries testcases", () => {
   });
 
   test("should display enter count query", async ({ page }) => {
-    await page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox').click();
+    await page.locator('[data-test="logs-search-bar-query-editor"]').locator(".monaco-editor").click();
     // await page.click('.cm-lines')
     await page.keyboard.type('SELECT COUNT(_timestamp) AS xyz, _timestamp FROM "e2e_automate"  Group by _timestamp ORDER BY _timestamp DESC');
     await page.waitForTimeout(4000);
@@ -276,14 +276,17 @@ test.describe("Logs Queries testcases", () => {
   });
 
   test("should display values API text successfully and error to not be displayed", async ({ page }) => {
+    // click on all fields button
+    await page.locator('[data-test="logs-all-fields-btn"]').click();
+    await page.waitForTimeout(2000);
     await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('kubernetes_pod_name');
     await page.getByLabel('Expand "kubernetes_pod_name"').click();
     const errorMessage = page.getByText('Error while fetching field values');
     await expect(errorMessage).not.toBeVisible();
     await page.getByText('ziox-ingester-').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.getByLabel('Collapse "kubernetes_pod_name"').click();
-    await page.getByLabel('Expand "kubernetes_pod_name"').click();
+    await page.getByRole('button', { name: 'Collapse "kubernetes_pod_name"' }).click();
+    await page.getByRole('button', { name: 'Expand "kubernetes_pod_name"' }).click();
     const targetElement = page.locator('[data-test="logs-search-subfield-add-kubernetes_pod_name-ziox-ingester-0"]').getByText('ziox-ingester-');
     await expect(targetElement).toBeVisible(); // Assertion to ensure visibility
     await targetElement.click()
