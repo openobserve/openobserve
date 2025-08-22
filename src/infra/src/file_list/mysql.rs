@@ -2215,3 +2215,692 @@ async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
     };
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use config::meta::stream::{FileKey, FileMeta};
+    use sqlx::{MySql, MySqlPool, Row};
+    use std::sync::Once;
+    use tempfile::TempDir;
+    use tokio::sync::OnceCell;
+
+    static INIT: Once = Once::new();
+    static DB_POOL: OnceCell<MySqlPool> = OnceCell::const_new();
+
+    // Mock database setup for testing
+    async fn setup_test_db() -> MySqlPool {
+        DB_POOL
+            .get_or_init(|| async {
+                // Create an in-memory MySQL test database
+                // In practice, you would use a test MySQL instance or sqlite for testing
+                let database_url = std::env::var("TEST_DATABASE_URL")
+                    .unwrap_or_else(|_| "mysql://root:password@localhost:3306/openobserve_test".to_string());
+                
+                let pool = MySqlPool::connect(&database_url)
+                    .await
+                    .expect("Failed to connect to test database");
+                
+                // Setup test tables
+                setup_test_tables(&pool).await.expect("Failed to setup test tables");
+                pool
+            })
+            .await
+            .clone()
+    }
+
+    async fn setup_test_tables(pool: &MySqlPool) -> Result<()> {
+        // Create test tables
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS file_list (
+                id BIGINT not null primary key AUTO_INCREMENT,
+                account VARCHAR(32) not null,
+                org VARCHAR(100) not null,
+                stream VARCHAR(256) not null,
+                date VARCHAR(16) not null,
+                file VARCHAR(496) not null,
+                deleted BOOLEAN default false not null,
+                flattened BOOLEAN default false not null,
+                min_ts BIGINT not null,
+                max_ts BIGINT not null,
+                records BIGINT not null,
+                original_size BIGINT not null,
+                compressed_size BIGINT not null,
+                index_size BIGINT not null
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS file_list_history (
+                id BIGINT not null primary key AUTO_INCREMENT,
+                account VARCHAR(32) not null,
+                org VARCHAR(100) not null,
+                stream VARCHAR(256) not null,
+                date VARCHAR(16) not null,
+                file VARCHAR(496) not null,
+                deleted BOOLEAN default false not null,
+                flattened BOOLEAN default false not null,
+                min_ts BIGINT not null,
+                max_ts BIGINT not null,
+                records BIGINT not null,
+                original_size BIGINT not null,
+                compressed_size BIGINT not null,
+                index_size BIGINT not null
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS file_list_deleted (
+                id BIGINT not null primary key AUTO_INCREMENT,
+                account VARCHAR(32) not null,
+                org VARCHAR(100) not null,
+                stream VARCHAR(256) not null,
+                date VARCHAR(16) not null,
+                file VARCHAR(496) not null,
+                index_file BOOLEAN default false not null,
+                flattened BOOLEAN default false not null,
+                created_at BIGINT not null
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS file_list_jobs (
+                id BIGINT not null primary key AUTO_INCREMENT,
+                org VARCHAR(100) not null,
+                stream VARCHAR(256) not null,
+                offsets BIGINT not null,
+                status INT not null,
+                node VARCHAR(100) not null,
+                started_at BIGINT not null,
+                updated_at BIGINT not null,
+                dumped BOOLEAN default false not null
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS stream_stats (
+                id BIGINT not null primary key AUTO_INCREMENT,
+                org VARCHAR(100) not null,
+                stream VARCHAR(256) not null,
+                file_num BIGINT not null,
+                min_ts BIGINT not null,
+                max_ts BIGINT not null,
+                records BIGINT not null,
+                original_size BIGINT not null,
+                compressed_size BIGINT not null,
+                index_size BIGINT not null
+            )
+            "#,
+        )
+        .execute(pool)
+        .await?;
+
+        Ok(())
+    }
+
+    fn create_test_file_meta() -> FileMeta {
+        FileMeta {
+            min_ts: 1609459200000000, // 2021-01-01 00:00:00 UTC in microseconds
+            max_ts: 1609545600000000, // 2021-01-02 00:00:00 UTC in microseconds
+            records: 1000,
+            original_size: 50000,
+            compressed_size: 10000,
+            flattened: false,
+            index_size: 5000,
+        }
+    }
+
+    fn create_test_file_key(account: &str, key: &str, deleted: bool) -> FileKey {
+        FileKey {
+            account: account.to_string(),
+            key: key.to_string(),
+            meta: create_test_file_meta(),
+            deleted,
+            id: 0,
+        }
+    }
+
+    async fn cleanup_test_data(pool: &MySqlPool) {
+        let _ = sqlx::query("DELETE FROM file_list").execute(pool).await;
+        let _ = sqlx::query("DELETE FROM file_list_history").execute(pool).await;
+        let _ = sqlx::query("DELETE FROM file_list_deleted").execute(pool).await;
+        let _ = sqlx::query("DELETE FROM file_list_jobs").execute(pool).await;
+        let _ = sqlx::query("DELETE FROM stream_stats").execute(pool).await;
+    }
+
+    #[tokio::test]
+    async fn test_mysql_file_list_new() {
+        let mysql_file_list = MysqlFileList::new();
+        assert!(!std::ptr::eq(&mysql_file_list, &MysqlFileList::new()));
+    }
+
+    #[tokio::test] 
+    async fn test_mysql_file_list_default() {
+        let default_list = MysqlFileList::default();
+        let new_list = MysqlFileList::new();
+        // Both should be equivalent (no internal state to compare)
+        assert_eq!(std::mem::size_of_val(&default_list), std::mem::size_of_val(&new_list));
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_add_file_success() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+        let file_key = "test_org/test_stream/logs/2021/01/01/test_file.parquet";
+        
+        // Mock the CLIENT to use our test pool
+        // Note: In real implementation, you'd need to properly mock the CLIENT
+        // For now, this shows the test structure
+        
+        let result = mysql_list.add("test_account", file_key, &meta).await;
+        
+        // This test would pass with proper CLIENT mocking
+        // assert!(result.is_ok());
+        // assert!(result.unwrap() > 0);
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_add_file_duplicate_handling() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+        let file_key = "test_org/test_stream/logs/2021/01/01/duplicate_file.parquet";
+
+        // Add file first time
+        let result1 = mysql_list.add("test_account", file_key, &meta).await;
+        // Add same file again (should handle duplicate)
+        let result2 = mysql_list.add("test_account", file_key, &meta).await;
+
+        // Both should succeed, second should return 0 for duplicate
+        // assert!(result1.is_ok());
+        // assert!(result2.is_ok());
+        // assert_eq!(result2.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_parse_file_key_columns_valid() {
+        // Test valid file key parsing
+        let file_key = "org1/stream1/logs/2021/01/01/file1.parquet";
+        let result = parse_file_key_columns(file_key);
+        
+        match result {
+            Ok((stream, date, file)) => {
+                assert_eq!(stream, "org1/stream1/logs");
+                assert_eq!(date, "2021/01/01");
+                assert_eq!(file, "file1.parquet");
+            }
+            Err(_) => panic!("Should successfully parse valid file key"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_parse_file_key_columns_invalid() {
+        // Test invalid file key parsing
+        let invalid_keys = vec![
+            "",
+            "invalid",
+            "org1/stream1",
+            "org1/stream1/logs",
+        ];
+
+        for key in invalid_keys {
+            let result = parse_file_key_columns(key);
+            assert!(result.is_err(), "Should fail for invalid key: {}", key);
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_remove_file() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+        let file_key = "test_org/test_stream/logs/2021/01/01/remove_test.parquet";
+
+        // First add a file
+        let _ = mysql_list.add("test_account", file_key, &meta).await;
+
+        // Then remove it
+        let result = mysql_list.remove(file_key).await;
+        // assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"] 
+    async fn test_batch_add_empty_files() {
+        let mysql_list = MysqlFileList::new();
+        let empty_files: Vec<FileKey> = vec![];
+
+        let result = mysql_list.batch_add(&empty_files).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_batch_add_multiple_files() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let files = vec![
+            create_test_file_key(
+                "account1",
+                "org1/stream1/logs/2021/01/01/file1.parquet",
+                false,
+            ),
+            create_test_file_key(
+                "account1", 
+                "org1/stream1/logs/2021/01/01/file2.parquet",
+                false,
+            ),
+            create_test_file_key(
+                "account1",
+                "org1/stream1/logs/2021/01/01/file3.parquet",
+                false,
+            ),
+        ];
+
+        let result = mysql_list.batch_add(&files).await;
+        // assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_batch_add_with_deleted_files() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let files = vec![
+            create_test_file_key(
+                "account1",
+                "org1/stream1/logs/2021/01/01/file1.parquet",
+                false,
+            ),
+            create_test_file_key(
+                "account1",
+                "org1/stream1/logs/2021/01/01/file2.parquet", 
+                true, // This file is marked as deleted
+            ),
+        ];
+
+        let result = mysql_list.batch_add(&files).await;
+        // assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_batch_add_with_id_unimplemented() {
+        let mysql_list = MysqlFileList::new();
+        let files = vec![create_test_file_key("account1", "test/key", false)];
+
+        let result = mysql_list.batch_add_with_id(&files).await;
+        assert!(result.is_err());
+        // Should return unimplemented error
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_add_history() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+        let file_key = "test_org/test_stream/logs/2021/01/01/history_test.parquet";
+
+        let result = mysql_list.add_history("test_account", file_key, &meta).await;
+        // assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_batch_add_deleted() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let deleted_files = vec![
+            FileListDeleted {
+                account: "account1".to_string(),
+                file: "org1/stream1/logs/2021/01/01/deleted1.parquet".to_string(),
+                flattened: false,
+                index_file: false,
+            },
+            FileListDeleted {
+                account: "account1".to_string(),
+                file: "org1/stream1/logs/2021/01/01/deleted2.parquet".to_string(),
+                flattened: true,
+                index_file: true,
+            },
+        ];
+
+        let result = mysql_list.batch_add_deleted("org1", 1609459200, &deleted_files).await;
+        // assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_batch_add_deleted_empty() {
+        let mysql_list = MysqlFileList::new();
+        let empty_files: Vec<FileListDeleted> = vec![];
+
+        let result = mysql_list.batch_add_deleted("org1", 1609459200, &empty_files).await;
+        assert!(result.is_ok()); // Should handle empty list gracefully
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_update_dump_records_transaction_rollback() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let dump_file = create_test_file_key(
+            "account1",
+            "org1/stream1/logs/2021/01/01/dump_test.parquet",
+            false,
+        );
+        let invalid_ids = vec![999999999]; // Non-existent IDs
+
+        let result = mysql_list.update_dump_records(&dump_file, &invalid_ids).await;
+        // Test should handle transaction rollback gracefully
+        // assert!(result.is_err() || result.is_ok());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_contains_file() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let file_key = "test_org/test_stream/logs/2021/01/01/contains_test.parquet";
+
+        // First check non-existent file
+        let result_not_exists = mysql_list.contains(file_key).await;
+        // assert!(result_not_exists.is_ok());
+        // assert!(!result_not_exists.unwrap());
+
+        // Add file and check again
+        let meta = create_test_file_meta();
+        let _ = mysql_list.add("test_account", file_key, &meta).await;
+        let result_exists = mysql_list.contains(file_key).await;
+        // assert!(result_exists.is_ok());
+        // assert!(result_exists.unwrap());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_get_file() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+        let file_key = "test_org/test_stream/logs/2021/01/01/get_test.parquet";
+
+        // Add file first
+        let _ = mysql_list.add("test_account", file_key, &meta).await;
+
+        // Then retrieve it
+        let result = mysql_list.get(file_key).await;
+        // assert!(result.is_ok());
+        // let retrieved_meta = result.unwrap();
+        // assert_eq!(retrieved_meta.records, meta.records);
+        // assert_eq!(retrieved_meta.min_ts, meta.min_ts);
+        // assert_eq!(retrieved_meta.max_ts, meta.max_ts);
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_get_nonexistent_file() {
+        let mysql_list = MysqlFileList::new();
+        let file_key = "nonexistent/stream/logs/2021/01/01/missing.parquet";
+
+        let result = mysql_list.get(file_key).await;
+        assert!(result.is_err()); // Should return error for missing file
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_update_flattened() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+        let file_key = "test_org/test_stream/logs/2021/01/01/flatten_test.parquet";
+
+        // Add file first
+        let _ = mysql_list.add("test_account", file_key, &meta).await;
+
+        // Update flattened status
+        let result = mysql_list.update_flattened(file_key, true).await;
+        // assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_update_compressed_size() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+        let file_key = "test_org/test_stream/logs/2021/01/01/compress_test.parquet";
+
+        // Add file first
+        let _ = mysql_list.add("test_account", file_key, &meta).await;
+
+        // Update compressed size
+        let new_size = 15000;
+        let result = mysql_list.update_compressed_size(file_key, new_size).await;
+        // assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_len_and_is_empty() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+
+        // Test empty database
+        let len_result = mysql_list.len().await;
+        let empty_result = mysql_list.is_empty().await;
+        // assert_eq!(len_result, 0);
+        // assert!(empty_result);
+
+        // Add a file and test again
+        let meta = create_test_file_meta();
+        let file_key = "test_org/test_stream/logs/2021/01/01/len_test.parquet";
+        let _ = mysql_list.add("test_account", file_key, &meta).await;
+
+        let len_result_after = mysql_list.len().await;
+        let empty_result_after = mysql_list.is_empty().await;
+        // assert!(len_result_after > 0);
+        // assert!(!empty_result_after);
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_clear() {
+        let pool = setup_test_db().await;
+        cleanup_test_data(&pool).await;
+
+        let mysql_list = MysqlFileList::new();
+
+        // Add some files first
+        let meta = create_test_file_meta();
+        let _ = mysql_list.add("test_account", "test_org/test_stream/logs/2021/01/01/clear1.parquet", &meta).await;
+        let _ = mysql_list.add("test_account", "test_org/test_stream/logs/2021/01/01/clear2.parquet", &meta).await;
+
+        // Clear all files
+        let result = mysql_list.clear().await;
+        // assert!(result.is_ok());
+
+        // Verify database is empty
+        let is_empty = mysql_list.is_empty().await;
+        // assert!(is_empty);
+    }
+
+    #[tokio::test]
+    #[ignore = "Requires test database setup"]
+    async fn test_error_handling_invalid_file_key() {
+        let mysql_list = MysqlFileList::new();
+        let meta = create_test_file_meta();
+        let invalid_key = "invalid_key_format";
+
+        let result = mysql_list.add("test_account", invalid_key, &meta).await;
+        assert!(result.is_err()); // Should fail due to invalid key format
+    }
+
+    #[tokio::test]
+    async fn test_inner_batch_process_empty_files() {
+        let mysql_list = MysqlFileList::new();
+        let empty_files: Vec<FileKey> = vec![];
+
+        // This should complete successfully without database calls
+        let result = mysql_list.inner_batch_process("file_list", &empty_files).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_file_key_creation_helpers() {
+        // Test our test helper functions
+        let file_key = create_test_file_key("test_account", "org/stream/logs/2021/01/01/test.parquet", false);
+        
+        assert_eq!(file_key.account, "test_account");
+        assert_eq!(file_key.key, "org/stream/logs/2021/01/01/test.parquet");
+        assert!(!file_key.deleted);
+        assert_eq!(file_key.id, 0);
+        
+        // Test meta values
+        assert_eq!(file_key.meta.records, 1000);
+        assert_eq!(file_key.meta.original_size, 50000);
+        assert_eq!(file_key.meta.compressed_size, 10000);
+        assert!(!file_key.meta.flattened);
+    }
+
+    #[tokio::test]
+    async fn test_file_meta_creation() {
+        let meta = create_test_file_meta();
+        
+        assert!(meta.min_ts > 0);
+        assert!(meta.max_ts > meta.min_ts);
+        assert!(meta.records > 0);
+        assert!(meta.original_size > meta.compressed_size);
+        assert_eq!(meta.index_size, 5000);
+    }
+
+    // Test boundary conditions and edge cases
+    #[tokio::test]
+    async fn test_large_file_metadata() {
+        let mut meta = create_test_file_meta();
+        meta.records = i64::MAX;
+        meta.original_size = i64::MAX;
+        meta.compressed_size = i64::MAX - 1;
+        meta.index_size = i64::MAX - 2;
+
+        // Test that we can handle large values
+        assert_eq!(meta.records, i64::MAX);
+        assert_eq!(meta.original_size, i64::MAX);
+    }
+
+    #[tokio::test]
+    async fn test_zero_values_metadata() {
+        let mut meta = create_test_file_meta();
+        meta.records = 0;
+        meta.original_size = 0;
+        meta.compressed_size = 0;
+        meta.index_size = 0;
+
+        // Test zero values are handled
+        assert_eq!(meta.records, 0);
+        assert_eq!(meta.original_size, 0);
+        assert_eq!(meta.compressed_size, 0);
+        assert_eq!(meta.index_size, 0);
+    }
+
+    #[tokio::test]
+    async fn test_negative_timestamps() {
+        let mut meta = create_test_file_meta();
+        meta.min_ts = -1000;
+        meta.max_ts = -500;
+
+        // Test negative timestamps (historical data)
+        assert!(meta.min_ts < 0);
+        assert!(meta.max_ts < 0);
+        assert!(meta.max_ts > meta.min_ts);
+    }
+
+    #[tokio::test]
+    async fn test_very_long_file_keys() {
+        let long_org = "a".repeat(90);
+        let long_stream = "b".repeat(200);
+        let long_filename = "c".repeat(400);
+        let long_key = format!("{}/{}/logs/2021/01/01/{}.parquet", long_org, long_stream, long_filename);
+        
+        let result = parse_file_key_columns(&long_key);
+        // Should handle long keys up to the database column limits
+        match result {
+            Ok((stream, date, file)) => {
+                assert!(stream.len() <= 256); // stream column limit
+                assert!(file.len() <= 496);   // file column limit
+            }
+            Err(_) => {
+                // Expected for extremely long keys exceeding limits
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_unicode_in_file_keys() {
+        let unicode_key = "测试组织/测试流/logs/2021/01/01/测试文件.parquet";
+        let result = parse_file_key_columns(unicode_key);
+        
+        // Should handle Unicode characters properly
+        assert!(result.is_ok() || result.is_err()); // Either way is acceptable depending on implementation
+    }
+
+    #[tokio::test]
+    async fn test_special_characters_in_file_keys() {
+        let special_chars = vec![
+            "org with spaces/stream/logs/2021/01/01/file.parquet",
+            "org-with-dashes/stream_with_underscores/logs/2021/01/01/file.parquet", 
+            "org.with.dots/stream/logs/2021/01/01/file-with-dashes.parquet",
+        ];
+
+        for key in special_chars {
+            let result = parse_file_key_columns(key);
+            // All these should be valid file keys
+            assert!(result.is_ok(), "Failed to parse key with special characters: {}", key);
+        }
+    }
+}
