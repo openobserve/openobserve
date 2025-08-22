@@ -12,22 +12,17 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#[cfg(feature = "enterprise")]
 use std::sync::Arc;
 
-#[cfg(feature = "enterprise")]
 use config::meta::projections::ProjectionColumnMapping;
-#[cfg(feature = "enterprise")]
 use datafusion::common::tree_node::TreeNode;
 
-#[cfg(feature = "enterprise")]
 use crate::service::search::{
     cluster::flight::{SearchContextBuilder, register_table},
     request::Request,
     sql::Sql,
 };
 
-#[cfg(feature = "enterprise")]
 pub async fn get_columns_from_projections(
     sql: Sql,
 ) -> Result<Vec<ProjectionColumnMapping>, anyhow::Error> {
@@ -46,7 +41,6 @@ pub async fn get_columns_from_projections(
 }
 
 #[cfg(test)]
-#[cfg(feature = "enterprise")]
 mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::stream::StreamType;
@@ -162,19 +156,18 @@ mod tests {
         assert!(mappings.len() >= 2);
 
         // Find mappings by checking if they contain the expected source columns
-        let count_mapping = mappings
-            .iter()
-            .find(|m| m.source_columns.contains("k8s_namespace_name"));
-        if let Some(mapping) = count_mapping {
-            assert!(mapping.source_columns.contains("k8s_namespace_name"));
-        }
-
-        let max_mapping = mappings
-            .iter()
-            .find(|m| m.source_columns.contains("floatvalue"));
-        if let Some(mapping) = max_mapping {
-            assert!(mapping.source_columns.contains("floatvalue"));
-        }
+        assert!(
+            mappings
+                .iter()
+                .find(|m| m.source_columns.contains("k8s_namespace_name"))
+                .is_some()
+        );
+        assert!(
+            mappings
+                .iter()
+                .find(|m| m.source_columns.contains("floatvalue"))
+                .is_some()
+        );
     }
 
     #[tokio::test]
@@ -191,7 +184,6 @@ mod tests {
             .iter()
             .find(|m| m.source_columns.contains("log"))
             .unwrap();
-        assert!(mapping.source_columns.contains("log"));
         assert!(mapping.output_field.contains("extracted_time"));
     }
 
@@ -213,9 +205,7 @@ mod tests {
                     && m.source_columns.contains("code")
             })
             .unwrap();
-        assert!(mapping.source_columns.contains("k8s_namespace_name"));
-        assert!(mapping.source_columns.contains("floatvalue"));
-        assert!(mapping.source_columns.contains("code"));
+        assert!(mapping.source_columns.len() == 3);
     }
 
     #[tokio::test]
@@ -236,8 +226,28 @@ mod tests {
                     && m.source_columns.contains("k8s_pod_name")
             })
             .unwrap();
-        assert!(mapping.source_columns.contains("k8s_namespace_name"));
-        assert!(mapping.source_columns.contains("k8s_pod_name"));
+        assert!(mapping.source_columns.len() == 2);
+    }
+
+    #[tokio::test]
+    async fn test_multiple_columns_in_expression_no_alias() {
+        let sql = "SELECT k8s_namespace_name, k8s_pod_name FROM \"default\"";
+        let parsed = get_sql(sql).await;
+        let mappings = get_columns_from_projections(parsed).await.unwrap();
+
+        assert!(mappings.len() >= 2);
+        assert!(
+            mappings
+                .iter()
+                .find(|m| m.output_field == "k8s_namespace_name")
+                .is_some()
+        );
+        assert!(
+            mappings
+                .iter()
+                .find(|m| m.output_field == "k8s_pod_name")
+                .is_some()
+        );
     }
 
     #[tokio::test]
@@ -256,21 +266,18 @@ mod tests {
         // The actual count might include additional system columns
         assert!(mappings.len() >= 2);
 
-        let namespace_mapping = mappings
-            .iter()
-            .find(|m| m.output_field == "k8s_namespace_name")
-            .unwrap();
         assert!(
-            namespace_mapping
-                .source_columns
-                .contains("k8s_namespace_name")
+            mappings
+                .iter()
+                .find(|m| m.output_field == "k8s_namespace_name")
+                .is_some()
         );
 
-        let count_mapping = mappings.iter().find(|m| m.output_field == "count").unwrap();
-        // For COUNT(*), the source columns might be empty or include system columns
-        // Just verify the mapping exists
         assert!(
-            !count_mapping.source_columns.is_empty() || count_mapping.source_columns.is_empty()
+            mappings
+                .iter()
+                .find(|m| m.output_field == "count")
+                .is_some()
         );
     }
 
@@ -291,25 +298,23 @@ mod tests {
         assert!(mappings.len() >= 2);
 
         // Find mappings by checking if they contain the expected source columns
-        let namespace_mapping = mappings
-            .iter()
-            .find(|m| m.source_columns.contains("k8s_namespace_name"));
-        if let Some(mapping) = namespace_mapping {
-            assert!(mapping.source_columns.contains("k8s_namespace_name"));
-        }
+        assert!(
+            mappings
+                .iter()
+                .find(|m| m.source_columns.contains("k8s_namespace_name"))
+                .is_some()
+        );
 
-        let count_mapping = mappings
-            .iter()
-            .find(|m| m.output_field == "total_count" || m.projection_expr.contains("count"));
-        if let Some(mapping) = count_mapping {
-            // For COUNT(*), the source columns might be empty or include system columns
-            // Just verify the mapping exists
-            assert!(!mapping.source_columns.is_empty() || mapping.source_columns.is_empty());
-        }
+        assert!(
+            mappings
+                .iter()
+                .find(|m| m.output_field == "total_count" || m.projection_expr.contains("count"))
+                .is_some()
+        );
     }
 
     #[tokio::test]
-    async fn test_subquery_with_aggregation() {
+    async fn test_query_with_aggregation() {
         // Simplify the SQL to avoid parsing issues
         let sql = r#"
             SELECT k8s_namespace_name, MAX(floatvalue) as max_value
@@ -322,21 +327,19 @@ mod tests {
         // The actual count might include additional system columns
         assert!(mappings.len() >= 2);
 
-        let namespace_mapping = mappings
-            .iter()
-            .find(|m| m.source_columns.contains("k8s_namespace_name"));
-        if let Some(mapping) = namespace_mapping {
-            assert!(mapping.source_columns.contains("k8s_namespace_name"));
-        }
+        assert!(
+            mappings
+                .iter()
+                .find(|m| m.source_columns.contains("k8s_namespace_name"))
+                .is_some()
+        );
 
-        let max_mapping = mappings
-            .iter()
-            .find(|m| m.output_field == "max_value" || m.projection_expr.contains("max"));
-        if let Some(mapping) = max_mapping {
-            // The subquery might not properly extract source columns in this complex case
-            // Just verify the mapping exists
-            assert!(!mapping.source_columns.is_empty() || mapping.source_columns.is_empty());
-        }
+        assert!(
+            mappings
+                .iter()
+                .find(|m| m.output_field == "max_value")
+                .is_some()
+        );
     }
 
     #[tokio::test]
@@ -456,11 +459,11 @@ mod tests {
                 .contains("k8s_namespace_name")
         );
 
-        let count_mapping = mappings.iter().find(|m| m.output_field == "count").unwrap();
-        // For COUNT(*), the source columns might be empty or include system columns
-        // Just verify the mapping exists
         assert!(
-            !count_mapping.source_columns.is_empty() || count_mapping.source_columns.is_empty()
+            mappings
+                .iter()
+                .find(|m| m.output_field == "count")
+                .is_some()
         );
     }
 

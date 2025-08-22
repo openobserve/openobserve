@@ -16,5 +16,6 @@
 pub mod deduplication;
 pub mod deduplication_exec;
 pub mod projections;
+#[cfg(feature = "enterprise")]
 pub mod regex_projections;
 pub mod tantivy_optimize_exec;

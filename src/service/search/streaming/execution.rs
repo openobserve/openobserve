@@ -747,7 +747,7 @@ async fn send_partial_search_resp(
         },
     };
     log::info!(
-        "[HTTP2_STREAM]: trace_id: {trace_id} Sending partial search response for {stream_name}{stream_type}"
+        "[HTTP2_STREAM]: trace_id: {trace_id} Sending partial search response for {stream_name} {stream_type}"
     );
 
     if sender.send(Ok(response)).await.is_err() {
