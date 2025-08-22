@@ -3,23 +3,63 @@ permissions:
 name: All Checks
 
 on:
-  pull_request:
-    branches:
-      - "*"
+  workflow_run:
+    workflows: 
+      - "Unit tests"
+      - "Security audit" 
+      - "Licenses checker"
+      - "JS Licenses checker"
+      - "PR Title Checker"
+      - "Playwright UI Tests"
+      - "API Integration Test"
+    types:
+      - completed
 
 jobs:
   all-checks:
     name: All checks passed
     runs-on: ubuntu-latest
-    if: always()
+    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'cancelled' }}
     
     steps:
-      - name: Wait for other workflow runs to complete
+      - name: Check if this is a required workflow
+        id: check_workflow
+        run: |
+          required_workflows=("Unit tests" "Security audit" "Licenses checker" "JS Licenses checker" "PR Title Checker" "Playwright UI Tests" "API Integration Test")
+          workflow_name="${{ github.event.workflow_run.name }}"
+          
+          for required in "${required_workflows[@]}"; do
+            if [[ "$required" == "$workflow_name" ]]; then
+              echo "is_required=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+          
+          echo "is_required=false" >> $GITHUB_OUTPUT
+          
+      - name: Check all workflows status
+        if: steps.check_workflow.outputs.is_required == 'true'
         uses: actions/github-script@v7
         with:
           script: |
             const { owner, repo } = context.repo;
-            const sha = context.payload.pull_request.head.sha;
+            const prNumber = context.payload.workflow_run.pull_requests[0]?.number;
+            
+            if (!prNumber) {
+              console.log('No PR found for this workflow run');
+              return;
+            }
+            
+            console.log(`Checking status for PR #${prNumber}`);
+            
+            // Get the PR to get the head SHA
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: prNumber
+            });
+            
+            const sha = pr.head.sha;
             
             // Define the workflows we need to wait for
             const requiredWorkflows = [
@@ -32,91 +72,86 @@ jobs:
               'API Integration Test'
             ];
             
-            console.log(`Waiting for workflows to complete for SHA: ${sha}`);
+            // Get all workflow runs for this SHA
+            const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner,
+              repo,
+              head_sha: sha,
+              per_page: 100
+            });
             
-            let maxAttempts = 720; // 4 hours with 20 second intervals
-            let attempt = 0;
+            // Filter to only the workflows we care about
+            const relevantRuns = workflowRuns.workflow_runs.filter(run => 
+              requiredWorkflows.includes(run.name) && run.head_sha === sha
+            );
             
-            while (attempt < maxAttempts) {
-              attempt++;
+            console.log(`Found ${relevantRuns.length} relevant workflow runs for SHA: ${sha}`);
+            
+            // Check status of each required workflow
+            let allComplete = true;
+            let anyFailed = false;
+            let completedCount = 0;
+            
+            for (const workflowName of requiredWorkflows) {
+              const runs = relevantRuns.filter(run => run.name === workflowName);
               
-              // Log progress every 15 attempts (5 minutes)
-              if (attempt % 15 === 0) {
-                console.log(`⏱️  Still waiting... Attempt ${attempt}/${maxAttempts} (${Math.round(attempt * 20 / 60)} minutes elapsed)`);
+              if (runs.length === 0) {
+                console.log(`❓ Workflow "${workflowName}" not found yet`);
+                allComplete = false;
+                continue;
               }
               
-              // Get all workflow runs for this SHA
-              const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
-                owner,
-                repo,
-                head_sha: sha,
-                per_page: 100
-              });
+              // Get the latest run for this workflow
+              const latestRun = runs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
               
-              // Filter to only the workflows we care about
-              const relevantRuns = workflowRuns.workflow_runs.filter(run => 
-                requiredWorkflows.includes(run.name) && run.head_sha === sha
-              );
+              console.log(`📊 Workflow "${workflowName}": ${latestRun.status} / ${latestRun.conclusion}`);
               
-              // Also get count of all workflows for this SHA for visibility
-              const allWorkflowsForSha = workflowRuns.workflow_runs.filter(run => run.head_sha === sha);
-              
-              if (attempt % 15 === 0) {
-                console.log(`📊 Found ${allWorkflowsForSha.length} total workflows, ${relevantRuns.length} required workflows for this SHA`);
+              if (latestRun.status !== 'completed') {
+                allComplete = false;
+              } else if (latestRun.conclusion !== 'success') {
+                console.log(`❌ Workflow "${workflowName}" failed with conclusion: ${latestRun.conclusion}`);
+                anyFailed = true;
+              } else {
+                completedCount++;
               }
-              
-              // Check status of each required workflow
-              let allComplete = true;
-              let anyFailed = false;
-              let completedCount = 0;
-              
-              for (const workflowName of requiredWorkflows) {
-                const runs = relevantRuns.filter(run => run.name === workflowName);
-                
-                if (runs.length === 0) {
-                  if (attempt % 15 === 0) {
-                    console.log(`❓ Workflow "${workflowName}" not found or not started yet`);
-                  }
-                  allComplete = false;
-                  continue;
-                }
-                
-                // Get the latest run for this workflow
-                const latestRun = runs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
-                
-                if (attempt % 15 === 0) {
-                  console.log(`📊 Workflow "${workflowName}": ${latestRun.status} / ${latestRun.conclusion}`);
-                }
-                
-                if (latestRun.status !== 'completed') {
-                  allComplete = false;
-                } else if (latestRun.conclusion !== 'success') {
-                  console.log(`❌ Workflow "${workflowName}" failed with conclusion: ${latestRun.conclusion}`);
-                  anyFailed = true;
-                } else {
-                  completedCount++;
-                }
-              }
-              
-              if (attempt % 15 === 0) {
-                console.log(`✅ Progress: ${completedCount}/${requiredWorkflows.length} required workflows completed`);
-              }
-              
-              if (anyFailed) {
-                core.setFailed('One or more required workflows failed');
-                return;
-              }
-              
-              if (allComplete) {
-                console.log('✅ All required workflows completed successfully!');
-                return;
-              }
-              
-              // Wait 20 seconds before checking again
-              await new Promise(resolve => setTimeout(resolve, 20000));
             }
             
-            core.setFailed('Timeout waiting for required workflows to complete after 4 hours');
+            console.log(`✅ Progress: ${completedCount}/${requiredWorkflows.length} required workflows completed`);
             
-      - name: Success message
-        run: echo "✅ All required checks passed successfully!"
+            if (anyFailed) {
+              // Create a failed status check
+              await github.rest.repos.createCommitStatus({
+                owner,
+                repo,
+                sha,
+                state: 'failure',
+                context: 'All checks passed',
+                description: 'One or more required workflows failed'
+              });
+              core.setFailed('One or more required workflows failed');
+              return;
+            }
+            
+            if (allComplete) {
+              // All workflows completed successfully - create success status
+              await github.rest.repos.createCommitStatus({
+                owner,
+                repo,
+                sha,
+                state: 'success',
+                context: 'All checks passed',
+                description: 'All required workflows completed successfully'
+              });
+              console.log('✅ All required workflows completed successfully!');
+            } else {
+              // Still waiting for some workflows - create pending status
+              await github.rest.repos.createCommitStatus({
+                owner,
+                repo,
+                sha,
+                state: 'pending',
+                context: 'All checks passed',
+                description: `Waiting for workflows (${completedCount}/${requiredWorkflows.length} complete)`
+              });
+              console.log('⏳ Still waiting for some workflows to complete');
+            }
