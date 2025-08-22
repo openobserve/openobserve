@@ -398,7 +398,7 @@ export const getSeriesColor = (
   // Check for custom color from colorBySeries mappings first
   if (colorBySeries?.length > 0) {
     const customMapping = colorBySeries.find(
-      (mapping: any) => mapping.value === seriesName && mapping.color
+      (mapping: any) => mapping.value === seriesName && mapping.color,
     );
     if (customMapping) {
       return customMapping.color;
@@ -439,3 +439,30 @@ export const getSeriesColor = (
     );
   }
 };
+
+export const getColorForTable = [
+  "#FFCDEE",
+  "#FFD2D3",
+  "#C8FCFA",
+  "#B2DAFB",
+  "#C0E9FC",
+  "#FFCDE5",
+  "#C0EFF5",
+  "#FFFDBA",
+  "#E6F3FF",
+  "#F2B9B9",
+  "#A6E8F0",
+  "#C8E5FC",
+  "#E8A3F4",
+  "#C0E5E2",
+  "#C9FFBD",
+  "#F8B1C9",
+  "#BDDFFF",
+  "#D2B9FF",
+  "#D2EBDA",
+  "#C0E3C2",
+  "#F0F8E8",
+  "#FFF2CC",
+  "#FFE6E6",
+  "#E8F4FD",
+];
