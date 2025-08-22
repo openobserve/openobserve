@@ -1644,7 +1644,6 @@ export default defineComponent({
       async () => {
         // Skip processing if we're currently restoring from URL
         if (isRestoringFromUrl.value) {
-          console.log("Skipping chart type change processing during URL restoration");
           return;
         }
         
