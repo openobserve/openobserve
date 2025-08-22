@@ -67,7 +67,7 @@ impl OutputColumnExtractor {
             let mut source_columns = HashSet::new();
 
             // Use a more robust column extraction approach
-            self.extract_columns_from_expr(expr, &mut source_columns);
+            Self::extract_columns_from_expr(expr, &mut source_columns);
 
             let mapping = ProjectionColumnMapping {
                 output_field: Self::get_output_field_name(expr),
@@ -79,7 +79,7 @@ impl OutputColumnExtractor {
         }
     }
 
-    fn extract_columns_from_expr(&self, expr: &Expr, columns: &mut HashSet<String>) {
+    fn extract_columns_from_expr(expr: &Expr, columns: &mut HashSet<String>) {
         match expr {
             Expr::Column(col) => {
                 // Check if this column name represents an aggregate function
@@ -87,55 +87,55 @@ impl OutputColumnExtractor {
                 if col.name.contains('(') && col.name.contains(')') {
                     // This is likely an aggregate function column reference
                     // Extract the column name from within the parentheses
-                    if let Some(start) = col.name.find('(') &&
-                         let Some(end) = col.name.rfind(')') {
-                            let inner_expr = &col.name[start + 1..end];
-                            // Parse the inner expression to extract the actual column name
-                            // For now, try to extract the last part after the last dot
-                            if let Some(last_dot) = inner_expr.rfind('.') {
-                                let column_name = &inner_expr[last_dot + 1..];
-                                columns.insert(column_name.to_string());
-                            } else {
-                                // No dot found, use the inner expression as is
-                                columns.insert(inner_expr.to_string());
-                            }
-                        
+                    if let Some(start) = col.name.find('(')
+                        && let Some(end) = col.name.rfind(')')
+                    {
+                        let inner_expr = &col.name[start + 1..end];
+                        // Parse the inner expression to extract the actual column name
+                        // For now, try to extract the last part after the last dot
+                        if let Some(last_dot) = inner_expr.rfind('.') {
+                            let column_name = &inner_expr[last_dot + 1..];
+                            columns.insert(column_name.to_string());
+                        } else {
+                            // No dot found, use the inner expression as is
+                            columns.insert(inner_expr.to_string());
+                        }
                     }
                 } else {
                     columns.insert(col.name.clone());
                 }
             }
             Expr::Alias(alias) => {
-                self.extract_columns_from_expr(&alias.expr, columns);
+                Self::extract_columns_from_expr(&alias.expr, columns);
             }
             Expr::BinaryExpr(binary_expr) => {
-                self.extract_columns_from_expr(&binary_expr.left, columns);
-                self.extract_columns_from_expr(&binary_expr.right, columns);
+                Self::extract_columns_from_expr(&binary_expr.left, columns);
+                Self::extract_columns_from_expr(&binary_expr.right, columns);
             }
             Expr::ScalarFunction(func) => {
                 for arg in &func.args {
-                    self.extract_columns_from_expr(arg, columns);
+                    Self::extract_columns_from_expr(arg, columns);
                 }
             }
             Expr::AggregateFunction(agg_func) => {
                 // Handle aggregate functions like MAX, MIN, COUNT, etc.
                 for arg in &agg_func.params.args {
-                    self.extract_columns_from_expr(arg, columns);
+                    Self::extract_columns_from_expr(arg, columns);
                 }
             }
             Expr::Cast(cast_expr) => {
-                self.extract_columns_from_expr(&cast_expr.expr, columns);
+                Self::extract_columns_from_expr(&cast_expr.expr, columns);
             }
             Expr::Case(case_expr) => {
                 if let Some(expr) = &case_expr.expr {
-                    self.extract_columns_from_expr(expr, columns);
+                    Self::extract_columns_from_expr(expr, columns);
                 }
                 for (when, then) in &case_expr.when_then_expr {
-                    self.extract_columns_from_expr(when, columns);
-                    self.extract_columns_from_expr(then, columns);
+                    Self::extract_columns_from_expr(when, columns);
+                    Self::extract_columns_from_expr(then, columns);
                 }
                 if let Some(else_expr) = &case_expr.else_expr {
-                    self.extract_columns_from_expr(else_expr, columns);
+                    Self::extract_columns_from_expr(else_expr, columns);
                 }
             }
             _ => {}
@@ -623,18 +623,20 @@ mod tests {
         assert!(direct_mapping.source_columns.contains("k8s_namespace_name"));
 
         // Check the aliased column projection
-        let aliased_mapping = mappings
-            .iter()
-            .find(|m| m.output_field == "a")
-            .unwrap();
-        assert!(aliased_mapping.source_columns.contains("k8s_namespace_name"));
+        let aliased_mapping = mappings.iter().find(|m| m.output_field == "a").unwrap();
+        assert!(
+            aliased_mapping
+                .source_columns
+                .contains("k8s_namespace_name")
+        );
 
         // Check the aggregate function projection
-        let aggregate_mapping = mappings
-            .iter()
-            .find(|m| m.output_field == "b")
-            .unwrap();
-        assert!(aggregate_mapping.source_columns.contains("k8s_namespace_name"));
+        let aggregate_mapping = mappings.iter().find(|m| m.output_field == "b").unwrap();
+        assert!(
+            aggregate_mapping
+                .source_columns
+                .contains("k8s_namespace_name")
+        );
         assert!(aggregate_mapping.projection_expr.contains("max"));
     }
 }

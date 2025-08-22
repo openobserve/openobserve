@@ -240,7 +240,8 @@ pub async fn do_partitioned_search(
             stream_name,
             stream_type,
             &mut search_res,
-        ).await?;
+        )
+        .await?;
 
         if is_result_array_skip_vrl {
             search_res.hits = crate::service::search::cache::apply_vrl_to_response(
@@ -562,7 +563,8 @@ pub async fn process_delta(
             stream_name,
             stream_type,
             &mut search_res,
-        ).await?;
+        )
+        .await?;
 
         if is_result_array_skip_vrl {
             search_res.hits = crate::service::search::cache::apply_vrl_to_response(
@@ -607,6 +609,7 @@ pub async fn process_delta(
             );
             // pass original start_time and end_time partition end time
             let _ = send_partial_search_resp(
+                &req,
                 trace_id,
                 "reached max query range limit",
                 new_start_time,
@@ -619,6 +622,7 @@ pub async fn process_delta(
                 backup_query_fn.clone(),
                 org_id,
                 stream_name,
+                stream_type,
             )
             .await;
             break;
@@ -682,6 +686,7 @@ pub fn calc_queried_range(start_time: i64, end_time: i64, result_cache_ratio: us
 /// Send a partial search response
 #[allow(clippy::too_many_arguments)]
 async fn send_partial_search_resp(
+    req: &config::meta::search::Request,
     trace_id: &str,
     error: &str,
     new_start_time: i64,
@@ -694,6 +699,7 @@ async fn send_partial_search_resp(
     backup_query_fn: Option<String>,
     org_id: &str,
     stream_name: &str,
+    stream_type: StreamType,
 ) -> Result<(), infra::errors::Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
@@ -710,13 +716,14 @@ async fn send_partial_search_resp(
         trace_id: trace_id.to_string(),
         ..Default::default()
     };
-    // crate::service::search::cache::apply_regex_to_response(
-    //     &req,
-    //     org_id,
-    //     &stream_name,
-    //     stream_type,
-    //     &mut s_resp,
-    // ).await?;
+    crate::service::search::cache::apply_regex_to_response(
+        req,
+        org_id,
+        stream_name,
+        stream_type,
+        &mut s_resp,
+    )
+    .await?;
     if is_result_array_skip_vrl {
         s_resp.hits = crate::service::search::cache::apply_vrl_to_response(
             backup_query_fn.clone(),
