@@ -366,6 +366,7 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
     );
 
+    #[cfg(feature = "enterprise")]
     crate::service::search::cache::apply_regex_to_response(
         req,
         org_id,

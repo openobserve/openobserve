@@ -493,6 +493,7 @@ pub async fn search(
     }
     // result cache save changes Ends
 
+    #[cfg(feature = "enterprise")]
     crate::service::search::cache::apply_regex_to_response(
         &req,
         org_id,

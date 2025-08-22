@@ -13,14 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use config::meta::projections::ProjectionColumnMapping;
-use datafusion::{
-    common::tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
-    logical_expr::LogicalPlan,
-    prelude::Expr,
-};
+use datafusion::common::tree_node::TreeNode;
 
 use crate::service::search::{
     cluster::flight::{SearchContextBuilder, register_table},
@@ -28,150 +24,14 @@ use crate::service::search::{
     sql::Sql,
 };
 
-/// Structure to extract projection-column mappings that return data to users
-#[derive(Debug)]
-pub struct OutputColumnExtractor {
-    /// Mappings of projections to underlying columns (for targeted redaction)
-    pub projection_mappings: Vec<ProjectionColumnMapping>,
-    /// Flag to track if we've found the top-level projection
-    found_top_projection: bool,
+#[cfg(not(feature = "enterprise"))]
+pub async fn get_columns_from_projections(
+    sql: Sql,
+) -> Result<Vec<ProjectionColumnMapping>, anyhow::Error> {
+    Ok(vec![])
 }
 
-impl OutputColumnExtractor {
-    fn new() -> Self {
-        Self {
-            projection_mappings: Vec::new(),
-            found_top_projection: false,
-        }
-    }
-
-    fn get_output_field_name(expr: &Expr) -> String {
-        match expr {
-            Expr::Alias(alias) => alias.name.clone(),
-            Expr::Column(col) => col.name.clone(),
-            _ => {
-                // For complex expressions, try to extract a meaningful name
-                // or use a hash of the expression string
-                let expr_str = format!("{expr}");
-                if expr_str.len() > 50 {
-                    format!("expr_{}", expr_str.chars().take(20).collect::<String>())
-                } else {
-                    expr_str
-                }
-            }
-        }
-    }
-
-    fn extract_projection_mappings(&mut self, exprs: &[Expr]) {
-        for expr in exprs {
-            let mut source_columns = HashSet::new();
-
-            // Use a more robust column extraction approach
-            Self::extract_columns_from_expr(expr, &mut source_columns);
-
-            let mapping = ProjectionColumnMapping {
-                output_field: Self::get_output_field_name(expr),
-                projection_expr: format!("{expr}"),
-                source_columns: source_columns.into_iter().collect(),
-            };
-
-            self.projection_mappings.push(mapping);
-        }
-    }
-
-    fn extract_columns_from_expr(expr: &Expr, columns: &mut HashSet<String>) {
-        match expr {
-            Expr::Column(col) => {
-                // Check if this column name represents an aggregate function
-                // e.g., "max(default.k8s_namespace_name)" should extract "k8s_namespace_name"
-                if col.name.contains('(') && col.name.contains(')') {
-                    // This is likely an aggregate function column reference
-                    // Extract the column name from within the parentheses
-                    if let Some(start) = col.name.find('(')
-                        && let Some(end) = col.name.rfind(')')
-                    {
-                        let inner_expr = &col.name[start + 1..end];
-                        // Parse the inner expression to extract the actual column name
-                        // For now, try to extract the last part after the last dot
-                        if let Some(last_dot) = inner_expr.rfind('.') {
-                            let column_name = &inner_expr[last_dot + 1..];
-                            columns.insert(column_name.to_string());
-                        } else {
-                            // No dot found, use the inner expression as is
-                            columns.insert(inner_expr.to_string());
-                        }
-                    }
-                } else {
-                    columns.insert(col.name.clone());
-                }
-            }
-            Expr::Alias(alias) => {
-                Self::extract_columns_from_expr(&alias.expr, columns);
-            }
-            Expr::BinaryExpr(binary_expr) => {
-                Self::extract_columns_from_expr(&binary_expr.left, columns);
-                Self::extract_columns_from_expr(&binary_expr.right, columns);
-            }
-            Expr::ScalarFunction(func) => {
-                for arg in &func.args {
-                    Self::extract_columns_from_expr(arg, columns);
-                }
-            }
-            Expr::AggregateFunction(agg_func) => {
-                // Handle aggregate functions like MAX, MIN, COUNT, etc.
-                for arg in &agg_func.params.args {
-                    Self::extract_columns_from_expr(arg, columns);
-                }
-            }
-            Expr::Cast(cast_expr) => {
-                Self::extract_columns_from_expr(&cast_expr.expr, columns);
-            }
-            Expr::Case(case_expr) => {
-                if let Some(expr) = &case_expr.expr {
-                    Self::extract_columns_from_expr(expr, columns);
-                }
-                for (when, then) in &case_expr.when_then_expr {
-                    Self::extract_columns_from_expr(when, columns);
-                    Self::extract_columns_from_expr(then, columns);
-                }
-                if let Some(else_expr) = &case_expr.else_expr {
-                    Self::extract_columns_from_expr(else_expr, columns);
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-impl<'n> TreeNodeVisitor<'n> for OutputColumnExtractor {
-    type Node = LogicalPlan;
-
-    fn f_down(
-        &mut self,
-        node: &'n Self::Node,
-    ) -> Result<TreeNodeRecursion, datafusion::error::DataFusionError> {
-        match node {
-            LogicalPlan::Projection(proj) => {
-                // Always extract from projections as they represent the final output
-                self.extract_projection_mappings(&proj.expr);
-                self.found_top_projection = true;
-            }
-            LogicalPlan::Aggregate(aggr) => {
-                // Only process aggregates if we haven't found a projection yet
-                // This prevents duplicate processing when both Projection and Aggregate exist
-                if !self.found_top_projection {
-                    let mut all_exprs = aggr.group_expr.clone();
-                    all_exprs.extend(aggr.aggr_expr.clone());
-                    self.extract_projection_mappings(&all_exprs);
-                    self.found_top_projection = true;
-                }
-            }
-            _ => {}
-        }
-        Ok(TreeNodeRecursion::Continue)
-    }
-}
-
+#[cfg(feature = "enterprise")]
 pub async fn get_columns_from_projections(
     sql: Sql,
 ) -> Result<Vec<ProjectionColumnMapping>, anyhow::Error> {
@@ -182,13 +42,15 @@ pub async fn get_columns_from_projections(
     register_table(&ctx, &sql_arc).await?;
     let plan = ctx.state().create_logical_plan(&sql_arc.sql).await?;
 
-    let mut extractor = OutputColumnExtractor::new();
+    let mut extractor =
+        o2_enterprise::enterprise::search::projection_utils::OutputColumnExtractor::default();
     plan.visit(&mut extractor)?;
 
     Ok(extractor.projection_mappings)
 }
 
 #[cfg(test)]
+#[cfg(feature = "enterprise")]
 mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::stream::StreamType;
