@@ -2079,7 +2079,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     parser = await sqlParser();
 
     // do not allow to modify custom query fields for logs page
-    updateQueryValue(pageKey == "logs" ? true : falsepageKey == "logs" ? true : false);
+    updateQueryValue(pageKey == "logs" ? true : false);
   };
 
   /**
