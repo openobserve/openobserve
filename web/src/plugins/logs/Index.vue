@@ -1411,6 +1411,12 @@ export default defineComponent({
     const searchResponseForVisualization = ref({});
 
     const shouldUseHistogramQuery = ref(false);
+    
+    // Flag to prevent unnecessary chart type changes during URL restoration
+    const isRestoringFromUrl = ref(false);
+    
+    // Flag to track if this is the first time switching to visualization mode
+    const isFirstVisualizationToggle = ref(true);
 
     watch(
       () => [searchObj?.meta?.logsVisualizeToggle],
@@ -1442,54 +1448,42 @@ export default defineComponent({
             // Store current config and chart type to preserve them during rebuild
             const queryParams = router.currentRoute.value.query;
             let preservedConfig = null;
-            // let preservedChartType = null;
-            // let shouldAutoSelectChartType = true;
-
-            // First, try to restore config from URL if present
+            let shouldAutoSelectChartType = true;
+            // Always try to restore config from URL if present
             const visualizationDataParam = queryParams.visualization_data;
             if (visualizationDataParam && typeof visualizationDataParam === 'string') {
               try {
                 const restoredData = decodeVisualizationConfig(visualizationDataParam);
 
                 if (restoredData && typeof restoredData === 'object') {
-                  // Restore only config and type from URL
+                  // Always restore config from URL on every toggle
                   if (restoredData.config && typeof restoredData.config === 'object') {
                     preservedConfig = { ...restoredData.config };
                   }
 
-                  // if (restoredData.type && typeof restoredData.type === 'string') {
-                  //   const validLogsChartTypes = ['area', 'bar', 'h-bar', 'line', 'scatter', 'table'];
-                  //   if (validLogsChartTypes.includes(restoredData.type)) {
-                  //     preservedChartType = restoredData.type;
-                  //     shouldAutoSelectChartType = false;
-                  //   } else {
-                  //     console.warn(`Invalid chart type '${restoredData.type}' for logs visualization, using auto-selection`);
-                  //   }
-                  // }
+                  // Only check for chart type from URL on first visualization toggle
+                  if (isFirstVisualizationToggle.value && restoredData.type && typeof restoredData.type === 'string') {
+                    const validLogsChartTypes = ['area', 'bar', 'h-bar', 'line', 'scatter', 'table'];
+                    if (validLogsChartTypes.includes(restoredData.type)) {
+                      // Valid chart type found in URL - set it and disable auto-selection
+                      dashboardPanelData.data.type = restoredData.type;
+                      shouldAutoSelectChartType = false;
+                    }
+                  }
                 }
               } catch (error) {
                 console.warn('Failed to restore visualization config from URL:', error);
               }
             }
 
-            // // If no config restored from URL, preserve current dashboard panel config
-            // if (!preservedConfig && dashboardPanelData?.data?.config) {
-            //   preservedConfig = { ...dashboardPanelData.data.config };
-            // }
+            // Mark that we've processed the first toggle
+            if (isFirstVisualizationToggle.value) {
+              isFirstVisualizationToggle.value = false;
+            }
 
-            // If no chart type restored from URL, preserve current dashboard panel chart type
-            // if (!preservedChartType) {
-            //   const currentChartType = dashboardPanelData?.data?.type;
-            //   const validLogsChartTypes = ['area', 'bar', 'h-bar', 'line', 'scatter', 'table'];
-
-            //   if (currentChartType && validLogsChartTypes.includes(currentChartType)) {
-            //     preservedChartType = currentChartType;
-            //     shouldAutoSelectChartType = false;
-            //   }
-            // }
-
-            // always auto select chart type
-            shouldUseHistogramQuery.value = await extractVisualizationFields(true);
+            // Use conditional auto-selection based on first toggle and URL chart type
+            isRestoringFromUrl.value = true;
+            shouldUseHistogramQuery.value = await extractVisualizationFields(shouldAutoSelectChartType);
 
             // if not able to parse query, do not do anything
             if (shouldUseHistogramQuery.value === null) {
@@ -1544,8 +1538,7 @@ export default defineComponent({
             // reset old rendered chart
             visualizeChartData.value = {};
 
-
-            if (searchObj?.data?.customDownloadQueryObj?.query?.end_time && searchObj?.data?.datetime?.startTime) {
+            if (searchObj?.data?.customDownloadQueryObj?.query?.start_time && searchObj?.data?.customDownloadQueryObj?.query?.end_time) {
               dashboardPanelData.meta.dateTime = {
                 start_time: new Date(searchObj.data.customDownloadQueryObj.query.start_time),
                 end_time: new Date(searchObj.data.customDownloadQueryObj.query.end_time),
@@ -1565,7 +1558,7 @@ export default defineComponent({
               };
             }
 
-            // Restore preserved config and chart type after field extraction
+            // Always restore preserved config after field extraction
             if (preservedConfig) {
               dashboardPanelData.data.config = {
                 ...dashboardPanelData.data.config,
@@ -1578,16 +1571,26 @@ export default defineComponent({
               JSON.stringify(dashboardPanelData.data),
             );
 
+            // Clear the restoration flag after all operations are complete
+            await nextTick();
+            isRestoringFromUrl.value = false;
+
             // set fields extraction loading to false
             variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
 
             // emit resize event
             // this will rerender/call resize method of already rendered chart to resize
             window.dispatchEvent(new Event("resize"));
+
+            // Sync visualization data to URL parameters when chart type changes
+            if (searchObj.meta.logsVisualizeToggle === "visualize") {
+              updateUrlQueryParams(dashboardPanelData);
+            }
+
           } else {
             // reset dashboard panel data as we will rebuild when user came back to visualize
             // this fixes blank chart issue when user came back to visualize
-            resetDashboardPanelData()
+            resetDashboardPanelData();
           }
         } catch (err: any) {
           // this will clear dummy trace id
@@ -1639,6 +1642,12 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.data.type,
       async () => {
+        // Skip processing if we're currently restoring from URL
+        if (isRestoringFromUrl.value) {
+          console.log("Skipping chart type change processing during URL restoration");
+          return;
+        }
+        
         const currentQuery =
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
