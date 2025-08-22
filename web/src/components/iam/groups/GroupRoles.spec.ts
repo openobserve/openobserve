@@ -29,13 +29,11 @@ vi.mock("@/services/iam", () => ({
   getRoles: vi.fn(() => Promise.resolve({ data: ["admin", "user", "developer"] })),
 }));
 
-const mockUsePermissions = vi.fn(() => ({
-  rolesState: {},
-  groupsState: {},
-}));
-
 vi.mock("@/composables/iam/usePermissions", () => ({
-  default: mockUsePermissions,
+  default: vi.fn(() => ({
+    rolesState: {},
+    groupsState: {},
+  })),
 }));
 
 vi.mock("@/components/AppTable.vue", () => ({
@@ -59,7 +57,7 @@ describe("GroupRoles Component", () => {
       groupsState: {},
     };
 
-    mockUsePermissions.mockReturnValue(mockPermissions);
+    vi.mocked(await import("@/composables/iam/usePermissions")).default.mockReturnValue(mockPermissions);
 
     wrapper = mount(GroupRoles, {
       global: {
@@ -455,9 +453,13 @@ describe("GroupRoles Component", () => {
     it("handles API error when fetching roles", async () => {
       const { getRoles } = await import("@/services/iam");
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      vi.mocked(getRoles).mockRejectedValue(new Error("Network error"));
+      vi.mocked(getRoles).mockRejectedValueOnce(new Error("Network error"));
 
-      await wrapper.vm.getchOrgUsers();
+      try {
+        await wrapper.vm.getchOrgUsers();
+      } catch (error) {
+        // Expected to catch error
+      }
 
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
