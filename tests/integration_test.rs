@@ -27,7 +27,12 @@ mod tests {
         meta::{
             alerts::{Operator, QueryCondition, TriggerCondition, alert::Alert},
             dashboards::{Dashboard, v1},
-            triggers::Trigger,
+            pipeline::{
+                Pipeline,
+                components::{DerivedStream, PipelineSource},
+            },
+            stream::StreamType,
+            triggers::{ScheduledTriggerData, Trigger, TriggerModule, TriggerStatus},
         },
         utils::json,
     };
@@ -254,6 +259,14 @@ mod tests {
         // Cleanup
         e2e_delete_alert_with_sns_destination().await;
         e2e_delete_sns_alert_destination().await;
+
+        // derived streams
+        e2e_create_test_pipeline().await;
+        e2e_handle_derived_stream_success().await;
+        e2e_handle_derived_stream_pipeline_not_found().await;
+        e2e_handle_derived_stream_max_retries().await;
+        e2e_handle_derived_stream_evaluation_failure().await;
+        e2e_cleanup_test_pipeline().await;
 
         // syslog
         e2e_post_syslog_route().await;
@@ -2462,5 +2475,471 @@ mod tests {
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
+    }
+
+    // Helper function to create pipeline via API
+    async fn e2e_post_pipeline(pipeline_data: Pipeline) {
+        let auth = setup();
+        let body_str = serde_json::to_string(&pipeline_data).unwrap();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes),
+        )
+        .await;
+        let req = test::TestRequest::post()
+            .uri(&format!("/api/{}/pipelines", "e2e"))
+            .insert_header(ContentType::json())
+            .append_header(auth)
+            .set_payload(body_str)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        if !resp.status().is_success() {
+            let body = test::read_body(resp).await;
+            println!("Response body: {}", String::from_utf8_lossy(&body));
+            assert!(false);
+        }
+        assert!(true);
+    }
+
+    // Derived Stream Integration Tests
+    async fn e2e_create_test_pipeline() {
+        // Create a test pipeline with derived stream for testing
+        let pipeline_data = Pipeline {
+            id: "test_derived_stream_pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "e2e".to_string(),
+            name: "test_derived_stream".to_string(),
+            description: "Test pipeline for derived stream integration tests".to_string(),
+            source: PipelineSource::Scheduled(DerivedStream {
+                org_id: "e2e".to_string(),
+                stream_type: StreamType::Logs,
+                query_condition: QueryCondition {
+                    query_type: config::meta::alerts::QueryType::SQL,
+                    sql: Some("SELECT _timestamp FROM \"olympics_schema\"".to_string()),
+                    ..Default::default()
+                },
+                trigger_condition: TriggerCondition {
+                    period: 5,      // 5 minutes
+                    frequency: 300, // 5 minutes in seconds
+                    ..Default::default()
+                },
+                tz_offset: 0,
+                start_at: None,
+                delay: None,
+            }),
+            nodes: vec![
+                // Source node (query node for scheduled pipeline)
+                config::meta::pipeline::components::Node::new(
+                    "source-node-1".to_string(),
+                    config::meta::pipeline::components::NodeData::Query(DerivedStream {
+                        org_id: "e2e".to_string(),
+                        stream_type: StreamType::Logs,
+                        query_condition: QueryCondition {
+                            query_type: config::meta::alerts::QueryType::SQL,
+                            sql: Some("SELECT _timestamp FROM \"olympics_schema\"".to_string()),
+                            ..Default::default()
+                        },
+                        trigger_condition: TriggerCondition {
+                            period: 5,
+                            frequency: 300,
+                            ..Default::default()
+                        },
+                        tz_offset: 0,
+                        start_at: None,
+                        delay: None,
+                    }),
+                    100.0,
+                    50.0,
+                    "input".to_string(),
+                ),
+                // Destination node (output stream)
+                config::meta::pipeline::components::Node::new(
+                    "dest-node-1".to_string(),
+                    config::meta::pipeline::components::NodeData::Stream(
+                        config::meta::stream::StreamParams {
+                            org_id: "e2e".to_string().into(),
+                            stream_name: "test_derived_output_stream".to_string().into(),
+                            stream_type: StreamType::Logs,
+                        },
+                    ),
+                    100.0,
+                    200.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![config::meta::pipeline::components::Edge::new(
+                "source-node-1".to_string(),
+                "dest-node-1".to_string(),
+            )],
+        };
+
+        // Save pipeline using API call
+        e2e_post_pipeline(pipeline_data).await;
+    }
+
+    async fn e2e_handle_derived_stream_success() {
+        // list the pipelines and choose the first one using API
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri("/api/e2e/pipelines")
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let pipeline_list: openobserve::handler::http::models::pipelines::PipelineList =
+            json::from_slice(&body).unwrap();
+        let pipeline = pipeline_list.list.first();
+        assert!(pipeline.is_some());
+        let pipeline = pipeline.unwrap();
+
+        let now = Utc::now().timestamp_micros();
+        let mins_5_later = now
+            + Duration::try_minutes(5)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        let module_key = format!("logs/e2e/test_derived_stream/{}", pipeline.id);
+
+        let trigger = Trigger {
+            id: 1,
+            org: "e2e".to_string(),
+            module: TriggerModule::DerivedStream,
+            module_key: module_key.clone(),
+            start_time: Some(now),
+            end_time: Some(mins_5_later),
+            next_run_at: now,
+            is_realtime: false,
+            is_silenced: false,
+            status: config::meta::triggers::TriggerStatus::Processing,
+            retries: 0,
+            data: "{}".to_string(),
+        };
+
+        let trace_id = "test_derived_stream_trace_id";
+        let res = handle_triggers(trace_id, trigger).await;
+        // Should succeed even with empty data
+        assert!(res.is_ok());
+
+        // Verify trigger was updated
+        let trigger = openobserve::service::db::scheduler::get(
+            "e2e",
+            TriggerModule::DerivedStream,
+            &module_key,
+        )
+        .await;
+        assert!(trigger.is_ok());
+        let trigger = trigger.unwrap();
+        let scheduled_trigger_data: ScheduledTriggerData =
+            serde_json::from_str(&trigger.data).unwrap();
+        assert!(scheduled_trigger_data.period_end_time.is_some());
+        assert!(scheduled_trigger_data.period_end_time.unwrap() > 0);
+        assert!(trigger.status == TriggerStatus::Waiting);
+        assert!(trigger.next_run_at > now && trigger.retries == 0);
+    }
+
+    async fn e2e_handle_derived_stream_pipeline_not_found() {
+        let now = Utc::now().timestamp_micros();
+        let mins_5_later = now
+            + Duration::try_minutes(5)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        let module_key = "logs/e2e/nonexistent_pipeline/invalid_id".to_string();
+
+        let trigger = Trigger {
+            id: 2,
+            org: "e2e".to_string(),
+            module: TriggerModule::DerivedStream,
+            module_key,
+            start_time: Some(now),
+            end_time: Some(mins_5_later),
+            next_run_at: now,
+            is_realtime: false,
+            is_silenced: false,
+            status: config::meta::triggers::TriggerStatus::Processing,
+            retries: 0,
+            data: "{}".to_string(),
+        };
+
+        let trace_id = "test_derived_stream_not_found_trace_id";
+        let res = handle_triggers(trace_id, trigger).await;
+        // Should fail with pipeline not found error
+        assert!(res.is_err());
+        assert!(
+            res.unwrap_err()
+                .to_string()
+                .contains("Pipeline associated with trigger not found")
+        );
+    }
+
+    async fn e2e_handle_derived_stream_max_retries() {
+        // list pipelines using API
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri("/api/e2e/pipelines")
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let pipeline_list: openobserve::handler::http::models::pipelines::PipelineList =
+            json::from_slice(&body).unwrap();
+        let pipelines = pipeline_list.list.first();
+        assert!(pipelines.is_some());
+        let pipeline = pipelines.unwrap();
+
+        let now = Utc::now().timestamp_micros();
+        let mins_5_later = now
+            + Duration::try_minutes(5)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        let module_key = format!("logs/e2e/test_derived_stream/{}", pipeline.id);
+
+        let trigger = Trigger {
+            id: 3,
+            org: "e2e".to_string(),
+            module: TriggerModule::DerivedStream,
+            module_key: module_key.clone(),
+            start_time: Some(now),
+            end_time: Some(mins_5_later),
+            next_run_at: now,
+            is_realtime: false,
+            is_silenced: false,
+            status: config::meta::triggers::TriggerStatus::Processing,
+            retries: 5, // Max retries reached
+            data: "{}".to_string(),
+        };
+
+        let trace_id = "test_derived_stream_max_retries_trace_id";
+        let res = handle_triggers(trace_id, trigger).await;
+        // Should succeed but skip to next run due to max retries
+        assert!(res.is_ok());
+
+        // Verify trigger was updated with next run time and retries reset
+        let trigger = openobserve::service::db::scheduler::get(
+            "e2e",
+            TriggerModule::DerivedStream,
+            &module_key,
+        )
+        .await;
+        assert!(trigger.is_ok());
+        let trigger = trigger.unwrap();
+        assert!(trigger.next_run_at > now && trigger.retries == 0);
+    }
+
+    async fn e2e_handle_derived_stream_evaluation_failure() {
+        let auth = setup();
+        // Create a pipeline with invalid SQL to cause evaluation failure
+        let pipeline_data = Pipeline {
+            id: "test_derived_stream_pipeline_invalid".to_string(),
+            version: 1,
+            enabled: true,
+            org: "e2e".to_string(),
+            name: "test_derived_stream_invalid".to_string(),
+            description: "Test pipeline with invalid SQL".to_string(),
+            source: PipelineSource::Scheduled(DerivedStream {
+                org_id: "e2e".to_string(),
+                stream_type: StreamType::Logs,
+                query_condition: QueryCondition {
+                    query_type: config::meta::alerts::QueryType::SQL,
+                    sql: Some("SELECT _timestamp, city FROM \"olympics_schema\"".to_string()), /* Invalid
+                                                                                                * SQL */
+                    ..Default::default()
+                },
+                trigger_condition: TriggerCondition {
+                    period: 5,
+                    frequency: 300,
+                    ..Default::default()
+                },
+                tz_offset: 0,
+                start_at: None,
+                delay: None,
+            }),
+            nodes: vec![
+                // Source node (query node for scheduled pipeline with invalid SQL)
+                config::meta::pipeline::components::Node::new(
+                    "source-node-2".to_string(),
+                    config::meta::pipeline::components::NodeData::Query(DerivedStream {
+                        org_id: "e2e".to_string(),
+                        stream_type: StreamType::Logs,
+                        query_condition: QueryCondition {
+                            query_type: config::meta::alerts::QueryType::SQL,
+                            sql: Some(
+                                "SELECT _timestamp, city FROM \"olympics_schema\"".to_string(),
+                            ),
+                            ..Default::default()
+                        },
+                        trigger_condition: TriggerCondition {
+                            period: 5,
+                            frequency: 300,
+                            ..Default::default()
+                        },
+                        tz_offset: 0,
+                        start_at: None,
+                        delay: None,
+                    }),
+                    150.0,
+                    50.0,
+                    "input".to_string(),
+                ),
+                // Destination node (output stream)
+                config::meta::pipeline::components::Node::new(
+                    "dest-node-2".to_string(),
+                    config::meta::pipeline::components::NodeData::Stream(
+                        config::meta::stream::StreamParams {
+                            org_id: "e2e".to_string().into(),
+                            stream_name: "test_invalid_pipeline_output".to_string().into(),
+                            stream_type: StreamType::Logs,
+                        },
+                    ),
+                    150.0,
+                    200.0,
+                    "output".to_string(),
+                ),
+            ],
+            edges: vec![config::meta::pipeline::components::Edge::new(
+                "source-node-2".to_string(),
+                "dest-node-2".to_string(),
+            )],
+        };
+
+        // Save pipeline using API call
+        e2e_post_pipeline(pipeline_data.clone()).await;
+
+        // Check if pipeline was saved successfully by doing a list using API
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes),
+        )
+        .await;
+
+        // delete the city field from the stream
+        // Make a PUT call to `e2e/streams/olympics_schema/delete_fields` api
+        // with `{"fields":["method"]}` as the payload
+        let delete_fields_url = format!("/api/e2e/streams/olympics_schema/delete_fields",);
+        let delete_fields_payload = serde_json::json!({"fields": ["city"]});
+
+        let req = test::TestRequest::put()
+            .uri(&delete_fields_url)
+            .append_header(auth)
+            .set_json(&delete_fields_payload)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success(), "Failed to delete fields");
+
+        let req = test::TestRequest::get()
+            .uri("/api/e2e/pipelines")
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success(), "Failed to list pipelines");
+        let body = test::read_body(resp).await;
+        let pipeline_response: openobserve::handler::http::models::pipelines::PipelineList =
+            json::from_slice(&body).unwrap();
+        // Get the pipeline that matches the pipeline name
+        let pipeline = pipeline_response
+            .list
+            .iter()
+            .find(|p| p.name == pipeline_data.name);
+        assert!(pipeline.is_some(), "Pipeline not found");
+        let pipeline = pipeline.unwrap();
+
+        let now = Utc::now().timestamp_micros();
+        let mins_5_later = now
+            + Duration::try_minutes(5)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        let module_key = format!("logs/e2e/test_derived_stream_invalid/{}", pipeline.id);
+
+        let trigger = Trigger {
+            id: 4,
+            org: "e2e".to_string(),
+            module: TriggerModule::DerivedStream,
+            module_key: module_key.clone(),
+            start_time: Some(now),
+            end_time: Some(mins_5_later),
+            next_run_at: now,
+            is_realtime: false,
+            is_silenced: false,
+            status: config::meta::triggers::TriggerStatus::Processing,
+            retries: 0,
+            data: "{}".to_string(),
+        };
+
+        let trace_id = "test_derived_stream_eval_failure_trace_id";
+        let _ = handle_triggers(trace_id, trigger).await;
+        // Should succeed (handler handles errors gracefully) but increment retries
+        // Verify trigger retries were incremented
+        let trigger = openobserve::service::db::scheduler::get(
+            "e2e",
+            TriggerModule::DerivedStream,
+            &module_key,
+        )
+        .await;
+        assert!(trigger.is_ok());
+        let trigger = trigger.unwrap();
+        assert!(trigger.retries > 0);
+
+        // Clean up the invalid pipeline
+        let _ = openobserve::service::db::pipeline::delete(&pipeline.id).await;
+    }
+
+    async fn e2e_cleanup_test_pipeline() {
+        // list the pipelines and choose the first one using API
+        let auth = setup();
+        let app = test::init_service(
+            App::new()
+                .app_data(web::JsonConfig::default().limit(get_config().limit.req_json_limit))
+                .app_data(web::PayloadConfig::new(
+                    get_config().limit.req_payload_limit,
+                ))
+                .configure(get_service_routes),
+        )
+        .await;
+        let req = test::TestRequest::get()
+            .uri("/api/e2e/pipelines")
+            .append_header(auth)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+        let body = test::read_body(resp).await;
+        let pipeline_list: openobserve::handler::http::models::pipelines::PipelineList =
+            json::from_slice(&body).unwrap();
+        let pipeline = pipeline_list.list.first();
+        assert!(pipeline.is_some());
+        let pipeline = pipeline.unwrap();
+
+        // Clean up test pipelines
+        let _ = openobserve::service::db::pipeline::delete(&pipeline.id).await;
     }
 }
