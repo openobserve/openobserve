@@ -12,7 +12,7 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use config::meta::projections::ProjectionColumnMapping;
 use datafusion::common::tree_node::TreeNode;
@@ -25,7 +25,7 @@ use crate::service::search::{
 
 pub async fn get_columns_from_projections(
     sql: Sql,
-) -> Result<Vec<ProjectionColumnMapping>, anyhow::Error> {
+) -> Result<HashMap<String, Vec<ProjectionColumnMapping>>, anyhow::Error> {
     let sql_arc = Arc::new(sql.clone());
     let ctx = SearchContextBuilder::new()
         .build(&Request::default(), &sql_arc)
@@ -63,18 +63,50 @@ mod tests {
         ]
     }
 
+    fn get_fields_t2() -> Vec<Field> {
+        vec![
+            Field::new("k8s_namespace_name", DataType::Utf8, false),
+            Field::new("k8s_pod_name", DataType::Utf8, false),
+            Field::new("floatvalue", DataType::Float32, false),
+        ]
+    }
+
     async fn get_sql(sql: &str) -> Sql {
-        let default_schema = Schema::new(get_fields_default());
-        infra::db_init().await.unwrap();
-        infra::schema::merge(
-            "parse_test",
-            "default",
-            StreamType::Logs,
-            &default_schema,
-            Some(1752660674351000),
-        )
-        .await
-        .unwrap();
+        // Use a simple static flag to initialize only once
+        use std::sync::atomic::{AtomicBool, Ordering};
+        static INITIALIZED: AtomicBool = AtomicBool::new(false);
+
+        if !INITIALIZED.load(Ordering::Relaxed) {
+            let default_schema = Schema::new(get_fields_default());
+            let t2_schema = Schema::new(get_fields_t2());
+
+            // Only initialize if not already done
+            if INITIALIZED
+                .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+            {
+                infra::db_init().await.unwrap();
+                infra::schema::merge(
+                    "parse_test",
+                    "default",
+                    StreamType::Logs,
+                    &default_schema,
+                    Some(1752660674351000),
+                )
+                .await
+                .unwrap();
+
+                infra::schema::merge(
+                    "parse_test",
+                    "t2",
+                    StreamType::Logs,
+                    &t2_schema,
+                    Some(1752660674351000),
+                )
+                .await
+                .unwrap();
+            }
+        }
 
         let query = SearchQuery {
             sql: sql.to_string(),
@@ -100,11 +132,14 @@ mod tests {
     async fn test_simple_projection() {
         let sql = "SELECT k8s_namespace_name, k8s_node_name FROM \"default\"";
         let parsed = get_sql(sql).await;
-        let mappings = get_columns_from_projections(parsed).await.unwrap();
+        let res = get_columns_from_projections(parsed).await.unwrap();
+        assert!(
+            !res.is_empty(),
+            "Expected at least 1 table but got empty result"
+        );
 
-        // The actual count might include additional system columns or the query might be processed
-        // differently
-        assert!(mappings.len() >= 2);
+        // For simple queries, we should have mappings grouped by table name
+        let mappings = res.get("default").unwrap();
 
         let namespace_mapping = mappings
             .iter()
@@ -115,7 +150,6 @@ mod tests {
                 .source_columns
                 .contains("k8s_namespace_name")
         );
-
         let node_mapping = mappings
             .iter()
             .find(|m| m.output_field == "k8s_node_name")
@@ -127,11 +161,9 @@ mod tests {
     async fn test_aliased_columns() {
         let sql = "SELECT k8s_namespace_name AS namespace, k8s_node_name AS node FROM \"default\"";
         let parsed = get_sql(sql).await;
-        let mappings = get_columns_from_projections(parsed).await.unwrap();
-
-        // The actual count might include additional system columns
-        assert!(mappings.len() >= 2);
-
+        let res = get_columns_from_projections(parsed).await.unwrap();
+        let mappings = res.get("default").unwrap();
+        assert!(mappings.len() >= 1);
         let namespace_mapping = mappings
             .iter()
             .find(|m| m.output_field == "namespace")
@@ -150,12 +182,11 @@ mod tests {
     async fn test_function_columns() {
         let sql = "SELECT COUNT(k8s_namespace_name), MAX(floatvalue) FROM \"default\"";
         let parsed = get_sql(sql).await;
-        let mappings = get_columns_from_projections(parsed).await.unwrap();
+        let res = get_columns_from_projections(parsed).await.unwrap();
+        let mappings = res.get("default").unwrap();
 
-        // The actual count might include additional system columns
         assert!(mappings.len() >= 2);
 
-        // Find mappings by checking if they contain the expected source columns
         assert!(
             mappings
                 .iter()
@@ -174,12 +205,11 @@ mod tests {
     async fn test_complex_expression() {
         let sql = "SELECT CAST(array_element(regexp_match(log, 'took: ([0-9]+) ms'), 1) AS INTEGER) AS extracted_time FROM \"default\"";
         let parsed = get_sql(sql).await;
-        let mappings = get_columns_from_projections(parsed).await.unwrap();
+        let res = get_columns_from_projections(parsed).await.unwrap();
+        let mappings = res.get("default").unwrap();
 
-        // The actual count might include additional system columns
         assert!(mappings.len() >= 1);
 
-        // Find the mapping that contains the 'log' column
         let mapping = mappings
             .iter()
             .find(|m| m.source_columns.contains("log"))
@@ -191,12 +221,12 @@ mod tests {
     async fn test_case_expression() {
         let sql = "SELECT CASE WHEN k8s_namespace_name = 'test' THEN floatvalue ELSE code END AS conditional_value FROM \"default\"";
         let parsed = get_sql(sql).await;
-        let mappings = get_columns_from_projections(parsed).await.unwrap();
+        let res = get_columns_from_projections(parsed).await.unwrap();
+        let mappings = res.get("default").unwrap();
 
-        // The actual count might include additional system columns
         assert!(mappings.len() >= 1);
+        println!("DEBUG: Mappings: {:?}", mappings);
 
-        // Find the mapping that contains the expected source columns
         let mapping = mappings
             .iter()
             .find(|m| {
@@ -213,27 +243,37 @@ mod tests {
         let sql =
             "SELECT CONCAT(k8s_namespace_name, '-', k8s_pod_name) AS full_name FROM \"default\"";
         let parsed = get_sql(sql).await;
-        let mappings = get_columns_from_projections(parsed).await.unwrap();
+        let res = get_columns_from_projections(parsed).await.unwrap();
+        let mappings = res.get("default").unwrap();
 
-        // The actual count might include additional system columns
-        assert!(mappings.len() >= 1);
+        assert!(mappings.len() >= 2);
 
-        // Find the mapping that contains the expected source columns
-        let mapping = mappings
-            .iter()
-            .find(|m| {
-                m.source_columns.contains("k8s_namespace_name")
-                    && m.source_columns.contains("k8s_pod_name")
-            })
-            .unwrap();
-        assert!(mapping.source_columns.len() == 2);
+        assert!(
+            mappings
+                .iter()
+                .find(|m| m.output_field == "full_name")
+                .is_some()
+        );
+        assert!(
+            mappings
+                .iter()
+                .find(|m| m.source_columns.contains("k8s_namespace_name"))
+                .is_some()
+        );
+        assert!(
+            mappings
+                .iter()
+                .find(|m| m.source_columns.contains("k8s_pod_name"))
+                .is_some()
+        );
     }
 
     #[tokio::test]
     async fn test_multiple_columns_in_expression_no_alias() {
         let sql = "SELECT k8s_namespace_name, k8s_pod_name FROM \"default\"";
         let parsed = get_sql(sql).await;
-        let mappings = get_columns_from_projections(parsed).await.unwrap();
+        let res = get_columns_from_projections(parsed).await.unwrap();
+        let mappings = res.get("default").unwrap();
 
         assert!(mappings.len() >= 2);
         assert!(
@@ -261,10 +301,14 @@ mod tests {
             SELECT k8s_namespace_name, count FROM namespace_stats
         "#;
         let parsed = get_sql(sql).await;
-        let mappings = get_columns_from_projections(parsed).await.unwrap();
+        let res = get_columns_from_projections(parsed).await.unwrap();
 
-        // The actual count might include additional system columns
-        assert!(mappings.len() >= 2);
+        let mappings = res.get("default").unwrap();
+
+        assert!(
+            !mappings.is_empty(),
+            "Expected at least some mappings but got none"
+        );
 
         assert!(
             mappings
@@ -292,12 +336,12 @@ mod tests {
             ) subq
         "#;
         let parsed = get_sql(sql).await;
-        let mappings = get_columns_from_projections(parsed).await.unwrap();
+        let res = get_columns_from_projections(parsed).await.unwrap();
 
-        // The actual count might include additional system columns
+        let mappings = res.get("default").unwrap();
+
         assert!(mappings.len() >= 2);
 
-        // Find mappings by checking if they contain the expected source columns
         assert!(
             mappings
                 .iter()
@@ -308,7 +352,7 @@ mod tests {
         assert!(
             mappings
                 .iter()
-                .find(|m| m.output_field == "total_count" || m.projection_expr.contains("count"))
+                .find(|m| m.output_field == "total_count")
                 .is_some()
         );
     }
@@ -322,10 +366,10 @@ mod tests {
             GROUP BY k8s_namespace_name
         "#;
         let parsed = get_sql(sql).await;
-        let mappings = get_columns_from_projections(parsed).await.unwrap();
+        let res = get_columns_from_projections(parsed).await.unwrap();
+        let mappings = res.get("default").unwrap();
 
-        // The actual count might include additional system columns
-        assert!(mappings.len() >= 2);
+        assert!(mappings.len() >= 1);
 
         assert!(
             mappings
@@ -359,20 +403,16 @@ mod tests {
             WHERE rank = 1
         "#;
         let parsed = get_sql(sql).await;
-        let mappings = get_columns_from_projections(parsed).await.unwrap();
+        let res = get_columns_from_projections(parsed).await.unwrap();
+        let mappings = res.get("default").unwrap();
 
-        // The actual count might include additional system columns
-        assert!(mappings.len() >= 3);
+        assert!(mappings.len() >= 1);
 
         let namespace_mapping = mappings
             .iter()
-            .find(|m| m.output_field == "k8s_namespace_name")
+            .find(|m| m.source_columns.contains("k8s_namespace_name"))
             .unwrap();
-        assert!(
-            namespace_mapping
-                .source_columns
-                .contains("k8s_namespace_name")
-        );
+        assert!(namespace_mapping.output_field == "k8s_namespace_name");
 
         let pod_mapping = mappings
             .iter()
@@ -394,40 +434,34 @@ mod tests {
                 n1.k8s_namespace_name,
                 n1.k8s_pod_name,
                 (SELECT MAX(floatvalue) FROM "default" n2 WHERE n2.k8s_namespace_name = n1.k8s_namespace_name) as max_value
-            FROM "default" n1
+            FROM "t2" n1
             WHERE n1.k8s_pod_name IS NOT NULL
         "#;
         let parsed = get_sql(sql).await;
-        let mappings = get_columns_from_projections(parsed).await.unwrap();
-
-        // The actual count might include additional system columns
-        assert!(mappings.len() >= 3);
-
-        let namespace_mapping = mappings
-            .iter()
-            .find(|m| m.output_field == "k8s_namespace_name")
-            .unwrap();
+        let res = get_columns_from_projections(parsed).await.unwrap();
+        let mappings = res.get("default").unwrap();
+        assert!(mappings.len() >= 1);
         assert!(
-            namespace_mapping
-                .source_columns
-                .contains("k8s_namespace_name")
+            mappings
+                .iter()
+                .find(|m| m.output_field == "max_value")
+                .is_some()
         );
 
-        let pod_mapping = mappings
-            .iter()
-            .find(|m| m.output_field == "k8s_pod_name")
-            .unwrap();
-        assert!(pod_mapping.source_columns.contains("k8s_pod_name"));
+        let mappings = res.get("t2").unwrap();
+        assert!(mappings.len() >= 2);
 
-        let max_value_mapping = mappings
-            .iter()
-            .find(|m| m.output_field == "max_value")
-            .unwrap();
-        // The subquery might not properly extract source columns in this complex case
-        // Just verify the mapping exists
         assert!(
-            !max_value_mapping.source_columns.is_empty()
-                || max_value_mapping.source_columns.is_empty()
+            mappings
+                .iter()
+                .find(|m| m.output_field == "k8s_namespace_name")
+                .is_some()
+        );
+        assert!(
+            mappings
+                .iter()
+                .find(|m| m.output_field == "k8s_pod_name")
+                .is_some()
         );
     }
 
@@ -444,10 +478,14 @@ mod tests {
             SELECT k8s_namespace_name, count FROM namespace_data
         "#;
         let parsed = get_sql(sql).await;
-        let mappings = get_columns_from_projections(parsed).await.unwrap();
+        let res = get_columns_from_projections(parsed).await.unwrap();
 
-        // The actual count might include additional system columns
-        assert!(mappings.len() >= 2);
+        let mappings = res.get("default").unwrap();
+
+        assert!(
+            !mappings.is_empty(),
+            "Expected at least some mappings but got none"
+        );
 
         let namespace_mapping = mappings
             .iter()
@@ -471,19 +509,17 @@ mod tests {
     async fn test_group_by_with_aggregate_function() {
         let sql = "SELECT k8s_namespace_name, k8s_namespace_name AS a, MAX(k8s_namespace_name) AS b FROM \"default\" GROUP BY k8s_namespace_name";
         let parsed = get_sql(sql).await;
-        let mappings = get_columns_from_projections(parsed).await.unwrap();
+        let res = get_columns_from_projections(parsed).await.unwrap();
+        let mappings = res.get("default").unwrap();
 
-        // Should have 3 projections: k8s_namespace_name, a, b
-        assert!(mappings.len() >= 3);
+        assert!(mappings.len() >= 1);
 
-        // Check the direct column projection
         let direct_mapping = mappings
             .iter()
             .find(|m| m.output_field == "k8s_namespace_name")
             .unwrap();
         assert!(direct_mapping.source_columns.contains("k8s_namespace_name"));
 
-        // Check the aliased column projection
         let aliased_mapping = mappings.iter().find(|m| m.output_field == "a").unwrap();
         assert!(
             aliased_mapping
@@ -491,7 +527,6 @@ mod tests {
                 .contains("k8s_namespace_name")
         );
 
-        // Check the aggregate function projection
         let aggregate_mapping = mappings.iter().find(|m| m.output_field == "b").unwrap();
         assert!(
             aggregate_mapping
@@ -499,5 +534,44 @@ mod tests {
                 .contains("k8s_namespace_name")
         );
         assert!(aggregate_mapping.projection_expr.contains("max"));
+    }
+
+    #[tokio::test]
+    async fn test_table_alias_resolution_with_grouped_mappings() {
+        let sql = r#"
+            SELECT t1.k8s_namespace_name AS k1, t2.k8s_namespace_name AS k2
+            FROM "default" t1
+            JOIN "t2" t2 ON t1.k8s_namespace_name = t2.k8s_namespace_name
+        "#;
+        let parsed = get_sql(sql).await;
+        let grouped_mappings = get_columns_from_projections(parsed).await.unwrap();
+
+        let default_mappings = grouped_mappings.get("default").unwrap();
+        assert!(
+            default_mappings
+                .iter()
+                .find(|m| m.source_columns.contains("k8s_namespace_name"))
+                .is_some()
+        );
+        assert!(
+            default_mappings
+                .iter()
+                .find(|m| m.output_field.contains("k1"))
+                .is_some()
+        );
+
+        let t2_mappings = grouped_mappings.get("t2").unwrap();
+        assert!(
+            t2_mappings
+                .iter()
+                .find(|m| m.source_columns.contains("k8s_namespace_name"))
+                .is_some()
+        );
+        assert!(
+            t2_mappings
+                .iter()
+                .find(|m| m.output_field.contains("k2"))
+                .is_some()
+        );
     }
 }

@@ -16,6 +16,8 @@
 use std::str::FromStr;
 
 use chrono::{TimeZone, Utc};
+#[cfg(feature = "enterprise")]
+use config::meta::projections::ProjectionColumnMapping;
 use config::{
     TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -1201,7 +1203,7 @@ pub async fn apply_regex_to_response(
             }
         };
 
-    let projections =
+    let projections: std::collections::HashMap<String, Vec<ProjectionColumnMapping>> =
         crate::service::search::datafusion::plan::regex_projections::get_columns_from_projections(
             sql,
         )
@@ -1210,7 +1212,6 @@ pub async fn apply_regex_to_response(
     match pattern_manager.process_at_search(
         org_id,
         StreamType::Logs,
-        all_streams,
         &mut res.hits,
         projections,
     ) {
