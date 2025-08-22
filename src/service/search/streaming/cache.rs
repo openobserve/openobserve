@@ -22,7 +22,6 @@ use config::meta::{
     stream::StreamType,
 };
 use log;
-
 use tokio::sync::mpsc;
 
 use super::sorting::order_search_results;
@@ -367,13 +366,14 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
     );
 
-   crate::service::search::cache::apply_regex_to_response(
+    crate::service::search::cache::apply_regex_to_response(
         req,
         org_id,
         all_streams,
         stream_type,
         &mut cached.cached_response,
-    ).await?;
+    )
+    .await?;
 
     if is_result_array_skip_vrl {
         cached.cached_response.hits = crate::service::search::cache::apply_vrl_to_response(
