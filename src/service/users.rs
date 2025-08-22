@@ -931,6 +931,26 @@ pub async fn remove_user_from_org(
                     )));
                 }
 
+                #[cfg(feature = "cloud")]
+                {
+                    use o2_enterprise::enterprise::cloud::org_invites;
+
+                    match org_invites::delete_invites_for_user(org_id, &email_id).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            log::error!(
+                                "error deleting invites when deleting user {email_id} from org {org_id} : {e}"
+                            );
+                            return Ok(HttpResponse::InternalServerError().json(
+                                MetaHttpResponse::error(
+                                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                                    "error deleting user invites",
+                                ),
+                            ));
+                        }
+                    }
+                }
+
                 if !user.organizations.is_empty() {
                     let orgs = &mut user.organizations;
                     if orgs.len() == 1 {
