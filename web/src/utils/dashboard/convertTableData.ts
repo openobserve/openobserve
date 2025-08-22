@@ -74,7 +74,7 @@ export const convertTableData = (
 
       if (alias && config) {
         if (config.type === "unique_value_color") {
-          const autoColor = config.autoColor === true;
+          const autoColor = config.autoColor;
           colorConfigMap[alias] = { autoColor };
         } else if (config.type === "unit") {
           const unit = config.value?.unit;
