@@ -931,6 +931,13 @@ pub async fn remove_user_from_org(
                     )));
                 }
 
+                if initiating_user.email == email_id {
+                    return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                        http::StatusCode::FORBIDDEN,
+                        "Not Allowed",
+                    )));
+                }
+
                 #[cfg(feature = "cloud")]
                 {
                     use o2_enterprise::enterprise::cloud::org_invites;

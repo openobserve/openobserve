@@ -468,6 +468,16 @@ pub async fn generate_invitation(
             None => return Err(anyhow::anyhow!("Unauthorized access")),
         }
     }
+    for invitee in &invites.invites {
+        match get_user(Some(org_id),invitee).await {
+            None => {}
+            Some(_) => {
+                return Err(anyhow::anyhow!(
+                    "user with email {invitee} already part of the organization"
+                ));
+            }
+        }
+    }
     if let Some(org) = get_org(org_id).await {
         let invite_token = config::ider::generate();
         let expires_at = Utc::now().timestamp_micros()
@@ -496,7 +506,14 @@ pub async fn generate_invitation(
             if !cfg.smtp.smtp_reply_to.is_empty() {
                 email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
             }
-            let msg = get_invite_email_body(org_id, &org.name, &inviter_name, &invite_token);
+            let msg = get_invite_email_body(
+                org_id,
+                &org.name,
+                &inviter_name,
+                &invite_token,
+                invites.role,
+                expires_at,
+            );
             let email = email.singlepart(SinglePart::html(msg)).unwrap();
 
             // Send the email
