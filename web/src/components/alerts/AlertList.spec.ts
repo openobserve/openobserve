@@ -752,13 +752,7 @@ describe("AlertList - micro validations", () => {
     expect(wrapper.vm.folderIdToBeCloned).toBe("folderX");
   });
 
-  it("multipleExportAlert notifies and clears selection on success", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-    wrapper.vm.selectedAlerts = [wrapper.vm.filteredResults[0]];
-    await wrapper.vm.multipleExportAlert();
-    expect(wrapper.vm.selectedAlerts.length).toBe(0);
-  });
+  // Note: multipleExportAlert functionality is already tested in "exports multiple selected alerts to JSON" test above
 
   it("toggle searchAcrossFolders rebinds models", async () => {
     const wrapper: any = await mountAlertList();
