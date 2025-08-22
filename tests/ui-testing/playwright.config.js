@@ -1,34 +1,29 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
 
-/**
- * Fallback to .env file if environment variables are not set
- * This allows both UI runner (which sets env vars) and terminal usage (which uses .env)
- */
-function loadEnvironmentVariables() {
-  // Check if essential env vars are already set (from UI runner)
-  if (process.env.ZO_BASE_URL && process.env.ZO_ROOT_USER_EMAIL && process.env.ZO_ROOT_USER_PASSWORD) {
-    console.log('Using environment variables from UI runner');
-    return;
-  }
-
-  // Fallback to .env file for terminal usage
-  try {
-    require('dotenv').config();
-    console.log('Using environment variables from .env file');
-  } catch (error) {
-    console.warn('dotenv not available, using existing environment variables');
-  }
+// Load environment variables from .env file
+try {
+  require('dotenv').config();
+  console.log('✅ Environment variables loaded from .env file');
+} catch (error) {
+  console.warn('⚠️  dotenv not available, using system environment variables');
 }
 
-// Load environment variables
-loadEnvironmentVariables();
+// Check if essential environment variables are set
+if (!process.env.ZO_BASE_URL || !process.env.ZO_ROOT_USER_EMAIL || !process.env.ZO_ROOT_USER_PASSWORD) {
+  console.warn('⚠️  Essential environment variables not found. Make sure to set ZO_BASE_URL, ZO_ROOT_USER_EMAIL, and ZO_ROOT_USER_PASSWORD');
+}
 
 /**
  * @see https://playwright.dev/docs/test-configuration
  */
 module.exports = defineConfig({
   testDir: './playwright-tests',
+  /* Exclude archived tests from all test runs */
+  testIgnore: ['**/test-archives/**', '**/*_old.js'],
+  /* Global setup and teardown */
+  globalSetup: './playwright-tests/utils/global-setup.js',
+  globalTeardown: './playwright-tests/utils/global-teardown.js',
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
