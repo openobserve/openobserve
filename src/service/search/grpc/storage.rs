@@ -142,7 +142,7 @@ pub async fn search(
     let mut idx_took = 0;
     let mut is_add_filter_back = false;
     if use_inverted_index {
-        (idx_took, is_add_filter_back, ..) = filter_file_list_by_tantivy_index(
+        (idx_took, is_add_filter_back, ..) = tantivy_search(
             query.clone(),
             &mut files,
             tantivy_condition.clone(),
@@ -622,7 +622,8 @@ pub async fn cache_files(
 /// If the query does not match any FST in the index file, the file will be filtered out.
 /// If the query does match then the segment IDs for the file will be updated.
 /// If the query not find corresponding index file, the file will *not* be filtered out.
-pub async fn filter_file_list_by_tantivy_index(
+#[tracing::instrument(name = "service:search:grpc:storage:tantivy_search", skip_all)]
+pub async fn tantivy_search(
     query: Arc<super::QueryParams>,
     file_list: &mut Vec<FileKey>,
     index_condition: Option<IndexCondition>,
