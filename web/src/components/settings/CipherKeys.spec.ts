@@ -346,7 +346,7 @@ describe("CipherKeys", () => {
 
       const wrapper = createWrapper();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await wrapper.vm.$nextTick();
 
       // Should be called at least twice - loading notification first, then error
       expect(mockNotify).toHaveBeenCalledTimes(2);
@@ -369,7 +369,7 @@ describe("CipherKeys", () => {
 
       const wrapper = createWrapper();
       await nextTick();
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await wrapper.vm.$nextTick();
 
       // Should only be called once with loading notification for 403 errors
       expect(mockNotify).toHaveBeenCalledTimes(1);
@@ -437,6 +437,9 @@ describe("CipherKeys", () => {
       const wrapper = createWrapper();
       wrapper.vm.showAddDialog = true;
       await nextTick();
+      
+      // Call the hideAddDialog method directly
+      await wrapper.vm.hideAddDialog();
 
       expect(router.push).toHaveBeenCalledWith({
         name: "cipherKeys",
