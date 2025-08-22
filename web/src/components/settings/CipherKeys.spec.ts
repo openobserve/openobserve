@@ -324,9 +324,7 @@ describe("CipherKeys", () => {
 
   describe("Data loading", () => {
     it("should populate table data after successful fetch", async () => {
-      const wrapper = createWrapper();
-      await nextTick();
-      await wrapper.vm.$nextTick();
+      const wrapper = await createWrapperAndWait();
       
       expect(wrapper.vm.tabledata).toHaveLength(2);
       expect(wrapper.vm.tabledata[0]).toEqual({
@@ -773,9 +771,7 @@ describe("CipherKeys", () => {
       
       mockCipherKeysService.list.mockResolvedValue(incompleteData);
       
-      const wrapper = createWrapper();
-      await nextTick();
-      await wrapper.vm.$nextTick();
+      const wrapper = await createWrapperAndWait();
 
       // The component should handle missing properties gracefully
       if (wrapper.vm.tabledata.length > 0) {

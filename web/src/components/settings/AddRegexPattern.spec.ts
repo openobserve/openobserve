@@ -93,9 +93,14 @@ const router = createRouter({
   ],
 });
 
-// Mock the router methods we need to test
-const mockRouterPush = vi.fn();
-router.push = mockRouterPush;
+// Mock Vue Router
+const mockRouter = {
+  currentRoute: {
+    value: {
+      query: {},
+    },
+  },
+};
 
 const createWrapper = (props = {}, options = {}) => {
   return mount(AddRegexPattern, {
@@ -107,7 +112,8 @@ const createWrapper = (props = {}, options = {}) => {
     global: {
       plugins: [i18n, router],
       mocks: {
-        $store: store,
+        $store: mockStore,
+        $router: mockRouter,
       },
       provide: {
         store: store,
@@ -164,11 +170,11 @@ const createWrapper = (props = {}, options = {}) => {
 describe("AddRegexPattern", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    setupStoreForTest();
-    mockRouterPush.mockClear();
-    
-    // Set up router state
-    await router.push('/');
+    mockStore.state.theme = "light";
+    mockStore.state.isAiChatEnabled = false;
+    mockStore.state.organizationData.regexPatternPrompt = "";
+    mockStore.state.organizationData.regexPatternTestValue = "";
+    mockRouter.currentRoute.value.query = {};
   });
 
   afterEach(() => {
@@ -329,17 +335,25 @@ describe("AddRegexPattern", () => {
     it("should create new regex pattern successfully", async () => {
       const wrapper = createWrapper();
       
-      // Set form data directly
-      wrapper.vm.regexPatternInputs.name = "Test Pattern";
-      wrapper.vm.regexPatternInputs.pattern = "\\d+";
-      wrapper.vm.regexPatternInputs.description = "Test Description";
-      await nextTick();
+      await wrapper.setData({
+        regexPatternInputs: {
+          name: "Test Pattern",
+          pattern: "\\d+",
+          description: "Test Description",
+        },
+      });
 
-      // Call the save method directly - MSW will handle the HTTP request
-      await wrapper.vm.saveRegexPattern();
+      const form = wrapper.find('[data-test-stub="q-form"]');
+      await form.trigger("submit");
 
-      // Verify the component behavior after successful save
-      expect(wrapper.vm.isSaving).toBe(false);
+      expect(mockRegexPatternService.create).toHaveBeenCalledWith(
+        "test-org",
+        {
+          name: "Test Pattern",
+          pattern: "\\d+",
+          description: "Test Description",
+        }
+      );
     });
 
     it("should update existing regex pattern successfully", async () => {
@@ -369,10 +383,17 @@ describe("AddRegexPattern", () => {
     it("should emit update:list event after successful save", async () => {
       const wrapper = createWrapper();
       
-      // Set form data directly
-      wrapper.vm.regexPatternInputs.name = "Test Pattern";
-      wrapper.vm.regexPatternInputs.pattern = "\\d+";
-      wrapper.vm.regexPatternInputs.description = "";
+      await wrapper.setData({
+        regexPatternInputs: {
+          name: "Test Pattern",
+          pattern: "\\d+",
+          description: "",
+        },
+      });
+
+      const form = wrapper.find('[data-test-stub="q-form"]');
+      await form.trigger("submit");
+      
       await nextTick();
 
       // Call the save method directly
@@ -459,12 +480,14 @@ describe("AddRegexPattern", () => {
     it("should show loading state during test", async () => {
       const wrapper = createWrapper();
       
-      // Set test data directly
-      wrapper.vm.regexPatternInputs.pattern = "\\d+";
-      wrapper.vm.testString = "123";
+      await wrapper.setData({
+        regexPatternInputs: { pattern: "\\d+" },
+        testString: "123",
+      });
+
+      const testPromiseCall = wrapper.vm.testStringOutput();
       
-      // Check loading state behavior
-      expect(wrapper.vm.testLoading).toBe(false);
+      expect(wrapper.vm.testLoading).toBe(true);
       
       // Call test method and verify it works with MSW
       await wrapper.vm.testStringOutput();
@@ -477,10 +500,8 @@ describe("AddRegexPattern", () => {
     it("should show AI button when enterprise and AI is enabled", () => {
       store.state.zoConfig.ai_enabled = true;
       const wrapper = createWrapper();
-      
-      // Check if the AI functionality is available in the component
-      // Use optional chaining in case the property doesn't exist
-      expect(wrapper.vm.isAiEnabled || store.state.zoConfig.ai_enabled).toBe(true);
+      const aiBtn = wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]');
+      expect(aiBtn.exists()).toBe(true);
     });
 
     it("should hide AI button when AI is disabled", () => {
@@ -573,21 +594,15 @@ describe("AddRegexPattern", () => {
       expect(wrapper.vm.regexPatternInputs.description).toBe("");
     });
 
-    it("should handle router query parameters for AI context", async () => {
-      store.state.organizationData.regexPatternPrompt = "Test prompt";
-      store.state.organizationData.regexPatternTestValue = "Test value";
-      
-      // Set router query before creating wrapper
-      await router.push({ query: { from: "logs" } });
+    it("should handle router query parameters for AI context", () => {
+      mockStore.state.organizationData.regexPatternPrompt = "Test prompt";
+      mockStore.state.organizationData.regexPatternTestValue = "Test value";
+      mockRouter.currentRoute.value.query = { from: "logs" };
       
       const wrapper = createWrapper();
       
-      // Give the component time to process the router query
-      await wrapper.vm.$nextTick();
-      
-      // Check if the data is properly set, with fallbacks
-      expect(wrapper.vm.inputContext || store.state.organizationData.regexPatternPrompt).toBe("Test prompt");
-      expect(wrapper.vm.testString || store.state.organizationData.regexPatternTestValue).toBe("Test value");
+      expect(wrapper.vm.inputContext).toBe("Test prompt");
+      expect(wrapper.vm.testString).toBe("Test value");
     });
 
     it("should handle component width calculations based on AI chat state", async () => {
