@@ -151,7 +151,8 @@ mod tests {
     fn test_metrics_default() {
         let metrics = Metrics::default();
         assert_eq!(metrics.stage, 0);
-        assert_eq!(metrics.node, "");
+        assert_eq!(metrics.node_address, "");
+        assert_eq!(metrics.node_name, "");
         assert_eq!(metrics.metrics, "");
     }
 
@@ -237,7 +238,8 @@ mod tests {
             CustomMessage::Metrics(metrics) => {
                 assert_eq!(metrics.len(), 1);
                 assert_eq!(metrics[0].stage, 2); // func() returns true, is_super_cluster is false
-                assert!(!metrics[0].node.is_empty());
+                assert!(!metrics[0].node_address.is_empty());
+                assert!(!metrics[0].node_name.is_empty());
                 assert!(!metrics[0].metrics.is_empty());
             }
             _ => panic!("Expected Metrics variant"),
@@ -255,12 +257,14 @@ mod tests {
     fn test_pre_custom_message_get_custom_message_metrics_ref() {
         let metrics1 = vec![Metrics {
             stage: 1,
-            node: "node1".to_string(),
+            node_address: "node1".to_string(),
+            node_name: "Node 1".to_string(),
             metrics: "metrics1".to_string(),
         }];
         let metrics2 = vec![Metrics {
             stage: 2,
-            node: "node2".to_string(),
+            node_address: "node2".to_string(),
+            node_name: "Node 2".to_string(),
             metrics: "metrics2".to_string(),
         }];
 
@@ -275,8 +279,8 @@ mod tests {
         match custom_msg {
             CustomMessage::Metrics(metrics) => {
                 assert_eq!(metrics.len(), 2);
-                assert_eq!(metrics[0].node, "node1");
-                assert_eq!(metrics[1].node, "node2");
+                assert_eq!(metrics[0].node_address, "node1");
+                assert_eq!(metrics[1].node_address, "node2");
             }
             _ => panic!("Expected Metrics variant"),
         }
@@ -303,7 +307,7 @@ mod tests {
         let metrics = collect_metrics(&metrics_info);
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].stage, 1); // func() returns true, is_super_cluster is true
-        assert!(!metrics[0].node.is_empty());
+        assert!(!metrics[0].node_address.is_empty());
         assert!(!metrics[0].metrics.is_empty());
     }
 
@@ -356,7 +360,8 @@ mod tests {
     fn test_metrics_serialization() {
         let metrics = vec![Metrics {
             stage: 1,
-            node: "test_node".to_string(),
+            node_address: "test_node".to_string(),
+            node_name: "Test Node".to_string(),
             metrics: "test_metrics".to_string(),
         }];
         let custom_msg = CustomMessage::Metrics(metrics);
@@ -368,7 +373,8 @@ mod tests {
             CustomMessage::Metrics(metrics) => {
                 assert_eq!(metrics.len(), 1);
                 assert_eq!(metrics[0].stage, 1);
-                assert_eq!(metrics[0].node, "test_node");
+                assert_eq!(metrics[0].node_address, "test_node");
+                assert_eq!(metrics[0].node_name, "Test Node");
                 assert_eq!(metrics[0].metrics, "test_metrics");
             }
             _ => panic!("Expected Metrics variant"),
