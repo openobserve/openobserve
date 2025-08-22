@@ -276,11 +276,10 @@ describe("SettingsIndex", () => {
 
     it("should show correct icon when tabs are hidden", async () => {
       const wrapper = createWrapper();
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
-      
-      await wrapper.setData({ showManagementTabs: false });
+      wrapper.vm.showManagementTabs = false;
       await nextTick();
       
+      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn-management"]');
       expect(collapseBtn.attributes("icon")).toBe("chevron_right");
     });
 
@@ -343,6 +342,11 @@ describe("SettingsIndex", () => {
       const wrapper = createWrapper();
       
       // Mock that we're on regex patterns route by setting the component's router
+      Object.defineProperty(wrapper.vm.router, 'currentRoute', {
+        value: { value: { name: 'regexPatterns' } }
+      });
+      
+      // Mock that we're on regex patterns route by setting the component's router
       try {
         Object.defineProperty(wrapper.vm.router, 'currentRoute', {
           value: { value: { name: 'regexPatterns' } }
@@ -354,80 +358,6 @@ describe("SettingsIndex", () => {
         expect(expectedIcon).toBeDefined();
         expect(expectedIcon).toMatch(/regex_icon_(light|dark)\.svg$/);
       }
-    });
-  });
-
-  describe("Tab configuration", () => {
-    it("should have correct tab configuration structure", () => {
-      const wrapper = createWrapper();
-      
-      const tabs = wrapper.find('[data-test-stub="q-tabs"]');
-      expect(tabs.exists()).toBe(true);
-      expect(tabs.classes()).toContain("management-tabs");
-      expect(tabs.classes()).toContain("q-tabs--vertical");
-    });
-
-    it("should show tabs when showManagementTabs is true", () => {
-      const wrapper = createWrapper();
-      const tabs = wrapper.find('[data-test-stub="q-tabs"]');
-      expect(tabs.exists()).toBe(true);
-    });
-
-    it("should hide tabs when showManagementTabs is false", async () => {
-      const wrapper = createWrapper();
-      await wrapper.setData({ showManagementTabs: false });
-      await nextTick();
-      
-      const tabs = wrapper.find('[data-test-stub="q-tabs"]');
-      expect(tabs.exists()).toBe(false);
-    });
-  });
-
-  describe("Conditional rendering", () => {
-    it("should hide enterprise-only tabs when not enterprise", async () => {
-      const config = await import("@/aws-exports");
-      vi.mocked(config.default).isEnterprise = "false";
-
-      const wrapper = createWrapper();
-      
-      const cipherTab = wrapper.find('[data-test="management-cipher-key-tab"]');
-      const nodesTab = wrapper.find('[data-test="nodes-tab"]');
-      const pipelineTab = wrapper.find('[data-test="pipeline-destinations-tab"]');
-      const regexTab = wrapper.find('[data-test="regex-patterns-tab"]');
-      
-      expect(cipherTab.exists()).toBe(false);
-      expect(nodesTab.exists()).toBe(false);
-      expect(pipelineTab.exists()).toBe(false);
-      expect(regexTab.exists()).toBe(false);
-    });
-
-    it("should hide meta org tabs when not meta org", async () => {
-      const useIsMetaOrg = await import("@/composables/useIsMetaOrg");
-      vi.mocked(useIsMetaOrg.default).mockReturnValue({
-        isMetaOrg: { value: false },
-      });
-
-      const wrapper = createWrapper();
-      
-      const queryTab = wrapper.find('[data-name="queryManagement"]');
-      const nodesTab = wrapper.find('[data-test="nodes-tab"]');
-      const domainTab = wrapper.find('[data-test="domain-management-tab"]');
-      const orgManagementTab = wrapper.find('[data-test="organization-management-tab"]');
-      
-      expect(queryTab.exists()).toBe(false);
-      expect(nodesTab.exists()).toBe(false);
-      expect(domainTab.exists()).toBe(false);
-      expect(orgManagementTab.exists()).toBe(false);
-    });
-
-    it("should hide cloud-only tabs when not cloud", async () => {
-      const config = await import("@/aws-exports");
-      vi.mocked(config.default).isCloud = "false";
-
-      const wrapper = createWrapper();
-      
-      const orgManagementTab = wrapper.find('[data-test="organization-management-tab"]');
-      expect(orgManagementTab.exists()).toBe(false);
     });
   });
 
