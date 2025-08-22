@@ -135,7 +135,7 @@ mod tests {
         FileKey {
             id,
             account: "test_account".to_string(),
-            key: format!("file_{}.parquet", id),
+            key: format!("file_{id}.parquet"),
             meta: FileMeta {
                 min_ts,
                 max_ts,

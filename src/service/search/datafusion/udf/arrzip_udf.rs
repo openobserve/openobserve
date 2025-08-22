@@ -126,10 +126,7 @@ mod tests {
         delimiter: &str,
         expected_output: Vec<&str>,
     ) {
-        let sql = format!(
-            "select arrzip(arr_field1, arr_field2, '{}') as ret from t",
-            delimiter
-        );
+        let sql = format!("select arrzip(arr_field1, arr_field2, '{delimiter}') as ret from t");
         let sqls = [(sql.as_str(), expected_output)];
 
         let schema = Arc::new(Schema::new(vec![
@@ -256,7 +253,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_arr_zip_null_input() {
-        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
+        let expected_output = ["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
 
         let schema = Arc::new(Schema::new(vec![
             Field::new("arr_field1", DataType::Utf8, true),
@@ -299,7 +296,7 @@ mod tests {
             r#"[1, 2]"#,
         ];
         let sql = "select arrzip(arr_field1, arr_field2, ',') as ret from t";
-        let expected_output = vec![
+        let expected_output = [
             "+---------------------+",
             "| ret                 |",
             "+---------------------+",

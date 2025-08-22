@@ -243,7 +243,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_arr_sort_null_input() {
-        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
+        let expected_output = ["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
 
         let schema = Arc::new(Schema::new(vec![Field::new(
             "arr_field",
@@ -277,7 +277,7 @@ mod tests {
             r#"{"key": "value"}"#,
         ];
         let sql = "select arrsort(arr_field) as ret from t";
-        let expected_output = vec![
+        let expected_output = [
             "+---------------+",
             "| ret           |",
             "+---------------+",
