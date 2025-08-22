@@ -414,6 +414,7 @@ pub enum Config {
     #[serde(rename = "unique_value_color")]
     #[serde(rename_all = "camelCase")]
     UniqueValueColor {
+        #[serde(default)]
         auto_color: bool,
     },
 }
