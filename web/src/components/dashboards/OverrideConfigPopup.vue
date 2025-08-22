@@ -390,7 +390,7 @@ export default defineComponent({
       if (!fieldValue) return "";
 
       const option = columnsOptions.value.find(
-        (option) => option.value === fieldValue,
+        (option: any) => option.value === fieldValue,
       );
 
       if (option) {
