@@ -41,7 +41,7 @@ use crate::handler::grpc::MetadataMap;
 
 pub struct Eventer;
 
-const CHUNK_SIZE: usize = 5 * 1024 * 1024; // 4MB chunks
+const CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks
 
 #[tonic::async_trait]
 impl Event for Eventer {
