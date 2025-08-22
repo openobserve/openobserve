@@ -188,10 +188,7 @@ describe("NoRegexPatterns", () => {
       
       expect(titleText.classes()).toContain("title-text");
       
-      // Check computed styles would be applied via CSS
-      const styles = getComputedStyle(titleText.element);
-      // Note: In jsdom, computed styles are not fully supported, 
-      // but we can verify the class is applied correctly
+      // CSS styles are applied via the class and tested through visual/integration tests
     });
 
     it("should apply correct styling to subtitle text", () => {
@@ -291,8 +288,9 @@ describe("NoRegexPatterns", () => {
       
       expect(wrapper.exists()).toBe(true);
       const container = wrapper.find(".full-width");
-      // Should default to light mode when theme is undefined
+      // When theme is undefined, component defaults to light-mode
       expect(container.classes()).toContain("light-mode");
+      expect(container.classes()).not.toContain("dark-mode");
     });
 
     it("should handle multiple rapid clicks on create new", async () => {
@@ -324,16 +322,21 @@ describe("NoRegexPatterns", () => {
     it("should define correct emission events", () => {
       const wrapper = createWrapper();
       
-      // Check that the component defines the expected emits
-      expect(wrapper.vm.$options.emits).toContain("create-new-regex-pattern");
-      expect(wrapper.vm.$options.emits).toContain("import-regex-pattern");
+      // Test behavior by triggering actions and checking emissions
+      const createNewText = wrapper.find(".create-new-text");
+      createNewText.trigger("click");
+      expect(wrapper.emitted("create-new-regex-pattern")).toBeTruthy();
+      
+      const importButton = wrapper.find('[data-test-stub="q-btn"]');
+      importButton.trigger("click");
+      expect(wrapper.emitted("import-regex-pattern")).toBeTruthy();
     });
 
     it("should not accept any props", () => {
       const wrapper = createWrapper();
       
-      // This component doesn't define any props
-      expect(wrapper.vm.$options.props).toBeUndefined();
+      // This component is designed to be stateless without props
+      expect(wrapper.props()).toEqual({});
     });
   });
 
