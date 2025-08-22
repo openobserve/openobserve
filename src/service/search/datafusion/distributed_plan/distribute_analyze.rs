@@ -63,7 +63,8 @@ impl DistributeAnalyzeExec {
     pub fn new(verbose: bool, show_statistics: bool, input: Arc<dyn ExecutionPlan>) -> Self {
         let fields = vec![
             Field::new("phase", DataType::Int32, false),
-            Field::new("node", DataType::Utf8, false),
+            Field::new("node_address", DataType::Utf8, false),
+            Field::new("node_name", DataType::Utf8, false),
             Field::new("plan", DataType::Utf8, false),
         ];
         let schema = Arc::new(Schema::new(fields));
@@ -181,11 +182,13 @@ fn create_output_batch(
     schema: SchemaRef,
 ) -> Result<RecordBatch> {
     let mut phase_builder = Int32Builder::new();
-    let mut node_builder = StringBuilder::with_capacity(1, 1024);
+    let mut address_builder = StringBuilder::with_capacity(1, 1024);
+    let mut name_builder = StringBuilder::with_capacity(1, 1024);
     let mut plan_builder = StringBuilder::with_capacity(1, 1024);
 
     phase_builder.append_value(0); // Phase 0 for the main plan
-    node_builder.append_value(LOCAL_NODE.get_grpc_addr());
+    address_builder.append_value(LOCAL_NODE.get_grpc_addr());
+    name_builder.append_value(LOCAL_NODE.get_name());
 
     let annotated_plan = DisplayableExecutionPlan::new(input.as_ref())
         .indent(verbose)
@@ -197,17 +200,20 @@ fn create_output_batch(
 
     for m in metrics {
         phase_builder.append_value(m.stage);
-        node_builder.append_value(m.node);
+        address_builder.append_value(m.node_address);
+        name_builder.append_value(m.node_name);
         plan_builder.append_value(m.metrics);
     }
 
     if verbose {
         phase_builder.append_value(0); // Phase 0 for the main plan
-        node_builder.append_value("Output Rows");
+        address_builder.append_value("Output Rows");
+        name_builder.append_value("");
         plan_builder.append_value(total_rows.to_string());
 
         phase_builder.append_value(0); // Phase 0 for the main plan
-        node_builder.append_value("Duration");
+        address_builder.append_value("Duration");
+        name_builder.append_value("");
         plan_builder.append_value(format!("{duration:?}"));
     }
 
@@ -215,7 +221,8 @@ fn create_output_batch(
         schema,
         vec![
             Arc::new(phase_builder.finish()),
-            Arc::new(node_builder.finish()),
+            Arc::new(address_builder.finish()),
+            Arc::new(name_builder.finish()),
             Arc::new(plan_builder.finish()),
         ],
     )
