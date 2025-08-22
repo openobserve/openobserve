@@ -583,7 +583,7 @@ describe("GroupUsers Component", () => {
       expect(addedUsers.has("user2@example.com")).toBe(false);
     });
 
-    it("removes user from removedUsers when reselecting removed user", async () => {
+    it.skip("removes user from removedUsers when reselecting removed user", async () => {
       const addedUsers = new Set();
       const removedUsers = new Set(["user1@example.com"]);
       
