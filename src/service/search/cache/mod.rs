@@ -1207,7 +1207,6 @@ pub async fn apply_regex_to_response(
         )
         .await?;
 
-    // TODO: store regex projections in the schema
     match pattern_manager.process_at_search(
         org_id,
         StreamType::Logs,
