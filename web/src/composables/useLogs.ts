@@ -4521,27 +4521,6 @@ const useLogs = () => {
       searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
     }
 
-    // Restore visualization data if available and in visualize mode
-    // Note: Only config and type are restored from URL
-    // The query will always be rebuilt from logs page data
-    if (queryParams.visualization_data && 
-        searchObj.meta.logsVisualizeToggle === "visualize" && 
-        dashboardPanelData) {
-      const restoredData = decodeVisualizationConfig(queryParams.visualization_data);
-      if (restoredData && dashboardPanelData.data) {
-        // Only restore config and type - not the entire data object
-        if (restoredData.config) {
-          dashboardPanelData.data.config = {
-            ...dashboardPanelData.data.config,
-            ...restoredData.config
-          };
-        }
-        if (restoredData.type) {
-          dashboardPanelData.data.type = restoredData.type;
-        }
-      }
-    }
-
     // TODO OK : Replace push with replace and test all scenarios
     router.push({
       query: {
