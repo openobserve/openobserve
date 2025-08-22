@@ -25,7 +25,7 @@ use config::{
     utils::{
         hash::Sum64,
         parquet::parse_file_key_columns,
-        time::{DAY_MICRO_SECS, end_of_the_day},
+        time::{DAY_MICRO_SECS, end_of_the_day, now_micros},
     },
 };
 use hashbrown::HashMap;
@@ -1758,6 +1758,7 @@ impl MysqlFileList {
         file: &str,
         meta: &FileMeta,
     ) -> Result<i64> {
+        let now_ts = now_micros();
         let pool = CLIENT.clone();
         let (stream_key, date_key, file_name) =
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
@@ -1765,7 +1766,7 @@ impl MysqlFileList {
         DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
         match  sqlx::query(
             format!(r#"
-INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)
+INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             "#).as_str(),
         )
@@ -1782,6 +1783,7 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
         .bind(meta.compressed_size)
         .bind(meta.index_size)
         .bind(meta.flattened)
+        .bind(now_ts)
         .execute(&pool)
         .await {
             Err(sqlx::Error::Database(e)) => if e.is_unique_violation() {
@@ -1799,6 +1801,7 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
             return Ok(());
         }
 
+        let now_ts = now_micros();
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
 
@@ -1807,7 +1810,7 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
             let chunks = add_items.chunks(100);
             for files in chunks {
                 let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
-                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened)").as_str(),
+                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)").as_str(),
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let (stream_key, date_key, file_name) =
@@ -1825,7 +1828,8 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
                         .push_bind(item.meta.original_size)
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
-                        .push_bind(item.meta.flattened);
+                        .push_bind(item.meta.flattened)
+                        .push_bind(now_ts);
                 });
                 DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
                 if let Err(e) = query_builder.build().execute(&mut *tx).await {
@@ -1883,14 +1887,19 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
                 // delete files by ids
                 if !ids.is_empty() {
                     let sql = format!(
-                        "UPDATE file_list SET deleted = true WHERE id IN({});",
+                        "UPDATE file_list SET deleted = true AND updated_at = ? WHERE id IN({});",
                         ids.join(",")
                     );
                     DB_QUERY_NUMS
                         .with_label_values(&["delete_id", "file_list"])
                         .inc();
+                    let now_ts = now_micros();
                     let start = std::time::Instant::now();
-                    if let Err(e) = sqlx::query(sql.as_str()).execute(&mut *tx).await {
+                    if let Err(e) = sqlx::query(sql.as_str())
+                        .bind(now_ts)
+                        .execute(&mut *tx)
+                        .await
+                    {
                         if let Err(e) = tx.rollback().await {
                             log::error!(
                                 "[MYSQL] rollback {table} batch process for delete error: {e}"
@@ -1934,7 +1943,8 @@ CREATE TABLE IF NOT EXISTS file_list
     records   BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
-    index_size      BIGINT not null
+    index_size      BIGINT not null,
+    updated_at      BIGINT not null
 );
         "#,
     )
@@ -1958,7 +1968,8 @@ CREATE TABLE IF NOT EXISTS file_list_history
     records   BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
-    index_size      BIGINT not null
+    index_size      BIGINT not null,
+    updated_at      BIGINT not null
 );
         "#,
     )
@@ -2062,6 +2073,12 @@ CREATE TABLE IF NOT EXISTS stream_stats
     )
     .await?;
 
+    // create column updated_at for version >= 0.14.7
+    let column = "updated_at";
+    let data_type = "BIGINT default 0 not null";
+    add_column("file_list", column, data_type).await?;
+    add_column("file_list_history", column, data_type).await?;
+ 
     Ok(())
 }
 
@@ -2081,9 +2098,9 @@ pub async fn create_table_index() -> Result<()> {
             &["stream", "date"],
         ),
         (
-            "file_list_org_deleted_stream_idx",
+            "file_list_updated_at_deleted_idx",
             "file_list",
-            &["org", "deleted", "stream"],
+            &["updated_at", "deleted"],
         ),
         ("file_list_history_org_idx", "file_list_history", &["org"]),
         (

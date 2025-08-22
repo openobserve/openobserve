@@ -1814,7 +1814,8 @@ CREATE TABLE IF NOT EXISTS file_list
     records   BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
-    index_size      BIGINT not null
+    index_size      BIGINT not null,
+    updated_at      BIGINT not null
 );
         "#,
     )
@@ -1838,7 +1839,8 @@ CREATE TABLE IF NOT EXISTS file_list_history
     records   BIGINT not null,
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
-    index_size      BIGINT not null
+    index_size      BIGINT not null,
+    updated_at      BIGINT not null
 );
         "#,
     )
@@ -1942,6 +1944,12 @@ CREATE TABLE IF NOT EXISTS stream_stats
     )
     .await?;
 
+    // create column updated_at for version >= 0.14.7
+    let column = "updated_at";
+    let data_type = "BIGINT default 0 not null";
+    add_column("file_list", column, data_type).await?;
+    add_column("file_list_history", column, data_type).await?;
+
     Ok(())
 }
 
@@ -1961,9 +1969,9 @@ pub async fn create_table_index() -> Result<()> {
             &["stream", "date"],
         ),
         (
-            "file_list_org_deleted_stream_idx",
+            "file_list_updated_at_deleted_idx",
             "file_list",
-            &["org", "deleted", "stream"],
+            &["updated_at", "deleted"],
         ),
         ("file_list_history_org_idx", "file_list_history", &["org"]),
         (
