@@ -45,7 +45,8 @@ pub enum CustomMessage {
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Metrics {
     pub stage: i32,
-    pub node: String,
+    pub node_address: String,
+    pub node_name: String,
     pub metrics: String,
 }
 
@@ -108,7 +109,8 @@ fn collect_metrics(metrics_info: &MetricsInfo) -> Vec<Metrics> {
     };
     vec![Metrics {
         stage,
-        node: LOCAL_NODE.get_grpc_addr().to_string(),
+        node_address: LOCAL_NODE.get_grpc_addr().to_string(),
+        node_name: LOCAL_NODE.get_name().to_string(),
         metrics: plan_with_metrics,
     }]
 }
