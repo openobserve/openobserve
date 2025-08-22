@@ -315,7 +315,7 @@ async fn get_remote_batch(
         "[trace_id {trace_id}] flight->search: prepare to response node: {grpc_addr}, is_super: {is_super}, is_querier: {is_querier}",
     );
 
-    let query_context = QueryContext::new(context.clone(), node)
+    let query_context = QueryContext::new(node)
         .with_trace_id(&trace_id)
         .with_is_super(is_super)
         .with_is_querier(is_querier)

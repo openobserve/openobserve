@@ -35,7 +35,7 @@ pub mod remote {
 
     use super::*;
 
-    fn get_remote_key_prefix(org_id: &str, table_name: &str) -> String {
+    pub(crate) fn get_remote_key_prefix(org_id: &str, table_name: &str) -> String {
         format!(
             "files/{}/{}/{}",
             org_id,
@@ -45,7 +45,7 @@ pub mod remote {
     }
 
     /// Create remote key with enrichment table prefix
-    fn create_remote_key(org_id: &str, table_name: &str, created_at: i64) -> String {
+    pub(crate) fn create_remote_key(org_id: &str, table_name: &str, created_at: i64) -> String {
         let ts = chrono::DateTime::from_timestamp_micros(created_at).unwrap();
         let file_name = format!(
             "{:04}/{:02}/{:02}/{:02}/{}.parquet",

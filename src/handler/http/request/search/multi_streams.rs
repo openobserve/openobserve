@@ -969,7 +969,7 @@ mod tests {
         let request = MultiStreamRequest {
             sql: vec![config::meta::search::SqlQuery {
                 sql: "SELECT * FROM logs".to_string(),
-                start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                start_time: Some(Utc::now().timestamp_micros() - 3_600_000_000),
                 end_time: Some(Utc::now().timestamp_micros()),
                 query_fn: None,
                 is_old_format: false,
@@ -978,7 +978,7 @@ mod tests {
             timeout: 0,
             from: 0,
             size: 10,
-            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            start_time: Utc::now().timestamp_micros() - 3_600_000_000,
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
@@ -1004,7 +1004,7 @@ mod tests {
     fn test_multi_search_partition_request_structure() {
         let request = MultiSearchPartitionRequest {
             sql: vec!["SELECT * FROM logs".to_string()],
-            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            start_time: Utc::now().timestamp_micros() - 3_600_000_000,
             end_time: Utc::now().timestamp_micros(),
             encoding: config::meta::search::RequestEncoding::Empty,
             regions: vec![],
@@ -1024,7 +1024,7 @@ mod tests {
             sql: vec![config::meta::search::SqlQuery {
                 sql: "SELECT * FROM logs".to_string(),
                 start_time: Some(Utc::now().timestamp_micros()),
-                end_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                end_time: Some(Utc::now().timestamp_micros() - 3_600_000_000),
                 query_fn: None,
                 is_old_format: false,
             }],
@@ -1033,7 +1033,7 @@ mod tests {
             from: 0,
             size: 10,
             start_time: Utc::now().timestamp_micros(),
-            end_time: Utc::now().timestamp_micros() - 3600_000_000,
+            end_time: Utc::now().timestamp_micros() - 3_600_000_000,
             sort_by: None,
             quick_mode: false,
             query_type: "".to_string(),
@@ -1061,7 +1061,7 @@ mod tests {
             timeout: 0,
             from: 0,
             size: 10,
-            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            start_time: Utc::now().timestamp_micros() - 3_600_000_000,
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
@@ -1086,7 +1086,7 @@ mod tests {
         let request = MultiStreamRequest {
             sql: vec![config::meta::search::SqlQuery {
                 sql: "SELECT * FROM logs".to_string(),
-                start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                start_time: Some(Utc::now().timestamp_micros() - 3_600_000_000),
                 end_time: Some(Utc::now().timestamp_micros()),
                 query_fn: Some("base64_encoded_vrl_function".to_string()),
                 is_old_format: false,
@@ -1095,7 +1095,7 @@ mod tests {
             timeout: 0,
             from: 0,
             size: 10,
-            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            start_time: Utc::now().timestamp_micros() - 3_600_000_000,
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
@@ -1121,7 +1121,7 @@ mod tests {
         let request = MultiStreamRequest {
             sql: vec![config::meta::search::SqlQuery {
                 sql: "SELECT * FROM logs".to_string(),
-                start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                start_time: Some(Utc::now().timestamp_micros() - 3_600_000_000),
                 end_time: Some(Utc::now().timestamp_micros()),
                 query_fn: None,
                 is_old_format: false,
@@ -1130,7 +1130,7 @@ mod tests {
             timeout: 0,
             from: 0,
             size: 10,
-            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            start_time: Utc::now().timestamp_micros() - 3_600_000_000,
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
@@ -1156,14 +1156,14 @@ mod tests {
             sql: vec![
                 config::meta::search::SqlQuery {
                     sql: "SELECT * FROM logs".to_string(),
-                    start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                    start_time: Some(Utc::now().timestamp_micros() - 3_600_000_000),
                     end_time: Some(Utc::now().timestamp_micros()),
                     query_fn: None,
                     is_old_format: false,
                 },
                 config::meta::search::SqlQuery {
                     sql: "SELECT * FROM metrics".to_string(),
-                    start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                    start_time: Some(Utc::now().timestamp_micros() - 3_600_000_000),
                     end_time: Some(Utc::now().timestamp_micros()),
                     query_fn: None,
                     is_old_format: false,
@@ -1173,7 +1173,7 @@ mod tests {
             timeout: 0,
             from: 0,
             size: 10,
-            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            start_time: Utc::now().timestamp_micros() - 3_600_000_000,
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
@@ -1200,7 +1200,7 @@ mod tests {
         let request = MultiStreamRequest {
             sql: vec![config::meta::search::SqlQuery {
                 sql: "SELECT * FROM logs".to_string(),
-                start_time: Some(Utc::now().timestamp_micros() - 3600_000_000),
+                start_time: Some(Utc::now().timestamp_micros() - 3_600_000_000),
                 end_time: Some(Utc::now().timestamp_micros()),
                 query_fn: None,
                 is_old_format: false,
@@ -1209,7 +1209,7 @@ mod tests {
             timeout: 0,
             from: 0,
             size: 10000,
-            start_time: Utc::now().timestamp_micros() - 3600_000_000,
+            start_time: Utc::now().timestamp_micros() - 3_600_000_000,
             end_time: Utc::now().timestamp_micros(),
             sort_by: None,
             quick_mode: false,
@@ -1247,10 +1247,10 @@ mod tests {
     #[test]
     fn test_time_range_validation() {
         let start_time = Utc::now().timestamp_micros();
-        let end_time = start_time + 3600_000_000; // 1 hour later
+        let end_time = start_time + 3_600_000_000; // 1 hour later
 
         assert!(end_time > start_time);
-        assert_eq!(end_time - start_time, 3600_000_000);
+        assert_eq!(end_time - start_time, 3_600_000_000);
     }
 
     #[test]

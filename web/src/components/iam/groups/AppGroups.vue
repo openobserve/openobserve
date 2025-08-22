@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("iam.groups") }}
     </div>
     <div class=" row items-center justify-end">
-        <div date-test="iam-groups-search-input">
+        <div data-test="iam-groups-search-input">
           <q-input
             v-model="filterQuery"
             filled
@@ -229,7 +229,7 @@ const deleteUserGroup = (group: any) => {
   deleteGroup(group.group_name, store.state.selectedOrganization.identifier)
     .then(() => {
       q.notify({
-        message: "Role deleted successfully!",
+        message: "Group deleted successfully!",
         color: "positive",
         position: "bottom",
       });

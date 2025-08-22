@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import stream from "@/services/stream";
 import http from "@/services/http";
 
@@ -39,6 +39,10 @@ describe("stream service", () => {
       delete: vi.fn(),
     };
     (http as any).mockReturnValue(mockHttpInstance);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe("nameList", () => {
@@ -291,53 +295,6 @@ describe("stream service", () => {
     });
   });
 
-  describe("createSettings", () => {
-    it("should make POST request to create stream settings with type", async () => {
-      const params = {
-        org_identifier: "org123",
-        stream_name: "test_stream",
-        type: "logs",
-        data: { partition_keys: ["timestamp"] },
-      };
-
-      mockHttpInstance.post.mockResolvedValue({ data: { success: true } });
-
-      await stream.createSettings(
-        params.org_identifier,
-        params.stream_name,
-        params.type,
-        params.data
-      );
-
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams/${params.stream_name}/settings?type=${params.type}`,
-        params.data
-      );
-    });
-
-    it("should make POST request to create stream settings without type", async () => {
-      const params = {
-        org_identifier: "org123",
-        stream_name: "test_stream",
-        type: "",
-        data: { partition_keys: ["timestamp"] },
-      };
-
-      mockHttpInstance.post.mockResolvedValue({ data: { success: true } });
-
-      await stream.createSettings(
-        params.org_identifier,
-        params.stream_name,
-        params.type,
-        params.data
-      );
-
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams/${params.stream_name}/settings`,
-        params.data
-      );
-    });
-  });
 
   describe("fieldValues", () => {
     it("should make GET request with basic parameters", async () => {

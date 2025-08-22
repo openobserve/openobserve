@@ -92,16 +92,11 @@ use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
 #[cfg(feature = "enterprise")]
 use {config::Config, o2_enterprise::enterprise::common::config::O2Config};
-#[cfg(feature = "pyroscope")]
-use {
-    pyroscope::PyroscopeAgent,
-    pyroscope_pprofrs::{PprofConfig, pprof_backend},
-};
 
-#[cfg(feature = "mimalloc")]
+#[cfg(all(feature = "mimalloc", not(feature = "jemalloc")))]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-#[cfg(feature = "jemalloc")]
+#[cfg(all(feature = "jemalloc", not(feature = "mimalloc")))]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 use tracing_subscriber::{
@@ -430,49 +425,49 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // stop profiling
     #[cfg(feature = "profiling")]
-    if let Some(guard) = pprof_guard {
-        if let Ok(report) = guard.report().build() {
-            if cfg.profiling.pprof_protobuf_enabled {
-                let pb_file = format!("{}.pb", cfg.profiling.pprof_flamegraph_path);
-                match std::fs::File::create(&pb_file) {
-                    Ok(mut file) => {
-                        use std::io::Write;
+    if let Some(guard) = pprof_guard
+        && let Ok(report) = guard.report().build()
+    {
+        if cfg.profiling.pprof_protobuf_enabled {
+            let pb_file = format!("{}.pb", cfg.profiling.pprof_flamegraph_path);
+            match std::fs::File::create(&pb_file) {
+                Ok(mut file) => {
+                    use std::io::Write;
 
-                        use pprof::protos::Message;
+                    use pprof::protos::Message;
 
-                        if let Ok(profile) = report.pprof() {
-                            let mut content = Vec::new();
-                            profile.encode(&mut content).unwrap();
-                            if let Err(e) = file.write_all(&content) {
-                                log::error!("Failed to write flamegraph: {}", e);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        log::error!("Failed to create flamegraph file: {}", e);
-                    }
-                }
-            } else {
-                match std::fs::File::create(&cfg.profiling.pprof_flamegraph_path) {
-                    Ok(file) => {
-                        if let Err(e) = report.flamegraph(file) {
+                    if let Ok(profile) = report.pprof() {
+                        let mut content = Vec::new();
+                        profile.encode(&mut content).unwrap();
+                        if let Err(e) = file.write_all(&content) {
                             log::error!("Failed to write flamegraph: {}", e);
                         }
                     }
-                    Err(e) => {
-                        log::error!("Failed to create flamegraph file: {}", e);
-                    }
+                }
+                Err(e) => {
+                    log::error!("Failed to create flamegraph file: {}", e);
                 }
             }
-        };
-    }
+        } else {
+            match std::fs::File::create(&cfg.profiling.pprof_flamegraph_path) {
+                Ok(file) => {
+                    if let Err(e) = report.flamegraph(file) {
+                        log::error!("Failed to write flamegraph: {}", e);
+                    }
+                }
+                Err(e) => {
+                    log::error!("Failed to create flamegraph file: {}", e);
+                }
+            }
+        }
+    };
 
     // stop pyroscope
     #[cfg(feature = "pyroscope")]
-    if let Some(agent) = pyroscope_agent {
-        if let Ok(agent_ready) = agent.stop() {
-            agent_ready.shutdown();
-        }
+    if let Some(agent) = pyroscope_agent
+        && let Ok(agent_ready) = agent.stop()
+    {
+        agent_ready.shutdown();
     }
 
     log::info!("server stopped");

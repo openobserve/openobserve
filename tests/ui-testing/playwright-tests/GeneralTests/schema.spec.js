@@ -23,9 +23,8 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
 }
 
-async function ingestion(page) {
-  const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
+async function ingestion(page, testStreamName) {
+  const orgId = "automationtesting";
   const basicAuthCredentials = Buffer.from(
     `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
   ).toString('base64');
@@ -45,7 +44,7 @@ async function ingestion(page) {
     url: process.env.INGESTION_URL,
     headers: headers,
     orgId: orgId,
-    streamName: streamName,
+    streamName: testStreamName,
     logsdata: logsdata
   });
   console.log(response);
@@ -71,25 +70,27 @@ test.describe("Schema testcases", () => {
     await expect.poll(async () => (await search).status()).toBe(200);
   }
 
-  test.beforeEach(async ({ page }) => {
-    await login(page);
-    pageManager = new PageManager(page);
-    await page.waitForTimeout(1000)
-    await ingestion(page);
-    await page.waitForTimeout(2000)
-
-    await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
-    await pageManager.logsPage.selectStream("e2e_automate"); 
-    await applyQueryButton(page);
-  });
+  // Each test handles its own setup with unique streams
 
   test('stream schema settings updated to be displayed under logs', async ({ page }) => {
+    const testStreamName = "test1";
+    
+    // Setup for this test
+    await login(page);
+    pageManager = new PageManager(page);
+    await page.waitForTimeout(1000);
+    await ingestion(page, testStreamName);
+    await page.waitForTimeout(2000);
+
+    await page.goto(`${logData.logsUrl}?org_identifier=automationtesting`);
+    const allsearch = page.waitForResponse("**/api/automationtesting/_search**");
+    await pageManager.logsPage.selectStream(testStreamName); 
+    await applyQueryButton(page);
+    
+    // Start of actual test
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
-    await page.getByPlaceholder('Search Stream').fill('e2e_automate');
+    await page.getByPlaceholder('Search Stream').fill(testStreamName);
     await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Stream Detail' }).first().click();
     await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]').click();
@@ -100,9 +101,9 @@ test.describe("Schema testcases", () => {
     await page.getByRole('cell', { name: 'kubernetes_annotations_kubectl_kubernetes_io_default_container' }).click();
     await page.getByRole('cell', { name: 'kubernetes_annotations_kubernetes_io_psp' }).click();
     await page.waitForTimeout(1000);
-    await ingestion(page);
+    await ingestion(page, testStreamName);
     await page.waitForTimeout(2000);
-    await page.locator('button').filter({ hasText: 'close' }).click();
+    await page.getByRole('button').filter({ hasText: 'close' }).click();
     await page.getByRole('button', { name: 'Explore' }).first().click();
     await page.waitForTimeout(1000);
     await page.locator('[data-test="date-time-btn"]').click();
@@ -141,7 +142,7 @@ test.describe("Schema testcases", () => {
     await expect(errorMessage).not.toBeVisible();
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
-    await page.getByPlaceholder('Search Stream').fill('e2e_automate');
+    await page.getByPlaceholder('Search Stream').fill(testStreamName);
     await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Stream Detail' }).first().click();
     await page.locator('[data-test="tab-schemaFields"]').click();
@@ -149,9 +150,9 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
     await page.locator('[data-test="schema-add-field-button"]').click();
     await page.locator('[data-test="schema-update-settings-button"]').click();
-    await page.locator('button').filter({ hasText: 'close' }).click();
+    await page.getByRole('button').filter({ hasText: 'close' }).click();
     await page.waitForTimeout(1000);
-    await ingestion(page);
+    await ingestion(page, testStreamName);
     await page.waitForTimeout(2000);
     await page.getByRole('button', { name: 'Explore' }).first().click();
     await page.waitForTimeout(3000);
@@ -165,6 +166,20 @@ test.describe("Schema testcases", () => {
   });
 
   test('should display stream details on navigating from blank stream to stream with details', async ({ page }) => {
+    const testStreamName = "test2";
+    
+    // Setup for this test
+    await login(page);
+    pageManager = new PageManager(page);
+    await page.waitForTimeout(1000);
+    await ingestion(page, testStreamName);
+    await page.waitForTimeout(2000);
+
+    await page.goto(`${logData.logsUrl}?org_identifier=automationtesting`);
+    await pageManager.logsPage.selectStream(testStreamName); 
+    await applyQueryButton(page);
+    
+    // Start of actual test
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.locator('[data-test="log-stream-add-stream-btn"]').click();
     await page.getByLabel('Name *').click();
@@ -182,9 +197,9 @@ test.describe("Schema testcases", () => {
     // await page.getByRole('option', { name: streamName }).locator('div').nth(2).click();
     await page.waitForTimeout(1000);
     await page.locator('[data-test="log-search-index-list-select-stream"]').click();
-    await page.locator('[data-test="log-search-index-list-select-stream"]').fill('e2e_automate');
-    // await page.getByRole('option', { name: 'e2e_automate' }).locator('div').nth(2).click();
-    await page.getByText('e2e_automate').click();
+    await page.locator('[data-test="log-search-index-list-select-stream"]').fill(testStreamName);
+    // await page.getByRole('option', { name: testStreamName }).locator('div').nth(2).click();
+    await page.getByText(testStreamName).click();
     await page.waitForTimeout(4000);
     await page.waitForSelector('text=Loading...', { state: 'hidden' });
     await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click()
@@ -200,9 +215,23 @@ test.describe("Schema testcases", () => {
   });
 
   test('should add a new field and delete it from schema', async ({ page }) => {
+    const testStreamName = "test3";
+    
+    // Setup for this test
+    await login(page);
+    pageManager = new PageManager(page);
+    await page.waitForTimeout(1000);
+    await ingestion(page, testStreamName);
+    await page.waitForTimeout(2000);
+
+    await page.goto(`${logData.logsUrl}?org_identifier=automationtesting`);
+    await pageManager.logsPage.selectStream(testStreamName); 
+    await applyQueryButton(page);
+    
+    // Start of actual test
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
-    await page.getByPlaceholder('Search Stream').fill('e2e_automate');
+    await page.getByPlaceholder('Search Stream').fill(testStreamName);
     await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Stream Detail' }).first().click();
     await page.locator('[data-test="tab-allFields"]').click();
@@ -214,18 +243,27 @@ test.describe("Schema testcases", () => {
     
     await page.getByPlaceholder('Name *').click();
     await page.getByPlaceholder('Name *').fill('newtest');
+    await page.getByPlaceholder('Data Type *').click();
+    const dataTypeOptions = [
+      () => page.getByRole('option', { name: 'Float64' }).locator('span').click(),
+      () => page.getByRole('option', { name: 'Int64', exact: true }).locator('span').click(),
+      () => page.getByRole('option', { name: 'Boolean' }).click()
+    ];
+    const randomOption = dataTypeOptions[Math.floor(Math.random() * dataTypeOptions.length)];
+    await randomOption();
     await page.locator('[data-test="schema-update-settings-button"]').click();
-    await page.locator('[data-test="schema-field-search-input"]').fill('newtest')
+    await page.locator('[data-test="schema-field-search-input"]').fill('newtest');
     await page.waitForTimeout(1000);
     await page.locator('[data-test="schema-stream-delete-newtest-field-fts-key-checkbox"]').click();
     await page.locator('[data-test="schema-add-field-button"]').click();
     await page.locator('[data-test="schema-update-settings-button"]').click();
+    
     await page.getByRole('cell', { name: 'newtest' }).first().click();
     await page.locator('[data-test="schema-stream-delete-newtest-field-fts-key-checkbox"]').first().click();
     await page.locator('[data-test="schema-delete-button"]').click();
     await page.locator('[data-test="confirm-button"]').click();
     await page.waitForTimeout(2000);
-    await page.locator('button').filter({ hasText: 'close' }).click()
+    await page.locator('button').filter({ hasText: 'close' }).click();
     await page.waitForTimeout(1000);
     await page.getByRole('button', { name: 'Stream Detail' }).first().click();
     await page.locator('[data-test="tab-schemaFields"]').click();
