@@ -271,13 +271,13 @@ mod tests {
         // Add some entries
         for i in 0..10 {
             let meta = ObjectMeta {
-                location: Path::from(format!("test_file_{}", i)),
+                location: Path::from(format!("test_file_{i}")),
                 last_modified: DateTime::parse_from_rfc3339("2022-09-27T22:36:00+02:00")
                     .unwrap()
                     .into(),
                 size: 1024 * (i + 1),
-                e_tag: Some(format!("etag_{}", i)),
-                version: Some(format!("v{}", i)),
+                e_tag: Some(format!("etag_{i}")),
+                version: Some(format!("v{i}")),
             };
 
             let schema = Schema::new(vec![
