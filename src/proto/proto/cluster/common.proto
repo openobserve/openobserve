@@ -41,6 +41,7 @@ message ScanStats {
 
 message FileList {
     repeated FileKey items = 1;
+    string node_addr = 2;
 }
 
 message FileKey {
@@ -54,4 +55,17 @@ message FileKey {
 message IdxFileName {
     string         key         = 1;
     optional bytes segment_ids = 2;
+}
+
+message FileContentResponse {
+    repeated FileContent entries = 1;
+}
+
+message FileContent {
+    bytes content = 1;  // The actual parquet file content
+    string filename = 2;  // The name of the file
+}
+
+message SimpleFileList {
+    repeated string paths = 1;
 }
