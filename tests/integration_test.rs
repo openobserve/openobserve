@@ -2500,9 +2500,8 @@ mod tests {
         if !resp.status().is_success() {
             let body = test::read_body(resp).await;
             println!("Response body: {}", String::from_utf8_lossy(&body));
-            assert!(false);
+            panic!("Failed to create pipeline");
         }
-        assert!(true);
     }
 
     // Derived Stream Integration Tests
@@ -2845,11 +2844,11 @@ mod tests {
         // delete the city field from the stream
         // Make a PUT call to `e2e/streams/olympics_schema/delete_fields` api
         // with `{"fields":["method"]}` as the payload
-        let delete_fields_url = format!("/api/e2e/streams/olympics_schema/delete_fields",);
+        let delete_fields_url = "/api/e2e/streams/olympics_schema/delete_fields";
         let delete_fields_payload = serde_json::json!({"fields": ["city"]});
 
         let req = test::TestRequest::put()
-            .uri(&delete_fields_url)
+            .uri(delete_fields_url)
             .append_header(auth)
             .set_json(&delete_fields_payload)
             .to_request();

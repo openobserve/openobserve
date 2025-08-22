@@ -747,7 +747,7 @@ async fn write_traces_by_stream(
             .await
             .is_none()
         {
-            let org = super::organization::get_org(&org_id).await.unwrap();
+            let org = super::organization::get_org(org_id).await.unwrap();
 
             super::self_reporting::cloud_events::enqueue_cloud_event(
                 super::self_reporting::cloud_events::CloudEvent {

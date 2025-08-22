@@ -427,14 +427,14 @@ mod tests {
         let now = now_micros();
 
         // Add some fresh entries with unique keys
-        let fresh_key1 = format!("{}_fresh1", test_prefix);
+        let fresh_key1 = format!("{test_prefix}_fresh1");
         let fresh_entry1 = CardinalityCacheEntry {
             value: 100.0,
             timestamp: now - 1000, // 1ms ago (fresh)
         };
         CARDINALITY_CACHE.insert(fresh_key1.clone(), fresh_entry1);
 
-        let fresh_key2 = format!("{}_fresh2", test_prefix);
+        let fresh_key2 = format!("{test_prefix}_fresh2");
         let fresh_entry2 = CardinalityCacheEntry {
             value: 200.0,
             timestamp: now - 60 * 1_000_000, // 1 minute ago (fresh)
@@ -442,14 +442,14 @@ mod tests {
         CARDINALITY_CACHE.insert(fresh_key2.clone(), fresh_entry2);
 
         // Add some expired entries with unique keys
-        let expired_key1 = format!("{}_expired1", test_prefix);
+        let expired_key1 = format!("{test_prefix}_expired1");
         let expired_entry1 = CardinalityCacheEntry {
             value: 300.0,
             timestamp: now - CACHE_EXPIRATION_MICROS - 1000, // Over 1 hour ago (expired)
         };
         CARDINALITY_CACHE.insert(expired_key1.clone(), expired_entry1);
 
-        let expired_key2 = format!("{}_expired2", test_prefix);
+        let expired_key2 = format!("{test_prefix}_expired2");
         let expired_entry2 = CardinalityCacheEntry {
             value: 400.0,
             timestamp: now - CACHE_EXPIRATION_MICROS - 60 * 1_000_000, /* Way over 1 hour ago
@@ -461,19 +461,15 @@ mod tests {
         let (total, expired) = get_cache_stats().await;
         assert!(
             total >= initial_total + 4,
-            "Total entries should be initial_total + 4, but got total={}, initial_total={}",
-            total,
-            initial_total
+            "Total entries should be initial_total + 4, but got total={total}, initial_total={initial_total}"
         );
         assert!(
             expired >= initial_expired + 2,
-            "Expired entries should be initial_expired + 2, but got expired={}, initial_expired={}",
-            expired,
-            initial_expired
+            "Expired entries should be initial_expired + 2, but got expired={expired}, initial_expired={initial_expired}"
         );
 
         // Add one more fresh entry
-        let fresh_key3 = format!("{}_fresh3", test_prefix);
+        let fresh_key3 = format!("{test_prefix}_fresh3");
         let fresh_entry3 = CardinalityCacheEntry {
             value: 500.0,
             timestamp: now - 30 * 1_000_000, // 30 seconds ago (fresh)
@@ -485,16 +481,12 @@ mod tests {
         assert_eq!(
             total,
             initial_total + 5,
-            "Total entries should be initial_total + 5, but got total={}, initial_total={}",
-            total,
-            initial_total
+            "Total entries should be initial_total + 5, but got total={total}, initial_total={initial_total}"
         );
         assert_eq!(
             expired,
             initial_expired + 2,
-            "Expired entries should be initial_expired + 2, but got expired={}, initial_expired={}",
-            expired,
-            initial_expired
+            "Expired entries should be initial_expired + 2, but got expired={expired}, initial_expired={initial_expired}"
         );
 
         // Clean up test entries
@@ -508,13 +500,11 @@ mod tests {
         let (total, expired) = get_cache_stats().await;
         assert_eq!(
             total, initial_total,
-            "After cleanup, total should be back to initial_total={}, but got total={}",
-            initial_total, total
+            "After cleanup, total should be back to initial_total={initial_total}, but got total={total}"
         );
         assert_eq!(
             expired, initial_expired,
-            "After cleanup, expired should be back to initial_expired={}, but got expired={}",
-            initial_expired, expired
+            "After cleanup, expired should be back to initial_expired={initial_expired}, but got expired={expired}"
         );
     }
 
@@ -526,9 +516,9 @@ mod tests {
         let test_id = now_micros();
 
         // Use unique field names to avoid conflicts
-        let field1 = format!("field1_{}", test_id);
-        let field2 = format!("field2_{}", test_id);
-        let field3 = format!("field3_{}", test_id);
+        let field1 = format!("field1_{test_id}");
+        let field2 = format!("field2_{test_id}");
+        let field3 = format!("field3_{test_id}");
         let fields = vec![field1.to_string(), field2.to_string(), field3.to_string()];
 
         // Manually add some entries to cache

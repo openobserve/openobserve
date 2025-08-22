@@ -368,15 +368,12 @@ mod tests {
             assert_eq!(
                 TWENTY_FOUR_HOURS % adjusted,
                 0,
-                "Interval {} seconds cannot divide 24 hours evenly",
-                adjusted
+                "Interval {adjusted} seconds cannot divide 24 hours evenly"
             );
             // Verify that the adjusted interval is >= the original interval
             assert!(
                 adjusted >= interval,
-                "Adjusted interval {} is less than original interval {}",
-                adjusted,
-                interval
+                "Adjusted interval {adjusted} is less than original interval {interval}"
             );
         }
     }

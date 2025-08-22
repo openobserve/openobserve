@@ -162,7 +162,7 @@ mod tests {
     #[tokio::test]
     async fn test_to_array_string_null_input() {
         let sql = "select to_array_string(null) as ret";
-        let expected_output = vec!["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
+        let expected_output = ["+-----+", "| ret |", "+-----+", "|     |", "+-----+"];
 
         let ctx = SessionContext::new();
         ctx.register_udf(TO_ARR_STRING.clone());

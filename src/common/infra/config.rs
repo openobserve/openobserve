@@ -478,6 +478,5 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(10)).await;
 
         // Test passes if no panic occurs
-        assert!(true);
     }
 }

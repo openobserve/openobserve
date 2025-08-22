@@ -554,7 +554,7 @@ mod tests {
 
     #[test]
     fn test_parse_f64_array() {
-        let f64_values = vec![1.0, 0.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY];
+        let f64_values = [1.0, 0.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY];
         let field_values = f64_values.iter().map(|v| v.to_string()).collect::<Vec<_>>();
         let array = parse_f64_array(&field_values).unwrap();
         let array_values = array.as_any().downcast_ref::<Float64Array>().unwrap();
