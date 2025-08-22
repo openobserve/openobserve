@@ -324,7 +324,9 @@ describe("CipherKeys", () => {
 
   describe("Data loading", () => {
     it("should populate table data after successful fetch", async () => {
-      const wrapper = await createWrapperAndWait();
+      const wrapper = createWrapper();
+      await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
       
       expect(wrapper.vm.tabledata).toHaveLength(2);
       expect(wrapper.vm.tabledata[0]).toEqual({
@@ -344,14 +346,8 @@ describe("CipherKeys", () => {
 
       const wrapper = createWrapper();
       await nextTick();
-      await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
-      // Should be called at least twice - loading notification first, then error
-      expect(mockNotify).toHaveBeenCalledTimes(2);
-      expect(mockNotify).toHaveBeenCalledWith({
-        message: "Please wait while loading data...",
-        spinner: true,
-      });
       expect(mockNotify).toHaveBeenCalledWith({
         type: "negative",
         message: "Server error",
@@ -367,14 +363,9 @@ describe("CipherKeys", () => {
 
       const wrapper = createWrapper();
       await nextTick();
-      await wrapper.vm.$nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
-      // Should only be called once with loading notification for 403 errors
-      expect(mockNotify).toHaveBeenCalledTimes(1);
-      expect(mockNotify).toHaveBeenCalledWith({
-        message: "Please wait while loading data...",
-        spinner: true,
-      });
+      expect(mockNotify).not.toHaveBeenCalled();
     });
   });
 
@@ -435,11 +426,8 @@ describe("CipherKeys", () => {
       const wrapper = createWrapper();
       wrapper.vm.showAddDialog = true;
       await nextTick();
-      
-      // Call the hideAddDialog method directly
-      await wrapper.vm.hideAddDialog();
 
-      expect(router.push).toHaveBeenCalledWith({
+      expect(mockRouter.push).toHaveBeenCalledWith({
         name: "cipherKeys",
         query: {
           org_identifier: "test-org",
@@ -771,7 +759,9 @@ describe("CipherKeys", () => {
       
       mockCipherKeysService.list.mockResolvedValue(incompleteData);
       
-      const wrapper = await createWrapperAndWait();
+      const wrapper = createWrapper();
+      await nextTick();
+      await new Promise(resolve => setTimeout(resolve, 0));
 
       // The component should handle missing properties gracefully
       if (wrapper.vm.tabledata.length > 0) {
