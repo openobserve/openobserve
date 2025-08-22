@@ -3,7 +3,7 @@ import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import PageManager from "../../pages/page-manager.js";
 
-test.describe.configure({ mode: 'parallel' });
+test.describe.configure({ mode: 'serial' });
 const streamName = `stream${Date.now()}`;
 
 async function login(page) {
@@ -149,7 +149,7 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
     await page.locator('[data-test="schema-add-field-button"]').click();
     await page.locator('[data-test="schema-update-settings-button"]').click();
-    await page.locator('button').filter({ hasText: 'close' }).click();
+    await page.locator('#q-portal--dialog--9').getByRole('button').filter({ hasText: 'close' }).click();
     await page.waitForTimeout(1000);
     await ingestion(page);
     await page.waitForTimeout(2000);
@@ -214,6 +214,14 @@ test.describe("Schema testcases", () => {
     
     await page.getByPlaceholder('Name *').click();
     await page.getByPlaceholder('Name *').fill('newtest');
+    await page.getByPlaceholder('Data Type *').click();
+    const dataTypeOptions = [
+      () => page.getByRole('option', { name: 'Float64' }).locator('span').click(),
+      () => page.getByRole('option', { name: 'Int64', exact: true }).locator('span').click(),
+      () => page.getByRole('option', { name: 'Boolean' }).click()
+    ];
+    const randomOption = dataTypeOptions[Math.floor(Math.random() * dataTypeOptions.length)];
+    await randomOption();
     await page.locator('[data-test="schema-update-settings-button"]').click();
     await page.locator('[data-test="schema-field-search-input"]').fill('newtest')
     await page.waitForTimeout(1000);
