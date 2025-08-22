@@ -38,6 +38,18 @@ vi.mock("quasar", async () => {
   };
 });
 
+// Mock useQuasar
+const mockNotify = vi.fn(() => vi.fn()); // notify returns dismiss function
+vi.mock("quasar", async () => {
+  const actual = await vi.importActual("quasar");
+  return {
+    ...actual,
+    useQuasar: () => ({
+      notify: mockNotify,
+    }),
+  };
+});
+
 // MSW is set up globally in setupTests.ts - no need to mock services
 // Import the actual services to test real HTTP calls
 import organizations from "@/services/organizations";
@@ -99,27 +111,15 @@ const setupStoreForTest = () => {
   ];
 };
 
-// Create real router instance
-let router: any;
-
-beforeEach(async () => {
-  router = createRouter({
-    history: createWebHistory(),
-    routes: [
-      { path: '/', name: 'general-settings', component: General },
-    ],
-  });
-  await router.push('/');
-  
-  // Set up store for each test
-  setupStoreForTest();
-  
-  // Spy on router.push
-  vi.spyOn(router, 'push');
-  
-  // Clear all mocks
-  vi.clearAllMocks();
-});
+// Mock Vue Router
+const mockRouter = {
+  currentRoute: {
+    value: {
+      query: {},
+    },
+  },
+  push: vi.fn(),
+};
 
 // Mock Quasar notify is defined above
 
@@ -131,8 +131,8 @@ const createWrapper = (props = {}, options = {}) => {
     global: {
       plugins: [i18n, router],
       mocks: {
-        $store: store,
-        $router: router,
+        $store: mockStore,
+        $router: mockRouter,
         $q: {
           notify: mockNotify,
         },
@@ -245,10 +245,19 @@ const createWrapper = (props = {}, options = {}) => {
 describe("General", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Set up store state for each test
-    setupStoreForTest();
-    // Use test-org for this test suite since many assertions expect it
-    store.state.selectedOrganization.identifier = "test-org";
+    mockStore.state.organizationData.organizationSettings = {
+      scrape_interval: 30,
+      enable_websocket_search: true,
+      enable_streaming_search: false,
+      streaming_aggregation_enabled: true,
+    };
+    mockStore.state.zoConfig.custom_logo_text = "Test Logo Text";
+    mockStore.state.zoConfig.custom_logo_img = "base64imagedata";
+    mockOrganizations.post_organization_settings.mockResolvedValue({ status: 200 });
+    mockSettingsService.createLogo.mockResolvedValue({ status: 200 });
+    mockSettingsService.deleteLogo.mockResolvedValue({ status: 200 });
+    mockSettingsService.updateCustomText.mockResolvedValue({ status: 200 });
+    mockConfigService.get_config.mockResolvedValue({ data: {} });
     mockDOMPurify.sanitize.mockImplementation((text) => text);
   });
 
@@ -332,7 +341,11 @@ describe("General", () => {
       await form.trigger("submit");
       await nextTick();
 
-      expect(store.dispatch).toHaveBeenCalledWith("setOrganizationSettings", {
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setOrganizationSettings", {
+        scrape_interval: 30, // from initial state
+        enable_websocket_search: true,
+        enable_streaming_search: false,
+        streaming_aggregation_enabled: true,
         scrape_interval: 60,
         enable_websocket_search: false,
         enable_streaming_search: true,
@@ -454,13 +467,7 @@ describe("General", () => {
     it("should display current custom logo text", () => {
       const wrapper = createWrapper();
       
-      // Check if text is available in component or fallback to checking store state
-      if (wrapper.text().includes("Test Logo Text")) {
-        expect(wrapper.text()).toContain("Test Logo Text");
-      } else {
-        // Fallback: verify component has access to the custom text from store
-        expect(store.state.zoConfig.custom_logo_text).toBe("Test Logo Text");
-      }
+      expect(wrapper.text()).toContain("Test Logo Text");
     });
 
     it("should enter edit mode when edit button is clicked", async () => {
@@ -562,14 +569,12 @@ describe("General", () => {
     });
 
     it("should handle custom text update error", async () => {
+      mockSettingsService.updateCustomText.mockRejectedValue({
+        message: "Update failed",
+      });
+
       const wrapper = createWrapper();
-      // Override MSW handler to simulate error
-      global.server.use(
-        http.post("http://localhost:5080/api/:org/settings/logo/text", () => {
-          return HttpResponse.json({ message: "Update failed" }, { status: 500 });
-        })
-      );
-      Object.assign(wrapper.vm, { 
+      await wrapper.setData({ 
         editingText: true,
         customText: "New Text" 
       });
@@ -590,12 +595,7 @@ describe("General", () => {
     it("should display existing logo image", () => {
       const wrapper = createWrapper();
       const logoImg = wrapper.find('[data-test="setting_ent_custom_logo_img"]');
-      if (logoImg.exists()) {
-        expect(logoImg.exists()).toBe(true);
-      } else {
-        // Fallback: verify component has access to logo image from store
-        expect(store.state.zoConfig.custom_logo_img).toBeTruthy();
-      }
+      expect(logoImg.exists()).toBe(true);
     });
 
     it("should show file upload when no logo exists", async () => {
@@ -603,12 +603,7 @@ describe("General", () => {
       const wrapper = createWrapper();
       
       const fileUpload = wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload"]');
-      if (fileUpload.exists()) {
-        expect(fileUpload.exists()).toBe(true);
-      } else {
-        // Fallback: verify store state shows no logo image
-        expect(store.state.zoConfig.custom_logo_img).toBeNull();
-      }
+      expect(fileUpload.exists()).toBe(true);
     });
 
     it("should upload image successfully", async () => {
@@ -626,15 +621,12 @@ describe("General", () => {
     });
 
     it("should handle upload error", async () => {
+      mockSettingsService.createLogo.mockRejectedValue({
+        message: "Upload failed",
+      });
+
       const mockFile = new File(["test"], "test.png", { type: "image/png" });
       const wrapper = createWrapper();
-      
-      // Override MSW handler to simulate logo upload error
-      global.server.use(
-        http.post("http://localhost:5080/api/:org/settings/logo", () => {
-          return HttpResponse.json({ message: "Upload failed" }, { status: 500 });
-        })
-      );
       
       await wrapper.vm.uploadImage(mockFile);
       // Wait for async operations to complete
@@ -675,13 +667,11 @@ describe("General", () => {
     });
 
     it("should handle delete error", async () => {
+      mockSettingsService.deleteLogo.mockRejectedValue({
+        message: "Delete failed",
+      });
+
       const wrapper = createWrapper();
-      // Override MSW handler to simulate logo delete error
-      global.server.use(
-        http.delete("http://localhost:5080/api/:org/settings/logo", () => {
-          return HttpResponse.json({ message: "Delete failed" }, { status: 500 });
-        })
-      );
       
       await wrapper.vm.deleteLogo();
       // Wait for async operations to complete
@@ -768,9 +758,8 @@ describe("General", () => {
 
   describe("Organization identifier handling", () => {
     it("should use default organization when no selected organization", async () => {
-      // Create wrapper first, then modify store state
+      mockStore.state.selectedOrganization = null;
       const wrapper = createWrapper();
-      store.state.selectedOrganization = null;
       
       await wrapper.vm.uploadImage(new File(["test"], "test.png"));
 
@@ -852,17 +841,11 @@ describe("General", () => {
     });
 
     it("should show 'No Text Available' when custom text is empty", async () => {
-      // Create wrapper first, then modify store
+      mockStore.state.zoConfig.custom_logo_text = "";
       const wrapper = createWrapper();
-      store.state.zoConfig.custom_logo_text = "";
-      Object.assign(wrapper.vm, { editingText: false });
+      await wrapper.setData({ editingText: false });
       
-      if (wrapper.text().includes("No Text Available")) {
-        expect(wrapper.text()).toContain("No Text Available");
-      } else {
-        // Fallback: verify store state shows empty text
-        expect(store.state.zoConfig.custom_logo_text).toBe("");
-      }
+      expect(wrapper.text()).toContain("No Text Available");
     });
   });
 });
