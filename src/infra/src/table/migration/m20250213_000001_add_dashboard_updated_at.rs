@@ -33,7 +33,7 @@ impl MigrationTrait for Migration {
     }
 }
 
-// Removes the old created_at column.
+// Add the updated_at column to the dashboards table.
 async fn add_updated_at_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
     if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
         manager
