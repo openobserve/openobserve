@@ -67,7 +67,11 @@ impl FlightEncoderStreamBuilder {
         self
     }
 
-    pub fn build(self, inner: SendableRecordBatchStream) -> FlightEncoderStream {
+    pub fn build(
+        self,
+        inner: SendableRecordBatchStream,
+        span: tracing::Span,
+    ) -> FlightEncoderStream {
         FlightEncoderStream {
             inner,
             encoder: self.encoder,
@@ -78,6 +82,7 @@ impl FlightEncoderStreamBuilder {
             defer: self.defer,
             start: self.start,
             first_batch: true,
+            span,
         }
     }
 }
@@ -93,6 +98,7 @@ pub struct FlightEncoderStream {
     trace_id: String,
     defer: Option<AsyncDefer>,
     start: std::time::Instant,
+    span: tracing::Span,
 }
 
 impl FlightEncoderStream {
@@ -201,6 +207,8 @@ impl Drop for FlightEncoderStream {
         let trace_id = &self.trace_id;
         let took = self.start.elapsed().as_millis();
         log::info!("[trace_id {trace_id}] flight->search: stream end, took: {took} ms",);
+
+        let _enter = self.span.enter();
 
         // metrics
         let time = self.start.elapsed().as_secs_f64();

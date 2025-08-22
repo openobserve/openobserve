@@ -38,7 +38,7 @@ use datafusion::{
 use futures::TryStreamExt;
 
 use crate::service::search::{
-    grpc::{QueryParams, storage::filter_file_list_by_tantivy_index},
+    grpc::{QueryParams, storage::tantivy_search},
     index::IndexCondition,
 };
 
@@ -164,7 +164,7 @@ async fn adapt_tantivy_result(
     schema: SchemaRef,
     idx_optimize_mode: IndexOptimizeMode,
 ) -> Result<SendableRecordBatchStream> {
-    let (idx_took, error, result) = filter_file_list_by_tantivy_index(
+    let (idx_took, error, result) = tantivy_search(
         query.clone(),
         &mut file_list,
         index_condition,
