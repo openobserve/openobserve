@@ -11,76 +11,112 @@ jobs:
   all-checks:
     name: All checks passed
     runs-on: ubuntu-latest
-    needs:
-      # Wait for all critical check workflows to complete
-      - unit-tests
-      - security-audit
-      - licenses-checker
-      - js-licenses-checker
-      - pr-title-checker
-      - playwright-tests
-      - api-integration-tests
     if: always()
     
     steps:
-      - name: Check all required jobs status
-        run: |
-          # Check if any of the required jobs failed
-          if [[ "${{ needs.unit-tests.result }}" != "success" ]]; then
-            echo "❌ Unit tests failed or were cancelled"
-            exit 1
-          fi
-          
-          if [[ "${{ needs.security-audit.result }}" != "success" ]]; then
-            echo "❌ Security audit failed or was cancelled"
-            exit 1
-          fi
-          
-          if [[ "${{ needs.licenses-checker.result }}" != "success" ]]; then
-            echo "❌ License checker failed or was cancelled"
-            exit 1
-          fi
-          
-          if [[ "${{ needs.js-licenses-checker.result }}" != "success" ]]; then
-            echo "❌ JS License checker failed or was cancelled"
-            exit 1
-          fi
-          
-          if [[ "${{ needs.pr-title-checker.result }}" != "success" ]]; then
-            echo "❌ PR title checker failed or was cancelled"
-            exit 1
-          fi
-          
-          if [[ "${{ needs.playwright-tests.result }}" != "success" ]]; then
-            echo "❌ Playwright tests failed or were cancelled"
-            exit 1
-          fi
-          
-          if [[ "${{ needs.api-integration-tests.result }}" != "success" ]]; then
-            echo "❌ API integration tests failed or were cancelled"
-            exit 1
-          fi
-          
-          echo "✅ All required checks passed successfully!"
-
-  # Reference the existing workflow jobs
-  unit-tests:
-    uses: ./.github/workflows/unit-tests.yml
-
-  security-audit:
-    uses: ./.github/workflows/audit-checker.yml
-
-  licenses-checker:
-    uses: ./.github/workflows/cargo-deny.yml
-
-  js-licenses-checker:
-    uses: ./.github/workflows/js-license-checker.yml
-
-  pr-title-checker:
-    uses: ./.github/workflows/pr-title-checker.yml
-
-  playwright-tests:
-    uses: ./.github/workflows/playwright.yml
-
-  api-integration-tests:
-    uses: ./.github/workflows/api-testing.yml
+      - name: Wait for other workflow runs to complete
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sha = context.payload.pull_request.head.sha;
+            
+            // Define the workflows we need to wait for
+            const requiredWorkflows = [
+              'Unit tests',
+              'Security audit', 
+              'Licenses checker',
+              'JS Licenses checker',
+              'PR Title Checker',
+              'Playwright UI Tests',
+              'API Integration Test'
+            ];
+            
+            console.log(`Waiting for workflows to complete for SHA: ${sha}`);
+            
+            let maxAttempts = 720; // 4 hours with 20 second intervals
+            let attempt = 0;
+            
+            while (attempt < maxAttempts) {
+              attempt++;
+              
+              // Log progress every 15 attempts (5 minutes)
+              if (attempt % 15 === 0) {
+                console.log(`⏱️  Still waiting... Attempt ${attempt}/${maxAttempts} (${Math.round(attempt * 20 / 60)} minutes elapsed)`);
+              }
+              
+              // Get all workflow runs for this SHA
+              const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner,
+                repo,
+                head_sha: sha,
+                per_page: 100
+              });
+              
+              // Filter to only the workflows we care about
+              const relevantRuns = workflowRuns.workflow_runs.filter(run => 
+                requiredWorkflows.includes(run.name) && run.head_sha === sha
+              );
+              
+              // Also get count of all workflows for this SHA for visibility
+              const allWorkflowsForSha = workflowRuns.workflow_runs.filter(run => run.head_sha === sha);
+              
+              if (attempt % 15 === 0) {
+                console.log(`📊 Found ${allWorkflowsForSha.length} total workflows, ${relevantRuns.length} required workflows for this SHA`);
+              }
+              
+              // Check status of each required workflow
+              let allComplete = true;
+              let anyFailed = false;
+              let completedCount = 0;
+              
+              for (const workflowName of requiredWorkflows) {
+                const runs = relevantRuns.filter(run => run.name === workflowName);
+                
+                if (runs.length === 0) {
+                  if (attempt % 15 === 0) {
+                    console.log(`❓ Workflow "${workflowName}" not found or not started yet`);
+                  }
+                  allComplete = false;
+                  continue;
+                }
+                
+                // Get the latest run for this workflow
+                const latestRun = runs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+                
+                if (attempt % 15 === 0) {
+                  console.log(`📊 Workflow "${workflowName}": ${latestRun.status} / ${latestRun.conclusion}`);
+                }
+                
+                if (latestRun.status !== 'completed') {
+                  allComplete = false;
+                } else if (latestRun.conclusion !== 'success') {
+                  console.log(`❌ Workflow "${workflowName}" failed with conclusion: ${latestRun.conclusion}`);
+                  anyFailed = true;
+                } else {
+                  completedCount++;
+                }
+              }
+              
+              if (attempt % 15 === 0) {
+                console.log(`✅ Progress: ${completedCount}/${requiredWorkflows.length} required workflows completed`);
+              }
+              
+              if (anyFailed) {
+                core.setFailed('One or more required workflows failed');
+                return;
+              }
+              
+              if (allComplete) {
+                console.log('✅ All required workflows completed successfully!');
+                return;
+              }
+              
+              // Wait 20 seconds before checking again
+              await new Promise(resolve => setTimeout(resolve, 20000));
+            }
+            
+            core.setFailed('Timeout waiting for required workflows to complete after 4 hours');
+            
+      - name: Success message
+        run: echo "✅ All required checks passed successfully!"
