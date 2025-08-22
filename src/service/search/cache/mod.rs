@@ -1209,12 +1209,7 @@ pub async fn apply_regex_to_response(
         )
         .await?;
 
-    match pattern_manager.process_at_search(
-        org_id,
-        StreamType::Logs,
-        &mut res.hits,
-        projections,
-    ) {
+    match pattern_manager.process_at_search(org_id, StreamType::Logs, &mut res.hits, projections) {
         Ok(_) => Ok(()),
         Err(e) => {
             log::error!("error in processing records for patterns for stream {all_streams} : {e}");
