@@ -29,7 +29,7 @@ export class SanityPage {
         this.histogramToggleDiv = '[data-test="logs-search-bar-show-histogram-toggle-btn"] div';
         
         // Saved Search locators
-        this.saveButton = 'button';
+        this.saveSearchButton = 'button';
         this.alertNameInput = '[data-test="add-alert-name-input"]';
         this.savedViewDialogSave = '[data-test="saved-view-dialog-save-btn"]';
         this.savedViewsButton = '[data-test="logs-search-saved-views-btn"]';
@@ -132,7 +132,7 @@ export class SanityPage {
 
     // Saved Search Methods
     async createAndDeleteSavedSearch(savedViewName) {
-        await this.page.locator(this.saveButton).filter({ hasText: "savesaved_search" }).click();
+        await this.page.locator(this.saveSearchButton).filter({ hasText: "savesaved_search" }).click();
         await this.page.locator(this.alertNameInput).click();
         await this.page.locator(this.alertNameInput).fill(savedViewName);
         await this.page.locator(this.savedViewDialogSave).click();
