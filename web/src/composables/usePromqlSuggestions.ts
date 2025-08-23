@@ -285,6 +285,10 @@ const usePromlqSuggestions = () => {
     getSuggestions,
     updateMetricKeywords,
     parsePromQlQuery,
+    analyzeLabelFocus,
+    getLabelSuggestions,
+    updatePromqlKeywords,
+    metricKeywords,
   };
 };
 

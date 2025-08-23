@@ -574,6 +574,15 @@ export default defineComponent({
       cancelDeleteRoute,
       disableToggle,
       outlinedDelete,
+      // Expose methods for testing
+      createRoute,
+      updateRoute,
+      getRoutePayload,
+      getUUID,
+      getSyslogRoutes,
+      getDefaultRoute,
+      organization,
+      routeToDelete,
     };
   },
 });

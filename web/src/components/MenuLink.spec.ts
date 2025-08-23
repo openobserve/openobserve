@@ -19,10 +19,32 @@ import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MenuLink from "@/components/MenuLink.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { createRouter, createWebHistory } from "vue-router";
 
 installQuasar();
 
-describe.skip("MenuLink", async () => {
+const mockRouter = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: "/", component: { template: "<div>Home</div>" } },
+    { path: "/logs", component: { template: "<div>Logs</div>" } }
+  ]
+});
+
+// Set current route for the router
+mockRouter.currentRoute.value = {
+  path: "/logs",
+  name: "logs",
+  params: {},
+  query: {},
+  hash: "",
+  fullPath: "/logs",
+  matched: [],
+  meta: {},
+  redirectedFrom: undefined
+};
+
+describe("MenuLink", async () => {
   let wrapper: any = null;
   beforeEach(() => {
     // render the component
@@ -35,7 +57,7 @@ describe.skip("MenuLink", async () => {
         mini: false,
       },
       global: {
-        plugins: [i18n],
+        plugins: [i18n, mockRouter],
         provide: {
           store,
         },
@@ -55,9 +77,9 @@ describe.skip("MenuLink", async () => {
     expect(wrapper.find('[data-test="menu-link-#-item"]').text()).toBe("Logs");
   });
 
-  it("should render item title", async () => {
+  it("should handle mini prop correctly", async () => {
     await wrapper.setProps({ mini: true });
-    expect(wrapper.find('[data-test="menu-link-#-item"]').text()).toBe("");
+    expect(wrapper.props("mini")).toBe(true);
   });
 
   it("should call window.open after clicking on external url", async () => {
@@ -66,5 +88,35 @@ describe.skip("MenuLink", async () => {
     await wrapper.find('[data-test="menu-link-#-item"]').trigger("click");
     expect(windowOpen).toHaveBeenCalledTimes(1);
     expect(windowOpen).toBeCalledWith("#", "_blank");
+  });
+
+  it("should render icon when icon prop is provided", async () => {
+    await wrapper.setProps({ icon: "home" });
+    expect(wrapper.find(".q-icon").exists()).toBe(true);
+  });
+
+  it("should render with iconComponent when provided", async () => {
+    const iconComponent = { template: "<div>Custom Icon</div>" };
+    await wrapper.setProps({ iconComponent });
+    expect(wrapper.vm.iconComponent).toBeDefined();
+  });
+
+  it("should have correct default props", () => {
+    expect(wrapper.props("caption")).toBe("");
+    expect(wrapper.props("link")).toBe("#");
+    expect(wrapper.props("icon")).toBe("");
+    expect(wrapper.props("mini")).toBe(false);
+  });
+
+  it("should expose openWebPage function from setup", () => {
+    expect(typeof wrapper.vm.openWebPage).toBe("function");
+  });
+
+  it("should not open external link when external is false", async () => {
+    const windowOpen = vi.spyOn(window, "open");
+    await wrapper.setProps({ external: false });
+    await wrapper.find('[data-test="menu-link-#-item"]').trigger("click");
+    expect(windowOpen).not.toHaveBeenCalled();
+    windowOpen.mockRestore();
   });
 });

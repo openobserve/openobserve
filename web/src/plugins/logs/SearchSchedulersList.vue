@@ -1017,6 +1017,11 @@ export default defineComponent({
       confirmCancelJob,
       toBeCancelled,
       confirmCancel,
+      calculateDuration,
+      convertUnixToQuasarFormat,
+      dateTimeToBeSent,
+      isDateTimeChanged,
+      router,
     };
     // Watch the searchObj for changes
   },
