@@ -1143,6 +1143,13 @@ export default defineComponent({
       filterActions,
       filteredActions,
       updateDestinationAction,
+      // Exposed validation and helper functions for testing
+      validateDestinationInputs,
+      checkDestinationInList,
+      checkTemplatesInList,
+      createDestination,
+      processJsonObject,
+      getServiceActions,
     };
   },
   components: {

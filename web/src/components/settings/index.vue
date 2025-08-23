@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :to="{
               name: 'alertDestinations',
               query: {
-                org_identifier: store.state.selectedOrganization.identifier,
+                org_identifier: store.state.selectedOrganization?.identifier,
               },
             }"
             icon="location_on"
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :to="{
               name: 'pipelineDestinations',
               query: {
-                org_identifier: store.state.selectedOrganization.identifier,
+                org_identifier: store.state.selectedOrganization?.identifier,
               },
             }"
             icon="person_pin_circle"
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :to="{
               name: 'alertTemplates',
               query: {
-                org_identifier: store.state.selectedOrganization.identifier,
+                org_identifier: store.state.selectedOrganization?.identifier,
               },
             }"
             icon="description"
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :to="{
               name: 'cipherKeys',
               query: {
-                org_identifier: store.state.selectedOrganization.identifier,
+                org_identifier: store.state.selectedOrganization?.identifier,
               },
             }"
             icon="key"
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :to="{
               name: 'nodes',
               query: {
-                org_identifier: store.state.selectedOrganization.identifier,
+                org_identifier: store.state.selectedOrganization?.identifier,
               },
             }"
             icon="hub"
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :to="{
               name: 'domainManagement',
               query: {
-                org_identifier: store.state.selectedOrganization.identifier,
+                org_identifier: store.state.selectedOrganization?.identifier,
               },
             }"
             icon="domain"
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :to="{
               name: 'orgnizationManagement',
               query: {
-                org_identifier: store.state.selectedOrganization.identifier,
+                org_identifier: store.state.selectedOrganization?.identifier,
               },
             }"
             icon="lan"
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :to="{
               name: 'regexPatterns',
               query: {
-                org_identifier: store.state.selectedOrganization.identifier,
+                org_identifier: store.state.selectedOrganization?.identifier,
               },
             }"
             content-class="tab_content"
@@ -247,7 +247,7 @@ export default defineComponent({
           router.push({
             path: "/settings/query_management",
             query: {
-              org_identifier: store.state.selectedOrganization.identifier,
+              org_identifier: store.state.selectedOrganization?.identifier,
             },
           });
         } 
@@ -256,7 +256,7 @@ export default defineComponent({
           router.push({
             path: "/settings/general",
             query: {
-              org_identifier: store.state.selectedOrganization.identifier,
+              org_identifier: store.state.selectedOrganization?.identifier,
             },
           });
         }
@@ -267,7 +267,7 @@ export default defineComponent({
           router.push({
             path: "/settings/general",
             query: {
-              org_identifier: store.state.selectedOrganization.identifier,
+              org_identifier: store.state.selectedOrganization?.identifier,
             },
           });
         }
@@ -315,8 +315,10 @@ export default defineComponent({
       isMetaOrg,
       showManagementTabs,
       controlManagementTabs,
-      regexIcon
-      
+      regexIcon,
+      // Expose methods for testing
+      handleSettingsRouting,
+      storePreviousStoreModel
     };
   },
 });

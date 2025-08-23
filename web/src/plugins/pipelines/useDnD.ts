@@ -597,5 +597,12 @@ export default function useDragAndDrop() {
     deletePipelineNode,
     resetPipelineData,
     comparePipelinesById,
+    // Exporting internal functions for testing
+    hasInputNodeFn,
+    detectCycle,
+    // Exporting constants for testing
+    defaultObject,
+    defaultPipelineObj,
+    dialogObj,
   };
 }

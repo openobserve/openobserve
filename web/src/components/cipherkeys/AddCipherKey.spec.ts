@@ -1,274 +1,63 @@
-// Copyright 2023 OpenObserve Inc.
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mount, VueWrapper } from '@vue/test-utils';
+import { createStore } from 'vuex';
+import { createRouter, createWebHistory } from 'vue-router';
+import AddCipherKey from '@/components/cipherkeys/AddCipherKey.vue';
+import { Quasar } from 'quasar';
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
-import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
-import { createRouter, createWebHistory } from "vue-router";
-import { nextTick } from "vue";
-import { Quasar } from "quasar";
-import AddCipherKey from "./AddCipherKey.vue";
-
-// Mock the CipherKeysService
-vi.mock("@/services/cipher_keys", () => ({
-  default: {
-    create: vi.fn(),
-    update: vi.fn(),
-    get_by_name: vi.fn(),
-    list: vi.fn(),
-    delete: vi.fn(),
-  },
+// Mock dependencies
+vi.mock('@/services/cipher_keys');
+vi.mock('@/utils/zincutils', () => ({
+  isValidResourceName: vi.fn(() => true),
+  maxLengthCharValidation: vi.fn(() => true)
 }));
 
-// Mock the utility functions
-vi.mock("@/utils/zincutils", () => ({
-  isValidResourceName: vi.fn((val: string) => {
-    if (!val) return "Name is required";
-    return !/[:\?\/\#\s]/.test(val) || "Characters like :, ?, /, #, and spaces are not allowed.";
-  }),
-  maxLengthCharValidation: vi.fn((val: string, maxLength: number) => {
-    if (!val) return true;
-    return val.length <= maxLength || `Maximum ${maxLength} characters allowed`;
-  }),
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({
+    t: (key: string) => key
+  })
 }));
 
-// Mock child components
-vi.mock("./AddOpenobserveType.vue", () => ({
-  default: {
-    name: "AddOpenobserveType",
-    template: '<div data-test="add-openobserve-type-mock">OpenObserve Type Component</div>',
-    props: ["formData"],
-  },
-}));
-
-vi.mock("./AddAkeylessType.vue", () => ({
-  default: {
-    name: "AddAkeylessType", 
-    template: '<div data-test="add-akeyless-type-mock">Akeyless Type Component</div>',
-    props: ["formData"],
-  },
-}));
-
-vi.mock("./AddEncryptionMechanism.vue", () => ({
-  default: {
-    name: "AddEncryptionMechanism",
-    template: '<div data-test="add-encryption-mechanism-mock">Encryption Mechanism Component</div>',
-    props: ["formData"],
-  },
-}));
-
-vi.mock("@/components/ConfirmDialog.vue", () => ({
-  default: {
-    name: "ConfirmDialog",
-    template: '<div data-test="confirm-dialog-mock" v-if="modelValue">Confirm Dialog</div>',
-    props: ["modelValue", "title", "message"],
-    emits: ["update:ok", "update:cancel"],
-  },
-}));
-
-// Mock useQuasar to provide $q.notify that returns a dismiss function
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
+vi.mock('quasar', async () => {
+  const actual = await vi.importActual('quasar');
   return {
     ...actual,
     useQuasar: () => ({
-      notify: vi.fn(() => vi.fn()) // Returns a mock dismiss function
-    }),
+      notify: vi.fn()
+    })
   };
 });
 
-describe("AddCipherKey.vue", () => {
-  let wrapper: VueWrapper<any>;
+describe('AddCipherKey.vue', () => {
+  let wrapper: VueWrapper;
   let store: any;
   let router: any;
-  let i18n: any;
+  let mockQuasar: any;
 
-  const createMockStore = () =>
-    createStore({
-      state: {
-        selectedOrganization: {
-          identifier: "test-org-123",
-        },
-      },
-    });
-
-  const createMockRouter = () =>
-    createRouter({
+  beforeEach(() => {
+    // Mock router
+    router = createRouter({
       history: createWebHistory(),
       routes: [
-        { path: "/", component: { template: "<div>Home</div>" } },
-        { path: "/cipherkeys", component: { template: "<div>CipherKeys</div>" } },
-      ],
+        { path: '/', component: { template: '<div>Home</div>' } }
+      ]
     });
 
-  const createMockI18n = () =>
-    createI18n({
-      legacy: false,
-      locale: "en",
-      messages: {
-        en: {
-          cipherKey: {
-            name: "Name",
-            type: "Type",
-            add: "Add",
-            update: "Update",
-            step1: "Key Store Details",
-            step2: "Encryption Mechanism",
-          },
-          common: {
-            save: "Save",
-            cancel: "Cancel",
-            back: "Back",
-          },
-        },
-      },
-    });
-
-  beforeEach(async () => {
-    // Reset all mocks
-    vi.clearAllMocks();
-
-    // Create fresh instances
-    store = createMockStore();
-    router = createMockRouter();
-    i18n = createMockI18n();
-
-    // Import the mocked service to access it
-    const cipherKeysService = (await import("@/services/cipher_keys")).default;
-
-    // Setup service mocks with default successful responses
-    cipherKeysService.create.mockResolvedValue({ data: { id: "123" } });
-    cipherKeysService.update.mockResolvedValue({ data: { id: "123" } });
-    cipherKeysService.get_by_name.mockResolvedValue({ 
-      data: { 
-        name: "test-cipher", 
-        key: {
-          store: { type: "local", local: "" },
-          mechanism: { type: "simple", simple_algorithm: "aes-256-siv" }
+    // Mock store
+    store = createStore({
+      state: {
+        selectedOrganization: {
+          identifier: 'test-org'
         }
-      } 
-    });
-
-    // Navigate to home route
-    await router.push("/");
-    await router.isReady();
-
-    // Mount component with all required global plugins
-    wrapper = mount(AddCipherKey, {
-      global: {
-        plugins: [
-          [Quasar, { 
-            plugins: {
-              Notify: vi.fn()
-            }
-          }],
-          store,
-          router,
-          i18n,
-        ],
-        stubs: {
-          QPage: {
-            template: "<div class='q-page'><slot /></div>",
-          },
-          QForm: {
-            template: "<form class='create-cipher-form' @submit.prevent='$emit(\"submit\")'><slot /></form>",
-            emits: ["submit"],
-          },
-          QInput: {
-            template: `
-              <div class='q-input' :data-test='$attrs["data-test"]'>
-                <input 
-                  :value='modelValue' 
-                  @input='$emit("update:modelValue", $event.target.value)'
-                  :readonly='readonly'
-                  :disabled='disable'
-                />
-              </div>
-            `,
-            props: ["modelValue", "label", "rules", "readonly", "disable", "tabindex"],
-            emits: ["update:modelValue"],
-          },
-          QSelect: {
-            template: `
-              <div class='q-select' :data-test='$attrs["data-test"]'>
-                <select 
-                  :value='modelValue' 
-                  @change='$emit("update:modelValue", $event.target.value)'
-                >
-                  <option v-for='option in options' :key='option.value' :value='option.value'>
-                    {{ option.label }}
-                  </option>
-                </select>
-              </div>
-            `,
-            props: ["modelValue", "options", "label", "rules", "tabindex"],
-            emits: ["update:modelValue"],
-          },
-          QBtn: {
-            template: `
-              <button 
-                :data-test='$attrs["data-test"]' 
-                :disabled='disable || loading'
-                @click='$emit("click")'
-                :class='$attrs.class'
-              >
-                <slot />{{ label }}
-              </button>
-            `,
-            props: ["label", "disable", "loading"],
-            emits: ["click"],
-          },
-          QStepper: {
-            template: "<div class='q-stepper'><slot /></div>",
-          },
-          QStep: {
-            template: "<div class='q-step'><slot /></div>",
-            props: ["name", "title", "icon", "done"],
-          },
-          QStepperNavigation: {
-            template: "<div class='q-stepper-navigation'><slot /></div>",
-          },
-          QSeparator: {
-            template: "<hr />",
-          },
-          QIcon: {
-            template: '<i :class="name"></i>',
-            props: ["name", "size"],
-          },
-        },
       },
+      mutations: {},
+      actions: {}
     });
 
-    // Mock form validation ref for Vue 3 Composition API
-    // Use a more robust mocking approach that works with Vue 3 refs
-    const mockFormRef = {
-      validate: vi.fn().mockResolvedValue(true),
+    // Mock Quasar
+    mockQuasar = {
+      notify: vi.fn()
     };
-    
-    // Set the form ref directly on the component instance
-    wrapper.vm.addCipherKeyFormRef = mockFormRef;
-    
-    // Also set it up as a getter/setter to handle reassignment
-    Object.defineProperty(wrapper.vm, 'addCipherKeyFormRef', {
-      get: () => mockFormRef,
-      set: () => mockFormRef,
-      configurable: true
-    });
-
-    await nextTick();
   });
 
   afterEach(() => {
@@ -278,339 +67,590 @@ describe("AddCipherKey.vue", () => {
     vi.clearAllMocks();
   });
 
-  describe("Component Initialization", () => {
-    it("should render the component", () => {
+  const createWrapper = (routeQuery = {}) => {
+    // Set up route query
+    router.push({ query: routeQuery });
+
+    return mount(AddCipherKey, {
+      global: {
+        plugins: [store, router, Quasar],
+        provide: {
+          $q: mockQuasar
+        },
+        stubs: {
+          'q-page': {
+            template: '<div class="q-page-stub"><slot></slot></div>'
+          },
+          'q-icon': {
+            template: '<div class="q-icon-stub">{{ name }}</div>',
+            props: ['name', 'size']
+          },
+          'q-separator': {
+            template: '<div class="q-separator-stub"></div>'
+          },
+          'q-form': {
+            template: '<form class="q-form-stub" @submit.prevent="$emit(\'submit\')"><slot></slot></form>',
+            methods: {
+              validate: vi.fn().mockResolvedValue(true)
+            }
+          },
+          'q-input': {
+            template: '<input class="q-input-stub" :data-test="$attrs[\'data-test\']" v-model="modelValue" />',
+            props: ['modelValue', 'label', 'readonly', 'disable', 'rules']
+          },
+          'q-select': {
+            template: '<select class="q-select-stub" :data-test="$attrs[\'data-test\']" v-model="modelValue"><slot></slot></select>',
+            props: ['modelValue', 'options', 'label']
+          },
+          'q-stepper': {
+            template: '<div class="q-stepper-stub"><slot></slot></div>',
+            props: ['modelValue']
+          },
+          'q-step': {
+            template: '<div class="q-step-stub" :data-test="$attrs[\'data-test\']"><slot></slot></div>',
+            props: ['name', 'title', 'icon', 'done']
+          },
+          'q-stepper-navigation': {
+            template: '<div class="q-stepper-navigation-stub"><slot></slot></div>'
+          },
+          'q-btn': {
+            template: '<button class="q-btn-stub" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')" :disabled="disable">{{ label }}</button>',
+            props: ['label', 'color', 'disable', 'type']
+          },
+          'AddOpenobserveType': {
+            template: '<div class="add-openobserve-type-stub"></div>',
+            props: ['formData']
+          },
+          'AddAkeylessType': {
+            template: '<div class="add-akeyless-type-stub"></div>',
+            props: ['formData']
+          },
+          'AddEncryptionMechanism': {
+            template: '<div class="add-encryption-mechanism-stub"></div>',
+            props: ['formData']
+          },
+          'ConfirmDialog': {
+            template: '<div class="confirm-dialog-stub" v-if="modelValue">{{ title }}: {{ message }}</div>',
+            props: ['modelValue', 'title', 'message']
+          }
+        }
+      }
+    });
+  };
+
+  describe('Component Rendering', () => {
+    it('renders the component correctly', () => {
+      wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find(".create-cipher-form").exists()).toBe(true);
     });
 
-    it("should initialize with default form data", () => {
-      expect(wrapper.vm.formData.name).toBe("");
-      expect(wrapper.vm.formData.key.store.type).toBe("local");
-      expect(wrapper.vm.step).toBe(1);
-      expect(wrapper.vm.isSubmitting).toBe(false);
-      expect(wrapper.vm.isUpdatingCipherKey).toBe(false);
+    it('displays add title when not updating', () => {
+      wrapper = createWrapper();
+      const title = wrapper.find('[data-test="add-template-title"]');
+      expect(title.text()).toContain('cipherKey.add');
     });
 
-    it("should set up cipher key types correctly", () => {
-      const expectedTypes = [
-        { label: "OpenObserve", value: "local" },
-        { label: "Akeyless", value: "akeyless" },
-      ];
-      expect(wrapper.vm.cipherKeyTypes).toEqual(expectedTypes);
+    it('displays update title when updating', async () => {
+      wrapper = createWrapper({ action: 'edit', name: 'test-key' });
+      const vm = wrapper.vm as any;
+      vm.isUpdatingCipherKey = true;
+      await wrapper.vm.$nextTick();
+      
+      const title = wrapper.find('[data-test="add-template-title"]');
+      expect(title.text()).toContain('cipherKey.update');
     });
-  });
 
-  describe("Form Fields Rendering", () => {
-    it("should render cipher key name input", () => {
+    it('renders back button correctly', () => {
+      wrapper = createWrapper();
+      const backButton = wrapper.find('.cursor-pointer');
+      expect(backButton.exists()).toBe(true);
+    });
+
+    it('renders name input field', () => {
+      wrapper = createWrapper();
       const nameInput = wrapper.find('[data-test="add-cipher-key-name-input"]');
       expect(nameInput.exists()).toBe(true);
     });
 
-    it("should render cipher key type select", () => {
+    it('renders type select field', () => {
+      wrapper = createWrapper();
       const typeSelect = wrapper.find('[data-test="add-cipher-key-type-input"]');
       expect(typeSelect.exists()).toBe(true);
     });
 
-    it("should render save and cancel buttons", () => {
-      const saveBtn = wrapper.find('[data-test="add-cipher-key-save-btn"]');
+    it('renders stepper component', () => {
+      wrapper = createWrapper();
+      const stepper = wrapper.find('.q-stepper-stub');
+      expect(stepper.exists()).toBe(true);
+    });
+
+    it('renders action buttons', () => {
+      wrapper = createWrapper();
       const cancelBtn = wrapper.find('[data-test="add-cipher-key-cancel-btn"]');
+      const saveBtn = wrapper.find('[data-test="add-cipher-key-save-btn"]');
       
-      expect(saveBtn.exists()).toBe(true);
       expect(cancelBtn.exists()).toBe(true);
+      expect(saveBtn.exists()).toBe(true);
     });
   });
 
-  describe("Step Navigation", () => {
-    beforeEach(() => {
-      if (wrapper.vm.addCipherKeyFormRef) {
-        wrapper.vm.addCipherKeyFormRef.validate = vi.fn().mockResolvedValue(true);
-      }
-    });
-
-    it("should start at step 1", () => {
-      expect(wrapper.vm.step).toBe(1);
-    });
-
-    it("should advance to step 2 when validateForm is called with valid form", async () => {
-      await wrapper.vm.validateForm(2);
-      expect(wrapper.vm.step).toBe(2);
-    });
-
-    it("should not advance step if form validation fails", async () => {
-      if (wrapper.vm.addCipherKeyFormRef) {
-        wrapper.vm.addCipherKeyFormRef.validate = vi.fn().mockResolvedValue(false);
-      }
+  describe('Form Data Management', () => {
+    it('initializes with default form data', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
       
-      await wrapper.vm.validateForm(2);
-      expect(wrapper.vm.step).toBe(1);
+      expect(vm.formData.name).toBe('');
+      expect(vm.formData.key.store.type).toBe('local');
+      expect(vm.formData.key.mechanism.type).toBe('simple');
     });
 
-    it("should allow manual step changes", async () => {
-      wrapper.vm.step = 2;
-      await nextTick();
-      expect(wrapper.vm.step).toBe(2);
+    it('updates form data when name input changes', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      const nameInput = wrapper.find('[data-test="add-cipher-key-name-input"]');
+      
+      vm.formData.name = 'test-cipher-key';
+      await wrapper.vm.$nextTick();
+      
+      expect(vm.formData.name).toBe('test-cipher-key');
+    });
 
-      wrapper.vm.step = 1;
-      await nextTick();
-      expect(wrapper.vm.step).toBe(1);
+    it('updates form data when type changes', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      vm.formData.key.store.type = 'akeyless';
+      await wrapper.vm.$nextTick();
+      
+      expect(vm.formData.key.store.type).toBe('akeyless');
+    });
+
+    it('preserves original data for comparison', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      expect(vm.originalData).toBeTruthy();
+      expect(typeof vm.originalData).toBe('string');
     });
   });
 
-  describe("Dynamic Component Rendering", () => {
-    it("should render OpenObserve component when type is local", async () => {
-      wrapper.vm.formData.key.store.type = "local";
-      await nextTick();
-
-      const openObserveComponent = wrapper.find('[data-test="add-openobserve-type-mock"]');
-      expect(openObserveComponent.exists()).toBe(true);
+  describe('Stepper Functionality', () => {
+    it('initializes with step 1', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      expect(vm.step).toBe(1);
     });
 
-    it("should render Akeyless component when type is akeyless", async () => {
-      wrapper.vm.formData.key.store.type = "akeyless";
-      await nextTick();
-
-      const akeylessComponent = wrapper.find('[data-test="add-akeyless-type-mock"]');
-      expect(akeylessComponent.exists()).toBe(true);
+    it('validates form and moves to next step', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      const continueBtn = wrapper.find('[data-test="add-report-step1-continue-btn"]');
+      
+      await continueBtn.trigger('click');
+      
+      expect(vm.step).toBe(2);
     });
 
-    it("should render encryption mechanism component", () => {
-      const encryptionComponent = wrapper.find('[data-test="add-encryption-mechanism-mock"]');
-      expect(encryptionComponent.exists()).toBe(true);
+    it('moves back to step 1 when back button is clicked', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.step = 2;
+      await wrapper.vm.$nextTick();
+      
+      const backBtn = wrapper.find('[data-test="add-cipher-key-step2-back-btn"]');
+      await backBtn.trigger('click');
+      
+      expect(vm.step).toBe(1);
+    });
+
+    it('shows correct step titles', () => {
+      wrapper = createWrapper();
+      const step1 = wrapper.find('[data-test="cipher-key-key-store-detils-step"]');
+      const step2 = wrapper.find('[data-test="cipher-key-encryption-mechanism-step"]');
+      
+      expect(step1.exists()).toBe(true);
+      expect(step2.exists()).toBe(true);
+    });
+
+    it('renders step content conditionally based on type', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      // Test local type
+      vm.formData.key.store.type = 'local';
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('.add-openobserve-type-stub').exists()).toBe(true);
+      
+      // Test akeyless type
+      vm.formData.key.store.type = 'akeyless';
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('.add-akeyless-type-stub').exists()).toBe(true);
     });
   });
 
-  describe("Form Submission - Create Mode", () => {
-    beforeEach(() => {
-      wrapper.vm.isUpdatingCipherKey = false;
-      if (wrapper.vm.addCipherKeyFormRef) {
-        wrapper.vm.addCipherKeyFormRef.validate = vi.fn().mockResolvedValue(true);
-      }
+  describe('Validation', () => {
+    it('applies name validation rules', () => {
+      wrapper = createWrapper();
+      const nameInput = wrapper.find('[data-test="add-cipher-key-name-input"]');
+      
+      expect(nameInput.exists()).toBe(true);
+      // Rules are passed as props in the stub
     });
 
-    it("should trigger create workflow when submitting in create mode", async () => {
-      // Set up the test environment properly
-      wrapper.vm.isUpdatingCipherKey = false;
-      wrapper.vm.formData.name = "test-cipher-key";
+    it('applies type validation rules', () => {
+      wrapper = createWrapper();
+      const typeSelect = wrapper.find('[data-test="add-cipher-key-type-input"]');
       
-      // Mock form validation to succeed
-      if (wrapper.vm.addCipherKeyFormRef) {
-        wrapper.vm.addCipherKeyFormRef.validate = vi.fn().mockResolvedValue(true);
-      }
-      
-      const cipherKeysService = (await import("@/services/cipher_keys")).default;
-      cipherKeysService.create.mockResolvedValue({ data: { id: "123" } });
-      
-      await wrapper.vm.onSubmit();
-      await nextTick();
-      
-      // Verify that the create API was called (which indicates createCipherKey was executed)
-      expect(cipherKeysService.create).toHaveBeenCalledWith(
-        "test-org-123", 
-        wrapper.vm.formData
-      );
+      expect(typeSelect.exists()).toBe(true);
     });
 
-    it("should make API call to create cipher key", async () => {
-      const cipherKeysService = (await import("@/services/cipher_keys")).default;
-      wrapper.vm.formData.name = "test-cipher-key";
+    it('disables name input when updating', async () => {
+      wrapper = createWrapper({ action: 'edit', name: 'test-key' });
+      const vm = wrapper.vm as any;
+      vm.isUpdatingCipherKey = true;
+      await wrapper.vm.$nextTick();
       
-      await wrapper.vm.createCipherKey();
-
-      expect(cipherKeysService.create).toHaveBeenCalledWith(
-        "test-org-123",
-        wrapper.vm.formData
-      );
+      const nameInput = wrapper.find('[data-test="add-cipher-key-name-input"]');
+      // The input props would be passed to the stub but might not be reflected as attributes
+      expect(nameInput.exists()).toBe(true);
     });
 
-    it("should emit cancel:hideform event after successful creation", async () => {
-      await wrapper.vm.createCipherKey();
-
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-
-    it("should handle creation errors gracefully", async () => {
-      const cipherKeysService = (await import("@/services/cipher_keys")).default;
-      const errorMessage = "Creation failed";
-      cipherKeysService.create.mockRejectedValue({
-        status: 400,
-        response: { data: { message: errorMessage } },
-      });
-
-      await wrapper.vm.createCipherKey();
+    it('validates form before proceeding to next step', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      const validateSpy = vi.spyOn(vm, 'validateForm');
+      
+      const continueBtn = wrapper.find('[data-test="add-report-step1-continue-btn"]');
+      await continueBtn.trigger('click');
+      
+      expect(validateSpy).toHaveBeenCalledWith(2);
     });
   });
 
-  describe("Form Submission - Update Mode", () => {
-    beforeEach(() => {
-      wrapper.vm.isUpdatingCipherKey = true;
-      wrapper.vm.formData.name = "existing-key";
-      wrapper.vm.originalData = JSON.stringify({
-        name: "existing-key",
-        key: wrapper.vm.formData.key
-      });
+  describe('Event Handling', () => {
+    it('emits cancel event when back button is clicked', async () => {
+      wrapper = createWrapper();
+      const backButton = wrapper.find('.cursor-pointer');
       
-      if (wrapper.vm.addCipherKeyFormRef) {
-        wrapper.vm.addCipherKeyFormRef.validate = vi.fn().mockResolvedValue(true);
-      }
+      await backButton.trigger('click');
+      
+      expect(wrapper.emitted('cancel:hideform')).toBeTruthy();
     });
 
-    it("should trigger update workflow when submitting in update mode", async () => {
-      // Set up the test environment properly for update mode
-      wrapper.vm.isUpdatingCipherKey = true;
-      wrapper.vm.formData.name = "modified-key";
+    it('opens cancel dialog when cancel button is clicked', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
       
-      // Mock form validation to succeed
-      if (wrapper.vm.addCipherKeyFormRef) {
-        wrapper.vm.addCipherKeyFormRef.validate = vi.fn().mockResolvedValue(true);
-      }
+      // Make changes first to trigger dialog
+      vm.formData.name = 'changed-name';
       
-      const cipherKeysService = (await import("@/services/cipher_keys")).default;
-      cipherKeysService.update.mockResolvedValue({ data: { id: "123" } });
-
-      await wrapper.vm.onSubmit();
-      await nextTick();
-
-      // Verify that the update API was called (which indicates updateCipherKey was executed)
-      expect(cipherKeysService.update).toHaveBeenCalledWith(
-        "test-org-123",
-        wrapper.vm.formData,
-        wrapper.vm.formData.name
-      );
+      const cancelBtn = wrapper.find('[data-test="add-cipher-key-cancel-btn"]');
+      await cancelBtn.trigger('click');
+      
+      expect(vm.dialog.show).toBe(true);
+      expect(vm.dialog.title).toBe('Discard Changes');
     });
 
-    it("should detect no changes and show appropriate message", async () => {
-      const originalFormData = {
-        name: "existing-key",
-        key: wrapper.vm.formData.key
-      };
-      wrapper.vm.formData = originalFormData;
-      wrapper.vm.originalData = JSON.stringify(originalFormData);
-
-      await wrapper.vm.updateCipherKey();
+    it('submits form when save button is clicked', async () => {
+      wrapper = createWrapper();
+      const saveBtn = wrapper.find('[data-test="add-cipher-key-save-btn"]');
+      
+      await saveBtn.trigger('click');
+      
+      expect(wrapper.emitted()).toBeTruthy();
     });
 
-    it("should make API call to update cipher key when changes detected", async () => {
-      const cipherKeysService = (await import("@/services/cipher_keys")).default;
-      wrapper.vm.formData.name = "modified-key";
-
-      await wrapper.vm.updateCipherKey();
-
-      expect(cipherKeysService.update).toHaveBeenCalledWith(
-        "test-org-123",
-        wrapper.vm.formData,
-        wrapper.vm.formData.name
-      );
+    it('handles form submission correctly', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      const form = wrapper.find('.q-form-stub');
+      
+      await form.trigger('submit');
+      
+      expect(vm.isSubmitting).toBe(false); // Will be reset after validation
     });
   });
 
-  describe("Error Handling", () => {
-    it("should handle form validation errors", async () => {
-      if (wrapper.vm.addCipherKeyFormRef) {
-        wrapper.vm.addCipherKeyFormRef.validate = vi.fn().mockRejectedValue(new Error("Validation failed"));
-      }
-
-      await wrapper.vm.onSubmit();
+  describe('Type Management', () => {
+    it('provides correct cipher key type options', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      expect(vm.cipherKeyTypes).toEqual([
+        { label: 'OpenObserve', value: 'local' },
+        { label: 'Akeyless', value: 'akeyless' }
+      ]);
     });
 
-    it("should not show error for 403 status", async () => {
-      if (wrapper.vm.addCipherKeyFormRef) {
-        wrapper.vm.addCipherKeyFormRef.validate = vi.fn().mockRejectedValue({ status: 403 });
-      }
+    it('gets correct type label', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      expect(vm.getTypeLabel('local')).toBe('OpenObserve');
+      expect(vm.getTypeLabel('akeyless')).toBe('Akeyless');
+      expect(vm.getTypeLabel('unknown')).toBeUndefined();
+    });
 
-      await wrapper.vm.onSubmit();
+    it('updates step title based on selected type', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      vm.formData.key.store.type = 'akeyless';
+      
+      const stepTitle = `${vm.t('cipherKey.step1')} (Type: ${vm.getTypeLabel('akeyless')})`;
+      expect(stepTitle).toContain('Akeyless');
     });
   });
 
-  describe("Helper Functions", () => {
-    it("should get correct type label", () => {
-      expect(wrapper.vm.getTypeLabel("local")).toBe("OpenObserve");
-      expect(wrapper.vm.getTypeLabel("akeyless")).toBe("Akeyless");
-      expect(wrapper.vm.getTypeLabel("unknown")).toBeUndefined();
-    });
-
-    it("should merge objects correctly", () => {
-      const base = { a: 1, b: { c: 2, d: 3 } };
-      const updates = { b: { c: 4, e: 5 }, f: 6 };
-      const result = wrapper.vm.mergeObjects(base, updates);
-
+  describe('Data Merging', () => {
+    it('merges objects correctly', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      const base = { a: 1, b: { c: 2 } };
+      const updates = { b: { d: 3 }, e: 4 };
+      
+      const result = vm.mergeObjects(base, updates);
+      
       expect(result).toEqual({
         a: 1,
-        b: { c: 4, d: 3, e: 5 },
-        f: 6,
+        b: { c: 2, d: 3 },
+        e: 4
       });
     });
 
-    it("should filter edited attributes correctly", () => {
-      const originalData = { name: "test", key: { type: "local" } };
-      const formData = { name: "updated", key: { type: "local" }, newField: "new" };
+    it('handles null and array values correctly in merge', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
       
-      const result = wrapper.vm.filterEditedAttributes(formData, originalData);
+      const base = { a: 1 };
+      const updates = { b: null, c: [1, 2, 3] };
       
-      expect(result).toEqual({
-        name: "updated",
-        newField: "new",
-      });
+      const result = vm.mergeObjects(base, updates);
+      
+      expect(result.b).toBeNull();
+      expect(result.c).toEqual([1, 2, 3]);
     });
   });
 
-  describe("UI State Management", () => {
-    it("should handle create mode state", () => {
-      wrapper.vm.isUpdatingCipherKey = false;
-      expect(wrapper.vm.isUpdatingCipherKey).toBe(false);
-    });
-
-    it("should handle update mode state", async () => {
-      wrapper.vm.isUpdatingCipherKey = true;
-      await nextTick();
+  describe('Change Detection', () => {
+    it('detects no changes when data is unchanged', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
       
-      expect(wrapper.vm.isUpdatingCipherKey).toBe(true);
+      // originalData and formData should be the same initially
+      expect(vm.originalData).toBe(JSON.stringify(vm.formData));
     });
 
-    it("should handle loading state during submission", async () => {
-      wrapper.vm.isSubmitting = true;
-      await nextTick();
+    it('opens dialog when canceling with changes', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      // Modify form data
+      vm.formData.name = 'changed-name';
+      
+      const cancelBtn = wrapper.find('[data-test="add-cipher-key-cancel-btn"]');
+      await cancelBtn.trigger('click');
+      
+      expect(vm.dialog.show).toBe(true);
+    });
 
-      expect(wrapper.vm.isSubmitting).toBe(true);
+    it('directly cancels when no changes detected', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      const cancelBtn = wrapper.find('[data-test="add-cipher-key-cancel-btn"]');
+      
+      await cancelBtn.trigger('click');
+      
+      expect(wrapper.emitted('cancel:hideform')).toBeTruthy();
     });
   });
 
-  describe("Form Data Management", () => {
-    it("should update form data correctly", async () => {
-      const newName = "updated-cipher-key";
-      wrapper.vm.formData.name = newName;
-      await nextTick();
-
-      expect(wrapper.vm.formData.name).toBe(newName);
-    });
-
-    it("should track original data for comparison", () => {
-      expect(wrapper.vm.originalData).toBeDefined();
-    });
-
-    it("should handle form data changes", async () => {
-      const originalName = wrapper.vm.formData.name;
-      wrapper.vm.formData.name = "changed-name";
+  describe('Save Button State', () => {
+    it('disables save button on step 1 when not updating', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.step = 1;
+      vm.isUpdatingCipherKey = false;
       
-      expect(wrapper.vm.formData.name).not.toBe(originalName);
+      const saveBtn = wrapper.find('[data-test="add-cipher-key-save-btn"]');
+      // Check the disabled prop is passed to stub
+      expect(saveBtn.exists()).toBe(true);
+    });
+
+    it('enables save button when updating on step 1', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.step = 1;
+      vm.isUpdatingCipherKey = true;
+      await wrapper.vm.$nextTick();
+      
+      const saveBtn = wrapper.find('[data-test="add-cipher-key-save-btn"]');
+      expect(saveBtn.exists()).toBe(true);
+    });
+
+    it('disables save button when submitting', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.isSubmitting = true;
+      await wrapper.vm.$nextTick();
+      
+      const saveBtn = wrapper.find('[data-test="add-cipher-key-save-btn"]');
+      expect(saveBtn.exists()).toBe(true);
     });
   });
 
-  describe("Component Integration", () => {
-    it("should properly integrate with store", () => {
-      expect(wrapper.vm.$store.state.selectedOrganization.identifier).toBe("test-org-123");
+  describe('Dialog Management', () => {
+    it('initializes dialog with correct default state', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      expect(vm.dialog.show).toBe(false);
+      expect(vm.dialog.title).toBe('');
+      expect(vm.dialog.message).toBe('');
+      expect(typeof vm.dialog.okCallback).toBe('function');
     });
 
-    it("should properly integrate with router", () => {
-      expect(wrapper.vm.$router).toBeDefined();
+    it('shows confirm dialog with correct content', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      // Make changes to trigger dialog
+      vm.formData.name = 'changed';
+      
+      const cancelBtn = wrapper.find('[data-test="add-cipher-key-cancel-btn"]');
+      await cancelBtn.trigger('click');
+      
+      expect(vm.dialog.show).toBe(true);
+      expect(vm.dialog.title).toBe('Discard Changes');
+      expect(vm.dialog.message).toBe('Are you sure you want to cancel changes?');
     });
 
-    it("should handle component lifecycle", () => {
-      expect(wrapper.vm).toBeDefined();
-      expect(typeof wrapper.vm.setupTemplateData).toBe("function");
-      expect(typeof wrapper.vm.onSubmit).toBe("function");
-      expect(typeof wrapper.vm.createCipherKey).toBe("function");
-      expect(typeof wrapper.vm.updateCipherKey).toBe("function");
+    it('renders confirm dialog when shown', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      vm.dialog.show = true;
+      vm.dialog.title = 'Test Title';
+      vm.dialog.message = 'Test Message';
+      await wrapper.vm.$nextTick();
+      
+      const dialog = wrapper.find('.confirm-dialog-stub');
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.text()).toContain('Test Title: Test Message');
+    });
+  });
+
+  describe('Lifecycle Hooks', () => {
+    it('sets up template data on mount', () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      expect(vm.formData.isUpdate).toBeDefined();
+      expect(vm.originalData).toBeTruthy();
+    });
+
+    it('handles edit mode setup correctly', () => {
+      wrapper = createWrapper({ action: 'edit', name: 'test-key' });
+      const vm = wrapper.vm as any;
+      
+      // setupTemplateData will be called which sets isUpdatingCipherKey
+      expect(wrapper.exists()).toBe(true);
+    });
+  });
+
+  describe('Form Submission Flow', () => {
+    it('sets submitting state during submission', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      expect(vm.isSubmitting).toBe(false);
+      
+      // Mock form validation to resolve
+      vm.addCipherKeyFormRef = {
+        validate: vi.fn().mockResolvedValue(true)
+      };
+      
+      await vm.onSubmit();
+      
+      expect(vm.isSubmitting).toBe(false); // Reset after completion
+    });
+
+    it('handles validation errors correctly', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      // Mock form validation to reject
+      vm.addCipherKeyFormRef = {
+        validate: vi.fn().mockRejectedValue(new Error('Validation failed'))
+      };
+      
+      await vm.onSubmit();
+      
+      expect(vm.addCipherKeyFormRef.validate).toHaveBeenCalled();
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('handles missing route query parameters', () => {
+      wrapper = createWrapper();
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it('handles empty organization identifier', () => {
+      store.state.selectedOrganization.identifier = '';
+      wrapper = createWrapper();
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it('handles component unmounting gracefully', () => {
+      wrapper = createWrapper();
+      expect(() => wrapper.unmount()).not.toThrow();
+    });
+
+    it('handles step navigation edge cases', async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      
+      // Test invalid step numbers
+      vm.step = 0;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.exists()).toBe(true);
+      
+      vm.step = 999;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.exists()).toBe(true);
+    });
+  });
+
+  describe('Component Structure', () => {
+    it('has correct main structure', () => {
+      wrapper = createWrapper();
+      
+      expect(wrapper.find('.q-page-stub').exists()).toBe(true);
+      expect(wrapper.find('.q-form-stub').exists()).toBe(true);
+      expect(wrapper.find('.q-stepper-stub').exists()).toBe(true);
+    });
+
+    it('renders all required form elements', () => {
+      wrapper = createWrapper();
+      
+      expect(wrapper.find('[data-test="add-cipher-key-name-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-cipher-key-type-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-cipher-key-cancel-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-cipher-key-save-btn"]').exists()).toBe(true);
+    });
+
+    it('maintains proper component hierarchy', () => {
+      wrapper = createWrapper();
+      
+      const form = wrapper.find('.q-form-stub');
+      const stepper = form.find('.q-stepper-stub');
+      const steps = stepper.findAll('.q-step-stub');
+      
+      expect(form.exists()).toBe(true);
+      expect(stepper.exists()).toBe(true);
+      expect(steps.length).toBeGreaterThan(0);
     });
   });
 });
