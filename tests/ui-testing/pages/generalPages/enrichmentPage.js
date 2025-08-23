@@ -62,18 +62,18 @@ class EnrichmentPage {
 
         // Click on 'Save'
         await this.page.getByText(this.saveButton).click({ force: true });
-        await this.page.waitForTimeout(3000);
+        await this.page.waitForLoadState('networkidle');
     }
 
     async searchForEnrichmentTable(fileName) {
         await this.page.getByPlaceholder(this.searchEnrichmentTable).fill(fileName);
-        await this.page.waitForTimeout(3000);
+        await this.page.waitForLoadState('networkidle');
     }
 
     // Exploration Methods
     async exploreEnrichmentTable() {
         await this.page.getByRole('button', { name: this.exploreButton }).click();
-        await this.page.waitForTimeout(3000);
+        await this.page.waitForLoadState('networkidle');
     }
 
     async clickTimestampColumn() {
@@ -82,7 +82,7 @@ class EnrichmentPage {
 
     async closeLogDialog() {
         await this.page.locator(this.closeDialog).click();
-        await this.page.waitForTimeout(3000);
+        await this.page.waitForLoadState('networkidle');
     }
 
     async clickDateTimeButton() {
@@ -101,36 +101,71 @@ abc, err = get_enrichment_table_record("${fileName}", {
 })
 .protocol_keyword = abc.keyword
 `;
-        await this.page.locator(this.vrlEditor).getByRole('textbox').fill(fullQuery);
-        await this.page.waitForTimeout(1000);
+        // Wait for VRL editor to be ready
+        await this.page.waitForSelector(this.vrlEditor, { state: 'visible' });
+        const textbox = this.page.locator(this.vrlEditor).getByRole('textbox');
+        await textbox.waitFor({ state: 'visible' });
+        
+        // Clear any existing content and fill new query
+        await textbox.clear();
+        await textbox.fill(fullQuery);
+        
+        // Wait for editor to process the input
+        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.waitForTimeout(500); // Allow VRL syntax highlighting
     }
 
     async applyQuery() {
+        // Wait for refresh button to be ready
+        await this.page.waitForSelector(this.refreshButton, { state: 'visible' });
+        await this.page.waitForLoadState('networkidle');
+        
         // Click on the run query button and wait for response
         const search = this.page.waitForResponse("**/api/**/_search**");
-        await this.page.waitForTimeout(3000);
         await this.page.locator(this.refreshButton).click({ force: true });
         
-        // Verify successful response
-        await expect.poll(async () => (await search).status()).toBe(200);
+        // Wait for the search response
+        const response = await search;
+        await expect.poll(async () => response.status()).toBe(200);
+        
+        // Additional wait for results to render
+        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.waitForTimeout(1000); // Small wait for VRL processing
     }
 
     async verifyNoQueryWarning() {
+        // Wait a moment for any potential warnings to appear
+        await this.page.waitForTimeout(1000);
+        
         const warningElement = this.page.locator(this.warningQueryExecution);
         await expect(warningElement).toBeHidden();
     }
 
     async expandFirstLogRow() {
-        await this.page.waitForTimeout(3000);
-        await this.page
-            .locator(this.timestampColumn)
-            .locator(this.expandMenu)
-            .click();
-        await this.page.waitForTimeout(1000);
+        await this.page.waitForLoadState('networkidle');
+        
+        // Wait for timestamp column to be visible and stable
+        await this.page.waitForSelector(this.timestampColumn, { state: 'visible' });
+        const expandButton = this.page.locator(this.timestampColumn).locator(this.expandMenu);
+        await expandButton.waitFor({ state: 'visible' });
+        
+        await expandButton.click();
+        await this.page.waitForLoadState('domcontentloaded');
+        
+        // Wait for expand panel to load
+        await this.page.waitForTimeout(500);
     }
 
     async clickProtocolKeyword() {
-        await this.page.locator(this.protocolKeywordText).click();
+        // Wait for protocol keyword element to be present and stable
+        await this.page.waitForSelector(this.protocolKeywordText, { state: 'visible', timeout: 10000 });
+        
+        // Additional wait to ensure element is clickable
+        const protocolElement = this.page.locator(this.protocolKeywordText);
+        await protocolElement.waitFor({ state: 'visible' });
+        await protocolElement.hover(); // Ensure element is interactable
+        
+        await protocolElement.click();
     }
 
     // Validation Methods
@@ -177,9 +212,9 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async appendDataToTable(filePath) {
         const inputFile = await this.page.locator(this.fileInput);
         await inputFile.setInputFiles(filePath);
-        await this.page.waitForTimeout(3000);
+        await this.page.waitForLoadState('networkidle');
         await this.page.getByRole('button', { name: this.saveButton }).click();
-        await this.page.waitForTimeout(3000);
+        await this.page.waitForLoadState('networkidle');
     }
 
     // Complete workflow methods

@@ -7,9 +7,9 @@ class ChangeOrgPage {
 
     // Home Page Methods
     async validateHomePageDefault(pageManager) {
-        await this.page.waitForTimeout(1000);
+        await this.page.waitForLoadState('domcontentloaded');
         await this.page.reload();
-        await this.page.waitForTimeout(5000);
+        await this.page.waitForLoadState('networkidle');
         await pageManager.homePage.homePageValidation();
         await pageManager.homePage.gotoHomePage();
         await pageManager.homePage.homePageValidation();
@@ -145,7 +145,7 @@ class ChangeOrgPage {
     async validateAlertsPageDefault(pageManager) {
         await pageManager.commonActions.navigateToAlerts();
         await pageManager.homePage.clickDefaultOrg();
-        await this.page.waitForTimeout(5000);
+        await this.page.waitForLoadState('networkidle');
         await pageManager.homePage.homePageURLValidationDefaultOrg();
         await pageManager.alertsPage.alertsURLValidation();
     }

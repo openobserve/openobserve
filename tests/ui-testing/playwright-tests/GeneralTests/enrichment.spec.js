@@ -74,29 +74,26 @@ test.describe("Enrichment data testcases", () => {
 
         // Click on 'Save'
         await page.getByText("Save").click({ force: true });
-        await page.waitForTimeout(3000);
+        await page.waitForLoadState('networkidle');
 
         // Search for the uploaded file name
         await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
-        await page.waitForTimeout(3000);
+        await page.waitForLoadState('networkidle');
 
         // Verify the file name in the enrichment table
         await pm.enrichmentPage.verifyFileInTable(fileName);
 
         // Explore the file with VRL query
+        await page.getByRole("button", { name: "Explore" }).waitFor({ state: 'visible' });
         await page.getByRole("button", { name: "Explore" }).click();
-        await page.waitForTimeout(3000);
+        await page.waitForLoadState('networkidle');
         
-        // Fill VRL query
-        await page.locator('#fnEditor').getByRole('textbox')
-            .fill(`
-abc, err = get_enrichment_table_record("${fileName}", {
-  "protocol_number": to_string!(.protocol_number)
-})
-.protocol_keyword = abc.keyword
-`);
-
-        await page.waitForTimeout(1000);
+        // Wait for logs page to load completely
+        await page.waitForLoadState('domcontentloaded');
+        await page.waitForTimeout(1000); // Additional wait for VRL editor initialization
+        
+        // Fill VRL query using page object method
+        await pm.enrichmentPage.fillVRLQuery(fileName);
 
         // Apply the query
         await pm.enrichmentPage.applyQuery();
@@ -147,18 +144,18 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Click on 'Save'
         await page.getByText("Save").click({ force: true });
-        await page.waitForTimeout(3000);
+        await page.waitForLoadState('networkidle');
         
         // Search and explore the uploaded table
         await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
-        await page.waitForTimeout(3000);
+        await page.waitForLoadState('networkidle');
 
         await page.getByRole("button", { name: "Explore" }).click();
         await page.locator('[data-test="date-time-btn"]').click();
         await expect(page.getByRole('cell', { name: 'Start time' })).toBeVisible();
         await page.locator('[data-test="log-table-column-0-_timestamp"]').click();
         await page.locator('[data-test="close-dialog"]').click();
-        await page.waitForTimeout(3000);
+        await page.waitForLoadState('networkidle');
 
         // Navigate to append data to the existing enrichment table
         await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
@@ -171,13 +168,13 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // Upload the CSV again for appending
         await inputFile.setInputFiles(fileContentPath);
-        await page.waitForTimeout(3000);
+        await page.waitForLoadState('networkidle');
         await page.getByRole('button', { name: 'Save' }).click();
-        await page.waitForTimeout(3000);
+        await page.waitForLoadState('networkidle');
         
         // Verify appended data
         await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
-        await page.waitForTimeout(3000);
+        await page.waitForLoadState('networkidle');
         await page.getByRole("button", { name: "Explore" }).click();
 
         // Verify row count increased
