@@ -41,6 +41,7 @@ import { CreateOrgPage } from "./generalPages/createOrgPage.js";
 import { CommonActions } from "./commonActions.js";
 import { UserPage } from "./generalPages/userPage.js";
 import { SanityPage } from "./generalPages/sanityPage.js";
+import { ChangeOrgPage } from "./generalPages/changeOrgPage.js";
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
@@ -98,6 +99,7 @@ class PageManager {
     this.commonActions = new CommonActions(page);
     this.userPage = new UserPage(page);
     this.sanityPage = new SanityPage(page);
+    this.changeOrgPage = new ChangeOrgPage(page);
     
     // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
     this.logsQueryPage = new LogsQueryPage(page);
