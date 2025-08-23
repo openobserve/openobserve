@@ -110,6 +110,7 @@ jobs:
         testfilename: [
             "GeneralTests/sanity.spec.js",
             "GeneralTests/changeOrg.spec.js",
+            "GeneralTests/enrichment.spec.js",
             # "alerts/alerts-e2e-flow.spec.js",
             # "alerts/alerts-ui-operations.spec.js",
             # "alerts/alerts-import.spec.js",
@@ -130,7 +131,6 @@ jobs:
             # # "dashboards/visualize.spec.js",
             # # "dashboards/visualization-vrl.spec.js",
             # "dashboards/dashboard-html-chart.spec.js",
-            # "GeneralTests/enrichment.spec.js",
             # "Logs/join.spec.js",
             # "Logs/logshistogram.spec.js",
             # "Logs/logspage.spec.js",
