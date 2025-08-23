@@ -73,6 +73,26 @@ export class SanityPage {
         this.createNewFunctionButton = { role: 'button', name: 'Create new function' };
         this.nameLabel = { label: 'Name' };
         this.saveButton = { role: 'button', name: 'Save' };
+        
+        // Settings locators (sanity2 specific)
+        this.settingsMenuItem = '[data-test="menu-link-settings-item"]';
+        this.generalSettingsTab = { role: 'tab', name: 'General Settings' };
+        this.scrapeIntervalInput = { label: 'Scrape Interval (In Seconds) *' };
+        this.dashboardSubmitButton = '[data-test="dashboard-add-submit"]';
+        
+        // Stream Stats locators (sanity2 specific)
+        this.refreshStatsButton = '[data-test="log-stream-refresh-stats-btn"]';
+        this.streamCellButton = { role: 'cell', name: '01' };
+        
+        // Schema Pagination locators (sanity2 specific)
+        this.schemaNextPageButton = '[data-test="logs-page-fields-list-pagination-nextpage-button"]';
+        this.schemaPrevPageButton = '[data-test="logs-page-fields-list-pagination-previouspage-button"]';
+        this.schemaPaginationText = 'fast_rewind1/2fast_forward';
+        
+        // Advanced Histogram locators (sanity2 specific)
+        this.histogramCanvas = '[data-test="logs-search-result-bar-chart"] canvas';
+        this.timestampColumn = '[data-test="log-table-column-1-_timestamp"]';
+        this.timestampExpandMenu = '[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]';
     }
 
     // Quick Mode Methods
@@ -349,5 +369,301 @@ export class SanityPage {
         await this.page.locator(this.closeDialog).click();
         
         await expect(this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down")).toBeVisible({ timeout: 10000 });
+    }
+
+    // Sanity2-Specific Methods
+
+    // Settings Management Methods
+    async changeSettingsSuccessfully() {
+        await this.page.waitForTimeout(2000);
+        await this.page.locator(this.settingsMenuItem).click();
+        await this.page.waitForTimeout(2000);
+        await this.page.getByText("General SettingsScrape").click();
+        await this.page.getByRole(this.generalSettingsTab.role, { name: this.generalSettingsTab.name }).click();
+        await this.page.getByLabel(this.scrapeIntervalInput.label).fill("16");
+        await this.page.locator(this.dashboardSubmitButton).click();
+        await this.page.getByText("Organization settings updated").click();
+    }
+
+    // Stream Stats Methods
+    async displayResultsOnRefreshStats() {
+        await this.page.locator(this.streamsMenuItem).click();
+        await this.page.locator(this.refreshStatsButton).click();
+        this.page.reload();
+        await this.page.getByRole(this.streamCellButton.role, { name: this.streamCellButton.name, exact: true }).click();
+    }
+
+    // Schema Pagination Methods
+    async displayPaginationForSchema() {
+        // First, ensure data is loaded by clicking the refresh button
+        const refreshButton = this.page.locator(this.refreshButton);
+        await expect(refreshButton).toBeVisible({ timeout: 15000 });
+        await expect(refreshButton).toBeEnabled({ timeout: 10000 });
+        
+        try {
+            await refreshButton.click({ timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        } catch (error) {
+            console.warn('Refresh button click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await refreshButton.click({ timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        }
+        
+        // Wait and click on the pagination dropdown with error handling
+        try {
+            const paginationDropdown = this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down");
+            await expect(paginationDropdown).toBeVisible({ timeout: 15000 });
+            await paginationDropdown.click({ timeout: 10000 });
+        } catch (error) {
+            console.warn('Pagination dropdown click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").click({ timeout: 10000 });
+        }
+        
+        // Click on schema pagination text with error handling
+        try {
+            const schemaPaginationText = this.page.getByText(this.schemaPaginationText);
+            await expect(schemaPaginationText).toBeVisible({ timeout: 15000 });
+            await schemaPaginationText.click({ timeout: 10000 });
+        } catch (error) {
+            console.warn('Schema pagination text click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await this.page.getByText(this.schemaPaginationText).click({ timeout: 10000 });
+        }
+        
+        // Click next page button with error handling
+        try {
+            const nextPageButton = this.page.locator(this.schemaNextPageButton);
+            await expect(nextPageButton).toBeVisible({ timeout: 15000 });
+            await expect(nextPageButton).toBeEnabled({ timeout: 10000 });
+            await nextPageButton.click({ timeout: 10000 });
+        } catch (error) {
+            console.warn('Next page button click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await this.page.locator(this.schemaNextPageButton).click({ timeout: 10000 });
+        }
+        
+        // Click previous page button with error handling
+        try {
+            const prevPageButton = this.page.locator(this.schemaPrevPageButton);
+            await expect(prevPageButton).toBeVisible({ timeout: 15000 });
+            await expect(prevPageButton).toBeEnabled({ timeout: 10000 });
+            await prevPageButton.click({ timeout: 10000 });
+        } catch (error) {
+            console.warn('Previous page button click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await this.page.locator(this.schemaPrevPageButton).click({ timeout: 10000 });
+        }
+    }
+
+    // Advanced Histogram Methods
+    async displayPaginationWhenHistogramOffWithResult() {
+        // First, ensure data is loaded by clicking the refresh button
+        const refreshButton = this.page.locator(this.refreshButton);
+        await expect(refreshButton).toBeVisible({ timeout: 15000 });
+        await expect(refreshButton).toBeEnabled({ timeout: 10000 });
+        
+        try {
+            await refreshButton.click({ timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        } catch (error) {
+            console.warn('Refresh button click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await refreshButton.click({ timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        }
+        
+        // Turn off histogram with error handling
+        try {
+            const histogramToggle = this.page.locator(this.histogramToggleDiv).nth(2);
+            await expect(histogramToggle).toBeVisible({ timeout: 15000 });
+            await histogramToggle.click({ timeout: 10000 });
+            await this.page.waitForTimeout(1000); // Brief wait for toggle effect
+        } catch (error) {
+            console.warn('Histogram toggle click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await this.page.locator(this.histogramToggleDiv).nth(2).click({ timeout: 10000 });
+        }
+        
+        // Click on result column with error handling
+        try {
+            const resultColumn = this.page.locator(this.resultColumnSource);
+            await expect(resultColumn).toBeVisible({ timeout: 15000 });
+            await resultColumn.click({ timeout: 10000 });
+        } catch (error) {
+            console.warn('Result column click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await this.page.locator(this.resultColumnSource).click({ timeout: 10000 });
+        }
+        
+        // Close dialog with error handling
+        try {
+            const closeDialogButton = this.page.locator(this.closeDialog);
+            await expect(closeDialogButton).toBeVisible({ timeout: 15000 });
+            await closeDialogButton.click({ timeout: 10000 });
+        } catch (error) {
+            console.warn('Close dialog click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await this.page.locator(this.closeDialog).click({ timeout: 10000 });
+        }
+        
+        // Click on pagination with error handling
+        try {
+            const paginationElement = this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down");
+            await expect(paginationElement).toBeVisible({ timeout: 15000 });
+            await paginationElement.click({ timeout: 10000 });
+        } catch (error) {
+            console.warn('Pagination element click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").click({ timeout: 10000 });
+        }
+    }
+
+    async displayPaginationWhenOnlySQLWithResult() {
+        await this.page.locator(this.histogramToggleDiv).nth(2).click();
+        await this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2).click();
+        await this.page.locator(this.refreshButton).click();
+        await this.page.locator(this.timestampColumn).click();
+        await this.page.locator(this.closeDialog).click();
+        await this.page.getByText("fast_rewind12345fast_forward50arrow_drop_down").click();
+    }
+
+    async displayHistogramInSQLMode() {
+        // First, ensure data is loaded by clicking the refresh button
+        const initialRefreshButton = this.page.locator(this.refreshButton);
+        await expect(initialRefreshButton).toBeVisible({ timeout: 15000 });
+        await expect(initialRefreshButton).toBeEnabled({ timeout: 10000 });
+        
+        try {
+            await initialRefreshButton.click({ timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        } catch (error) {
+            console.warn('Initial refresh button click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await initialRefreshButton.click({ timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        }
+        
+        // Wait for canvas to be ready and visible (should now be there after data load)
+        await expect(this.page.locator(this.histogramCanvas)).toBeVisible({ timeout: 15000 });
+        await this.page.waitForLoadState('networkidle');
+        
+        // First canvas click with error handling
+        try {
+            await this.page.locator(this.histogramCanvas).click({
+                position: { x: 182, y: 66 },
+                timeout: 10000
+            });
+        } catch (error) {
+            console.warn('First canvas click failed, retrying after wait:', error.message);
+            await this.page.waitForTimeout(2000);
+            await this.page.locator(this.histogramCanvas).click({
+                position: { x: 182, y: 66 },
+                timeout: 10000
+            });
+        }
+        
+        // Enable SQL mode with error handling
+        const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2);
+        await expect(sqlModeSwitch).toBeVisible({ timeout: 15000 });
+        
+        try {
+            await sqlModeSwitch.click({ timeout: 10000 });
+        } catch (error) {
+            console.warn('SQL mode switch failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await sqlModeSwitch.click({ timeout: 10000 });
+        }
+        
+        // Click refresh button with waits
+        const refreshButton = this.page.locator(this.refreshButton);
+        await expect(refreshButton).toBeVisible({ timeout: 15000 });
+        await expect(refreshButton).toBeEnabled({ timeout: 10000 });
+        
+        try {
+            await refreshButton.click({ timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        } catch (error) {
+            console.warn('Refresh button click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await refreshButton.click({ timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        }
+
+        await expect(
+            this.page.getByRole("heading", { name: "Error while fetching" })
+        ).not.toBeVisible();
+        
+        // Wait for canvas to be ready again after refresh
+        await expect(this.page.locator(this.histogramCanvas)).toBeVisible({ timeout: 15000 });
+        await this.page.waitForTimeout(1000);
+        
+        // Second canvas click with error handling
+        try {
+            await this.page.locator(this.histogramCanvas).click({
+                position: { x: 182, y: 66 },
+                timeout: 10000
+            });
+        } catch (error) {
+            console.warn('Second canvas click failed, continuing anyway:', error.message);
+        }
+    }
+
+    async displayResultsWhenSQLHistogramOnWithStreamSelection() {
+        // Navigate to home and logs with waits
+        await expect(this.page.locator('[data-test="menu-link-\\/-item"]')).toBeVisible({ timeout: 15000 });
+        await this.page.locator('[data-test="menu-link-\\/-item"]').click();
+        await this.page.waitForLoadState('domcontentloaded');
+        
+        await expect(this.page.locator('[data-test="menu-link-\\/logs-item"]')).toBeVisible({ timeout: 15000 });
+        await this.page.locator('[data-test="menu-link-\\/logs-item"]').click();
+        await this.page.waitForLoadState('networkidle', { timeout: 20000 });
+        
+        // Wait for SQL editor to be ready
+        const sqlEditor = this.page.locator('#fnEditor').getByRole('textbox');
+        await expect(sqlEditor).toBeVisible({ timeout: 15000 });
+        await expect(sqlEditor).toBeEditable({ timeout: 10000 });
+        await sqlEditor.click();
+        
+        // Enable SQL mode with error handling
+        const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2);
+        await expect(sqlModeSwitch).toBeVisible({ timeout: 15000 });
+        
+        try {
+            await sqlModeSwitch.click({ timeout: 10000 });
+            await this.page.waitForTimeout(1000); // Brief wait for mode switch
+        } catch (error) {
+            console.warn('SQL mode switch click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await sqlModeSwitch.click({ timeout: 10000 });
+        }
+        
+        // Click refresh button with robust waits
+        const refreshButton = this.page.locator(this.refreshButton);
+        await expect(refreshButton).toBeVisible({ timeout: 15000 });
+        await expect(refreshButton).toBeEnabled({ timeout: 10000 });
+        
+        try {
+            await refreshButton.click({ timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        } catch (error) {
+            console.warn('Refresh button click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await refreshButton.click({ timeout: 10000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 25000 });
+        }
+        
+        // Click timestamp expand menu with error handling
+        const timestampMenu = this.page.locator(this.timestampExpandMenu);
+        await expect(timestampMenu).toBeVisible({ timeout: 15000 });
+        
+        try {
+            await timestampMenu.click({ timeout: 10000 });
+        } catch (error) {
+            console.warn('Timestamp expand menu click failed, retrying:', error.message);
+            await this.page.waitForTimeout(2000);
+            await timestampMenu.click({ timeout: 10000 });
+        }
     }
 }

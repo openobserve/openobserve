@@ -141,7 +141,6 @@ jobs:
             # "Reports/reportsUpdated.spec.js",
             # "Reports/reportsUpdated2.spec.js",
             "GeneralTests/sanity.spec.js",
-            # "GeneralTests/sanity2.spec.js",
             # "GeneralTests/schema.spec.js",
             # "GeneralTests/schemaload.spec.js",
             # "Logs/secondsPrecisionAdded.spec.js",
