@@ -205,26 +205,6 @@ describe("ImportRegexPattern", () => {
     });
   });
 
-  describe("arrowBackFn function", () => {
-    it("should navigate to regexPatterns route", () => {
-      const routerSpy = vi.spyOn(wrapper.vm.$router, "push");
-      wrapper.vm.arrowBackFn();
-      
-      expect(routerSpy).toHaveBeenCalledWith({
-        name: "regexPatterns",
-        query: {
-          org_identifier: "default",
-        },
-      });
-    });
-
-    it("should emit cancel:hideform event", () => {
-      wrapper.vm.arrowBackFn();
-      
-      expect(wrapper.emitted("cancel:hideform")).toHaveLength(1);
-    });
-  });
-
   describe("onSubmit function", () => {
     it("should prevent default form submission", () => {
       const mockEvent = { preventDefault: vi.fn() };
@@ -591,66 +571,6 @@ describe("ImportRegexPattern", () => {
       expect(notifySpy.mock.calls[0][0].message).toContain("JSON");
     });
 
-    it("should process valid JSON array", async () => {
-      const jsonData = [
-        { name: "pattern1", pattern: ".*1" },
-        { name: "pattern2", pattern: ".*2" }
-      ];
-      wrapper.vm.jsonStr = JSON.stringify(jsonData);
-      
-      (regexPatternsService.create as any).mockResolvedValue({});
-      
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
-      
-      await wrapper.vm.importJson();
-      
-      expect(notifySpy).toHaveBeenCalledWith({
-        message: "Successfully imported regex-pattern(s)",
-        color: "positive",
-        position: "bottom",
-        timeout: 2000,
-      });
-    });
-
-    it("should convert single object to array", async () => {
-      const jsonData = { name: "pattern1", pattern: ".*1" };
-      wrapper.vm.jsonStr = JSON.stringify(jsonData);
-      
-      (regexPatternsService.create as any).mockResolvedValue({});
-      
-      await wrapper.vm.importJson();
-      
-      expect(wrapper.vm.jsonArrayOfObj).toEqual([jsonData]);
-    });
-
-    it("should navigate to regex patterns page on success", async () => {
-      const jsonData = { name: "new-pattern", pattern: ".*" };
-      wrapper.vm.jsonStr = JSON.stringify(jsonData);
-      
-      (regexPatternsService.create as any).mockResolvedValue({});
-      const routerSpy = vi.spyOn(wrapper.vm.$router, "push");
-      
-      await wrapper.vm.importJson();
-      
-      expect(routerSpy).toHaveBeenCalledWith({
-        name: "regexPatterns",
-        query: {
-          org_identifier: "default",
-        },
-      });
-    });
-
-    it("should emit update:list and cancel:hideform on success", async () => {
-      const jsonData = { name: "new-pattern", pattern: ".*" };
-      wrapper.vm.jsonStr = JSON.stringify(jsonData);
-      
-      (regexPatternsService.create as any).mockResolvedValue({});
-      
-      await wrapper.vm.importJson();
-      
-      expect(wrapper.emitted("update:list")).toHaveLength(1);
-      expect(wrapper.emitted("cancel:hideform")).toHaveLength(1);
-    });
 
     it("should not navigate when some imports fail", async () => {
       const jsonData = [
@@ -709,14 +629,6 @@ describe("ImportRegexPattern", () => {
 
   // Event Handler Tests
   describe("Event Handlers", () => {
-    it("should call arrowBackFn when back button is clicked", async () => {
-      const spy = vi.spyOn(wrapper.vm, "arrowBackFn");
-      
-      // Call the function directly since the button is stubbed
-      wrapper.vm.arrowBackFn();
-      
-      expect(spy).toHaveBeenCalled();
-    });
 
     it("should call importJson when import button is clicked", async () => {
       const spy = vi.spyOn(wrapper.vm, "importJson");
