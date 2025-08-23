@@ -120,9 +120,21 @@ export class IamPage {
 
 
     async verifySuccessMessage(expectedMessage) {
-        await expect(this.page.locator('role=alert').first()).toBeVisible();
-        await expect(this.alertMessage).toContainText(expectedMessage);
-
+        // Wait for any loading messages to disappear first
+        await this.page.waitForTimeout(2000);
+        
+        // Look for the specific alert message we're expecting
+        const alertWithMessage = this.page.getByRole('alert').filter({ hasText: expectedMessage });
+        await expect(alertWithMessage).toBeVisible({ timeout: 10000 });
+        
+        // Alternative fallback: if specific alert not found, check any alert contains the message
+        try {
+            await expect(alertWithMessage).toContainText(expectedMessage, { timeout: 5000 });
+        } catch (error) {
+            // Fallback: check all alerts for the expected message
+            const allAlerts = this.page.getByRole('alert');
+            await expect(allAlerts.filter({ hasText: expectedMessage })).toBeVisible({ timeout: 5000 });
+        }
     }
 
     async validateServiceAccountToken() {

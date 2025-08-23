@@ -44,6 +44,7 @@ import { SanityPage } from "./generalPages/sanityPage.js";
 import { ChangeOrgPage } from "./generalPages/changeOrgPage.js";
 import { EnrichmentPage } from "./generalPages/enrichmentPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
+const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
@@ -104,6 +105,7 @@ class PageManager {
     this.changeOrgPage = new ChangeOrgPage(page);
     this.enrichmentPage = new EnrichmentPage(page);
     this.schemaPage = new SchemaPage(page);
+    this.schemaLoadPage = new SchemaLoadPage(page);
     
     // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
     this.logsQueryPage = new LogsQueryPage(page);
