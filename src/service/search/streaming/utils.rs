@@ -92,3 +92,154 @@ pub fn get_top_k_values(
 
     Ok((top_k_values, result_count as u64))
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn test_get_top_k_values_success() {
+        let hits = vec![
+            json!({
+                "zo_sql_key": "key1",
+                "zo_sql_num": 10
+            }),
+            json!({
+                "zo_sql_key": "key2",
+                "zo_sql_num": 20
+            }),
+            json!({
+                "zo_sql_key": "key3",
+                "zo_sql_num": 15
+            }),
+        ];
+
+        let (result, count) = get_top_k_values(&hits, "test_field", 5, false).unwrap();
+
+        assert_eq!(count, 3);
+        assert_eq!(result.len(), 1);
+
+        let field_obj = result[0].as_object().unwrap();
+        assert_eq!(field_obj["field"], "test_field");
+
+        let values = field_obj["values"].as_array().unwrap();
+        assert_eq!(values.len(), 3);
+
+        // Check first value structure
+        let first_value = values[0].as_object().unwrap();
+        assert_eq!(first_value["zo_sql_key"], "key1");
+        assert_eq!(first_value["zo_sql_num"], 10);
+    }
+
+    #[test]
+    fn test_get_top_k_values_empty_field() {
+        let hits = vec![json!({"zo_sql_key": "key1", "zo_sql_num": 10})];
+
+        let result = get_top_k_values(&hits, "", 5, false);
+        assert!(result.is_err());
+        // The actual error message includes "Error# " prefix
+        assert!(result.unwrap_err().to_string().contains("field is empty"));
+    }
+
+    #[test]
+    fn test_get_top_k_values_empty_hits() {
+        let hits = vec![];
+
+        let (result, count) = get_top_k_values(&hits, "test_field", 5, false).unwrap();
+
+        assert_eq!(count, 0);
+        assert_eq!(result.len(), 1);
+
+        let field_obj = result[0].as_object().unwrap();
+        assert_eq!(field_obj["field"], "test_field");
+
+        let values = field_obj["values"].as_array().unwrap();
+        assert_eq!(values.len(), 0);
+    }
+
+    #[test]
+    fn test_get_top_k_values_missing_fields() {
+        let hits = vec![
+            json!({"zo_sql_key": "key1"}), // Missing zo_sql_num
+            json!({"zo_sql_num": 20}),     // Missing zo_sql_key
+            json!({}),                     // Empty object
+        ];
+
+        let (result, count) = get_top_k_values(&hits, "test_field", 5, false).unwrap();
+
+        assert_eq!(count, 3);
+        assert_eq!(result.len(), 1);
+
+        let values = result[0]["values"].as_array().unwrap();
+        assert_eq!(values.len(), 3);
+
+        // Check that missing fields are handled gracefully
+        let first_value = values[0].as_object().unwrap();
+        assert_eq!(first_value["zo_sql_key"], "key1");
+        assert_eq!(first_value["zo_sql_num"], 0); // Default value for missing num
+
+        let second_value = values[1].as_object().unwrap();
+        assert_eq!(second_value["zo_sql_key"], ""); // Default value for missing key
+        assert_eq!(second_value["zo_sql_num"], 20);
+    }
+
+    #[test]
+    fn test_get_top_k_values_with_top_k_limit() {
+        let hits = vec![
+            json!({"zo_sql_key": "key1", "zo_sql_num": 10}),
+            json!({"zo_sql_key": "key2", "zo_sql_num": 20}),
+            json!({"zo_sql_key": "key3", "zo_sql_num": 15}),
+            json!({"zo_sql_key": "key4", "zo_sql_num": 25}),
+            json!({"zo_sql_key": "key5", "zo_sql_num": 5}),
+        ];
+
+        let (result, count) = get_top_k_values(&hits, "test_field", 3, false).unwrap();
+
+        // Note: The current implementation doesn't actually limit by top_k
+        // It returns all hits, but this test documents the current behavior
+        assert_eq!(count, 5);
+        assert_eq!(result.len(), 1);
+
+        let values = result[0]["values"].as_array().unwrap();
+        assert_eq!(values.len(), 5);
+    }
+
+    #[test]
+    fn test_get_top_k_values_no_count_flag() {
+        let hits = vec![
+            json!({"zo_sql_key": "key1", "zo_sql_num": 10}),
+            json!({"zo_sql_key": "key2", "zo_sql_num": 20}),
+        ];
+
+        let (result, count) = get_top_k_values(&hits, "test_field", 5, true).unwrap();
+
+        // The no_count flag doesn't affect the current implementation
+        // but this test documents the current behavior
+        assert_eq!(count, 2);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_get_top_k_values_large_numbers() {
+        let hits = vec![
+            json!({"zo_sql_key": "key1", "zo_sql_num": i64::MAX}),
+            json!({"zo_sql_key": "key2", "zo_sql_num": i64::MIN}),
+            json!({"zo_sql_key": "key3", "zo_sql_num": 0}),
+        ];
+
+        let (result, count) = get_top_k_values(&hits, "test_field", 5, false).unwrap();
+
+        assert_eq!(count, 3);
+        let values = result[0]["values"].as_array().unwrap();
+        assert_eq!(values.len(), 3);
+
+        // Check that large numbers are handled correctly
+        let first_value = values[0].as_object().unwrap();
+        assert_eq!(first_value["zo_sql_num"], i64::MAX);
+
+        let second_value = values[1].as_object().unwrap();
+        assert_eq!(second_value["zo_sql_num"], i64::MIN);
+    }
+}

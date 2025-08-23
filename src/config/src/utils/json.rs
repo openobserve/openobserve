@@ -296,4 +296,254 @@ mod tests {
             ))
         );
     }
+
+    // Additional comprehensive tests for better coverage
+    #[test]
+    fn test_value_conversion_functions() {
+        // Test get_float_value
+        assert_eq!(
+            get_float_value(&Value::String("123.45".to_string())),
+            123.45
+        );
+        assert_eq!(get_float_value(&Value::String("invalid".to_string())), 0.0);
+        assert_eq!(get_float_value(&Value::Number(Number::from(42))), 42.0);
+        assert_eq!(
+            get_float_value(&Value::Number(Number::from_f64(3.14).unwrap())),
+            3.14
+        );
+        assert_eq!(get_float_value(&Value::Bool(true)), 1.0);
+        assert_eq!(get_float_value(&Value::Bool(false)), 0.0);
+        assert_eq!(get_float_value(&Value::Null), 0.0);
+        assert_eq!(get_float_value(&Value::Array(vec![])), 0.0);
+
+        // Test get_int_value
+        assert_eq!(get_int_value(&Value::String("123".to_string())), 123);
+        assert_eq!(get_int_value(&Value::String("invalid".to_string())), 0);
+        assert_eq!(get_int_value(&Value::Number(Number::from(42))), 42);
+        assert_eq!(
+            get_int_value(&Value::Number(Number::from_f64(3.14).unwrap())),
+            3
+        );
+        assert_eq!(get_int_value(&Value::Bool(true)), 1);
+        assert_eq!(get_int_value(&Value::Bool(false)), 0);
+        assert_eq!(get_int_value(&Value::Null), 0);
+        assert_eq!(get_int_value(&Value::Array(vec![])), 0);
+
+        // Test get_uint_value
+        assert_eq!(get_uint_value(&Value::String("123".to_string())), 123);
+        assert_eq!(get_uint_value(&Value::String("invalid".to_string())), 0);
+        assert_eq!(get_uint_value(&Value::Number(Number::from(42u64))), 42);
+        assert_eq!(
+            get_uint_value(&Value::Number(Number::from_f64(3.14).unwrap())),
+            3
+        );
+        assert_eq!(get_uint_value(&Value::Bool(true)), 1);
+        assert_eq!(get_uint_value(&Value::Bool(false)), 0);
+        assert_eq!(get_uint_value(&Value::Null), 0);
+        assert_eq!(get_uint_value(&Value::Array(vec![])), 0);
+
+        // Test get_bool_value
+        assert_eq!(get_bool_value(&Value::String("true".to_string())), true);
+        assert_eq!(get_bool_value(&Value::String("false".to_string())), false);
+        assert_eq!(get_bool_value(&Value::String("invalid".to_string())), false);
+        assert_eq!(get_bool_value(&Value::Number(Number::from(1))), true);
+        assert_eq!(get_bool_value(&Value::Number(Number::from(0))), false);
+        assert_eq!(get_bool_value(&Value::Number(Number::from(42))), true);
+        assert_eq!(get_bool_value(&Value::Bool(true)), true);
+        assert_eq!(get_bool_value(&Value::Bool(false)), false);
+        assert_eq!(get_bool_value(&Value::Null), false);
+        assert_eq!(get_bool_value(&Value::Array(vec![])), false);
+
+        // Test get_string_value
+        assert_eq!(
+            get_string_value(&Value::String("hello".to_string())),
+            "hello"
+        );
+        assert_eq!(get_string_value(&Value::Number(Number::from(42))), "42");
+        assert_eq!(
+            get_string_value(&Value::Number(Number::from_f64(3.14).unwrap())),
+            "3.14"
+        );
+        assert_eq!(get_string_value(&Value::Bool(true)), "true");
+        assert_eq!(get_string_value(&Value::Bool(false)), "false");
+        assert_eq!(get_string_value(&Value::Null), "");
+        assert_eq!(
+            get_string_value(&Value::Array(vec![Value::String("test".to_string())])),
+            "[\"test\"]"
+        );
+    }
+
+    #[test]
+    fn test_pickup_string_value() {
+        assert_eq!(
+            pickup_string_value(Value::String("hello".to_string())),
+            "hello"
+        );
+        assert_eq!(pickup_string_value(Value::Number(Number::from(42))), "42");
+        assert_eq!(pickup_string_value(Value::Bool(true)), "true");
+        assert_eq!(pickup_string_value(Value::Bool(false)), "false");
+        assert_eq!(pickup_string_value(Value::Null), "null");
+        assert_eq!(
+            pickup_string_value(Value::Array(vec![Value::String("test".to_string())])),
+            "[\"test\"]"
+        );
+    }
+
+    #[test]
+    fn test_estimate_json_bytes_comprehensive() {
+        // Test empty objects and arrays
+        let empty_obj = json!({});
+        assert_eq!(estimate_json_bytes(&empty_obj), 2); // {}
+
+        let empty_arr = json!([]);
+        assert_eq!(estimate_json_bytes(&empty_arr), 2); // []
+
+        // Test simple values
+        let null_val = json!(null);
+        assert_eq!(estimate_json_bytes(&null_val), 4); // null
+
+        let bool_val = json!(true);
+        assert_eq!(estimate_json_bytes(&bool_val), 4); // true
+
+        let num_val = json!(123);
+        assert_eq!(estimate_json_bytes(&num_val), 3); // 123
+
+        let str_val = json!("hello");
+        assert_eq!(estimate_json_bytes(&str_val), 7); // "hello"
+
+        // Test nested structures
+        let nested = json!({
+            "a": {
+                "b": [1, 2, 3],
+                "c": "test"
+            },
+            "d": null
+        });
+        let expected_size = estimate_json_bytes(&nested);
+        assert!(expected_size > 0);
+    }
+
+    #[test]
+    fn test_get_value_from_path_edge_cases() {
+        // Test with empty path - the function returns the entire value
+        let json1 = json!({"a": "b"});
+        assert_eq!(get_value_from_path(&json1, ""), Some(json!({"a": "b"})));
+
+        // Test with path containing only dots - the function returns the entire value
+        let json2 = json!({"a": "b"});
+        assert_eq!(get_value_from_path(&json2, "..."), Some(json!({"a": "b"})));
+
+        // Test with wildcard on non-array - this should return None since "a" is not an array
+        let json5 = json!({"a": "b"});
+        assert_eq!(get_value_from_path(&json5, "*.a"), None);
+
+        // Test with wildcard on array
+        let json6 = json!([{"a": "b"}, {"a": "c"}]);
+        let result = get_value_from_path(&json6, "*.a");
+        assert!(result.is_some());
+        if let Some(Value::Array(arr)) = result {
+            assert_eq!(arr.len(), 2);
+        }
+    }
+
+    #[test]
+    fn test_get_value_from_path_deep_nesting() {
+        let json = json!({
+            "level1": {
+                "level2": {
+                    "level3": {
+                        "level4": {
+                            "level5": "deep_value"
+                        }
+                    }
+                }
+            }
+        });
+
+        let result = get_value_from_path(&json, "level1.level2.level3.level4.level5");
+        assert_eq!(result, Some(json!("deep_value")));
+
+        // Test non-existent deep path
+        let result = get_value_from_path(&json, "level1.level2.level3.level4.level5.level6");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_get_value_from_path_array_operations() {
+        let json = json!([
+            {"id": 1, "name": "Alice"},
+            {"id": 2, "name": "Bob"},
+            {"id": 3, "name": "Charlie"}
+        ]);
+
+        // Test wildcard on array
+        let names = get_value_from_path(&json, "*.name");
+        assert!(names.is_some());
+        if let Some(Value::Array(arr)) = names {
+            assert_eq!(arr.len(), 3);
+            assert_eq!(arr[0], json!("Alice"));
+            assert_eq!(arr[1], json!("Bob"));
+            assert_eq!(arr[2], json!("Charlie"));
+        }
+
+        // Test specific array index - this won't work with the current implementation
+        // let first_item = get_value_from_path(&json, "0");
+        // assert_eq!(first_item, Some(json!({"id": 1, "name": "Alice"})));
+
+        // Test nested array access
+        let json = json!([
+            {"items": [{"value": "a"}, {"value": "b"}]},
+            {"items": [{"value": "c"}]}
+        ]);
+
+        let values = get_value_from_path(&json, "*.items.*.value");
+        assert!(values.is_some());
+        if let Some(Value::Array(arr)) = values {
+            assert_eq!(arr.len(), 3);
+            assert_eq!(arr[0], json!("a"));
+            assert_eq!(arr[1], json!("b"));
+            assert_eq!(arr[2], json!("c"));
+        }
+    }
+
+    #[test]
+    fn test_get_value_from_path_special_characters() {
+        let json = json!({
+            "key.with.dots": "value1",
+            "key-with-dashes": "value2",
+            "key_with_underscores": "value3",
+            "key with spaces": "value4"
+        });
+
+        // Test keys with dots - the function splits on dots, so this won't work
+        // let result = get_value_from_path(&json, "key.with.dots");
+        // assert_eq!(result, Some(json!("value1")));
+
+        // Test keys with other special characters
+        let result = get_value_from_path(&json, "key-with-dashes");
+        assert_eq!(result, Some(json!("value2")));
+
+        let result = get_value_from_path(&json, "key_with_underscores");
+        assert_eq!(result, Some(json!("value3")));
+
+        let result = get_value_from_path(&json, "key with spaces");
+        assert_eq!(result, Some(json!("value4")));
+    }
+
+    #[test]
+    fn test_estimate_json_bytes_with_escaped_characters() {
+        // Test strings with quotes and backslashes
+        let json = json!({
+            "quoted": "He said \"Hello World!\"",
+            "backslashed": "C:\\Users\\Name\\file.txt",
+            "mixed": "Line 1\nLine 2\tTabbed"
+        });
+
+        let estimated_size = estimate_json_bytes(&json);
+        let actual_size = to_string(&json).unwrap().len();
+
+        // The estimate should be close to the actual size
+        assert!(estimated_size > 0);
+        assert!(estimated_size <= actual_size);
+    }
 }
