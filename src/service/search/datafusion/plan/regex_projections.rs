@@ -214,7 +214,7 @@ mod tests {
             .iter()
             .find(|m| m.source_columns.contains("log"))
             .unwrap();
-        assert!(mapping.output_field.contains("extracted_time"));
+        assert_eq!(mapping.output_field, "extracted_time");
     }
 
     #[tokio::test]
@@ -225,7 +225,6 @@ mod tests {
         let mappings = res.get("default").unwrap();
 
         assert!(mappings.len() >= 1);
-        println!("DEBUG: Mappings: {:?}", mappings);
 
         let mapping = mappings
             .iter()
@@ -533,7 +532,12 @@ mod tests {
                 .source_columns
                 .contains("k8s_namespace_name")
         );
-        assert!(aggregate_mapping.projection_expr.contains("max"));
+        assert!(
+            aggregate_mapping
+                .projection_expr
+                .to_lowercase()
+                .contains("max")
+        );
     }
 
     #[tokio::test]
@@ -556,7 +560,7 @@ mod tests {
         assert!(
             default_mappings
                 .iter()
-                .find(|m| m.output_field.contains("k1"))
+                .find(|m| m.output_field == "k1")
                 .is_some()
         );
 
@@ -570,7 +574,26 @@ mod tests {
         assert!(
             t2_mappings
                 .iter()
-                .find(|m| m.output_field.contains("k2"))
+                .find(|m| m.output_field == "k2")
+                .is_some()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_empty_result_set() {
+        let sql = "SELECT k8s_namespace_name FROM \"default\" WHERE 1=0";
+        let parsed = get_sql(sql).await;
+        let res = get_columns_from_projections(parsed).await.unwrap();
+        let mappings = res.get("default").unwrap();
+
+        assert!(
+            !mappings.is_empty(),
+            "Should still have column mappings even with empty result set"
+        );
+        assert!(
+            mappings
+                .iter()
+                .find(|m| m.output_field == "k8s_namespace_name")
                 .is_some()
         );
     }
