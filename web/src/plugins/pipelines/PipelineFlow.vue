@@ -185,6 +185,8 @@ function resetTransform() {
       vueFlowRef,
       resetTransform,
       isCanvasEmpty,
+      store,
+      setViewport,
     };
   },
 };

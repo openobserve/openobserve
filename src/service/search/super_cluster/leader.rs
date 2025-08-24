@@ -41,8 +41,9 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::service::search::{
     DATAFUSION_RUNTIME, SEARCH_SERVER, SearchResult,
     cluster::flight::{SearchContextBuilder, register_table},
-    datafusion::optimizer::context::{
-        PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext,
+    datafusion::optimizer::{
+        context::{PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext},
+        create_physical_plan,
     },
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     request::Request,
@@ -239,8 +240,7 @@ async fn run_datafusion(
     register_table(&ctx, &sql).await?;
 
     // create physical plan
-    let plan = ctx.state().create_logical_plan(&sql.sql).await?;
-    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+    let physical_plan = create_physical_plan(&ctx, &sql.sql).await?;
 
     if cfg.common.print_key_sql {
         log::info!("[trace_id {trace_id}] super cluster leader: physical plan");

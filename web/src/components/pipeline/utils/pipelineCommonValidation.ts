@@ -30,6 +30,6 @@ export function sanitizeStreamName(input: string): string | null {
 }
 
 // Only sanitize non-dynamic parts
-function sanitizeStaticPart(str: string): string[] {
+export function sanitizeStaticPart(str: string): string[] {
   return str.split('').map(char => /[a-zA-Z0-9]/.test(char) ? char : '_');
 } 

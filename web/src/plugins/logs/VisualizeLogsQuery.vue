@@ -815,6 +815,8 @@ export default defineComponent({
       collapseFieldList,
       is_ui_histogram,
       onResultMetadataUpdate,
+      hoveredSeriesState,
+      resultMetaData,
     };
   },
 });

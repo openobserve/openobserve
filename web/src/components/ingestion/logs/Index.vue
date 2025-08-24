@@ -279,6 +279,7 @@ export default defineComponent({
       ingestiontabs,
       showSyslog,
       showCloudIngestionOptions,
+      ingestRoutes,
     };
   },
 });

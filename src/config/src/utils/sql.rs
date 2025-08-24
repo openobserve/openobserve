@@ -87,6 +87,15 @@ pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser:
 }
 
 /// distinct with no group by
+pub fn is_explain_query(query: &str) -> bool {
+    match Parser::parse_sql(&GenericDialect {}, query) {
+        Ok(statements) if !statements.is_empty() => {
+            matches!(statements[0], Statement::Explain { .. })
+        }
+        _ => false,
+    }
+}
+
 pub fn is_simple_distinct_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     for statement in ast.iter() {
@@ -1124,5 +1133,22 @@ mod tests {
 
         assert_eq!(is_not_union_all, false);
         assert_eq!(is_union_all, true);
+    }
+
+    #[test]
+    fn test_is_explain_query() {
+        // Test EXPLAIN query
+        assert!(is_explain_query("EXPLAIN SELECT * FROM users"));
+        assert!(is_explain_query("explain select count(*) from logs"));
+
+        // Test EXPLAIN ANALYZE query
+        assert!(is_explain_query("EXPLAIN ANALYZE SELECT * FROM users"));
+
+        // Test regular query
+        assert!(!is_explain_query("SELECT * FROM users"));
+        assert!(!is_explain_query("SELECT count(*) FROM logs"));
+
+        // Test invalid SQL
+        assert!(!is_explain_query("INVALID SQL"));
     }
 }

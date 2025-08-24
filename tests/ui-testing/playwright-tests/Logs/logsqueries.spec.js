@@ -213,6 +213,7 @@ test.describe("Logs Queries testcases", () => {
   }, async ({ page }) => {
     await pageManager.logsPage.clickRefreshButton();
     await pageManager.logsPage.clickFunctionDropdownSave();
+    await pageManager.logsPage.toggleVrlEditor();
     await pageManager.logsPage.clickVrlEditor();
     await pageManager.logsPage.waitForTimeout(1000);
     await pageManager.logsPage.clickFunctionDropdownSave();
@@ -234,6 +235,7 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@functionSaveValidation', '@all', '@logs']
   }, async ({ page }) => {
     await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.toggleVrlEditor();
     await pageManager.logsPage.clickVrlEditor();
     await pageManager.logsPage.waitForTimeout(1000);
     await pageManager.logsPage.clickFunctionDropdownSave();
@@ -245,6 +247,7 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@functionNameValidation', '@all', '@logs']
   }, async ({ page }) => {
     await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.toggleVrlEditor();
     await pageManager.logsPage.clickVrlEditor();
     await pageManager.logsPage.waitForTimeout(1000);
     await pageManager.logsPage.clickFunctionDropdownSave();
@@ -257,6 +260,7 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@functionNameValidation', '@all', '@logs']
   }, async ({ page }) => {
     await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.toggleVrlEditor();
     await pageManager.logsPage.clickVrlEditor();
     await pageManager.logsPage.waitForTimeout(1000);
     await pageManager.logsPage.clickFunctionDropdownSave();
@@ -269,6 +273,7 @@ test.describe("Logs Queries testcases", () => {
     tag: ['@functionPersistence', '@all', '@logs']
   }, async ({ page }) => {
     await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.toggleVrlEditor();
     await pageManager.logsPage.clickVrlEditor();
     await pageManager.logsPage.waitForTimeout(1000);
     await pageManager.logsPage.clickRefreshButton();
@@ -308,6 +313,7 @@ test.describe("Logs Queries testcases", () => {
 
   test.skip("should display results for search around after adding function", async ({ page }) => {
     await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.toggleVrlEditor();
     await pageManager.logsPage.clickVrlEditor();
     await pageManager.logsPage.waitForTimeout(1000);
     await pageManager.logsPage.clickRefreshButton();

@@ -68,7 +68,7 @@ mod tests {
                 o2_type: format!("user:{ORG_ID}"),
                 org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -85,7 +85,7 @@ mod tests {
                 o2_type: format!("user:{ORG_ID}"),
                 org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -102,7 +102,7 @@ mod tests {
                 o2_type: format!("user:{EMAIL_ID}"),
                 org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -119,7 +119,7 @@ mod tests {
                 o2_type: format!("user:{ORG_ID}"),
                 org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -136,7 +136,7 @@ mod tests {
                 o2_type: format!("user:{EMAIL_ID}"),
                 org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -148,16 +148,16 @@ mod tests {
     async fn get_organizations() {
         test_auth(
             Method::GET,
-            format!("api/organizations"),
+            "api/organizations".to_string(),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{LIST_METHOD}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: LIST_METHOD.to_string(),
                 // In subsequent authorization steps `##user_id##` is replaced
                 // with the actual user ID.
-                o2_type: format!("org:##user_id##"),
-                org_id: format!("organizations"), // This is expected.
+                o2_type: "org:##user_id##".to_string(),
+                org_id: "organizations".to_string(), // This is expected.
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -169,14 +169,14 @@ mod tests {
             Method::GET,
             format!("api/{ORG_ID}/summary"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
+                auth: AUTH_HEADER_VAL.to_string(),
                 // LIST is used instead of GET because there is no resource ID
                 // associated with a summary.
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("summary:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -188,14 +188,14 @@ mod tests {
             Method::GET,
             format!("api/{ORG_ID}/passcode"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
+                auth: AUTH_HEADER_VAL.to_string(),
                 // LIST is used instead of GET because there is no resource ID
                 // associated with a passcode.
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("passcode:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -207,12 +207,12 @@ mod tests {
             Method::PUT,
             format!("api/{ORG_ID}/passcode"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{PUT_METHOD}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("passcode:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -224,14 +224,14 @@ mod tests {
             Method::GET,
             format!("api/{ORG_ID}/rumtoken"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
+                auth: AUTH_HEADER_VAL.to_string(),
                 // LIST is used instead of GET because there is no resource ID
                 // associated with a rumtoken.
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("rumtoken:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -243,12 +243,12 @@ mod tests {
             Method::PUT,
             format!("api/{ORG_ID}/rumtoken"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{PUT_METHOD}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("rumtoken:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -260,12 +260,12 @@ mod tests {
             Method::POST,
             format!("api/{ORG_ID}/rumtoken"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{POST_METHOD}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("rumtoken:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -282,12 +282,12 @@ mod tests {
             Method::POST,
             format!("api/{ORG_ID}/settings"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{PUT_METHOD}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("settings:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -299,12 +299,12 @@ mod tests {
             Method::GET,
             format!("api/{ORG_ID}/settings"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{GET_METHOD}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("settings:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -316,12 +316,12 @@ mod tests {
             Method::POST,
             format!("api/{ORG_ID}/settings/logo"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{PUT_METHOD}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("settings:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -333,13 +333,13 @@ mod tests {
             Method::DELETE,
             format!("api/{ORG_ID}/settings/logo"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
+                auth: AUTH_HEADER_VAL.to_string(),
                 // In OpenFGA we treat this operation as PUT rather than DELETE.
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("settings:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -351,12 +351,12 @@ mod tests {
             Method::POST,
             format!("api/{ORG_ID}/settings/logo/text"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{PUT_METHOD}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("settings:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -368,12 +368,12 @@ mod tests {
             Method::DELETE,
             format!("api/{ORG_ID}/settings/logo/text"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{PUT_METHOD}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("settings:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -390,12 +390,12 @@ mod tests {
             Method::GET,
             format!("api/{ORG_ID}/streams/STREAM_NAME/schema"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{GET_METHOD}"),
-                o2_type: format!("stream:STREAM_NAME"),
-                org_id: format!("{ORG_ID}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: GET_METHOD.to_string(),
+                o2_type: "stream:STREAM_NAME".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -407,12 +407,12 @@ mod tests {
             Method::POST,
             format!("api/{ORG_ID}/streams/STREAM_NAME/settings"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{POST_METHOD}"),
-                o2_type: format!("stream:STREAM_NAME"),
-                org_id: format!("{ORG_ID}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: POST_METHOD.to_string(),
+                o2_type: "stream:STREAM_NAME".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -424,12 +424,12 @@ mod tests {
             Method::PUT,
             format!("api/{ORG_ID}/streams/STREAM_NAME/settings"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{PUT_METHOD}"),
-                o2_type: format!("stream:STREAM_NAME"),
-                org_id: format!("{ORG_ID}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: PUT_METHOD.to_string(),
+                o2_type: "stream:STREAM_NAME".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -441,12 +441,12 @@ mod tests {
             Method::PUT,
             format!("api/{ORG_ID}/streams/STREAM_NAME/delete_fields"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{PUT_METHOD}"),
-                o2_type: format!("stream:STREAM_NAME"),
-                org_id: format!("{ORG_ID}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: PUT_METHOD.to_string(),
+                o2_type: "stream:STREAM_NAME".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -458,12 +458,12 @@ mod tests {
             Method::DELETE,
             format!("api/{ORG_ID}/streams/STREAM_NAME"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{DELETE_METHOD}"),
-                o2_type: format!("stream:STREAM_NAME"),
-                org_id: format!("{ORG_ID}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: DELETE_METHOD.to_string(),
+                o2_type: "stream:STREAM_NAME".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -475,16 +475,16 @@ mod tests {
             Method::GET,
             format!("api/{ORG_ID}/streams"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{LIST_METHOD}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: LIST_METHOD.to_string(),
                 // o2_type is intentially stream:TEST_ORG_ID instead of
                 // stream:STREAM_NAME because stream:TEST_ORG_ID indicates
                 // permission for listing all streams that belong to the
                 // organization.
                 o2_type: format!("stream:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -496,12 +496,12 @@ mod tests {
             Method::DELETE,
             format!("api/{ORG_ID}/streams/STREAM_NAME/cache/results"),
             AuthExtractor {
-                auth: format!("{AUTH_HEADER_VAL}"),
-                method: format!("{DELETE_METHOD}"),
-                o2_type: format!("stream:STREAM_NAME"),
-                org_id: format!("{ORG_ID}"),
+                auth: AUTH_HEADER_VAL.to_string(),
+                method: DELETE_METHOD.to_string(),
+                o2_type: "stream:STREAM_NAME".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -519,11 +519,11 @@ mod tests {
             format!("api/{ORG_ID}/traces"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("stream:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -536,11 +536,11 @@ mod tests {
             format!("api/{ORG_ID}/v1/traces"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("stream:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -554,11 +554,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Are these empty strings correct?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -573,11 +573,11 @@ mod tests {
             format!("api/{ORG_ID}/v1/metrics"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("stream:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -590,11 +590,11 @@ mod tests {
             format!("api/{ORG_ID}/ingest/metrics/_json"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("stream:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -609,11 +609,11 @@ mod tests {
             format!("api/{ORG_ID}/prometheus/api/v1/write"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("stream:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -627,11 +627,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -645,11 +645,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -663,11 +663,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -681,11 +681,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -699,11 +699,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -717,11 +717,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -734,11 +734,11 @@ mod tests {
             format!("api/{ORG_ID}/prometheus/api/v1/metadata"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
-                o2_type: format!("prometheus:api"),
-                org_id: format!("{ORG_ID}"),
+                method: GET_METHOD.to_string(),
+                o2_type: "prometheus:api".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -752,11 +752,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -770,11 +770,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -787,11 +787,11 @@ mod tests {
             format!("api/{ORG_ID}/prometheus/api/v1/labels"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
-                o2_type: format!("prometheus:api"),
-                org_id: format!("{ORG_ID}"),
+                method: GET_METHOD.to_string(),
+                o2_type: "prometheus:api".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -804,11 +804,11 @@ mod tests {
             format!("api/{ORG_ID}/prometheus/api/v1/labels"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
-                o2_type: format!("prometheus:api"),
-                org_id: format!("{ORG_ID}"),
+                method: POST_METHOD.to_string(),
+                o2_type: "prometheus:api".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -821,11 +821,11 @@ mod tests {
             format!("api/{ORG_ID}/prometheus/api/v1/label/LABEL_NAME/values"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
-                o2_type: format!("prometheus:api"),
-                org_id: format!("{ORG_ID}"),
+                method: GET_METHOD.to_string(),
+                o2_type: "prometheus:api".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -839,11 +839,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -857,11 +857,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -876,11 +876,11 @@ mod tests {
             format!("api/{ORG_ID}/enrichment_tables/TABLE_NAME"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("enrichment_table:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -896,11 +896,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -913,11 +913,11 @@ mod tests {
             format!("api/{ORG_ID}/STREAM_NAME/_around"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
-                o2_type: format!("stream:STREAM_NAME"),
-                org_id: format!("{ORG_ID}"),
+                method: GET_METHOD.to_string(),
+                o2_type: "stream:STREAM_NAME".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -930,11 +930,11 @@ mod tests {
             format!("api/{ORG_ID}/STREAM_NAME/_values"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
-                o2_type: format!("stream:STREAM_NAME"),
-                org_id: format!("{ORG_ID}"),
+                method: GET_METHOD.to_string(),
+                o2_type: "stream:STREAM_NAME".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -948,11 +948,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -966,11 +966,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -985,11 +985,11 @@ mod tests {
             format!("api/{ORG_ID}/savedviews/{VIEW_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("savedviews:{VIEW_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1002,11 +1002,11 @@ mod tests {
             format!("api/{ORG_ID}/savedviews"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("savedviews:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1019,11 +1019,11 @@ mod tests {
             format!("api/{ORG_ID}/savedviews/{VIEW_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("savedviews:{VIEW_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1036,11 +1036,11 @@ mod tests {
             format!("api/{ORG_ID}/savedviews"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("savedviews:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1053,11 +1053,11 @@ mod tests {
             format!("api/{ORG_ID}/savedviews/{VIEW_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("savedviews:{VIEW_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1073,11 +1073,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1091,11 +1091,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1108,11 +1108,11 @@ mod tests {
             format!("api/{ORG_ID}/{STREAM_NAME}/_around_multi"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("stream:{STREAM_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1127,11 +1127,11 @@ mod tests {
             format!("api/{ORG_ID}/search_jobs"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("search_jobs:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1144,11 +1144,11 @@ mod tests {
             format!("api/{ORG_ID}/search_jobs"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("search_jobs:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1161,11 +1161,11 @@ mod tests {
             format!("api/{ORG_ID}/search_jobs/{JOB_ID}/status"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("search_jobs:{JOB_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1178,11 +1178,11 @@ mod tests {
             format!("api/{ORG_ID}/search_jobs/{JOB_ID}/cancel"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("search_jobs:{JOB_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1195,11 +1195,11 @@ mod tests {
             format!("api/{ORG_ID}/search_jobs/{JOB_ID}/result"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("search_jobs:{JOB_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1212,11 +1212,11 @@ mod tests {
             format!("api/{ORG_ID}/search_jobs/{JOB_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("search_jobs:{JOB_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1229,11 +1229,11 @@ mod tests {
             format!("api/{ORG_ID}/search_jobs/{JOB_ID}/retry"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("search_jobs:{JOB_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1249,11 +1249,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1267,11 +1267,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1285,11 +1285,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1304,11 +1304,11 @@ mod tests {
             format!("api/{ORG_ID}/functions"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("function:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1321,11 +1321,11 @@ mod tests {
             format!("api/{ORG_ID}/functions"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("function:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1338,11 +1338,11 @@ mod tests {
             format!("api/{ORG_ID}/functions/{FUNCTION_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("function:{FUNCTION_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1355,11 +1355,11 @@ mod tests {
             format!("api/{ORG_ID}/functions/{FUNCTION_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("function:{FUNCTION_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1372,11 +1372,11 @@ mod tests {
             format!("api/{ORG_ID}/functions/{FUNCTION_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("function:{FUNCTION_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1389,11 +1389,11 @@ mod tests {
             format!("api/{ORG_ID}/functions/test"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
-                o2_type: format!("function:test"),
-                org_id: format!("{ORG_ID}"),
+                method: POST_METHOD.to_string(),
+                o2_type: "function:test".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1408,11 +1408,11 @@ mod tests {
             format!("api/{ORG_ID}/dashboards"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
-                o2_type: format!("dfolder:default"),
-                org_id: format!("{ORG_ID}"),
+                method: POST_METHOD.to_string(),
+                o2_type: "dfolder:default".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1425,11 +1425,11 @@ mod tests {
             format!("api/{ORG_ID}/dashboards?folder={FOLDER_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("dfolder:{FOLDER_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("{FOLDER_ID}"),
+                parent_id: FOLDER_ID.to_string(),
             },
         )
         .await
@@ -1442,11 +1442,11 @@ mod tests {
             format!("api/{ORG_ID}/dashboards/{DASHBOARD_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("dashboard:{DASHBOARD_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1459,11 +1459,11 @@ mod tests {
             format!("api/{ORG_ID}/dashboards"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
-                o2_type: format!("dfolder:default"),
-                org_id: format!("{ORG_ID}"),
+                method: LIST_METHOD.to_string(),
+                o2_type: "dfolder:default".to_string(),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1476,11 +1476,11 @@ mod tests {
             format!("api/{ORG_ID}/dashboards?folder={FOLDER_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("dfolder:{FOLDER_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("{FOLDER_ID}"),
+                parent_id: FOLDER_ID.to_string(),
             },
         )
         .await
@@ -1493,11 +1493,11 @@ mod tests {
             format!("api/{ORG_ID}/dashboards/{DASHBOARD_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("dashboard:{DASHBOARD_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1510,11 +1510,11 @@ mod tests {
             format!("api/{ORG_ID}/dashboards/{DASHBOARD_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("dashboard:{DASHBOARD_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1527,11 +1527,11 @@ mod tests {
             format!("api/{ORG_ID}/folders/dashboards/{DASHBOARD_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("dashboard:{DASHBOARD_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1546,11 +1546,11 @@ mod tests {
             format!("api/{ORG_ID}/reports"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("report:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1563,11 +1563,11 @@ mod tests {
             format!("api/{ORG_ID}/reports/{REPORT_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("report:{REPORT_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1580,11 +1580,11 @@ mod tests {
             format!("api/{ORG_ID}/reports"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("report:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1597,11 +1597,11 @@ mod tests {
             format!("api/{ORG_ID}/reports/{REPORT_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("report:{REPORT_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1614,11 +1614,11 @@ mod tests {
             format!("api/{ORG_ID}/reports/{REPORT_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("report:{REPORT_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1631,11 +1631,11 @@ mod tests {
             format!("api/{ORG_ID}/reports/{REPORT_NAME}/enable"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("report:{REPORT_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1648,11 +1648,11 @@ mod tests {
             format!("api/{ORG_ID}/reports/{REPORT_NAME}/trigger"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("report:{REPORT_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1667,11 +1667,11 @@ mod tests {
             format!("api/{ORG_ID}/folders"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("dfolder:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1684,11 +1684,11 @@ mod tests {
             format!("api/{ORG_ID}/folders/{FOLDER_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("dfolder:{FOLDER_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1701,11 +1701,11 @@ mod tests {
             format!("api/{ORG_ID}/folders"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("dfolder:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1718,11 +1718,11 @@ mod tests {
             format!("api/{ORG_ID}/folders/{FOLDER_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("dfolder:{FOLDER_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1735,11 +1735,11 @@ mod tests {
             format!("api/{ORG_ID}/folders/name/{FOLDER_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("dfolder:_all_{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1752,11 +1752,11 @@ mod tests {
             format!("api/{ORG_ID}/folders/{FOLDER_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("dfolder:{FOLDER_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1771,11 +1771,11 @@ mod tests {
             format!("api/{ORG_ID}/{STREAM_NAME}/alerts"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("alert:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1788,11 +1788,11 @@ mod tests {
             format!("api/{ORG_ID}/{STREAM_NAME}/alerts/{ALERT_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("alert:{ALERT_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1805,11 +1805,11 @@ mod tests {
             format!("api/{ORG_ID}/{STREAM_NAME}/alerts"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("alert:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1822,11 +1822,11 @@ mod tests {
             format!("api/{ORG_ID}/alerts"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("alert:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1839,13 +1839,13 @@ mod tests {
             format!("api/{ORG_ID}/{STREAM_NAME}/alerts/{ALERT_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 // Is this correct? Can two streams have the same name if they
                 // have different types?
                 o2_type: format!("alert:{ALERT_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1858,11 +1858,11 @@ mod tests {
             format!("api/{ORG_ID}/{STREAM_NAME}/alerts/{ALERT_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("alert:{ALERT_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1875,11 +1875,11 @@ mod tests {
             format!("api/{ORG_ID}/{STREAM_NAME}/alerts/{ALERT_NAME}/enable"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("alert:{ALERT_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1892,13 +1892,13 @@ mod tests {
             format!("api/{ORG_ID}/{STREAM_NAME}/alerts/{ALERT_NAME}/trigger"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 // Is this correct? This seems like a potential bug. Shouldn't
                 // the first part be a type name?
                 o2_type: format!("{STREAM_NAME}:alerts"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1913,11 +1913,11 @@ mod tests {
             format!("api/{ORG_ID}/alerts/templates"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("template:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1930,11 +1930,11 @@ mod tests {
             format!("api/{ORG_ID}/alerts/templates/{TEMPLATE_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("template:{TEMPLATE_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1947,11 +1947,11 @@ mod tests {
             format!("api/{ORG_ID}/alerts/templates/{TEMPLATE_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("template:{TEMPLATE_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1964,11 +1964,11 @@ mod tests {
             format!("api/{ORG_ID}/alerts/templates"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("template:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -1981,11 +1981,11 @@ mod tests {
             format!("api/{ORG_ID}/alerts/templates/{TEMPLATE_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("template:{TEMPLATE_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2000,11 +2000,11 @@ mod tests {
             format!("api/{ORG_ID}/alerts/destinations"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("destination:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2017,11 +2017,11 @@ mod tests {
             format!("api/{ORG_ID}/alerts/destinations/{DESTINATION_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("destination:{DESTINATION_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2034,11 +2034,11 @@ mod tests {
             format!("api/{ORG_ID}/alerts/destinations/{DESTINATION_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("destination:{DESTINATION_NAME}"), // Is this correct?
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2051,11 +2051,11 @@ mod tests {
             format!("api/{ORG_ID}/alerts/destinations"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("destination:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2068,11 +2068,11 @@ mod tests {
             format!("api/{ORG_ID}/alerts/destinations/{DESTINATION_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("destination:{DESTINATION_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2087,11 +2087,11 @@ mod tests {
             format!("api/{ORG_ID}/kv/{KV_KEY}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("kv:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2104,11 +2104,11 @@ mod tests {
             format!("api/{ORG_ID}/kv/{KV_KEY}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("kv:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2121,11 +2121,11 @@ mod tests {
             format!("api/{ORG_ID}/kv/{KV_KEY}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("kv:{KV_KEY}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2138,11 +2138,11 @@ mod tests {
             format!("api/{ORG_ID}/kv"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("kv:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2157,11 +2157,11 @@ mod tests {
             format!("api/{ORG_ID}/syslog-server"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("syslog-server:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2174,11 +2174,11 @@ mod tests {
             format!("api/{ORG_ID}/syslog-routes"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("syslog-route:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2191,11 +2191,11 @@ mod tests {
             format!("api/{ORG_ID}/syslog-routes/{SYSLOG_ROUTE_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("syslog-route:{SYSLOG_ROUTE_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2208,11 +2208,11 @@ mod tests {
             format!("api/{ORG_ID}/syslog-routes"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("syslog-route:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2225,11 +2225,11 @@ mod tests {
             format!("api/{ORG_ID}/syslog-routes/{SYSLOG_ROUTE_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("syslog-route:{SYSLOG_ROUTE_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2244,11 +2244,11 @@ mod tests {
             format!("api/{ORG_ID}/roles"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("role:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2261,11 +2261,11 @@ mod tests {
             format!("api/{ORG_ID}/roles/{ROLE_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("role:{ORG_ID}/{ROLE_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2278,11 +2278,11 @@ mod tests {
             format!("api/{ORG_ID}/roles"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("role:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2295,11 +2295,11 @@ mod tests {
             format!("api/{ORG_ID}/roles/{ROLE_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("role:{ORG_ID}/{ROLE_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2312,11 +2312,11 @@ mod tests {
             format!("api/{ORG_ID}/roles/{ROLE_ID}/permissions/{RESOURCE_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("role:{ORG_ID}/{ROLE_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2329,11 +2329,11 @@ mod tests {
             format!("api/{ORG_ID}/roles/{ROLE_ID}/users"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("role:{ORG_ID}/{ROLE_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2346,11 +2346,11 @@ mod tests {
             format!("api/{ORG_ID}/groups"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("group:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2363,11 +2363,11 @@ mod tests {
             format!("api/{ORG_ID}/groups/{GROUP_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("group:{ORG_ID}/{GROUP_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2380,11 +2380,11 @@ mod tests {
             format!("api/{ORG_ID}/groups"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("group:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2397,11 +2397,11 @@ mod tests {
             format!("api/{ORG_ID}/groups/{GROUP_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("group:{ORG_ID}/{GROUP_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2415,11 +2415,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2432,11 +2432,11 @@ mod tests {
             format!("api/{ORG_ID}/groups/{GROUP_NAME}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("group:{ORG_ID}/{GROUP_NAME}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2448,15 +2448,15 @@ mod tests {
     async fn list_clusters() {
         test_auth(
             Method::GET,
-            format!("api/clusters"),
+            "api/clusters".to_string(),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2471,11 +2471,11 @@ mod tests {
             format!("api/{ORG_ID}/pipelines"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("pipeline:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2488,11 +2488,11 @@ mod tests {
             format!("api/{ORG_ID}/pipelines"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!("pipeline:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2505,11 +2505,11 @@ mod tests {
             format!("api/{ORG_ID}/pipelines/streams"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"), // Should this be LIST?
+                method: GET_METHOD.to_string(), // Should this be LIST?
                 o2_type: format!("pipeline:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2522,11 +2522,11 @@ mod tests {
             format!("api/{ORG_ID}/pipelines/{PIPELINE_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("pipeline:{PIPELINE_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2539,11 +2539,11 @@ mod tests {
             format!("api/{ORG_ID}/pipelines"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("pipeline:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2556,11 +2556,11 @@ mod tests {
             format!("api/{ORG_ID}/pipelines/{PIPELINE_ID}/enable"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("pipeline:{PIPELINE_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2576,11 +2576,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2594,11 +2594,11 @@ mod tests {
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
                 // Should these be empty strings?
-                method: format!(""),
-                o2_type: format!(""),
-                org_id: format!(""),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2613,11 +2613,11 @@ mod tests {
             format!("api/{ORG_ID}/service_accounts"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!("service_accounts:{ORG_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2630,11 +2630,11 @@ mod tests {
             format!("api/{ORG_ID}/service_accounts/{EMAIL_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!("service_accounts:{EMAIL_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2647,11 +2647,11 @@ mod tests {
             format!("api/{ORG_ID}/service_accounts/{EMAIL_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!("service_accounts:{EMAIL_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2664,11 +2664,11 @@ mod tests {
             format!("api/{ORG_ID}/service_accounts/{EMAIL_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!("service_accounts:{EMAIL_ID}"),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2683,16 +2683,16 @@ mod tests {
             format!("api/{ORG_ID}/actions/{ACTION_KSUID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!(
                     "{}:{ACTION_KSUID}",
                     OFGA_MODELS
                         .get("actions")
                         .map_or("actions", |model| model.key)
                 ),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2705,16 +2705,16 @@ mod tests {
             format!("api/{ORG_ID}/actions/download/{ACTION_KSUID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!(
                     "{}:{ACTION_KSUID}",
                     OFGA_MODELS
                         .get("actions")
                         .map_or("actions", |model| model.key)
                 ),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2727,16 +2727,16 @@ mod tests {
             format!("api/{ORG_ID}/actions/{ACTION_KSUID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!(
                     "{}:{ACTION_KSUID}",
                     OFGA_MODELS
                         .get("actions")
                         .map_or("actions", |model| model.key)
                 ),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2749,16 +2749,16 @@ mod tests {
             format!("api/{ORG_ID}/actions"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!(
                     "{}:{ORG_ID}",
                     OFGA_MODELS
                         .get("actions")
                         .map_or("actions", |model| model.key)
                 ),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2771,16 +2771,16 @@ mod tests {
             format!("api/{ORG_ID}/actions/{ACTION_KSUID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!(
                     "{}:{ACTION_KSUID}",
                     OFGA_MODELS
                         .get("actions")
                         .map_or("actions", |model| model.key)
                 ),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2793,11 +2793,11 @@ mod tests {
             format!("api/{ORG_ID}/actions/upload"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: "".to_string(),
-                o2_type: "".to_string(),
-                org_id: "".to_string(),
+                method: String::new(),
+                o2_type: String::new(),
+                org_id: String::new(),
                 bypass_check: true,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2812,16 +2812,16 @@ mod tests {
             format!("api/{ORG_ID}/cipher_keys"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{POST_METHOD}"),
+                method: POST_METHOD.to_string(),
                 o2_type: format!(
                     "{}:{ORG_ID}",
                     OFGA_MODELS
                         .get("cipher_keys")
                         .map_or("cipher_keys", |model| model.key)
                 ),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2834,16 +2834,16 @@ mod tests {
             format!("api/{ORG_ID}/cipher_keys/{CIPHER_KEY_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{GET_METHOD}"),
+                method: GET_METHOD.to_string(),
                 o2_type: format!(
                     "{}:{CIPHER_KEY_ID}",
                     OFGA_MODELS
                         .get("cipher_keys")
                         .map_or("cipher_keys", |model| model.key)
                 ),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2856,16 +2856,16 @@ mod tests {
             format!("api/{ORG_ID}/cipher_keys"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{LIST_METHOD}"),
+                method: LIST_METHOD.to_string(),
                 o2_type: format!(
                     "{}:{ORG_ID}",
                     OFGA_MODELS
                         .get("cipher_keys")
                         .map_or("cipher_keys", |model| model.key)
                 ),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2878,16 +2878,16 @@ mod tests {
             format!("api/{ORG_ID}/cipher_keys/{CIPHER_KEY_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{DELETE_METHOD}"),
+                method: DELETE_METHOD.to_string(),
                 o2_type: format!(
                     "{}:{CIPHER_KEY_ID}",
                     OFGA_MODELS
                         .get("cipher_keys")
                         .map_or("cipher_keys", |model| model.key)
                 ),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await
@@ -2900,16 +2900,16 @@ mod tests {
             format!("api/{ORG_ID}/cipher_keys/{CIPHER_KEY_ID}"),
             AuthExtractor {
                 auth: AUTH_HEADER_VAL.to_string(),
-                method: format!("{PUT_METHOD}"),
+                method: PUT_METHOD.to_string(),
                 o2_type: format!(
                     "{}:{CIPHER_KEY_ID}",
                     OFGA_MODELS
                         .get("cipher_keys")
                         .map_or("cipher_keys", |model| model.key)
                 ),
-                org_id: format!("{ORG_ID}"),
+                org_id: ORG_ID.to_string(),
                 bypass_check: false,
-                parent_id: format!("default"),
+                parent_id: "default".to_string(),
             },
         )
         .await

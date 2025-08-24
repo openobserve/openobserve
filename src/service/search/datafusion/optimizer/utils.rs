@@ -69,7 +69,10 @@ impl TreeNodeRewriter for AddSortAndLimit {
         let is_complex = node.exists(|plan| Ok(is_complex_query(plan)))?;
         let mut is_stop = true;
         let (mut transformed, schema) = match node {
-            LogicalPlan::Projection(_) | LogicalPlan::SubqueryAlias(_) => {
+            // skip projection,subqueryalias, analyze, that we can add limit/sort after them
+            LogicalPlan::Projection(_)
+            | LogicalPlan::SubqueryAlias(_)
+            | LogicalPlan::Analyze(_) => {
                 is_stop = false;
                 (Transformed::no(node), None)
             }

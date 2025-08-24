@@ -19,6 +19,7 @@ use add_sort_and_limit::AddSortAndLimitRule;
 use add_timestamp::AddTimestampRule;
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME};
 use datafusion::{
+    common::Result,
     optimizer::{
         AnalyzerRule, OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
         decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
@@ -35,6 +36,8 @@ use datafusion::{
         single_distinct_to_groupby::SingleDistinctToGroupBy,
     },
     physical_optimizer::PhysicalOptimizerRule,
+    physical_plan::ExecutionPlan,
+    prelude::SessionContext,
 };
 use infra::schema::get_stream_setting_fts_fields;
 use limit_join_right_side::LimitJoinRightSide;
@@ -51,8 +54,8 @@ use {
 
 use crate::service::search::{
     datafusion::optimizer::{
-        context::PhysicalOptimizerContext, join_reorder::JoinReorderRule,
-        remote_scan::generate_remote_scan_rules,
+        context::PhysicalOptimizerContext, distribute_analyze::optimize_distribute_analyze,
+        join_reorder::JoinReorderRule, remote_scan::generate_remote_scan_rules,
     },
     request::Request,
     sql::Sql,
@@ -63,6 +66,7 @@ pub mod add_timestamp;
 #[cfg(feature = "enterprise")]
 pub mod cipher;
 pub mod context;
+pub mod distribute_analyze;
 pub mod join_reorder;
 pub mod limit_join_right_side;
 pub mod remote_scan;
@@ -210,4 +214,16 @@ pub fn generate_physical_optimizer_rules(
         }
     }
     rules
+}
+
+// create physical plan
+// NOTE: this function only can rewrite AnalyzeExec
+// another rewrite should move to optimize rule
+pub async fn create_physical_plan(
+    ctx: &SessionContext,
+    sql: &str,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    let plan = ctx.state().create_logical_plan(sql).await?;
+    let physical_plan = ctx.state().create_physical_plan(&plan).await?;
+    optimize_distribute_analyze(physical_plan)
 }

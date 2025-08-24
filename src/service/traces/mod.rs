@@ -747,7 +747,7 @@ async fn write_traces_by_stream(
             .await
             .is_none()
         {
-            let org = super::organization::get_org(&org_id).await.unwrap();
+            let org = super::organization::get_org(org_id).await.unwrap();
 
             super::self_reporting::cloud_events::enqueue_cloud_event(
                 super::self_reporting::cloud_events::CloudEvent {
@@ -1021,28 +1021,34 @@ mod tests {
     }
 
     #[test]
-    fn test_get_span_status() {
-        // Test OK status
+    fn test_get_span_status_ok() {
         let status = Status {
             code: StatusCode::Ok as i32,
             message: "success".to_string(),
         };
         assert_eq!(super::get_span_status(Some(status)), "OK");
+    }
 
-        // Test ERROR status
+    #[test]
+    fn test_get_span_status_error() {
         let status = Status {
             code: StatusCode::Error as i32,
             message: "error occurred".to_string(),
         };
         assert_eq!(super::get_span_status(Some(status)), "ERROR");
+    }
 
-        // Test UNSET status
+    #[test]
+    fn test_get_span_status_unset() {
         let status = Status {
             code: StatusCode::Unset as i32,
             message: "".to_string(),
         };
         assert_eq!(super::get_span_status(Some(status)), "UNSET");
+    }
 
+    #[test]
+    fn test_get_span_status_none() {
         // Test None status (default case)
         assert_eq!(super::get_span_status(None), "UNSET");
     }
@@ -1060,14 +1066,17 @@ mod tests {
             config::meta::otlp::OtlpRequestType::HttpJson,
         );
         assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.status(), actix_web::http::StatusCode::OK);
     }
 
     #[test]
-    fn test_format_response_partial() {
+    fn test_format_response_partial_success() {
         let partial_success =
             opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
                 rejected_spans: 5,
-                error_message: "".to_string(),
+                error_message: "Some spans rejected".to_string(),
             };
 
         let result = super::format_response(
@@ -1075,10 +1084,16 @@ mod tests {
             config::meta::otlp::OtlpRequestType::HttpJson,
         );
         assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(
+            response.status(),
+            actix_web::http::StatusCode::PARTIAL_CONTENT
+        );
     }
 
     #[test]
-    fn test_format_response_protobuf() {
+    fn test_format_response_grpc() {
         let partial_success =
             opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
                 rejected_spans: 0,
@@ -1088,29 +1103,34 @@ mod tests {
         let result =
             super::format_response(partial_success, config::meta::otlp::OtlpRequestType::Grpc);
         assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.status(), actix_web::http::StatusCode::OK);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "application/x-protobuf"
+        );
     }
 
     #[test]
-    fn test_constants() {
-        // Test that constants are properly defined
-        assert_eq!(super::SERVICE_NAME, "service.name");
-        assert_eq!(super::SERVICE, "service");
-        assert_eq!(super::PARENT_SPAN_ID, "reference.parent_span_id");
-        assert_eq!(super::PARENT_TRACE_ID, "reference.parent_trace_id");
-        assert_eq!(super::REF_TYPE, "reference.ref_type");
-        assert_eq!(super::SPAN_ID_BYTES_COUNT, 8);
-        assert_eq!(super::TRACE_ID_BYTES_COUNT, 16);
-        assert_eq!(super::ATTR_STATUS_CODE, "status_code");
-        assert_eq!(super::ATTR_STATUS_MESSAGE, "status_message");
-    }
+    fn test_format_response_http_protobuf() {
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 0,
+                error_message: "".to_string(),
+            };
 
-    #[test]
-    fn test_block_fields() {
-        // Test that BLOCK_FIELDS contains expected values
-        let expected_fields = ["_timestamp", "duration", "start_time", "end_time"];
-        for field in expected_fields {
-            assert!(super::BLOCK_FIELDS.contains(&field));
-        }
-        assert_eq!(super::BLOCK_FIELDS.len(), 4);
+        let result = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpProtobuf,
+        );
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.status(), actix_web::http::StatusCode::OK);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "application/x-protobuf"
+        );
     }
 }

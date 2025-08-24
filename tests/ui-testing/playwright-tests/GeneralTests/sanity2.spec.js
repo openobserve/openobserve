@@ -186,6 +186,8 @@ test.describe("Sanity testcases", () => {
   test("should display results when SQL+histogram is on and then stream is selected", async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/-item"]').click();
     await page.locator('[data-test="menu-link-\\/logs-item"]').click();
+    //before we click on fn editor we need to turn on the function editor if is toggled off
+    await page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
     await page
       .locator('#fnEditor').getByRole('textbox')
       .click();

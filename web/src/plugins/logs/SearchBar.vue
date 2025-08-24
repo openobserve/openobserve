@@ -3838,6 +3838,17 @@ export default defineComponent({
       downloadCustomFileType,
       downloadCustomFileTypeOptions,
       showDownloadMenu,
+      // Expose additional functions for testing
+      updateAutoComplete,
+      handleEscKey,
+      applyAction,
+      showSavedViewConfirmDialog,
+      getFieldList,
+      buildStreamQuery,
+      regionFilterMethod,
+      resetRegionFilter,
+      updateActionSelection,
+      updateEditorWidth,
     };
   },
   computed: {

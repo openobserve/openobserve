@@ -639,6 +639,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         updateRegexPatternName,
         updateRegexPattern,
         userSelectedRegexPattern,
+        existingPatternNames,
+        processJsonObject,
+        validateRegexPatternInputs,
+        createRegexPattern,
       };
     },
     components: {
