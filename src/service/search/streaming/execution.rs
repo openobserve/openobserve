@@ -723,3 +723,212 @@ async fn send_partial_search_resp(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::sql::OrderBy;
+    use tokio::sync::mpsc;
+
+    use super::*;
+
+    #[test]
+    fn test_calc_queried_range_basic() {
+        let start_time = 1_000_000_000; // 1 second in microseconds
+        let end_time = 3_600_000_000; // 1 hour in microseconds
+
+        // 100% cache ratio should result in 0 hours queried
+        let result = calc_queried_range(start_time, end_time, 100);
+        assert_eq!(result, 0.0);
+
+        // 0% cache ratio should result in full range queried
+        let result = calc_queried_range(start_time, end_time, 0);
+        let expected = (end_time - start_time) as f64 / 3_600_000_000.0;
+        assert_eq!(result, expected);
+
+        // 50% cache ratio should result in half range queried
+        let result = calc_queried_range(start_time, end_time, 50);
+        let expected = (end_time - start_time) as f64 / 3_600_000_000.0 * 0.5;
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_calc_queried_range_edge_cases() {
+        // Same start and end time
+        let result = calc_queried_range(1_000_000_000, 1_000_000_000, 0);
+        assert_eq!(result, 0.0);
+
+        // Very small time range
+        let result = calc_queried_range(1_000_000_000, 1_000_001_000, 0);
+        let expected = 1_000.0 / 3_600_000_000.0;
+        assert_eq!(result, expected);
+
+        // Very large time range
+        let result = calc_queried_range(0, 86_400_000_000, 0); // 24 hours
+        assert_eq!(result, 24.0);
+    }
+
+    #[test]
+    fn test_calc_queried_range_cache_ratio_bounds() {
+        let start_time = 0;
+        let end_time = 3_600_000_000; // 1 hour
+
+        // Cache ratio > 100 should be clamped to 100
+        let result = calc_queried_range(start_time, end_time, 150);
+        assert_eq!(result, 0.0);
+
+        // Cache ratio < 0 should work (though unusual)
+        let result = calc_queried_range(start_time, end_time, 50);
+        let expected = 0.5; // 1 hour * 0.5
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_handle_partial_response() {
+        let response = Response {
+            is_partial: true,
+            function_error: vec!["Custom error".to_string()],
+            trace_id: "test-123".to_string(),
+            ..Default::default()
+        };
+
+        let result = handle_partial_response(response.clone());
+
+        // Should add the partial error message
+        assert!(
+            result
+                .function_error
+                .contains(&PARTIAL_ERROR_RESPONSE_MESSAGE.to_string())
+        );
+        assert!(result.function_error.contains(&"Custom error".to_string()));
+        assert_eq!(result.function_error.len(), 2);
+    }
+
+    #[test]
+    fn test_handle_partial_response_no_errors() {
+        let response = Response {
+            is_partial: true,
+            function_error: vec![],
+            trace_id: "test-123".to_string(),
+            ..Default::default()
+        };
+
+        let result = handle_partial_response(response.clone());
+
+        // Should add only the partial error message
+        assert_eq!(result.function_error.len(), 1);
+        assert_eq!(result.function_error[0], PARTIAL_ERROR_RESPONSE_MESSAGE);
+    }
+
+    #[test]
+    fn test_handle_partial_response_not_partial() {
+        let response = Response {
+            is_partial: false,
+            function_error: vec!["Custom error".to_string()],
+            trace_id: "test-123".to_string(),
+            ..Default::default()
+        };
+
+        let result = handle_partial_response(response.clone());
+
+        // Should not change the response
+        assert_eq!(result.function_error.len(), 1);
+        assert_eq!(result.function_error[0], "Custom error");
+    }
+
+    #[tokio::test]
+    async fn test_send_partial_search_resp_success() {
+        let (tx, mut rx) = mpsc::channel(10);
+
+        let result = send_partial_search_resp(
+            "test-123",
+            "Test error",
+            1000,
+            2000,
+            Some(OrderBy::Desc),
+            vec![("field".to_string(), OrderBy::Asc)],
+            false,
+            tx,
+            false,
+            None,
+            "test-org",
+            "test-stream",
+        )
+        .await;
+
+        assert!(result.is_ok());
+
+        // Check that response was sent
+        let response = rx.recv().await.unwrap().unwrap();
+        match response {
+            StreamResponses::SearchResponse { results, .. } => {
+                assert!(results.is_partial);
+                // The error message gets formatted with PARTIAL_ERROR_RESPONSE_MESSAGE
+                let expected_error = format!("{PARTIAL_ERROR_RESPONSE_MESSAGE} \n Test error");
+                assert!(results.function_error.contains(&expected_error));
+                assert_eq!(results.new_start_time, Some(1000));
+                assert_eq!(results.new_end_time, Some(2000));
+            }
+            _ => panic!("Expected SearchResponse"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_send_partial_search_resp_empty_error() {
+        let (tx, mut rx) = mpsc::channel(10);
+
+        let result = send_partial_search_resp(
+            "test-123",
+            "",
+            1000,
+            2000,
+            Some(OrderBy::Desc),
+            vec![],
+            false,
+            tx,
+            false,
+            None,
+            "test-org",
+            "test-stream",
+        )
+        .await;
+
+        assert!(result.is_ok());
+
+        let response = rx.recv().await.unwrap().unwrap();
+        match response {
+            StreamResponses::SearchResponse { results, .. } => {
+                assert!(
+                    results
+                        .function_error
+                        .contains(&PARTIAL_ERROR_RESPONSE_MESSAGE.to_string())
+                );
+            }
+            _ => panic!("Expected SearchResponse"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_send_partial_search_resp_sender_closed() {
+        let (tx, _rx) = mpsc::channel(1);
+        drop(_rx); // Close the receiver
+
+        let result = send_partial_search_resp(
+            "test-123",
+            "Test error",
+            1000,
+            2000,
+            None,
+            vec![],
+            false,
+            tx,
+            false,
+            None,
+            "test-org",
+            "test-stream",
+        )
+        .await;
+
+        // Should not panic, should return Ok
+        assert!(result.is_ok());
+    }
+}

@@ -1106,10 +1106,18 @@ export default defineComponent({
             ) {
               // check for schema exist in the object or not
               // if not pull the schema from server.
-              if (!stream.hasOwnProperty("schema")) {
+              // Also check if schema is an empty array
+              if (
+                !stream.hasOwnProperty("schema") ||
+                (Array.isArray(stream.schema) && stream.schema.length === 0)
+              ) {
                 const streamData: any = await loadStreamFields(stream.name);
                 const streamSchema: any = streamData.schema;
-                if (streamSchema == undefined) {
+                if (
+                  !streamSchema ||
+                  (Array.isArray(streamSchema) && streamSchema.length === 0)
+                ) {
+                  stream.schema = [];
                   return;
                 }
                 stream.settings = streamData.settings;

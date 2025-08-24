@@ -25,7 +25,6 @@ use crate::{common::meta::telemetry, service::stream::get_streams};
 
 /// This file has all odd-jobs that are specific to cloud installation,
 /// and do not fit specifically anywhere else
-
 // interval for checking and reporting no ingestion events
 const NO_INGESTION_REPORT_INTERVAL: u64 = 3600;
 

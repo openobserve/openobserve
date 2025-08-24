@@ -1350,4 +1350,773 @@ mod tests {
         let result = is_expr_valid_for_index(&expr, &index_fields);
         assert!(result);
     }
+
+    #[test]
+    fn test_get_index_condition_from_expr_simple_equality() {
+        let index_fields = HashSet::from_iter(vec!["field1".to_string()]);
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::Identifier(Ident::new("field1"))),
+            op: BinaryOperator::Eq,
+            right: Box::new(Expr::Value(
+                Value::SingleQuotedString("value1".to_string()).into(),
+            )),
+        };
+
+        let (condition, other_expr) = get_index_condition_from_expr(&index_fields, &expr);
+
+        assert!(condition.is_some());
+        let condition = condition.unwrap();
+        assert_eq!(condition.conditions.len(), 1);
+        assert!(matches!(
+            condition.conditions[0],
+            Condition::Equal(ref field, ref value) if field == "field1" && value == "value1"
+        ));
+        assert!(other_expr.is_none());
+    }
+
+    #[test]
+    fn test_get_index_condition_from_expr_non_indexed_field() {
+        let index_fields = HashSet::from_iter(vec!["field1".to_string()]);
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::Identifier(Ident::new("field2"))),
+            op: BinaryOperator::Eq,
+            right: Box::new(Expr::Value(
+                Value::SingleQuotedString("value1".to_string()).into(),
+            )),
+        };
+
+        let (condition, other_expr) = get_index_condition_from_expr(&index_fields, &expr);
+
+        assert!(condition.is_none());
+        assert!(other_expr.is_some());
+    }
+
+    #[test]
+    fn test_get_index_condition_from_expr_mixed_conditions() {
+        let index_fields = HashSet::from_iter(vec!["field1".to_string()]);
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::BinaryOp {
+                left: Box::new(Expr::Identifier(Ident::new("field1"))),
+                op: BinaryOperator::Eq,
+                right: Box::new(Expr::Value(
+                    Value::SingleQuotedString("value1".to_string()).into(),
+                )),
+            }),
+            op: BinaryOperator::And,
+            right: Box::new(Expr::BinaryOp {
+                left: Box::new(Expr::Identifier(Ident::new("field2"))),
+                op: BinaryOperator::Eq,
+                right: Box::new(Expr::Value(
+                    Value::SingleQuotedString("value2".to_string()).into(),
+                )),
+            }),
+        };
+
+        let (condition, other_expr) = get_index_condition_from_expr(&index_fields, &expr);
+
+        assert!(condition.is_some());
+        let condition = condition.unwrap();
+        assert_eq!(condition.conditions.len(), 1);
+        assert!(other_expr.is_some());
+    }
+
+    #[test]
+    fn test_condition_from_expr_equality() {
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::Identifier(Ident::new("field1"))),
+            op: BinaryOperator::Eq,
+            right: Box::new(Expr::Value(
+                Value::SingleQuotedString("value1".to_string()).into(),
+            )),
+        };
+
+        let condition = Condition::from_expr(&expr);
+        assert!(matches!(
+            condition,
+            Condition::Equal(field, value) if field == "field1" && value == "value1"
+        ));
+    }
+
+    #[test]
+    fn test_condition_from_expr_not_equal() {
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::Identifier(Ident::new("field1"))),
+            op: BinaryOperator::NotEq,
+            right: Box::new(Expr::Value(
+                Value::SingleQuotedString("value1".to_string()).into(),
+            )),
+        };
+
+        let condition = Condition::from_expr(&expr);
+        assert!(matches!(
+            condition,
+            Condition::NotEqual(field, value) if field == "field1" && value == "value1"
+        ));
+    }
+
+    #[test]
+    fn test_condition_from_expr_in_list() {
+        let expr = Expr::InList {
+            expr: Box::new(Expr::Identifier(Ident::new("field1"))),
+            list: vec![
+                Expr::Value(Value::SingleQuotedString("value1".to_string()).into()),
+                Expr::Value(Value::SingleQuotedString("value2".to_string()).into()),
+            ],
+            negated: false,
+        };
+
+        let condition = Condition::from_expr(&expr);
+        assert!(matches!(
+            condition,
+            Condition::In(field, values, negated)
+            if field == "field1" && values == vec!["value1", "value2"] && !negated
+        ));
+    }
+
+    #[test]
+    fn test_condition_from_expr_in_list_negated() {
+        let expr = Expr::InList {
+            expr: Box::new(Expr::Identifier(Ident::new("field1"))),
+            list: vec![Expr::Value(
+                Value::SingleQuotedString("value1".to_string()).into(),
+            )],
+            negated: true,
+        };
+
+        let condition = Condition::from_expr(&expr);
+        assert!(matches!(
+            condition,
+            Condition::In(field, values, negated)
+            if field == "field1" && values == vec!["value1"] && negated
+        ));
+    }
+
+    #[test]
+    fn test_condition_from_expr_match_all() {
+        let expr = Expr::Function(Function {
+            name: ObjectName::from(vec![Ident::new("match_all")]),
+            uses_odbc_syntax: false,
+            parameters: FunctionArguments::None,
+            args: FunctionArguments::List(FunctionArgumentList {
+                duplicate_treatment: None,
+                args: vec![FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+                    Value::SingleQuotedString("search_term".to_string()).into(),
+                )))],
+                clauses: vec![],
+            }),
+            filter: None,
+            null_treatment: None,
+            over: None,
+            within_group: vec![],
+        });
+
+        let condition = Condition::from_expr(&expr);
+        assert!(matches!(
+            condition,
+            Condition::MatchAll(term) if term == "search_term"
+        ));
+    }
+
+    #[test]
+    fn test_condition_from_expr_fuzzy_match_all() {
+        let expr = Expr::Function(Function {
+            name: ObjectName::from(vec![Ident::new("fuzzy_match_all")]),
+            uses_odbc_syntax: false,
+            parameters: FunctionArguments::None,
+            args: FunctionArguments::List(FunctionArgumentList {
+                duplicate_treatment: None,
+                args: vec![
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+                        Value::SingleQuotedString("search_term".to_string()).into(),
+                    ))),
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+                        Value::Number("2".to_string(), false).into(),
+                    ))),
+                ],
+                clauses: vec![],
+            }),
+            filter: None,
+            null_treatment: None,
+            over: None,
+            within_group: vec![],
+        });
+
+        let condition = Condition::from_expr(&expr);
+        assert!(matches!(
+            condition,
+            Condition::FuzzyMatchAll(term, distance) if term == "search_term" && distance == 2
+        ));
+    }
+
+    #[test]
+    fn test_condition_from_expr_str_match() {
+        let expr = Expr::Function(Function {
+            name: ObjectName::from(vec![Ident::new("str_match")]),
+            uses_odbc_syntax: false,
+            parameters: FunctionArguments::None,
+            args: FunctionArguments::List(FunctionArgumentList {
+                duplicate_treatment: None,
+                args: vec![
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(Ident::new(
+                        "field1",
+                    )))),
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+                        Value::SingleQuotedString("pattern".to_string()).into(),
+                    ))),
+                ],
+                clauses: vec![],
+            }),
+            filter: None,
+            null_treatment: None,
+            over: None,
+            within_group: vec![],
+        });
+
+        let condition = Condition::from_expr(&expr);
+        assert!(matches!(
+            condition,
+            Condition::StrMatch(field, pattern, case_sensitive)
+            if field == "field1" && pattern == "pattern" && case_sensitive
+        ));
+    }
+
+    #[test]
+    fn test_condition_from_expr_str_match_ignore_case() {
+        let expr = Expr::Function(Function {
+            name: ObjectName::from(vec![Ident::new("str_match_ignore_case")]),
+            uses_odbc_syntax: false,
+            parameters: FunctionArguments::None,
+            args: FunctionArguments::List(FunctionArgumentList {
+                duplicate_treatment: None,
+                args: vec![
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(Ident::new(
+                        "field1",
+                    )))),
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+                        Value::SingleQuotedString("pattern".to_string()).into(),
+                    ))),
+                ],
+                clauses: vec![],
+            }),
+            filter: None,
+            null_treatment: None,
+            over: None,
+            within_group: vec![],
+        });
+
+        let condition = Condition::from_expr(&expr);
+        assert!(matches!(
+            condition,
+            Condition::StrMatch(field, pattern, case_sensitive)
+            if field == "field1" && pattern == "pattern" && !case_sensitive
+        ));
+    }
+
+    #[test]
+    fn test_condition_from_expr_or() {
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::BinaryOp {
+                left: Box::new(Expr::Identifier(Ident::new("field1"))),
+                op: BinaryOperator::Eq,
+                right: Box::new(Expr::Value(
+                    Value::SingleQuotedString("value1".to_string()).into(),
+                )),
+            }),
+            op: BinaryOperator::Or,
+            right: Box::new(Expr::BinaryOp {
+                left: Box::new(Expr::Identifier(Ident::new("field2"))),
+                op: BinaryOperator::Eq,
+                right: Box::new(Expr::Value(
+                    Value::SingleQuotedString("value2".to_string()).into(),
+                )),
+            }),
+        };
+
+        let condition = Condition::from_expr(&expr);
+        assert!(matches!(condition, Condition::Or(_, _)));
+    }
+
+    #[test]
+    fn test_condition_from_expr_and() {
+        let expr = Expr::BinaryOp {
+            left: Box::new(Expr::BinaryOp {
+                left: Box::new(Expr::Identifier(Ident::new("field1"))),
+                op: BinaryOperator::Eq,
+                right: Box::new(Expr::Value(
+                    Value::SingleQuotedString("value1".to_string()).into(),
+                )),
+            }),
+            op: BinaryOperator::And,
+            right: Box::new(Expr::BinaryOp {
+                left: Box::new(Expr::Identifier(Ident::new("field2"))),
+                op: BinaryOperator::Eq,
+                right: Box::new(Expr::Value(
+                    Value::SingleQuotedString("value2".to_string()).into(),
+                )),
+            }),
+        };
+
+        let condition = Condition::from_expr(&expr);
+        assert!(matches!(condition, Condition::And(_, _)));
+    }
+
+    #[test]
+    fn test_condition_from_expr_not() {
+        let expr = Expr::UnaryOp {
+            op: UnaryOperator::Not,
+            expr: Box::new(Expr::BinaryOp {
+                left: Box::new(Expr::Identifier(Ident::new("field1"))),
+                op: BinaryOperator::Eq,
+                right: Box::new(Expr::Value(
+                    Value::SingleQuotedString("value1".to_string()).into(),
+                )),
+            }),
+        };
+
+        let condition = Condition::from_expr(&expr);
+        assert!(matches!(condition, Condition::Not(_)));
+    }
+
+    #[test]
+    fn test_condition_from_expr_nested() {
+        let expr = Expr::Nested(Box::new(Expr::BinaryOp {
+            left: Box::new(Expr::Identifier(Ident::new("field1"))),
+            op: BinaryOperator::Eq,
+            right: Box::new(Expr::Value(
+                Value::SingleQuotedString("value1".to_string()).into(),
+            )),
+        }));
+
+        let condition = Condition::from_expr(&expr);
+        assert!(matches!(
+            condition,
+            Condition::Equal(field, value) if field == "field1" && value == "value1"
+        ));
+    }
+
+    #[test]
+    fn test_index_condition_new() {
+        let condition = IndexCondition::new();
+        assert!(condition.conditions.is_empty());
+    }
+
+    #[test]
+    fn test_index_condition_add_condition() {
+        let mut index_condition = IndexCondition::new();
+        let condition = Condition::Equal("field1".to_string(), "value1".to_string());
+
+        index_condition.add_condition(condition.clone());
+
+        assert_eq!(index_condition.conditions.len(), 1);
+        assert!(matches!(
+            index_condition.conditions[0],
+            Condition::Equal(ref field, ref value) if field == "field1" && value == "value1"
+        ));
+    }
+
+    #[test]
+    fn test_index_condition_add_index_condition() {
+        let mut index_condition1 = IndexCondition::new();
+        index_condition1
+            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+
+        let mut index_condition2 = IndexCondition::new();
+        index_condition2
+            .add_condition(Condition::Equal("field2".to_string(), "value2".to_string()));
+
+        index_condition1.add_index_condition(index_condition2);
+
+        assert_eq!(index_condition1.conditions.len(), 2);
+    }
+
+    #[test]
+    fn test_index_condition_to_query() {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        index_condition.add_condition(Condition::Equal("field2".to_string(), "value2".to_string()));
+
+        let query_string = index_condition.to_query();
+        assert_eq!(query_string, "field1=value1 AND field2=value2");
+    }
+
+    #[test]
+    fn test_index_condition_to_query_empty() {
+        let index_condition = IndexCondition::new();
+        let query_string = index_condition.to_query();
+        assert_eq!(query_string, "");
+    }
+
+    #[test]
+    fn test_index_condition_is_empty() {
+        let mut index_condition = IndexCondition::new();
+        assert!(index_condition.is_empty());
+
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        assert!(!index_condition.is_empty());
+    }
+
+    #[test]
+    fn test_index_condition_is_simple_str_match() {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::StrMatch(
+            "field1".to_string(),
+            "value1".to_string(),
+            true,
+        ));
+
+        assert!(index_condition.is_simple_str_match("field1"));
+        assert!(!index_condition.is_simple_str_match("field2"));
+    }
+
+    #[test]
+    fn test_index_condition_is_simple_str_match_multiple_conditions() {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::StrMatch(
+            "field1".to_string(),
+            "value1".to_string(),
+            true,
+        ));
+        index_condition.add_condition(Condition::Equal("field2".to_string(), "value2".to_string()));
+
+        assert!(!index_condition.is_simple_str_match("field1"));
+    }
+
+    #[test]
+    fn test_index_condition_get_str_match_condition() {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::StrMatch(
+            "field1".to_string(),
+            "value1".to_string(),
+            true,
+        ));
+
+        let result = index_condition.get_str_match_condition();
+        assert_eq!(result, Some(("value1".to_string(), true)));
+    }
+
+    #[test]
+    fn test_index_condition_get_str_match_condition_all() {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::All());
+
+        let result = index_condition.get_str_match_condition();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_index_condition_is_condition_all() {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::All());
+
+        assert!(index_condition.is_condition_all());
+
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        assert!(!index_condition.is_condition_all());
+    }
+
+    #[test]
+    fn test_index_condition_is_negated_condition() {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+
+        assert!(!index_condition.is_negated_condition());
+
+        index_condition.add_condition(Condition::NotEqual(
+            "field2".to_string(),
+            "value2".to_string(),
+        ));
+        assert!(index_condition.is_negated_condition());
+    }
+
+    #[test]
+    fn test_index_condition_split_condition_by_negated() {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        index_condition.add_condition(Condition::NotEqual(
+            "field2".to_string(),
+            "value2".to_string(),
+        ));
+        index_condition.add_condition(Condition::Equal("field3".to_string(), "value3".to_string()));
+
+        let (positive, negative) = index_condition.split_condition_by_negated();
+
+        assert_eq!(positive.conditions.len(), 2);
+        assert_eq!(negative.conditions.len(), 1);
+        assert!(matches!(negative.conditions[0], Condition::NotEqual(_, _)));
+    }
+
+    #[test]
+    fn test_condition_to_query_equal() {
+        let condition = Condition::Equal("field1".to_string(), "value1".to_string());
+        assert_eq!(condition.to_query(), "field1=value1");
+    }
+
+    #[test]
+    fn test_condition_to_query_not_equal() {
+        let condition = Condition::NotEqual("field1".to_string(), "value1".to_string());
+        assert_eq!(condition.to_query(), "field1!=value1");
+    }
+
+    #[test]
+    fn test_condition_to_query_str_match() {
+        let condition = Condition::StrMatch("field1".to_string(), "value1".to_string(), true);
+        assert_eq!(condition.to_query(), "str_match(field1, 'value1')");
+
+        let condition = Condition::StrMatch("field1".to_string(), "value1".to_string(), false);
+        assert_eq!(
+            condition.to_query(),
+            "str_match_ignore_case(field1, 'value1')"
+        );
+    }
+
+    #[test]
+    fn test_condition_to_query_in() {
+        let condition = Condition::In(
+            "field1".to_string(),
+            vec!["value1".to_string(), "value2".to_string()],
+            false,
+        );
+        assert_eq!(condition.to_query(), "field1 IN (value1,value2)");
+
+        let condition = Condition::In("field1".to_string(), vec!["value1".to_string()], true);
+        assert_eq!(condition.to_query(), "field1 NOT IN (value1)");
+    }
+
+    #[test]
+    fn test_condition_to_query_regex() {
+        let condition = Condition::Regex("field1".to_string(), "pattern.*".to_string());
+        assert_eq!(condition.to_query(), "field1=~pattern.*");
+    }
+
+    #[test]
+    fn test_condition_to_query_match_all() {
+        let condition = Condition::MatchAll("search_term".to_string());
+        assert_eq!(condition.to_query(), "_all:search_term");
+    }
+
+    #[test]
+    fn test_condition_to_query_fuzzy_match_all() {
+        let condition = Condition::FuzzyMatchAll("search_term".to_string(), 2);
+        assert_eq!(condition.to_query(), "_all:fuzzy(search_term, 2)");
+    }
+
+    #[test]
+    fn test_condition_to_query_all() {
+        let condition = Condition::All();
+        assert_eq!(condition.to_query(), "ALL");
+    }
+
+    #[test]
+    fn test_condition_to_query_or() {
+        let left = Condition::Equal("field1".to_string(), "value1".to_string());
+        let right = Condition::Equal("field2".to_string(), "value2".to_string());
+        let condition = Condition::Or(Box::new(left), Box::new(right));
+        assert_eq!(condition.to_query(), "(field1=value1 OR field2=value2)");
+    }
+
+    #[test]
+    fn test_condition_to_query_and() {
+        let left = Condition::Equal("field1".to_string(), "value1".to_string());
+        let right = Condition::Equal("field2".to_string(), "value2".to_string());
+        let condition = Condition::And(Box::new(left), Box::new(right));
+        assert_eq!(condition.to_query(), "(field1=value1 AND field2=value2)");
+    }
+
+    #[test]
+    fn test_condition_to_query_not() {
+        let inner = Condition::Equal("field1".to_string(), "value1".to_string());
+        let condition = Condition::Not(Box::new(inner));
+        assert_eq!(condition.to_query(), "NOT(field1=value1)");
+    }
+
+    #[test]
+    fn test_condition_need_all_term_fields_str_match() {
+        let condition = Condition::StrMatch("field1".to_string(), "value".to_string(), true);
+        let fields = condition.need_all_term_fields();
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_condition_need_all_term_fields_match_all_wildcard() {
+        let condition = Condition::MatchAll("*test*".to_string());
+        let fields = condition.need_all_term_fields();
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
+    }
+
+    #[test]
+    fn test_condition_need_all_term_fields_match_all_simple() {
+        let condition = Condition::MatchAll("test".to_string());
+        let fields = condition.need_all_term_fields();
+        assert_eq!(fields.len(), 0);
+    }
+
+    #[test]
+    fn test_condition_need_all_term_fields_fuzzy_match_all() {
+        let condition = Condition::FuzzyMatchAll("test".to_string(), 2);
+        let fields = condition.need_all_term_fields();
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
+    }
+
+    #[test]
+    fn test_condition_need_all_term_fields_not_equal() {
+        let condition = Condition::NotEqual("field1".to_string(), "value".to_string());
+        let fields = condition.need_all_term_fields();
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_condition_need_all_term_fields_in_negated() {
+        let condition = Condition::In("field1".to_string(), vec!["value1".to_string()], true);
+        let fields = condition.need_all_term_fields();
+        assert_eq!(fields.len(), 1);
+        assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_condition_need_all_term_fields_or() {
+        let left = Condition::StrMatch("field1".to_string(), "value".to_string(), true);
+        let right = Condition::NotEqual("field2".to_string(), "value".to_string());
+        let condition = Condition::Or(Box::new(left), Box::new(right));
+        let fields = condition.need_all_term_fields();
+        assert_eq!(fields.len(), 2);
+        assert!(fields.contains("field1"));
+        assert!(fields.contains("field2"));
+    }
+
+    #[test]
+    fn test_condition_can_remove_filter_equal() {
+        let condition = Condition::Equal("field1".to_string(), "value1".to_string());
+        assert!(condition.can_remove_filter());
+    }
+
+    #[test]
+    fn test_condition_can_remove_filter_regex() {
+        let condition = Condition::Regex("field1".to_string(), "pattern.*".to_string());
+        assert!(!condition.can_remove_filter());
+    }
+
+    #[test]
+    fn test_condition_can_remove_filter_match_all_alphanumeric() {
+        let condition = Condition::MatchAll("test123".to_string());
+        assert!(condition.can_remove_filter());
+    }
+
+    #[test]
+    fn test_condition_can_remove_filter_match_all_non_alphanumeric() {
+        let condition = Condition::MatchAll("test 123".to_string());
+        assert!(!condition.can_remove_filter());
+    }
+
+    #[test]
+    fn test_condition_can_remove_filter_fuzzy_match_all() {
+        let condition = Condition::FuzzyMatchAll("test".to_string(), 2);
+        assert!(!condition.can_remove_filter());
+    }
+
+    #[test]
+    fn test_condition_can_remove_filter_or() {
+        let left = Condition::Equal("field1".to_string(), "value1".to_string());
+        let right = Condition::Equal("field2".to_string(), "value2".to_string());
+        let condition = Condition::Or(Box::new(left), Box::new(right));
+        assert!(condition.can_remove_filter());
+
+        let left = Condition::Equal("field1".to_string(), "value1".to_string());
+        let right = Condition::Regex("field2".to_string(), "pattern.*".to_string());
+        let condition = Condition::Or(Box::new(left), Box::new(right));
+        assert!(!condition.can_remove_filter());
+    }
+
+    #[test]
+    fn test_condition_is_negated_condition() {
+        assert!(!Condition::Equal("field".to_string(), "value".to_string()).is_negated_condition());
+        assert!(
+            Condition::NotEqual("field".to_string(), "value".to_string()).is_negated_condition()
+        );
+        assert!(
+            !Condition::In("field".to_string(), vec!["value".to_string()], false)
+                .is_negated_condition()
+        );
+        assert!(
+            Condition::In("field".to_string(), vec!["value".to_string()], true)
+                .is_negated_condition()
+        );
+        assert!(
+            Condition::Not(Box::new(Condition::Equal(
+                "field".to_string(),
+                "value".to_string()
+            )))
+            .is_negated_condition()
+        );
+    }
+
+    #[test]
+    fn test_condition_is_negated_condition_or() {
+        let left = Condition::Equal("field1".to_string(), "value1".to_string());
+        let right = Condition::NotEqual("field2".to_string(), "value2".to_string());
+        let condition = Condition::Or(Box::new(left), Box::new(right));
+        assert!(condition.is_negated_condition());
+    }
+
+    #[test]
+    fn test_get_value() {
+        let expr = Expr::Value(Value::SingleQuotedString("quoted".to_string()).into());
+        assert_eq!(get_value(&expr), "quoted");
+
+        let expr = Expr::Value(Value::Number("123".to_string(), false).into());
+        assert_eq!(get_value(&expr), "123");
+    }
+
+    #[test]
+    fn test_disjunction_single() {
+        use datafusion::{physical_expr::expressions::Literal, scalar::ScalarValue};
+
+        let expr = Arc::new(Literal::new(ScalarValue::Boolean(Some(true))));
+        let result = disjunction(vec![expr.clone()]);
+        assert_eq!(result.as_ref() as *const _, expr.as_ref() as *const _);
+    }
+
+    #[test]
+    fn test_conjunction_single() {
+        use datafusion::{physical_expr::expressions::Literal, scalar::ScalarValue};
+
+        let expr = Arc::new(Literal::new(ScalarValue::Boolean(Some(true))));
+        let result = conjunction(vec![expr.clone()]);
+        assert_eq!(result.as_ref() as *const _, expr.as_ref() as *const _);
+    }
+
+    #[test]
+    fn test_get_scalar_value_boolean() {
+        let result = get_scalar_value("true", &DataType::Boolean);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_get_scalar_value_int64() {
+        let result = get_scalar_value("123", &DataType::Int64);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_get_scalar_value_utf8() {
+        let result = get_scalar_value("test", &DataType::Utf8);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_get_scalar_value_error() {
+        let result = get_scalar_value("not_a_number", &DataType::Int64);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_arg_name_unnamed() {
+        let arg = FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(Ident::new(
+            "field1",
+        ))));
+        assert_eq!(get_arg_name(&arg), "field1");
+    }
 }

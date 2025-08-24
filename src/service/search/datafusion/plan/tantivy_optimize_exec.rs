@@ -38,7 +38,7 @@ use datafusion::{
 use futures::TryStreamExt;
 
 use crate::service::search::{
-    grpc::{QueryParams, storage::filter_file_list_by_tantivy_index},
+    grpc::{QueryParams, storage::tantivy_search},
     index::IndexCondition,
 };
 
@@ -164,7 +164,7 @@ async fn adapt_tantivy_result(
     schema: SchemaRef,
     idx_optimize_mode: IndexOptimizeMode,
 ) -> Result<SendableRecordBatchStream> {
-    let (idx_took, error, result) = filter_file_list_by_tantivy_index(
+    let (idx_took, error, result) = tantivy_search(
         query.clone(),
         &mut file_list,
         index_condition,
@@ -554,7 +554,7 @@ mod tests {
 
     #[test]
     fn test_parse_f64_array() {
-        let f64_values = vec![1.0, 0.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY];
+        let f64_values = [1.0, 0.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY];
         let field_values = f64_values.iter().map(|v| v.to_string()).collect::<Vec<_>>();
         let array = parse_f64_array(&field_values).unwrap();
         let array_values = array.as_any().downcast_ref::<Float64Array>().unwrap();

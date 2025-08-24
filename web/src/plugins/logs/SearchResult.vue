@@ -773,6 +773,11 @@ export default defineComponent({
       histogramLoader,
       sendToAiChat,
       closeTable,
+      getRowIndex,
+      getPartitionPaginations,
+      getSocketPaginations,
+      resetPlotChart,
+      columnSizes,
     };
   },
   computed: {

@@ -34,7 +34,10 @@ use config::{
     utils::{
         base64, json,
         schema::filter_source_by_partition_key,
-        sql::{is_aggregate_query, is_eligible_for_histogram, is_simple_distinct_query},
+        sql::{
+            is_aggregate_query, is_eligible_for_histogram, is_explain_query,
+            is_simple_distinct_query,
+        },
         time::now_micros,
     },
 };
@@ -645,10 +648,10 @@ pub async fn search_partition(
         }
     };
 
-    // if there is no _timestamp field in the query, return single partitions
+    // if there is no _timestamp field or EXPLAIN in the query, return single partitions
+    let is_explain_query = is_explain_query(&req.sql);
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let res_ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
-    let ts_column = res_ts_column.map(|(v, _)| v);
+    let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate).map(|(v, _)| v);
 
     #[cfg(feature = "enterprise")]
     let mut is_cachable_aggs = is_simple_aggregate_query(&req.sql).unwrap_or(false);
@@ -689,7 +692,7 @@ pub async fn search_partition(
     }
 
     // if http distinct, we should skip file list
-    if is_http_distinct {
+    if is_http_distinct || is_explain_query {
         skip_get_file_list = true;
     }
 
@@ -697,6 +700,7 @@ pub async fn search_partition(
     // check if we need to use streaming_output
     let (streaming_id, streaming_interval_micros) = if req.streaming_output
         && is_streaming_aggregate
+        && !skip_get_file_list
     {
         let (stream_name, _all_streams) = match resolve_stream_names(&req.sql) {
             // TODO: cache don't not support multiple stream names

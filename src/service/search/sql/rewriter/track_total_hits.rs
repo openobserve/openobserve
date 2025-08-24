@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn test_track_total_hits_distinct_single_column() {
         let sql = "SELECT DISTINCT name FROM t WHERE name = 'a'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn test_track_total_hits_distinct_multiple_columns() {
         let sql = "SELECT DISTINCT unique_id, continent FROM oly WHERE continent = 'ASI'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();
@@ -325,7 +325,7 @@ mod tests {
     fn test_track_total_hits_distinct_three_columns() {
         let sql =
             "SELECT DISTINCT unique_id, continent, bronze_medals FROM oly WHERE continent = 'ASI'";
-        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
             .pop()
             .unwrap();

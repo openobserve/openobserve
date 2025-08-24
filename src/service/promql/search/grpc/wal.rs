@@ -186,6 +186,7 @@ async fn get_wal_batches(
             timeout: cfg.limit.query_timeout,
             use_cache: false,
             histogram_interval: 0, // not needed for wal
+            is_analyze: false,     // not needed for wal
         },
         index_info: IndexInfo::default(), // not needed for wal
         super_cluster_info: cluster_rpc::SuperClusterInfo::default(), // current not needed for wal

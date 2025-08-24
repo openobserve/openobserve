@@ -84,7 +84,9 @@ const store = createStore({
           text: "re_not_match(field, 'pattern')",
         },
       ],
-      timestamp_column: "_timestamp"
+      timestamp_column: "_timestamp",
+      all_fields_name: "_all",
+      default_secondary_index_fields: ["level"]
     },
     organizationData: {
       organizationPasscode: "",

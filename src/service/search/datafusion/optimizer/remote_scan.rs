@@ -124,30 +124,21 @@ impl PhysicalOptimizerRule for RemoteScanRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        // should not add remote scan for placeholder or emptyplan
         if is_place_holder_or_empty(&plan) {
             return Ok(plan);
         }
 
-        let mut plan = plan;
-        let is_change = if is_single_node_optimize(&plan) {
-            false
-        } else {
-            let mut rewrite = RemoteScanRewriter::new(self.remote_scan_nodes.clone());
-            plan = plan.rewrite(&mut rewrite)?.data;
-            rewrite.is_changed
-        };
+        // if single node and can optimize, add remote scan to top
+        if is_single_node_optimize(&plan) {
+            return remote_scan_to_top_if_needed(plan, self.remote_scan_nodes.clone());
+        }
 
-        // add remote scan exec to top if physical plan do not have remote scan exec
-        if !is_change {
-            let mut visitor = TableNameVisitor::new();
-            plan.visit(&mut visitor)?;
-            if visitor.is_remote_scan {
-                let table_name = visitor.table_name.clone().unwrap();
-                plan = Arc::new(RemoteScanExec::new(
-                    plan,
-                    self.remote_scan_nodes.get_remote_node(&table_name),
-                )?);
-            }
+        // if not single node, rewrite physical plan to add remote scan
+        let mut rewrite = RemoteScanRewriter::new(self.remote_scan_nodes.clone());
+        let mut plan = plan.rewrite(&mut rewrite)?.data;
+        if !rewrite.is_changed {
+            plan = remote_scan_to_top_if_needed(plan, self.remote_scan_nodes.clone())?;
         }
         Ok(plan)
     }
@@ -264,6 +255,23 @@ fn is_single_node_optimize(plan: &Arc<dyn ExecutionPlan>) -> bool {
         .expect("visit physical plan failed in is_single_node_optimize");
     let empty_exec_count = visitor.get_count();
     empty_exec_count <= 1 && config::cluster::LOCAL_NODE.is_single_node()
+}
+
+fn remote_scan_to_top_if_needed(
+    plan: Arc<dyn ExecutionPlan>,
+    remote_scan_nodes: Arc<RemoteScanNodes>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    let mut visitor = TableNameVisitor::new();
+    plan.visit(&mut visitor)?;
+    if visitor.is_remote_scan {
+        let table_name = visitor.table_name.clone().unwrap();
+        let remote_scan = Arc::new(RemoteScanExec::new(
+            plan,
+            remote_scan_nodes.get_remote_node(&table_name),
+        )?);
+        return Ok(remote_scan);
+    }
+    Ok(plan)
 }
 
 // visit physical plan to get underlying table name and check is add a remote scan after current

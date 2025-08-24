@@ -198,6 +198,7 @@ openobserveRum.startSessionReplayRecording();`;
       initConfiguration,
       displayConfiguration,
       replaceStaticValues,
+      defaultConfig,
     };
   },
   computed: {

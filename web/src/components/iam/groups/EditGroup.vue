@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     >
       <q-btn
-        data-test="add-alert-cancel-btn"
+        data-test="edit-group-cancel-btn"
         class="text-bold"
         :label="t('alerts.cancel')"
         text-color="light-text"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="cancelEditGroup"
       />
       <q-btn
-        data-test="add-alert-submit-btn"
+        data-test="edit-group-submit-btn"
         :label="t('alerts.save')"
         class="text-bold no-border q-ml-md"
         color="secondary"

@@ -426,7 +426,7 @@ mod tests {
         table.add_row(Row::new(vec![Cell::new("Data1"), Cell::new("Data2")]));
 
         // Verify table can be created without panicking
-        let table_string = format!("{}", table);
+        let table_string = format!("{table}");
         assert!(table_string.contains("Header1"));
         assert!(table_string.contains("Data1"));
     }
@@ -499,7 +499,7 @@ mod tests {
         ];
 
         for method in methods {
-            assert!(format!("{}", method).len() > 0);
+            assert!(!format!("{method}").is_empty());
         }
     }
 
@@ -522,7 +522,7 @@ mod tests {
                 match key.as_str() {
                     "field1" => assert_eq!(string_val, "\"value1\""),
                     "field2" => assert_eq!(string_val, "42"),
-                    _ => panic!("Unexpected key: {}", key),
+                    _ => panic!("Unexpected key: {key}"),
                 }
             }
         }

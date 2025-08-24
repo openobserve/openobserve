@@ -1335,18 +1335,18 @@ mod tests {
         // Test that the function handles errors properly
         let (redirect_error, _) = handle_auth_failure_for_redirect(req, &error);
         // The error should be a redirect response, not necessarily contain "redirect" in the string
-        assert!(redirect_error.to_string().len() > 0);
+        assert!(!redirect_error.to_string().is_empty());
     }
 
     #[test]
     async fn test_validate_credentials_path_handling() {
         // Test path handling in validate_credentials
-        let path_columns = vec!["api", "v1", "organizations"];
+        let path_columns = ["api", "v1", "organizations"];
         let last_segment = path_columns.last().unwrap_or(&"");
         assert_eq!(*last_segment, "organizations");
 
         // Test path with trailing slash
-        let path_with_slash = vec!["api", "v1", "logs", ""];
+        let path_with_slash = ["api", "v1", "logs", ""];
         let last_segment_with_slash = path_with_slash.last().unwrap_or(&"");
         assert_eq!(*last_segment_with_slash, "");
     }
@@ -1354,7 +1354,7 @@ mod tests {
     #[test]
     async fn test_v2_api_prefix_handling() {
         // Test V2 API prefix handling
-        let v2_path_columns = vec!["v2", "org_id", "logs"];
+        let v2_path_columns = ["v2", "org_id", "logs"];
         let org_id = if v2_path_columns.len() > 1 && v2_path_columns[0].eq("v2") {
             v2_path_columns[1]
         } else {
@@ -1363,7 +1363,7 @@ mod tests {
         assert_eq!(org_id, "org_id");
 
         // Test non-V2 path
-        let normal_path_columns = vec!["org_id", "logs"];
+        let normal_path_columns = ["org_id", "logs"];
         let org_id_normal = if normal_path_columns.len() > 1 && normal_path_columns[0].eq("v2") {
             normal_path_columns[1]
         } else {
