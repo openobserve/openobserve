@@ -449,4 +449,123 @@ mod tests {
         let work_groups = vec![None];
         assert_eq!(get_work_group(work_groups), None);
     }
+
+    #[test]
+    fn test_get_enable_align_histogram_from_request() {
+        // Test with "true" value
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("enable_align_histogram".to_string(), "true".to_string());
+        assert!(get_enable_align_histogram_from_request(&query));
+
+        // Test with "false" value
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("enable_align_histogram".to_string(), "false".to_string());
+        assert!(!get_enable_align_histogram_from_request(&query));
+
+        // Test with invalid boolean value (should default to false)
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("enable_align_histogram".to_string(), "invalid".to_string());
+        assert!(!get_enable_align_histogram_from_request(&query));
+
+        // Test with missing parameter (should default to false)
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert!(!get_enable_align_histogram_from_request(&query));
+    }
+
+    #[test]
+    fn test_get_ts_from_request_with_key() {
+        // Test with valid timestamp
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("start_time".to_string(), "1609459200".to_string());
+        assert_eq!(get_ts_from_request_with_key(&query, "start_time").unwrap(), 1609459200);
+
+        // Test with missing parameter
+        let query = Query::<HashMap<String, String>>(Default::default());
+        let result = get_ts_from_request_with_key(&query, "missing_key");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("missing_key parameter is missing"));
+
+        // Test with invalid timestamp format
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("invalid_ts".to_string(), "not_a_number".to_string());
+        let result = get_ts_from_request_with_key(&query, "invalid_ts");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("invalid_ts is not a valid timestamp"));
+
+        // Test with negative timestamp
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("negative_ts".to_string(), "-123456789".to_string());
+        assert_eq!(get_ts_from_request_with_key(&query, "negative_ts").unwrap(), -123456789);
+    }
+
+    #[test]
+    fn test_get_is_ui_histogram_from_request() {
+        // Test with "true" value
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("is_ui_histogram".to_string(), "true".to_string());
+        assert!(get_is_ui_histogram_from_request(&query));
+
+        // Test with "TRUE" value (case insensitive)
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("is_ui_histogram".to_string(), "TRUE".to_string());
+        assert!(get_is_ui_histogram_from_request(&query));
+
+        // Test with "false" value
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("is_ui_histogram".to_string(), "false".to_string());
+        assert!(!get_is_ui_histogram_from_request(&query));
+
+        // Test with invalid boolean value (should default to false)
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("is_ui_histogram".to_string(), "invalid".to_string());
+        assert!(!get_is_ui_histogram_from_request(&query));
+
+        // Test with missing parameter (should default to false)
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert!(!get_is_ui_histogram_from_request(&query));
+    }
+
+    #[test]
+    fn test_get_is_multi_stream_search_from_request() {
+        // Test with "true" value
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("is_multi_stream_search".to_string(), "true".to_string());
+        assert!(get_is_multi_stream_search_from_request(&query));
+
+        // Test with "TRUE" value (case insensitive)
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("is_multi_stream_search".to_string(), "TRUE".to_string());
+        assert!(get_is_multi_stream_search_from_request(&query));
+
+        // Test with "false" value
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("is_multi_stream_search".to_string(), "false".to_string());
+        assert!(!get_is_multi_stream_search_from_request(&query));
+
+        // Test with invalid boolean value (should default to false)
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("is_multi_stream_search".to_string(), "invalid".to_string());
+        assert!(!get_is_multi_stream_search_from_request(&query));
+
+        // Test with missing parameter (should default to false)
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert!(!get_is_multi_stream_search_from_request(&query));
+    }
+
+    #[test]
+    fn test_get_fallback_order_by_col_from_request_2() {
+        // Test with custom fallback column
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("fallback_order_by_col".to_string(), "custom_column".to_string());
+        assert_eq!(get_fallback_order_by_col_from_request(&query), Some("custom_column".to_string()));
+
+        // Test with missing parameter (should return None)
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert_eq!(get_fallback_order_by_col_from_request(&query), None);
+
+        // Test with empty string
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("fallback_order_by_col".to_string(), "".to_string());
+        assert_eq!(get_fallback_order_by_col_from_request(&query), Some("".to_string()));
+    }
 }
