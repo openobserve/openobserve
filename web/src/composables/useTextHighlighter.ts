@@ -123,15 +123,38 @@ export function useTextHighlighter() {
   /**
    * Escapes HTML characters in text for safe rendering
    * 
+   * Prevents XSS attacks by converting dangerous HTML characters into safe HTML entities.
+   * This ensures user content displays as literal text instead of executing as HTML markup.
+   * 
    * @param str - String to escape
-   * @returns HTML-safe string
+   * @returns HTML-safe string with entities escaped
+   * 
+   * @example
+   * // Input containing malicious HTML
+   * const userInput = '<script>alert("hack")</script>';
+   * const safeOutput = escapeHtml(userInput);
+   * // Output: '&lt;script&gt;alert("hack")&lt;/script&gt;'
+   * // Displays as: <script>alert("hack")</script> (visible text, not executed)
+   * 
+   * @example
+   * // Log data with HTML tags
+   * const logMessage = '<h1>Error: Database connection failed</h1>';
+   * const escapedLog = escapeHtml(logMessage);
+   * // Output: '&lt;h1&gt;Error: Database connection failed&lt;/h1&gt;'
+   * // Displays as: <h1>Error: Database connection failed</h1> (visible text)
+   * 
+   * @example
+   * // JSON data with quotes and ampersands
+   * const jsonData = '{"message": "Success & complete", "html": "<div>content</div>"}';
+   * const safeJson = escapeHtml(jsonData);
+   * // Output: '{&quot;message&quot;: &quot;Success &amp; complete&quot;, &quot;html&quot;: &quot;&lt;div&gt;content&lt;/div&gt;&quot;}'
    */
   function escapeHtml(str: string): string {
     return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+      .replace(/&/g, "&amp;")   // Must be first: & → &amp;
+      .replace(/</g, "&lt;")    // Less than: < → &lt;
+      .replace(/>/g, "&gt;")    // Greater than: > → &gt;
+      .replace(/"/g, "&quot;"); // Double quote: " → &quot;
   }
 
   /**
