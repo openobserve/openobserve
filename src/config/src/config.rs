@@ -1519,6 +1519,13 @@ pub struct CacheLatestFiles {
     pub cache_index: bool,
     #[env_config(name = "ZO_CACHE_LATEST_FILES_DELETE_MERGE_FILES", default = false)]
     pub delete_merge_files: bool,
+    #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_FROM_NODE", default = false)]
+    pub download_from_node: bool,
+    #[env_config(
+        name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_FROM_NODE_MAX_SIZE",
+        default = 250
+    )]
+    pub download_from_node_max_size: usize,
 }
 
 #[derive(EnvConfig)]
@@ -2560,12 +2567,12 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     if cfg.disk_cache.result_max_size == 0 {
-        cfg.disk_cache.result_max_size = cfg.disk_cache.max_size / 10; // 10% 
+        cfg.disk_cache.result_max_size = cfg.disk_cache.max_size / 10; // 10%
     } else {
         cfg.disk_cache.result_max_size *= 1024 * 1024;
     }
     if cfg.disk_cache.aggregation_max_size == 0 {
-        cfg.disk_cache.aggregation_max_size = cfg.disk_cache.max_size / 10; // 10% 
+        cfg.disk_cache.aggregation_max_size = cfg.disk_cache.max_size / 10; // 10%
     } else {
         cfg.disk_cache.aggregation_max_size *= 1024 * 1024;
     }
