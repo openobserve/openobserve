@@ -83,7 +83,7 @@ test.describe("Sanity Test Cases", () => {
     testLogger.info('Query editor test completed');
   });
 
-  // Pagination Tests
+  // Pagination Tests 
   test("should display result text and pagination", async ({ page }) => {
     testLogger.info('Testing pagination display');
     
@@ -97,7 +97,7 @@ test.describe("Sanity Test Cases", () => {
     await pm.sanityPage.toggleHistogramOffAndOn();
   });
 
-  // Saved Search Tests
+  // Saved Search tests
   test("should save search, favorite, click on saved search and then delete", async ({ page }) => {
     const randomSavedViewName = `streamslog${Math.random().toString(36).substring(2, 10)}`;
     await pm.sanityPage.createAndDeleteSavedSearch(randomSavedViewName);
