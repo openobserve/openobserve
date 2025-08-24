@@ -29,7 +29,7 @@ export class IamPage {
 
         this.updateButton = emailName => `//td[contains(text(),'${emailName}')]/following-sibling::td/button[@title='Update Service Account']`;
 
-        this.alertMessage = this.page.getByRole('alert').first();
+        // Removed deprecated alert reference - use specific alert verification in methods
 
 
     }
@@ -126,9 +126,11 @@ export class IamPage {
         // Wait for alert to appear and verify the message
         await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
         
-        // Get the alert message and verify it contains expected text
-        const alertLocator = this.page.getByRole('alert').first();
-        await expect(alertLocator).toContainText(expectedMessage, { timeout: 5000 });
+        // Find the alert that contains the expected message (instead of just checking the first one)
+        const specificAlert = this.page.getByRole('alert').filter({ hasText: expectedMessage });
+        
+        // Verify the specific alert with our expected message is visible
+        await expect(specificAlert).toBeVisible({ timeout: 5000 });
     }
 
     async validateServiceAccountToken() {

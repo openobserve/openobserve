@@ -7,11 +7,6 @@ test.describe.configure({ mode: 'parallel' });
 test.describe("Users and Organizations", () => {
     let pageManager;
 
-    const timestamp = Date.now(); 
-    const randomSuffix = Math.floor(Math.random() * 1000); 
-    const emailName = `email${timestamp}${randomSuffix}@gmail.com`;
-    const orgName = `Organ${timestamp}${randomSuffix}`;
-
     test("Error Message displayed if Email Blank", async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         
@@ -27,13 +22,14 @@ test.describe("Users and Organizations", () => {
     });
 
     test("Error Message displayed if Add user with missing role", async ({ page }, testInfo) => {
+        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
         testLogger.testStart(testInfo.title, testInfo.file);
         
         await navigateToBase(page);
         pageManager = new PageManager(page);
         
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.addUser(uniqueEmail);
         await pageManager.userPage.userCreate();
         await pageManager.userPage.verifySuccessMessage('Field is required');
         
@@ -41,13 +37,14 @@ test.describe("Users and Organizations", () => {
     });
 
     test("User created with password and first name and last name", async ({ page }, testInfo) => {
+        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
         testLogger.testStart(testInfo.title, testInfo.file);
         
         await navigateToBase(page);
         pageManager = new PageManager(page);
         
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.addUser(uniqueEmail);
         await pageManager.userPage.selectUserRole('Admin');
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.userCreate();
@@ -63,13 +60,14 @@ test.describe("Users and Organizations", () => {
     });
 
     test("User not created if Email already exists", async ({ page }, testInfo) => {
+        const duplicateEmail = `duplicate${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
         testLogger.testStart(testInfo.title, testInfo.file);
         
         await navigateToBase(page);
         pageManager = new PageManager(page);
         
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.addUser(duplicateEmail);
         await pageManager.userPage.selectUserRole('Admin');
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.userCreate();
@@ -81,7 +79,7 @@ test.describe("Users and Organizations", () => {
         await pageManager.userPage.verifySuccessMessage('User added successfully.');
         await page.waitForLoadState('networkidle');
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.addUser(duplicateEmail);
         await pageManager.userPage.selectUserRole('Admin');
         await pageManager.userPage.userCreate();   
         await pageManager.userPage.verifySuccessMessage('User is already part of the organization');
@@ -90,19 +88,20 @@ test.describe("Users and Organizations", () => {
     });
     
     test("User not created if Cancel clicked on first Add User Page", async ({ page }, testInfo) => {
+        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
         testLogger.testStart(testInfo.title, testInfo.file);
         
         await navigateToBase(page);
         pageManager = new PageManager(page);
         
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.addUser(uniqueEmail);
         await pageManager.userPage.selectUserRole('Admin');
         await page.waitForLoadState('domcontentloaded');
         await page.locator('[data-test="cancel-user-button"]').click();
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.searchUser(emailName);
+        await pageManager.userPage.searchUser(uniqueEmail);
         await pageManager.userPage.verifyUserNotExists();
         
         testLogger.info('Test completed successfully');
@@ -115,7 +114,8 @@ test.describe("Users and Organizations", () => {
         pageManager = new PageManager(page);
         
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.addUser(emailName);
+        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
+        await pageManager.userPage.addUser(uniqueEmail);
         await pageManager.userPage.selectUserRole('Admin');
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.userCreate();
@@ -126,20 +126,21 @@ test.describe("Users and Organizations", () => {
         await page.locator('[data-test="cancel-user-button"]').click();
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.searchUser(emailName);
+        await pageManager.userPage.searchUser(uniqueEmail);
         await pageManager.userPage.verifyUserNotExists();
         
         testLogger.info('Test completed successfully');
     });
 
     test("User Created and deleted", async ({ page }, testInfo) => {
+        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
         testLogger.testStart(testInfo.title, testInfo.file);
         
         await navigateToBase(page);
         pageManager = new PageManager(page);
         
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.addUser(uniqueEmail);
         await pageManager.userPage.selectUserRole('Admin');
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.userCreate();
@@ -152,20 +153,21 @@ test.describe("Users and Organizations", () => {
         await pageManager.userPage.verifySuccessMessage('User added successfully.');
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.deleteUser(emailName);
+        await pageManager.userPage.deleteUser(uniqueEmail);
         await pageManager.userPage.verifySuccessMessage('User deleted successfully.');
         
         testLogger.info('Test completed successfully');
     });
 
     test("User Created and not deleted if cancel clicked", async ({ page }, testInfo) => {
+        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
         testLogger.testStart(testInfo.title, testInfo.file);
         
         await navigateToBase(page);
         pageManager = new PageManager(page);
         
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.addUser(uniqueEmail);
         await pageManager.userPage.selectUserRole('Admin');
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.userCreate();
@@ -178,22 +180,23 @@ test.describe("Users and Organizations", () => {
         await pageManager.userPage.verifySuccessMessage('User added successfully.');
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.deleteUserCancel(emailName);
+        await pageManager.userPage.deleteUserCancel(uniqueEmail);
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.searchUser(emailName);
-        await pageManager.userPage.verifyUserExists(emailName);
+        await pageManager.userPage.searchUser(uniqueEmail);
+        await pageManager.userPage.verifyUserExists(uniqueEmail);
         
         testLogger.info('Test completed successfully');
     });
 
     test("User Created and updated First Name and Last Name", async ({ page }, testInfo) => {
+        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
         testLogger.testStart(testInfo.title, testInfo.file);
         
         await navigateToBase(page);
         pageManager = new PageManager(page);
         
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.addUser(uniqueEmail);
         await pageManager.userPage.selectUserRole('Admin');
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.userCreate();
@@ -206,7 +209,7 @@ test.describe("Users and Organizations", () => {
         await pageManager.userPage.verifySuccessMessage('User added successfully.');
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.editUser(emailName);
+        await pageManager.userPage.editUser(uniqueEmail);
         await pageManager.userPage.addUserFirstLast('c', 'd');
         await pageManager.userPage.userCreate();
         await pageManager.userPage.verifySuccessMessage('User updated successfully.');
@@ -215,13 +218,14 @@ test.describe("Users and Organizations", () => {
     });
 
     test("User Created and updated Password", async ({ page }, testInfo) => {
+        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
         testLogger.testStart(testInfo.title, testInfo.file);
         
         await navigateToBase(page);
         pageManager = new PageManager(page);
         
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.addUser(emailName);
+        await pageManager.userPage.addUser(uniqueEmail);
         await pageManager.userPage.selectUserRole('Admin');
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.userCreate();
@@ -234,7 +238,7 @@ test.describe("Users and Organizations", () => {
         await pageManager.userPage.verifySuccessMessage('User added successfully.');
         await page.waitForLoadState('domcontentloaded');
         await pageManager.userPage.gotoIamPage();
-        await pageManager.userPage.editUser(emailName);
+        await pageManager.userPage.editUser(uniqueEmail);
         await pageManager.userPage.addNewPassword('1234567890');
         await pageManager.userPage.userCreate();
         await pageManager.userPage.verifySuccessMessage('User updated successfully.');
@@ -243,6 +247,7 @@ test.describe("Users and Organizations", () => {
     });
 
     test('Add Organization Successfully', async ({ page }, testInfo) => {
+        const uniqueOrgName = `Org${Date.now()}_${Math.floor(Math.random() * 10000)}`;
         testLogger.testStart(testInfo.title, testInfo.file);
         
         await navigateToBase(page);
@@ -250,7 +255,7 @@ test.describe("Users and Organizations", () => {
         
         await pageManager.createOrgPage.navigateToOrg();
         await pageManager.createOrgPage.clickAddOrg();
-        await pageManager.createOrgPage.fillOrgName(orgName);
+        await pageManager.createOrgPage.fillOrgName(uniqueOrgName);
         await pageManager.createOrgPage.clickSaveOrg();
         await pageManager.userPage.verifySuccessMessage('Organization added successfully.');
         
@@ -272,6 +277,7 @@ test.describe("Users and Organizations", () => {
     });
 
     test('Organization not added if Cancel clicked', async ({ page }, testInfo) => {
+        const uniqueOrgName = `Org${Date.now()}_${Math.floor(Math.random() * 10000)}`;
         testLogger.testStart(testInfo.title, testInfo.file);
         
         await navigateToBase(page);
@@ -279,10 +285,10 @@ test.describe("Users and Organizations", () => {
         
         await pageManager.createOrgPage.navigateToOrg();
         await pageManager.createOrgPage.clickAddOrg();
-        await pageManager.createOrgPage.fillOrgName(orgName);
+        await pageManager.createOrgPage.fillOrgName(uniqueOrgName);
         await pageManager.createOrgPage.clickCancelButton();
         await pageManager.createOrgPage.navigateToOrg();
-        await pageManager.createOrgPage.searchOrg(orgName);
+        await pageManager.createOrgPage.searchOrg(uniqueOrgName);
         await pageManager.createOrgPage.verifyOrgNotExists(expect);
         
         testLogger.info('Test completed successfully');

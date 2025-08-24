@@ -261,7 +261,10 @@ export class ReportsPage {
     await this.page
       .locator(`[data-test="report-list-${reportName}-pause-start-report"]`)
       .click({ force: true });
-      await expect(this.page.getByRole('alert').first()).toContainText('Stopped report successfully.');
+      // Wait for alert and find specific message
+      await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
+      const stopAlert = this.page.getByRole('alert').filter({ hasText: 'Stopped report successfully.' });
+      await expect(stopAlert).toBeVisible({ timeout: 5000 });
   }
 
   async updateReport(reportName) {
@@ -277,7 +280,10 @@ export class ReportsPage {
       await this.page.locator('[data-test="add-report-step1-continue-btn"]').click({ force: true });
       await this.page.locator('[data-test="add-report-step2-continue-btn"]').click({ force: true });
       await this.page.locator('[data-test="add-report-save-btn"]').click({ force: true });
-      await expect(this.page.getByRole('alert').first()).toContainText('Report updated successfully.');
+      // Wait for alert and find specific message
+      await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
+      const updateAlert = this.page.getByRole('alert').filter({ hasText: 'Report updated successfully.' });
+      await expect(updateAlert).toBeVisible({ timeout: 5000 });
   }
 
   // async logedOut() {
