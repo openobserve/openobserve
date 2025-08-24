@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               self="top middle"
               class="organization-menu-o2"
             >
-              <q-list data-test="organization-menu-list" style="width: 250px">
+              <q-list data-test="organization-menu-list" style="width: 450px">
                 <q-item data-test="organization-menu-item" style="padding: 0">
                   <q-item-section data-test="organization-menu-item-section" class="column" style="padding: 0px">
                     <q-table
@@ -191,10 +191,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <q-item-section>
                               <q-item-label
                                   data-test="organization-menu-item-label-item-label"
-                                  class="tw-overflow-hidden tw-whitespace-nowrap tw-text-ellipsis tw-max-w-[230px]"
+                                  class="tw-overflow-hidden tw-whitespace-nowrap tw-text-ellipsis tw-max-w-[430px]"
                                 >
-                                  {{ props.row.label }}
-                                  <q-tooltip v-if="props.row.label.length > 35"  anchor="bottom middle" self="top start">
+                                  {{ props.row.label.length > 30 ? props.row.label.substring(0, 30) + '... | ' + props.row.identifier : props.row.label + ' | ' + props.row.identifier }}
+                                  <q-tooltip v-if="props.row.label.length > 30"  anchor="bottom middle" self="top start">
                                     {{ props.row.label }}
                                   </q-tooltip>
                                 </q-item-label>
