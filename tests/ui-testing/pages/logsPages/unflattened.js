@@ -48,7 +48,7 @@ class UnflattenedPage {
     }
 
     get o2IdText() {
-        return this.page.locator('[data-test="log-detail-json-content"] [data-test="log-expand-detail-key-_o2_id-text"]');
+        return this.page.locator('[data-test="log-detail-json-content"] [data-test="log-expand-detail-key-_o2_id"]');
     }
 
     get unflattenedTab() {
