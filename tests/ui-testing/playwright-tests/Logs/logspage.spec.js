@@ -204,6 +204,8 @@ test.describe("Logs Page testcases", () => {
   test("should click on VRL toggle and display the field, then disable toggle and make the VRL field disappear", {
     tag: ['@vrlToggle', '@all', '@logs']
   }, async ({ page }) => {
+    //here we should toggle vrl because currently it is off by default
+    await pageManager.logsPage.clickVrlToggle();
     await pageManager.logsPage.expectVrlFieldVisible();
     await pageManager.logsPage.clickVrlToggle();
     await pageManager.logsPage.expectFnEditorNotVisible();
