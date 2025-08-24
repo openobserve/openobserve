@@ -64,6 +64,26 @@ export const convertTableData = (
   const histogramFields: string[] = [];
 
   const overrideConfigs = panelSchema.config.override_config || [];
+  const colorConfigMap: Record<string, any> = {};
+  const unitConfigMap: Record<string, any> = {};
+  try {
+    // Build maps for both color and unit configs
+    overrideConfigs.forEach((o: any) => {
+      const alias = o?.field?.value;
+      const config = o?.config?.[0];
+
+      if (alias && config) {
+        if (config.type === "unique_value_color") {
+          const autoColor = config.autoColor;
+          colorConfigMap[alias] = { autoColor };
+        } else if (config.type === "unit") {
+          const unit = config.value?.unit;
+          const customUnit = config.value?.customUnit;
+          unitConfigMap[alias] = { unit, customUnit };
+        }
+      }
+    });
+  } catch (e) {}
 
   // use all response keys if tableDynamicColumns is true
   if (panelSchema?.config?.table_dynamic_columns == true) {
@@ -150,6 +170,10 @@ export const convertTableData = (
       obj["label"] = it.label;
       obj["align"] = !isNumber ? "left" : "right";
       obj["sortable"] = true;
+      // pass color mode info for renderer
+      if (colorConfigMap?.[it.alias]?.autoColor) {
+        obj["colorMode"] = "auto";
+      }
 
       obj["format"] = (val: any) => {
         // value mapping
@@ -181,14 +205,10 @@ export const convertTableData = (
           let unitToUse = null;
           let customUnitToUse = null;
 
-          if (overrideConfigs.length > 0) {
-            const overrideConfig = overrideConfigs.find(
-              (override: any) => override.field?.value === it.alias,
-            );
-            if (overrideConfig) {
-              unitToUse = overrideConfig.config[0].value.unit;
-              customUnitToUse = overrideConfig.config[0].value.customUnit;
-            }
+          // Check unit config map first
+          if (unitConfigMap[it.alias]) {
+            unitToUse = unitConfigMap[it.alias].unit;
+            customUnitToUse = unitConfigMap[it.alias].customUnit;
           }
 
           if (!unitToUse) {
@@ -324,6 +344,10 @@ export const convertTableData = (
         obj["label"] = it;
         obj["align"] = !isNumber ? "left" : "right";
         obj["sortable"] = true;
+        // pass color mode info for renderer
+        if (colorConfigMap?.[it]?.autoColor) {
+          obj["colorMode"] = "auto";
+        }
 
         obj["format"] = (val: any) => {
           // value mapping

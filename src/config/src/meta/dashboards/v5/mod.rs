@@ -399,12 +399,19 @@ pub struct Field {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Config {
-    #[serde(rename = "type")]
-    typee: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    value: Option<Value>,
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum Config {
+    #[serde(rename = "unit")]
+    Unit {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<Value>,
+    },
+    #[serde(rename = "unique_value_color")]
+    #[serde(rename_all = "camelCase")]
+    UniqueValueColor {
+        #[serde(default)]
+        auto_color: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
