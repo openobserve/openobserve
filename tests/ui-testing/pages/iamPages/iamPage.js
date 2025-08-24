@@ -78,7 +78,10 @@ export class IamPage {
 
         await this.page.getByRole('button', { name: 'Save' }).click();
 
-        await expect(this.page.getByRole('alert').nth(2)).toContainText('Please enter a valid email address');
+        // Wait for validation alert and verify it contains the expected message
+        await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
+        const alertLocator = this.page.getByRole('alert').filter({ hasText: 'Please enter a valid email address' });
+        await expect(alertLocator).toBeVisible({ timeout: 5000 });
 
 
     }
@@ -120,21 +123,12 @@ export class IamPage {
 
 
     async verifySuccessMessage(expectedMessage) {
-        // Wait for any loading messages to disappear first
-        await this.page.waitForTimeout(2000);
+        // Wait for alert to appear and verify the message
+        await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
         
-        // Look for the specific alert message we're expecting
-        const alertWithMessage = this.page.getByRole('alert').filter({ hasText: expectedMessage });
-        await expect(alertWithMessage).toBeVisible({ timeout: 10000 });
-        
-        // Alternative fallback: if specific alert not found, check any alert contains the message
-        try {
-            await expect(alertWithMessage).toContainText(expectedMessage, { timeout: 5000 });
-        } catch (error) {
-            // Fallback: check all alerts for the expected message
-            const allAlerts = this.page.getByRole('alert');
-            await expect(allAlerts.filter({ hasText: expectedMessage })).toBeVisible({ timeout: 5000 });
-        }
+        // Get the alert message and verify it contains expected text
+        const alertLocator = this.page.getByRole('alert').first();
+        await expect(alertLocator).toContainText(expectedMessage, { timeout: 5000 });
     }
 
     async validateServiceAccountToken() {

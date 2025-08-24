@@ -53,7 +53,11 @@ export class UserPage {
         // Click the edit button
         await this.page.locator(editButtonSelector).click();
         await this.page.goto(process.env["ZO_BASE_URL"] + "/web/iam/users?action=update&org_identifier=default&email=" + email);
-        await this.page.waitForTimeout(10000);
+        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.waitForLoadState('networkidle');
+        
+        // Wait for edit form elements to be available
+        await this.page.waitForSelector('[data-test="user-first-name-field"]', { state: 'visible', timeout: 15000 });
     }
     
 
@@ -69,9 +73,12 @@ export class UserPage {
     }
 
     async verifySuccessMessage(expectedMessage) {
-        await expect(this.page.locator('role=alert').first()).toBeVisible();
-        await expect(this.alertMessage).toContainText(expectedMessage);
-
+        // Wait for alert to appear and verify the message
+        await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
+        
+        // Get the alert message and verify it contains expected text
+        const alertLocator = this.page.getByRole('alert').first();
+        await expect(alertLocator).toContainText(expectedMessage, { timeout: 5000 });
     }
 
     async addUserFirstLast(firstName, lastName) {
