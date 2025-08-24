@@ -2067,6 +2067,12 @@ pub struct CuckooFilter {
         help = "building cuckoo filter index job interval, unit seconds, default 1 hour"
     )]
     pub build_index_interval: u64,
+    #[env_config(
+        name = "ZO_BUILD_INDEX_BATCH_SIZE",
+        default = 2000000,
+        help = "building cuckoo filter index batch size when using command"
+    )]
+    pub build_index_batch_size: usize,
 }
 
 pub fn init() -> Config {

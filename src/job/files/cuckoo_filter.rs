@@ -184,7 +184,6 @@ pub async fn start_hourly_job(manager: Arc<CuckooFilterManager>) -> Result<()> {
             orgs.len(),
             now.timestamp()
         );
-
         for org_id in &orgs {
             // Only process streams of type Traces and stream_name == "default"
             let streams = db::schema::list_streams_from_cache(org_id, StreamType::Traces).await;
@@ -232,7 +231,9 @@ pub async fn start_hourly_job(manager: Arc<CuckooFilterManager>) -> Result<()> {
 
                 for day_key in &day_keys_to_check {
                     let s3_prefix = format!("cuckoo_filters/{org_id}/{day_key}/");
-                    if let Ok(files) = storage::list("", &s3_prefix).await {
+                    if storage::head("", &s3_prefix).await.is_ok()
+                        && let Ok(files) = storage::list("", &s3_prefix).await
+                    {
                         for file in files {
                             if let Some(fname) = file.split('/').next_back() {
                                 // Only process hourly filter files
@@ -344,7 +345,7 @@ pub async fn build_cuckoo_filters_for_time_range(
             log::info!(
                 "[CUCKOO_FILTER_BUILD] Org {org_id}: No '{stream_name}' traces stream found, skipping",
             );
-            continue;
+            // continue;
         }
 
         log::info!(
@@ -388,7 +389,9 @@ pub async fn build_cuckoo_filters_for_time_range(
 
             for day_key in &day_keys_to_check {
                 let s3_prefix = format!("cuckoo_filters/{org_id}/{day_key}/");
-                if let Ok(files) = storage::list("", &s3_prefix).await {
+                if storage::head("", &s3_prefix).await.is_ok()
+                    && let Ok(files) = storage::list("", &s3_prefix).await
+                {
                     for file in files {
                         if let Some(fname) = file.split('/').next_back()
                             && fname.ends_with(".cuckoo")
@@ -451,7 +454,7 @@ pub async fn build_cuckoo_filters_for_time_range(
                 progress,
                 hour_key
             );
-            std::io::Write::flush(&mut std::io::stdout()).unwrap();
+            // std::io::Write::flush(&mut std::io::stdout()).unwrap();
 
             let day_key = &hour_key[..8];
             let job_state = CuckooFilterJobState {

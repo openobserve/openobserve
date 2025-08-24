@@ -726,7 +726,7 @@ impl CuckooFilterManager {
         log::info!("end building hour map");
 
         let mut filters = self.filters.lock().unwrap();
-        log::info!("start building hour map");
+        log::info!("start processing hour map");
         // Process hour-based filters
         let flush_mode = FlushMode::from_str(cfg.cuckoo_filter.flush_mode.as_str()).unwrap();
         for (hour_key, trace_ids) in hour_map {
@@ -767,7 +767,7 @@ impl CuckooFilterManager {
             for trace_id in &trace_ids {
                 // log::debug!("Inserting trace_id: {}", trace_id);
                 if let Err(e) = filter_instance.0.insert(trace_id) {
-                    log::error!("Failed to insert trace id: {}", e);
+                    log::error!("Failed to insert trace id: {}, filter_key: {filter_key}", e);
                 }
             }
             log::info!(
@@ -1035,15 +1035,22 @@ impl CuckooFilterManager {
             );
             return Ok(());
         }
+        log::info!("[CUCKOO_FILTER_JOB] Found {} files", files.len());
 
         let mut parquet_paths = Vec::new();
         for file in &files {
-            let _ = file_data::disk::download(
-                &file.account,
-                &file.key,
-                Some(file.meta.compressed_size as usize),
-            )
-            .await;
+            // Check if file already exists locally before downloading
+            if !file_data::disk::exist(&file.key).await {
+                let _ = file_data::disk::download(
+                    &file.account,
+                    &file.key,
+                    Some(file.meta.compressed_size as usize),
+                )
+                .await;
+            } else {
+                log::debug!("File already exists locally, skipping download: {}", file.key);
+            }
+            
             if let Some(path) = file_data::disk::get_file_path(&file.key) {
                 parquet_paths.push(path);
             }
@@ -1062,7 +1069,7 @@ impl CuckooFilterManager {
             Field::new("trace_id", DataType::Utf8, false),
         ]));
         let parquet_batch_size = 10;
-        let trace_id_batch_size = 500000; // Reduce batch size to lower memory pressure
+        let trace_id_batch_size = config::get_config().cuckoo_filter.build_index_batch_size; // Reduce batch size to lower memory pressure
         let mut batch_trace_items = Vec::with_capacity(trace_id_batch_size);
         let mut total_processed = 0;
 
@@ -1071,6 +1078,7 @@ impl CuckooFilterManager {
         let seen_cleanup_threshold = trace_id_batch_size * 10; // Periodically clear 'seen' to prevent infinite memory growth
 
         use arrow::array::{Int64Array, StringArray};
+        log::info!("[CUCKOO_FILTER_JOB] Start processing, parquet_paths len: {}", parquet_paths.len());
         for chunk in parquet_paths.chunks(parquet_batch_size) {
             let ctx = SessionContext::new();
             for (i, path) in chunk.iter().enumerate() {
@@ -1087,6 +1095,7 @@ impl CuckooFilterManager {
                 .collect::<Vec<_>>()
                 .join(" UNION ALL ");
             let sql = format!("SELECT DISTINCT trace_id, _timestamp FROM ( {union_sql} )",);
+            log::info!("UNION ALL SQL : {sql}");
             let df = ctx.sql(&sql).await?;
             let batches = df.collect().await?;
             for batch in batches {
@@ -1111,7 +1120,7 @@ impl CuckooFilterManager {
                         batch_trace_items.push(TraceListItem {
                             trace_id,
                             _timestamp: ts,
-                            stream_name: "trace_list_index".to_string(),
+                            stream_name: crate::service::metadata::trace_list_index::STREAM_NAME.to_string(),
                             service_name: "".to_string(),
                         });
 
@@ -1207,6 +1216,7 @@ impl CuckooFilterManager {
         );
         if let Ok(data) = std::fs::read(&hour_file) {
             let s3_key = format!("cuckoo_filters/{org_id}/{day_key}/{hour_key}.cuckoo");
+            log::info!("[CUCKOO_FILTER_JOB] Start Uploading hour filter: {s3_key}");
             storage::put("", &s3_key, data.into()).await?;
             log::info!("[CUCKOO_FILTER_JOB] Uploaded hour filter: {s3_key}");
         }
@@ -1233,8 +1243,7 @@ impl CuckooFilterManager {
         let hour_s3_key = format!("cuckoo_filters/{org_id}/{day_key}/{hour_key}.cuckoo");
         // Check if exists in S3
         log::debug!("check {hour_s3_key} if exists in S3");
-        if let Ok(list) = (storage::list("", &hour_s3_key).await)
-            && list.is_empty()
+        if storage::head("", &hour_s3_key).await.is_err()
         {
             log::debug!("{hour_s3_key} is not present in storage, continue");
             return Ok(());
