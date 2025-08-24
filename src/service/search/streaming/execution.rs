@@ -886,6 +886,8 @@ mod tests {
             None,
             "test-org",
             "test-stream",
+            StreamType::Logs,
+            &config::meta::search::Request::default(),
         )
         .await;
 
@@ -923,6 +925,8 @@ mod tests {
             None,
             "test-org",
             "test-stream",
+            StreamType::Logs,
+            &config::meta::search::Request::default(),
         )
         .await;
 
@@ -959,6 +963,8 @@ mod tests {
             None,
             "test-org",
             "test-stream",
+            StreamType::Logs,
+            &config::meta::search::Request::default(),
         )
         .await;
 
