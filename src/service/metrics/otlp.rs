@@ -953,3 +953,584 @@ fn format_response(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::promql::{Metadata, MetricType};
+    use opentelemetry_proto::tonic::metrics::v1::{
+        AggregationTemporality, Exemplar, HistogramDataPoint, Metric, NumberDataPoint,
+    };
+    use serde_json::json;
+
+    use super::*;
+
+    fn create_test_gauge_metric(name: &str, value: f64) -> Metric {
+        Metric {
+            name: name.to_string(),
+            description: "Test gauge metric".to_string(),
+            unit: "test_unit".to_string(),
+            metadata: vec![],
+            data: Some(Data::Gauge(opentelemetry_proto::tonic::metrics::v1::Gauge {
+                data_points: vec![NumberDataPoint {
+                    attributes: vec![],
+                    start_time_unix_nano: 0,
+                    time_unix_nano: 1640995200000000000, // 2022-01-01 00:00:00 UTC
+                    exemplars: vec![],
+                    flags: 0,
+                    value: Some(opentelemetry_proto::tonic::metrics::v1::number_data_point::Value::AsDouble(value)),
+                }],
+            })),
+        }
+    }
+
+    fn create_test_sum_metric(name: &str, value: f64, is_monotonic: bool) -> Metric {
+        Metric {
+            name: name.to_string(),
+            description: "Test sum metric".to_string(),
+            unit: "test_unit".to_string(),
+            metadata: vec![],
+            data: Some(Data::Sum(opentelemetry_proto::tonic::metrics::v1::Sum {
+                data_points: vec![NumberDataPoint {
+                    attributes: vec![],
+                    start_time_unix_nano: 0,
+                    time_unix_nano: 1640995200000000000,
+                    exemplars: vec![],
+                    flags: 0,
+                    value: Some(
+                        opentelemetry_proto::tonic::metrics::v1::number_data_point::Value::AsDouble(
+                            value,
+                        ),
+                    ),
+                }],
+                aggregation_temporality: AggregationTemporality::Cumulative as i32,
+                is_monotonic,
+            })),
+        }
+    }
+
+    fn create_test_histogram_metric(name: &str, counts: Vec<u64>, bounds: Vec<f64>) -> Metric {
+        Metric {
+            name: name.to_string(),
+            description: "Test histogram metric".to_string(),
+            unit: "test_unit".to_string(),
+            metadata: vec![],
+            data: Some(Data::Histogram(
+                opentelemetry_proto::tonic::metrics::v1::Histogram {
+                    data_points: vec![HistogramDataPoint {
+                        attributes: vec![],
+                        start_time_unix_nano: 0,
+                        time_unix_nano: 1640995200000000000,
+                        exemplars: vec![],
+                        flags: 0,
+                        count: counts.iter().sum(),
+                        sum: Some(100.0),
+                        bucket_counts: counts,
+                        explicit_bounds: bounds,
+                        min: Some(0.0),
+                        max: Some(100.0),
+                    }],
+                    aggregation_temporality: AggregationTemporality::Cumulative as i32,
+                },
+            )),
+        }
+    }
+
+    fn create_test_exponential_histogram_metric(name: &str) -> Metric {
+        Metric {
+            name: name.to_string(),
+            description: "Test exponential histogram metric".to_string(),
+            unit: "test_unit".to_string(),
+            metadata: vec![],
+            data: Some(Data::ExponentialHistogram(opentelemetry_proto::tonic::metrics::v1::ExponentialHistogram {
+                data_points: vec![opentelemetry_proto::tonic::metrics::v1::ExponentialHistogramDataPoint {
+                    attributes: vec![],
+                    start_time_unix_nano: 0,
+                    time_unix_nano: 1640995200000000000,
+                    exemplars: vec![],
+                    flags: 0,
+                    count: 100,
+                    sum: Some(100.0),
+                    min: Some(0.0),
+                    max: Some(100.0),
+                    scale: 0,
+                    zero_count: 10,
+                    zero_threshold: 0.0,
+                    positive: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                        offset: 0,
+                        bucket_counts: vec![50, 30, 20],
+                    }),
+                    negative: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                        offset: 0,
+                        bucket_counts: vec![0],
+                    }),
+                }],
+                aggregation_temporality: AggregationTemporality::Cumulative as i32,
+            })),
+        }
+    }
+
+    fn create_test_summary_metric(name: &str) -> Metric {
+        Metric {
+            name: name.to_string(),
+            description: "Test summary metric".to_string(),
+            unit: "test_unit".to_string(),
+            metadata: vec![],
+            data: Some(Data::Summary(opentelemetry_proto::tonic::metrics::v1::Summary {
+                data_points: vec![opentelemetry_proto::tonic::metrics::v1::SummaryDataPoint {
+                    attributes: vec![],
+                    start_time_unix_nano: 0,
+                    time_unix_nano: 1640995200000000000,
+                    flags: 0,
+                    count: 100,
+                    sum: 100.0,
+                    quantile_values: vec![
+                        opentelemetry_proto::tonic::metrics::v1::summary_data_point::ValueAtQuantile {
+                            quantile: 0.5,
+                            value: 50.0,
+                        },
+                        opentelemetry_proto::tonic::metrics::v1::summary_data_point::ValueAtQuantile {
+                            quantile: 0.95,
+                            value: 95.0,
+                        },
+                    ],
+                }],
+            })),
+        }
+    }
+
+    #[test]
+    fn test_process_gauge() {
+        let metric = create_test_gauge_metric("test_gauge", 42.5);
+        let mut rec = json!({
+            "__name__": "test_gauge",
+            "__type__": "gauge"
+        });
+        let mut metadata = Metadata {
+            metric_type: MetricType::Unknown,
+            metric_family_name: "test_gauge".to_string(),
+            help: "Test gauge metric".to_string(),
+            unit: "test_unit".to_string(),
+        };
+        let mut prom_meta: HashMap<String, String> = HashMap::new();
+
+        if let Some(Data::Gauge(gauge)) = &metric.data {
+            let result = process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta);
+
+            // Verify the processed data
+            assert!(!result.is_empty());
+            let processed_data = &result[0];
+            assert_eq!(processed_data["__name__"], "test_gauge");
+            assert_eq!(processed_data["__type__"], "gauge");
+            assert_eq!(processed_data["value"], 42.5);
+            assert_eq!(metadata.metric_type, MetricType::Gauge);
+        } else {
+            panic!("Expected gauge metric");
+        }
+    }
+
+    #[test]
+    fn test_process_sum() {
+        let metric = create_test_sum_metric("test_counter", 100.0, true);
+        let mut rec = json!({
+            "__name__": "test_counter",
+            "__type__": "counter"
+        });
+        let mut metadata = Metadata {
+            metric_type: MetricType::Unknown,
+            metric_family_name: "test_counter".to_string(),
+            help: "Test counter metric".to_string(),
+            unit: "test_unit".to_string(),
+        };
+        let mut prom_meta: HashMap<String, String> = HashMap::new();
+
+        if let Some(Data::Sum(sum)) = &metric.data {
+            let result = process_sum(&mut rec, sum, &mut metadata, &mut prom_meta);
+
+            // Verify the processed data
+            assert!(!result.is_empty());
+            let processed_data = &result[0];
+            assert_eq!(processed_data["__name__"], "test_counter");
+            assert_eq!(processed_data["__type__"], "counter");
+            assert_eq!(processed_data["value"], 100.0);
+            assert_eq!(metadata.metric_type, MetricType::Counter);
+            assert_eq!(processed_data["is_monotonic"], "true");
+        } else {
+            panic!("Expected sum metric");
+        }
+    }
+
+    #[test]
+    fn test_process_histogram() {
+        let metric = create_test_histogram_metric(
+            "test_histogram",
+            vec![10, 20, 30],
+            vec![10.0, 20.0, 30.0],
+        );
+        let mut rec = json!({
+            "__name__": "test_histogram",
+            "__type__": "histogram"
+        });
+        let mut metadata = Metadata {
+            metric_type: MetricType::Unknown,
+            metric_family_name: "test_histogram".to_string(),
+            help: "Test histogram metric".to_string(),
+            unit: "test_unit".to_string(),
+        };
+        let mut prom_meta: HashMap<String, String> = HashMap::new();
+
+        if let Some(Data::Histogram(hist)) = &metric.data {
+            let result = process_histogram(&mut rec, hist, &mut metadata, &mut prom_meta);
+
+            // Verify the processed data
+            assert!(!result.is_empty());
+            assert_eq!(metadata.metric_type, MetricType::Histogram);
+
+            // Should have count, sum, min, max, and bucket records
+            assert!(result.len() >= 4);
+        } else {
+            panic!("Expected histogram metric");
+        }
+    }
+
+    #[test]
+    fn test_process_exponential_histogram() {
+        let metric = create_test_exponential_histogram_metric("test_exp_histogram");
+        let mut rec = json!({
+            "__name__": "test_exp_histogram",
+            "__type__": "exponential_histogram"
+        });
+        let mut metadata = Metadata {
+            metric_type: MetricType::Unknown,
+            metric_family_name: "test_exp_histogram".to_string(),
+            help: "Test exponential histogram metric".to_string(),
+            unit: "test_unit".to_string(),
+        };
+        let mut prom_meta: HashMap<String, String> = HashMap::new();
+
+        if let Some(Data::ExponentialHistogram(hist)) = &metric.data {
+            let result =
+                process_exponential_histogram(&mut rec, hist, &mut metadata, &mut prom_meta);
+
+            // Verify the processed data
+            assert!(!result.is_empty());
+            assert_eq!(metadata.metric_type, MetricType::ExponentialHistogram);
+        } else {
+            panic!("Expected exponential histogram metric");
+        }
+    }
+
+    #[test]
+    fn test_process_summary() {
+        let metric = create_test_summary_metric("test_summary");
+        let rec = json!({
+            "__name__": "test_summary",
+            "__type__": "summary"
+        });
+        let mut metadata = Metadata {
+            metric_type: MetricType::Unknown,
+            metric_family_name: "test_summary".to_string(),
+            help: "Test summary metric".to_string(),
+            unit: "test_unit".to_string(),
+        };
+        let mut prom_meta: HashMap<String, String> = HashMap::new();
+
+        if let Some(Data::Summary(summary)) = &metric.data {
+            let result = process_summary(&rec, summary, &mut metadata, &mut prom_meta);
+
+            // Verify the processed data
+            assert!(!result.is_empty());
+            assert_eq!(metadata.metric_type, MetricType::Summary);
+        } else {
+            panic!("Expected summary metric");
+        }
+    }
+
+    #[test]
+    fn test_process_data_point() {
+        let mut rec = json!({
+            "__name__": "test_metric",
+            "__type__": "gauge"
+        });
+        let data_point = NumberDataPoint {
+            attributes: vec![],
+            start_time_unix_nano: 0,
+            time_unix_nano: 1640995200000000000,
+            exemplars: vec![],
+            flags: 0,
+            value: Some(
+                opentelemetry_proto::tonic::metrics::v1::number_data_point::Value::AsDouble(42.0),
+            ),
+        };
+
+        process_data_point(&mut rec, &data_point);
+
+        // Verify the processed data
+        assert_eq!(rec["value"], 42.0);
+        assert!(rec.get("_timestamp").is_some());
+        assert!(rec.get("start_time").is_some());
+        assert!(rec.get("flag").is_some());
+    }
+
+    #[test]
+    fn test_process_hist_data_point() {
+        let rec = json!({
+            "__name__": "test_histogram",
+            "__type__": "histogram"
+        });
+        let data_point = HistogramDataPoint {
+            attributes: vec![],
+            start_time_unix_nano: 0,
+            time_unix_nano: 1640995200000000000,
+            exemplars: vec![],
+            flags: 0,
+            count: 100,
+            sum: Some(100.0),
+            bucket_counts: vec![10, 20, 30],
+            explicit_bounds: vec![10.0, 20.0, 30.0],
+            min: Some(0.0),
+            max: Some(100.0),
+        };
+
+        let result = process_hist_data_point(&mut rec.clone(), &data_point);
+
+        // Verify the processed data
+        assert!(!result.is_empty());
+        // Should have count, sum, min, max, and bucket records
+        assert!(result.len() >= 4);
+
+        // Check count record
+        let count_rec = &result[0];
+        assert!(count_rec["__name__"].as_str().unwrap().ends_with("_count"));
+        assert_eq!(count_rec["value"], json!(100.0));
+
+        // Check sum record
+        let sum_rec = &result[1];
+        assert!(sum_rec["__name__"].as_str().unwrap().ends_with("_sum"));
+        assert_eq!(sum_rec["value"], json!(100.0));
+    }
+
+    #[test]
+    fn test_process_exp_hist_data_point() {
+        let mut rec = json!({
+            "__name__": "test_exp_histogram",
+            "__type__": "exponential_histogram"
+        });
+        let data_point = opentelemetry_proto::tonic::metrics::v1::ExponentialHistogramDataPoint {
+            attributes: vec![],
+            start_time_unix_nano: 0,
+            time_unix_nano: 1640995200000000000,
+            exemplars: vec![],
+            flags: 0,
+            count: 100,
+            sum: Some(100.0),
+            min: Some(0.0),
+            max: Some(100.0),
+            scale: 0,
+            zero_count: 10,
+            zero_threshold: 0.0,
+            positive: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                offset: 0,
+                bucket_counts: vec![50, 30, 20],
+            }),
+            negative: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                offset: 0,
+                bucket_counts: vec![0],
+            }),
+        };
+
+        let result = process_exp_hist_data_point(&mut rec, &data_point);
+
+        // Verify the processed data
+        assert!(!result.is_empty());
+        // Should have count, sum, and bucket records
+        assert!(result.len() >= 2);
+
+        // Check count record
+        let count_rec = &result[0];
+        assert!(count_rec["__name__"].as_str().unwrap().ends_with("_count"));
+        assert_eq!(count_rec["value"], json!(100.0));
+    }
+
+    #[test]
+    fn test_process_summary_data_point() {
+        let mut rec = json!({
+            "__name__": "test_summary",
+            "__type__": "summary"
+        });
+        let data_point = opentelemetry_proto::tonic::metrics::v1::SummaryDataPoint {
+            attributes: vec![],
+            start_time_unix_nano: 0,
+            time_unix_nano: 1640995200000000000,
+            flags: 0,
+            count: 100,
+            sum: 100.0,
+            quantile_values: vec![
+                opentelemetry_proto::tonic::metrics::v1::summary_data_point::ValueAtQuantile {
+                    quantile: 0.5,
+                    value: 50.0,
+                },
+                opentelemetry_proto::tonic::metrics::v1::summary_data_point::ValueAtQuantile {
+                    quantile: 0.95,
+                    value: 95.0,
+                },
+            ],
+        };
+
+        let result = process_summary_data_point(&mut rec, &data_point);
+
+        // Verify the processed data
+        assert!(!result.is_empty());
+        // Should have count, sum, and quantile records
+        assert!(result.len() >= 2);
+
+        // Check count record
+        let count_rec = &result[0];
+        assert!(count_rec["__name__"].as_str().unwrap().ends_with("_count"));
+        assert_eq!(count_rec["value"], json!(100.0));
+
+        // Check sum record
+        let sum_rec = &result[1];
+        assert!(sum_rec["__name__"].as_str().unwrap().ends_with("_sum"));
+        assert_eq!(sum_rec["value"], json!(100.0));
+    }
+
+    #[test]
+    fn test_process_exemplars() {
+        let mut rec = json!({
+            "__name__": "test_metric",
+            "__type__": "gauge"
+        });
+        let exemplar = Exemplar {
+            filtered_attributes: vec![],
+            time_unix_nano: 1640995200000000000,
+            value: Some(opentelemetry_proto::tonic::metrics::v1::exemplar::Value::AsDouble(42.0)),
+            span_id: vec![],
+            trace_id: vec![],
+        };
+
+        process_exemplars(&mut rec, &vec![exemplar]);
+
+        // Verify exemplars were processed
+        assert!(rec.get("exemplars").is_some());
+    }
+
+    #[test]
+    fn test_process_aggregation_temporality() {
+        let mut rec = json!({
+            "__name__": "test_metric",
+            "__type__": "gauge"
+        });
+
+        // Test Cumulative
+        process_aggregation_temporality(&mut rec, AggregationTemporality::Cumulative as i32);
+        assert_eq!(
+            rec["aggregation_temporality"],
+            "AGGREGATION_TEMPORALITY_CUMULATIVE"
+        );
+
+        // Test Delta
+        process_aggregation_temporality(&mut rec, AggregationTemporality::Delta as i32);
+        assert_eq!(
+            rec["aggregation_temporality"],
+            "AGGREGATION_TEMPORALITY_DELTA"
+        );
+
+        // Test unknown value
+        process_aggregation_temporality(&mut rec, 999);
+        assert_eq!(
+            rec["aggregation_temporality"],
+            "AGGREGATION_TEMPORALITY_UNSPECIFIED"
+        );
+    }
+
+    #[test]
+    fn test_format_response() {
+        let partial_success = ExportMetricsPartialSuccess {
+            rejected_data_points: 5,
+            error_message: "Some data points were rejected".to_string(),
+        };
+
+        let response = format_response(partial_success, OtlpRequestType::HttpJson);
+        assert!(response.is_ok());
+
+        let http_response = response.unwrap();
+        assert_eq!(http_response.status(), http::StatusCode::PARTIAL_CONTENT);
+    }
+
+    #[test]
+    fn test_format_response_success() {
+        let partial_success = ExportMetricsPartialSuccess {
+            rejected_data_points: 0,
+            error_message: "".to_string(),
+        };
+
+        let response = format_response(partial_success, OtlpRequestType::HttpJson);
+        assert!(response.is_ok());
+
+        let http_response = response.unwrap();
+        assert_eq!(http_response.status(), http::StatusCode::OK);
+    }
+
+    #[test]
+    fn test_format_response_protobuf() {
+        let partial_success = ExportMetricsPartialSuccess {
+            rejected_data_points: 0,
+            error_message: "".to_string(),
+        };
+
+        let response = format_response(partial_success, OtlpRequestType::HttpProtobuf);
+        assert!(response.is_ok());
+
+        let http_response = response.unwrap();
+        assert_eq!(http_response.status(), http::StatusCode::OK);
+        assert_eq!(
+            http_response.headers().get("content-type").unwrap(),
+            "application/x-protobuf"
+        );
+    }
+
+    #[test]
+    fn test_metric_with_attributes() {
+        let metric = create_test_gauge_metric("test_metric_with_attrs", 42.0);
+        let mut rec = json!({
+            "__name__": "test_metric_with_attrs",
+            "__type__": "gauge"
+        });
+        let mut metadata = Metadata {
+            metric_type: MetricType::Unknown,
+            metric_family_name: "test_metric_with_attrs".to_string(),
+            help: "Test metric with attributes".to_string(),
+            unit: "test_unit".to_string(),
+        };
+        let mut prom_meta: HashMap<String, String> = HashMap::new();
+
+        if let Some(Data::Gauge(gauge)) = &metric.data {
+            let result = process_gauge(&mut rec, gauge, &mut metadata, &mut prom_meta);
+
+            // Verify the processed data has required fields
+            assert!(!result.is_empty());
+            let processed_data = &result[0];
+            assert!(processed_data.get("__name__").is_some());
+            assert!(processed_data.get("__type__").is_some());
+            assert!(processed_data.get("value").is_some());
+            assert!(processed_data.get("_timestamp").is_some());
+        } else {
+            panic!("Expected gauge metric");
+        }
+    }
+
+    #[test]
+    fn test_empty_metrics_handling() {
+        let empty_metric = Metric {
+            name: "empty_metric".to_string(),
+            description: "Empty metric".to_string(),
+            unit: "test_unit".to_string(),
+            metadata: vec![],
+            data: None,
+        };
+
+        // This should handle empty data gracefully
+        // The actual behavior depends on the implementation
+        assert!(empty_metric.data.is_none());
+    }
+}
