@@ -879,10 +879,15 @@ export default defineComponent({
         show_histogram: "false",
         type: "search_scheduler",
       };
-
+      //here if we have function then we are adding fn_editor flag as true because it will open the function editor by default
+      //else we are adding fn_editor flag as false because it will close the function editor by default
       if (row.hasOwnProperty("function") && row.function) {
         const functionContent = b64EncodeUnicode(row.function);
         queryObject["functionContent"] = functionContent;
+        queryObject["fn_editor"] = "true";
+      }
+      else{
+        queryObject["fn_editor"] = "false";
       }
 
       $q.notify({

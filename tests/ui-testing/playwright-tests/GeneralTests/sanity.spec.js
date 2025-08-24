@@ -261,6 +261,8 @@ test.describe("Sanity testcases", () => {
       .locator('[data-test="logs-search-bar-function-dropdown"] button')
       .filter({ hasText: "save" })
       .click();
+      //before we click on fn editor we need to turn on the function editor if is toggled off
+    await page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').first().click();
     await page
       .locator('#fnEditor').getByRole('textbox')
       .click();
