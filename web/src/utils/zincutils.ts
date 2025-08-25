@@ -501,6 +501,10 @@ export const addCommasToNumber = (number: number) => {
  * @param us : Time in microseconds
  */
 export const formatTimeWithSuffix = (us: number) => {
+  if(!us || us === 0) {
+    return "0us";
+  }
+  
   if (us >= 1000 * 1000) {
     return `${(us / 1000 / 1000).toFixed(2)}s`;
   }

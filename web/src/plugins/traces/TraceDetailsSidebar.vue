@@ -18,11 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="flex justify-start items-center q-px-sm header_bg border border-bottom border-top"
     :style="{ height: '30px' }"
+    data-test="trace-details-sidebar-header"
   >
     <div
       :title="span.operation_name"
       :style="{ width: 'calc(100% - 22px)' }"
       class="q-pb-none ellipsis flex justify-between"
+      data-test="trace-details-sidebar-header-operation-name"
     >
       {{ span.operation_name }}
     </div>
@@ -33,23 +35,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="align-right no-border q-pa-xs"
       size="xs"
       @click="closeSidebar"
+      data-test="trace-details-sidebar-header-close-btn"
     ></q-btn>
   </div>
   <div
     class="q-pb-sm q-pt-xs flex flex-wrap justify-between trace-details-toolbar-container"
+    data-test="trace-details-sidebar-header-toolbar"
   >
     <div class="flex flex-wrap">
       <div
         class="q-px-sm ellipsis non-selectable"
         :title="span.service_name"
         style="border-right: 1px solid #cccccc; font-size: 14px"
+        data-test="trace-details-sidebar-header-toolbar-service"
       >
-        <span class="text-grey-7">Service: </span> {{ span.service_name }}
+        <span class="text-grey-7">Service: </span>
+        <span data-test="trace-details-sidebar-header-toolbar-service-name">{{
+          span.service_name
+        }}</span>
       </div>
       <div
         class="q-px-sm ellipsis non-selectable"
         :title="getDuration"
         style="border-right: 1px solid #cccccc; font-size: 14px"
+        data-test="trace-details-sidebar-header-toolbar-duration"
       >
         <span class="text-grey-7">Duration: </span>
         <span>{{ getDuration }}</span>
@@ -59,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-px-sm ellipsis non-selectable"
         :title="getStartTime"
         style="font-size: 14px"
+        data-test="trace-details-sidebar-header-toolbar-start-time"
       >
         <span class="text-grey-7">Start Time: </span>
         <span>{{ getStartTime }}</span>
@@ -67,14 +77,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex">
       <div class="text-right flex items-center justify-end q-mr-sm">
-        <span class="text-grey-7 q-mr-xs">Span Id: </span
-        ><span class="">{{ span.span_id }}</span>
+        <div
+          class="flex items-center justify-end"
+          data-test="trace-details-sidebar-header-toolbar-span-id"
+        >
+          <span class="text-grey-7 q-mr-xs">Span ID: </span
+          ><span class="">{{ span.span_id }}</span>
+        </div>
         <q-icon
           class="q-ml-xs text-grey-8 cursor-pointer trace-copy-icon"
           size="12px"
           name="content_copy"
           title="Copy"
           @click="copySpanId"
+          data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
         />
       </div>
 
@@ -87,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         no-caps
         :title="t('traces.viewLogs')"
         @click.stop="viewSpanLogs"
+        data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
       >
         View Logs</q-btn
       >
@@ -97,66 +114,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     dense
     inline-label
     class="text-bold q-mx-sm span_details_tabs"
+    data-test="trace-details-sidebar-tabs"
   >
     <q-tab
       name="tags"
       :label="t('common.tags')"
       style="text-transform: capitalize"
+      data-test="trace-details-sidebar-tabs-tags"
     />
     <q-tab
       name="process"
       :label="t('common.process')"
       style="text-transform: capitalize"
+      data-test="trace-details-sidebar-tabs-process"
     />
     <q-tab
       name="events"
       :label="t('common.events')"
       style="text-transform: capitalize"
+      data-test="trace-details-sidebar-tabs-events"
     />
     <q-tab
       name="exceptions"
       :label="t('common.exceptions')"
       style="text-transform: capitalize"
+      data-test="trace-details-sidebar-tabs-exceptions"
     />
     <q-tab
       name="links"
       :label="t('common.links')"
       style="text-transform: capitalize"
+      data-test="trace-details-sidebar-tabs-links"
     />
     <q-tab
       name="attributes"
       :label="t('common.attributes')"
       style="text-transform: capitalize"
+      data-test="trace-details-sidebar-tabs-attributes"
     />
   </q-tabs>
   <q-separator style="width: 100%" />
   <q-tab-panels v-model="activeTab" class="span_details_tab-panels">
     <q-tab-panel name="tags">
-      <table class="q-my-sm">
+      <table class="q-my-sm" data-test="trace-details-sidebar-tags-table">
         <tbody>
           <template v-for="(val, key) in tags" :key="key">
-            <tr>
-              <td
-                class="q-py-xs q-px-sm"
-                :class="
-                  store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'
-                "
-              >
-                {{ key }} 
-              </td>
-              <td class="q-py-xs q-px-sm">
-                <span v-html="highlightSearch(String(val))"></span> 
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-    </q-tab-panel>
-    <q-tab-panel name="process">
-      <table class="q-my-sm">
-        <tbody>
-          <template v-for="(val, key) in processes" :key="key">
-            <tr>
+            <tr :data-test="`trace-details-sidebar-tags-${key}`">
               <td
                 class="q-py-xs q-px-sm"
                 :class="
@@ -166,7 +169,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ key }}
               </td>
               <td class="q-py-xs q-px-sm">
-                <span v-html="highlightSearch(val)"></span> 
+                <span v-html="highlightSearch(String(val))"></span>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </q-tab-panel>
+    <q-tab-panel name="process">
+      <table class="q-my-sm" data-test="trace-details-sidebar-process-table">
+        <tbody>
+          <template v-for="(val, key) in processes" :key="key">
+            <tr :data-test="`trace-details-sidebar-process-${key}`">
+              <td
+                class="q-py-xs q-px-sm"
+                :class="
+                  store.state.theme === 'dark' ? 'text-red-5' : 'text-red-10'
+                "
+              >
+                {{ key }}
+              </td>
+              <td class="q-py-xs q-px-sm">
+                <span v-html="highlightSearch(val)"></span>
               </td>
             </tr>
           </template>
@@ -174,14 +198,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </table>
     </q-tab-panel>
     <q-tab-panel name="attributes">
-      <pre class="attr-text" v-html="highlightedAttributes(spanDetails.attrs)"></pre>
+      <pre
+        class="attr-text"
+        v-html="highlightedAttributes(spanDetails.attrs)"
+        data-test="trace-details-sidebar-attributes-table"
+      ></pre>
     </q-tab-panel>
     <q-tab-panel name="events">
       <q-virtual-scroll
         type="table"
         ref="searchTableRef"
-        style="max-height: 100%"
+        style="max-height: 100%; min-height: 100px"
         :items="spanDetails.events"
+        data-test="trace-details-sidebar-events-table"
       >
         <template v-slot:before>
           <thead class="thead-sticky text-left">
@@ -200,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template v-slot="{ item: row, index }">
           <q-tr
-            :data-test="`trace-event-detail-${
+            :data-test="`trace-event-details-${
               row[store.state.zoConfig.timestamp_column]
             }`"
             :key="'expand_' + index"
@@ -209,11 +238,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="pointer"
           >
             <q-td
-              v-for="(column,columnIndex) in eventColumns"
+              v-for="(column, columnIndex) in eventColumns"
               :key="index + '-' + column.name"
               class="field_list"
               style="cursor: pointer"
-              :style="getSecondTdWidth(columnIndex)"
+              :style="
+                columnIndex > 0
+                  ? { whiteSpace: 'normal', wordBreak: 'break-word' }
+                  : {}
+              "
             >
               <div class="flex row items-center no-wrap">
                 <q-btn
@@ -229,16 +262,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mr-xs"
                   @click.stop="expandEvent(index)"
                 ></q-btn>
-                <span  v-if="column.name !== '@timestamp'" v-html="highlightSearch(column.prop(row))"></span> 
-               <span v-else> {{ column.prop(row) }}</span>
+                <span
+                  v-if="column.name !== '@timestamp'"
+                  v-html="highlightSearch(column.prop(row))"
+                ></span>
+                <span v-else> {{ column.prop(row) }}</span>
               </div>
             </q-td>
           </q-tr>
           <q-tr v-if="expandedEvents[index.toString()]">
             <td colspan="2">
               <!-- <pre class="log_json_content">{{ row }}</pre> -->
-              <pre class="log_json_content" v-html="highlightedAttributes(row)"></pre>
-
+              <pre
+                class="log_json_content"
+                v-html="highlightedAttributes(row)"
+              ></pre>
             </td>
           </q-tr>
         </template>
@@ -246,6 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="full-width text-center q-pt-lg text-bold"
         v-if="!spanDetails.events.length"
+        data-test="trace-details-sidebar-no-events"
       >
         No events present for this span
       </div>
@@ -256,6 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="searchTableRef"
         style="max-height: 100%"
         :items="getExceptionEvents"
+        data-test="trace-details-sidebar-exceptions-table"
       >
         <template v-slot:before>
           <thead class="thead-sticky text-left">
@@ -301,13 +341,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   flat
                   class="q-mr-xs"
                   @click.stop="expandEvent(index)"
+                  :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${index}`"
                 ></q-btn>
-                <span  v-if="column.name !== '@timestamp'" v-html="highlightSearch(column.prop(row))"></span> 
+                <span
+                  v-if="column.name !== '@timestamp'"
+                  v-html="highlightSearch(column.prop(row))"
+                ></span>
                 <span v-else> {{ column.prop(row) }}</span>
               </div>
             </q-td>
           </q-tr>
-          <q-tr v-if="expandedEvents[index.toString()]">
+          <q-tr
+            v-if="expandedEvents[index.toString()]"
+            :data-test="`trace-details-sidebar-exceptions-table-expanded-row-${index}`"
+          >
             <td colspan="2" style="font-size: 12px; font-family: monospace">
               <div class="q-pl-sm">
                 <div>
@@ -349,8 +396,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="full-width text-center q-pt-lg text-bold"
         v-if="!getExceptionEvents.length"
+        data-test="trace-details-sidebar-no-exceptions"
       >
-        No events present for this span
+        No exceptions present for this span
       </div>
     </q-tab-panel>
 
@@ -361,6 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="searchTableRef"
           style="max-height: 100%"
           :items="spanLinks"
+          data-test="trace-details-sidebar-links-table"
         >
           <template v-slot:before>
             <thead class="thead-sticky text-left">
@@ -379,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-slot="{ item: row, index }">
             <q-tr
-              :data-test="`trace-event-detail-${row['traceId']}`"
+              :data-test="`trace-event-detail-link-${index}`"
               :key="'expand_' + index"
               @click="openReferenceTrace('span', row)"
               style="cursor: pointer"
@@ -399,7 +448,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-virtual-scroll>
       </div>
-      <div v-else class="full-width text-center q-pt-lg text-bold">
+      <div
+        v-else
+        class="full-width text-center q-pt-lg text-bold"
+        data-test="trace-details-sidebar-no-links"
+      >
         No links present for this span
       </div>
     </q-tab-panel>
@@ -431,7 +484,7 @@ export default defineComponent({
     },
     searchQuery: {
       type: String,
-      default: '',
+      default: "",
     },
   },
   emits: ["close", "view-logs", "select-span", "open-trace"],
@@ -452,42 +505,46 @@ export default defineComponent({
     });
     const q = useQuasar();
     const { buildQueryDetails, navigateToLogs } = useTraces();
-    const isLinksExpanded = ref(false);
     const router = useRouter();
-    const highlightSearch = (value: any,preserveString:any = false): string => {
+    const highlightSearch = (
+      value: any,
+      preserveString: any = false,
+    ): string => {
       if (!props.searchQuery) {
         // Return the object/JSON value as is if there's no search query
-        return typeof value === 'object' && value !== null
+        return typeof value === "object" && value !== null
           ? JSON.stringify(value, null, 2)
           : value;
       }
 
-      if (typeof value === 'string') {
+      if (typeof value === "string") {
         // Highlight text in string values
-        const regex = new RegExp(`(${props.searchQuery})`, 'gi');
-        if(preserveString){
-          return `"${value.replace(regex, (match) => `<span class="highlight ${store.state.theme === 'dark' ? 'tw-text-gray-900' : ''}">${match}</span>`)}"`;
+        const regex = new RegExp(`(${props.searchQuery})`, "gi");
+        if (preserveString) {
+          return `"${value.replace(regex, (match) => `<span class="highlight ${store.state.theme === "dark" ? "tw-text-gray-900" : ""}">${match}</span>`)}"`;
+        } else {
+          return value.replace(
+            regex,
+            (match) =>
+              `<span class="highlight ${store.state.theme === "dark" ? "tw-text-gray-900" : ""}">${match}</span>`,
+          );
         }
-        else{
-          return value.replace(regex, (match) => `<span class="highlight ${store.state.theme === 'dark' ? 'tw-text-gray-900' : ''}">${match}</span>`);
-        }
-
       } else if (Array.isArray(value)) {
-        return `[${value.map((item) => highlightSearch(item)).join(', ')}]`;
-      } else if (typeof value === 'object' && value !== null) {
+        return `[${value.map((item) => highlightSearch(item)).join(", ")}]`;
+      } else if (typeof value === "object" && value !== null) {
         const highlightedEntries = Object.entries(value).map(([key, val]) => {
           // Do not highlight the keys; only process the values
-          const highlightedVal = highlightSearch(val,true);
+          const highlightedVal = highlightSearch(val, true);
           return `"${key}": ${highlightedVal}`;
         });
-        return `{\n  ${highlightedEntries.join(',\n  ')}\n}`;
+        return `{\n  ${highlightedEntries.join(",\n  ")}\n}`;
       } else {
         return JSON.stringify(value);
       }
     };
 
     const highlightedAttributes = computed(() => {
-      return (value: any) => highlightSearch(value,true);
+      return (value: any) => highlightSearch(value, true);
     });
 
     watch(
@@ -499,11 +556,11 @@ export default defineComponent({
       },
       {
         deep: true,
-      }
+      },
     );
 
     const getDuration = computed(() =>
-      formatTimeWithSuffix(props.span.duration)
+      formatTimeWithSuffix(props.span.duration),
     );
 
     onBeforeMount(() => {
@@ -515,15 +572,10 @@ export default defineComponent({
     const eventColumns = ref([
       {
         name: "@timestamp",
-        field: (row: any) =>
-          date.formatDate(
-            Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
-          ),
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
+            "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         label: "Timestamp",
         align: "left",
@@ -531,54 +583,20 @@ export default defineComponent({
       },
       {
         name: "source",
-        field: (row: any) => JSON.stringify(row),
         prop: (row: any) => JSON.stringify(row),
         label: "source",
         align: "left",
         sortable: true,
       },
     ]);
-    const secondTdWidth = ref<number | null>(null);
-      // Function to calculate width dynamically
-    const getSecondTdWidth = (columnIndex: number) => {
-      if (columnIndex === 1) {
-        const tableElement = document.querySelector('.q-virtual-scroll') as HTMLElement | null;
-        const tableWidth = tableElement?.offsetWidth || 0;
 
-        const headersWidth = eventColumns.value
-          .slice(0, columnIndex)
-          .reduce((acc, col) => {
-            const headerElement = document.querySelector(`[data-test="trace-events-table-th-${col.label}"]`) as HTMLElement | null;
-            const colWidth = headerElement?.offsetWidth || 0;
-            return acc + colWidth;
-          }, 0);
-
-        secondTdWidth.value = tableWidth - headersWidth;
-      }
-      return secondTdWidth.value
-        ? `width: ${secondTdWidth.value}px; white-space: normal; word-break: break-word;`
-        : '';
-
-    };
-    // Recalculate width when component is mounted or updated
-    onMounted(() => {
-      getSecondTdWidth(1);
-    });
-    watch(() => eventColumns, () => {
-      getSecondTdWidth(1);
-    });
     const exceptionEventColumns = ref([
       {
         name: "@timestamp",
-        field: (row: any) =>
-          date.formatDate(
-            Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
-          ),
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z"
+            "MMM DD, YYYY HH:mm:ss.SSS Z",
           ),
         label: "Timestamp",
         align: "left",
@@ -586,7 +604,6 @@ export default defineComponent({
       },
       {
         name: "type",
-        field: (row: any) => row["exception.type"],
         prop: (row: any) => row["exception.type"],
         label: "Type",
         align: "left",
@@ -597,16 +614,14 @@ export default defineComponent({
     const linkColumns = ref([
       {
         name: "traceId",
-        field: (row: any) => (row.context ? row.context.traceId : ""),
-        prop: (row: any) => (row.context ? row.context.traceId : ""),
+        prop: (row: any) => (row.context ? row?.context?.traceId : ""),
         label: "TraceId",
         align: "left",
         sortable: true,
       },
       {
         name: "spanId",
-        field: (row: any) => (row.context ? row.context.spanId : ""),
-        prop: (row: any) => (row.context ? row.context.spanId : ""),
+        prop: (row: any) => (row.context ? row?.context?.spanId : ""),
         label: "spanId",
         align: "left",
         sortable: true,
@@ -615,7 +630,7 @@ export default defineComponent({
 
     const getExceptionEvents = computed(() => {
       return spanDetails.value.events.filter(
-        (event: any) => event.name === "exception"
+        (event: any) => event.name === "exception",
       );
     });
 
@@ -650,15 +665,19 @@ export default defineComponent({
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
         date.formatDate(
           Math.floor(
-            spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000
+            spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000,
           ),
-          "MMM DD, YYYY HH:mm:ss.SSS Z"
+          "MMM DD, YYYY HH:mm:ss.SSS Z",
         );
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
-      spanDetails.events = JSON.parse(props.span.events || "[]").map(
-        (event: any) => event
-      );
+      try {
+        spanDetails.events = JSON.parse(props.span.events || "[]").map(
+          (event: any) => event,
+        );
+      } catch (_e: any) {
+        spanDetails.events = [];
+      }
 
       return spanDetails;
     };
@@ -696,7 +715,7 @@ export default defineComponent({
       {
         deep: true,
         immediate: true,
-      }
+      },
     );
     function formatStackTrace(trace: any) {
       // Split the trace into lines
@@ -730,66 +749,46 @@ export default defineComponent({
     });
 
     const copySpanId = () => {
-      try {
-        copyToClipboard(props.span.span_id);
-        q.notify({
-          type: "positive",
-          message: "Span ID copied to clipboard",
-          timeout: 2000,
-        });
-      } catch (e) {
-        q.notify({
-          type: "negative",
-          message: "Failed to copy Span ID to clipboard",
-          timeout: 2000,
-        });
-        console.error("Error copying to clipboard:", e);
-      }
-    };
+      copyToClipboard(props.span?.span_id || "");
 
-    const toggleLinks = () => {
-      isLinksExpanded.value = !isLinksExpanded.value;
+      q?.notify?.({
+        type: "positive",
+        message: "Span ID copied to clipboard",
+        timeout: 2000,
+      });
     };
 
     const openReferenceTrace = (type: string, link: any) => {
-      if (!link || !link.context) {
-        console.error("Link or link context is undefined");
-        return;
+      if (link && link.context) {
+        const query = {
+          stream: router.currentRoute.value.query.stream,
+          trace_id: link.context.traceId,
+          span_id: link.context.spanId,
+          from:
+            convertTimeFromNsToMs(props.span.start_time) * 1000 - 3600000000,
+          to: convertTimeFromNsToMs(props.span.end_time) * 1000 + 3600000000,
+          org_identifier: store.state.selectedOrganization.identifier,
+        };
+
+        if (query.trace_id === props.span.trace_id) {
+          emit("select-span", link.context.spanId);
+          return;
+        }
+
+        router.push({
+          name: "traceDetails",
+          query,
+        });
+
+        emit("open-trace");
       }
-
-      const query = {
-        stream: router.currentRoute.value.query.stream,
-        trace_id: link.context.traceId,
-        span_id: link.context.spanId,
-        from: convertTimeFromNsToMs(props.span.start_time) * 1000 - 3600000000,
-        to: convertTimeFromNsToMs(props.span.end_time) * 1000 + 3600000000,
-        org_identifier: store.state.selectedOrganization.identifier,
-      };
-
-      if (type !== "span") {
-        delete query.span_id;
-      }
-
-      if (query.trace_id === props.span.trace_id) {
-        emit("select-span", link.context.spanId);
-        return;
-      }
-
-      router.push({
-        name: "traceDetails",
-        query,
-      });
-
-      emit("open-trace");
     };
 
     const spanLinks = computed(() => {
       try {
-        if (typeof props.span.links === "string") {
-          return JSON.parse(props.span.links);
-        } else {
-          return props.span.links;
-        }
+        return typeof props.span.links === "string"
+          ? JSON.parse(props.span.links)
+          : props.span.links;
       } catch (e) {
         console.log("Error parsing span links:", e);
         return [];
@@ -815,15 +814,11 @@ export default defineComponent({
       viewSpanLogs,
       getStartTime,
       copySpanId,
-      toggleLinks,
-      isLinksExpanded,
       openReferenceTrace,
       spanLinks,
       linkColumns,
-      secondTdWidth,
-      getSecondTdWidth,
       highlightSearch,
-      highlightedAttributes
+      highlightedAttributes,
     };
   },
 });

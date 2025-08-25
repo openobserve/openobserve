@@ -58,7 +58,7 @@ describe("stream service", () => {
       await stream.nameList(params.org_identifier, params.type, params.schema);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams?type=${params.type}`
+        `/api/${params.org_identifier}/streams?type=${params.type}`,
       );
     });
 
@@ -78,11 +78,11 @@ describe("stream service", () => {
         params.type,
         params.schema,
         params.offset,
-        params.limit
+        params.limit,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams?type=${params.type}&offset=${params.offset}&limit=${params.limit}`
+        `/api/${params.org_identifier}/streams?type=${params.type}&offset=${params.offset}&limit=${params.limit}`,
       );
     });
 
@@ -104,11 +104,11 @@ describe("stream service", () => {
         params.schema,
         params.offset,
         params.limit,
-        params.keyword
+        params.keyword,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams?type=${params.type}&keyword=${params.keyword}`
+        `/api/${params.org_identifier}/streams?type=${params.type}&keyword=${params.keyword}`,
       );
     });
 
@@ -134,11 +134,11 @@ describe("stream service", () => {
         params.limit,
         params.keyword,
         params.sort,
-        params.asc
+        params.asc,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams?type=${params.type}&sort=${params.sort}&asc=${params.asc}`
+        `/api/${params.org_identifier}/streams?type=${params.type}&sort=${params.sort}&asc=${params.asc}`,
       );
     });
 
@@ -154,7 +154,7 @@ describe("stream service", () => {
       await stream.nameList(params.org_identifier, params.type, params.schema);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams?type=${params.type}&fetchSchema=${params.schema}`
+        `/api/${params.org_identifier}/streams?type=${params.type}&fetchSchema=${params.schema}`,
       );
     });
 
@@ -170,7 +170,7 @@ describe("stream service", () => {
       await stream.nameList(params.org_identifier, params.type, params.schema);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams`
+        `/api/${params.org_identifier}/streams`,
       );
     });
 
@@ -196,11 +196,11 @@ describe("stream service", () => {
         params.limit,
         params.keyword,
         params.sort,
-        params.asc
+        params.asc,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams?type=${params.type}&offset=${params.offset}&limit=${params.limit}&keyword=${params.keyword}&sort=${params.sort}&asc=${params.asc}&fetchSchema=${params.schema}`
+        `/api/${params.org_identifier}/streams?type=${params.type}&offset=${params.offset}&limit=${params.limit}&keyword=${params.keyword}&sort=${params.sort}&asc=${params.asc}&fetchSchema=${params.schema}`,
       );
     });
   });
@@ -218,11 +218,11 @@ describe("stream service", () => {
       await stream.schema(
         params.org_identifier,
         params.stream_name,
-        params.type
+        params.type,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams/${params.stream_name}/schema?type=${params.type}`
+        `/api/${params.org_identifier}/streams/${params.stream_name}/schema?type=${params.type}`,
       );
     });
 
@@ -238,11 +238,11 @@ describe("stream service", () => {
       await stream.schema(
         params.org_identifier,
         params.stream_name,
-        params.type
+        params.type,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams/${params.stream_name}/schema`
+        `/api/${params.org_identifier}/streams/${params.stream_name}/schema`,
       );
     });
   });
@@ -262,12 +262,12 @@ describe("stream service", () => {
         params.org_identifier,
         params.stream_name,
         params.type,
-        params.data
+        params.data,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/streams/${params.stream_name}/settings?type=${params.type}`,
-        params.data
+        params.data,
       );
     });
 
@@ -285,16 +285,63 @@ describe("stream service", () => {
         params.org_identifier,
         params.stream_name,
         params.type,
-        params.data
+        params.data,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/streams/${params.stream_name}/settings`,
-        params.data
+        params.data,
       );
     });
   });
 
+  describe("createSettings", () => {
+    it("should make POST request to create stream settings with type", async () => {
+      const params = {
+        org_identifier: "org123",
+        stream_name: "test_stream",
+        type: "logs",
+        data: { partition_keys: ["timestamp"] },
+      };
+
+      mockHttpInstance.post.mockResolvedValue({ data: { success: true } });
+
+      await stream.updateSettings(
+        params.org_identifier,
+        params.stream_name,
+        params.type,
+        params.data,
+      );
+
+      expect(mockHttpInstance.put).toHaveBeenCalledWith(
+        `/api/${params.org_identifier}/streams/${params.stream_name}/settings?type=${params.type}`,
+        params.data,
+      );
+    });
+
+    it("should make POST request to create stream settings without type", async () => {
+      const params = {
+        org_identifier: "org123",
+        stream_name: "test_stream",
+        type: "",
+        data: { partition_keys: ["timestamp"] },
+      };
+
+      mockHttpInstance.post.mockResolvedValue({ data: { success: true } });
+
+      await stream.updateSettings(
+        params.org_identifier,
+        params.stream_name,
+        params.type,
+        params.data,
+      );
+
+      expect(mockHttpInstance.put).toHaveBeenCalledWith(
+        `/api/${params.org_identifier}/streams/${params.stream_name}/settings`,
+        params.data,
+      );
+    });
+  });
 
   describe("fieldValues", () => {
     it("should make GET request with basic parameters", async () => {
@@ -312,7 +359,7 @@ describe("stream service", () => {
       await stream.fieldValues(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/_values?fields=field1,field2&size=${params.size}&start_time=${params.start_time}&end_time=${params.end_time}`
+        `/api/${params.org_identifier}/${params.stream_name}/_values?fields=field1,field2&size=${params.size}&start_time=${params.start_time}&end_time=${params.end_time}`,
       );
     });
 
@@ -338,7 +385,7 @@ describe("stream service", () => {
       await stream.fieldValues(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/_values?fields=field1&size=${params.size}&start_time=${params.start_time}&end_time=${params.end_time}&sql=${params.query_context}&no_count=${params.no_count}&query_fn=${params.query_fn}&action_id=${params.action_id}&type=${params.type}&regions=${params.regions}&clusters=${params.clusters}`
+        `/api/${params.org_identifier}/${params.stream_name}/_values?fields=field1&size=${params.size}&start_time=${params.start_time}&end_time=${params.end_time}&sql=${params.query_context}&no_count=${params.no_count}&query_fn=${params.query_fn}&action_id=${params.action_id}&type=${params.type}&regions=${params.regions}&clusters=${params.clusters}`,
       );
     });
 
@@ -359,7 +406,7 @@ describe("stream service", () => {
       await stream.fieldValues(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/_values?fields=field1&size=${params.size}&start_time=${params.start_time}&end_time=${params.end_time}`
+        `/api/${params.org_identifier}/${params.stream_name}/_values?fields=field1&size=${params.size}&start_time=${params.start_time}&end_time=${params.end_time}`,
       );
     });
   });
@@ -380,7 +427,7 @@ describe("stream service", () => {
       await stream.tracesFieldValues(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/_values?fields=service_name,operation_name&size=${params.size}&start_time=${params.start_time}&end_time=${params.end_time}`
+        `/api/${params.org_identifier}/${params.stream_name}/_values?fields=service_name,operation_name&size=${params.size}&start_time=${params.start_time}&end_time=${params.end_time}`,
       );
     });
 
@@ -402,7 +449,7 @@ describe("stream service", () => {
       await stream.tracesFieldValues(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/_values?fields=service_name&size=${params.size}&start_time=${params.start_time}&end_time=${params.end_time}&filter=${params.filter}&type=${params.type}&keyword=${params.keyword}`
+        `/api/${params.org_identifier}/${params.stream_name}/_values?fields=service_name&size=${params.size}&start_time=${params.start_time}&end_time=${params.end_time}&filter=${params.filter}&type=${params.type}&keyword=${params.keyword}`,
       );
     });
   });
@@ -422,7 +469,7 @@ describe("stream service", () => {
       await stream.labelValues(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/prometheus/api/v1/label/${params.label}/values?&match[]=${params.stream_name}&start=${params.start_time}&end=${params.end_time}`
+        `/api/${params.org_identifier}/prometheus/api/v1/label/${params.label}/values?&match[]=${params.stream_name}&start=${params.start_time}&end=${params.end_time}`,
       );
     });
   });
@@ -440,11 +487,11 @@ describe("stream service", () => {
       await stream.delete(
         params.org_identifier,
         params.stream_name,
-        params.stream_type
+        params.stream_type,
       );
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams/${params.stream_name}?type=${params.stream_type}&delete_all=true`
+        `/api/${params.org_identifier}/streams/${params.stream_name}?type=${params.stream_type}&delete_all=true`,
       );
     });
 
@@ -462,11 +509,11 @@ describe("stream service", () => {
         params.org_identifier,
         params.stream_name,
         params.stream_type,
-        params.deleteAssociatedAlertsPipelines
+        params.deleteAssociatedAlertsPipelines,
       );
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams/${params.stream_name}?type=${params.stream_type}&delete_all=false`
+        `/api/${params.org_identifier}/streams/${params.stream_name}?type=${params.stream_type}&delete_all=false`,
       );
     });
   });
@@ -484,14 +531,14 @@ describe("stream service", () => {
       await stream.deleteFields(
         params.org_identifier,
         params.stream_name,
-        params.fields as []
+        params.fields as [],
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/streams/${params.stream_name}/delete_fields`,
         {
           fields: params.fields,
-        }
+        },
       );
     });
 
@@ -507,14 +554,14 @@ describe("stream service", () => {
       await stream.deleteFields(
         params.org_identifier,
         params.stream_name,
-        params.fields as []
+        params.fields as [],
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/streams/${params.stream_name}/delete_fields`,
         {
           fields: [],
-        }
+        },
       );
     });
   });
@@ -524,9 +571,9 @@ describe("stream service", () => {
       const error = new Error("Network error");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(
-        stream.nameList("org123", "logs", false)
-      ).rejects.toThrow("Network error");
+      await expect(stream.nameList("org123", "logs", false)).rejects.toThrow(
+        "Network error",
+      );
     });
 
     it("should handle API errors gracefully for schema method", async () => {
@@ -534,7 +581,7 @@ describe("stream service", () => {
       mockHttpInstance.get.mockRejectedValue(error);
 
       await expect(
-        stream.schema("org123", "test_stream", "logs")
+        stream.schema("org123", "test_stream", "logs"),
       ).rejects.toThrow("Not found");
     });
 
@@ -543,7 +590,7 @@ describe("stream service", () => {
       mockHttpInstance.put.mockRejectedValue(error);
 
       await expect(
-        stream.updateSettings("org123", "test_stream", "logs", {})
+        stream.updateSettings("org123", "test_stream", "logs", {}),
       ).rejects.toThrow("Forbidden");
     });
 
@@ -552,7 +599,7 @@ describe("stream service", () => {
       mockHttpInstance.delete.mockRejectedValue(error);
 
       await expect(
-        stream.delete("org123", "test_stream", "logs")
+        stream.delete("org123", "test_stream", "logs"),
       ).rejects.toThrow("Internal server error");
     });
 
@@ -568,7 +615,7 @@ describe("stream service", () => {
           size: 100,
           start_time: 123,
           end_time: 456,
-        })
+        }),
       ).rejects.toThrow("Bad request");
     });
   });
