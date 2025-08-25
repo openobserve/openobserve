@@ -903,7 +903,7 @@ SELECT date
 SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS file_num,
     SUM(records)::BIGINT AS records, SUM(original_size)::BIGINT AS original_size, SUM(compressed_size)::BIGINT AS compressed_size, SUM(index_size)::BIGINT AS index_size
     FROM file_list
-    WHERE updated_at >= {min} AND updated_at < {max}
+    WHERE updated_at > {min} AND updated_at <= {max}
     GROUP BY stream
             "#
         );
@@ -1061,7 +1061,7 @@ UPDATE stream_stats
         loop {
             let start = std::time::Instant::now();
             match sqlx::query(
-                    r#"DELETE FROM file_list WHERE deleted IS TRUE AND updated_at >= $1 AND updated_at < $2"#,
+                    r#"DELETE FROM file_list WHERE deleted IS TRUE AND updated_at > $1 AND updated_at <= $2"#,
                 )
                 .bind(min_ts)
                 .bind(max_ts)
