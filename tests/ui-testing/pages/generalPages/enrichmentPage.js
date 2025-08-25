@@ -23,9 +23,8 @@ class EnrichmentPage {
         this.protocolKeywordText = '[data-test="log-expand-detail-key-protocol_keyword-text"]';
         this.dateTimeBtn = '[data-test="date-time-btn"]';
         
-        // VRL editor locators (with fallback options)
+        // VRL editor locator
         this.vrlEditor = '#fnEditor';
-        this.vrlEditorFallback = '[data-test="logs-vrl-function-editor"]';
         this.refreshButton = "[data-test='logs-search-bar-refresh-btn']";
         
         // Table and validation locators
@@ -122,25 +121,14 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 // Functions button may not be present, continue
             }
             
-            // Select VRL editor - prefer primary (#fnEditor) if visible, fallback otherwise
-            let activeVrlEditor = this.vrlEditor;
-            const primaryEditorVisible = await this.page.locator(this.vrlEditor).isVisible().catch(() => false);
-            
-            if (!primaryEditorVisible) {
-                const fallbackEditorVisible = await this.page.locator(this.vrlEditorFallback).isVisible().catch(() => false);
-                if (fallbackEditorVisible) {
-                    activeVrlEditor = this.vrlEditorFallback;
-                }
-            }
-            
-            // Wait for selected VRL editor to be ready
-            await this.page.waitForSelector(activeVrlEditor, { 
+            // Wait for VRL editor to be ready
+            await this.page.waitForSelector(this.vrlEditor, { 
                 state: 'visible',
                 timeout: 30000 
             });
             
             // Get textbox using the original working approach
-            const textbox = this.page.locator(activeVrlEditor).getByRole('textbox');
+            const textbox = this.page.locator(this.vrlEditor).getByRole('textbox');
             await textbox.waitFor({ state: 'visible', timeout: 15000 });
             
             // Fill the VRL query
