@@ -256,24 +256,54 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
     // Validation Methods
     async verifyFileInTable(fileName) {
-        const rows = await this.page.locator(this.tableRows);
+        console.log(`🔍 Looking for file: ${fileName}`);
+        
+        // Wait for table to be present and have data
+        await this.page.waitForSelector(this.tableRows, { 
+            state: 'visible',
+            timeout: 15000 
+        });
+        
+        // Allow time for table to refresh after file upload (CI needs more time)
+        await this.page.waitForTimeout(3000);
+        
+        // Try to find the file with retries (table might still be loading in CI)
         let fileFound = false;
-
-        for (let i = 0; i < (await rows.count()); i++) {
-            const row = rows.nth(i);
-            const displayedName = await row
-                .locator(this.tableCellLeft)
-                .nth(1)
-                .textContent();
-            if (displayedName?.trim() === fileName) {
-                fileFound = true;
-                console.log("File found in table:", displayedName);
-                break;
+        let attempts = 0;
+        const maxAttempts = 10; // 10 attempts with 2s intervals = 20s total
+        
+        while (!fileFound && attempts < maxAttempts) {
+            const rows = await this.page.locator(this.tableRows);
+            const rowCount = await rows.count();
+            console.log(`📊 Table has ${rowCount} rows (attempt ${attempts + 1}/${maxAttempts})`);
+            
+            for (let i = 0; i < rowCount; i++) {
+                const row = rows.nth(i);
+                const displayedName = await row
+                    .locator(this.tableCellLeft)
+                    .nth(1)
+                    .textContent();
+                
+                console.log(`🔎 Row ${i + 1}: "${displayedName?.trim()}"`);
+                
+                if (displayedName?.trim() === fileName) {
+                    fileFound = true;
+                    console.log(`✅ File found in table: ${displayedName}`);
+                    break;
+                }
+            }
+            
+            if (!fileFound) {
+                attempts++;
+                if (attempts < maxAttempts) {
+                    console.log(`⏳ File not found yet, waiting 2s before retry...`);
+                    await this.page.waitForTimeout(2000);
+                }
             }
         }
 
         if (!fileFound) {
-            throw new Error(`File name "${fileName}" not found in the table.`);
+            throw new Error(`File name "${fileName}" not found in enrichment table after ${maxAttempts} attempts (${maxAttempts * 2} seconds). This may indicate slow table refresh in CI.`);
         }
     }
 
