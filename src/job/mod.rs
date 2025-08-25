@@ -106,7 +106,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]
-    if self_reporting::run_audit_publish().await.is_none() {
+    if self_reporting::run_audit_publish().is_none() {
         log::error!("Failed to run audit publish");
     };
     #[cfg(feature = "enterprise")]

@@ -31,7 +31,7 @@ use config::{
 };
 use futures::TryStreamExt;
 use hashbrown::HashSet;
-use infra::storage;
+use infra::{cache::file_data::TRACE_ID_FOR_CACHE_LATEST_FILE, storage};
 use parquet::arrow::async_reader::ParquetRecordBatchStream;
 use puffin_directory::writer::PuffinDirWriter;
 use tokio::task::JoinHandle;
@@ -67,10 +67,15 @@ pub(crate) async fn create_tantivy_index(
         return Ok(0);
     };
 
-    // TODO: check the main branch
-    if get_config().cache_latest_files.cache_index {
-        infra::cache::file_data::disk::set("", &idx_file_name, Bytes::from(puffin_bytes.clone()))
-            .await?;
+    if get_config().cache_latest_files.cache_index
+        && get_config().cache_latest_files.download_from_node
+    {
+        infra::cache::file_data::disk::set(
+            TRACE_ID_FOR_CACHE_LATEST_FILE,
+            &idx_file_name,
+            Bytes::from(puffin_bytes.clone()),
+        )
+        .await?;
         log::info!("file: {idx_file_name} file_data::disk::set success");
     }
 
