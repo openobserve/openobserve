@@ -93,7 +93,8 @@ test.describe("Enrichment data testcases", () => {
         
         // Ensure we're on the logs page with additional wait
         await page.waitForLoadState('domcontentloaded');
-        await page.waitForTimeout(2000); // Additional wait for VRL editor initialization in CI
+        // Wait for VRL editor initialization to complete
+        await page.waitForLoadState('networkidle', { timeout: 10000 });
         
         // Verify we're on the correct page before proceeding
         await page.waitForSelector('[data-test="logs-search-bar-refresh-btn"]', { 

@@ -103,101 +103,56 @@ abc, err = get_enrichment_table_record("${fileName}", {
 .protocol_keyword = abc.keyword
 `;
         try {
-            console.log('🔍 Starting VRL editor initialization');
-            console.log('📍 Current URL:', await this.page.url());
-            
-            // Wait for logs page to be fully loaded (matching original working approach)
+            // Wait for logs page to be fully loaded and stable
             await this.page.waitForLoadState('domcontentloaded');
-            console.log('✅ DOM content loaded');
-            
             await this.page.waitForLoadState('networkidle', { timeout: 30000 });
-            console.log('✅ Network idle achieved');
             
-            // Give extra time for VRL editor initialization in CI (like original 3s timeout)
-            await this.page.waitForTimeout(5000);
-            console.log('✅ Waited 5s for editor initialization');
+            // Wait for VRL editor to be fully initialized (addressing the race condition)
+            // The original working code had a 3-second wait after "Explore" click for editor initialization
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 });
             
-            // Check what elements are available
-            const allIds = await this.page.locator('*[id]').evaluateAll(
-                elements => elements.map(el => ({ id: el.id, visible: el.offsetParent !== null })).filter(item => item.id)
-            );
-            console.log('📋 Available element IDs:', allIds);
-            
-            // Try to click functions button if it exists to ensure VRL panel is open
+            // Ensure VRL functions panel is available if needed
             try {
                 const functionsButton = this.page.locator('[data-test="logs-search-functions-btn"]');
-                const isVisible = await functionsButton.isVisible();
-                console.log('🔘 Functions button visible:', isVisible);
-                if (isVisible) {
+                if (await functionsButton.isVisible()) {
                     await functionsButton.click();
-                    console.log('✅ Functions button clicked');
-                    await this.page.waitForTimeout(2000);
+                    await this.page.waitForLoadState('domcontentloaded');
                 }
             } catch (e) {
-                console.log('⚠️ Functions button not found or error:', e.message);
+                // Functions button may not be present, continue
             }
             
-            // Try primary VRL editor selector first
+            // Select VRL editor - prefer primary (#fnEditor) if visible, fallback otherwise
             let activeVrlEditor = this.vrlEditor;
-            let editorCount = await this.page.locator(this.vrlEditor).count();
-            console.log('📝 Primary fnEditor (#fnEditor) elements found:', editorCount);
+            const primaryEditorVisible = await this.page.locator(this.vrlEditor).isVisible().catch(() => false);
             
-            // If primary editor not found, try fallback selector
-            if (editorCount === 0) {
-                console.log('🔄 Trying fallback VRL editor selector...');
-                editorCount = await this.page.locator(this.vrlEditorFallback).count();
-                console.log('📝 Fallback VRL editor elements found:', editorCount);
-                
-                if (editorCount > 0) {
+            if (!primaryEditorVisible) {
+                const fallbackEditorVisible = await this.page.locator(this.vrlEditorFallback).isVisible().catch(() => false);
+                if (fallbackEditorVisible) {
                     activeVrlEditor = this.vrlEditorFallback;
-                    console.log('✅ Using fallback VRL editor selector');
-                } else {
-                    // Both selectors failed - provide debugging info
-                    await this.page.screenshot({ path: 'debug-no-vrl-editor.png', fullPage: true });
-                    const pageContent = await this.page.content();
-                    console.log('❌ No VRL editor found with either selector');
-                    console.log('📄 Page content contains "editor":', pageContent.includes('editor'));
-                    console.log('📄 Page content contains "function":', pageContent.includes('function'));
-                    console.log('📄 Page content contains "vrl":', pageContent.includes('vrl'));
-                    throw new Error('VRL editor not found with either selector (#fnEditor or [data-test="logs-vrl-function-editor"]). VRL features may be disabled in CI environment.');
                 }
             }
             
-            // Check if selected editor is visible
-            const editorVisible = await this.page.locator(activeVrlEditor).isVisible();
-            console.log('👁️ Selected VRL editor visible:', editorVisible);
-            
-            // Wait for VRL editor to be visible
-            console.log('⏳ Waiting for VRL editor to become visible...');
+            // Wait for selected VRL editor to be ready
             await this.page.waitForSelector(activeVrlEditor, { 
                 state: 'visible',
-                timeout: 45000 
+                timeout: 30000 
             });
-            console.log('✅ VRL editor is now visible');
             
-            // Wait for the textbox inside the editor to be interactive
+            // Get textbox using the original working approach
             const textbox = this.page.locator(activeVrlEditor).getByRole('textbox');
-            await textbox.waitFor({ 
-                state: 'visible',
-                timeout: 15000 
-            });
-            console.log('✅ Editor textbox is ready');
+            await textbox.waitFor({ state: 'visible', timeout: 15000 });
             
-            // Clear any existing content and fill new query
+            // Fill the VRL query
             await textbox.clear();
             await textbox.fill(fullQuery);
             
-            // Wait for editor to process the input
+            // Critical: Wait for VRL query validation and processing before proceeding
+            // The VRL editor needs time to parse and validate the query syntax
             await this.page.waitForLoadState('domcontentloaded');
-            await this.page.waitForTimeout(500); // Allow VRL syntax highlighting
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
         } catch (error) {
-            console.error('VRL Query filling failed:', error.message);
-            // Take a screenshot for debugging
-            await this.page.screenshot({ 
-                path: `debug-vrl-error-${Date.now()}.png`,
-                fullPage: true 
-            });
-            throw error;
+            throw new Error(`VRL Query filling failed: ${error.message}`);
         }
     }
 
@@ -206,22 +161,43 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.waitForSelector(this.refreshButton, { state: 'visible' });
         await this.page.waitForLoadState('networkidle');
         
-        // Click on the run query button and wait for response
-        const search = this.page.waitForResponse("**/api/**/_search**");
-        await this.page.locator(this.refreshButton).click({ force: true });
+        // Retry logic for run query button - sometimes needs multiple clicks to register
+        let queryExecuted = false;
+        let attempts = 0;
+        const maxAttempts = 3;
         
-        // Wait for the search response
-        const response = await search;
-        await expect.poll(async () => response.status()).toBe(200);
+        while (!queryExecuted && attempts < maxAttempts) {
+            attempts++;
+            
+            try {
+                // Set up response listener before clicking
+                const search = this.page.waitForResponse("**/api/**/_search**", { timeout: 15000 });
+                
+                // Click the run query button with force to ensure it registers
+                await this.page.locator(this.refreshButton).click({ force: true });
+                
+                // Wait for the search response with timeout
+                const response = await search;
+                await expect.poll(async () => response.status()).toBe(200);
+                
+                queryExecuted = true;
+            } catch (error) {
+                if (attempts >= maxAttempts) {
+                    throw new Error(`Query execution failed after ${maxAttempts} attempts. Last error: ${error.message}`);
+                }
+                
+                // Brief wait before retry
+                await this.page.waitForLoadState('domcontentloaded');
+            }
+        }
         
-        // Additional wait for results to render
-        await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForTimeout(1000); // Small wait for VRL processing
+        // Wait for results to render and process
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
     }
 
     async verifyNoQueryWarning() {
-        // Wait a moment for any potential warnings to appear
-        await this.page.waitForTimeout(1000);
+        // Wait for potential warnings to appear by checking DOM state
+        await this.page.waitForLoadState('domcontentloaded');
         
         const warningElement = this.page.locator(this.warningQueryExecution);
         await expect(warningElement).toBeHidden();
@@ -238,8 +214,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await expandButton.click();
         await this.page.waitForLoadState('domcontentloaded');
         
-        // Wait for expand panel to load
-        await this.page.waitForTimeout(500);
+        // Wait for expand panel to load and stabilize
+        await this.page.waitForSelector(this.protocolKeywordText, { state: 'visible', timeout: 5000 });
     }
 
     async clickProtocolKeyword() {
@@ -256,26 +232,23 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
     // Validation Methods
     async verifyFileInTable(fileName) {
-        console.log(`🔍 Looking for file: ${fileName}`);
-        
         // Wait for table to be present and have data
         await this.page.waitForSelector(this.tableRows, { 
             state: 'visible',
             timeout: 15000 
         });
         
-        // Allow time for table to refresh after file upload (CI needs more time)
-        await this.page.waitForTimeout(3000);
+        // Wait for table to be stable after file upload
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
         
         // Try to find the file with retries (table might still be loading in CI)
         let fileFound = false;
         let attempts = 0;
-        const maxAttempts = 10; // 10 attempts with 2s intervals = 20s total
+        const maxAttempts = 10;
         
         while (!fileFound && attempts < maxAttempts) {
             const rows = await this.page.locator(this.tableRows);
             const rowCount = await rows.count();
-            console.log(`📊 Table has ${rowCount} rows (attempt ${attempts + 1}/${maxAttempts})`);
             
             for (let i = 0; i < rowCount; i++) {
                 const row = rows.nth(i);
@@ -284,11 +257,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
                     .nth(1)
                     .textContent();
                 
-                console.log(`🔎 Row ${i + 1}: "${displayedName?.trim()}"`);
-                
                 if (displayedName?.trim() === fileName) {
                     fileFound = true;
-                    console.log(`✅ File found in table: ${displayedName}`);
                     break;
                 }
             }
@@ -296,14 +266,13 @@ abc, err = get_enrichment_table_record("${fileName}", {
             if (!fileFound) {
                 attempts++;
                 if (attempts < maxAttempts) {
-                    console.log(`⏳ File not found yet, waiting 2s before retry...`);
-                    await this.page.waitForTimeout(2000);
+                    await this.page.waitForLoadState('networkidle', { timeout: 5000 });
                 }
             }
         }
 
         if (!fileFound) {
-            throw new Error(`File name "${fileName}" not found in enrichment table after ${maxAttempts} attempts (${maxAttempts * 2} seconds). This may indicate slow table refresh in CI.`);
+            throw new Error(`File name "${fileName}" not found in enrichment table after ${maxAttempts} attempts. This may indicate slow table refresh in CI.`);
         }
     }
 
