@@ -1413,6 +1413,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         userSelectedOrgId,
         organizationData,
         updateOrgId,
+        // Exposed internal functions for testing
+        processJsonObject,
+        validatePipelineInputs,
+        validateSourceStream,
+        validateDestinationStream,
+        validateScheduledPipelineNodes,
+        validateNodesForOrg,
+        validateRemoteDestination,
+        createPipeline,
+        getFunctions,
+        getAlertDestinations,
+        getScheduledPipelines,
+        getSourceStreamsList,
+        getDestinationStreamsList,
+        getOutputStreamsList,
+        importJson,
       };
     },
     components: {
