@@ -380,7 +380,9 @@ describe("TraceBlock", () => {
     });
 
     it("should format time in 12-hour format", async () => {
-      await flushPromises();
+      // Ensure moment is imported and date is formatted
+      await wrapper.vm.importMoment();
+      await wrapper.vm.getFormattedDate();
       await flushPromises();
       
       const traceTime = wrapper.find("[data-test='trace-block-trace-date-time']");
