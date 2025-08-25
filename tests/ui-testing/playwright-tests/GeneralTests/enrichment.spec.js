@@ -85,12 +85,21 @@ test.describe("Enrichment data testcases", () => {
 
         // Explore the file with VRL query
         await page.getByRole("button", { name: "Explore" }).waitFor({ state: 'visible' });
-        await page.getByRole("button", { name: "Explore" }).click();
-        await page.waitForLoadState('networkidle');
         
-        // Wait for logs page to load completely
+        // Wait for navigation response before clicking
+        const navigationPromise = page.waitForLoadState('networkidle', { timeout: 30000 });
+        await page.getByRole("button", { name: "Explore" }).click();
+        await navigationPromise;
+        
+        // Ensure we're on the logs page with additional wait
         await page.waitForLoadState('domcontentloaded');
-        await page.waitForTimeout(1000); // Additional wait for VRL editor initialization
+        await page.waitForTimeout(2000); // Additional wait for VRL editor initialization in CI
+        
+        // Verify we're on the correct page before proceeding
+        await page.waitForSelector('[data-test="logs-search-bar-refresh-btn"]', { 
+            state: 'visible',
+            timeout: 15000 
+        });
         
         // Fill VRL query using page object method
         await pm.enrichmentPage.fillVRLQuery(fileName);

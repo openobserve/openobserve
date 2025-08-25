@@ -101,18 +101,39 @@ abc, err = get_enrichment_table_record("${fileName}", {
 })
 .protocol_keyword = abc.keyword
 `;
-        // Wait for VRL editor to be ready
-        await this.page.waitForSelector(this.vrlEditor, { state: 'visible' });
-        const textbox = this.page.locator(this.vrlEditor).getByRole('textbox');
-        await textbox.waitFor({ state: 'visible' });
-        
-        // Clear any existing content and fill new query
-        await textbox.clear();
-        await textbox.fill(fullQuery);
-        
-        // Wait for editor to process the input
-        await this.page.waitForLoadState('domcontentloaded');
-        await this.page.waitForTimeout(500); // Allow VRL syntax highlighting
+        try {
+            // Wait for page to be ready and VRL editor to be available
+            await this.page.waitForLoadState('domcontentloaded');
+            await this.page.waitForLoadState('networkidle', { timeout: 30000 });
+            
+            // Wait for VRL editor to be ready with increased timeout
+            await this.page.waitForSelector(this.vrlEditor, { 
+                state: 'visible',
+                timeout: 30000 
+            });
+            
+            const textbox = this.page.locator(this.vrlEditor).getByRole('textbox');
+            await textbox.waitFor({ 
+                state: 'visible',
+                timeout: 15000 
+            });
+            
+            // Clear any existing content and fill new query
+            await textbox.clear();
+            await textbox.fill(fullQuery);
+            
+            // Wait for editor to process the input
+            await this.page.waitForLoadState('domcontentloaded');
+            await this.page.waitForTimeout(500); // Allow VRL syntax highlighting
+        } catch (error) {
+            console.error('VRL Query filling failed:', error.message);
+            // Take a screenshot for debugging
+            await this.page.screenshot({ 
+                path: `debug-vrl-error-${Date.now()}.png`,
+                fullPage: true 
+            });
+            throw error;
+        }
     }
 
     async applyQuery() {
