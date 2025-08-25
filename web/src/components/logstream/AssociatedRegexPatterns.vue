@@ -441,7 +441,7 @@ export default defineComponent({
         const isPatternValid = ref(false);
         const testString = ref("");
         const policy = ref("Redact");
-        const apply_at = ref<any>([""]);
+        const apply_at = ref<any>([]);
         const appliedPatternsExpandedRef = ref<any>(null);
         const allPatternsExpandedRef = ref<any>(null);
         const isFormDirty = ref(false);
@@ -744,7 +744,7 @@ export default defineComponent({
           //and set it to the apply_at value
           //we need to get the previous value of apply_at values 
           //so we are transforming the apply_at value to the previous value of apply_at values
-          apply_at.value = transformApplyAtValue(userClickedPattern.value.apply_at);
+          apply_at.value = transformApplyAtValue(userClickedPattern.value?.apply_at);
         };
 
         const transformApplyAtValue = (applyAtValue: string) => {
