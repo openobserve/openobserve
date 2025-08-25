@@ -242,9 +242,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
       )
       .click();
       await page.waitForTimeout(1000);
-    await page
-      .locator('[data-test="log-expand-detail-key-protocol_keyword-text"]')
-      .click();
+    await page.locator('[data-test="log-expand-detail-key-protocol_keyword"]').getByText('protocol_keyword').click();
+    await page.waitForTimeout(1000);
     // Return to the pipeline menu and delete the uploaded table
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
     await page.locator('[data-test="function-enrichment-table-tab"]').click();

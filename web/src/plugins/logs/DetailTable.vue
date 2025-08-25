@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card
     class="column full-height no-wrap searchdetaildialog"
     data-test="dialog-box"
+    :style="{ borderTop: `4px solid ${statusColor}` }"
   >
     <q-card-section class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap">
@@ -90,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="rowData"
             show-copy-button
             mode="sidebar"
+            :highlight-query="highlightQuery"
             @copy="copyContentToClipboard"
             @add-field-to-table="addFieldToTable"
             @add-search-term="toggleIncludeSearchTerm"
@@ -133,7 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section
                   :data-test="`log-detail-${value}-key`"
-                  class="col-3 text-weight-regular text-red-10"
+                  class="col-3 text-weight-regular"
+                  :class="store.state.theme == 'dark' ? 'tw-text-[#f67a7aff]' : 'tw-text-[#B71C1C]'"
                   >{{ value }}</q-item-section
                 >
                 <q-item-section
@@ -259,15 +262,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </q-item>
                     </q-list>
                   </q-btn-dropdown>
-
                   <pre
                     :data-test="`log-detail-${value}-value`"
                     class="table-pre"
                     :style="{
                       'white-space': !shouldWrapValues ? 'nowrap' : 'pre-wrap',
                     }"
-                    >{{ key }}</pre
-                  >
+                  ><LogsHighLighting :data="key" :show-braces="false" :query-string="highlightQuery" /></pre>
                 </q-item-section>
               </q-item>
             </q-list>
@@ -354,6 +355,8 @@ import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import { extractStatusFromLog } from "@/utils/logs/statusParser";
 
 const defaultValue: any = () => {
   return {
@@ -363,7 +366,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn },
+  components: { EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting },
   emits: [
     "showPrevDetail",
     "showNextDetail",
@@ -391,6 +394,10 @@ export default defineComponent({
     streamType: {
       type: String,
       default: "logs",
+    },
+    highlightQuery: {
+      type: String,
+      default: "",
     },
   },
   methods: {
@@ -431,6 +438,11 @@ export default defineComponent({
     let hasAggregationQuery: any = computed(() => {
       let parsedSQL = fnParsedSQL();
       return hasAggregation(parsedSQL?.columns);
+    });
+
+    // Compute status color for the top border
+    const statusColor = computed(() => {
+      return extractStatusFromLog(rowData.value).color;
     });
 
     onBeforeMount(() => {
@@ -517,7 +529,8 @@ export default defineComponent({
       viewTrace,
       hasAggregationQuery,
       sendToAiChat,
-      closeTable
+      closeTable,
+      statusColor
     };
   },
   async created() {
@@ -566,6 +579,8 @@ export default defineComponent({
   display: inline;
   font-weight: normal;
   font-family: monospace;
+  margin: 0;
+  padding: 0;
 }
 
 .json-pre {
