@@ -118,8 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-add-submit"
               :loading="onSubmit.isLoading.value"
               :label="t('dashboard.save')"
-              class="q-mb-md text-bold no-border"
-              color="secondary"
+              class="q-mb-md o2-primary-button no-border tw-h-[36px]"
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              @click="onSubmit.execute"
               type="submit"
               no-caps
               size="md"
@@ -162,15 +163,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               class="btn-group relative-position vertical-middle"
-              style="margin-top: 55px"
+              style="margin-top: 53px"
             >
               <q-btn
                 data-test="settings_ent_logo_custom_text_save_btn"
                 :loading="onSubmit.isLoading.value"
                 :label="t('dashboard.save')"
-                class="text-bold no-border q-mr-sm"
-                color="secondary"
-                size="sm"
+                class="q-mr-sm tw-h-[28px] o2-primary-button-small no-border"
+                flat
+                dense
+                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                color="primary"
                 type="submit"
                 no-caps
                 @click="updateCustomText"
@@ -178,8 +181,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <q-btn
                 type="button"
-                size="sm"
+                class="tw-h-[28px] o2-secondary-button-small no-border"
+                no-caps
+                :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                 :label="t('common.cancel')"
+                dense
+                flat
                 @click="editingText = !editingText"
               ></q-btn>
             </div>

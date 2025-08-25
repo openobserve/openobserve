@@ -33,21 +33,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex justify-center">
           <q-btn
             v-close-popup
-            class="text-bold q-mr-md"
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
             :label="t('function.cancel')"
-            text-color="light-text"
-            padding="sm xl"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             @click="arrowBackFn"
             data-test="regex-pattern-import-cancel-btn"
           />
           <q-btn
-            class="text-bold no-border"
+            class="o2-primary-button no-border tw-h-[36px]"
             :label="t('dashboard.import')"
-            color="secondary"
             type="submit"
-            padding="sm xl"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             @click="importJson"
             data-test="regex-pattern-import-json-btn"
           />

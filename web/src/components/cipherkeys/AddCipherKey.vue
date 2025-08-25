@@ -163,11 +163,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex justify-start q-px-md q-py-sm full-width">
         <q-btn
           data-test="add-cipher-key-cancel-btn"
-          class="text-bold"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
           :label="t('common.cancel')"
-          text-color="light-text"
-          padding="sm md"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="openCancelDialog"
         />
         <q-btn
@@ -175,12 +175,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (step === 1 && isUpdatingCipherKey == false) || isSubmitting
           "
           data-test="add-cipher-key-save-btn"
+          class="o2-primary-button no-border tw-h-[36px]"
           :label="t('common.save')"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm xl"
-          no-caps
           type="submit"
+          no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         />
       </div>
     </q-form>

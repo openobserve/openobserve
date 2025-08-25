@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator />
-    <div class="flex" style="height: calc(100vh - 162px); overflow: auto">
+    <div class="flex" style="height: calc(100vh - 152px); overflow: auto">
       <div ref="addAlertFormRef" class="q-px-lg q-my-md" style="width: 1024px">
         <q-form
           class="create-report-form"
@@ -785,7 +785,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="flex justify-end q-px-md q-py-sm full-width"
+      class="flex justify-end q-px-md full-width tw-py-3"
       style="position: sticky; bottom: 0px; z-index: 2"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
       :style="{
@@ -797,20 +797,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <q-btn
         data-test="add-report-cancel-btn"
-        class="text-bold"
+        class="q-mr-md o2-secondary-button tw-h-[36px]"
         :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
         no-caps
+        flat
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         @click="openCancelDialog"
       />
       <q-btn
         data-test="add-report-save-btn"
+        class="o2-primary-button no-border tw-h-[36px]"
         :label="t('alerts.save')"
-        class="text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
+        type="submit"
         no-caps
+        flat
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         @click="saveReport"
       />
     </div>
