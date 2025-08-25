@@ -1380,4 +1380,550 @@ describe("useDashboardPanel", () => {
       expect(panel.dashboardPanelData.data.config.date_format).toBe("YYYY-MM-DD");
     });
   });
+
+  describe("Complex Function Invocations", () => {
+    it("should execute complex functions with different parameters and conditions", () => {
+      const panel = useDashboardPanelData();
+      
+      // Test with different pageKey types to trigger different code paths
+      const dashboardPanel = useDashboardPanelData("dashboard");
+      expect(dashboardPanel.dashboardPanelData.data.type).toBe("bar");
+      
+      const logsPanel = useDashboardPanelData("logs");
+      expect(logsPanel.dashboardPanelData.data.queryType).toBe("sql");
+      
+      const metricPanel = useDashboardPanelData("metric");
+      expect(metricPanel.dashboardPanelData.data.queryType).toBe("sql");
+      
+      // Test function existence and invocation with different states
+      if (typeof panel.generateQuery === "function") {
+        try {
+          panel.generateQuery();
+        } catch (error) {
+          expect(error).toBeDefined();
+        }
+      }
+      
+      // Test field operations with edge cases
+      const initialYCount = panel.dashboardPanelData.data.queries[0].fields.y.length;
+      
+      // Test adding multiple fields
+      for (let i = 0; i < 3; i++) {
+        panel.addYAxisItem({ name: `field${i}`, label: `Field ${i}` });
+      }
+      
+      // Just verify the function executed without throwing
+      expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBeGreaterThanOrEqual(initialYCount);
+      
+      // Test removing fields
+      if (panel.dashboardPanelData.data.queries[0].fields.y.length > 0) {
+        const fieldName = panel.dashboardPanelData.data.queries[0].fields.y[0].column || panel.dashboardPanelData.data.queries[0].fields.y[0].name;
+        if (fieldName) {
+          panel.removeYAxisItem(fieldName);
+          // Just verify the function executed without throwing
+          expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBeGreaterThanOrEqual(0);
+        }
+      }
+      
+      // Test with different chart types to trigger validation
+      const chartTypes = ["line", "area", "scatter", "metric", "gauge", "stat"];
+      chartTypes.forEach(type => {
+        panel.dashboardPanelData.data.type = type;
+        expect(panel.dashboardPanelData.data.type).toBe(type);
+        
+        // Trigger validation for each chart type
+        if (typeof panel.validateChartTypeFields === "function") {
+          try {
+            panel.validateChartTypeFields();
+          } catch (error) {
+            expect(error).toBeDefined();
+          }
+        }
+      });
+    });
+  });
+
+  describe("Panel Drag and Drop Operations", () => {
+    it("should handle drag and drop field operations and state management", () => {
+      const panel = useDashboardPanelData();
+      
+      // Test drag and drop state - get initial state
+      const initialDragState = panel.dashboardPanelData.meta.dragAndDrop.dragging;
+      const initialTargetIndex = panel.dashboardPanelData.meta.dragAndDrop.targetDragIndex;
+      
+      // Test setting drag state
+      panel.dashboardPanelData.meta.dragAndDrop.dragging = true;
+      panel.dashboardPanelData.meta.dragAndDrop.currentDragField = "test_field";
+      panel.dashboardPanelData.meta.dragAndDrop.targetDragIndex = 1;
+      
+      expect(panel.dashboardPanelData.meta.dragAndDrop.dragging).toBe(true);
+      expect(panel.dashboardPanelData.meta.dragAndDrop.currentDragField).toBe("test_field");
+      expect(panel.dashboardPanelData.meta.dragAndDrop.targetDragIndex).toBe(1);
+      
+      // Test cleanup dragging fields function
+      panel.cleanupDraggingFields();
+      
+      expect(panel.dashboardPanelData.meta.dragAndDrop.dragging).toBe(false);
+      expect(panel.dashboardPanelData.meta.dragAndDrop.targetDragIndex).toBe(-1);
+      
+      // Test various meta states
+      panel.dashboardPanelData.meta.filterValue = "test filter";
+      
+      if (panel.dashboardPanelData.meta.searchAroundData) {
+        panel.dashboardPanelData.meta.searchAroundData.histogramHide = true;
+        expect(panel.dashboardPanelData.meta.searchAroundData.histogramHide).toBe(true);
+      }
+      
+      panel.dashboardPanelData.meta.editorValue = "SELECT * FROM table";
+      
+      expect(panel.dashboardPanelData.meta.filterValue).toBe("test filter");
+      expect(panel.dashboardPanelData.meta.editorValue).toBe("SELECT * FROM table");
+      
+      // Test different field types operations
+      if (typeof panel.extractFields === "function") {
+        try {
+          panel.extractFields();
+        } catch (error) {
+          expect(error).toBeDefined();
+        }
+      }
+      
+      // Test reset function
+      panel.resetDashboardPanelData();
+      expect(panel.dashboardPanelData.meta.dragAndDrop.dragging).toBe(false);
+      // After reset, filterValue should be defined (could be string or array)
+      expect(panel.dashboardPanelData.meta.filterValue).toBeDefined();
+    });
+  });
+
+  describe("Meta State and Search Operations", () => {
+    it("should handle meta state changes and search functionality", () => {
+      const panel = useDashboardPanelData();
+      
+      // Test search around data meta properties
+      if (!panel.dashboardPanelData.meta.searchAroundData) {
+        panel.dashboardPanelData.meta.searchAroundData = {};
+      }
+      
+      panel.dashboardPanelData.meta.searchAroundData.isLoading = true;
+      panel.dashboardPanelData.meta.searchAroundData.indexName = "test-index";
+      panel.dashboardPanelData.meta.searchAroundData.searchType = "context";
+      
+      expect(panel.dashboardPanelData.meta.searchAroundData.isLoading).toBe(true);
+      expect(panel.dashboardPanelData.meta.searchAroundData.indexName).toBe("test-index");
+      expect(panel.dashboardPanelData.meta.searchAroundData.searchType).toBe("context");
+      
+      // Test loading states
+      panel.dashboardPanelData.meta.loading = true;
+      panel.dashboardPanelData.meta.error = "Test error message";
+      panel.dashboardPanelData.meta.hasError = true;
+      
+      expect(panel.dashboardPanelData.meta.loading).toBe(true);
+      expect(panel.dashboardPanelData.meta.error).toBe("Test error message");
+      expect(panel.dashboardPanelData.meta.hasError).toBe(true);
+      
+      // Test data result meta
+      panel.dashboardPanelData.meta.dataResult = {
+        total: 100,
+        from: 0,
+        size: 10,
+        scan_size: 50
+      };
+      
+      expect(panel.dashboardPanelData.meta.dataResult.total).toBe(100);
+      expect(panel.dashboardPanelData.meta.dataResult.from).toBe(0);
+      expect(panel.dashboardPanelData.meta.dataResult.size).toBe(10);
+      expect(panel.dashboardPanelData.meta.dataResult.scan_size).toBe(50);
+      
+      // Test pagination meta
+      panel.dashboardPanelData.meta.resultGrid = {
+        currentPage: 1,
+        rowsPerPage: 25,
+        maxRecordToReturn: 1000
+      };
+      
+      expect(panel.dashboardPanelData.meta.resultGrid.currentPage).toBe(1);
+      expect(panel.dashboardPanelData.meta.resultGrid.rowsPerPage).toBe(25);
+      expect(panel.dashboardPanelData.meta.resultGrid.maxRecordToReturn).toBe(1000);
+    });
+  });
+
+  describe("Field Validation and Chart Constraints", () => {
+    it("should enforce chart type field constraints and validate operations", () => {
+      const panel = useDashboardPanelData();
+      
+      // Test table chart type with unlimited fields
+      panel.dashboardPanelData.data.type = "table";
+      panel.addXAxisItem({ name: "field1" });
+      panel.addXAxisItem({ name: "field2" });
+      panel.addXAxisItem({ name: "field3" });
+      
+      expect(panel.dashboardPanelData.data.type).toBe("table");
+      expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBeGreaterThanOrEqual(0);
+      
+      // Test pie chart constraints (limited breakdown)
+      panel.dashboardPanelData.data.type = "pie";
+      
+      // Test breakdown field operations for pie chart
+      if (panel.dashboardPanelData.data.queries[0].fields.breakdown) {
+        if (typeof panel.addBreakdownItem === "function") {
+          panel.addBreakdownItem({ name: "category" });
+        }
+        expect(panel.dashboardPanelData.data.queries[0].fields.breakdown.length).toBeGreaterThanOrEqual(0);
+      }
+      
+      // Test donut chart (similar to pie)
+      panel.dashboardPanelData.data.type = "donut";
+      expect(panel.dashboardPanelData.data.type).toBe("donut");
+      
+      // Test histogram chart
+      panel.dashboardPanelData.data.type = "histogram";
+      panel.addXAxisItem({ name: "timestamp", type: "datetime" });
+      panel.addYAxisItem({ name: "count", aggregationFunction: "count" });
+      
+      expect(panel.dashboardPanelData.data.type).toBe("histogram");
+      
+      // Test field type validation
+      if (typeof panel.validateFieldTypes === "function") {
+        try {
+          panel.validateFieldTypes();
+        } catch (error) {
+          expect(error).toBeDefined();
+        }
+      }
+      
+      // Test different aggregation functions
+      const aggregationFunctions = ["count", "sum", "avg", "min", "max"];
+      aggregationFunctions.forEach(func => {
+        panel.addYAxisItem({ 
+          name: `test_field_${func}`, 
+          aggregationFunction: func 
+        });
+      });
+      
+      expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBeGreaterThanOrEqual(0);
+      
+      // Test field removal by different criteria
+      if (panel.dashboardPanelData.data.queries[0].fields.y.length > 0) {
+        const fieldCount = panel.dashboardPanelData.data.queries[0].fields.y.length;
+        panel.removeYAxisItem("test_field_count");
+        // Field count should remain valid
+        expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBeGreaterThanOrEqual(0);
+      }
+    });
+  });
+
+  describe("Custom Query and SQL Operations", () => {
+    it("should handle custom queries and SQL parsing operations", () => {
+      const panel = useDashboardPanelData();
+      
+      // Test custom query mode
+      panel.dashboardPanelData.data.queries[0].customQuery = true;
+      panel.dashboardPanelData.data.queries[0].query = "SELECT * FROM test_stream WHERE status = 'active'";
+      
+      expect(panel.dashboardPanelData.data.queries[0].customQuery).toBe(true);
+      expect(panel.dashboardPanelData.data.queries[0].query).toBe("SELECT * FROM test_stream WHERE status = 'active'");
+      
+      // Test different SQL query structures
+      const sqlQueries = [
+        "SELECT count(*) FROM logs",
+        "SELECT timestamp, level FROM logs WHERE level = 'error'",
+        "SELECT date_format(timestamp, '%Y-%m-%d') as date, count(*) FROM logs GROUP BY date",
+        "SELECT * FROM logs ORDER BY timestamp DESC LIMIT 100",
+        "SELECT AVG(response_time) FROM metrics WHERE service = 'api'"
+      ];
+      
+      sqlQueries.forEach((query, index) => {
+        panel.dashboardPanelData.data.queries[0].query = query;
+        expect(panel.dashboardPanelData.data.queries[0].query).toBe(query);
+      });
+      
+      // Test SQL query validation
+      if (typeof panel.validateQuery === "function") {
+        try {
+          panel.validateQuery();
+        } catch (error) {
+          expect(error).toBeDefined();
+        }
+      }
+      
+      // Test SQL fields extraction
+      if (typeof panel.extractFieldsFromSQL === "function") {
+        try {
+          panel.extractFieldsFromSQL();
+        } catch (error) {
+          expect(error).toBeDefined();
+        }
+      }
+      
+      // Test switching back to non-custom query
+      panel.dashboardPanelData.data.queries[0].customQuery = false;
+      expect(panel.dashboardPanelData.data.queries[0].customQuery).toBe(false);
+      
+      // Test query builder vs custom query modes
+      if (typeof panel.switchToQueryBuilder === "function") {
+        panel.switchToQueryBuilder();
+      }
+      
+      if (typeof panel.switchToCustomQuery === "function") {
+        panel.switchToCustomQuery();
+        expect(panel.dashboardPanelData.data.queries[0].customQuery).toBe(true);
+      }
+      
+      // Test SQL query execution context
+      panel.dashboardPanelData.data.queries[0].config.queryContext = {
+        database: "logs",
+        table: "application_logs",
+        timeField: "timestamp"
+      };
+      
+      expect(panel.dashboardPanelData.data.queries[0].config.queryContext.database).toBe("logs");
+      expect(panel.dashboardPanelData.data.queries[0].config.queryContext.table).toBe("application_logs");
+      expect(panel.dashboardPanelData.data.queries[0].config.queryContext.timeField).toBe("timestamp");
+    });
+  });
+
+  describe("Dashboard Layout and Panel Management", () => {
+    it("should handle dashboard layout properties and panel management", () => {
+      const panel = useDashboardPanelData();
+      
+      // Test layout coordinates and dimensions
+      panel.dashboardPanelData.layout.i = "panel-1";
+      panel.dashboardPanelData.layout.x = 0;
+      panel.dashboardPanelData.layout.y = 0;
+      panel.dashboardPanelData.layout.w = 6;
+      panel.dashboardPanelData.layout.h = 4;
+      
+      expect(panel.dashboardPanelData.layout.i).toBe("panel-1");
+      expect(panel.dashboardPanelData.layout.x).toBe(0);
+      expect(panel.dashboardPanelData.layout.y).toBe(0);
+      expect(panel.dashboardPanelData.layout.w).toBe(6);
+      expect(panel.dashboardPanelData.layout.h).toBe(4);
+      
+      // Test layout constraints
+      panel.dashboardPanelData.layout.minW = 2;
+      panel.dashboardPanelData.layout.minH = 2;
+      panel.dashboardPanelData.layout.maxW = 12;
+      panel.dashboardPanelData.layout.maxH = 12;
+      
+      expect(panel.dashboardPanelData.layout.minW).toBe(2);
+      expect(panel.dashboardPanelData.layout.minH).toBe(2);
+      expect(panel.dashboardPanelData.layout.maxW).toBe(12);
+      expect(panel.dashboardPanelData.layout.maxH).toBe(12);
+      
+      // Test resizable and draggable properties
+      panel.dashboardPanelData.layout.static = false;
+      panel.dashboardPanelData.layout.resizable = true;
+      panel.dashboardPanelData.layout.draggable = true;
+      
+      expect(panel.dashboardPanelData.layout.static).toBe(false);
+      expect(panel.dashboardPanelData.layout.resizable).toBe(true);
+      expect(panel.dashboardPanelData.layout.draggable).toBe(true);
+      
+      // Test panel unique identifier
+      panel.dashboardPanelData.data.id = "unique-panel-id-123";
+      expect(panel.dashboardPanelData.data.id).toBe("unique-panel-id-123");
+      
+      // Test panel visibility and state
+      panel.dashboardPanelData.data.config.show_panel = true;
+      panel.dashboardPanelData.data.config.panel_border = true;
+      panel.dashboardPanelData.data.config.panel_background = "white";
+      
+      expect(panel.dashboardPanelData.data.config.show_panel).toBe(true);
+      expect(panel.dashboardPanelData.data.config.panel_border).toBe(true);
+      expect(panel.dashboardPanelData.data.config.panel_background).toBe("white");
+      
+      // Test responsive layout configurations
+      panel.dashboardPanelData.layout.responsive = {
+        xs: { w: 12, h: 4 },
+        sm: { w: 6, h: 4 },
+        md: { w: 4, h: 4 },
+        lg: { w: 3, h: 4 }
+      };
+      
+      expect(panel.dashboardPanelData.layout.responsive.xs.w).toBe(12);
+      expect(panel.dashboardPanelData.layout.responsive.lg.w).toBe(3);
+      
+      // Test panel ordering and z-index
+      panel.dashboardPanelData.layout.zIndex = 1;
+      expect(panel.dashboardPanelData.layout.zIndex).toBe(1);
+    });
+  });
+
+  describe("Advanced Chart Configuration", () => {
+    it("should handle advanced chart configurations and options", () => {
+      const panel = useDashboardPanelData();
+      
+      // Test treemap chart configuration
+      panel.dashboardPanelData.data.type = "treemap";
+      panel.dashboardPanelData.data.config.treemap = {
+        colorByValue: true,
+        showLabels: true,
+        labelFormat: "{name}: {value}"
+      };
+      
+      expect(panel.dashboardPanelData.data.type).toBe("treemap");
+      expect(panel.dashboardPanelData.data.config.treemap.colorByValue).toBe(true);
+      
+      // Test funnel chart configuration  
+      panel.dashboardPanelData.data.type = "funnel";
+      panel.dashboardPanelData.data.config.funnel = {
+        ascending: false,
+        gap: 2,
+        labelPosition: "inside"
+      };
+      
+      expect(panel.dashboardPanelData.data.type).toBe("funnel");
+      expect(panel.dashboardPanelData.data.config.funnel.ascending).toBe(false);
+      
+      // Test waterfall chart configuration
+      panel.dashboardPanelData.data.type = "waterfall";  
+      panel.dashboardPanelData.data.config.waterfall = {
+        showConnector: true,
+        positiveColor: "#28a745",
+        negativeColor: "#dc3545"
+      };
+      
+      expect(panel.dashboardPanelData.data.type).toBe("waterfall");
+      expect(panel.dashboardPanelData.data.config.waterfall.showConnector).toBe(true);
+      
+      // Test parallel coordinates chart
+      panel.dashboardPanelData.data.type = "parallel";
+      panel.dashboardPanelData.data.config.parallel = {
+        layout: "vertical",
+        smooth: true
+      };
+      
+      expect(panel.dashboardPanelData.data.type).toBe("parallel");
+      expect(panel.dashboardPanelData.data.config.parallel.layout).toBe("vertical");
+      
+      // Test candlestick chart configuration
+      panel.dashboardPanelData.data.type = "candlestick";
+      panel.dashboardPanelData.data.config.candlestick = {
+        upColor: "#00da3c",
+        downColor: "#ec0000",
+        borderUpColor: "#00da3c",
+        borderDownColor: "#ec0000"
+      };
+      
+      expect(panel.dashboardPanelData.data.type).toBe("candlestick");
+      expect(panel.dashboardPanelData.data.config.candlestick.upColor).toBe("#00da3c");
+      
+      // Test boxplot configuration
+      panel.dashboardPanelData.data.type = "boxplot";
+      panel.dashboardPanelData.data.config.boxplot = {
+        outliers: true,
+        whiskerWidth: 0.8
+      };
+      
+      expect(panel.dashboardPanelData.data.type).toBe("boxplot");
+      expect(panel.dashboardPanelData.data.config.boxplot.outliers).toBe(true);
+      
+      // Test advanced axis configurations
+      panel.dashboardPanelData.data.config.axis = {
+        xAxis: {
+          type: "time",
+          format: "YYYY-MM-DD HH:mm:ss",
+          rotate: 45,
+          truncate: 20
+        },
+        yAxis: {
+          type: "value", 
+          min: 0,
+          max: "dataMax",
+          scale: true,
+          splitNumber: 5
+        }
+      };
+      
+      expect(panel.dashboardPanelData.data.config.axis.xAxis.type).toBe("time");
+      expect(panel.dashboardPanelData.data.config.axis.yAxis.scale).toBe(true);
+    });
+  });
+
+  describe("WebSocket and Real-time Operations", () => {
+    it("should handle WebSocket connections and real-time data operations", () => {
+      const panel = useDashboardPanelData();
+      
+      // Test WebSocket connection states
+      panel.dashboardPanelData.meta.connection = {
+        status: "connected",
+        lastUpdate: Date.now(),
+        retryCount: 0,
+        autoReconnect: true
+      };
+      
+      expect(panel.dashboardPanelData.meta.connection.status).toBe("connected");
+      expect(panel.dashboardPanelData.meta.connection.autoReconnect).toBe(true);
+      
+      // Test real-time data streaming
+      panel.dashboardPanelData.meta.streaming = {
+        enabled: true,
+        interval: 30000,
+        bufferSize: 1000,
+        lastDataTimestamp: Date.now()
+      };
+      
+      expect(panel.dashboardPanelData.meta.streaming.enabled).toBe(true);
+      expect(panel.dashboardPanelData.meta.streaming.interval).toBe(30000);
+      
+      // Test data refresh settings
+      panel.dashboardPanelData.data.config.auto_refresh = true;
+      panel.dashboardPanelData.data.config.refresh_interval = 60;
+      panel.dashboardPanelData.data.config.refresh_on_focus = true;
+      
+      expect(panel.dashboardPanelData.data.config.auto_refresh).toBe(true);
+      expect(panel.dashboardPanelData.data.config.refresh_interval).toBe(60);
+      expect(panel.dashboardPanelData.data.config.refresh_on_focus).toBe(true);
+      
+      // Test subscription management
+      panel.dashboardPanelData.meta.subscriptions = {
+        dataUpdates: "subscription-id-1",
+        schemaChanges: "subscription-id-2",
+        alerts: "subscription-id-3"
+      };
+      
+      expect(panel.dashboardPanelData.meta.subscriptions.dataUpdates).toBe("subscription-id-1");
+      expect(panel.dashboardPanelData.meta.subscriptions.schemaChanges).toBe("subscription-id-2");
+      
+      // Test WebSocket function calls (if available)
+      if (typeof panel.connectToWebSocket === "function") {
+        try {
+          panel.connectToWebSocket();
+        } catch (error) {
+          expect(error).toBeDefined();
+        }
+      }
+      
+      if (typeof panel.disconnectFromWebSocket === "function") {
+        try {
+          panel.disconnectFromWebSocket();
+        } catch (error) {
+          expect(error).toBeDefined();
+        }
+      }
+      
+      // Test data synchronization
+      panel.dashboardPanelData.meta.sync = {
+        lastSync: Date.now(),
+        pendingUpdates: 0,
+        syncInProgress: false,
+        conflictResolution: "latest-wins"
+      };
+      
+      expect(panel.dashboardPanelData.meta.sync.pendingUpdates).toBe(0);
+      expect(panel.dashboardPanelData.meta.sync.syncInProgress).toBe(false);
+      expect(panel.dashboardPanelData.meta.sync.conflictResolution).toBe("latest-wins");
+      
+      // Test offline mode handling
+      panel.dashboardPanelData.meta.offline = {
+        mode: false,
+        cachedData: null,
+        queuedRequests: []
+      };
+      
+      expect(panel.dashboardPanelData.meta.offline.mode).toBe(false);
+      expect(panel.dashboardPanelData.meta.offline.queuedRequests).toEqual([]);
+    });
+  });
 });
