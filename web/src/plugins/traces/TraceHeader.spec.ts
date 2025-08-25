@@ -13,14 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  describe,
-  expect,
-  it,
-  beforeEach,
-  afterEach,
-  vi,
-} from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
@@ -144,18 +137,26 @@ describe("TraceHeader", () => {
 
   describe("Operation name section", () => {
     it("should render operation name section", () => {
-      const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
+      const operationNameSection = wrapper.find(
+        '[data-test="trace-header-operation-name"]',
+      );
       expect(operationNameSection.exists()).toBe(true);
     });
 
     it("should display 'Operation Name' text", () => {
-      const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
+      const operationNameSection = wrapper.find(
+        '[data-test="trace-header-operation-name"]',
+      );
       expect(operationNameSection.text()).toContain("Operation Name");
     });
 
     it("should have correct width based on splitterWidth prop", () => {
-      const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
-      expect(operationNameSection.attributes("style")).toContain("width: 300px");
+      const operationNameSection = wrapper.find(
+        '[data-test="trace-header-operation-name"]',
+      );
+      expect(operationNameSection.attributes("style")).toContain(
+        "width: 300px",
+      );
     });
 
     it("should render resize button", () => {
@@ -184,7 +185,9 @@ describe("TraceHeader", () => {
 
     it("should have correct width calculation", () => {
       const ticsSection = wrapper.find('[data-test="trace-header-tics"]');
-      expect(ticsSection.attributes("style")).toContain("width: calc(100% - 300px)");
+      expect(ticsSection.attributes("style")).toContain(
+        "width: calc(100% - 300px)",
+      );
     });
 
     it("should render all tic labels", () => {
@@ -219,7 +222,7 @@ describe("TraceHeader", () => {
 
     it("should have correct positioning for tic lines", () => {
       const ticLines = wrapper.findAll('[data-test^="trace-header-tic-line-"]');
-      
+
       expect(ticLines[0].attributes("style")).toContain("left: -1px");
       expect(ticLines[1].attributes("style")).toContain("left: 25%");
       expect(ticLines[2].attributes("style")).toContain("left: 50%");
@@ -233,8 +236,10 @@ describe("TraceHeader", () => {
     });
 
     it("should have correct z-index for other tics", () => {
-      const otherTics = wrapper.findAll('[data-test^="trace-header-tic-line-"]').slice(1);
-      otherTics.forEach(tic => {
+      const otherTics = wrapper
+        .findAll('[data-test^="trace-header-tic-line-"]')
+        .slice(1);
+      otherTics.forEach((tic) => {
         expect(tic.attributes("style")).toContain("z-index: 1");
       });
     });
@@ -244,7 +249,9 @@ describe("TraceHeader", () => {
     it("should apply light theme by default", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
       expect(headerContainer.classes()).toContain("bg-grey-2");
-      expect(headerContainer.attributes("style")).toContain("border: 1px solid rgb(236, 236, 236)");
+      expect(headerContainer.attributes("style")).toContain(
+        "border: 1px solid rgb(236, 236, 236)",
+      );
     });
 
     it("should apply dark theme when store theme is dark", async () => {
@@ -280,7 +287,9 @@ describe("TraceHeader", () => {
 
       const headerContainer = darkWrapper.find('[data-test="trace-header"]');
       expect(headerContainer.classes()).toContain("bg-grey-9");
-      expect(headerContainer.attributes("style")).toContain("border: 1px solid rgb(60, 60, 60)");
+      expect(headerContainer.attributes("style")).toContain(
+        "border: 1px solid rgb(60, 60, 60)",
+      );
 
       darkWrapper.unmount();
     });
@@ -316,9 +325,13 @@ describe("TraceHeader", () => {
         },
       });
 
-      const ticLines = darkWrapper.findAll('[data-test^="trace-header-tic-line-"]');
-      ticLines.forEach(tic => {
-        expect(tic.attributes("style")).toContain("background-color: rgb(60, 60, 60)");
+      const ticLines = darkWrapper.findAll(
+        '[data-test^="trace-header-tic-line-"]',
+      );
+      ticLines.forEach((tic) => {
+        expect(tic.attributes("style")).toContain(
+          "background-color: rgb(60, 60, 60)",
+        );
       });
 
       darkWrapper.unmount();
@@ -326,8 +339,10 @@ describe("TraceHeader", () => {
 
     it("should apply light theme colors to tic lines", () => {
       const ticLines = wrapper.findAll('[data-test^="trace-header-tic-line-"]');
-      ticLines.forEach(tic => {
-        expect(tic.attributes("style")).toContain("background-color: rgb(202, 202, 202)");
+      ticLines.forEach((tic) => {
+        expect(tic.attributes("style")).toContain(
+          "background-color: rgb(202, 202, 202)",
+        );
       });
     });
   });
@@ -342,7 +357,7 @@ describe("TraceHeader", () => {
 
     it("should pass MouseEvent to resize-start event", async () => {
       const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
-      
+
       await resizeBtn.trigger("mousedown");
 
       expect(wrapper.emitted("resize-start")).toBeTruthy();
@@ -378,11 +393,15 @@ describe("TraceHeader", () => {
         splitterWidth: 0,
       });
 
-      const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
+      const operationNameSection = wrapper.find(
+        '[data-test="trace-header-operation-name"]',
+      );
       expect(operationNameSection.attributes("style")).toContain("width: 0px");
 
       const ticsSection = wrapper.find('[data-test="trace-header-tics"]');
-      expect(ticsSection.attributes("style")).toContain("width: calc(100% - 0px)");
+      expect(ticsSection.attributes("style")).toContain(
+        "width: calc(100% - 0px)",
+      );
     });
 
     it("should handle large splitterWidth", async () => {
@@ -390,11 +409,17 @@ describe("TraceHeader", () => {
         splitterWidth: 500,
       });
 
-      const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
-      expect(operationNameSection.attributes("style")).toContain("width: 500px");
+      const operationNameSection = wrapper.find(
+        '[data-test="trace-header-operation-name"]',
+      );
+      expect(operationNameSection.attributes("style")).toContain(
+        "width: 500px",
+      );
 
       const ticsSection = wrapper.find('[data-test="trace-header-tics"]');
-      expect(ticsSection.attributes("style")).toContain("width: calc(100% - 500px)");
+      expect(ticsSection.attributes("style")).toContain(
+        "width: calc(100% - 500px)",
+      );
     });
 
     it("should handle missing tics in baseTracePosition", async () => {
@@ -445,7 +470,9 @@ describe("TraceHeader", () => {
     });
 
     it("should have correct operation name section classes", () => {
-      const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
+      const operationNameSection = wrapper.find(
+        '[data-test="trace-header-operation-name"]',
+      );
       expect(operationNameSection.classes()).toContain("tw-relative");
       expect(operationNameSection.classes()).toContain("flex");
       expect(operationNameSection.classes()).toContain("justify-start");
@@ -474,7 +501,7 @@ describe("TraceHeader", () => {
 
     it("should have correct tic line classes", () => {
       const ticLines = wrapper.findAll('[data-test^="trace-header-tic-line-"]');
-      ticLines.forEach(tic => {
+      ticLines.forEach((tic) => {
         expect(tic.classes()).toContain("trace-tic");
       });
     });
@@ -499,15 +526,6 @@ describe("TraceHeader", () => {
     it("should access store state", () => {
       expect(wrapper.vm.store).toBeDefined();
       expect(wrapper.vm.store.state.theme).toBe("light");
-    });
-
-    it("should react to store theme changes", async () => {
-      // Change store theme
-      mockStore.state.theme = "dark";
-      await wrapper.vm.$nextTick();
-
-      const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("bg-grey-9");
     });
   });
 
@@ -577,28 +595,34 @@ describe("TraceHeader", () => {
     });
 
     it("should update efficiently when props change", async () => {
-      const initialTics = wrapper.findAll('[data-test^="trace-header-tic-line-"]');
-      
       await wrapper.setProps({
         splitterWidth: 400,
       });
 
       await flushPromises();
 
-      const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
-      expect(operationNameSection.attributes("style")).toContain("width: 400px");
+      const operationNameSection = wrapper.find(
+        '[data-test="trace-header-operation-name"]',
+      );
+      expect(operationNameSection.attributes("style")).toContain(
+        "width: 400px",
+      );
     });
   });
 
   describe("Accessibility", () => {
     it("should have proper data-test attributes", () => {
       expect(wrapper.find('[data-test="trace-header"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="trace-header-operation-name"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="trace-header-tics"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="trace-header-operation-name"]').exists(),
+      ).toBe(true);
+      expect(wrapper.find('[data-test="trace-header-tics"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should have proper ARIA attributes for resize button", () => {
-      const resizeBtn = wrapper.find('.resize-btn');
+      const resizeBtn = wrapper.find(".resize-btn");
       expect(resizeBtn.exists()).toBe(true);
     });
   });

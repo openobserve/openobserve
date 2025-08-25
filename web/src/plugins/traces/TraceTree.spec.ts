@@ -13,14 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  describe,
-  expect,
-  it,
-  beforeEach,
-  afterEach,
-  vi,
-} from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import * as quasar from "quasar";
@@ -84,7 +77,7 @@ const mockSpans = [
 ];
 
 const mockSpanMap = {
-  "d9603ec7f76eb499": {
+  d9603ec7f76eb499: {
     _timestamp: 1752490492843047,
     start_time: 1752490492843047200,
     end_time: 1752490493164419300,
@@ -95,7 +88,6 @@ const mockSpanMap = {
     span_status: "UNSET",
     span_kind: 2,
     parent_id: "6702b0494b2b6e57",
-    test: ["span1", "span2"]
   },
   "6702b0494b2b6e57": {
     _timestamp: 1752490492843047,
@@ -165,7 +157,20 @@ const mockSpanList = [
     operation_name: "service:alerts:evaluate_scheduled",
     duration: 321372,
     span_status: "UNSET",
-    links: [{"context": {"traceId": "f6e08ab2a928aa393375f0d9b05a9054", "spanId": "ecc59cb843104cf8"}}, {"context": {"traceId": "6262666637a9ae45ad3e25f5111dd59f", "spanId": "d9603ec7f76eb499"}}],
+    links: [
+      {
+        context: {
+          traceId: "f6e08ab2a928aa393375f0d9b05a9054",
+          spanId: "ecc59cb843104cf8",
+        },
+      },
+      {
+        context: {
+          traceId: "6262666637a9ae45ad3e25f5111dd59f",
+          spanId: "d9603ec7f76eb499",
+        },
+      },
+    ],
   },
   {
     span_id: "6702b0494b2b6e57",
@@ -173,7 +178,7 @@ const mockSpanList = [
     operation_name: "service:alerts:process",
     duration: 321372,
     span_status: "ERROR",
-    links: []
+    links: [],
   },
 ];
 
@@ -218,67 +223,89 @@ describe("TraceTree", () => {
   it("should render all spans", () => {
     // loop through all spans and check if they exist
 
-    const spanElements = wrapper.findAll(`[data-test^="trace-tree-span-container-"]`);
+    const spanElements = wrapper.findAll(
+      `[data-test^="trace-tree-span-container-"]`,
+    );
     expect(spanElements.length).toBe(mockSpans.length);
 
     for (const span of mockSpans) {
-      const spanElement = wrapper.find(`[data-test="trace-tree-span-container-${span.spanId}"]`);
+      const spanElement = wrapper.find(
+        `[data-test="trace-tree-span-container-${span.spanId}"]`,
+      );
       expect(spanElement.exists()).toBe(true);
     }
   });
 
   it("should render span operation names", () => {
     for (const span of mockSpans) {
-      const operationNameElement = wrapper.find(`[data-test="trace-tree-span-operation-name-${span.spanId}"]`);
+      const operationNameElement = wrapper.find(
+        `[data-test="trace-tree-span-operation-name-${span.spanId}"]`,
+      );
       expect(operationNameElement.exists()).toBe(true);
       expect(operationNameElement.text()).toBe(span.operationName);
     }
   });
 
   it("should render service names", () => {
-    const serviceNameElements = wrapper.findAll('[data-test^="trace-tree-span-service-name-"]');
+    const serviceNameElements = wrapper.findAll(
+      '[data-test^="trace-tree-span-service-name-"]',
+    );
     expect(serviceNameElements.length).toBe(mockSpans.length);
-    
+
     expect(serviceNameElements[0].text()).toBe(mockSpans[0].serviceName);
     expect(serviceNameElements[1].text()).toBe(mockSpans[1].serviceName);
   });
 
   it("should render error icon for error spans", () => {
-    const errorIcon = wrapper.find('[data-test="trace-tree-span-error-icon-6702b0494b2b6e57"]');
+    const errorIcon = wrapper.find(
+      '[data-test="trace-tree-span-error-icon-6702b0494b2b6e57"]',
+    );
     expect(errorIcon.exists()).toBe(true);
   });
 
   it("should not render error icon for non-error spans", () => {
-    const errorIcon = wrapper.find('[data-test="trace-tree-span-error-icon-d9603ec7f76eb499"]');
+    const errorIcon = wrapper.find(
+      '[data-test="trace-tree-span-error-icon-d9603ec7f76eb499"]',
+    );
     expect(errorIcon.exists()).toBe(false);
   });
 
   it("should render collapse button for spans with children", () => {
-    const collapseBtn = wrapper.find('[data-test="trace-tree-span-collapse-btn-d9603ec7f76eb499"]');
+    const collapseBtn = wrapper.find(
+      '[data-test="trace-tree-span-collapse-btn-d9603ec7f76eb499"]',
+    );
     expect(collapseBtn.exists()).toBe(true);
   });
 
   it("should not render collapse button for spans without children", () => {
-    const collapseBtn = wrapper.find('[data-test="trace-tree-span-collapse-btn-6702b0494b2b6e57"]');
+    const collapseBtn = wrapper.find(
+      '[data-test="trace-tree-span-collapse-btn-6702b0494b2b6e57"]',
+    );
     expect(collapseBtn.exists()).toBe(false);
   });
 
   it("should render view logs button", () => {
-    const viewLogsBtn = wrapper.find('[data-test="trace-tree-span-view-logs-btn-d9603ec7f76eb499"]');
+    const viewLogsBtn = wrapper.find(
+      '[data-test="trace-tree-span-view-logs-btn-d9603ec7f76eb499"]',
+    );
     expect(viewLogsBtn.exists()).toBe(true);
   });
 
- describe("Span selection", () => {
+  describe("Span selection", () => {
     it("should emit selectSpan when span is clicked", async () => {
-      const selectBtn = wrapper.find('[data-test="trace-tree-span-select-btn-d9603ec7f76eb499"]');
+      const selectBtn = wrapper.find(
+        '[data-test="trace-tree-span-select-btn-d9603ec7f76eb499"]',
+      );
       await selectBtn.trigger("click");
 
       expect(wrapper.emitted("selectSpan")).toBeTruthy();
-       expect(wrapper.emitted("selectSpan")[0]).toEqual(["d9603ec7f76eb499"]);
+      expect(wrapper.emitted("selectSpan")[0]).toEqual(["d9603ec7f76eb499"]);
     });
 
     it("should emit selectSpan with correct span ID", async () => {
-      const selectBtn = wrapper.find('[data-test="trace-tree-span-select-btn-6702b0494b2b6e57"]');
+      const selectBtn = wrapper.find(
+        '[data-test="trace-tree-span-select-btn-6702b0494b2b6e57"]',
+      );
       await selectBtn.trigger("click");
 
       expect(wrapper.emitted("selectSpan")).toBeTruthy();
@@ -288,35 +315,45 @@ describe("TraceTree", () => {
 
   describe("Span collapse functionality", () => {
     it("should emit toggleCollapse when collapse button is clicked", async () => {
-      const collapseBtn = wrapper.find('[data-test="trace-tree-span-collapse-btn-d9603ec7f76eb499"]');
+      const collapseBtn = wrapper.find(
+        '[data-test="trace-tree-span-collapse-btn-d9603ec7f76eb499"]',
+      );
       await collapseBtn.trigger("click");
 
       expect(wrapper.emitted("toggleCollapse")).toBeTruthy();
-      expect(wrapper.emitted("toggleCollapse")[0]).toEqual(["d9603ec7f76eb499"]);
+      expect(wrapper.emitted("toggleCollapse")[0]).toEqual([
+        "d9603ec7f76eb499",
+      ]);
     });
 
     it("should apply correct collapse icon rotation", async () => {
       await wrapper.setProps({
-        collapseMapping: { "d9603ec7f76eb499": true },
+        collapseMapping: { d9603ec7f76eb499: true },
       });
 
-      const collapseIcon = wrapper.find('[data-test="trace-tree-span-collapse-btn-d9603ec7f76eb499"] .collapse-btn');
+      const collapseIcon = wrapper.find(
+        '[data-test="trace-tree-span-collapse-btn-d9603ec7f76eb499"] .collapse-btn',
+      );
       expect(collapseIcon.attributes("style")).toContain("rotate: 0deg");
     });
 
     it("should apply correct expand icon rotation", async () => {
       await wrapper.setProps({
-        collapseMapping: { "d9603ec7f76eb499": false },
+        collapseMapping: { d9603ec7f76eb499: false },
       });
 
-      const collapseIcon = wrapper.find('[data-test="trace-tree-span-collapse-btn-d9603ec7f76eb499"] .collapse-btn');
+      const collapseIcon = wrapper.find(
+        '[data-test="trace-tree-span-collapse-btn-d9603ec7f76eb499"] .collapse-btn',
+      );
       expect(collapseIcon.attributes("style")).toContain("rotate: 270deg");
     });
   });
 
   describe("View logs functionality", () => {
     it("should emit view-logs when view logs button is clicked", async () => {
-      const viewLogsBtn = wrapper.find('[data-test="trace-tree-span-view-logs-btn-d9603ec7f76eb499"]');
+      const viewLogsBtn = wrapper.find(
+        '[data-test="trace-tree-span-view-logs-btn-d9603ec7f76eb499"]',
+      );
       await viewLogsBtn.trigger("click");
 
       // The component should call viewSpanLogs function which uses useTraces composable
@@ -435,16 +472,22 @@ describe("TraceTree", () => {
 
       it("should return true for array path that matches search results", () => {
         // Mock searchResults to contain array paths
-        wrapper.vm.searchResults = [["service_name", "alertmanager"], ["operation_name", "evaluate_scheduled"]];
-        
-        const result = wrapper.vm.isHighlighted(["service_name", "alertmanager"]);
+        wrapper.vm.searchResults = [
+          ["service_name", "alertmanager"],
+          ["operation_name", "evaluate_scheduled"],
+        ];
+
+        const result = wrapper.vm.isHighlighted([
+          "service_name",
+          "alertmanager",
+        ]);
         expect(result).toBe(true);
       });
 
       it("should return false for array path that doesn't match search results", () => {
         // Mock searchResults to contain array paths
         wrapper.vm.searchResults = [["service_name", "alertmanager"]];
-        
+
         const result = wrapper.vm.isHighlighted(["operation_name", "process"]);
         expect(result).toBe(false);
       });
@@ -452,7 +495,7 @@ describe("TraceTree", () => {
       it("should return true for single value that matches search results", () => {
         // Mock searchResults to contain single values
         wrapper.vm.searchResults = ["d9603ec7f76eb499", "6702b0494b2b6e57"];
-        
+
         const result = wrapper.vm.isHighlighted("d9603ec7f76eb499");
         expect(result).toBe(true);
       });
@@ -460,14 +503,14 @@ describe("TraceTree", () => {
       it("should return false for single value that doesn't match search results", () => {
         // Mock searchResults to contain single values
         wrapper.vm.searchResults = ["d9603ec7f76eb499"];
-        
+
         const result = wrapper.vm.isHighlighted("6702b0494b2b6e57");
         expect(result).toBe(false);
       });
 
       it("should handle empty search results", () => {
         wrapper.vm.searchResults = [];
-        
+
         const result = wrapper.vm.isHighlighted("d9603ec7f76eb499");
         expect(result).toBe(false);
       });
@@ -491,9 +534,9 @@ describe("TraceTree", () => {
 
         // Mock searchResults to have matches
         wrapper.vm.searchResults = ["d9603ec7f76eb499"];
-        
+
         wrapper.vm.scrollToMatch();
-        
+
         expect(document.querySelector).toHaveBeenCalledWith(".current-match");
         expect(mockElement.scrollIntoView).toHaveBeenCalledWith({
           behavior: "smooth",
@@ -513,9 +556,9 @@ describe("TraceTree", () => {
 
         // Mock searchResults to be empty
         wrapper.vm.searchResults = [];
-        
+
         wrapper.vm.scrollToMatch();
-        
+
         expect(document.querySelector).not.toHaveBeenCalled();
         expect(mockElement.scrollIntoView).not.toHaveBeenCalled();
 
@@ -532,9 +575,9 @@ describe("TraceTree", () => {
 
         // Mock searchResults to have matches
         wrapper.vm.searchResults = ["d9603ec7f76eb499"];
-        
+
         wrapper.vm.scrollToMatch();
-        
+
         expect(document.querySelector).toHaveBeenCalledWith(".current-match");
         expect(mockElement.scrollIntoView).not.toHaveBeenCalled();
 
@@ -572,7 +615,7 @@ describe("TraceTree", () => {
       // First go to next match
       wrapper.vm.nextMatch();
       await flushPromises();
-      
+
       const currentIndex = wrapper.vm.currentIndex;
       wrapper.vm.prevMatch();
       await flushPromises();
@@ -592,7 +635,7 @@ describe("TraceTree", () => {
       // Go to last match
       wrapper.vm.nextMatch();
       await flushPromises();
-      
+
       const lastIndex = wrapper.vm.currentIndex;
       wrapper.vm.nextMatch();
       await flushPromises();
@@ -603,26 +646,36 @@ describe("TraceTree", () => {
 
   describe("Hover functionality", () => {
     it("should show view logs button on hover", async () => {
-      const operationContainer = wrapper.find('[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]');
+      const operationContainer = wrapper.find(
+        '[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]',
+      );
       await operationContainer.trigger("mouseover");
 
-      const viewLogsContainer = wrapper.find('[data-test="trace-tree-span-view-logs-container-d9603ec7f76eb499"]');
+      const viewLogsContainer = wrapper.find(
+        '[data-test="trace-tree-span-view-logs-container-d9603ec7f76eb499"]',
+      );
       expect(viewLogsContainer.classes()).toContain("show");
     });
 
     it("should hide view logs button when not hovered", async () => {
-      const operationContainer = wrapper.find('[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]');
+      const operationContainer = wrapper.find(
+        '[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]',
+      );
       await operationContainer.trigger("mouseover");
       await operationContainer.trigger("mouseout");
 
-      const viewLogsContainer = wrapper.find('[data-test="trace-tree-span-view-logs-container-d9603ec7f76eb499"]');
+      const viewLogsContainer = wrapper.find(
+        '[data-test="trace-tree-span-view-logs-container-d9603ec7f76eb499"]',
+      );
       expect(viewLogsContainer.classes()).not.toContain("show");
     });
   });
 
   describe("Theme support", () => {
     it("should apply light theme by default", () => {
-      const operationContainer = wrapper.find('[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]');
+      const operationContainer = wrapper.find(
+        '[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]',
+      );
       expect(operationContainer.classes()).toContain("bg-white");
     });
 
@@ -665,7 +718,9 @@ describe("TraceTree", () => {
         },
       });
 
-      const operationContainer = darkWrapper.find('[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]');
+      const operationContainer = darkWrapper.find(
+        '[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]',
+      );
       expect(operationContainer.classes()).toContain("bg-dark");
 
       darkWrapper.unmount();
@@ -676,17 +731,21 @@ describe("TraceTree", () => {
     it("should pass correct props to span-block", () => {
       const spanBlock = wrapper.findComponent({ name: "span-block" });
       expect(spanBlock.exists()).toBe(true);
-      
+
       expect(spanBlock.props("span")).toEqual(mockSpans[0]);
       expect(spanBlock.props("depth")).toBe(0);
-      expect(spanBlock.props("baseTracePosition")).toEqual(mockBaseTracePosition);
+      expect(spanBlock.props("baseTracePosition")).toEqual(
+        mockBaseTracePosition,
+      );
       expect(spanBlock.props("spanDimensions")).toEqual(mockSpanDimensions);
-      expect(spanBlock.props("spanData")).toEqual(mockSpanMap["d9603ec7f76eb499"]);
+      expect(spanBlock.props("spanData")).toEqual(
+        mockSpanMap["d9603ec7f76eb499"],
+      );
     });
 
     it("should handle span-block events", async () => {
       const spanBlock = wrapper.findComponent({ name: "span-block" });
-      
+
       // Simulate span-block events
       await spanBlock.vm.$emit("select-span", "d9603ec7f76eb499");
       await spanBlock.vm.$emit("toggle-collapse", "d9603ec7f76eb499");
@@ -733,28 +792,28 @@ describe("TraceTree", () => {
       it("should return null when currentIndex is -1", () => {
         wrapper.vm.currentIndex = -1;
         wrapper.vm.searchResults = ["d9603ec7f76eb499"];
-        
+
         expect(wrapper.vm.currentSelectedValue).toBeNull();
       });
 
       it("should return null when searchResults is empty", () => {
         wrapper.vm.currentIndex = 0;
         wrapper.vm.searchResults = [];
-        
+
         expect(wrapper.vm.currentSelectedValue).toBeNull();
       });
 
       it("should return the current selected value when valid", () => {
         wrapper.vm.currentIndex = 0;
         wrapper.vm.searchResults = ["d9603ec7f76eb499", "6702b0494b2b6e57"];
-        
+
         expect(wrapper.vm.currentSelectedValue).toBe("d9603ec7f76eb499");
       });
 
       it("should return the correct value when currentIndex is not 0", () => {
         wrapper.vm.currentIndex = 1;
         wrapper.vm.searchResults = ["d9603ec7f76eb499", "6702b0494b2b6e57"];
-        
+
         expect(wrapper.vm.currentSelectedValue).toBe("6702b0494b2b6e57");
       });
     });
@@ -763,10 +822,14 @@ describe("TraceTree", () => {
   describe("findMatches function", () => {
     it("should find matches in string values", () => {
       const spanList = [
-        { span_id: "span1", service_name: "alertmanager", operation_name: "process" },
+        {
+          span_id: "span1",
+          service_name: "alertmanager",
+          operation_name: "process",
+        },
         { span_id: "span2", service_name: "other", operation_name: "other" },
       ];
-      
+
       const results = wrapper.vm.findMatches(spanList, "alertmanager");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
@@ -777,7 +840,7 @@ describe("TraceTree", () => {
         { span_id: "span1", duration: 321372 },
         { span_id: "span2", duration: 100000 },
       ];
-      
+
       const results = wrapper.vm.findMatches(spanList, "321372");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
@@ -788,7 +851,7 @@ describe("TraceTree", () => {
         { span_id: "span1", duration: 321372 },
         { span_id: "span2", duration: 100000 },
       ];
-      
+
       const results = wrapper.vm.findMatches(spanList, "321372us");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
@@ -799,7 +862,7 @@ describe("TraceTree", () => {
         { span_id: "span1", service_name: "AlertManager" },
         { span_id: "span2", service_name: "Other" },
       ];
-      
+
       const results = wrapper.vm.findMatches(spanList, "alertmanager");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
@@ -810,7 +873,7 @@ describe("TraceTree", () => {
         { span_id: "span1", service_name: "alertmanager" },
         { span_id: "span2", service_name: "other" },
       ];
-      
+
       const results = wrapper.vm.findMatches(spanList, "  alertmanager  ");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
@@ -818,10 +881,14 @@ describe("TraceTree", () => {
 
     it("should skip non-string and non-number values", () => {
       const spanList = [
-        { span_id: "span1", service_name: "alertmanager", metadata: { key: "value" } },
+        {
+          span_id: "span1",
+          service_name: "alertmanager",
+          metadata: { key: "value" },
+        },
         { span_id: "span2", service_name: "other" },
       ];
-      
+
       const results = wrapper.vm.findMatches(spanList, "alertmanager");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
@@ -832,16 +899,14 @@ describe("TraceTree", () => {
         { span_id: "span1", service_name: "alertmanager" },
         { span_id: "span2", service_name: "other" },
       ];
-      
+
       const results = wrapper.vm.findMatches(spanList, "nonexistent");
       expect(results).toEqual([]);
     });
 
     it("should handle empty search query", () => {
-      const spanList = [
-        { span_id: "span1", service_name: "alertmanager" },
-      ];
-      
+      const spanList = [{ span_id: "span1", service_name: "alertmanager" }];
+
       const results = wrapper.vm.findMatches(spanList, "");
       expect(results).toEqual([]);
     });
@@ -850,7 +915,7 @@ describe("TraceTree", () => {
   describe("updateSearch function", () => {
     beforeEach(() => {
       // Mock nextTick
-      vi.spyOn(wrapper.vm, 'scrollToMatch');
+      vi.spyOn(wrapper.vm, "scrollToMatch");
     });
 
     afterEach(() => {
@@ -875,8 +940,6 @@ describe("TraceTree", () => {
     });
 
     it("should clear search results when search query is empty", async () => {
-
-
       await wrapper.setProps({
         searchQuery: "alertmanager",
       });
@@ -946,20 +1009,22 @@ describe("TraceTree", () => {
 
       await flushPromises();
 
-      const spanElements = wrapper.findAll('[data-test^="trace-tree-span-container-"]');
+      const spanElements = wrapper.findAll(
+        '[data-test^="trace-tree-span-container-"]',
+      );
       expect(spanElements.length).toBe(100);
     });
 
     it("should update efficiently when props change", async () => {
-      const initialSpans = wrapper.findAll('[data-test^="trace-tree-span-container-"]');
-      
       await wrapper.setProps({
-        spans: [mockSpans[0]], // Remove one span
+        spans: [mockSpans[0]],
       });
 
       await flushPromises();
 
-      const updatedSpans = wrapper.findAll('[data-test^="trace-tree-span-container-"]');
+      const updatedSpans = wrapper.findAll(
+        '[data-test^="trace-tree-span-container-"]',
+      );
       expect(updatedSpans.length).toBe(1);
     });
   });

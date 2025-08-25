@@ -258,41 +258,6 @@ describe("TraceDetailsSidebar", async () => {
     expect(wrapper.vm.$q.notify).toBeTruthy();
   });
 
-  //   describe("When copy fails", async () => {
-  //     beforeEach(async () => {
-  //         vi.mock('quasar', async () => {
-  //             const actual = await vi.importActual<typeof import('quasar')>('quasar');
-  //             return {
-  //               ...actual,
-  //               copyToClipboard: vi.fn().mockRejectedValue(new Error('Clipboard error')),
-  //             };
-  //           });
-  //     });
-
-  //     afterEach(() => {
-  //         vi.clearAllMocks();
-  //     });
-
-  //     it("should show error notification when copy fails", async () => {
-  //         await flushPromises();
-
-  //         const copyBtn = wrapper.find(
-  //         '[data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"]',
-  //         );
-  //         expect(copyBtn.exists()).toBe(true);
-
-  //         await copyBtn.trigger("click");
-
-  //         await flushPromises();
-
-  //         // Check if clipboard.writeText was called
-  //         expect(navigator.clipboard.writeText).toHaveBeenCalledWith(mockSpan.span_id);
-
-  //         // Check if notification was triggered
-  //         expect(wrapper.vm.$q.notify).toBeTruthy();
-  //     });
-  //   });
-
   it("should show error notification when copy fails", async () => {
     // Mock clipboard API to fail for this specific test
     const originalWriteText = navigator.clipboard.writeText;
@@ -499,9 +464,11 @@ describe("TraceDetailsSidebar", async () => {
         });
 
         it("should display event rows that match the search query", async () => {
-            const highlightedText = wrapper.find('[data-test="trace-details-sidebar-events-table"]').find(".highlight");
+          const highlightedText = wrapper
+            .find('[data-test="trace-details-sidebar-events-table"]')
+            .find(".highlight");
 
-            expect(highlightedText.exists()).toBe(true);
+          expect(highlightedText.exists()).toBe(true);
         });
       });
     });
@@ -572,7 +539,13 @@ describe("TraceDetailsSidebar", async () => {
           '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
         );
         await exceptionRow.trigger("click");
-        expect(wrapper.find('[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]').exists()).toBe(true);
+        expect(
+          wrapper
+            .find(
+              '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
+            )
+            .exists(),
+        ).toBe(true);
       });
 
       it("should collapse exception when clicked again", async () => {
@@ -581,28 +554,25 @@ describe("TraceDetailsSidebar", async () => {
         );
         await exceptionRow.trigger("click");
 
-        expect(wrapper.find('[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]').exists()).toBe(true);
+        expect(
+          wrapper
+            .find(
+              '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
+            )
+            .exists(),
+        ).toBe(true);
 
         await exceptionRow.trigger("click");
 
-        expect(wrapper.find('[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]').exists()).toBe(false);
+        expect(
+          wrapper
+            .find(
+              '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
+            )
+            .exists(),
+        ).toBe(false);
       });
     });
-
-    //   it("should display exceptions when exception events exist", async () => {
-    //     // Update span to include exception events
-    //     await wrapper.setProps({
-    //       span: {
-    //         ...mockSpan,
-    //         events: '[{"name": "exception", "@timestamp": 1752490492843047, "exception.type": "RuntimeError", "exception.message": "Test error", "exception.escaped": "false", "exception.stacktrace": "Error: Test error\\n    at test.js:1:1"}]',
-    //       },
-    //     });
-
-    //     await flushPromises();
-
-    //     const exceptionsTable = wrapper.find('[data-test="span-details-exceptions-table"]');
-    //     expect(exceptionsTable.exists()).toBe(true);
-    //   });
   });
 
   describe("Links tab", () => {
@@ -653,18 +623,14 @@ describe("TraceDetailsSidebar", async () => {
       });
 
       it("should emit open-trace when a different trace link is clicked", async () => {
-        const linkRow = wrapper.find(
-          '[data-test="trace-event-detail-link-0"]',
-        );
+        const linkRow = wrapper.find('[data-test="trace-event-detail-link-0"]');
         await linkRow.trigger("click");
 
         expect(wrapper.emitted("open-trace")).toBeTruthy();
       });
 
       it("should emit select-span when a same trace link is clicked", async () => {
-        const linkRow = wrapper.find(
-          '[data-test="trace-event-detail-link-1"]',
-        );
+        const linkRow = wrapper.find('[data-test="trace-event-detail-link-1"]');
         await linkRow.trigger("click");
 
         expect(wrapper.emitted("select-span")).toBeTruthy();
@@ -781,74 +747,6 @@ describe("TraceDetailsSidebar", async () => {
       expect(highlightedText.text()).toBe("alertmanager");
     });
   });
-
-  //   describe("Theme support", () => {
-  //     it("should apply light theme by default", () => {
-  //       const container = wrapper.find('[data-test="span-details-sidebar"]');
-  //       expect(container.classes()).toContain("light-theme");
-  //     });
-
-  //     it("should apply dark theme when store theme is dark", async () => {
-  //       const darkStore = createStore({
-  //         state: {
-  //           theme: "dark",
-  //           API_ENDPOINT: "http://localhost:8080",
-  //           zoConfig: {
-  //             timestamp_column: "@timestamp",
-  //           },
-  //           selectedOrganization: {
-  //             identifier: "test-org",
-  //           },
-  //         },
-  //       });
-
-  //       const darkWrapper = mount(TraceDetailsSidebar, {
-  //         props: {
-  //           span: mockSpan,
-  //           baseTracePosition: mockBaseTracePosition,
-  //           searchQuery: "",
-  //         },
-  //         global: {
-  //           plugins: [i18n, router],
-  //           provide: {
-  //             store: darkStore,
-  //           },
-  //           stubs: {
-  //             "q-resize-observer": true,
-  //             "q-virtual-scroll": true,
-  //           },
-  //         },
-  //       });
-
-  //       const container = darkWrapper.find('[data-test="span-details-sidebar"]');
-  //       expect(container.classes()).toContain("dark-theme");
-
-  //       darkWrapper.unmount();
-  //     });
-  //   });
-
-  // describe("Navigation", () => {
-  // //   it("should navigate to trace details when link is clicked", async () => {
-  // //     const linksTab = wrapper.find('[data-test="trace-details-sidebar-tabs-links"]');
-  // //     await linksTab.trigger("click");
-
-  // //     const linkRow = wrapper.find('[data-test="trace-event-detail-f6e08ab2a928aa393375f0d9b05a9054"]');
-  // //     await linkRow.trigger("click");
-
-  // //     // Check if router.push was called
-  // //     expect(router.push).toBeTruthy();
-  // //   });
-
-  // //   it("should emit open-trace when navigating to different trace", async () => {
-  // //     const linksTab = wrapper.find('[data-test="trace-details-sidebar-tabs-links"]');
-  // //     await linksTab.trigger("click");
-
-  // //     const linkRow = wrapper.find('[data-test="trace-event-detail-f6e08ab2a928aa393375f0d9b05a9054"]');
-  // //     await linkRow.trigger("click");
-
-  // //     expect(wrapper.emitted("open-trace")).toBeTruthy();
-  // //   });
-  // });
 
   describe("Error handling", () => {
     it("should handle invalid events JSON gracefully", async () => {
@@ -978,34 +876,5 @@ describe("TraceDetailsSidebar", async () => {
         expect(wrapper.exists()).toBe(true);
       }
     });
-
-    // it("should show error notification when copy fails", async () => {
-    //   // Mock Quasar's copyToClipboard to throw an error
-    //   const originalCopyToClipboard = quasar.copyToClipboard;
-    //   vi.spyOn(quasar, 'copyToClipboard').mockImplementation(() => {
-    //     throw new Error("Copy to clipboard failed");
-    //   });
-
-    //   await flushPromises();
-
-    //   const copyBtn = wrapper.find(
-    //     '[data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"]',
-    //   );
-    //   if (copyBtn.exists()) {
-    //     await copyBtn.trigger("click");
-
-    //     // Should show error notification
-    //     expect(wrapper.exists()).toBe(true);
-
-    //     // Verify that copyToClipboard was called
-    //     expect(quasar.copyToClipboard).toHaveBeenCalledWith(mockSpan.span_id);
-
-    //     // Verify that the error notification was triggered
-    //     expect(wrapper.vm.$q.notify).toBeTruthy();
-    //   }
-
-    //   // Restore original function
-    //   vi.restoreAllMocks();
-    // });
   });
 });

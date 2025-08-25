@@ -30,7 +30,6 @@ node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
-
 describe("SyntaxGuide", () => {
   let wrapper: any;
 
@@ -53,13 +52,15 @@ describe("SyntaxGuide", () => {
   afterEach(() => {
     wrapper.unmount();
     // Clean up any menus that might be attached to document body
-    const menus = document.querySelectorAll('.q-menu');
-    menus.forEach(menu => menu.remove());
+    const menus = document.querySelectorAll(".q-menu");
+    menus.forEach((menu) => menu.remove());
   });
 
   describe("Component Rendering", () => {
     it("should render the syntax guide button", () => {
-      expect(wrapper.find('[data-cy="syntax-guide-button"]').exists()).toBe(true);
+      expect(wrapper.find('[data-cy="syntax-guide-button"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render button with correct label", () => {
@@ -69,13 +70,13 @@ describe("SyntaxGuide", () => {
 
     it("should render button with help icon", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.find('.q-icon').exists()).toBe(true);
+      expect(button.find(".q-icon").exists()).toBe(true);
     });
 
     it("should have correct button classes", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.classes()).toContain('syntax-guide-button');
-      expect(button.classes()).toContain('normal-mode');
+      expect(button.classes()).toContain("syntax-guide-button");
+      expect(button.classes()).toContain("normal-mode");
     });
   });
 
@@ -83,19 +84,19 @@ describe("SyntaxGuide", () => {
     it("should apply normal-mode class when sqlmode is false", async () => {
       await wrapper.setProps({ sqlmode: false });
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.classes()).toContain('normal-mode');
-      expect(button.classes()).not.toContain('sql-mode');
+      expect(button.classes()).toContain("normal-mode");
+      expect(button.classes()).not.toContain("sql-mode");
     });
 
     it("should apply sql-mode class when sqlmode is true", async () => {
       await wrapper.setProps({ sqlmode: true });
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.classes()).toContain('sql-mode');
-      expect(button.classes()).not.toContain('normal-mode');
+      expect(button.classes()).toContain("sql-mode");
+      expect(button.classes()).not.toContain("normal-mode");
     });
 
     it("should have sqlmode prop with default value false", () => {
-      expect(wrapper.props('sqlmode')).toBe(false);
+      expect(wrapper.props("sqlmode")).toBe(false);
     });
   });
 
@@ -107,45 +108,47 @@ describe("SyntaxGuide", () => {
 
     it("should show normal mode title", async () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      await button.trigger('click');
+      await button.trigger("click");
       await flushPromises();
-      
+
       // Menu is attached to document body, so we need to search in document
-      const menu = document.querySelector('.q-menu');
+      const menu = document.querySelector(".q-menu");
       expect(menu).toBeTruthy();
-      
-      const title = document.querySelector('.syntax-guide-title .label');
-      expect(title?.textContent).toBe('Syntax Guide');
+
+      const title = document.querySelector(".syntax-guide-title .label");
+      expect(title?.textContent).toBe("Syntax Guide");
     });
 
     it("should display normal mode syntax examples", async () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      await button.trigger('click');
+      await button.trigger("click");
       await flushPromises();
-      
-      const guideList = document.querySelector('.guide-list');
+
+      const guideList = document.querySelector(".guide-list");
       expect(guideList).toBeTruthy();
-      
-      const listItems = document.querySelectorAll('.guide-list li');
+
+      const listItems = document.querySelectorAll(".guide-list li");
       expect(listItems.length).toBeGreaterThan(0);
-      
+
       // Check for specific normal mode content
-      const text = document.body.textContent || '';
-      expect(text).toContain('match_all(\'error\') in query editor');
-      expect(text).toContain('str_match(fieldname, \'error\')');
-      expect(text).toContain('str_match_ignore_case(fieldname, \'Error\')');
-      expect(text).toContain('code=200');
-      expect(text).toContain('stream=\'stderr\'');
+      const text = document.body.textContent || "";
+      expect(text).toContain("match_all('error') in query editor");
+      expect(text).toContain("str_match(fieldname, 'error')");
+      expect(text).toContain("str_match_ignore_case(fieldname, 'Error')");
+      expect(text).toContain("code=200");
+      expect(text).toContain("stream='stderr'");
     });
 
     it("should contain link to documentation", async () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      await button.trigger('click');
+      await button.trigger("click");
       await flushPromises();
-      
-      const link = document.querySelector('a[href="https://openobserve.ai/docs/example-queries/"]');
+
+      const link = document.querySelector(
+        'a[href="https://openobserve.ai/docs/example-queries/"]',
+      );
       expect(link).toBeTruthy();
-      expect(link?.getAttribute('target')).toBe('_blank');
+      expect(link?.getAttribute("target")).toBe("_blank");
     });
   });
 
@@ -157,51 +160,57 @@ describe("SyntaxGuide", () => {
 
     it("should show SQL mode title", async () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      await button.trigger('click');
+      await button.trigger("click");
       await flushPromises();
-      
-      const title = document.querySelector('.syntax-guide-title .label');
-      expect(title?.textContent).toBe('Syntax Guide: SQL Mode');
+
+      const title = document.querySelector(".syntax-guide-title .label");
+      expect(title?.textContent).toBe("Syntax Guide: SQL Mode");
     });
 
     it("should display SQL mode syntax examples", async () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      await button.trigger('click');
+      await button.trigger("click");
       await flushPromises();
-      
-      const guideList = document.querySelector('.guide-list');
+
+      const guideList = document.querySelector(".guide-list");
       expect(guideList).toBeTruthy();
-      
-      const listItems = document.querySelectorAll('.guide-list li');
+
+      const listItems = document.querySelectorAll(".guide-list li");
       expect(listItems.length).toBeGreaterThan(0);
-      
+
       // Check for specific SQL mode content
-      const text = document.body.textContent || '';
-      expect(text).toContain('SELECT * FROM stream WHERE match_all(\'error\')');
-      expect(text).toContain('SELECT * FROM stream WHERE str_match(fieldname, \'error\')');
-      expect(text).toContain('SELECT * FROM stream WHERE code=200');
-      expect(text).toContain('SELECT * FROM stream WHERE stream=\'stderr\'');
-      expect(text).toContain('SELECT extract_ip(log) FROM stream WHERE code=200');
+      const text = document.body.textContent || "";
+      expect(text).toContain("SELECT * FROM stream WHERE match_all('error')");
+      expect(text).toContain(
+        "SELECT * FROM stream WHERE str_match(fieldname, 'error')",
+      );
+      expect(text).toContain("SELECT * FROM stream WHERE code=200");
+      expect(text).toContain("SELECT * FROM stream WHERE stream='stderr'");
+      expect(text).toContain(
+        "SELECT extract_ip(log) FROM stream WHERE code=200",
+      );
     });
 
     it("should contain link to documentation in SQL mode", async () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      await button.trigger('click');
+      await button.trigger("click");
       await flushPromises();
-      
-      const link = document.querySelector('a[href="https://openobserve.ai/docs/example-queries/"]');
+
+      const link = document.querySelector(
+        'a[href="https://openobserve.ai/docs/example-queries/"]',
+      );
       expect(link).toBeTruthy();
-      expect(link?.getAttribute('target')).toBe('_blank');
+      expect(link?.getAttribute("target")).toBe("_blank");
     });
   });
 
   describe("User Interactions", () => {
     it("should open menu when button is clicked", async () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      await button.trigger('click');
+      await button.trigger("click");
       await flushPromises();
-      
-      const menu = document.querySelector('.q-menu');
+
+      const menu = document.querySelector(".q-menu");
       expect(menu).toBeTruthy();
     });
   });
@@ -209,9 +218,9 @@ describe("SyntaxGuide", () => {
   describe("Styling and Classes", () => {
     it("should have correct button styling classes", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.classes()).toContain('q-ml-sm');
-      expect(button.classes()).toContain('q-pa-xs');
-      expect(button.classes()).toContain('syntax-guide-button');
+      expect(button.classes()).toContain("q-ml-sm");
+      expect(button.classes()).toContain("q-pa-xs");
+      expect(button.classes()).toContain("syntax-guide-button");
     });
   });
 
@@ -223,14 +232,15 @@ describe("SyntaxGuide", () => {
 
     it("should have proper ARIA attributes", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.attributes('aria-label')).toBeDefined();
+      expect(button.attributes("aria-label")).toBeDefined();
+      expect(button.attributes("aria-label")).toBe("Syntax Guide");
     });
   });
 
   describe("Component Integration", () => {
     it("should work with i18n translations", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.text()).toContain('Syntax Guide');
+      expect(button.text()).toContain("Syntax Guide");
     });
 
     it("should integrate with Vuex store", () => {
@@ -239,7 +249,7 @@ describe("SyntaxGuide", () => {
 
     it("should use Vue I18n composable", () => {
       expect(wrapper.vm.t).toBeDefined();
-      expect(typeof wrapper.vm.t).toBe('function');
+      expect(typeof wrapper.vm.t).toBe("function");
     });
   });
 
@@ -247,17 +257,17 @@ describe("SyntaxGuide", () => {
     it("should handle undefined sqlmode prop gracefully", async () => {
       await wrapper.setProps({ sqlmode: undefined });
       await flushPromises();
-      
+
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.classes()).toContain('normal-mode');
+      expect(button.classes()).toContain("normal-mode");
     });
 
     it("should handle null sqlmode prop gracefully", async () => {
       await wrapper.setProps({ sqlmode: null });
       await flushPromises();
-      
+
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.classes()).toContain('normal-mode');
+      expect(button.classes()).toContain("normal-mode");
     });
   });
 });

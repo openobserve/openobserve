@@ -13,16 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  describe,
-  expect,
-  it,
-  beforeEach,
-  afterEach,
-  vi,
-  afterAll,
-  beforeAll,
-} from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SpanBlock from "@/plugins/traces/SpanBlock.vue";
@@ -230,8 +221,7 @@ describe("SpanBlock", () => {
     expect(wrapper.emitted("hover")).toBeTruthy();
   });
 
-
-  it("should should be defocused when selectedSpanId is not present", async () => {
+  it("should be defocused when selectedSpanId is not present", async () => {
     const spanBlock = wrapper.find('[data-test="span-block-container"]');
     expect(spanBlock.attributes("style")).not.toContain("opacity: 0.3");
   });
@@ -304,7 +294,7 @@ describe("SpanBlock", () => {
       expect(spanBlock.classes()).toContain("defocus");
     });
 
-    it("Should show not show border when span is not selected", async () => {
+    it("Should not show border when span is not selected", async () => {
       const spanBlock = newWrapper.find('[data-test="span-block-container"]');
       expect(spanBlock.attributes("style")).not.toContain(
         `border-bottom: 2px solid ${mockSpan.style.color}`,
@@ -313,7 +303,9 @@ describe("SpanBlock", () => {
 
     describe("When span is clicked", async () => {
       beforeEach(async () => {
-        const spanBlock = newWrapper.find('[data-test="span-block-select-trigger"]');
+        const spanBlock = newWrapper.find(
+          '[data-test="span-block-select-trigger"]',
+        );
         await spanBlock.trigger("click");
       });
 
@@ -384,7 +376,7 @@ describe("SpanBlock", () => {
       });
 
       const el = newWrapper.find('[data-test="span-block"]').element;
-      Object.defineProperty(el, 'clientWidth', {
+      Object.defineProperty(el, "clientWidth", {
         configurable: true,
         value: 1024, // Set to expected mock width
       });
@@ -396,7 +388,7 @@ describe("SpanBlock", () => {
       newWrapper.unmount();
     });
 
-    it("should apply defocus class when span is not selected", async () => {
+    it("should show duration text in the correct position", async () => {
       const spanBlock = newWrapper.find('[data-test="span-block-duration"]');
       expect(spanBlock.exists()).toBe(true);
       expect(spanBlock.attributes("style")).toContain(`left:`);
