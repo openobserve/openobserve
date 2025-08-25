@@ -1,0 +1,113 @@
+{
+  "stream_name": "pw_automation",
+  "data": [
+    {
+      "_timestamp": "2025-08-23T04:35:30.883Z",
+      "suite": "POC Authentication Tests",
+      "test_name": "should always pass - valid login simulation",
+      "status": "passed",
+      "duration_ms": 157,
+      "retry_count": 0,
+      "passed": 1,
+      "failed": 0,
+      "flaky": 0,
+      "stream": "pw_automation"
+    },
+    {
+      "_timestamp": "2025-08-23T04:35:30.883Z",
+      "suite": "POC Authentication Tests",
+      "test_name": "should fail consistently - invalid credentials",
+      "status": "failed",
+      "duration_ms": 93,
+      "retry_count": 2,
+      "passed": 0,
+      "failed": 1,
+      "flaky": 0,
+      "stream": "pw_automation"
+    },
+    {
+      "_timestamp": "2025-08-23T04:35:30.883Z",
+      "suite": "POC Data Ingestion Tests",
+      "test_name": "should pass - data ingestion endpoint",
+      "status": "passed",
+      "duration_ms": 215,
+      "retry_count": 0,
+      "passed": 1,
+      "failed": 0,
+      "flaky": 0,
+      "stream": "pw_automation"
+    },
+    {
+      "_timestamp": "2025-08-23T04:35:30.883Z",
+      "suite": "POC Data Ingestion Tests",
+      "test_name": "should be flaky - network dependent operation",
+      "status": "flaky",
+      "duration_ms": 69,
+      "retry_count": 1,
+      "passed": 1,
+      "failed": 0,
+      "flaky": 1,
+      "stream": "pw_automation"
+    },
+    {
+      "_timestamp": "2025-08-23T04:35:30.883Z",
+      "suite": "POC Query Tests",
+      "test_name": "should pass - basic query validation",
+      "status": "passed",
+      "duration_ms": 122,
+      "retry_count": 0,
+      "passed": 1,
+      "failed": 0,
+      "flaky": 0,
+      "stream": "pw_automation"
+    },
+    {
+      "_timestamp": "2025-08-23T04:35:30.883Z",
+      "suite": "POC Query Tests",
+      "test_name": "should fail - malformed query",
+      "status": "failed",
+      "duration_ms": 94,
+      "retry_count": 2,
+      "passed": 0,
+      "failed": 1,
+      "flaky": 0,
+      "stream": "pw_automation"
+    },
+    {
+      "_timestamp": "2025-08-23T04:35:30.883Z",
+      "suite": "POC CTE Query Tests",
+      "test_name": "should pass - simple CTE query test",
+      "status": "passed",
+      "duration_ms": 213,
+      "retry_count": 0,
+      "passed": 1,
+      "failed": 0,
+      "flaky": 0,
+      "stream": "pw_automation"
+    },
+    {
+      "_timestamp": "2025-08-23T04:35:30.883Z",
+      "suite": "POC CTE Query Tests",
+      "test_name": "should fail - complex CTE validation",
+      "status": "failed",
+      "duration_ms": 129,
+      "retry_count": 2,
+      "passed": 0,
+      "failed": 1,
+      "flaky": 0,
+      "stream": "pw_automation"
+    },
+    {
+      "_timestamp": "2025-08-23T04:35:30.883Z",
+      "suite": "POC CTE Query Tests",
+      "test_name": "should be flaky - CTE performance dependent test",
+      "status": "flaky",
+      "duration_ms": 155,
+      "retry_count": 1,
+      "passed": 1,
+      "failed": 0,
+      "flaky": 1,
+      "stream": "pw_automation"
+    }
+  ]
+}
