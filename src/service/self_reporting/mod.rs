@@ -302,7 +302,7 @@ pub fn run_audit_publish() -> Option<tokio::task::JoinHandle<()>> {
             )
             .await;
         },
-        pause_if: o2cfg.common.audit_publish_interval == 0 || !o2_enterprise::enterprise::common::infra::config::get_config().common.audit_enabled
+        pause_if: o2cfg.common.audit_publish_interval == 0 || !o2_enterprise::enterprise::common::config::get_config().common.audit_enabled
     ))
 }
 
