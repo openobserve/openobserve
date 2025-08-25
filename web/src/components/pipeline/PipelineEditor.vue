@@ -1090,7 +1090,7 @@ const savePipelineJson = async (json: string) => {
 }
 
 .pipeline-chart-container {
-  height: 80vh;
+  height: 84vh;
   border-radius: 12px;
   width: calc(100% - 200px);
 }
