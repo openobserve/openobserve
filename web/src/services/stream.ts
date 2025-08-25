@@ -74,7 +74,6 @@ const stream = {
       url += "?type=" + type;
     }
 
-    console.log("url", url);
     return http().put(url, data);
   },
   createStream: (
