@@ -67,8 +67,10 @@ test.describe("Schema testcases", () => {
         // Start of actual test - simplified schema workflow
         await pm.schemaPage.completeStreamSettingsSchemaWorkflow(testStreamName);
         
-        // Basic verification that schema configuration worked
-        testLogger.info('Schema configuration completed successfully');
+        // Verify schema workflow completed by checking no error messages are present
+        const errorMessage = page.locator('[data-test="logs-search-error-message"]');
+        await expect(errorMessage).not.toBeVisible();
+        testLogger.assertion('Schema workflow completed without errors', true);
         
         testLogger.info('Stream schema settings test completed');
     });
@@ -99,7 +101,11 @@ test.describe("Schema testcases", () => {
         // Start of actual test - complete blank to detailed stream workflow
         await pm.schemaPage.completeBlankToDetailedStreamWorkflow(streamName, testStreamName);
         
-        testLogger.info('Blank to detailed stream navigation test completed');
+        // Verify navigation workflow completed by checking streams page is accessible
+        await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+        const streamsPageVisible = await page.getByPlaceholder('Search Stream').isVisible();
+        expect(streamsPageVisible).toBe(true);
+        testLogger.assertion('Stream navigation workflow completed successfully', streamsPageVisible);
     });
 
     test('should add a new field and delete it from schema', async ({ page }, testInfo) => {
@@ -128,6 +134,11 @@ test.describe("Schema testcases", () => {
         // Start of actual test - complete add and delete field workflow
         await pm.schemaPage.completeAddAndDeleteFieldWorkflow(testStreamName);
         
-        testLogger.info('Add and delete field from schema test completed');
+        // Verify add/delete field workflow completed by accessing streams page
+        await page.locator('[data-test="menu-link-\\/streams-item"]').click();
+        await page.getByPlaceholder('Search Stream').fill(testStreamName);
+        const streamFound = await page.getByRole('button', { name: 'Stream Detail' }).isVisible();
+        expect(streamFound).toBe(true);
+        testLogger.assertion('Add/delete field workflow completed successfully', streamFound);
     });
 });

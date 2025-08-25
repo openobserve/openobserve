@@ -159,4 +159,4 @@ class SlackReporter {
   }
 }
 
-export default SlackReporter;
+module.exports = SlackReporter;

@@ -1,4 +1,5 @@
 const { expect } = require('@playwright/test');
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 class EnrichmentPage {
     constructor(page) {
@@ -376,22 +377,22 @@ abc, err = get_enrichment_table_record("${fileName}", {
         // Check if VRL editor is enabled via URL parameter
         const currentUrl = new URL(this.page.url());
         const fnEditorParam = currentUrl.searchParams.get('fn_editor');
-        console.log('fn_editor URL parameter:', fnEditorParam);
+        testLogger.debug('fn_editor URL parameter', { fnEditorParam });
         
         // If fn_editor is explicitly false, enable it via URL modification
         if (fnEditorParam === 'false') {
-            console.log('VRL editor disabled via URL parameter, enabling via URL modification');
+            testLogger.debug('VRL editor disabled via URL parameter, enabling via URL modification');
             
             // Modify URL to enable VRL editor
             currentUrl.searchParams.set('fn_editor', 'true');
             const newUrl = currentUrl.toString();
-            console.log('Navigating to URL with fn_editor=true:', newUrl);
+            testLogger.debug('Navigating to URL with fn_editor=true', { newUrl });
             
             // Navigate to the modified URL
             await this.page.goto(newUrl);
             await this.page.waitForLoadState('domcontentloaded');
             await this.page.waitForLoadState('networkidle');
-            console.log('Navigated to URL with VRL editor enabled');
+            testLogger.debug('Navigated to URL with VRL editor enabled');
         }
         
         // Wait for VRL editor to appear after potential URL modification
@@ -401,7 +402,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         });
         
         const vrlEditorExists = await this.page.locator('#fnEditor').count();
-        console.log('VRL Editor count after URL logic:', vrlEditorExists);
+        testLogger.debug('VRL Editor count after URL logic', { vrlEditorExists });
         
         // Now proceed with VRL processing
         await this.fillVRLQuery(fileName);

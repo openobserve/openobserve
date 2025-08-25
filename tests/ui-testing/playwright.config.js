@@ -1,11 +1,9 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
 const dotenv = require('dotenv');
-dotenv.config();
-
 // Load environment variables from .env file
 try {
-  require('dotenv').config();
+  dotenv.config();
   console.log('✅ Environment variables loaded from .env file');
 } catch (error) {
   console.warn('⚠️  dotenv not available, using system environment variables');

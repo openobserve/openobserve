@@ -9,7 +9,7 @@ test.describe("Schema Load testcases", () => {
 
     // Ingestion helper function for large payloads
     async function largePayloadIngestion(page, streamName, logData) {
-        testLogger.debug('Starting large payload ingestion', { streamName, fieldCount: Object.keys(logData[0].log).length });
+        testLogger.debug('Starting large payload ingestion', { streamName, fieldCount: Object.keys(logData[0]).length });
         
         const orgId = process.env["ORGNAME"];
         const basicAuthCredentials = Buffer.from(

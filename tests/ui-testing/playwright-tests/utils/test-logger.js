@@ -150,11 +150,21 @@ class TestLogger {
   getTestContext() {
     try {
       const stack = new Error().stack;
-      const testMatch = stack.match(/at.*\/(.*\.spec\.js):(\d+):\d+/);
+      // Match various test file patterns: .spec.js, .test.js, .e2e.js, etc.
+      const testMatch = stack.match(/at.*\/([^\/]*\.(spec|test|e2e)\.js):(\d+):\d+/);
       if (testMatch) {
         return {
           file: testMatch[1],
-          line: testMatch[2]
+          line: testMatch[3]
+        };
+      }
+      
+      // Fallback: match any .js file in the stack (less specific but more flexible)
+      const jsMatch = stack.match(/at.*\/([^\/]*\.js):(\d+):\d+/);
+      if (jsMatch) {
+        return {
+          file: jsMatch[1],
+          line: jsMatch[2]
         };
       }
     } catch (e) {

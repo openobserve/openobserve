@@ -177,13 +177,14 @@ export class WaitHelpers {
       } else {
         // For RegExp, use waitForFunction
         await this.page.waitForFunction(
-          ({ sel, pattern }) => {
+          (sel, pattern) => {
             const element = typeof sel === 'string' ? 
               document.querySelector(sel) : 
               sel;
             return element && new RegExp(pattern).test(element.textContent);
           },
-          { selector, pattern: text.source },
+          selector,
+          text.source,
           { timeout }
         );
       }
@@ -284,7 +285,12 @@ export class WaitHelpers {
           nextRetryIn: `${delay}ms`
         });
         
-        await this.page.waitForTimeout(delay);
+        // Use intelligent wait instead of hard timeout
+        if (delay <= 1000) {
+          await this.page.waitForLoadState('domcontentloaded');
+        } else {
+          await this.page.waitForLoadState('networkidle', { timeout: Math.min(delay, 3000) });
+        }
       }
     }
   }

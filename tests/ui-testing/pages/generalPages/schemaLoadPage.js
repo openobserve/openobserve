@@ -1,5 +1,6 @@
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { waitUtils } = require('../../playwright-tests/utils/wait-helpers.js');
 
 class SchemaLoadPage {
     constructor(page) {
@@ -65,8 +66,8 @@ class SchemaLoadPage {
         await this.page.locator(this.schemaLoadLocators.logSearchIndexSelectStream).fill(streamName);
         await this.page.waitForLoadState('domcontentloaded');
         
-        // Wait a bit for the filtering to complete
-        await this.page.waitForTimeout(2000);
+        // Wait for the filtering to complete
+        await waitUtils.smartWait(this.page, 2000, 'stream filtering to complete');
         
         // Try multiple approaches to find the stream toggle
         const streamToggle = `[data-test="log-search-index-list-stream-toggle-${streamName}"] div`;
@@ -210,8 +211,8 @@ class SchemaLoadPage {
             await this.navigateToStreams();
             await this.searchStreamInStreamsPage(streamName);
             
-            // Verify stream is visible in streams page
-            await this.page.waitForTimeout(2000);
+            // Wait for stream to be visible in streams page
+            await waitUtils.smartWait(this.page, 2000, 'stream to appear in streams page');
             const streamExists = await this.page.locator(`text="${streamName}"`).isVisible();
             if (!streamExists) {
                 testLogger.error('Stream not found in streams page', { streamName });
