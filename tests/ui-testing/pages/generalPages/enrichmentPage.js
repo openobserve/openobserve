@@ -136,18 +136,11 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 console.log('⚠️ Functions button not found or error:', e.message);
             }
             
-            // Check if fnEditor exists in DOM but might not be visible
-            const editorExists = await this.page.locator(this.vrlEditor).count();
-            console.log('📝 fnEditor elements found:', editorExists);
+            // Check if fnEditor exists in DOM and provide debugging info
+            const editorCount = await this.page.locator(this.vrlEditor).count();
+            console.log('📝 fnEditor elements found:', editorCount);
             
-            if (editorExists > 0) {
-                const editorVisible = await this.page.locator(this.vrlEditor).isVisible();
-                console.log('👁️ fnEditor visible:', editorVisible);
-            }
-            
-            // Check if we can even find the editor element in CI
-            const editorExists = await this.page.locator(this.vrlEditor).count();
-            if (editorExists === 0) {
+            if (editorCount === 0) {
                 // Take screenshot and dump page content for debugging
                 await this.page.screenshot({ path: 'debug-no-editor.png', fullPage: true });
                 const pageContent = await this.page.content();
@@ -156,6 +149,10 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 console.log('📄 Page content contains "function":', pageContent.includes('function'));
                 throw new Error('VRL editor (#fnEditor) not found in DOM. This suggests the page did not load correctly or VRL features are disabled.');
             }
+            
+            // Check if editor is visible
+            const editorVisible = await this.page.locator(this.vrlEditor).isVisible();
+            console.log('👁️ fnEditor visible:', editorVisible);
             
             // Wait for VRL editor to be visible (simple approach)
             console.log('⏳ Waiting for VRL editor to become visible...');
