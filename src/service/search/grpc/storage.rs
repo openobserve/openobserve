@@ -1116,7 +1116,7 @@ async fn search_tantivy_index(
         && (result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
             || percent < 1.0)
     {
-        let entry = get_cache_entry(result.clone(), percent);
+        let entry = get_cache_entry(result.clone(), percent, parquet_file.meta.records as usize);
         tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
     }
     Ok((key, result))
@@ -1259,7 +1259,7 @@ fn repartition_sorted_groups(
     groups
 }
 
-fn get_cache_entry(tantivy_result: TantivyResult, percent: f64) -> CacheEntry {
+fn get_cache_entry(tantivy_result: TantivyResult, percent: f64, parquet_rows: usize) -> CacheEntry {
     match tantivy_result {
         TantivyResult::RowIdsBitVec(num_rows, bitvec) => {
             // if the percent is less than 1.0, we use roaring bitmap to store the row ids
@@ -1273,7 +1273,7 @@ fn get_cache_entry(tantivy_result: TantivyResult, percent: f64) -> CacheEntry {
                         roaring.insert(i as u32);
                     }
                 }
-                CacheEntry::RowIdsRoaring(num_rows, roaring)
+                CacheEntry::RowIdsRoaring(num_rows, roaring, parquet_rows)
             } else {
                 CacheEntry::RowIdsBitVec(num_rows, bitvec)
             }
