@@ -151,7 +151,8 @@ export class LogsPage {
     async navigateToLogs(orgIdentifier) {
         const logsUrl = '/web/logs'; // Using the same pattern as in test files
         const orgId = orgIdentifier || process.env["ORGNAME"];
-        await this.page.goto(`${logsUrl}?org_identifier=${orgId}`);
+        // Include fn_editor=true to ensure VRL editor is available for tests that need it
+        await this.page.goto(`${logsUrl}?org_identifier=${orgId}&fn_editor=true`);
     }
 
     async validateLogsPage() {
