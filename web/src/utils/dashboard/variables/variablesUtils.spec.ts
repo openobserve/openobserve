@@ -123,8 +123,8 @@ describe("Variables Utils", () => {
     });
 
     it("should convert years to seconds (using approximation)", () => {
-      expect(getTimeInSecondsBasedOnUnit(1, "y")).toBe(36288000); // 1 * 60 * 60 * 24 * 7 * 12 (approximate)
-      expect(getTimeInSecondsBasedOnUnit(2, "y")).toBe(72576000);
+      expect(getTimeInSecondsBasedOnUnit(1, "y")).toBe(7257600); // 1 * 60 * 60 * 24 * 7 * 12 (approximate)
+      expect(getTimeInSecondsBasedOnUnit(2, "y")).toBe(14515200);
     });
 
     it("should return original value for unknown units", () => {
@@ -302,10 +302,10 @@ describe("Variables Utils", () => {
     it("should handle complex content with mixed variable types", () => {
       const content = `
         SELECT * FROM logs 
-        WHERE region = '${region}' 
-        AND service IN (${service:singlequote})
-        AND env = '$env'
-        AND query REGEXP '${service:pipe}'
+        WHERE region = '\${region}' 
+        AND service IN (\${service:singlequote})
+        AND env = '\$env'
+        AND query REGEXP '\${service:pipe}'
       `;
       
       const expected = `
