@@ -22,7 +22,7 @@ use config::{
     get_config,
     meta::{cluster::get_internal_grpc_token, stream::FileKey},
     metrics,
-    utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
+    utils::inverted_index::convert_parquet_file_name_to_tantivy_file,
 };
 use futures_util::StreamExt;
 use infra::cache::file_data::{TRACE_ID_FOR_CACHE_LATEST_FILE, disk};
@@ -80,11 +80,11 @@ impl Event for Eventer {
                 }
 
                 // cache index for the parquet
-                if cfg.cache_latest_files.cache_index && item.meta.index_size > 0 {
-                    if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
-                    {
-                        index_files_to_download.push((ttv_file, item.meta.index_size));
-                    }
+                if cfg.cache_latest_files.cache_index
+                    && item.meta.index_size > 0
+                    && let Some(ttv_file) = convert_parquet_file_name_to_tantivy_file(&item.key)
+                {
+                    index_files_to_download.push((ttv_file, item.meta.index_size));
                 }
             }
 
@@ -184,7 +184,7 @@ impl Event for Eventer {
                             if v.deleted {
                                 match v.meta.as_ref() {
                                     Some(m) if m.index_size > 0 => {
-                                        convert_parquet_idx_file_name_to_tantivy_file(&v.key)
+                                        convert_parquet_file_name_to_tantivy_file(&v.key)
                                     }
                                     _ => None,
                                 }

@@ -64,7 +64,7 @@ pub fn unpack_u32_pair(packed: u64) -> (u32, u32) {
 /// e.g.
 /// from: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
 /// to:   files/default/index/quickstart1_logs/2024/02/16/16/7164299619311026293.ttv
-pub fn convert_parquet_idx_file_name_to_tantivy_file(from: &str) -> Option<String> {
+pub fn convert_parquet_file_name_to_tantivy_file(from: &str) -> Option<String> {
     let mut parts: Vec<Cow<str>> = from.split('/').map(Cow::Borrowed).collect();
 
     if parts.len() < 4 {
@@ -296,10 +296,7 @@ mod tests {
         ];
 
         for (input, expected) in test_cases {
-            assert_eq!(
-                convert_parquet_idx_file_name_to_tantivy_file(input),
-                expected
-            );
+            assert_eq!(convert_parquet_file_name_to_tantivy_file(input), expected);
         }
     }
 }
