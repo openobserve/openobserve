@@ -1,5 +1,6 @@
 const { chromium } = require('@playwright/test');
 const path = require('path');
+const fs = require('fs');
 const logsdata = require("../../../test-data/logs_data.json");
 const testLogger = require('./test-logger.js');
 
@@ -12,6 +13,9 @@ async function globalSetup() {
   
   // Create auth storage directory
   const authDir = path.join(__dirname, 'auth');
+  if (!fs.existsSync(authDir)) {
+    fs.mkdirSync(authDir, { recursive: true });
+  }
   const authFile = path.join(authDir, 'user.json');
   
   // Launch browser and create context
@@ -57,8 +61,6 @@ async function globalSetup() {
     
     // Wait for login to complete - look for navigation or success indicators
     await page.waitForLoadState('networkidle', { timeout: 15000 });
-    await page.goto(process.env["ZO_BASE_URL"]);
-    await page.waitForLoadState('domcontentloaded');
     
     // Verify login success by checking for a known element
     await page.locator('[data-test="menu-link-\\/-item"]').waitFor({ 

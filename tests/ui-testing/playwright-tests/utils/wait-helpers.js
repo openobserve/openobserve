@@ -307,8 +307,6 @@ const waitUtils = {
    * @param {string} reason - Reason for waiting
    */
   async smartWait(page, ms, reason = 'timeout replacement') {
-    testLogger.warn(`Converting hard wait to smart wait: ${ms}ms for ${reason}`);
-    
     // Convert common timeout patterns to smart waits
     if (ms <= 1000) {
       // Short waits - usually for UI updates

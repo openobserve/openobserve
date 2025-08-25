@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+const { waitUtils } = require('../../playwright-tests/utils/wait-helpers.js');
 
 export class SanityPage {
     constructor(page) {
@@ -211,13 +212,25 @@ export class SanityPage {
         await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
         await this.page.locator(this.fnEditor).getByRole('textbox').click();
         await this.page.locator(this.fnEditor).locator(".cm-content").fill(".a=2");
-        await this.page.waitForTimeout(1000);
+        await waitUtils.smartWait(this.page, 1000, 'VRL editor content stabilization');
         
         await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
+        
+        // Wait for save dialog to appear using multiple wait strategies
+        try {
+          // First try waiting for the element to be attached to DOM
+          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'attached', timeout: 3000 });
+          // Then wait for it to be visible  
+          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
+        } catch (error) {
+          // If dialog doesn't appear, try clicking save again
+          await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
+          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 5000 });
+        }
         await this.page.locator(this.savedFunctionNameInput).click();
         await this.page.locator(this.savedFunctionNameInput).fill(functionName);
         await this.page.locator(this.savedViewDialogSave).click();
-        await this.page.waitForTimeout(2000);
+        await this.page.waitForLoadState('networkidle', { timeout: 5000 });
         
         await this.page.locator(this.pipelineMenuItem).click();
         await this.page.locator(this.realtimeTab).click();
@@ -375,9 +388,9 @@ export class SanityPage {
 
     // Settings Management Methods
     async changeSettingsSuccessfully() {
-        await this.page.waitForTimeout(2000);
+        await waitUtils.smartWait(this.page, 2000, 'pre-settings navigation wait');
         await this.page.locator(this.settingsMenuItem).click();
-        await this.page.waitForTimeout(2000);
+        await waitUtils.smartWait(this.page, 2000, 'settings page load');
         await this.page.getByText("General SettingsScrape").click();
         await this.page.getByRole(this.generalSettingsTab.role, { name: this.generalSettingsTab.name }).click();
         await this.page.getByLabel(this.scrapeIntervalInput.label).fill("16");
@@ -389,7 +402,9 @@ export class SanityPage {
     async displayResultsOnRefreshStats() {
         await this.page.locator(this.streamsMenuItem).click();
         await this.page.locator(this.refreshStatsButton).click();
-        this.page.reload();
+        await this.page.reload();
+        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.waitForLoadState('networkidle');
         await this.page.getByRole(this.streamCellButton.role, { name: this.streamCellButton.name, exact: true }).click();
     }
 
@@ -597,7 +612,6 @@ export class SanityPage {
         
         // Wait for canvas to be ready again after refresh
         await expect(this.page.locator(this.histogramCanvas)).toBeVisible({ timeout: 15000 });
-        await this.page.waitForTimeout(1000);
         
         // Second canvas click with error handling
         try {
