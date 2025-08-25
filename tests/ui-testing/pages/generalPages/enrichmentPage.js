@@ -102,51 +102,30 @@ abc, err = get_enrichment_table_record("${fileName}", {
 .protocol_keyword = abc.keyword
 `;
         try {
-            // Wait for page to be fully loaded and stable
+            // Wait for logs page to be fully loaded (matching original working approach)
             await this.page.waitForLoadState('domcontentloaded');
-            await this.page.waitForLoadState('networkidle', { timeout: 45000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 30000 });
             
-            // Check if we need to open the functions panel first
-            const functionsButton = this.page.locator('[data-test="logs-search-functions-btn"]');
+            // Give extra time for VRL editor initialization in CI (like original 3s timeout)
+            await this.page.waitForTimeout(5000);
+            
+            // Try to click functions button if it exists to ensure VRL panel is open
             try {
-                await functionsButton.waitFor({ state: 'visible', timeout: 5000 });
-                await functionsButton.click();
-                await this.page.waitForTimeout(2000); // Wait for panel to open
-            } catch (e) {
-                console.log('Functions button not found or already open');
-            }
-            
-            // Debug: Take screenshot and check page elements
-            console.log('Current URL:', await this.page.url());
-            const availableElements = await this.page.locator('*[id]').evaluateAll(
-                elements => elements.map(el => el.id).filter(id => id)
-            );
-            console.log('Available element IDs:', availableElements);
-            
-            // Wait for VRL editor container with polling approach for CI reliability
-            let editorReady = false;
-            let attempts = 0;
-            const maxAttempts = 20; // Reduced to 20 attempts = 40s total
-            
-            while (!editorReady && attempts < maxAttempts) {
-                try {
-                    await this.page.waitForSelector(this.vrlEditor, { 
-                        state: 'visible',
-                        timeout: 2000 
-                    });
-                    editorReady = true;
-                } catch (e) {
-                    attempts++;
-                    if (attempts >= maxAttempts) {
-                        // Final debug info before failing
-                        const pageContent = await this.page.content();
-                        console.log('Page HTML contains fnEditor:', pageContent.includes('fnEditor'));
-                        console.log('Page HTML contains editor:', pageContent.includes('editor'));
-                        throw new Error(`VRL editor (#fnEditor) not found after ${maxAttempts * 2} seconds. Available IDs: ${availableElements.join(', ')}`);
-                    }
+                const functionsButton = this.page.locator('[data-test="logs-search-functions-btn"]');
+                const isVisible = await functionsButton.isVisible();
+                if (isVisible) {
+                    await functionsButton.click();
                     await this.page.waitForTimeout(2000);
                 }
+            } catch (e) {
+                // Functions button might not exist or already be open
             }
+            
+            // Wait for VRL editor with a more generous timeout for CI
+            await this.page.waitForSelector(this.vrlEditor, { 
+                state: 'visible',
+                timeout: 30000 
+            });
             
             // Wait for the textbox inside the editor to be interactive
             const textbox = this.page.locator(this.vrlEditor).getByRole('textbox');
