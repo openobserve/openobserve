@@ -23,7 +23,7 @@ use arrow::array::{Array, BooleanArray, Float64Array, Int64Array, StringArray, U
 use arrow_schema::{DataType, Schema};
 use bytes::Bytes;
 use config::{
-    INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME, get_config,
+    INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME,
     utils::{
         inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
         tantivy::tokenizer::{O2_TOKENIZER, o2_tokenizer_build},
@@ -67,13 +67,6 @@ pub(crate) async fn create_tantivy_index(
     else {
         return Ok(0);
     };
-
-    // TODO: check the main branch
-    if get_config().cache_latest_files.cache_index {
-        infra::cache::file_data::disk::set("", &idx_file_name, Bytes::from(puffin_bytes.clone()))
-            .await?;
-        log::info!("file: {idx_file_name} file_data::disk::set success");
-    }
 
     // the index file is stored in the same account as the parquet file
     match storage::put(&idx_file_name, Bytes::from(puffin_bytes)).await {
