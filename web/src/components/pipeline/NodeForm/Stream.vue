@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <q-separator />
 
-    <div   class="stream-routing-container full-width q-pa-md">
+    <div   class="stream-routing-container full-width q-py-md">
       <q-toggle
       v-if="selectedNodeType == 'input'"
         data-test="create-stream-toggle"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-form   @submit="saveStream">
 
-      <div v-if="!createNewStream">
+      <div v-if="!createNewStream" class="q-px-md">
         <div class="flex justify-start items-center" style="padding-top: 0px">
           <div
             data-test="input-node-stream-type-select"
