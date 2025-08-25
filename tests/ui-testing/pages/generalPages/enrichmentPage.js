@@ -102,21 +102,40 @@ abc, err = get_enrichment_table_record("${fileName}", {
 .protocol_keyword = abc.keyword
 `;
         try {
-            // Wait for page to be ready and VRL editor to be available
+            // Wait for page to be fully loaded and stable
             await this.page.waitForLoadState('domcontentloaded');
-            await this.page.waitForLoadState('networkidle', { timeout: 30000 });
+            await this.page.waitForLoadState('networkidle', { timeout: 45000 });
             
-            // Wait for VRL editor to be ready with increased timeout
-            await this.page.waitForSelector(this.vrlEditor, { 
-                state: 'visible',
-                timeout: 30000 
-            });
+            // Wait for VRL editor container with polling approach for CI reliability
+            let editorReady = false;
+            let attempts = 0;
+            const maxAttempts = 30; // 30 attempts with 2s intervals = 60s total
             
+            while (!editorReady && attempts < maxAttempts) {
+                try {
+                    await this.page.waitForSelector(this.vrlEditor, { 
+                        state: 'visible',
+                        timeout: 2000 
+                    });
+                    editorReady = true;
+                } catch (e) {
+                    attempts++;
+                    if (attempts >= maxAttempts) {
+                        throw new Error(`VRL editor not ready after ${maxAttempts * 2} seconds. Last error: ${e.message}`);
+                    }
+                    await this.page.waitForTimeout(2000);
+                }
+            }
+            
+            // Wait for the textbox inside the editor to be interactive
             const textbox = this.page.locator(this.vrlEditor).getByRole('textbox');
             await textbox.waitFor({ 
                 state: 'visible',
-                timeout: 15000 
+                timeout: 10000 
             });
+            
+            // Additional wait for editor initialization
+            await this.page.waitForTimeout(1000);
             
             // Clear any existing content and fill new query
             await textbox.clear();
