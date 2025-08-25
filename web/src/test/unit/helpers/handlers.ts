@@ -21,6 +21,7 @@ import alerts from "../mockData/alerts";
 import logs from "../mockData/logs";
 import organizations from "../mockData/organizations";
 import home from "../mockData/home";
+import regexPatterns from "../mockData/regexPatterns";
 import store from "./store";
 
 // TODO OK: Move below rest handlers to separate file
@@ -186,5 +187,77 @@ export const restHandlers = [
 
   http.get(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/short/:id`, ({ request }) => {
     return HttpResponse.json("http://localhost:5080/web/logs?stream_type=logs&stream=default1&from=1749120770351000&to=1749121670351000&refresh=0&defined_schemas=user_defined_schema&org_identifier=default&quick_mode=false&show_histogram=true");
+  }),
+
+  // Regex Pattern handlers
+  http.get(`${store.state.API_ENDPOINT}/api/:org/re_patterns`, ({ request }) => {
+    return HttpResponse.json({
+      data: regexPatterns
+    }, { status: 200 });
+  }),
+
+  http.post(`${store.state.API_ENDPOINT}/api/:org/re_patterns`, async ({ request }) => {
+    const body = await request.json() as any;
+    return HttpResponse.json({
+      id: "test-pattern-id",
+      name: body.name,
+      pattern: body.pattern,
+      description: body.description,
+      created_at: Date.now() / 1000,
+      updated_at: Date.now() / 1000
+    }, { status: 200 });
+  }),
+
+  http.put(`${store.state.API_ENDPOINT}/api/:org/re_patterns/:id`, async ({ request, params }) => {
+    const body = await request.json() as any;
+    return HttpResponse.json({
+      id: params.id,
+      name: body.name,
+      pattern: body.pattern,
+      description: body.description,
+      created_at: Date.now() / 1000 - 3600, // 1 hour ago
+      updated_at: Date.now() / 1000
+    }, { status: 200 });
+  }),
+
+  http.post(`${store.state.API_ENDPOINT}/api/:org/re_patterns/test`, async ({ request }) => {
+    const body = await request.json() as any;
+    const { pattern, test_records } = body;
+    
+    console.log('MSW Test Handler - Full URL:', request.url);
+    console.log('MSW Test Handler - pattern:', pattern, 'test_records:', test_records);
+    
+    // Simple regex test simulation
+    const results = test_records.map((testStr: string) => {
+      try {
+        const regex = new RegExp(pattern);
+        const match = testStr.match(regex);
+        const result = match ? match[0] : "";
+        console.log(`Testing "${testStr}" against /${pattern}/: ${result}`);
+        return result;
+      } catch (error) {
+        console.log('Regex error:', error);
+        return "";
+      }
+    });
+
+    console.log('MSW Test Handler - results:', results);
+
+    // The component expects response.data.results[0], so we return just the results structure
+    const response = {
+      results: results
+    };
+    
+    console.log('MSW Test Handler - sending response:', response);
+
+    return HttpResponse.json(response, { status: 200 });
+  }),
+
+  // Catch-all handler to debug other requests
+  http.all('*', ({ request }) => {
+    if (request.url.includes('/re_patterns/test')) {
+      console.log('Unmatched regex test request:', request.url);
+    }
+    return HttpResponse.passthrough();
   }),
 ];
