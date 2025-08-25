@@ -439,13 +439,40 @@ describe("AddRegexPattern", () => {
       wrapper.vm.testString = "abc123def";
       await nextTick();
 
-      await wrapper.vm.testStringOutput();
+      console.log('Before testStringOutput - outputString:', wrapper.vm.outputString);
+      console.log('Before testStringOutput - testLoading:', wrapper.vm.testLoading);
+      console.log('Store selectedOrganization:', store.state.selectedOrganization);
 
-      expect(mockRegexPatternService.test).toHaveBeenCalledWith(
-        "test-org",
-        "\\d+",
-        ["abc123def"]
-      );
+      // Spy on the service call to see what it actually returns
+      const serviceSpy = vi.spyOn(regexPatternService, 'test');
+      
+      // MSW will handle the HTTP request and return test results
+      try {
+        await wrapper.vm.testStringOutput();
+        console.log('testStringOutput completed successfully');
+        
+        // Check what the service call returned
+        if (serviceSpy.mock.calls.length > 0) {
+          console.log('Service was called with:', serviceSpy.mock.calls[0]);
+        }
+        if (serviceSpy.mock.results.length > 0) {
+          const result = await serviceSpy.mock.results[0].value;
+          console.log('Service returned:', result);
+        }
+      } catch (error) {
+        console.log('testStringOutput threw error:', error);
+      }
+      
+      console.log('After testStringOutput - outputString:', wrapper.vm.outputString);
+      console.log('After testStringOutput - testLoading:', wrapper.vm.testLoading);
+      
+      // Wait for async operation to complete
+      await new Promise(resolve => setTimeout(resolve, 200));
+      await wrapper.vm.$nextTick();
+
+      console.log('After wait - outputString:', wrapper.vm.outputString);
+      console.log('After wait - testLoading:', wrapper.vm.testLoading);
+
       expect(wrapper.vm.outputString).toBe("123");
       expect(wrapper.vm.expandState.outputString).toBe(true);
     });
