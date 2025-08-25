@@ -246,40 +246,19 @@ export const restHandlers = [
     const body = await request.json() as any;
     const { pattern, test_records } = body;
     
-    console.log('MSW Test Handler - Full URL:', request.url);
-    console.log('MSW Test Handler - pattern:', pattern, 'test_records:', test_records);
-    
     // Simple regex test simulation
     const results = test_records.map((testStr: string) => {
       try {
         const regex = new RegExp(pattern);
         const match = testStr.match(regex);
-        const result = match ? match[0] : "";
-        console.log(`Testing "${testStr}" against /${pattern}/: ${result}`);
-        return result;
+        return match ? match[0] : "";
       } catch (error) {
-        console.log('Regex error:', error);
         return "";
       }
     });
 
-    console.log('MSW Test Handler - results:', results);
-
-    // The component expects response.data.results[0], so we return just the results structure
-    const response = {
+    return HttpResponse.json({
       results: results
-    };
-    
-    console.log('MSW Test Handler - sending response:', response);
-
-    return HttpResponse.json(response, { status: 200 });
-  }),
-
-  // Catch-all handler to debug other requests
-  http.all('*', ({ request }) => {
-    if (request.url.includes('/re_patterns/test')) {
-      console.log('Unmatched regex test request:', request.url);
-    }
-    return HttpResponse.passthrough();
+    }, { status: 200 });
   }),
 ];
