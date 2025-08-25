@@ -2506,7 +2506,7 @@ mod tests {
         let mysql_list = MysqlFileList::new();
         let empty_files: Vec<FileKey> = vec![];
 
-        let _result = mysql_list.batch_add(&empty_files).await;
+        let result = mysql_list.batch_add(&empty_files).await;
         assert!(result.is_ok());
     }
 
@@ -2568,7 +2568,7 @@ mod tests {
         let mysql_list = MysqlFileList::new();
         let files = vec![create_test_file_key("account1", "test/key", false)];
 
-        let _result = mysql_list.batch_add_with_id(&files).await;
+        let result = mysql_list.batch_add_with_id(&files).await;
         assert!(result.is_err());
         // Should return unimplemented error
     }
@@ -2624,7 +2624,7 @@ mod tests {
         let mysql_list = MysqlFileList::new();
         let empty_files: Vec<FileListDeleted> = vec![];
 
-        let _result = mysql_list
+        let result = mysql_list
             .batch_add_deleted("org1", 1609459200, &empty_files)
             .await;
         assert!(result.is_ok()); // Should handle empty list gracefully
@@ -2701,7 +2701,7 @@ mod tests {
         let mysql_list = MysqlFileList::new();
         let file_key = "nonexistent/stream/logs/2021/01/01/missing.parquet";
 
-        let _result = mysql_list.get(file_key).await;
+        let result = mysql_list.get(file_key).await;
         assert!(result.is_err()); // Should return error for missing file
     }
 
@@ -2808,7 +2808,7 @@ mod tests {
         let meta = create_test_file_meta();
         let invalid_key = "invalid_key_format";
 
-        let _result = mysql_list.add("test_account", invalid_key, &meta).await;
+        let result = mysql_list.add("test_account", invalid_key, &meta).await;
         assert!(result.is_err()); // Should fail due to invalid key format
     }
 
@@ -2818,7 +2818,7 @@ mod tests {
         let empty_files: Vec<FileKey> = vec![];
 
         // This should complete successfully without database calls
-        let _result = mysql_list
+        let result = mysql_list
             .inner_batch_process("file_list", &empty_files)
             .await;
         assert!(result.is_ok());
