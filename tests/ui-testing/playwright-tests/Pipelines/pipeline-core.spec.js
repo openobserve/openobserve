@@ -94,7 +94,7 @@ async function exploreStreamAndInteractWithLogDetails(page, streamName) {
   await page.waitForTimeout(1000);
   await page.waitForSelector('[data-test="log-table-column-1-_timestamp"]');
   await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
-  await page.locator('[data-test="log-expand-detail-key-a-text"]').click();
+  await page.locator('[data-test="log-expand-detail-key-a"]').click();
   await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
 }
 
@@ -207,7 +207,7 @@ test.describe("Core Pipeline Tests", () => {
     await page.getByRole("img", { name: "Output Stream" }).click();
     await page.getByLabel("Stream Name *").click();
     await page.getByLabel("Stream Name *").fill("destination-node");
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(1000);
     await pageManager.pipelinesPage.clickInputNodeStreamSave();
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pageManager.pipelinesPage.enterPipelineName(pipelineName);
