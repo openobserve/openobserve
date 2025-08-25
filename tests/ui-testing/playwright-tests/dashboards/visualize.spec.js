@@ -695,11 +695,17 @@ LIMIT 100`;
 
     // Step 1: Open Logs page and query editor
     await pm.logsVisualise.openLogs();
-    // await pm.logsVisualise.openQueryEditor();
+    await pm.logsVisualise.openQueryEditor();
     await page
       .locator('[data-test="logs-search-bar-query-editor"]')
-      .getByLabel("Editor content;Press Alt+F1")
+      .getByRole("textbox")
+      .click();
+
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox")
       .fill(largeDatasetSqlQuery);
+
     // Fill the query editor with large dataset SQL query
     // await pm.logsVisualise.fillQueryEditor(largeDatasetSqlQuery);
 
@@ -708,8 +714,8 @@ LIMIT 100`;
     await pm.logsVisualise.logsApplyQueryButton();
 
     // Switch to SQL mode, apply the query, and refresh the search
-    await pm.logsVisualise.enableSQLMode();
-    await pm.logsVisualise.logsApplyQueryButton();
+    // await pm.logsVisualise.enableSQLMode();
+    // await pm.logsVisualise.logsApplyQueryButton();
     await pm.logsVisualise.openVisualiseTab();
 
     // Check for any error messages or indicators
@@ -733,17 +739,27 @@ LIMIT 100`;
 
     // Step 1: Open Logs page and query editor
     await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.openQueryEditor();
+    // await pm.logsVisualise.openQueryEditor();
 
     // Fill the query editor with large dataset SQL query
-    await pm.logsVisualise.fillQueryEditor(largeDatasetSqlQuery);
+    // await pm.logsVisualise.fillQueryEditor(largeDatasetSqlQuery);
+
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox")
+      .click();
+
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox")
+      .fill(largeDatasetSqlQuery);
 
     // Apply the time filter and refresh the search
     await pm.logsVisualise.setRelative("6", "w");
     await pm.logsVisualise.logsApplyQueryButton();
 
     // Switch to SQL mode and refresh the search
-    await pm.logsVisualise.enableSQLMode();
+    // await pm.logsVisualise.enableSQLMode();
     await pm.logsVisualise.logsApplyQueryButton();
 
     // Toggle visualization
@@ -802,10 +818,20 @@ LIMIT 100`;
 
     // Step 1: Open Logs page and query editor
     await pm.logsVisualise.openLogs();
-    await pm.logsVisualise.openQueryEditor();
+    // await pm.logsVisualise.openQueryEditor();
 
     // Fill the query editor with large dataset SQL query
-    await pm.logsVisualise.fillQueryEditor(largeDatasetSqlQuery);
+    // await pm.logsVisualise.fillQueryEditor(largeDatasetSqlQuery);
+
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox")
+      .click();
+
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox")
+      .fill(largeDatasetSqlQuery);
 
     // Apply the time filter and refresh the search
     await pm.logsVisualise.setRelative("6", "w");
@@ -823,9 +849,9 @@ LIMIT 100`;
     await pm.logsVisualise.streamIndexList();
 
     // Robust check: wait for table panel to render (source of truth for selected type)
-    // await page.waitForSelector('[data-test="dashboard-panel-table"]', {
-    // timeout: 15000,
-    // });
+    await page.waitForSelector('[data-test="dashboard-panel-table"]', {
+      timeout: 15000,
+    });
     await expect(
       page.locator('[data-test="dashboard-panel-table"]')
     ).toBeVisible();
