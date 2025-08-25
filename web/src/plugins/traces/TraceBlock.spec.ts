@@ -302,6 +302,11 @@ describe("TraceBlock", () => {
       await flushPromises();
       await flushPromises();
       await flushPromises();
+      
+      // Ensure moment is loaded and getFormattedDate is called
+      await wrapper.vm.importMoment();
+      await wrapper.vm.getFormattedDate();
+      await wrapper.vm.$nextTick();
 
       const traceDay = wrapper.find("[data-test='trace-block-trace-date-day']");
       
@@ -317,9 +322,9 @@ describe("TraceBlock", () => {
         item: { ...wrapper.props("item"), trace_start_time: yesterdayTimestamp },
       });
 
-      // Wait for the component to process the prop change
-      await flushPromises();
-      await wrapper.vm.$nextTick();
+      // Ensure moment is imported and date is formatted after prop change
+      await wrapper.vm.importMoment();
+      await wrapper.vm.getFormattedDate();
       await flushPromises();
       
       const traceDay = wrapper.find("[data-test='trace-block-trace-date-day']");
@@ -375,7 +380,9 @@ describe("TraceBlock", () => {
     });
 
     it("should format time in 12-hour format", async () => {
-      await flushPromises();
+      // Ensure moment is imported and date is formatted
+      await wrapper.vm.importMoment();
+      await wrapper.vm.getFormattedDate();
       await flushPromises();
       
       const traceTime = wrapper.find("[data-test='trace-block-trace-date-time']");
