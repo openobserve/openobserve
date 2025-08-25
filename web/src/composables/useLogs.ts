@@ -648,7 +648,12 @@ const useLogs = () => {
     if (!dashboardPanelData?.data) {
       return null;
     }
-    return dashboardPanelData.data;
+    
+    // Only store config object and chart type, not the entire dashboardPanelData
+    return {
+      config: dashboardPanelData.data.config || {},
+      type: dashboardPanelData.data.type || 'bar',
+    };
   };
 
   const encodeVisualizationConfig = (config: any) => {
@@ -745,14 +750,21 @@ const useLogs = () => {
       query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
     }
 
-    // Add visualization data to URL if in visualize mode and dashboardPanelData is provided
+    // Preserve visualization data in URL
+    // - If in visualize mode and panel data is provided, encode the dashboardPanelData
     if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
-      const visualizationConfig = getVisualizationConfig(dashboardPanelData);
-      if (visualizationConfig) {
-        const encodedConfig = encodeVisualizationConfig(visualizationConfig);
-        if (encodedConfig) {
-          query["visualization_data"] = encodedConfig;
+      const visualizationData = getVisualizationConfig(dashboardPanelData);
+      if (visualizationData) {
+        const encoded = encodeVisualizationConfig(visualizationData);
+        if (encoded) {
+          query["visualization_data"] = encoded;
         }
+      }
+    } else {
+      // else preserve existing visualization data from the current URL
+      const existingEncodedConfig = router.currentRoute.value?.query?.visualization_data as string | undefined;
+      if (existingEncodedConfig) {
+        query["visualization_data"] = existingEncodedConfig;
       }
     }
 
@@ -4895,19 +4907,6 @@ const useLogs = () => {
 
     if(queryParams.hasOwnProperty("logs_visualize_toggle") && queryParams.logs_visualize_toggle != "") {
       searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
-    }
-
-    // Restore visualization data if available and in visualize mode
-    if (queryParams.visualization_data && 
-        searchObj.meta.logsVisualizeToggle === "visualize" && 
-        dashboardPanelData) {
-      const restoredData = decodeVisualizationConfig(queryParams.visualization_data);
-      if (restoredData && dashboardPanelData.data) {
-        dashboardPanelData.data = {
-          ...dashboardPanelData.data,
-          ...restoredData
-        };
-      }
     }
 
     //here we restore the fn editor state from the url query params
