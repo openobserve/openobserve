@@ -894,8 +894,14 @@ mod tests {
             email: "test@example.com".to_string(),
             first_name: "John".to_string(),
             last_name: "Doe".to_string(),
+            password: "password".to_string(),
+            salt: "salt".to_string(),
+            token: "token".to_string(),
+            rum_token: None,
             role: UserRole::Admin,
+            org: "test_org".to_string(),
             is_external: false,
+            password_ext: None,
         };
 
         let response = TokenValidationResponseBuilder::from_user(&user).build();

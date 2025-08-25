@@ -1188,8 +1188,6 @@ fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::{self, Write};
-    use tempfile::TempDir;
     use tokio::runtime::Runtime;
 
     #[test]
@@ -1260,27 +1258,6 @@ mod tests {
         let result = check_ratelimit_config(&cfg, &o2cfg);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("greater than or equal to 2 seconds"));
-    }
-
-    #[tokio::test]
-    async fn test_graceful_shutdown_handle_creation() {
-        use actix_web::{App, HttpServer, web};
-        use std::time::Duration;
-        
-        // Create a test HTTP server to get a handle for testing
-        let server = HttpServer::new(|| {
-            App::new()
-                .route("/test", web::get().to(|| async { "OK" }))
-        })
-        .bind("127.0.0.1:0")
-        .unwrap()
-        .run();
-        
-        let handle = server.handle();
-        
-        // Test that we can create and use the server handle
-        // We can't easily test the actual signal handling without complex setup
-        assert!(handle.workers() >= 0);
     }
 
     #[tokio::test]

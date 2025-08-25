@@ -197,6 +197,7 @@ pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
 #[cfg(not(feature = "enterprise"))]
 pub async fn remove_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
+#[derive(Debug)]
 pub struct UserEmail {
     pub user_id: String,
 }

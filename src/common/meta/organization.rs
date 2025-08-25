@@ -178,7 +178,7 @@ pub enum IngestionTokensContainer {
     RumToken(RumIngestionToken),
 }
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, ToSchema, Clone)]
 pub struct IngestionPasscode {
     pub passcode: String,
     pub user: String,
@@ -189,7 +189,7 @@ pub struct PasscodeResponse {
     pub data: IngestionPasscode,
 }
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, ToSchema, Clone)]
 pub struct RumIngestionToken {
     pub user: String,
     pub rum_token: Option<String>,
@@ -745,9 +745,9 @@ mod tests {
         };
 
         let summary = OrgSummary {
-            streams: stream_summary.clone(),
-            pipelines: pipeline_summary.clone(),
-            alerts: alert_summary.clone(),
+            streams: stream_summary,
+            pipelines: pipeline_summary,
+            alerts: alert_summary,
             total_functions: 25,
             total_dashboards: 15,
         };

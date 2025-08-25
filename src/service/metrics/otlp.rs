@@ -965,13 +965,12 @@ mod tests {
     use opentelemetry_proto::tonic::{
         common::v1::{any_value::Value, AnyValue, KeyValue as OtelKeyValue},
         metrics::v1::{
-            number_data_point::Value as NumberValue, Gauge, Metric, NumberDataPoint, ResourceMetrics,
-            ScopeMetrics, Sum, AggregationTemporality, Exemplar, HistogramDataPoint
+            number_data_point::Value as NumberValue, Metric, NumberDataPoint, ResourceMetrics,
+            ScopeMetrics, AggregationTemporality, Exemplar, HistogramDataPoint
         },
         resource::v1::Resource,
     };
     use prost::Message;
-    use serde_json::{json, Value as JsonValue};
     use std::collections::HashMap;
 
     fn create_test_gauge_metric(name: &str, value: f64) -> Metric {
