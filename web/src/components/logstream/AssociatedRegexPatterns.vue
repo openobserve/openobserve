@@ -190,7 +190,7 @@
                 </div>
               </div>
               <!-- detach at section -->
-              <div v-if="false" class="tw-flex tw-flex-col">
+              <div class="tw-flex tw-flex-col">
                 <span class="individual-section-title">
                   Detect at:
                 </span>

@@ -1424,18 +1424,20 @@ describe("Use Logs Composable", () => {
         
         const dashboardPanelData = {
           data: {
-            chart_type: "line",
-            x_axis: "timestamp",
-            y_axis: "count"
+            config: {
+              decimals: 2,
+            },
+            type: "table"
           }
         };
 
         const config = wrapper.vm.getVisualizationConfig(dashboardPanelData);
         
         expect(config).toEqual({
-          chart_type: "line",
-          x_axis: "timestamp",
-          y_axis: "count"
+          config: {
+            decimals: 2,
+          },
+          type: "table"
         });
       });
 

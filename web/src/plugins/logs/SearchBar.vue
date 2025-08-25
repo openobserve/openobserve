@@ -556,7 +556,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disable="searchObj.meta.logsVisualizeToggle === 'visualize'"
         >
           <q-tooltip>
-           {{ searchObj.meta.logsVisualizeToggle === 'visualize' ? 'Not supported for visualization' : t("search.messageWrapContent") }}
+            {{
+              searchObj.meta.logsVisualizeToggle === "visualize"
+                ? "Not supported for visualization"
+                : t("search.messageWrapContent")
+            }}
           </q-tooltip>
         </q-toggle>
 
@@ -636,9 +640,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-item-section side>
                   <q-icon name="keyboard_arrow_right" />
                 </q-item-section>
-                <q-menu 
+                <q-menu
                   v-model="showDownloadMenu"
-                  anchor="top end" 
+                  anchor="top end"
                   self="top start"
                 >
                   <q-list>
@@ -647,11 +651,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-pa-sm saved-view-item"
                       clickable
                       v-close-popup
-                      @click="downloadLogs(searchObj.data.queryResults.hits, 'csv')"
+                      @click="
+                        downloadLogs(searchObj.data.queryResults.hits, 'csv')
+                      "
                     >
                       <q-icon name="grid_on" size="14px" class="q-pr-sm" />
                       <q-item-section>
-                        <q-item-label class="tw-flex tw-items-center tw-gap-2 q-mr-md">
+                        <q-item-label
+                          class="tw-flex tw-items-center tw-gap-2 q-mr-md"
+                        >
                           {{ t("search.downloadCSV") }}
                         </q-item-label>
                       </q-item-section>
@@ -661,11 +669,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-pa-sm saved-view-item"
                       clickable
                       v-close-popup
-                      @click="downloadLogs(searchObj.data.queryResults.hits, 'json')"
+                      @click="
+                        downloadLogs(searchObj.data.queryResults.hits, 'json')
+                      "
                     >
                       <q-icon name="data_object" size="14px" class="q-pr-sm" />
                       <q-item-section>
-                        <q-item-label class="tw-flex tw-items-center tw-gap-2 q-mr-md">
+                        <q-item-label
+                          class="tw-flex tw-items-center tw-gap-2 q-mr-md"
+                        >
                           {{ t("search.downloadJSON") }}
                         </q-item-label>
                       </q-item-section>
@@ -934,34 +946,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 100%; height: 100%"
             >
               <template v-if="showFunctionEditor">
-              <div class="tw-relative tw-h-full tw-w-full"
-              >
-                <code-query-editor
-                  v-if="router.currentRoute.value.name === 'logs'"
-                  data-test="logs-vrl-function-editor"
-                  ref="fnEditorRef"
-                  editor-id="fnEditor"
-                  class="monaco-editor"
-                  v-model:query="searchObj.data.tempFunctionContent"
+                <div class="tw-relative tw-h-full tw-w-full">
+                  <code-query-editor
+                    v-if="router.currentRoute.value.name === 'logs'"
+                    data-test="logs-vrl-function-editor"
+                    ref="fnEditorRef"
+                    editor-id="fnEditor"
+                    class="monaco-editor"
+                    v-model:query="searchObj.data.tempFunctionContent"
+                    :class="
+                      searchObj.data.tempFunctionContent == '' &&
+                      searchObj.meta.functionEditorPlaceholderFlag
+                        ? 'empty-function'
+                        : ''
+                    "
+                    :readOnly="
+                      searchObj.meta.logsVisualizeToggle === 'visualize'
+                    "
+                    @keydown="handleKeyDown"
+                    language="vrl"
+                    @focus="
+                      searchObj.meta.functionEditorPlaceholderFlag = false
+                    "
+                    @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
+                  />
+                </div>
+                <div
+                  v-if="searchObj.meta.logsVisualizeToggle === 'visualize'"
                   :class="
-                    searchObj.data.tempFunctionContent == '' &&
-                    searchObj.meta.functionEditorPlaceholderFlag
-                      ? 'empty-function'
-                      : ''
+                    store.state.theme == 'dark'
+                      ? 'tw-bg-white tw-bg-opacity-10'
+                      : 'tw-bg-black tw-bg-opacity-10'
                   "
-                  :readOnly="searchObj.meta.logsVisualizeToggle === 'visualize'"
-                  @keydown="handleKeyDown"
-                  language="vrl"
-                  @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
-                  @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
-                />
-             </div>
-               <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'" 
-               :class="store.state.theme == 'dark' ? 'tw-bg-white tw-bg-opacity-10' : 'tw-bg-black tw-bg-opacity-10'"
-               class="tw-absolute tw-bottom-0 tw-w-full " style="margin-top: 12px; display: flex; align-items: center; flex">
-                <q-icon name="warning" color="warning" size="20px" class="q-mx-sm" />
-                <span class="text-negative q-pa-sm" style="font-weight: semibold; font-size: 14px;">VRL Function Editor is not supported in visualize mode.</span>
-              </div>
+                  class="tw-absolute tw-bottom-0 tw-w-full"
+                  style="margin-top: 12px; display: flex; align-items: center; flex"
+                >
+                  <q-icon
+                    name="warning"
+                    color="warning"
+                    size="20px"
+                    class="q-mx-sm"
+                  />
+                  <span
+                    class="text-negative q-pa-sm"
+                    style="font-weight: semibold; font-size: 14px"
+                    >VRL Function Editor is not supported in visualize
+                    mode.</span
+                  >
+                </div>
               </template>
               <template v-else-if="searchObj.data.transformType === 'action'">
                 <code-query-editor
@@ -1076,8 +1108,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
           />
           <div class="q-py-sm file-type">
-            <label class="q-pr-sm">{{ t('search.fileType') }}</label><br />
-            <q-btn-group 
+            <label class="q-pr-sm">{{ t("search.fileType") }}</label
+            ><br />
+            <q-btn-group
               data-test="custom-download-file-type-button-group"
               class="file-type-button-group q-mt-xs"
             >
@@ -1085,7 +1118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="option in downloadCustomFileTypeOptions"
                 :key="option.value"
                 :data-test="`custom-download-file-type-${option.value}-btn`"
-                :class="downloadCustomFileType === option.value ? 'selected' : ''"
+                :class="
+                  downloadCustomFileType === option.value ? 'selected' : ''
+                "
                 @click="downloadCustomFileType = option.value"
                 :label="option.label"
                 no-caps
@@ -1425,7 +1460,7 @@ import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { json2csv } from 'json-2-csv';
+import { json2csv } from "json-2-csv";
 import {
   mergeDeep,
   b64DecodeUnicode,
@@ -1782,7 +1817,6 @@ export default defineComponent({
     watch(
       () => searchObj.meta.functionEditorPlaceholderFlag,
       (val) => {
-
         if (
           searchObj.meta.jobId != "" &&
           val == true &&
@@ -1948,9 +1982,8 @@ export default defineComponent({
               if (localInterestingFields.value != null) {
                 localFields = localInterestingFields.value;
               }
-              for (const stream of searchObj.data.stream.selectedStreamFields) {
-                // If the field is not the timestamp column, add it to the interesting field list
-                // As timestamp column is default interesting field, we don't need to add it to the local storage
+              for (const stream of searchObj.data.stream
+                ?.selectedStreamFields || []) {
                 if (
                   stream.name == col &&
                   !searchObj.data.stream.interestingFieldList.includes(col) &&
@@ -1977,12 +2010,8 @@ export default defineComponent({
             }
           }
 
-          // Add timestamp column to the interesting field list, as it is default interesting field
-          searchObj.data.stream.interestingFieldList.unshift(
-            store.state.zoConfig?.timestamp_column,
-          );
-
-          for (const item of searchObj.data.stream.selectedStreamFields) {
+          for (const item of searchObj.data.stream?.selectedStreamFields ||
+            []) {
             if (
               searchObj.data.stream.interestingFieldList.includes(item.name)
             ) {
@@ -3399,13 +3428,17 @@ export default defineComponent({
 
     const onLogsVisualizeToggleUpdate = (value: any) => {
       // prevent action if visualize is disabled (SQL mode disabled with multiple streams)
-      if (value === "visualize" && !searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1) {
+      if (
+        value === "visualize" &&
+        !searchObj.meta.sqlMode &&
+        searchObj.data.stream.selectedStream.length > 1
+      ) {
         showErrorNotification(
-          "Please enable SQL mode or select a single stream to visualize"
+          "Please enable SQL mode or select a single stream to visualize",
         );
         return;
       }
-      
+
       // confirm with user on toggle from visualize to logs
       if (
         value == "logs" &&
@@ -3413,33 +3446,49 @@ export default defineComponent({
       ) {
         // cancel all the visualize queries
         cancelVisualizeQueries();
-        if(searchObj.meta.logsVisualizeDirtyFlag === true || !Object.hasOwn(searchObj.data?.queryResults, "hits") || searchObj.data?.queryResults?.hits?.length == 0) {
+        if (
+          searchObj.meta.logsVisualizeDirtyFlag === true ||
+          !Object.hasOwn(searchObj.data?.queryResults, "hits") ||
+          searchObj.data?.queryResults?.hits?.length == 0
+        ) {
           searchObj.loading = true;
-          if(searchObj.meta.sqlMode) {
+          if (searchObj.meta.sqlMode) {
             searchObj.data.queryResults.aggs = undefined;
           }
           searchObj.meta.refreshHistogram = true;
           getQueryData();
           searchObj.meta.logsVisualizeDirtyFlag = false;
         }
-      } else if (value == "visualize" && searchObj.meta.logsVisualizeToggle == "logs") {
+      } else if (
+        value == "visualize" &&
+        searchObj.meta.logsVisualizeToggle == "logs"
+      ) {
         // validate query
-        // return if query is emptry and stream is not selected 
-        if(searchObj.data.query === "" && searchObj?.data?.stream?.selectedStream?.length === 0){ 
-          showErrorNotification("Query is empty, please write query to visualize");
+        // return if query is emptry and stream is not selected
+        if (
+          searchObj.data.query === "" &&
+          searchObj?.data?.stream?.selectedStream?.length === 0
+        ) {
+          showErrorNotification(
+            "Query is empty, please write query to visualize",
+          );
           return;
         }
 
         let logsPageQuery = searchObj.data.query;
 
         // handle sql mode
-        if(!searchObj.data.sqlMode){
-          const queryBuild= buildSearch();
+        if (!searchObj.data.sqlMode) {
+          const queryBuild = buildSearch();
           logsPageQuery = queryBuild?.query?.sql ?? "";
         }
 
         // if multiple sql, then do not allow to visualize
-        if(logsPageQuery && Array.isArray(logsPageQuery) && logsPageQuery.length > 1){
+        if (
+          logsPageQuery &&
+          Array.isArray(logsPageQuery) &&
+          logsPageQuery.length > 1
+        ) {
           showErrorNotification(
             "Multiple SQL queries are not allowed to visualize",
           );
@@ -3447,8 +3496,10 @@ export default defineComponent({
         }
 
         // validate sql query that all fields have alias
-        if(!allSelectionFieldsHaveAlias(logsPageQuery)){
-          showErrorNotification("All fields must have alias in query to visualize");
+        if (!allSelectionFieldsHaveAlias(logsPageQuery)) {
+          showErrorNotification(
+            "All fields must have alias in query to visualize",
+          );
           return;
         }
 
@@ -3477,7 +3528,8 @@ export default defineComponent({
     const visualizeSearchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
         variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
-      ).filter((item: any) => item.length > 0)
+      )
+        .filter((item: any) => item.length > 0)
         .flat() as string[];
 
       // If custom field extraction is in progress, push a dummy trace id so that cancel button is visible.
@@ -3853,10 +3905,16 @@ export default defineComponent({
   },
   computed: {
     isVisualizeDisabled() {
-      return !this.searchObj.meta.sqlMode && this.searchObj.data.stream.selectedStream.length > 1;
+      return (
+        !this.searchObj.meta.sqlMode &&
+        this.searchObj.data.stream.selectedStream.length > 1
+      );
     },
     isSqlModeDisabled() {
-      return this.searchObj.meta.logsVisualizeToggle === 'visualize' && this.searchObj.data.stream.selectedStream.length > 1;
+      return (
+        this.searchObj.meta.logsVisualizeToggle === "visualize" &&
+        this.searchObj.data.stream.selectedStream.length > 1
+      );
     },
     addSearchTerm() {
       return this.searchObj.data.stream.addToFilter;
@@ -4452,27 +4510,27 @@ export default defineComponent({
     border: 1px solid var(--q-border-color, #e0e0e0);
     background-color: var(--q-field-bg, #fafafa);
     color: var(--q-text-color, #000);
-    
+
     &.selected {
       background-color: var(--q-primary) !important;
       color: white !important;
       border-color: var(--q-primary) !important;
     }
-    
+
     &:first-child {
       border-top-left-radius: 4px;
       border-bottom-left-radius: 4px;
     }
-    
+
     &:last-child {
       border-top-right-radius: 4px;
       border-bottom-right-radius: 4px;
     }
-    
+
     &:not(:last-child) {
       border-right: none;
     }
-    
+
     &:hover:not(.selected) {
       background-color: var(--q-hover-color, #f5f5f5);
     }
@@ -4486,16 +4544,17 @@ export default defineComponent({
 }
 
 .file-type label {
-    transform: translate(-0.75rem, -175%);
-    font-weight: bold;
-    font-size: 14px;
-    color: rgba(0, 0, 0, 0.6);
+  transform: translate(-0.75rem, -175%);
+  font-weight: bold;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.6);
 }
 .q-dark .q-btn {
   font-weight: 600;
   border: 0px solid rgba(255, 255, 255, 0.2);
 }
-.q-dark .file-type label, .q-dark .file-type .q-btn {
-    color: rgba(255, 255, 255, 0.7);
+.q-dark .file-type label,
+.q-dark .file-type .q-btn {
+  color: rgba(255, 255, 255, 0.7);
 }
 </style>
