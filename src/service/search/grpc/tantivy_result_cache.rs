@@ -31,7 +31,8 @@ pub static GLOBAL_CACHE: Lazy<Arc<TantivyResultCache>> =
 #[derive(Debug, Clone)]
 pub enum CacheEntry {
     RowIdsBitVec(usize, BitVec),
-    RowIdsRoaring(usize, RoaringBitmap),
+    // true number in bitmap, bitmap, parquet row numbers
+    RowIdsRoaring(usize, RoaringBitmap, usize),
     Count(usize),              // simple count optimization
     Histogram(Vec<u64>),       // simple histogram optimization
     TopN(Vec<(String, u64)>),  // simple top n optimization
@@ -44,8 +45,8 @@ impl From<CacheEntry> for TantivyResult {
             CacheEntry::RowIdsBitVec(num_rows, bitvec) => {
                 TantivyResult::RowIdsBitVec(num_rows, bitvec)
             }
-            CacheEntry::RowIdsRoaring(num_rows, roaring) => {
-                let mut bitvec = BitVec::repeat(false, roaring.max().unwrap_or(0) as usize + 1);
+            CacheEntry::RowIdsRoaring(num_rows, roaring, parquet_rows) => {
+                let mut bitvec = BitVec::repeat(false, parquet_rows);
                 for i in roaring.into_iter() {
                     bitvec.set(i as usize, true);
                 }
@@ -65,8 +66,10 @@ impl CacheEntry {
             CacheEntry::RowIdsBitVec(_, bitvec) => {
                 bitvec.capacity().div_ceil(8) + std::mem::size_of::<BitVec>()
             }
-            CacheEntry::RowIdsRoaring(_, roaring) => {
-                roaring.serialized_size() + std::mem::size_of::<RoaringBitmap>()
+            CacheEntry::RowIdsRoaring(_, roaring, _) => {
+                roaring.serialized_size()
+                    + std::mem::size_of::<RoaringBitmap>()
+                    + std::mem::size_of::<usize>() * 2
             }
             CacheEntry::Count(_) => std::mem::size_of::<usize>(),
             CacheEntry::Histogram(histogram) => {
