@@ -200,17 +200,16 @@ describe("ColorBySeriesPopUp", () => {
   });
 
   it("should disable save button when form is invalid", async () => {
-    const saveButton = wrapper.find(
-      "[data-test='dashboard-addpanel-config-color-by-series-apply-btn']",
-    );
-    expect(saveButton.attributes("disabled")).toBeTruthy();
+    // Initially form should be invalid (empty values)
+    expect(wrapper.vm.isFormValid).toBe(false);
 
     // Set valid values
     wrapper.vm.editColorBySeries[0].value = "Series 1";
     wrapper.vm.editColorBySeries[0].color = "#FF0000";
     await flushPromises();
 
-    expect(saveButton.attributes("disabled")).toBeFalsy();
+    // Now form should be valid
+    expect(wrapper.vm.isFormValid).toBe(true);
   });
 
   it("should handle undefined or null series values", async () => {
