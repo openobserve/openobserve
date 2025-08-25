@@ -477,25 +477,39 @@ mod tests {
         // Test with valid timestamp
         let mut query = Query::<HashMap<String, String>>(Default::default());
         query.insert("start_time".to_string(), "1609459200".to_string());
-        assert_eq!(get_ts_from_request_with_key(&query, "start_time").unwrap(), 1609459200);
+        assert_eq!(
+            get_ts_from_request_with_key(&query, "start_time").unwrap(),
+            1609459200
+        );
 
         // Test with missing parameter
         let query = Query::<HashMap<String, String>>(Default::default());
         let result = get_ts_from_request_with_key(&query, "missing_key");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("missing_key parameter is missing"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("missing_key parameter is missing")
+        );
 
         // Test with invalid timestamp format
         let mut query = Query::<HashMap<String, String>>(Default::default());
         query.insert("invalid_ts".to_string(), "not_a_number".to_string());
         let result = get_ts_from_request_with_key(&query, "invalid_ts");
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("invalid_ts is not a valid timestamp"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("invalid_ts is not a valid timestamp")
+        );
 
         // Test with negative timestamp
         let mut query = Query::<HashMap<String, String>>(Default::default());
         query.insert("negative_ts".to_string(), "-123456789".to_string());
-        assert_eq!(get_ts_from_request_with_key(&query, "negative_ts").unwrap(), -123456789);
+        assert_eq!(
+            get_ts_from_request_with_key(&query, "negative_ts").unwrap(),
+            -123456789
+        );
     }
 
     #[test]
@@ -556,8 +570,14 @@ mod tests {
     fn test_get_fallback_order_by_col_from_request_2() {
         // Test with custom fallback column
         let mut query = Query::<HashMap<String, String>>(Default::default());
-        query.insert("fallback_order_by_col".to_string(), "custom_column".to_string());
-        assert_eq!(get_fallback_order_by_col_from_request(&query), Some("custom_column".to_string()));
+        query.insert(
+            "fallback_order_by_col".to_string(),
+            "custom_column".to_string(),
+        );
+        assert_eq!(
+            get_fallback_order_by_col_from_request(&query),
+            Some("custom_column".to_string())
+        );
 
         // Test with missing parameter (should return None)
         let query = Query::<HashMap<String, String>>(Default::default());
@@ -566,6 +586,9 @@ mod tests {
         // Test with empty string
         let mut query = Query::<HashMap<String, String>>(Default::default());
         query.insert("fallback_order_by_col".to_string(), "".to_string());
-        assert_eq!(get_fallback_order_by_col_from_request(&query), Some("".to_string()));
+        assert_eq!(
+            get_fallback_order_by_col_from_request(&query),
+            Some("".to_string())
+        );
     }
 }

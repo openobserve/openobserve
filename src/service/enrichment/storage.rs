@@ -470,3 +470,150 @@ pub mod database {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::remote::*;
+
+    #[test]
+    fn test_get_remote_key_prefix() {
+        let org_id = "test_org";
+        let table_name = "test_table";
+
+        let result = get_remote_key_prefix(org_id, table_name);
+
+        assert_eq!(result, "files/test_org/enrichment_tables/test_table");
+    }
+
+    #[test]
+    fn test_get_remote_key_prefix_with_special_chars() {
+        let org_id = "org-with_special.chars";
+        let table_name = "table_name-123";
+
+        let result = get_remote_key_prefix(org_id, table_name);
+
+        assert_eq!(
+            result,
+            "files/org-with_special.chars/enrichment_tables/table_name-123"
+        );
+    }
+
+    #[test]
+    fn test_get_remote_key_prefix_empty_strings() {
+        let result = get_remote_key_prefix("", "");
+        assert_eq!(result, "files//enrichment_tables/");
+    }
+
+    #[test]
+    fn test_create_remote_key() {
+        let org_id = "test_org";
+        let table_name = "test_table";
+        // Use a fixed timestamp: 2023-01-15 14:30:45 UTC (1673790645000000 microseconds)
+        let created_at = 1673790645000000_i64;
+
+        let result = create_remote_key(org_id, table_name, created_at);
+
+        // The result should have the correct prefix and suffix
+        assert!(result.starts_with("files/test_org/enrichment_tables/test_table/"));
+        assert!(result.contains("/2023/"));
+        assert!(result.contains("/01/"));
+        assert!(result.contains("/15/"));
+        assert!(result.contains("/13/")); // Hour 13 (not 14)
+        assert!(result.ends_with(".parquet"));
+    }
+
+    #[test]
+    fn test_create_remote_key_different_timestamp() {
+        let org_id = "org2";
+        let table_name = "table2";
+        // Use a different timestamp: 2024-12-31 23:59:59 UTC
+        let created_at = 1735689599000000_i64;
+
+        let result = create_remote_key(org_id, table_name, created_at);
+
+        // Should have the correct year/month/day/hour path
+        assert!(result.starts_with("files/org2/enrichment_tables/table2/"));
+        assert!(result.contains("/2024/"));
+        assert!(result.contains("/12/"));
+        assert!(result.contains("/31/"));
+        assert!(result.contains("/23/"));
+        assert!(result.ends_with(".parquet"));
+    }
+
+    #[test]
+    fn test_create_remote_key_midnight() {
+        let org_id = "midnight_org";
+        let table_name = "midnight_table";
+        // Use midnight timestamp: 2024-01-01 00:00:00 UTC
+        let created_at = 1704067200000000_i64;
+
+        let result = create_remote_key(org_id, table_name, created_at);
+
+        assert!(result.starts_with("files/midnight_org/enrichment_tables/midnight_table/"));
+        assert!(result.contains("/2024/"));
+        assert!(result.contains("/01/"));
+        assert!(result.contains("/01/"));
+        assert!(result.contains("/00/"));
+        assert!(result.ends_with(".parquet"));
+    }
+
+    #[test]
+    fn test_create_remote_key_structure() {
+        let result = create_remote_key("org", "table", 1673790645000000_i64);
+
+        // Split by / to verify structure
+        let parts: Vec<&str> = result.split('/').collect();
+        // Should be at least files/org/enrichment_tables/table/2023/01/15/14/{id}.parquet
+        assert!(parts.len() >= 8);
+        assert_eq!(parts[0], "files");
+        assert_eq!(parts[1], "org");
+        assert_eq!(parts[2], "enrichment_tables");
+        assert_eq!(parts[3], "table");
+        assert_eq!(parts[4], "2023");
+        assert_eq!(parts[5], "01");
+        assert_eq!(parts[6], "15");
+        assert_eq!(parts[7], "13");
+
+        // The filename should end with .parquet
+        let filename = parts.last().unwrap();
+        assert!(filename.ends_with(".parquet"));
+    }
+
+    #[test]
+    fn test_create_remote_key_unique_ids() {
+        let org_id = "test_org";
+        let table_name = "test_table";
+        let created_at = 1673790645000000_i64;
+
+        let result1 = create_remote_key(org_id, table_name, created_at);
+        let result2 = create_remote_key(org_id, table_name, created_at);
+
+        // Same timestamp should generate different IDs (due to config::ider::generate())
+        assert_ne!(result1, result2);
+
+        // But both should have same prefix pattern
+        let common_prefix = "files/test_org/enrichment_tables/test_table/";
+        assert!(result1.starts_with(common_prefix));
+        assert!(result2.starts_with(common_prefix));
+
+        // Both should contain the same date/time components
+        assert!(result1.contains("/2023/01/15/13/"));
+        assert!(result2.contains("/2023/01/15/13/"));
+    }
+
+    #[test]
+    fn test_create_remote_key_leap_year() {
+        let org_id = "leap_org";
+        let table_name = "leap_table";
+        // February 29, 2024 12:00:00 UTC (using microseconds)
+        let created_at = 1709294400000000_i64; // 2024-03-01 12:00:00 UTC
+
+        let result = create_remote_key(org_id, table_name, created_at);
+
+        assert!(result.starts_with("files/leap_org/enrichment_tables/leap_table/"));
+        assert!(result.contains("/2024/"));
+        assert!(result.contains("/03/")); // March
+        assert!(result.contains("/01/")); // Day 1
+        assert!(result.ends_with(".parquet"));
+    }
+}
