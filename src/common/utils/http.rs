@@ -243,12 +243,18 @@ pub fn get_work_group(work_group_set: Vec<Option<String>>) -> Option<String> {
 pub(crate) fn get_dashboard_info_from_request(
     query: &Query<HashMap<String, String>>,
 ) -> Option<DashboardInfo> {
+    let run_id = query.get("run_id").map(|s| s.to_string())?;
+    let panel_id = query.get("panel_id").map(|s| s.to_string())?;
+    let panel_name = query.get("panel_name").map(|s| s.to_string())?;
+    let tab_id = query.get("tab_id").map(|s| s.to_string())?;
+    let tab_name = query.get("tab_name").map(|s| s.to_string())?;
+    
     Some(DashboardInfo {
-        run_id: query.get("run_id").map(|s| s.to_string())?,
-        panel_id: query.get("panel_id").map(|s| s.to_string())?,
-        panel_name: query.get("panel_name").map(|s| s.to_string())?,
-        tab_id: query.get("tab_id").map(|s| s.to_string())?,
-        tab_name: query.get("tab_name").map(|s| s.to_string())?,
+        run_id,
+        panel_id,
+        panel_name,
+        tab_id,
+        tab_name,
     })
 }
 
@@ -524,11 +530,11 @@ mod tests {
         query.insert("tab_name".to_string(), "Test Tab".to_string());
 
         let dashboard_info = get_dashboard_info_from_request(&query).unwrap();
-        assert_eq!(dashboard_info.run_id, Some("run123".to_string()));
-        assert_eq!(dashboard_info.panel_id, Some("panel456".to_string()));
-        assert_eq!(dashboard_info.panel_name, Some("Test Panel".to_string()));
-        assert_eq!(dashboard_info.tab_id, Some("tab789".to_string()));
-        assert_eq!(dashboard_info.tab_name, Some("Test Tab".to_string()));
+        assert_eq!(dashboard_info.run_id, "run123".to_string());
+        assert_eq!(dashboard_info.panel_id, "panel456".to_string());
+        assert_eq!(dashboard_info.panel_name, "Test Panel".to_string());
+        assert_eq!(dashboard_info.tab_id, "tab789".to_string());
+        assert_eq!(dashboard_info.tab_name, "Test Tab".to_string());
 
         // Test partial data - missing run_id should return None
         let mut query = Query::<HashMap<String, String>>(Default::default());
@@ -601,7 +607,7 @@ mod tests {
             ("dashboards", Some(SearchEventType::Dashboards)),
             ("reports", Some(SearchEventType::Reports)),
             ("alerts", Some(SearchEventType::Alerts)),
-            ("rum", Some(SearchEventType::Rum)),
+            ("rum", Some(SearchEventType::RUM)),
             ("values", Some(SearchEventType::Values)),
         ];
 

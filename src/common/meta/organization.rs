@@ -150,7 +150,7 @@ pub struct OrgSummary {
     pub total_dashboards: i64,
 }
 
-#[derive(Default, Serialize, Deserialize, ToSchema)]
+#[derive(Default, Clone, Serialize, Deserialize, ToSchema)]
 pub struct StreamSummary {
     pub num_streams: i64,
     pub total_records: i64,
@@ -159,7 +159,7 @@ pub struct StreamSummary {
     pub total_index_size: f64,
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct PipelineSummary {
     pub num_realtime: i64,
     pub num_scheduled: i64,

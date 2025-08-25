@@ -2097,10 +2097,10 @@ async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::file_list::FileList;
     use config::meta::stream::{FileKey, FileMeta};
-    use sqlx::{Postgres, PgPool, Row};
+    use sqlx::PgPool;
     use std::sync::Once;
-    use tempfile::TempDir;
     use tokio::sync::OnceCell;
 
     static INIT: Once = Once::new();
@@ -2248,6 +2248,7 @@ mod tests {
             meta: create_test_file_meta(),
             deleted,
             id: 0,
+            segment_ids: None,
         }
     }
 
@@ -2457,12 +2458,14 @@ mod tests {
         let postgres_list = PostgresFileList::new();
         let deleted_files = vec![
             FileListDeleted {
+                id: 0,
                 account: "account1".to_string(),
                 file: "org1/stream1/logs/2021/01/01/pg_deleted1.parquet".to_string(),
                 flattened: false,
                 index_file: false,
             },
             FileListDeleted {
+                id: 0,
                 account: "account1".to_string(),
                 file: "org1/stream1/logs/2021/01/01/pg_deleted2.parquet".to_string(),
                 flattened: true,

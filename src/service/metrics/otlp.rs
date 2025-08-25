@@ -961,8 +961,7 @@ mod tests {
 
     use super::*;
 
-    use actix_web::{http::StatusCode, test};
-    use bytes::Bytes;
+    use actix_web::http::StatusCode;
     use opentelemetry_proto::tonic::{
         common::v1::{any_value::Value, AnyValue, KeyValue as OtelKeyValue},
         metrics::v1::{
@@ -972,6 +971,7 @@ mod tests {
         resource::v1::Resource,
     };
     use prost::Message;
+    use serde_json::{json, Value as JsonValue};
     use std::collections::HashMap;
 
     fn create_test_gauge_metric(name: &str, value: f64) -> Metric {
