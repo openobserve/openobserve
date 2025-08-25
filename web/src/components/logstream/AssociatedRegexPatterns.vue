@@ -169,8 +169,8 @@
                   </q-radio>
                   <div class="tw-flex tw-flex-col tw-items-start tw-mt-[6px] individual-section-sub-title">
                       Redact
-                      <span class="tw-font-[400] individual-section-sub-information" style="line-height: 20px;">
-                        This will redact the matched expression during data ingestion
+                      <span class="tw-font-[400] individual-section-sub-information">
+                        This will redact the matched expression
                       </span>
                     </div>
 
@@ -181,8 +181,8 @@
                   </q-radio>
                   <div class="tw-flex tw-flex-col tw-items-start tw-mt-[6px] individual-section-sub-title">
                       Drop
-                      <span class="tw-font-[400] individual-section-sub-information" style="line-height: 20px;">
-                        This will drop the field completely during data ingestion
+                      <span class="tw-font-[400] individual-section-sub-information">
+                        This will drop the field completely
                       </span>
                     </div>
                     
@@ -366,6 +366,14 @@
         </div>
       </div>
     </div>
+    <ConfirmDialog
+      title="Remove Pattern"
+      message="Are you sure you want to remove this pattern from the field?"
+      @update:ok="handleAddOrRemovePattern"
+      @update:cancel="handleCancelRemovePattern"
+      v-model="showWarningDialogToRemovePattern"
+    />
+
 </template>
 
 <script lang="ts">
@@ -378,6 +386,7 @@ import store from '@/test/unit/helpers/store';
 import { useI18n } from 'vue-i18n';
 import FullViewContainer from '../functions/FullViewContainer.vue';
 import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
+import ConfirmDialog from '../ConfirmDialog.vue';
 
 export interface PatternAssociation {
     field: string;
@@ -389,7 +398,8 @@ export interface PatternAssociation {
 export default defineComponent({
     name: "AssociatedRegexPatterns",
     components: {
-        FullViewContainer
+        FullViewContainer,
+        ConfirmDialog
     },
     props: {
         data: {
@@ -431,12 +441,13 @@ export default defineComponent({
         const isPatternValid = ref(false);
         const testString = ref("");
         const policy = ref("Redact");
-        const apply_at = ref<any>(["AtIngestion"]);
+        const apply_at = ref<any>([]);
         const appliedPatternsExpandedRef = ref<any>(null);
         const allPatternsExpandedRef = ref<any>(null);
         const isFormDirty = ref(false);
         const queryEditorRef = ref<any>(null);
         const testLoading = ref(false);
+        const showWarningDialogToRemovePattern = ref(false);
         const outputString = ref("");
         const expandState = ref({
           regexTestString: true,
@@ -555,6 +566,12 @@ export default defineComponent({
         })
         watch(()=> apply_at.value, (newVal) => {
           if(checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)){
+            //here we need to handle if user deselects the apply_at value then we need to show a message to the user 
+            //that they are willing to remove the pattern from the field if yes we can do that otherwise we need to show the user 
+            //the previous value of apply_at only
+            if(newVal.length == 0){
+              showWarningToRemovePattern();
+            }
             let apply_at_value = "";
             if(newVal.length == 2){
               apply_at_value = 'Both';
@@ -642,10 +659,6 @@ export default defineComponent({
             isFormDirty.value = true;
           }
           else{
-            //this needs to be removed once we suppport at search as well 
-            //as of now we are not supporting at search
-            //that is the reason we are hardcoding the apply_at value to AtIngestion
-            apply_at.value = ["AtIngestion"];
             if(apply_at.value.length == 0){
               $q.notify({
                 message: "Please select detect at option",
@@ -678,6 +691,9 @@ export default defineComponent({
             hasPatternChanges.value = true;
             isFormDirty.value = true;
           }
+          //this is for safety to close the warning dialog whenever user clicks on add or remove pattern button
+          showWarningDialogToRemovePattern.value = false;
+
         }
         //why this check because user might update the policy or apply_at value of already applied pattern 
         //so we need to check if the policy or apply_at value is changed and if it is then we need to update the isFormDirty value
@@ -713,6 +729,33 @@ export default defineComponent({
           outputString.value = "";
           expandState.value.outputString = false;
           expandState.value.regexTestString = true;
+        }
+
+        const showWarningToRemovePattern = () => {
+          //here we need to show the user the previous value of apply_at
+          //if user clicks on no then we need to show the user the previous value of apply_at
+          //otherwise we need to remove the pattern from the field
+          showWarningDialogToRemovePattern.value = true;
+        }
+
+        const handleCancelRemovePattern = async () => {
+          showWarningDialogToRemovePattern.value = false;
+          //we need to get the previous value of apply_at values 
+          //and set it to the apply_at value
+          //we need to get the previous value of apply_at values 
+          //so we are transforming the apply_at value to the previous value of apply_at values
+          apply_at.value = transformApplyAtValue(userClickedPattern.value?.apply_at);
+        };
+
+        const transformApplyAtValue = (applyAtValue: string) => {
+          let applyAtValues = [];
+          if(applyAtValue == 'Both'){
+            applyAtValues = ['AtIngestion', 'AtSearch'];
+          }
+          else{
+            applyAtValues = [applyAtValue];
+          }
+          return applyAtValues;
         }
 
 
@@ -757,7 +800,10 @@ export default defineComponent({
             checkIfPatternIsAppliedAndUpdate,
             appliedPatternsMap,
             hasPatternChanges,
-            debouncedEmit
+            debouncedEmit,
+            showWarningDialogToRemovePattern,
+            showWarningToRemovePattern,
+            handleCancelRemovePattern,
         }
     }
 })
