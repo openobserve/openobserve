@@ -322,9 +322,9 @@ describe("TraceBlock", () => {
         item: { ...wrapper.props("item"), trace_start_time: yesterdayTimestamp },
       });
 
-      // Wait for the component to process the prop change
-      await flushPromises();
-      await wrapper.vm.$nextTick();
+      // Ensure moment is imported and date is formatted after prop change
+      await wrapper.vm.importMoment();
+      await wrapper.vm.getFormattedDate();
       await flushPromises();
       
       const traceDay = wrapper.find("[data-test='trace-block-trace-date-day']");
