@@ -15,14 +15,14 @@
 
 use std::{collections::HashMap, fmt::Debug, pin::Pin, sync::Arc, task::Poll};
 
-use arrow::{array::ArrayRef, buffer::Buffer};
+use arrow::{array::ArrayRef, buffer::Buffer, ipc::MessageHeader};
 use arrow_flight::{
     FlightData,
     error::{FlightError, Result},
     utils::flight_data_to_arrow_batch,
 };
 use arrow_schema::{Schema, SchemaRef};
-use datafusion::parquet::data_type::AsBytes;
+use datafusion::{parquet::data_type::AsBytes, physical_plan::metrics::BaselineMetrics};
 use futures::{Stream, StreamExt, ready};
 use tonic::Streaming;
 
@@ -33,6 +33,7 @@ pub struct FlightDataDecoder {
     schema: Option<SchemaRef>,
     dictionaries_by_field: HashMap<i64, ArrayRef>,
     done: bool,
+    metrics: BaselineMetrics,
 }
 
 impl Debug for FlightDataDecoder {
@@ -48,12 +49,17 @@ impl Debug for FlightDataDecoder {
 
 impl FlightDataDecoder {
     /// Create a new wrapper around the stream of [`FlightData`]
-    pub fn new(response: Streaming<FlightData>, schema: Option<SchemaRef>) -> Self {
+    pub fn new(
+        response: Streaming<FlightData>,
+        schema: Option<SchemaRef>,
+        metrics: BaselineMetrics,
+    ) -> Self {
         Self {
             response,
             schema,
             dictionaries_by_field: HashMap::new(),
             done: false,
+            metrics,
         }
     }
 
@@ -64,11 +70,11 @@ impl FlightDataDecoder {
 
     /// Extracts flight data from the next message
     fn extract_message(&mut self, data: FlightData) -> Result<Option<FlightMessage>> {
-        use arrow::ipc::MessageHeader;
+        let timer = self.metrics.elapsed_compute().timer();
         let message = arrow::ipc::root_as_message(&data.data_header[..])
             .map_err(|e| FlightError::DecodeError(format!("Error decoding header: {e}")))?;
 
-        match message.header_type() {
+        let result = match message.header_type() {
             MessageHeader::NONE => {
                 let message = serde_json::from_slice::<CustomMessage>(data.app_metadata.as_bytes())
                     .map_err(|e| {
@@ -139,7 +145,9 @@ impl FlightDataDecoder {
                 let name = other.variant_name().unwrap_or("UNKNOWN");
                 Err(FlightError::protocol(format!("Unexpected message: {name}")))
             }
-        }
+        };
+        timer.done();
+        result
     }
 }
 

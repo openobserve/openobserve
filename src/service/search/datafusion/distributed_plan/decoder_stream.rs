@@ -19,6 +19,7 @@ use arrow::array::RecordBatch;
 use arrow_flight::{FlightData, error::Result};
 use arrow_schema::SchemaRef;
 use config::utils::size::bytes_to_human_readable;
+use datafusion::physical_plan::metrics::{BaselineMetrics, RecordOutput};
 use flight::{
     common::{CustomMessage, FlightMessage},
     decoder::FlightDataDecoder,
@@ -34,6 +35,7 @@ use crate::service::search::{
 #[derive(Debug)]
 pub struct FlightDecoderStream {
     inner: FlightDataDecoder,
+    metrics: BaselineMetrics,
     query_context: QueryContext,
 }
 
@@ -42,10 +44,12 @@ impl FlightDecoderStream {
     pub fn new(
         inner: Streaming<FlightData>,
         schema: SchemaRef,
+        metrics: BaselineMetrics,
         query_context: QueryContext,
     ) -> Self {
         Self {
-            inner: FlightDataDecoder::new(inner, Some(schema)),
+            inner: FlightDataDecoder::new(inner, Some(schema), metrics.clone()),
+            metrics,
             query_context,
         }
     }
@@ -71,12 +75,14 @@ impl Stream for FlightDecoderStream {
         mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> Poll<Option<Result<RecordBatch>>> {
+        let poll;
         loop {
             let res = ready!(self.inner.poll_next_unpin(cx));
             match res {
                 // Inner exhausted
                 None => {
-                    return Poll::Ready(None);
+                    poll = Poll::Ready(None);
+                    break;
                 }
                 Some(Err(e)) => {
                     log::error!(
@@ -88,13 +94,15 @@ impl Stream for FlightDecoderStream {
                         self.query_context.start.elapsed().as_millis(),
                     );
                     process_partial_err(self.query_context.partial_err.clone(), e.into());
-                    return Poll::Ready(None);
+                    poll = Poll::Ready(None);
+                    break;
                 }
                 // translate data
                 Some(Ok(data)) => match data {
                     FlightMessage::RecordBatch(batch) => {
                         self.query_context.num_rows += batch.num_rows();
-                        return Poll::Ready(Some(Ok(batch)));
+                        poll = Poll::Ready(Some(Ok(batch)));
+                        break;
                     }
                     FlightMessage::CustomMessage(message) => {
                         self.process_custom_message(message);
@@ -105,6 +113,7 @@ impl Stream for FlightDecoderStream {
                 },
             }
         }
+        record_poll(&self.metrics, poll)
     }
 }
 
@@ -159,4 +168,20 @@ impl Drop for FlightDecoderStream {
             )
         )
     }
+}
+
+fn record_poll(
+    metrics: &BaselineMetrics,
+    poll: Poll<Option<Result<RecordBatch>>>,
+) -> Poll<Option<Result<RecordBatch>>> {
+    if let Poll::Ready(maybe_batch) = &poll {
+        match maybe_batch {
+            Some(Ok(batch)) => {
+                batch.record_output(metrics);
+            }
+            Some(Err(_)) => metrics.done(),
+            None => metrics.done(),
+        }
+    }
+    poll
 }
