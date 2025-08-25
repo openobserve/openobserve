@@ -518,6 +518,28 @@ const saveDestination = () => {
   addNode(destinationData);
   emit("cancel:hideform");
 };
+
+// Expose functions for testing
+defineExpose({
+  getUUID,
+  createDestination,
+  addApiHeader,
+  deleteApiHeader,
+  createEmailTemplate,
+  getDestinations,
+  saveDestination,
+  formData,
+  apiHeaders,
+  selectedDestination,
+  destinations,
+  isValidDestination,
+  getFormattedDestinations,
+  createNewDestination,
+  isUpdatingDestination,
+  retries,
+  apiMethods,
+  outputFormats
+});
 </script>
 <style lang="scss" scoped>
 .destination-method-select {

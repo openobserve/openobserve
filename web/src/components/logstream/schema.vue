@@ -1857,6 +1857,13 @@ export default defineComponent({
       handleRemovePattern,
       handleUpdateAppliedPattern,
       isEnvironmentSettings,
+      getFieldIndices,
+      setSchema,
+      formatDate,
+      convertUnixToQuasarFormat,
+      computedSchemaFieldsName,
+      groupPatternAssociationsByField,
+      ungroupPatternAssociations,
     };
   },
   created() {

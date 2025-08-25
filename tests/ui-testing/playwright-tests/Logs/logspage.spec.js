@@ -126,6 +126,7 @@ test.describe("Logs Page testcases", () => {
     await pageManager.logsPage.clickRelative6WeeksButton();
     await applyQueryButton(page);
 
+    await pageManager.logsPage.toggleVrlEditor();
     await pageManager.logsPage.clickVrlEditor();
     await pageManager.logsPage.waitForTimeout(1000);
     await applyQueryButton(page);
@@ -203,6 +204,8 @@ test.describe("Logs Page testcases", () => {
   test("should click on VRL toggle and display the field, then disable toggle and make the VRL field disappear", {
     tag: ['@vrlToggle', '@all', '@logs']
   }, async ({ page }) => {
+    //here we should toggle vrl because currently it is off by default
+    await pageManager.logsPage.clickVrlToggle();
     await pageManager.logsPage.expectVrlFieldVisible();
     await pageManager.logsPage.clickVrlToggle();
     await pageManager.logsPage.expectFnEditorNotVisible();
@@ -275,6 +278,7 @@ test.describe("Logs Page testcases", () => {
   }, async ({ page }) => {
     await pageManager.logsPage.clickRefreshButton();
     await pageManager.logsPage.clickFunctionDropdownSave();
+    await pageManager.logsPage.toggleVrlEditor();
     await pageManager.logsPage.clickVrlEditor();
     await pageManager.logsPage.waitForTimeout(1000);
     await pageManager.logsPage.clickFunctionDropdownSave();
@@ -296,6 +300,7 @@ test.describe("Logs Page testcases", () => {
     tag: ['@functionSaveValidation', '@all', '@logs']
   }, async ({ page }) => {
     await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.toggleVrlEditor();
     await pageManager.logsPage.clickVrlEditor();
     await pageManager.logsPage.waitForTimeout(1000);
     await pageManager.logsPage.clickFunctionDropdownSave();
@@ -307,6 +312,7 @@ test.describe("Logs Page testcases", () => {
     tag: ['@functionNameValidation', '@all', '@logs']
   }, async ({ page }) => {
     await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.toggleVrlEditor();
     await pageManager.logsPage.clickVrlEditor();
     await pageManager.logsPage.waitForTimeout(1000);
     await pageManager.logsPage.clickFunctionDropdownSave();
@@ -319,6 +325,7 @@ test.describe("Logs Page testcases", () => {
     tag: ['@functionNameValidation', '@all', '@logs']
   }, async ({ page }) => {
     await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.toggleVrlEditor();
     await pageManager.logsPage.clickVrlEditor();
     await pageManager.logsPage.waitForTimeout(1000);
     await pageManager.logsPage.clickFunctionDropdownSave();
@@ -331,6 +338,7 @@ test.describe("Logs Page testcases", () => {
     tag: ['@functionPersistence', '@all', '@logs']
   }, async ({ page }) => {
     await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.toggleVrlEditor();
     await pageManager.logsPage.clickVrlEditor();
     await pageManager.logsPage.waitForTimeout(1000);
     await pageManager.logsPage.clickRefreshButton();
@@ -370,6 +378,7 @@ test.describe("Logs Page testcases", () => {
 
   test.skip('should display results for search around after adding function', async ({ page }) => {
     await pageManager.logsPage.waitForTimeout(1000);
+    await pageManager.logsPage.toggleVrlEditor();
     await pageManager.logsPage.clickVrlEditor();
     await pageManager.logsPage.waitForTimeout(1000);
     await pageManager.logsPage.clickRefreshButton();

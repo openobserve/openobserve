@@ -752,7 +752,12 @@ export default defineComponent({
             outputString,
             expandState,
             outlinedLightbulb,
-            resetInputValues
+            resetInputValues,
+            // Additional exposed methods for testing
+            checkIfPatternIsAppliedAndUpdate,
+            appliedPatternsMap,
+            hasPatternChanges,
+            debouncedEmit
         }
     }
 })

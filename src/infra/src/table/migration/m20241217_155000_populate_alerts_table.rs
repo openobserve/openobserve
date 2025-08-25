@@ -402,6 +402,7 @@ mod alerts_table_ser {
         NotContains,
     }
 
+    #[derive(Debug)]
     pub enum ThresholdOperator {
         EqualTo,
         NotEqualTo,
@@ -487,7 +488,7 @@ mod meta_table_alerts {
     use serde_json::Value as JsonValue;
 
     /// Defines the JSON schema for alerts stored in the meta table.
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Clone)]
     pub struct Alert {
         #[serde(default)]
         pub name: String,
@@ -526,7 +527,7 @@ mod meta_table_alerts {
         pub last_edited_by: Option<String>,
     }
 
-    #[derive(Default, Deserialize)]
+    #[derive(Default, Deserialize, Clone)]
     pub struct TriggerCondition {
         pub period: i64, // 10 minutes
         #[serde(default)]
@@ -546,13 +547,13 @@ mod meta_table_alerts {
         pub tolerance_in_secs: Option<i64>,
     }
 
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Serialize, Clone)]
     pub struct CompareHistoricData {
         #[serde(rename = "offSet")]
         pub offset: String,
     }
 
-    #[derive(Default, Deserialize, Serialize)]
+    #[derive(Default, Deserialize, Serialize, Clone)]
     pub enum FrequencyType {
         #[serde(rename = "cron")]
         Cron,
@@ -561,7 +562,7 @@ mod meta_table_alerts {
         Minutes,
     }
 
-    #[derive(Default, Deserialize, Serialize)]
+    #[derive(Default, Deserialize, Serialize, Clone)]
     pub struct QueryCondition {
         #[serde(default)]
         #[serde(rename = "type")]
@@ -579,14 +580,14 @@ mod meta_table_alerts {
         pub multi_time_range: Option<Vec<CompareHistoricData>>,
     }
 
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Serialize, Clone)]
     pub struct Aggregation {
         pub group_by: Option<Vec<String>>,
         pub function: AggFunction,
         pub having: Condition,
     }
 
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Serialize, Clone)]
     pub enum AggFunction {
         #[serde(rename = "avg")]
         Avg,
@@ -612,7 +613,7 @@ mod meta_table_alerts {
         P99,
     }
 
-    #[derive(Default, Deserialize, Serialize)]
+    #[derive(Default, Deserialize, Serialize, Clone)]
     #[allow(clippy::upper_case_acronyms)]
     pub enum QueryType {
         #[default]
@@ -624,7 +625,7 @@ mod meta_table_alerts {
         PromQL,
     }
 
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Serialize, Clone)]
     pub struct Condition {
         pub column: String,
         pub operator: Operator,
@@ -633,7 +634,7 @@ mod meta_table_alerts {
         pub ignore_case: bool,
     }
 
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Serialize, Clone)]
     pub enum Operator {
         #[serde(rename = "=")]
         EqualTo,
@@ -657,7 +658,7 @@ mod meta_table_alerts {
         }
     }
 
-    #[derive(Deserialize, Serialize)]
+    #[derive(Deserialize, Serialize, Clone)]
     #[serde(rename_all = "lowercase")]
     #[allow(clippy::upper_case_acronyms)]
     pub enum SearchEventType {
@@ -1092,5 +1093,63 @@ mod tests {
                 ORDER BY "meta"."id" ASC
             "#
         );
+    }
+
+    #[test]
+    fn test_ksuid_deterministic_generation() {
+        // Test that identical alert inputs always produce the same KSUID
+        let alert1 = meta_table_alerts::Alert {
+            name: "test_alert".to_string(),
+            org_id: "test_org".to_string(),
+            stream_type: meta_table_alerts::StreamType::Logs,
+            stream_name: "test_stream".to_string(),
+            is_real_time: true,
+            query_condition: Default::default(),
+            trigger_condition: Default::default(),
+            destinations: vec!["test@example.com".to_string()],
+            context_attributes: None,
+            row_template: "".to_string(),
+            description: "".to_string(),
+            enabled: true,
+            tz_offset: 0,
+            last_triggered_at: None,
+            last_satisfied_at: None,
+            owner: None,
+            updated_at: None,
+            last_edited_by: None,
+        };
+
+        let alert2 = meta_table_alerts::Alert {
+            name: "test_alert".to_string(),
+            org_id: "test_org".to_string(),
+            stream_type: meta_table_alerts::StreamType::Logs,
+            stream_name: "test_stream".to_string(),
+            // Different fields but same identity fields
+            is_real_time: false,
+            query_condition: Default::default(),
+            trigger_condition: Default::default(),
+            destinations: vec!["different@example.com".to_string()],
+            context_attributes: None,
+            row_template: "different template".to_string(),
+            description: "different description".to_string(),
+            enabled: false,
+            tz_offset: 300,
+            last_triggered_at: Some(123456789),
+            last_satisfied_at: Some(987654321),
+            owner: Some("different owner".to_string()),
+            updated_at: None,
+            last_edited_by: Some("different editor".to_string()),
+        };
+
+        // Same identity fields should produce same KSUID
+        let ksuid1 = ksuid_from_hash(&alert1);
+        let ksuid2 = ksuid_from_hash(&alert2);
+        assert_eq!(ksuid1, ksuid2);
+
+        // Different identity fields should produce different KSUID
+        let mut alert3 = alert1.clone();
+        alert3.name = "different_alert".to_string();
+        let ksuid3 = ksuid_from_hash(&alert3);
+        assert_ne!(ksuid1, ksuid3);
     }
 }
