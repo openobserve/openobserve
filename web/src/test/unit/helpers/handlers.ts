@@ -239,4 +239,48 @@ export const restHandlers = [
       results: results
     }, { status: 200 });
   }),
+
+  // Organization Settings handlers
+  http.post(`${store.state.API_ENDPOINT}/api/:org/settings`, async ({ request }) => {
+    const body = await request.json() as any;
+    return HttpResponse.json({
+      message: "Organization settings updated successfully",
+      settings: body
+    }, { status: 200 });
+  }),
+
+  // Settings Service handlers (logo and custom text)
+  http.post(`${store.state.API_ENDPOINT}/api/:org/settings/logo`, async ({ request }) => {
+    // Simulate logo upload
+    return HttpResponse.json({
+      message: "Logo uploaded successfully"
+    }, { status: 200 });
+  }),
+
+  http.delete(`${store.state.API_ENDPOINT}/api/:org/settings/logo`, () => {
+    return HttpResponse.json({
+      message: "Logo deleted successfully"
+    }, { status: 200 });
+  }),
+
+  http.post(`${store.state.API_ENDPOINT}/api/:org/settings/logo/text`, async ({ request }) => {
+    const body = await request.text();
+    return HttpResponse.json({
+      message: "Custom text updated successfully",
+      custom_text: body
+    }, { status: 200 });
+  }),
+
+  // Config Service handler
+  http.get(`${store.state.API_ENDPOINT}/config`, () => {
+    return HttpResponse.json({
+      websocket_enabled: true,
+      streaming_enabled: true,
+      custom_logo_text: "Test Logo Text",
+      custom_logo_img: "base64imagedata",
+      meta_org: "default",
+      version: "v0.10.0",
+      default_fts_keys: ["log", "message", "msg", "content", "data"],
+    }, { status: 200 });
+  }),
 ];
