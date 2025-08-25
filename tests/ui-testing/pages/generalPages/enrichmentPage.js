@@ -149,35 +149,13 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.waitForSelector(this.refreshButton, { state: 'visible' });
         await this.page.waitForLoadState('networkidle');
         
-        // Retry logic for run query button - sometimes needs multiple clicks to register
-        let queryExecuted = false;
-        let attempts = 0;
-        const maxAttempts = 3;
+        // Click on the run query button and wait for response
+        const search = this.page.waitForResponse("**/api/**/_search**");
+        await this.page.locator(this.refreshButton).click({ force: true });
         
-        while (!queryExecuted && attempts < maxAttempts) {
-            attempts++;
-            
-            try {
-                // Set up response listener before clicking
-                const search = this.page.waitForResponse("**/api/**/_search**", { timeout: 15000 });
-                
-                // Click the run query button with force to ensure it registers
-                await this.page.locator(this.refreshButton).click({ force: true });
-                
-                // Wait for the search response with timeout
-                const response = await search;
-                await expect.poll(async () => response.status()).toBe(200);
-                
-                queryExecuted = true;
-            } catch (error) {
-                if (attempts >= maxAttempts) {
-                    throw new Error(`Query execution failed after ${maxAttempts} attempts. Last error: ${error.message}`);
-                }
-                
-                // Brief wait before retry
-                await this.page.waitForLoadState('domcontentloaded');
-            }
-        }
+        // Wait for the search response
+        const response = await search;
+        await expect.poll(async () => response.status()).toBe(200);
         
         // Wait for results to render and process
         await this.page.waitForLoadState('networkidle', { timeout: 5000 });

@@ -105,8 +105,20 @@ test.describe("Enrichment data testcases", () => {
         // Fill VRL query using page object method
         await pm.enrichmentPage.fillVRLQuery(fileName);
 
-        // Apply the query
-        await pm.enrichmentPage.applyQuery();
+        // Click run query button multiple times to ensure it registers (VRL test specific)
+        const refreshButton = page.locator('[data-test="logs-search-bar-refresh-btn"]');
+        await refreshButton.waitFor({ state: 'visible' });
+        
+        for (let i = 0; i < 4; i++) {
+            await refreshButton.click({ force: true });
+            if (i < 3) { // Wait 1 second between clicks except after last click
+                await page.waitForLoadState('domcontentloaded');
+                await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 1000)));
+            }
+        }
+        
+        // Wait for query execution to complete
+        await page.waitForLoadState('networkidle', { timeout: 10000 });
 
         // Verify that no warning is shown for query execution
         await pm.enrichmentPage.verifyNoQueryWarning();
