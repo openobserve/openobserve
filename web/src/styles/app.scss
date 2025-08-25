@@ -599,6 +599,18 @@
   min-width: 90px !important;
 }
 
+
+.o2-secondary-button-small{
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  border-radius: 4px !important;
+  min-width: 72px !important;
+  padding: 0px 12px !important;
+  min-width: 90px !important;
+  height: 28px !important;
+}
+
 .o2-secondary-button-light{
   color: #19191E !important;
   border: 1px solid #D3D5DB !important;
@@ -612,6 +624,15 @@
 
 
 .o2-primary-button{
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  padding: 0px 12px !important;
+  border-radius: 4px !important;
+  min-width: 90px !important;
+}
+.o2-primary-button-small{
+  height: 28px !important;
   font-size: 13px !important;
   font-weight: 500 !important;
   line-height: 16px !important;
@@ -728,7 +749,8 @@
 
 .o2-toggle-button-lg-light{
   .q-toggle__track{
-    background-color: #EBECF0;
+    background-color: #acbbf3;
+    border: 1px solid #D3D5DB !important;
     opacity: 100%;
   }
   .q-toggle__thumb:after{
@@ -743,7 +765,8 @@
 
 .o2-toggle-button-lg-dark{
   .q-toggle__track{
-    background-color: #2B2D30;
+    background-color: #2f415e;
+    border: 1px solid #6F737A !important;
     opacity: 100%;
   }
   .q-toggle__thumb:after{

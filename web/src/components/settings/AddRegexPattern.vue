@@ -269,27 +269,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-form>
             <div class="flex justify-end q-mt-sm" style="position: sticky; bottom: 0; right: 0;">
                 <q-btn
-                    v-close-popup="true"
-                    data-test="add-regex-pattern-cancel-btn"
+                    v-close-popup
+                    class="q-mr-md o2-secondary-button tw-h-[36px]"
                     :label="t('regex_patterns.cancel')"
-                    class="q-my-sm text-bold q-mr-md"
-                    padding="sm md"
                     no-caps
-                    style="border: 1px solid #E6E6E6;"
+                    flat
+                    :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                    data-test="add-regex-pattern-cancel-btn"
                 />
                 <q-btn
-                    data-test="add-regex-pattern-save-btn"
+                    class="o2-primary-button no-border tw-h-[36px]"
                     :label="isSaving ? 'Saving...' : isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')"
-                    class="q-my-sm text-bold no-border"
-                    :style="{
-                        'background-color': isFormEmpty ? '#aeaeae' : '#5ca380',
-                        'color': isFormEmpty  ? store.state.theme === 'dark' ? '#ffffff ' : '#000000' : '#ffffff'
-                        }"
-                    padding="sm xl"
                     type="submit"
                     no-caps
+                    flat
+                    :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                     @click="saveRegexPattern"
                     :disable="isFormEmpty || isSaving"
+                    data-test="add-regex-pattern-save-btn"
                 />
             </div>
             </div>
