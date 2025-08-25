@@ -16,6 +16,8 @@
 use std::str::FromStr;
 
 use chrono::{TimeZone, Utc};
+#[cfg(feature = "enterprise")]
+use config::meta::projections::ProjectionColumnMapping;
 use config::{
     TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -40,6 +42,8 @@ use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
 use tracing::Instrument;
@@ -396,7 +400,7 @@ pub async fn search(
             None
         },
         request_body: Some(req.query.sql.clone()),
-        function: req.query.query_fn,
+        function: req.query.query_fn.clone(),
         user_email: user_id,
         min_ts: Some(req.query.start_time),
         max_ts: Some(req.query.end_time),
@@ -492,6 +496,16 @@ pub async fn search(
     }
     // result cache save changes Ends
 
+    #[cfg(feature = "enterprise")]
+    crate::service::search::cache::apply_regex_to_response(
+        &req,
+        org_id,
+        &stream_name,
+        stream_type,
+        &mut local_res,
+    )
+    .await?;
+
     if is_result_array_skip_vrl {
         local_res.hits = apply_vrl_to_response(
             backup_query_fn,
@@ -503,7 +517,7 @@ pub async fn search(
         return Ok(local_res);
     }
 
-    Ok(res)
+    Ok(local_res)
 }
 
 // based on _timestamp of first record in config::meta::search::Response either add it in start
@@ -1161,4 +1175,45 @@ pub fn is_result_array_skip_vrl(vrl_fn: &str) -> bool {
 fn deep_copy_response(res: &config::meta::search::Response) -> config::meta::search::Response {
     let serialized = serde_json::to_string(res).expect("Failed to serialize response");
     serde_json::from_str(&serialized).expect("Failed to deserialize response")
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn apply_regex_to_response(
+    req: &config::meta::search::Request,
+    org_id: &str,
+    all_streams: &str,
+    stream_type: StreamType,
+    res: &mut config::meta::search::Response,
+) -> Result<(), infra::errors::Error> {
+    if res.hits.is_empty() {
+        return Ok(());
+    }
+
+    let pattern_manager = get_pattern_manager().await?;
+
+    let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
+    let sql =
+        match crate::service::search::sql::Sql::new(&query, org_id, stream_type, req.search_type)
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Error parsing sql: {e}");
+                return Ok(());
+            }
+        };
+
+    let projections: std::collections::HashMap<String, Vec<ProjectionColumnMapping>> =
+        crate::service::search::datafusion::plan::regex_projections::get_columns_from_projections(
+            sql,
+        )
+        .await?;
+
+    match pattern_manager.process_at_search(org_id, StreamType::Logs, &mut res.hits, projections) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            log::error!("error in processing records for patterns for stream {all_streams} : {e}");
+            Err(infra::errors::Error::Message(e.to_string()))
+        }
+    }
 }
