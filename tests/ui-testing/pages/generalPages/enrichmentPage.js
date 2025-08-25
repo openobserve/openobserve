@@ -378,29 +378,30 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const fnEditorParam = currentUrl.searchParams.get('fn_editor');
         console.log('fn_editor URL parameter:', fnEditorParam);
         
-        // If fn_editor is explicitly false, we need to enable it
+        // If fn_editor is explicitly false, enable it via URL modification
         if (fnEditorParam === 'false') {
-            console.log('VRL editor disabled via URL parameter, enabling via functions toggle');
+            console.log('VRL editor disabled via URL parameter, enabling via URL modification');
             
-            // Click the functions toggle to enable VRL editor
-            const functionsToggle = this.page.locator('[data-test="logs-search-functions-btn"]');
-            if (await functionsToggle.isVisible()) {
-                await functionsToggle.click();
-                await this.page.waitForLoadState('domcontentloaded');
-                console.log('Functions toggle clicked to enable VRL editor');
-            } else {
-                console.log('Functions toggle not visible');
-            }
+            // Modify URL to enable VRL editor
+            currentUrl.searchParams.set('fn_editor', 'true');
+            const newUrl = currentUrl.toString();
+            console.log('Navigating to URL with fn_editor=true:', newUrl);
+            
+            // Navigate to the modified URL
+            await this.page.goto(newUrl);
+            await this.page.waitForLoadState('domcontentloaded');
+            await this.page.waitForLoadState('networkidle');
+            console.log('Navigated to URL with VRL editor enabled');
         }
         
-        // Wait for VRL editor to appear after potential toggle
+        // Wait for VRL editor to appear after potential URL modification
         await this.page.waitForSelector(this.vrlEditor, { 
             state: 'visible',
             timeout: 15000 
         });
         
         const vrlEditorExists = await this.page.locator('#fnEditor').count();
-        console.log('VRL Editor count after toggle logic:', vrlEditorExists);
+        console.log('VRL Editor count after URL logic:', vrlEditorExists);
         
         // Now proceed with VRL processing
         await this.fillVRLQuery(fileName);
