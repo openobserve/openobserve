@@ -1048,9 +1048,12 @@ impl CuckooFilterManager {
                 )
                 .await;
             } else {
-                log::debug!("File already exists locally, skipping download: {}", file.key);
+                log::debug!(
+                    "File already exists locally, skipping download: {}",
+                    file.key
+                );
             }
-            
+
             if let Some(path) = file_data::disk::get_file_path(&file.key) {
                 parquet_paths.push(path);
             }
@@ -1078,7 +1081,10 @@ impl CuckooFilterManager {
         let seen_cleanup_threshold = trace_id_batch_size * 10; // Periodically clear 'seen' to prevent infinite memory growth
 
         use arrow::array::{Int64Array, StringArray};
-        log::info!("[CUCKOO_FILTER_JOB] Start processing, parquet_paths len: {}", parquet_paths.len());
+        log::info!(
+            "[CUCKOO_FILTER_JOB] Start processing, parquet_paths len: {}",
+            parquet_paths.len()
+        );
         for chunk in parquet_paths.chunks(parquet_batch_size) {
             let ctx = SessionContext::new();
             for (i, path) in chunk.iter().enumerate() {
@@ -1120,7 +1126,8 @@ impl CuckooFilterManager {
                         batch_trace_items.push(TraceListItem {
                             trace_id,
                             _timestamp: ts,
-                            stream_name: crate::service::metadata::trace_list_index::STREAM_NAME.to_string(),
+                            stream_name: crate::service::metadata::trace_list_index::STREAM_NAME
+                                .to_string(),
                             service_name: "".to_string(),
                         });
 
@@ -1243,8 +1250,7 @@ impl CuckooFilterManager {
         let hour_s3_key = format!("cuckoo_filters/{org_id}/{day_key}/{hour_key}.cuckoo");
         // Check if exists in S3
         log::debug!("check {hour_s3_key} if exists in S3");
-        if storage::head("", &hour_s3_key).await.is_err()
-        {
+        if storage::head("", &hour_s3_key).await.is_err() {
             log::debug!("{hour_s3_key} is not present in storage, continue");
             return Ok(());
         }

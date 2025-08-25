@@ -231,9 +231,7 @@ pub async fn start_hourly_job(manager: Arc<CuckooFilterManager>) -> Result<()> {
 
                 for day_key in &day_keys_to_check {
                     let s3_prefix = format!("cuckoo_filters/{org_id}/{day_key}/");
-                    if storage::head("", &s3_prefix).await.is_ok()
-                        && let Ok(files) = storage::list("", &s3_prefix).await
-                    {
+                    if let Ok(files) = storage::list("", &s3_prefix).await {
                         for file in files {
                             if let Some(fname) = file.split('/').next_back() {
                                 // Only process hourly filter files
@@ -389,9 +387,7 @@ pub async fn build_cuckoo_filters_for_time_range(
 
             for day_key in &day_keys_to_check {
                 let s3_prefix = format!("cuckoo_filters/{org_id}/{day_key}/");
-                if storage::head("", &s3_prefix).await.is_ok()
-                    && let Ok(files) = storage::list("", &s3_prefix).await
-                {
+                if let Ok(files) = storage::list("", &s3_prefix).await {
                     for file in files {
                         if let Some(fname) = file.split('/').next_back()
                             && fname.ends_with(".cuckoo")
