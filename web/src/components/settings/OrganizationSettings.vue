@@ -83,20 +83,21 @@
       <q-btn
         data-test="add-alert-cancel-btn"
         v-close-popup="true"
-        class="q-mb-md text-bold"
+        class="q-mr-md o2-secondary-button tw-h-[36px]"
         :label="t('alerts.cancel')"
-        text-color="light-text"
-        padding="sm md"
         no-caps
+        flat
+        :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
         @click="$emit('cancel:hideform')"
       />
       <q-btn
         data-test="add-alert-submit-btn"
         :label="t('alerts.save')"
-        class="q-mb-md text-bold no-border q-ml-md"
-        color="secondary"
-        padding="sm xl"
+        class="o2-primary-button no-border tw-h-[36px]"
+        type="submit"
         no-caps
+        flat
+        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
         @click="saveOrgSettings"
       />
     </div>

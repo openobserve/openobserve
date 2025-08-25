@@ -2,7 +2,7 @@
     <div class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
     :class="store.state.theme === 'dark' ? 'dark-theme-list' : 'light-theme-list'"
     >
-    <div class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
+    <div v-if="!showImportRegexPatternDialog" class="tw-flex tw-justify-between tw-items-center tw-px-4 tw-py-3 tw-h-[71px] tw-border-b-[1px]"
       :class="store.state.theme == 'dark' ? 'o2-table-header-dark tw-border-gray-500' : 'o2-table-header-light tw-border-gray-200'"
     >
       <div class="q-table__title tw-font-[600]" data-test="regex-pattern-list-title">

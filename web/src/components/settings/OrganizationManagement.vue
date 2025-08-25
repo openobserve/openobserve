@@ -117,8 +117,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </q-card-section>
         <q-card-actions align="right" class="text-primary q-mt-md">
-          <q-btn flat :label="t('common.cancel')" v-close-popup class="text-capitalize page-border dialog-btn" outline />
-          <q-btn flat :label="`Extend trial by ${extendedTrial} week(s)`" class="text-capitalize bg-secondary text-white dialog-btn" @click.stop="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)" />
+          <q-btn
+            v-close-popup
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
+            :label="t('common.cancel')"
+            no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          />
+          <q-btn
+            class="o2-primary-button no-border tw-h-[36px]"
+            :label="`Extend trial by ${extendedTrial} week(s)`"
+            no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            @click.stop="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>

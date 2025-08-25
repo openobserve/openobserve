@@ -102,20 +102,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn
             v-close-popup="true"
             data-test="add-stream-cancel-btn"
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
             :label="t('logStream.cancel')"
-            class="q-my-sm text-bold q-mr-md"
-            text-color="light-text"
-            padding="sm md"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           />
           <q-btn
             data-test="save-stream-btn"
+            class="o2-primary-button no-border tw-h-[36px]"
             :label="t('logStream.createStream')"
-            class="q-my-sm text-bold no-border"
-            color="secondary"
-            padding="sm xl"
             type="submit"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           />
         </div>
       </q-form>

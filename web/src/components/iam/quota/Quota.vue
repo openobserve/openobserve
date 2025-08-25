@@ -484,22 +484,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <NoData />
       </div>
       <div
-        class="flex justify-end w-full tw-ml-auto floating-buttons q-pr-md"
+        class="flex justify-end w-full tw-ml-auto floating-buttons q-pr-md tw-py-2"
         v-if="editTable && activeType == 'table'"
       >
         <q-btn
           label="Cancel"
-          class="border q-ml-md title-height"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="cancelChanges"
         />
         <q-btn
           label="Save Changes"
-          class="text-bold no-border q-ml-md"
-          :color="Object.keys(changedValues).length > 0 ? 'secondary' : 'grey'"
+          class="o2-primary-button no-border tw-h-[36px]"
           :disable="Object.keys(changedValues).length === 0"
-          padding="sm md"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           @click="saveChanges"
         />
       </div>
@@ -509,17 +511,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-btn
           label="Cancel"
-          class="border q-ml-md title-height"
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
           @click="cancelJsonChanges"
           :disable="isSavingJson"
         />
         <q-btn
           :label="isSavingJson ? 'Saving Changes...' : 'Save Changes'"
-          class="text-bold no-border q-ml-md"
-          color="secondary"
-          padding="sm md"
+          class="o2-primary-button no-border tw-h-[36px]"
           no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
           @click="saveJsonChanges"
           :disable="isSavingJson"
         />

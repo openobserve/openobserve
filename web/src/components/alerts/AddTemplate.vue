@@ -132,23 +132,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="col-12 flex justify-center">
             <q-btn
-              data-test="add-template-cancel-btn"
-              v-close-popup="true"
-              class="text-bold"
+              v-close-popup
+              class="q-mr-md o2-secondary-button tw-h-[36px]"
               :label="t('alerts.cancel')"
-              text-color="light-text"
-              padding="sm md"
               no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               @click="$emit('cancel:hideform')"
+              data-test="add-template-cancel-btn"
             />
             <q-btn
-              data-test="add-template-submit-btn"
+              class="o2-primary-button no-border tw-h-[36px]"
               :label="t('alerts.save')"
-              class="text-bold no-border q-ml-md"
-              color="secondary"
-              padding="sm xl"
-              @click="saveTemplate"
               no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              @click="saveTemplate"
+              data-test="add-template-submit-btn"
             />
           </div>
         </div>

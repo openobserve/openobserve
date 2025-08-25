@@ -86,22 +86,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex q-mt-lg">
           <q-btn
             v-close-popup="true"
-            class="q-mb-md text-bold"
+            class="q-mr-md o2-secondary-button tw-h-[36px]"
             :label="t('organization.cancel')"
-            text-color="light-text"
-            padding="sm md"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             @click="router.replace({ name: 'organizations' })"
             data-test="cancel-organizations-modal"
           />
           <q-btn
             :disable="organizationData.name === '' && !proPlanRequired"
             :label="t('organization.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
+            class="o2-primary-button no-border tw-h-[36px]"
             type="submit"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             data-test="add-org"
           />
         </div>

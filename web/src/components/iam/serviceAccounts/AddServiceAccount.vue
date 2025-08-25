@@ -79,21 +79,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex justify-center q-mt-lg">
             <q-btn
               v-close-popup="true"
-              class="q-mb-md text-bold"
+              class="q-mr-md o2-secondary-button tw-h-[36px]"
               :label="t('user.cancel')"
-              text-color="light-text"
-              padding="sm md"
-              data-test="cancel-button"
               no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+              data-test="cancel-button"
               @click="$emit('cancel:hideform')"
             />
             <q-btn
               :label="t('user.save')"
-              class="q-mb-md text-bold no-border q-ml-md"
-              color="secondary"
-              padding="sm xl"
+              class="o2-primary-button no-border tw-h-[36px]"
               type="submit"
               no-caps
+              flat
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             />
           </div>
         </q-form>

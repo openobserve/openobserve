@@ -44,8 +44,22 @@
         </div>
       </q-card-section>
       <q-card-actions align="right">
-        <q-btn flat :label="t('common.cancel')" color="primary" v-close-popup="true" />
-        <q-btn flat :label="t('common.apply')" color="primary" @click="applyFilter" />
+        <q-btn
+          v-close-popup
+          class="q-mr-md o2-secondary-button tw-h-[36px]"
+          :label="t('common.cancel')"
+          no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        />
+        <q-btn
+          class="o2-primary-button no-border tw-h-[36px]"
+          :label="t('common.apply')"
+          no-caps
+          flat
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          @click="applyFilter"
+        />
       </q-card-actions>
     </q-card>
   </q-dialog>
