@@ -29,24 +29,6 @@ node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
-// Mock useTraces composable
-
-// Mock useStreams composable
-vi.mock("@/composables/useStreams", () => ({
-  default: () => ({
-    getStreams: vi.fn().mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          setTimeout(() => {
-            resolve({
-              list: [{ name: "test-stream" }, { name: "another-stream" }],
-            });
-          }, 1000); // 1 second delay
-        }),
-    ),
-  }),
-}));
-
 // Mock useNotifications composable
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
@@ -66,31 +48,6 @@ Object.assign(navigator, {
     writeText: vi.fn().mockResolvedValue(undefined),
   },
 });
-
-// Mock window.getComputedStyle
-// Object.defineProperty(window, "getComputedStyle", {
-//   value: () => ({
-//     getPropertyValue: () => "0px",
-//   }),
-// });
-
-// const mockStore = createStore({
-//   state: {
-//     theme: "light",
-//     API_ENDPOINT: "http://localhost:8080",
-//     zoConfig: {
-//       timestamp_column: "@timestamp",
-//     },
-//     selectedOrganization: {
-//       identifier: "test-org",
-//     },
-//     organizationData: {
-//       organizationSettings: {
-//         trace_id_field_name: "trace_id",
-//       },
-//     },
-//   },
-// });
 
 describe("TraceDetails", () => {
   let wrapper: any;
@@ -158,40 +115,6 @@ describe("TraceDetails", () => {
         },
         copyTracesUrl: vi.fn(),
       }),
-    }));
-
-    vi.doMock("@/services/search", () => ({
-      default: {
-        get_traces: () =>
-          new Promise((resolve) => {
-            console.log("resolving ----------");
-            resolve({
-              data: {
-                hits: [
-                  {
-                    trace_id: "test-trace-id",
-                    start_time: 1752490492843047200,
-                    end_time: 1752490493164419300,
-                    service_name: [{ service_name: "test-service", count: 1 }],
-                    operation_name: "test-operation",
-                    duration: 321372100,
-                    spans: [2, 0],
-                  },
-                ],
-              },
-            });
-          }),
-        search: () =>
-          new Promise((resolve) => {
-            setTimeout(() => {
-              resolve({
-                data: {
-                  hits: tracesMockData.tracesDetails.traceSpans.hits,
-                },
-              });
-            }); // 1.5 second delay
-          }),
-      },
     }));
 
     wrapper = mount(TraceDetails, {
