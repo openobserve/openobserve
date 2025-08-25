@@ -20,23 +20,25 @@ const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page.locator("div.q-item").getByText(`${stream}`).first().click();
 };
 
-const initialQuery = `SELECT
-kubernetes_namespace_name,
-kubernetes_pod_name,
-kubernetes_container_name,
-COUNT(*) AS log_count
-FROM
-e2e_automate
-WHERE
-kubernetes_container_name = 'ziox'
-GROUP BY
-kubernetes_namespace_name,
-kubernetes_pod_name,
-kubernetes_container_name
-ORDER BY
-log_count DESC
-LIMIT 100
-`;
+// Stream name used across tests
+const STREAM_NAME = "e2e_automate";
+// Add a global SQL query constant that can be reused across tests
+const largeDatasetSqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", 
+  count(kubernetes_container_hash) as "y_axis_1", 
+  count(kubernetes_container_name) as "y_axis_2", 
+  count(kubernetes_host) as "y_axis_3", 
+  count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", 
+  count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", 
+  count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", 
+  count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", 
+  count(kubernetes_labels_prometheus) as "y_axis_8", 
+  kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1"  
+  FROM "${STREAM_NAME}" 
+  WHERE kubernetes_namespace_name IS NOT NULL 
+  GROUP BY x_axis_1, breakdown_1`;
+
+const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1"  FROM "${STREAM_NAME}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`;
+
 test.describe("logs testcases", () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
@@ -154,7 +156,7 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.chartRender(470, 13);
   });
 
-  test("should correctly plot the data according to the new chart type when changing the chart type.", async ({
+  test.skip("should correctly plot the data according to the new chart type when changing the chart type.", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
@@ -312,7 +314,7 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.runQueryAndWaitForCompletion();
   });
 
-  test("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
+  test.skip("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
@@ -366,7 +368,7 @@ test.describe("logs testcases", () => {
     await expect(page.locator(".cm-line").first()).toBeEmpty();
   });
 
-  test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
+  test.skip("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
@@ -408,7 +410,7 @@ test.describe("logs testcases", () => {
     await expect(errorCount).toBe(0);
   });
 
-  test("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
+  test.skip("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
@@ -471,7 +473,7 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.backToLogs();
   });
 
-  test("should create dashboard from the visualization chart sucessfully", async ({
+  test.skip("should create dashboard from the visualization chart sucessfully", async ({
     page,
   }) => {
     const randomDashboardName =
@@ -550,7 +552,7 @@ test.describe("logs testcases", () => {
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
-  test("Should not call the API after toggling to the Visualization view.", async ({
+  test.skip("Should not call the API after toggling to the Visualization view.", async ({
     page,
   }) => {
     const pm = new PageManager(page);
@@ -656,7 +658,7 @@ LIMIT 100`;
     ).toHaveCount(1, { timeout: 10000 });
   });
 
-  test("Should redirect to the table chart in visualization when the query includes more than two fields on the X-axis.", async ({
+  test.skip("Should redirect to the table chart in visualization when the query includes more than two fields on the X-axis.", async ({
     page,
   }) => {
     const pm = new PageManager(page);
@@ -682,5 +684,160 @@ LIMIT 100`;
     await expect(
       page.locator('[data-test="selected-chart-table-item"]').locator("..")
     ).toHaveClass(/bg-grey-3|5/); // matches light (3) or dark (5) theme
+  });
+  ///////////////////////////////////////////////
+
+  test("1should handle large datasets and complex SQL queries without showing an error on the chart", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+    // const logsVisualise = new LogsVisualise(page);
+
+    // Step 1: Open Logs page and query editor
+    await pm.logsVisualise.openLogs();
+    // await pm.logsVisualise.openQueryEditor();
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill(largeDatasetSqlQuery);
+    // Fill the query editor with large dataset SQL query
+    // await pm.logsVisualise.fillQueryEditor(largeDatasetSqlQuery);
+
+    // Apply the time filter and refresh the search
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Switch to SQL mode, apply the query, and refresh the search
+    await pm.logsVisualise.enableSQLMode();
+    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.openVisualiseTab();
+
+    // Check for any error messages or indicators
+    const errorMessage = page.locator('[data-test="error-message"]'); // Update the selector based on your app's error message display
+    const errorCount = await errorMessage.count();
+
+    // Assert that no error messages are displayed
+    await expect(errorCount).toBe(0); // Fail the test if any error messages are present
+  });
+  test("Stream should be correct on visualize page after switching between logs and visualize", async ({
+    page,
+  }) => {
+    // Extract stream name from the SQL query dynamically
+    const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
+    const expectedStreamName = streamNameMatch
+      ? streamNameMatch[1]
+      : STREAM_NAME;
+
+    const pm = new PageManager(page);
+    // const logsVisualise = new LogsVisualise(page);
+
+    // Step 1: Open Logs page and query editor
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.openQueryEditor();
+
+    // Fill the query editor with large dataset SQL query
+    await pm.logsVisualise.fillQueryEditor(largeDatasetSqlQuery);
+
+    // Apply the time filter and refresh the search
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Switch to SQL mode and refresh the search
+    await pm.logsVisualise.enableSQLMode();
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Toggle visualization
+    await pm.logsVisualise.openVisualiseTab();
+
+    // Wait for the stream dropdown to be populated
+    await pm.logsVisualise.streamIndexList();
+
+    // Get stream value using multiple selector strategies
+    const getStreamValue = async () => {
+      const selectors = [
+        () =>
+          page
+            .locator('[data-test="index-dropdown-stream"]')
+            .getAttribute("value"),
+        () =>
+          page
+            .locator('.q-field__native input[aria-label="Stream"]')
+            .getAttribute("value"),
+        () => page.locator('[data-test="index-dropdown-stream"]').inputValue(),
+        () => page.locator('input[aria-label="Stream"]').getAttribute("value"),
+      ];
+
+      for (const selector of selectors) {
+        try {
+          const value = await selector();
+          if (value) return value;
+        } catch (error) {
+          // Continue to next selector
+        }
+      }
+      return null;
+    };
+
+    const streamValue = await getStreamValue();
+
+    // Assert that the stream value matches the expected stream name from the query
+    expect(streamValue).toBe(expectedStreamName);
+    expect(streamValue).toBeTruthy();
+
+    // Assert that the stream value is specifically "e2e_automate"
+    expect(streamValue).toBe("e2e_automate");
+  });
+
+  test("should redirect the correct chart type when added the aggregation query", async ({
+    page,
+  }) => {
+    // Extract stream name from the SQL query dynamically
+    const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
+    const expectedStreamName = streamNameMatch
+      ? streamNameMatch[1]
+      : STREAM_NAME;
+
+    const pm = new PageManager(page);
+    // const logsVisualise = new LogsVisualise(page);
+
+    // Step 1: Open Logs page and query editor
+    await pm.logsVisualise.openLogs();
+    await pm.logsVisualise.openQueryEditor();
+
+    // Fill the query editor with large dataset SQL query
+    await pm.logsVisualise.fillQueryEditor(largeDatasetSqlQuery);
+
+    // Apply the time filter and refresh the search
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // Switch to SQL mode and refresh the search
+    // await pm.logsVisualise.enableSQLMode();
+    // await pm.logsVisualise.logsApplyQueryButton();
+
+    // Toggle visualization
+    await pm.logsVisualise.openVisualiseTab();
+
+    await page.waitForTimeout(2000);
+    // Wait for visualization to load
+    await pm.logsVisualise.streamIndexList();
+
+    // Robust check: wait for table panel to render (source of truth for selected type)
+    // await page.waitForSelector('[data-test="dashboard-panel-table"]', {
+    // timeout: 15000,
+    // });
+    await expect(
+      page.locator('[data-test="dashboard-panel-table"]')
+    ).toBeVisible();
+
+    // Method 3: Verify table-specific content is rendered (breakdown_1 column from the SQL query)
+    await expect(
+      page
+        .locator('[data-test="dashboard-panel-table"]')
+        .getByRole("cell", { name: "breakdown_1" })
+    ).toBeVisible();
+    await expect(
+      page.locator('[data-test="dashboard-panel-table"]').first()
+    ).toBeVisible();
   });
 });

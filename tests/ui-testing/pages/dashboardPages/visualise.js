@@ -101,8 +101,7 @@ export default class LogsVisualise {
   //stream index list
   async streamIndexList() {
     await this.page
-      .locator('[data-test="logs-search-index-list"]')
-      .getByText("arrow_drop_down")
+      .locator('[data-test="dashboard-field-list-collapsed-icon"]')
       .click();
   }
   //logs: Select stream
