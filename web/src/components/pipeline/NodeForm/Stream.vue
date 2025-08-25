@@ -117,36 +117,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="flex justify-start full-width"
+          class="flex justify-start full-width q-mt-sm"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
+        <q-btn
+            v-if="pipelineObj.isEditNode"
+            data-test="input-node-stream-delete-btn"
+            class="o2-secondary-button tw-h-[36px] q-mr-md"
+            color="negative"
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+            no-caps
+            @click="openDeleteDialog"
+            >
+            <q-icon name="delete" class="q-mr-xs" />
+            {{ t('pipeline.deleteNode') }}
+          </q-btn>
           <q-btn
             data-test="input-node-stream-cancel-btn"
-            class="text-bold"
+            class="o2-secondary-button tw-h-[36px]"
             :label="t('alerts.cancel')"
-            text-color="light-text"
-            padding="sm md"
             no-caps
+            flat
+            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
             @click="openCancelDialog"
           />
           <q-btn
             data-test="input-node-stream-save-btn"
             :label="t('alerts.save')"
-            class="text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
+            class="no-border q-ml-md o2-primary-button tw-h-[36px]"
+            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+            flat
             no-caps
             type="submit"
-          />
-          <q-btn
-            v-if="pipelineObj.isEditNode"
-            data-test="input-node-stream-delete-btn"
-            :label="t('pipeline.deleteNode')"
-            class="text-bold no-border q-ml-md"
-            color="negative"
-            padding="sm xl"
-            no-caps
-            @click="openDeleteDialog"
           />
         </div>
       </div>

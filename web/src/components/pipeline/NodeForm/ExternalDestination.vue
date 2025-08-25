@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <q-separator />
-        <div class="row q-col-gutter-sm q-px-lg q-my-md">
+        <div class="row q-col-gutter-sm q-px-lg q-my-sm">
           <q-toggle
             data-test="create-stream-toggle"
             class="q-mb-sm"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div
             v-if="!createNewDestination"
-            class="col-12 q-py-xs destination-method-select q-pb-md"
+            class="col-12 q-py-xs destination-method-select"
           >
             <q-select
               data-test="external-destination-select"
@@ -241,23 +241,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <div class="flex justify-start q-mt-lg">
+            <div class="flex justify-start">
+              <q-btn
+                  v-if="pipelineObj.isEditNode && !createNewDestination"
+                  data-test="add-condition-delete-btn"
+                  class="o2-secondary-button tw-h-[36px] q-mr-md"
+                  color="negative"
+                  flat
+                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  no-caps
+                  @click="openDeleteDialog"
+                >
+                <q-icon name="delete" class="q-mr-xs" />
+                {{ t('pipeline.deleteNode') }}
+              </q-btn>
               <q-btn
                 data-test="add-destination-cancel-btn"
                 v-close-popup="true"
-                class="q-mb-md text-bold"
+                class="o2-secondary-button tw-h-[36px]"
                 :label="t('alerts.cancel')"
-                text-color="light-text"
-                padding="sm md"
+                flat
+                :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                 no-caps
                 @click="$emit('cancel:hideform')"
               />
               <q-btn
                 data-test="add-destination-submit-btn"
                 :label="t('alerts.save')"
-                class="q-mb-md text-bold no-border q-ml-md"
-                color="secondary"
-                padding="sm xl"
+                class="no-border q-ml-md o2-primary-button tw-h-[36px]"
+                :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                flat
                 type="submit"
                 no-caps
               />
@@ -267,6 +280,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-page>
   </div>
+  <confirm-dialog
+    v-model="dialog.show"
+    :title="dialog.title"
+    :message="dialog.message"
+    @update:ok="dialog.okCallback"
+    @update:cancel="dialog.show = false"
+  />
 </template>
 <script lang="ts" setup>
 import {
@@ -290,6 +310,7 @@ import type {
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
@@ -313,7 +334,7 @@ const formData: Ref<DestinationData> = ref({
 const isUpdatingDestination = ref(false);
 const createNewDestination = ref(false);
 const destinationForm = ref(null);
-const { addNode, pipelineObj } = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 const retries = ref(0);
 const selectedDestination: any = ref(
   pipelineObj.currentSelectedNodeData?.data?.destination_name
@@ -326,6 +347,13 @@ const selectedDestination: any = ref(
 const destinations = ref([]);
 
 const router = useRouter();
+
+const dialog = ref({
+  show: false,
+  title: "",
+  message: "",
+  okCallback: () => {},
+});
 
 // TODO OK: Use UUID package instead of this and move this method in utils
 const getUUID = () => {
@@ -519,6 +547,34 @@ const saveDestination = () => {
   emit("cancel:hideform");
 };
 
+const openDeleteDialog = () => {
+  dialog.value.show = true;
+  dialog.value.title = "Delete Node";
+  dialog.value.message = "Are you sure you want to delete stream routing?";
+  dialog.value.okCallback = deleteRoute;
+};
+const deleteRoute = () => {
+  // emit("delete:node", {
+  //   data: {
+  //     ...props.editingRoute,
+  //     name: props.editingRoute.name,
+  //   },
+  //   type: "streamRoute",
+  // });
+
+  // emit("delete:node", {
+  //   data: {
+  //     ...props.editingRoute,
+  //     name: props.editingRoute.name + ":" + "condition",
+  //   },
+  //   type: "condition",
+  // });
+
+  deletePipelineNode(pipelineObj.currentSelectedNodeID);
+
+  emit("cancel:hideform");
+};
+
 // Expose functions for testing
 defineExpose({
   getUUID,
@@ -538,7 +594,8 @@ defineExpose({
   isUpdatingDestination,
   retries,
   apiMethods,
-  outputFormats
+  outputFormats,
+  pipelineObj
 });
 </script>
 <style lang="scss" scoped>
