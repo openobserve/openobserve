@@ -2775,7 +2775,7 @@ mod tests {
                 false,
             ),
             create_test_file_key(
-                "account1", 
+                "account1",
                 "files/default/logs/olympics/2021/01/01/00/tx_test2.parquet",
                 true,
             ), // deleted
