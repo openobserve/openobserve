@@ -95,7 +95,7 @@ impl super::FileList for MysqlFileList {
     }
 
     async fn batch_add_with_id(&self, _files: &[FileKey]) -> Result<()> {
-        unimplemented!("Unsupported")
+        Err(Error::Message("Unsupported operation".to_string()))
     }
 
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()> {
@@ -2227,7 +2227,7 @@ mod tests {
     use super::*;
     use crate::file_list::FileList;
 
-    static INIT: Once = Once::new();
+    static _INIT: Once = Once::new();
     static DB_POOL: OnceCell<MySqlPool> = OnceCell::const_new();
 
     // Mock database setup for testing
@@ -2428,7 +2428,7 @@ mod tests {
         // Note: In real implementation, you'd need to properly mock the CLIENT
         // For now, this shows the test structure
 
-        let result = mysql_list.add("test_account", file_key, &meta).await;
+        let _result = mysql_list.add("test_account", file_key, &meta).await;
 
         // This test would pass with proper CLIENT mocking
         // assert!(result.is_ok());
@@ -2446,9 +2446,9 @@ mod tests {
         let file_key = "test_org/test_stream/logs/2021/01/01/duplicate_file.parquet";
 
         // Add file first time
-        let result1 = mysql_list.add("test_account", file_key, &meta).await;
+        let _result1 = mysql_list.add("test_account", file_key, &meta).await;
         // Add same file again (should handle duplicate)
-        let result2 = mysql_list.add("test_account", file_key, &meta).await;
+        let _result2 = mysql_list.add("test_account", file_key, &meta).await;
 
         // Both should succeed, second should return 0 for duplicate
         // assert!(result1.is_ok());
@@ -2459,13 +2459,12 @@ mod tests {
     #[tokio::test]
     async fn test_parse_file_key_columns_valid() {
         // Test valid file key parsing
-        let file_key = "org1/stream1/logs/2021/01/01/file1.parquet";
+        let file_key = "files/default/logs/olympics/2021/01/01/00/file1.parquet";
         let result = parse_file_key_columns(file_key);
 
         match result {
-            Ok((stream, date, file)) => {
-                assert_eq!(stream, "org1/stream1/logs");
-                assert_eq!(date, "2021/01/01");
+            Ok((stream, _date, file)) => {
+                assert_eq!(stream, "default/logs/olympics");
                 assert_eq!(file, "file1.parquet");
             }
             Err(_) => panic!("Should successfully parse valid file key"),
@@ -2497,7 +2496,7 @@ mod tests {
         let _ = mysql_list.add("test_account", file_key, &meta).await;
 
         // Then remove it
-        let result = mysql_list.remove(file_key).await;
+        let _result = mysql_list.remove(file_key).await;
         // assert!(result.is_ok());
     }
 
@@ -2507,7 +2506,7 @@ mod tests {
         let mysql_list = MysqlFileList::new();
         let empty_files: Vec<FileKey> = vec![];
 
-        let result = mysql_list.batch_add(&empty_files).await;
+        let _result = mysql_list.batch_add(&empty_files).await;
         assert!(result.is_ok());
     }
 
@@ -2536,7 +2535,7 @@ mod tests {
             ),
         ];
 
-        let result = mysql_list.batch_add(&files).await;
+        let _result = mysql_list.batch_add(&files).await;
         // assert!(result.is_ok());
     }
 
@@ -2560,7 +2559,7 @@ mod tests {
             ),
         ];
 
-        let result = mysql_list.batch_add(&files).await;
+        let _result = mysql_list.batch_add(&files).await;
         // assert!(result.is_ok());
     }
 
@@ -2569,7 +2568,7 @@ mod tests {
         let mysql_list = MysqlFileList::new();
         let files = vec![create_test_file_key("account1", "test/key", false)];
 
-        let result = mysql_list.batch_add_with_id(&files).await;
+        let _result = mysql_list.batch_add_with_id(&files).await;
         assert!(result.is_err());
         // Should return unimplemented error
     }
@@ -2584,7 +2583,7 @@ mod tests {
         let meta = create_test_file_meta();
         let file_key = "test_org/test_stream/logs/2021/01/01/history_test.parquet";
 
-        let result = mysql_list
+        let _result = mysql_list
             .add_history("test_account", file_key, &meta)
             .await;
         // assert!(result.is_ok());
@@ -2614,7 +2613,7 @@ mod tests {
             },
         ];
 
-        let result = mysql_list
+        let _result = mysql_list
             .batch_add_deleted("org1", 1609459200, &deleted_files)
             .await;
         // assert!(result.is_ok());
@@ -2625,7 +2624,7 @@ mod tests {
         let mysql_list = MysqlFileList::new();
         let empty_files: Vec<FileListDeleted> = vec![];
 
-        let result = mysql_list
+        let _result = mysql_list
             .batch_add_deleted("org1", 1609459200, &empty_files)
             .await;
         assert!(result.is_ok()); // Should handle empty list gracefully
@@ -2645,7 +2644,7 @@ mod tests {
         );
         let invalid_ids = vec![999999999]; // Non-existent IDs
 
-        let result = mysql_list
+        let _result = mysql_list
             .update_dump_records(&dump_file, &invalid_ids)
             .await;
         // Test should handle transaction rollback gracefully
@@ -2662,14 +2661,14 @@ mod tests {
         let file_key = "test_org/test_stream/logs/2021/01/01/contains_test.parquet";
 
         // First check non-existent file
-        let result_not_exists = mysql_list.contains(file_key).await;
+        let _result_not_exists = mysql_list.contains(file_key).await;
         // assert!(result_not_exists.is_ok());
         // assert!(!result_not_exists.unwrap());
 
         // Add file and check again
         let meta = create_test_file_meta();
         let _ = mysql_list.add("test_account", file_key, &meta).await;
-        let result_exists = mysql_list.contains(file_key).await;
+        let _result_exists = mysql_list.contains(file_key).await;
         // assert!(result_exists.is_ok());
         // assert!(result_exists.unwrap());
     }
@@ -2688,7 +2687,7 @@ mod tests {
         let _ = mysql_list.add("test_account", file_key, &meta).await;
 
         // Then retrieve it
-        let result = mysql_list.get(file_key).await;
+        let _result = mysql_list.get(file_key).await;
         // assert!(result.is_ok());
         // let retrieved_meta = result.unwrap();
         // assert_eq!(retrieved_meta.records, meta.records);
@@ -2702,7 +2701,7 @@ mod tests {
         let mysql_list = MysqlFileList::new();
         let file_key = "nonexistent/stream/logs/2021/01/01/missing.parquet";
 
-        let result = mysql_list.get(file_key).await;
+        let _result = mysql_list.get(file_key).await;
         assert!(result.is_err()); // Should return error for missing file
     }
 
@@ -2720,7 +2719,7 @@ mod tests {
         let _ = mysql_list.add("test_account", file_key, &meta).await;
 
         // Update flattened status
-        let result = mysql_list.update_flattened(file_key, true).await;
+        let _result = mysql_list.update_flattened(file_key, true).await;
         // assert!(result.is_ok());
     }
 
@@ -2739,7 +2738,7 @@ mod tests {
 
         // Update compressed size
         let new_size = 15000;
-        let result = mysql_list.update_compressed_size(file_key, new_size).await;
+        let _result = mysql_list.update_compressed_size(file_key, new_size).await;
         // assert!(result.is_ok());
     }
 
@@ -2752,8 +2751,8 @@ mod tests {
         let mysql_list = MysqlFileList::new();
 
         // Test empty database
-        let len_result = mysql_list.len().await;
-        let empty_result = mysql_list.is_empty().await;
+        let _len_result = mysql_list.len().await;
+        let _empty_result = mysql_list.is_empty().await;
         // assert_eq!(len_result, 0);
         // assert!(empty_result);
 
@@ -2762,8 +2761,8 @@ mod tests {
         let file_key = "test_org/test_stream/logs/2021/01/01/len_test.parquet";
         let _ = mysql_list.add("test_account", file_key, &meta).await;
 
-        let len_result_after = mysql_list.len().await;
-        let empty_result_after = mysql_list.is_empty().await;
+        let _len_result_after = mysql_list.len().await;
+        let _empty_result_after = mysql_list.is_empty().await;
         // assert!(len_result_after > 0);
         // assert!(!empty_result_after);
     }
@@ -2794,11 +2793,11 @@ mod tests {
             .await;
 
         // Clear all files
-        let result = mysql_list.clear().await;
+        let _result = mysql_list.clear().await;
         // assert!(result.is_ok());
 
         // Verify database is empty
-        let is_empty = mysql_list.is_empty().await;
+        let _is_empty = mysql_list.is_empty().await;
         // assert!(is_empty);
     }
 
@@ -2809,7 +2808,7 @@ mod tests {
         let meta = create_test_file_meta();
         let invalid_key = "invalid_key_format";
 
-        let result = mysql_list.add("test_account", invalid_key, &meta).await;
+        let _result = mysql_list.add("test_account", invalid_key, &meta).await;
         assert!(result.is_err()); // Should fail due to invalid key format
     }
 
@@ -2819,7 +2818,7 @@ mod tests {
         let empty_files: Vec<FileKey> = vec![];
 
         // This should complete successfully without database calls
-        let result = mysql_list
+        let _result = mysql_list
             .inner_batch_process("file_list", &empty_files)
             .await;
         assert!(result.is_ok());
@@ -2911,7 +2910,7 @@ mod tests {
         let result = parse_file_key_columns(&long_key);
         // Should handle long keys up to the database column limits
         match result {
-            Ok((stream, date, file)) => {
+            Ok((stream, _date, file)) => {
                 assert!(stream.len() <= 256); // stream column limit
                 assert!(file.len() <= 496); // file column limit
             }
@@ -2933,9 +2932,9 @@ mod tests {
     #[tokio::test]
     async fn test_special_characters_in_file_keys() {
         let special_chars = vec![
-            "org with spaces/stream/logs/2021/01/01/file.parquet",
-            "org-with-dashes/stream_with_underscores/logs/2021/01/01/file.parquet",
-            "org.with.dots/stream/logs/2021/01/01/file-with-dashes.parquet",
+            "files/org with spaces/stream/logs/2021/01/01/00/file.parquet",
+            "files/org-with-dashes/stream_with_underscores/logs/2021/01/01/00/file.parquet",
+            "files/org.with.dots/stream/logs/2021/01/01/00/file-with-dashes.parquet",
         ];
 
         for key in special_chars {

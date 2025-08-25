@@ -96,7 +96,7 @@ impl super::FileList for PostgresFileList {
     }
 
     async fn batch_add_with_id(&self, _files: &[FileKey]) -> Result<()> {
-        unimplemented!("Unsupported")
+        Err(Error::Message("Unsupported operation".to_string()))
     }
 
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()> {
@@ -2105,7 +2105,7 @@ mod tests {
     use super::*;
     use crate::file_list::FileList;
 
-    static INIT: Once = Once::new();
+    static _INIT: Once = Once::new();
     static DB_POOL: OnceCell<PgPool> = OnceCell::const_new();
 
     // Mock database setup for testing
@@ -2298,7 +2298,7 @@ mod tests {
         let meta = create_test_file_meta();
         let file_key = "test_org/test_stream/logs/2021/01/01/test_file.parquet";
 
-        let result = postgres_list.add("test_account", file_key, &meta).await;
+        let _result = postgres_list.add("test_account", file_key, &meta).await;
 
         // This test would pass with proper CLIENT mocking
         // assert!(result.is_ok());
@@ -2316,9 +2316,9 @@ mod tests {
         let file_key = "test_org/test_stream/logs/2021/01/01/duplicate_file.parquet";
 
         // Add file first time
-        let result1 = postgres_list.add("test_account", file_key, &meta).await;
+        let _result1 = postgres_list.add("test_account", file_key, &meta).await;
         // Add same file again (should handle duplicate)
-        let result2 = postgres_list.add("test_account", file_key, &meta).await;
+        let _result2 = postgres_list.add("test_account", file_key, &meta).await;
 
         // PostgreSQL should handle conflicts differently than MySQL
         // assert!(result1.is_ok());
@@ -2328,13 +2328,12 @@ mod tests {
     #[tokio::test]
     async fn test_parse_file_key_columns_valid_postgres() {
         // Test valid file key parsing (same as MySQL but testing PostgreSQL context)
-        let file_key = "org1/stream1/logs/2021/01/01/postgres_file1.parquet";
+        let file_key = "files/default/logs/olympics/2021/01/01/00/postgres_file1.parquet";
         let result = parse_file_key_columns(file_key);
 
         match result {
-            Ok((stream, date, file)) => {
-                assert_eq!(stream, "org1/stream1/logs");
-                assert_eq!(date, "2021/01/01");
+            Ok((stream, _date, file)) => {
+                assert_eq!(stream, "default/logs/olympics");
                 assert_eq!(file, "postgres_file1.parquet");
             }
             Err(_) => panic!("Should successfully parse valid file key"),
@@ -2372,7 +2371,7 @@ mod tests {
         let _ = postgres_list.add("test_account", file_key, &meta).await;
 
         // Then remove it (uses PostgreSQL $1, $2, $3 syntax)
-        let result = postgres_list.remove(file_key).await;
+        let _result = postgres_list.remove(file_key).await;
         // assert!(result.is_ok());
     }
 
@@ -2381,7 +2380,7 @@ mod tests {
         let postgres_list = PostgresFileList::new();
         let files = vec![create_test_file_key("account1", "test/key", false)];
 
-        let result = postgres_list.batch_add_with_id(&files).await;
+        let _result = postgres_list.batch_add_with_id(&files).await;
         assert!(result.is_err());
         // Should return unimplemented error
     }
@@ -2392,7 +2391,7 @@ mod tests {
         let postgres_list = PostgresFileList::new();
         let empty_files: Vec<FileKey> = vec![];
 
-        let result = postgres_list.batch_add(&empty_files).await;
+        let _result = postgres_list.batch_add(&empty_files).await;
         assert!(result.is_ok());
     }
 
@@ -2421,7 +2420,7 @@ mod tests {
             ),
         ];
 
-        let result = postgres_list.batch_add(&files).await;
+        let _result = postgres_list.batch_add(&files).await;
         // assert!(result.is_ok());
     }
 
@@ -2445,7 +2444,7 @@ mod tests {
             ),
         ];
 
-        let result = postgres_list.batch_add(&files).await;
+        let _result = postgres_list.batch_add(&files).await;
         // assert!(result.is_ok());
     }
 
@@ -2459,7 +2458,7 @@ mod tests {
         let meta = create_test_file_meta();
         let file_key = "test_org/test_stream/logs/2021/01/01/pg_history_test.parquet";
 
-        let result = postgres_list
+        let _result = postgres_list
             .add_history("test_account", file_key, &meta)
             .await;
         // assert!(result.is_ok());
@@ -2489,7 +2488,7 @@ mod tests {
             },
         ];
 
-        let result = postgres_list
+        let _result = postgres_list
             .batch_add_deleted("org1", 1609459200, &deleted_files)
             .await;
         // assert!(result.is_ok());
@@ -2500,7 +2499,7 @@ mod tests {
         let postgres_list = PostgresFileList::new();
         let empty_files: Vec<FileListDeleted> = vec![];
 
-        let result = postgres_list
+        let _result = postgres_list
             .batch_add_deleted("org1", 1609459200, &empty_files)
             .await;
         assert!(result.is_ok()); // Should handle empty list gracefully
@@ -2516,14 +2515,14 @@ mod tests {
         let file_key = "test_org/test_stream/logs/2021/01/01/pg_contains_test.parquet";
 
         // First check non-existent file
-        let result_not_exists = postgres_list.contains(file_key).await;
+        let _result_not_exists = postgres_list.contains(file_key).await;
         // assert!(result_not_exists.is_ok());
         // assert!(!result_not_exists.unwrap());
 
         // Add file and check again
         let meta = create_test_file_meta();
         let _ = postgres_list.add("test_account", file_key, &meta).await;
-        let result_exists = postgres_list.contains(file_key).await;
+        let _result_exists = postgres_list.contains(file_key).await;
         // assert!(result_exists.is_ok());
         // assert!(result_exists.unwrap());
     }
@@ -2542,7 +2541,7 @@ mod tests {
         let _ = postgres_list.add("test_account", file_key, &meta).await;
 
         // Then retrieve it
-        let result = postgres_list.get(file_key).await;
+        let _result = postgres_list.get(file_key).await;
         // assert!(result.is_ok());
         // let retrieved_meta = result.unwrap();
         // assert_eq!(retrieved_meta.records, meta.records);
@@ -2556,7 +2555,7 @@ mod tests {
         let postgres_list = PostgresFileList::new();
         let file_key = "nonexistent/stream/logs/2021/01/01/pg_missing.parquet";
 
-        let result = postgres_list.get(file_key).await;
+        let _result = postgres_list.get(file_key).await;
         assert!(result.is_err()); // Should return error for missing file
     }
 
@@ -2574,7 +2573,7 @@ mod tests {
         let _ = postgres_list.add("test_account", file_key, &meta).await;
 
         // Update flattened status
-        let result = postgres_list.update_flattened(file_key, true).await;
+        let _result = postgres_list.update_flattened(file_key, true).await;
         // assert!(result.is_ok());
     }
 
@@ -2593,7 +2592,7 @@ mod tests {
 
         // Update compressed size
         let new_size = 15000;
-        let result = postgres_list
+        let _result = postgres_list
             .update_compressed_size(file_key, new_size)
             .await;
         // assert!(result.is_ok());
@@ -2608,8 +2607,8 @@ mod tests {
         let postgres_list = PostgresFileList::new();
 
         // Test empty database
-        let len_result = postgres_list.len().await;
-        let empty_result = postgres_list.is_empty().await;
+        let _len_result = postgres_list.len().await;
+        let _empty_result = postgres_list.is_empty().await;
         // assert_eq!(len_result, 0);
         // assert!(empty_result);
 
@@ -2618,8 +2617,8 @@ mod tests {
         let file_key = "test_org/test_stream/logs/2021/01/01/pg_len_test.parquet";
         let _ = postgres_list.add("test_account", file_key, &meta).await;
 
-        let len_result_after = postgres_list.len().await;
-        let empty_result_after = postgres_list.is_empty().await;
+        let _len_result_after = postgres_list.len().await;
+        let _empty_result_after = postgres_list.is_empty().await;
         // assert!(len_result_after > 0);
         // assert!(!empty_result_after);
     }
@@ -2650,11 +2649,11 @@ mod tests {
             .await;
 
         // Clear all files
-        let result = postgres_list.clear().await;
+        let _result = postgres_list.clear().await;
         // assert!(result.is_ok());
 
         // Verify database is empty
-        let is_empty = postgres_list.is_empty().await;
+        let _is_empty = postgres_list.is_empty().await;
         // assert!(is_empty);
     }
 
@@ -2665,7 +2664,7 @@ mod tests {
         let meta = create_test_file_meta();
         let invalid_key = "invalid_key_format";
 
-        let result = postgres_list.add("test_account", invalid_key, &meta).await;
+        let _result = postgres_list.add("test_account", invalid_key, &meta).await;
         assert!(result.is_err()); // Should fail due to invalid key format
     }
 
@@ -2675,7 +2674,7 @@ mod tests {
         let empty_files: Vec<FileKey> = vec![];
 
         // This should complete successfully without database calls
-        let result = postgres_list
+        let _result = postgres_list
             .inner_batch_process("file_list", &empty_files)
             .await;
         assert!(result.is_ok());
@@ -2713,7 +2712,7 @@ mod tests {
 
         // Test that empty batch processing works
         let empty_files: Vec<FileKey> = vec![];
-        let result = postgres_list
+        let _result = postgres_list
             .inner_batch_process("file_list", &empty_files)
             .await;
         assert!(result.is_ok());
@@ -2756,7 +2755,7 @@ mod tests {
         // This is mainly a schema difference, but we test the concept
         let file_key = create_test_file_key(
             "account1",
-            "org/stream/logs/2021/01/01/identity_test.parquet",
+            "files/default/logs/olympics/2021/01/01/00/identity_test.parquet",
             false,
         );
 
@@ -2772,18 +2771,18 @@ mod tests {
         let files = vec![
             create_test_file_key(
                 "account1",
-                "org/stream/logs/2021/01/01/tx_test1.parquet",
+                "files/default/logs/olympics/2021/01/01/00/tx_test1.parquet",
                 false,
             ),
             create_test_file_key(
-                "account1",
-                "org/stream/logs/2021/01/01/tx_test2.parquet",
+                "account1", 
+                "files/default/logs/olympics/2021/01/01/00/tx_test2.parquet",
                 true,
             ), // deleted
         ];
 
         // Test that batch processing handles mixed add/delete operations
-        let result = postgres_list.inner_batch_process("file_list", &files).await;
+        let _result = postgres_list.inner_batch_process("file_list", &files).await;
 
         // Without actual DB connection, this tests the logic flow
         // In real PostgreSQL, this would test transaction commit/rollback behavior

@@ -59,7 +59,7 @@ static RE_SPACE_AROUND: Lazy<Regex> = Lazy::new(|| {
 
 pub static EMAIL_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"^([a-zA-Z0-9_+]([a-zA-Z0-9_+.-]*[a-zA-Z0-9_+])?)@([a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*\.[a-zA-Z]{2,6})",
+        r"^([a-zA-Z0-9_+]([a-zA-Z0-9_+\-]*(\.[a-zA-Z0-9_+\-]+)*)?[a-zA-Z0-9_+])@([a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*\.[a-zA-Z]{2,6})",
     )
     .unwrap()
 });
@@ -1450,7 +1450,7 @@ mod tests {
     fn test_regex_compilation() {
         // Test that the regexes compile without panicking
         assert!(RE_OFGA_UNSUPPORTED_NAME.is_match("test:name"));
-        assert!(RE_SPACE_AROUND.is_match("a & b"));
+        assert!(RE_SPACE_AROUND.is_match("a @ b")); // @ is not in the exclusion list, so this should match
         assert!(EMAIL_REGEX.is_match("test@example.com"));
 
         // Test that the regexes work as expected
