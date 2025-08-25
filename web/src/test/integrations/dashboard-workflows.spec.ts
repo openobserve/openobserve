@@ -37,9 +37,17 @@ vi.mock("@/services/search", () => ({
 }));
 
 // Mock utilities
-vi.mock("@/utils/zincutils", () => ({
-  getImageURL: vi.fn().mockReturnValue("/mock-image.svg"),
-}));
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/utils/zincutils")>();
+  return {
+    ...actual,
+    getImageURL: vi.fn().mockReturnValue("/mock-image.svg"),
+    useLocalOrganization: vi.fn(() => ({ value: {} })),
+    useLocalCurrentUser: vi.fn(() => ({ value: "" })),
+    useLocalTimezone: vi.fn(() => "UTC"),
+    useLocalStorage: vi.fn(() => ({ value: null })),
+  };
+});
 
 vi.mock("echarts/core", () => ({
   use: vi.fn(),
