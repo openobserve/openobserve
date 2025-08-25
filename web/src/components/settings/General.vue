@@ -350,7 +350,7 @@ export default defineComponent({
       } catch (err: any) {
         q.notify({
           type: "negative",
-          message: err?.message || "something went wrong",
+          message: err?.response?.data?.message || err?.message || "something went wrong",
           timeout: 2000,
         });
       }
@@ -396,7 +396,7 @@ export default defineComponent({
           .catch((e) => {
             q.notify({
               type: "negative",
-              message: e?.message || "Error while uploading image.",
+              message: e?.response?.data?.message || e?.message || "Error while uploading image.",
               timeout: 2000,
             });
           })
@@ -443,10 +443,10 @@ export default defineComponent({
             });
           }
         })
-        .catch(() => {
+        .catch((err) => {
           q.notify({
             type: "negative",
-            message: "Something went wrong.",
+            message: err?.response?.data?.message || err?.message || "Something went wrong.",
             timeout: 2000,
           });
         })
@@ -511,7 +511,7 @@ export default defineComponent({
         .catch((err) => {
           q.notify({
             type: "negative",
-            message: err?.message || "Something went wrong.",
+            message: err?.response?.data?.message || err?.message || "Something went wrong.",
             timeout: 2000,
           });
         })

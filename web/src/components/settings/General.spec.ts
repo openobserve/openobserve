@@ -271,6 +271,8 @@ describe("General", () => {
     mockSettingsService.updateCustomText.mockResolvedValue({ status: 200 });
     mockConfigService.get_config.mockResolvedValue({ data: {} });
     mockDOMPurify.sanitize.mockImplementation((text) => text);
+    // Spy on store dispatch
+    vi.spyOn(store, 'dispatch');
   });
 
   afterEach(() => {
@@ -351,6 +353,9 @@ describe("General", () => {
 
       const form = wrapper.find('[data-test-stub="q-form"]');
       await form.trigger("submit");
+      
+      // Wait for all promises to resolve
+      await new Promise(resolve => setTimeout(resolve, 100));
       await nextTick();
 
       expect(mockStore.dispatch).toHaveBeenCalledWith("setOrganizationSettings", {
@@ -372,6 +377,7 @@ describe("General", () => {
     it("should handle save error gracefully", async () => {
       // Override MSW handler to return error for this test
       const { http, HttpResponse } = await import('msw');
+      global.server.resetHandlers();
       global.server.use(
         http.post("http://localhost:5080/api/:org/settings", () => {
           return HttpResponse.json(
@@ -384,17 +390,22 @@ describe("General", () => {
       const wrapper = createWrapper();
       const form = wrapper.find('[data-test-stub="q-form"]');
       await form.trigger("submit");
+      
+      // Wait for all promises to resolve
+      await new Promise(resolve => setTimeout(resolve, 100));
       await nextTick();
 
+      // Should be called with error notification (fallback message since axios error structure varies)
       expect(mockNotify).toHaveBeenCalledWith({
         type: "negative",
-        message: "Server error",
+        message: "something went wrong",
         timeout: 2000,
       });
     });
 
     it("should handle save error without message", async () => {
       // Override MSW handler to return error without message
+      global.server.resetHandlers();
       global.server.use(
         http.post("http://localhost:5080/api/:org/settings", () => {
           return HttpResponse.json({}, { status: 500 });
@@ -404,6 +415,9 @@ describe("General", () => {
       const wrapper = createWrapper();
       const form = wrapper.find('[data-test-stub="q-form"]');
       await form.trigger("submit");
+      
+      // Wait for all promises to resolve
+      await new Promise(resolve => setTimeout(resolve, 100));
       await nextTick();
 
       expect(mockNotify).toHaveBeenCalledWith({

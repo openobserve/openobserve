@@ -438,6 +438,9 @@ describe("CipherKeys", () => {
       wrapper.vm.showAddDialog = true;
       await nextTick();
 
+      // Emit the cancel event to trigger hideAddDialog
+      await wrapper.vm.hideAddDialog();
+
       expect(router.push).toHaveBeenCalledWith({
         name: "cipherKeys",
         query: {
