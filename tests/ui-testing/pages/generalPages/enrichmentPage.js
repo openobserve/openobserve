@@ -23,8 +23,9 @@ class EnrichmentPage {
         this.protocolKeywordText = '[data-test="log-expand-detail-key-protocol_keyword-text"]';
         this.dateTimeBtn = '[data-test="date-time-btn"]';
         
-        // VRL editor locators
+        // VRL editor locators (with fallback options)
         this.vrlEditor = '#fnEditor';
+        this.vrlEditorFallback = '[data-test="logs-vrl-function-editor"]';
         this.refreshButton = "[data-test='logs-search-bar-refresh-btn']";
         
         // Table and validation locators
@@ -136,34 +137,46 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 console.log('⚠️ Functions button not found or error:', e.message);
             }
             
-            // Check if fnEditor exists in DOM and provide debugging info
-            const editorCount = await this.page.locator(this.vrlEditor).count();
-            console.log('📝 fnEditor elements found:', editorCount);
+            // Try primary VRL editor selector first
+            let activeVrlEditor = this.vrlEditor;
+            let editorCount = await this.page.locator(this.vrlEditor).count();
+            console.log('📝 Primary fnEditor (#fnEditor) elements found:', editorCount);
             
+            // If primary editor not found, try fallback selector
             if (editorCount === 0) {
-                // Take screenshot and dump page content for debugging
-                await this.page.screenshot({ path: 'debug-no-editor.png', fullPage: true });
-                const pageContent = await this.page.content();
-                console.log('❌ fnEditor not found in DOM');
-                console.log('📄 Page content contains "editor":', pageContent.includes('editor'));
-                console.log('📄 Page content contains "function":', pageContent.includes('function'));
-                throw new Error('VRL editor (#fnEditor) not found in DOM. This suggests the page did not load correctly or VRL features are disabled.');
+                console.log('🔄 Trying fallback VRL editor selector...');
+                editorCount = await this.page.locator(this.vrlEditorFallback).count();
+                console.log('📝 Fallback VRL editor elements found:', editorCount);
+                
+                if (editorCount > 0) {
+                    activeVrlEditor = this.vrlEditorFallback;
+                    console.log('✅ Using fallback VRL editor selector');
+                } else {
+                    // Both selectors failed - provide debugging info
+                    await this.page.screenshot({ path: 'debug-no-vrl-editor.png', fullPage: true });
+                    const pageContent = await this.page.content();
+                    console.log('❌ No VRL editor found with either selector');
+                    console.log('📄 Page content contains "editor":', pageContent.includes('editor'));
+                    console.log('📄 Page content contains "function":', pageContent.includes('function'));
+                    console.log('📄 Page content contains "vrl":', pageContent.includes('vrl'));
+                    throw new Error('VRL editor not found with either selector (#fnEditor or [data-test="logs-vrl-function-editor"]). VRL features may be disabled in CI environment.');
+                }
             }
             
-            // Check if editor is visible
-            const editorVisible = await this.page.locator(this.vrlEditor).isVisible();
-            console.log('👁️ fnEditor visible:', editorVisible);
+            // Check if selected editor is visible
+            const editorVisible = await this.page.locator(activeVrlEditor).isVisible();
+            console.log('👁️ Selected VRL editor visible:', editorVisible);
             
-            // Wait for VRL editor to be visible (simple approach)
+            // Wait for VRL editor to be visible
             console.log('⏳ Waiting for VRL editor to become visible...');
-            await this.page.waitForSelector(this.vrlEditor, { 
+            await this.page.waitForSelector(activeVrlEditor, { 
                 state: 'visible',
-                timeout: 60000 
+                timeout: 45000 
             });
             console.log('✅ VRL editor is now visible');
             
             // Wait for the textbox inside the editor to be interactive
-            const textbox = this.page.locator(this.vrlEditor).getByRole('textbox');
+            const textbox = this.page.locator(activeVrlEditor).getByRole('textbox');
             await textbox.waitFor({ 
                 state: 'visible',
                 timeout: 15000 
