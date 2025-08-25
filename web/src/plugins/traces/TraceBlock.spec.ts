@@ -302,6 +302,11 @@ describe("TraceBlock", () => {
       await flushPromises();
       await flushPromises();
       await flushPromises();
+      
+      // Ensure moment is loaded and getFormattedDate is called
+      await wrapper.vm.importMoment();
+      await wrapper.vm.getFormattedDate();
+      await wrapper.vm.$nextTick();
 
       const traceDay = wrapper.find("[data-test='trace-block-trace-date-day']");
       
