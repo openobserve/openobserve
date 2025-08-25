@@ -779,7 +779,7 @@ mod tests {
     #[test]
     fn test_get_default_user_org() {
         let org = get_default_user_org();
-        
+
         assert_eq!(org.name, "");
         assert_eq!(org.token, "");
         assert!(org.rum_token.is_none());
@@ -789,25 +789,28 @@ mod tests {
     #[test]
     fn test_get_default_user_role() {
         let role = get_default_user_role();
-        
+
         // Default role should be Admin in non-enterprise mode
         #[cfg(not(feature = "enterprise"))]
         assert_eq!(role, UserRole::Admin);
-        
+
         // In enterprise mode, it depends on configuration
         #[cfg(feature = "enterprise")]
         {
             // Just verify it returns a valid UserRole
-            assert!(matches!(role, UserRole::Admin | UserRole::Root | UserRole::ServiceAccount));
+            assert!(matches!(
+                role,
+                UserRole::Admin | UserRole::Root | UserRole::ServiceAccount
+            ));
         }
     }
 
     #[test]
     fn test_get_roles() {
         let roles = get_roles();
-        
+
         assert!(!roles.is_empty());
-        
+
         // Non-enterprise mode should have specific roles
         #[cfg(not(feature = "enterprise"))]
         {
@@ -816,7 +819,7 @@ mod tests {
             assert!(roles.contains(&UserRole::Root));
             assert!(roles.contains(&UserRole::ServiceAccount));
         }
-        
+
         // Enterprise mode uses iterator over all roles
         #[cfg(feature = "enterprise")]
         {
@@ -836,7 +839,7 @@ mod tests {
         assert!(is_standard_role("root"));
         assert!(is_standard_role("ROOT"));
         assert!(is_standard_role("Root"));
-        
+
         // Test invalid roles
         assert!(!is_standard_role("custom_role"));
         assert!(!is_standard_role("invalid"));
@@ -965,7 +968,10 @@ mod tests {
         // When role is not standard and no custom roles provided,
         // the role name should be added as custom role
         assert_eq!(org_role.base_role, get_default_user_role());
-        assert_eq!(org_role.custom_role, Some(vec!["custom_role_name".to_string()]));
+        assert_eq!(
+            org_role.custom_role,
+            Some(vec!["custom_role_name".to_string()])
+        );
     }
 
     #[test]
@@ -979,7 +985,10 @@ mod tests {
 
         // When custom roles are provided, use them instead of role name
         assert_eq!(org_role.base_role, get_default_user_role());
-        assert_eq!(org_role.custom_role, Some(vec!["perm1".to_string(), "perm2".to_string()]));
+        assert_eq!(
+            org_role.custom_role,
+            Some(vec!["perm1".to_string(), "perm2".to_string()])
+        );
     }
 
     #[test]
@@ -1085,11 +1094,23 @@ mod tests {
     #[test]
     fn test_invite_status_conversion() {
         use o2_enterprise::enterprise::cloud::OrgInviteStatus;
-        
-        assert_eq!(InviteStatus::from(&OrgInviteStatus::Pending), InviteStatus::Pending);
-        assert_eq!(InviteStatus::from(&OrgInviteStatus::Accepted), InviteStatus::Accepted);
-        assert_eq!(InviteStatus::from(&OrgInviteStatus::Rejected), InviteStatus::Rejected);
-        assert_eq!(InviteStatus::from(&OrgInviteStatus::Expired), InviteStatus::Expired);
+
+        assert_eq!(
+            InviteStatus::from(&OrgInviteStatus::Pending),
+            InviteStatus::Pending
+        );
+        assert_eq!(
+            InviteStatus::from(&OrgInviteStatus::Accepted),
+            InviteStatus::Accepted
+        );
+        assert_eq!(
+            InviteStatus::from(&OrgInviteStatus::Rejected),
+            InviteStatus::Rejected
+        );
+        assert_eq!(
+            InviteStatus::from(&OrgInviteStatus::Expired),
+            InviteStatus::Expired
+        );
     }
 
     #[cfg(feature = "cloud")]

@@ -1187,13 +1187,13 @@ mod tests {
     fn test_get_hash_caching() {
         let pass = "testpass";
         let salt = "testsalt";
-        
+
         // First call should create hash and cache it
         let hash1 = get_hash(pass, salt);
-        
+
         // Second call should return cached value
         let hash2 = get_hash(pass, salt);
-        
+
         assert_eq!(hash1, hash2);
         assert!(!hash1.is_empty());
     }
@@ -1207,7 +1207,7 @@ mod tests {
         assert!(is_valid_email("user_name@example.co.uk"));
         assert!(is_valid_email("123@example.com"));
         assert!(is_valid_email("a@b.co"));
-        
+
         // Invalid emails
         assert!(!is_valid_email(""));
         assert!(!is_valid_email("no-at-sign"));
@@ -1228,7 +1228,7 @@ mod tests {
         assert_eq!(into_ofga_supported_format("test"), "test");
         assert_eq!(into_ofga_supported_format("test_name"), "test_name");
         assert_eq!(into_ofga_supported_format("123"), "123");
-        
+
         // Special characters
         assert_eq!(into_ofga_supported_format("a:b"), "a_b");
         assert_eq!(into_ofga_supported_format("a#b"), "a_b");
@@ -1237,15 +1237,18 @@ mod tests {
         assert_eq!(into_ofga_supported_format("a\"b"), "a_b");
         assert_eq!(into_ofga_supported_format("a%b"), "a_b");
         assert_eq!(into_ofga_supported_format("a&b"), "a_b");
-        
+
         // Multiple spaces
         assert_eq!(into_ofga_supported_format("a   b"), "a_b");
         assert_eq!(into_ofga_supported_format("  a  b  "), "__a_b__");
-        
+
         // Complex combinations
-        assert_eq!(into_ofga_supported_format("test:name with spaces"), "test_name_with_spaces");
+        assert_eq!(
+            into_ofga_supported_format("test:name with spaces"),
+            "test_name_with_spaces"
+        );
         assert_eq!(into_ofga_supported_format("a & b : c # d"), "a_b_c_d");
-        
+
         // Edge cases
         assert_eq!(into_ofga_supported_format(""), "");
         assert_eq!(into_ofga_supported_format(":::"), "___");
@@ -1260,7 +1263,7 @@ mod tests {
         assert!(!is_ofga_unsupported("valid_name"));
         assert!(!is_ofga_unsupported("CamelCase"));
         assert!(!is_ofga_unsupported(""));
-        
+
         // Unsupported characters (should return true)
         assert!(is_ofga_unsupported("has:colon"));
         assert!(is_ofga_unsupported("has#hash"));
@@ -1270,7 +1273,7 @@ mod tests {
         assert!(is_ofga_unsupported("has\"doublequote"));
         assert!(is_ofga_unsupported("has%percent"));
         assert!(is_ofga_unsupported("has&ampersand"));
-        
+
         // Mixed cases
         assert!(is_ofga_unsupported("valid:invalid"));
         assert!(is_ofga_unsupported("valid invalid"));
@@ -1341,17 +1344,17 @@ mod tests {
         let time = 1600000000;
 
         let url = generate_presigned_url(username, password, salt, base_url, exp_in, time);
-        
+
         assert!(url.starts_with(base_url));
         assert!(url.contains("/auth/login"));
         assert!(url.contains(&format!("request_time={}", time)));
         assert!(url.contains(&format!("exp_in={}", exp_in)));
         assert!(url.contains("auth="));
-        
+
         // Test with different parameters
         let url2 = generate_presigned_url(username, password, salt, base_url, exp_in, time + 1);
         assert_ne!(url, url2); // Different time should generate different URL
-        
+
         let url3 = generate_presigned_url("different", password, salt, base_url, exp_in, time);
         assert_ne!(url, url3); // Different username should generate different URL
     }
@@ -1378,7 +1381,7 @@ mod tests {
             base_role: UserRole::User,
             custom_role: None,
         };
-        
+
         // In non-enterprise mode, should always return Admin
         assert_eq!(get_role(&user_role), UserRole::Admin);
     }
@@ -1390,7 +1393,7 @@ mod tests {
             parent: "test_parent".to_string(),
             parent_type: "folder".to_string(),
         };
-        
+
         // In non-enterprise mode, this should not panic and return immediately
         set_ownership("test_org", "dashboard", authz).await;
         // If we reach here, the function completed successfully
@@ -1404,7 +1407,7 @@ mod tests {
             parent: "test_parent".to_string(),
             parent_type: "folder".to_string(),
         };
-        
+
         // In non-enterprise mode, this should not panic and return immediately
         remove_ownership("test_org", "dashboard", authz).await;
         // If we reach here, the function completed successfully
@@ -1420,8 +1423,9 @@ mod tests {
             "test_user",
             "dashboard",
             "GET",
-        ).await;
-        
+        )
+        .await;
+
         assert!(!result);
     }
 
@@ -1430,7 +1434,7 @@ mod tests {
         let user_email = UserEmail {
             user_id: "test@example.com".to_string(),
         };
-        
+
         // Ensure Debug is implemented
         let debug_str = format!("{:?}", user_email);
         assert!(debug_str.contains("UserEmail"));
@@ -1448,7 +1452,7 @@ mod tests {
         assert!(RE_OFGA_UNSUPPORTED_NAME.is_match("test:name"));
         assert!(RE_SPACE_AROUND.is_match("a & b"));
         assert!(EMAIL_REGEX.is_match("test@example.com"));
-        
+
         // Test that the regexes work as expected
         assert!(!RE_OFGA_UNSUPPORTED_NAME.is_match("valid_name"));
         assert!(!EMAIL_REGEX.is_match("invalid-email"));

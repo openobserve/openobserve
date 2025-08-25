@@ -186,7 +186,7 @@ mod tests {
             tags: vec!["tag1".to_string(), "tag2".to_string()],
             panels: vec!["panel1".to_string()],
         };
-        
+
         let req = TimedAnnotationReq {
             timed_annotations: vec![annotation],
         };
@@ -198,13 +198,13 @@ mod tests {
         let invalid_annotation = TimedAnnotation {
             annotation_id: None,
             start_time: 2000,
-            end_time: Some(1000), // Invalid: end_time <= start_time
+            end_time: Some(1000),  // Invalid: end_time <= start_time
             title: "".to_string(), // Invalid: empty title
             text: None,
             tags: vec![],
             panels: vec![],
         };
-        
+
         let req = TimedAnnotationReq {
             timed_annotations: vec![invalid_annotation],
         };
@@ -284,10 +284,7 @@ mod tests {
             tags: vec![],
             panels: vec![],
         };
-        assert_eq!(
-            annotation.validate().unwrap_err(),
-            "title cannot be empty"
-        );
+        assert_eq!(annotation.validate().unwrap_err(), "title cannot be empty");
     }
 
     #[test]
@@ -301,10 +298,7 @@ mod tests {
             tags: vec![],
             panels: vec!["panel1".to_string(), "".to_string()], // Invalid: empty panel
         };
-        assert_eq!(
-            annotation.validate().unwrap_err(),
-            "panel cannot be empty"
-        );
+        assert_eq!(annotation.validate().unwrap_err(), "panel cannot be empty");
     }
 
     #[test]
@@ -318,10 +312,7 @@ mod tests {
             tags: vec!["tag1".to_string(), "".to_string()], // Invalid: empty tag
             panels: vec![],
         };
-        assert_eq!(
-            annotation.validate().unwrap_err(),
-            "tag cannot be empty"
-        );
+        assert_eq!(annotation.validate().unwrap_err(), "tag cannot be empty");
     }
 
     #[test]
@@ -495,10 +486,7 @@ mod tests {
             start_time: 1000,
             end_time: 2000,
         };
-        assert_eq!(
-            query.get_panels(),
-            Some(vec!["panel1".to_string()])
-        );
+        assert_eq!(query.get_panels(), Some(vec!["panel1".to_string()]));
     }
 
     #[test]
@@ -558,7 +546,8 @@ mod tests {
         assert!(!json.is_empty());
 
         // Test deserialization
-        let deserialized: TimedAnnotation = serde_json::from_str(&json).expect("Failed to deserialize");
+        let deserialized: TimedAnnotation =
+            serde_json::from_str(&json).expect("Failed to deserialize");
         assert_eq!(deserialized.annotation_id, annotation.annotation_id);
         assert_eq!(deserialized.start_time, annotation.start_time);
         assert_eq!(deserialized.end_time, annotation.end_time);
@@ -573,7 +562,7 @@ mod tests {
         let response = TimedAnnotationRes {
             timed_annotation_ids: vec!["id1".to_string(), "id2".to_string(), "id3".to_string()],
         };
-        
+
         assert_eq!(response.timed_annotation_ids.len(), 3);
         assert_eq!(response.timed_annotation_ids[0], "id1");
         assert_eq!(response.timed_annotation_ids[1], "id2");

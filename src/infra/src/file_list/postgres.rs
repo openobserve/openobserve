@@ -2096,12 +2096,14 @@ async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::file_list::FileList;
+    use std::sync::Once;
+
     use config::meta::stream::{FileKey, FileMeta};
     use sqlx::PgPool;
-    use std::sync::Once;
     use tokio::sync::OnceCell;
+
+    use super::*;
+    use crate::file_list::FileList;
 
     static INIT: Once = Once::new();
     static DB_POOL: OnceCell<PgPool> = OnceCell::const_new();
@@ -2110,14 +2112,17 @@ mod tests {
     async fn setup_test_db() -> PgPool {
         DB_POOL
             .get_or_init(|| async {
-                let database_url = std::env::var("TEST_POSTGRES_URL")
-                    .unwrap_or_else(|_| "postgresql://postgres:password@localhost:5432/openobserve_test".to_string());
-                
+                let database_url = std::env::var("TEST_POSTGRES_URL").unwrap_or_else(|_| {
+                    "postgresql://postgres:password@localhost:5432/openobserve_test".to_string()
+                });
+
                 let pool = PgPool::connect(&database_url)
                     .await
                     .expect("Failed to connect to test PostgreSQL database");
-                
-                setup_test_tables(&pool).await.expect("Failed to setup test tables");
+
+                setup_test_tables(&pool)
+                    .await
+                    .expect("Failed to setup test tables");
                 pool
             })
             .await
@@ -2254,9 +2259,15 @@ mod tests {
 
     async fn cleanup_test_data(pool: &PgPool) {
         let _ = sqlx::query("DELETE FROM file_list").execute(pool).await;
-        let _ = sqlx::query("DELETE FROM file_list_history").execute(pool).await;
-        let _ = sqlx::query("DELETE FROM file_list_deleted").execute(pool).await;
-        let _ = sqlx::query("DELETE FROM file_list_jobs").execute(pool).await;
+        let _ = sqlx::query("DELETE FROM file_list_history")
+            .execute(pool)
+            .await;
+        let _ = sqlx::query("DELETE FROM file_list_deleted")
+            .execute(pool)
+            .await;
+        let _ = sqlx::query("DELETE FROM file_list_jobs")
+            .execute(pool)
+            .await;
         let _ = sqlx::query("DELETE FROM stream_stats").execute(pool).await;
     }
 
@@ -2266,12 +2277,15 @@ mod tests {
         assert!(!std::ptr::eq(&postgres_file_list, &PostgresFileList::new()));
     }
 
-    #[tokio::test] 
+    #[tokio::test]
     async fn test_postgres_file_list_default() {
         let default_list = PostgresFileList::default();
         let new_list = PostgresFileList::new();
         // Both should be equivalent (no internal state to compare)
-        assert_eq!(std::mem::size_of_val(&default_list), std::mem::size_of_val(&new_list));
+        assert_eq!(
+            std::mem::size_of_val(&default_list),
+            std::mem::size_of_val(&new_list)
+        );
     }
 
     #[tokio::test]
@@ -2283,9 +2297,9 @@ mod tests {
         let postgres_list = PostgresFileList::new();
         let meta = create_test_file_meta();
         let file_key = "test_org/test_stream/logs/2021/01/01/test_file.parquet";
-        
+
         let result = postgres_list.add("test_account", file_key, &meta).await;
-        
+
         // This test would pass with proper CLIENT mocking
         // assert!(result.is_ok());
         // assert!(result.unwrap() > 0);
@@ -2316,7 +2330,7 @@ mod tests {
         // Test valid file key parsing (same as MySQL but testing PostgreSQL context)
         let file_key = "org1/stream1/logs/2021/01/01/postgres_file1.parquet";
         let result = parse_file_key_columns(file_key);
-        
+
         match result {
             Ok((stream, date, file)) => {
                 assert_eq!(stream, "org1/stream1/logs");
@@ -2333,7 +2347,7 @@ mod tests {
         let invalid_keys = vec![
             "",
             "invalid",
-            "org1/stream1", 
+            "org1/stream1",
             "org1/stream1/logs",
             "org1", // Too short
         ];
@@ -2373,7 +2387,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "Requires test PostgreSQL database setup"] 
+    #[ignore = "Requires test PostgreSQL database setup"]
     async fn test_batch_add_empty_files() {
         let postgres_list = PostgresFileList::new();
         let empty_files: Vec<FileKey> = vec![];
@@ -2396,7 +2410,7 @@ mod tests {
                 false,
             ),
             create_test_file_key(
-                "account1", 
+                "account1",
                 "org1/stream1/logs/2021/01/01/pg_file2.parquet",
                 false,
             ),
@@ -2426,7 +2440,7 @@ mod tests {
             ),
             create_test_file_key(
                 "account1",
-                "org1/stream1/logs/2021/01/01/pg_file2.parquet", 
+                "org1/stream1/logs/2021/01/01/pg_file2.parquet",
                 true, // This file is marked as deleted
             ),
         ];
@@ -2445,7 +2459,9 @@ mod tests {
         let meta = create_test_file_meta();
         let file_key = "test_org/test_stream/logs/2021/01/01/pg_history_test.parquet";
 
-        let result = postgres_list.add_history("test_account", file_key, &meta).await;
+        let result = postgres_list
+            .add_history("test_account", file_key, &meta)
+            .await;
         // assert!(result.is_ok());
     }
 
@@ -2473,7 +2489,9 @@ mod tests {
             },
         ];
 
-        let result = postgres_list.batch_add_deleted("org1", 1609459200, &deleted_files).await;
+        let result = postgres_list
+            .batch_add_deleted("org1", 1609459200, &deleted_files)
+            .await;
         // assert!(result.is_ok());
     }
 
@@ -2482,7 +2500,9 @@ mod tests {
         let postgres_list = PostgresFileList::new();
         let empty_files: Vec<FileListDeleted> = vec![];
 
-        let result = postgres_list.batch_add_deleted("org1", 1609459200, &empty_files).await;
+        let result = postgres_list
+            .batch_add_deleted("org1", 1609459200, &empty_files)
+            .await;
         assert!(result.is_ok()); // Should handle empty list gracefully
     }
 
@@ -2573,7 +2593,9 @@ mod tests {
 
         // Update compressed size
         let new_size = 15000;
-        let result = postgres_list.update_compressed_size(file_key, new_size).await;
+        let result = postgres_list
+            .update_compressed_size(file_key, new_size)
+            .await;
         // assert!(result.is_ok());
     }
 
@@ -2612,8 +2634,20 @@ mod tests {
 
         // Add some files first
         let meta = create_test_file_meta();
-        let _ = postgres_list.add("test_account", "test_org/test_stream/logs/2021/01/01/pg_clear1.parquet", &meta).await;
-        let _ = postgres_list.add("test_account", "test_org/test_stream/logs/2021/01/01/pg_clear2.parquet", &meta).await;
+        let _ = postgres_list
+            .add(
+                "test_account",
+                "test_org/test_stream/logs/2021/01/01/pg_clear1.parquet",
+                &meta,
+            )
+            .await;
+        let _ = postgres_list
+            .add(
+                "test_account",
+                "test_org/test_stream/logs/2021/01/01/pg_clear2.parquet",
+                &meta,
+            )
+            .await;
 
         // Clear all files
         let result = postgres_list.clear().await;
@@ -2641,20 +2675,26 @@ mod tests {
         let empty_files: Vec<FileKey> = vec![];
 
         // This should complete successfully without database calls
-        let result = postgres_list.inner_batch_process("file_list", &empty_files).await;
+        let result = postgres_list
+            .inner_batch_process("file_list", &empty_files)
+            .await;
         assert!(result.is_ok());
     }
 
     #[tokio::test]
     async fn test_file_key_creation_helpers_postgres() {
         // Test our test helper functions for PostgreSQL context
-        let file_key = create_test_file_key("test_account", "org/stream/logs/2021/01/01/pg_test.parquet", false);
-        
+        let file_key = create_test_file_key(
+            "test_account",
+            "org/stream/logs/2021/01/01/pg_test.parquet",
+            false,
+        );
+
         assert_eq!(file_key.account, "test_account");
         assert_eq!(file_key.key, "org/stream/logs/2021/01/01/pg_test.parquet");
         assert!(!file_key.deleted);
         assert_eq!(file_key.id, 0);
-        
+
         // Test meta values
         assert_eq!(file_key.meta.records, 1000);
         assert_eq!(file_key.meta.original_size, 50000);
@@ -2666,21 +2706,23 @@ mod tests {
     async fn test_postgresql_specific_syntax() {
         // Test PostgreSQL specific features like parameterized queries using $1, $2, $3
         let postgres_list = PostgresFileList::new();
-        
+
         // Test that invalid file key parsing still works the same
         let result = parse_file_key_columns("invalid/key");
         assert!(result.is_err());
-        
+
         // Test that empty batch processing works
         let empty_files: Vec<FileKey> = vec![];
-        let result = postgres_list.inner_batch_process("file_list", &empty_files).await;
+        let result = postgres_list
+            .inner_batch_process("file_list", &empty_files)
+            .await;
         assert!(result.is_ok());
     }
 
     #[tokio::test]
     async fn test_postgresql_data_types() {
         let meta = create_test_file_meta();
-        
+
         // Test PostgreSQL can handle the same data ranges as MySQL
         assert!(meta.min_ts > 0);
         assert!(meta.max_ts > meta.min_ts);
@@ -2694,7 +2736,7 @@ mod tests {
         // PostgreSQL allows VARCHAR(1024) for file column vs MySQL's VARCHAR(496)
         let long_filename = "c".repeat(1000); // Within PostgreSQL limit
         let long_key = format!("org/stream/logs/2021/01/01/{}.parquet", long_filename);
-        
+
         let result = parse_file_key_columns(&long_key);
         match result {
             Ok((stream, date, file)) => {
@@ -2712,11 +2754,15 @@ mod tests {
     async fn test_postgresql_identity_columns() {
         // PostgreSQL uses GENERATED ALWAYS AS IDENTITY instead of AUTO_INCREMENT
         // This is mainly a schema difference, but we test the concept
-        let file_key = create_test_file_key("account1", "org/stream/logs/2021/01/01/identity_test.parquet", false);
-        
+        let file_key = create_test_file_key(
+            "account1",
+            "org/stream/logs/2021/01/01/identity_test.parquet",
+            false,
+        );
+
         // ID should start at 0 for new FileKey objects before DB insertion
         assert_eq!(file_key.id, 0);
-        
+
         // After DB insertion (mocked), ID would be auto-generated by PostgreSQL's IDENTITY column
     }
 
@@ -2724,13 +2770,21 @@ mod tests {
     async fn test_postgresql_transaction_handling() {
         let postgres_list = PostgresFileList::new();
         let files = vec![
-            create_test_file_key("account1", "org/stream/logs/2021/01/01/tx_test1.parquet", false),
-            create_test_file_key("account1", "org/stream/logs/2021/01/01/tx_test2.parquet", true), // deleted
+            create_test_file_key(
+                "account1",
+                "org/stream/logs/2021/01/01/tx_test1.parquet",
+                false,
+            ),
+            create_test_file_key(
+                "account1",
+                "org/stream/logs/2021/01/01/tx_test2.parquet",
+                true,
+            ), // deleted
         ];
 
         // Test that batch processing handles mixed add/delete operations
         let result = postgres_list.inner_batch_process("file_list", &files).await;
-        
+
         // Without actual DB connection, this tests the logic flow
         // In real PostgreSQL, this would test transaction commit/rollback behavior
         assert!(result.is_ok());
@@ -2740,7 +2794,7 @@ mod tests {
     async fn test_postgresql_duplicate_index_handling() {
         // PostgreSQL handles duplicate index creation differently than MySQL
         // This tests the error message checking logic
-        
+
         let error_messages = vec![
             "could not create unique index", // PostgreSQL error message
             "duplicate key value violates unique constraint",
@@ -2749,9 +2803,11 @@ mod tests {
 
         for msg in error_messages {
             // Test PostgreSQL-specific error message patterns
-            assert!(msg.contains("could not create unique index") || 
-                   msg.contains("duplicate") ||
-                   msg.contains("already exists"));
+            assert!(
+                msg.contains("could not create unique index")
+                    || msg.contains("duplicate")
+                    || msg.contains("already exists")
+            );
         }
     }
 }

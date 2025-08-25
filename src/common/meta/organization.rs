@@ -731,7 +731,7 @@ mod tests {
             total_records: 1000000,
             total_storage_size: 1024.0 * 1024.0 * 100.0, // 100MB
             total_compressed_size: 1024.0 * 1024.0 * 25.0, // 25MB
-            total_index_size: 1024.0 * 1024.0 * 5.0, // 5MB
+            total_index_size: 1024.0 * 1024.0 * 5.0,     // 5MB
         };
 
         let pipeline_summary = PipelineSummary {
@@ -891,8 +891,14 @@ mod tests {
         };
 
         assert_eq!(payload.scrape_interval, Some(30));
-        assert_eq!(payload.trace_id_field_name, Some("custom_trace_id".to_string()));
-        assert_eq!(payload.span_id_field_name, Some("custom_span_id".to_string()));
+        assert_eq!(
+            payload.trace_id_field_name,
+            Some("custom_trace_id".to_string())
+        );
+        assert_eq!(
+            payload.span_id_field_name,
+            Some("custom_span_id".to_string())
+        );
         assert_eq!(payload.toggle_ingestion_logs, Some(true));
         assert_eq!(payload.streaming_aggregation_enabled, Some(false));
         assert_eq!(payload.enable_streaming_search, Some(true));
@@ -916,7 +922,10 @@ mod tests {
             data: setting.clone(),
         };
 
-        assert_eq!(response.data.trace_id_field_name, setting.trace_id_field_name);
+        assert_eq!(
+            response.data.trace_id_field_name,
+            setting.trace_id_field_name
+        );
         assert_eq!(response.data.span_id_field_name, setting.span_id_field_name);
     }
 
@@ -949,25 +958,45 @@ mod tests {
             name: "node-1".to_string(),
             ..Default::default()
         };
-        
+
         let node2 = Node {
             name: "node-2".to_string(),
             ..Default::default()
         };
 
         let mut response = NodeListResponse::new();
-        response.add_node(node1.clone(), "us-east".to_string(), "cluster-a".to_string());
-        response.add_node(node2.clone(), "eu-west".to_string(), "cluster-b".to_string());
+        response.add_node(
+            node1.clone(),
+            "us-east".to_string(),
+            "cluster-a".to_string(),
+        );
+        response.add_node(
+            node2.clone(),
+            "eu-west".to_string(),
+            "cluster-b".to_string(),
+        );
 
         assert_eq!(response.regions.len(), 2);
         assert!(response.regions.contains_key("us-east"));
         assert!(response.regions.contains_key("eu-west"));
 
-        let us_nodes = &response.regions.get("us-east").unwrap().clusters.get("cluster-a").unwrap();
+        let us_nodes = &response
+            .regions
+            .get("us-east")
+            .unwrap()
+            .clusters
+            .get("cluster-a")
+            .unwrap();
         assert_eq!(us_nodes.len(), 1);
         assert_eq!(us_nodes[0].name, "node-1");
 
-        let eu_nodes = &response.regions.get("eu-west").unwrap().clusters.get("cluster-b").unwrap();
+        let eu_nodes = &response
+            .regions
+            .get("eu-west")
+            .unwrap()
+            .clusters
+            .get("cluster-b")
+            .unwrap();
         assert_eq!(eu_nodes.len(), 1);
         assert_eq!(eu_nodes[0].name, "node-2");
     }
@@ -980,9 +1009,7 @@ mod tests {
 
     #[test]
     fn test_cluster_info_with_jobs() {
-        let info = ClusterInfo {
-            pending_jobs: 42,
-        };
+        let info = ClusterInfo { pending_jobs: 42 };
         assert_eq!(info.pending_jobs, 42);
     }
 
@@ -995,12 +1022,20 @@ mod tests {
     #[test]
     fn test_cluster_info_response_multiple_clusters() {
         let mut response = ClusterInfoResponse::default();
-        
+
         let info1 = ClusterInfo { pending_jobs: 5 };
         let info2 = ClusterInfo { pending_jobs: 10 };
 
-        response.add_cluster_info(info1.clone(), "cluster-1".to_string(), "us-east".to_string());
-        response.add_cluster_info(info2.clone(), "cluster-2".to_string(), "us-east".to_string());
+        response.add_cluster_info(
+            info1.clone(),
+            "cluster-1".to_string(),
+            "us-east".to_string(),
+        );
+        response.add_cluster_info(
+            info2.clone(),
+            "cluster-2".to_string(),
+            "us-east".to_string(),
+        );
 
         assert_eq!(response.regions.len(), 1);
         let region = response.regions.get("us-east").unwrap();
@@ -1030,7 +1065,8 @@ mod tests {
         assert!(!json.is_empty());
 
         // Test deserialization
-        let deserialized: Organization = serde_json::from_str(&json).expect("Failed to deserialize");
+        let deserialized: Organization =
+            serde_json::from_str(&json).expect("Failed to deserialize");
         assert_eq!(deserialized.identifier, org.identifier);
         assert_eq!(deserialized.name, org.name);
         assert_eq!(deserialized.org_type, org.org_type);

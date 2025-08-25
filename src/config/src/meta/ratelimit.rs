@@ -158,20 +158,22 @@ pub fn get_resource_from_params(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::time::{Duration, Instant};
+
     use bytes::Bytes;
+
+    use super::*;
 
     #[test]
     fn test_cached_user_roles_creation() {
         let roles = vec!["admin".to_string(), "user".to_string()];
         let expires_at = Instant::now() + Duration::from_secs(3600);
-        
+
         let cached_roles = CachedUserRoles {
             roles: roles.clone(),
             expires_at,
         };
-        
+
         assert_eq!(cached_roles.roles, roles);
         assert!(cached_roles.expires_at > Instant::now());
     }
@@ -201,7 +203,7 @@ mod tests {
             api_group_operation: Some("query".to_string()),
             threshold: 100,
         };
-        
+
         assert_eq!(rule.org, "test_org");
         assert_eq!(rule.rule_type, Some("exact".to_string()));
         assert_eq!(rule.rule_id, Some("rule123".to_string()));
@@ -224,10 +226,10 @@ mod tests {
             api_group_operation: Some("query".to_string()),
             threshold: 100,
         };
-        
+
         let json = serde_json::to_string(&rule).unwrap();
         let bytes = Bytes::from(json);
-        
+
         let parsed_rule = RatelimitRule::try_from(&bytes).unwrap();
         assert_eq!(parsed_rule.org, rule.org);
         assert_eq!(parsed_rule.rule_type, rule.rule_type);
@@ -239,7 +241,12 @@ mod tests {
         let invalid_json = Bytes::from("invalid json");
         let result = RatelimitRule::try_from(&invalid_json);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Failed to deserialize RatelimitRule"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to deserialize RatelimitRule")
+        );
     }
 
     #[test]
@@ -247,11 +254,11 @@ mod tests {
         let mut operations = HashMap::new();
         operations.insert("query".to_string(), 100);
         operations.insert("insert".to_string(), 50);
-        
+
         let mut groups = HashMap::new();
         groups.insert("search".to_string(), operations.clone());
         groups.insert("ingest".to_string(), operations.clone());
-        
+
         let updater = RatelimitRuleUpdater(groups);
         assert_eq!(updater.0.len(), 2);
         assert!(updater.0.contains_key("search"));
@@ -263,16 +270,16 @@ mod tests {
         let mut operations = HashMap::new();
         operations.insert("QUERY".to_string(), 100);
         operations.insert("INSERT".to_string(), 50);
-        
+
         let mut groups = HashMap::new();
         groups.insert("search".to_string(), operations.clone());
         groups.insert("ingest".to_string(), operations.clone());
-        
+
         let updater = RatelimitRuleUpdater(groups);
         let rules = RatelimitRule::from_updater("test_org", "admin", &updater);
-        
+
         assert_eq!(rules.len(), 4); // 2 groups × 2 operations
-        
+
         for rule in &rules {
             assert_eq!(rule.org, "test_org");
             assert_eq!(rule.rule_type, Some("exact".to_string()));
@@ -283,14 +290,16 @@ mod tests {
             assert!(rule.api_group_operation.is_some());
             assert!(rule.threshold > 0);
         }
-        
+
         // Check that operations are lowercase
-        let query_rules: Vec<_> = rules.iter()
+        let query_rules: Vec<_> = rules
+            .iter()
             .filter(|r| r.api_group_operation == Some("query".to_string()))
             .collect();
         assert_eq!(query_rules.len(), 2);
-        
-        let insert_rules: Vec<_> = rules.iter()
+
+        let insert_rules: Vec<_> = rules
+            .iter()
             .filter(|r| r.api_group_operation == Some("insert".to_string()))
             .collect();
         assert_eq!(insert_rules.len(), 2);
@@ -298,10 +307,22 @@ mod tests {
 
     #[test]
     fn test_ratelimit_rule_type_from_str() {
-        assert!(matches!(RatelimitRuleType::from("exact"), RatelimitRuleType::Exact));
-        assert!(matches!(RatelimitRuleType::from("regex"), RatelimitRuleType::Regex));
-        assert!(matches!(RatelimitRuleType::from("invalid"), RatelimitRuleType::Exact));
-        assert!(matches!(RatelimitRuleType::from(""), RatelimitRuleType::Exact));
+        assert!(matches!(
+            RatelimitRuleType::from("exact"),
+            RatelimitRuleType::Exact
+        ));
+        assert!(matches!(
+            RatelimitRuleType::from("regex"),
+            RatelimitRuleType::Regex
+        ));
+        assert!(matches!(
+            RatelimitRuleType::from("invalid"),
+            RatelimitRuleType::Exact
+        ));
+        assert!(matches!(
+            RatelimitRuleType::from(""),
+            RatelimitRuleType::Exact
+        ));
     }
 
     #[test]
@@ -322,7 +343,7 @@ mod tests {
             api_group_operation: Some("query".to_string()),
             threshold: 100,
         };
-        
+
         assert_eq!(rule.get_rule_id(), "rule123");
         assert_eq!(rule.get_org(), "test_org");
         assert_eq!(rule.get_rule_type(), "exact");
@@ -345,7 +366,7 @@ mod tests {
             api_group_operation: None,
             threshold: 50,
         };
-        
+
         assert_eq!(rule.get_rule_id(), "");
         assert_eq!(rule.get_org(), "test_org");
         assert_eq!(rule.get_rule_type(), "");
@@ -368,7 +389,7 @@ mod tests {
             api_group_operation: Some("query".to_string()),
             threshold: 100,
         };
-        
+
         let expected = "test_org:exact:admin:search:query:user123";
         assert_eq!(rule.get_resource(), expected);
     }
@@ -385,22 +406,16 @@ mod tests {
             api_group_operation: None,
             threshold: 50,
         };
-        
+
         let expected = "test_org:::::";
         assert_eq!(rule.get_resource(), expected);
     }
 
     #[test]
     fn test_get_resource_from_params() {
-        let resource = get_resource_from_params(
-            "test_org",
-            "exact",
-            "admin",
-            "search",
-            "query",
-            "user123"
-        );
-        
+        let resource =
+            get_resource_from_params("test_org", "exact", "admin", "search", "query", "user123");
+
         assert_eq!(resource, "test_org:exact:admin:search:query:user123");
     }
 
@@ -418,10 +433,13 @@ mod tests {
             "admin",
             "search",
             "query",
-            "user:123"
+            "user:123",
         );
-        
-        assert_eq!(resource, "org:with:colons:exact:admin:search:query:user:123");
+
+        assert_eq!(
+            resource,
+            "org:with:colons:exact:admin:search:query:user:123"
+        );
     }
 
     #[test]
@@ -442,7 +460,8 @@ mod tests {
         assert!(!json.is_empty());
 
         // Test deserialization
-        let deserialized: RatelimitRule = serde_json::from_str(&json).expect("Failed to deserialize");
+        let deserialized: RatelimitRule =
+            serde_json::from_str(&json).expect("Failed to deserialize");
         assert_eq!(deserialized.org, rule.org);
         assert_eq!(deserialized.rule_type, rule.rule_type);
         assert_eq!(deserialized.rule_id, rule.rule_id);
@@ -467,7 +486,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&rule).expect("Failed to serialize");
-        
+
         // Check that None values are not included in JSON
         assert!(!json.contains("rule_type"));
         assert!(!json.contains("rule_id"));
@@ -475,7 +494,7 @@ mod tests {
         assert!(!json.contains("user_id"));
         assert!(!json.contains("api_group_name"));
         assert!(!json.contains("api_group_operation"));
-        
+
         // Check that required fields are included
         assert!(json.contains("org"));
         assert!(json.contains("threshold"));
@@ -485,7 +504,7 @@ mod tests {
     fn test_ratelimit_rule_type_clone_and_debug() {
         let rule_type = RatelimitRuleType::Exact;
         let cloned = rule_type.clone();
-        
+
         assert!(matches!(cloned, RatelimitRuleType::Exact));
         assert_eq!(format!("{:?}", rule_type), "Exact");
         assert_eq!(format!("{:?}", RatelimitRuleType::Regex), "Regex");

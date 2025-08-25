@@ -2218,12 +2218,14 @@ async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::file_list::FileList;
+    use std::sync::Once;
+
     use config::meta::stream::{FileKey, FileMeta};
     use sqlx::MySqlPool;
-    use std::sync::Once;
     use tokio::sync::OnceCell;
+
+    use super::*;
+    use crate::file_list::FileList;
 
     static INIT: Once = Once::new();
     static DB_POOL: OnceCell<MySqlPool> = OnceCell::const_new();
@@ -2234,15 +2236,18 @@ mod tests {
             .get_or_init(|| async {
                 // Create an in-memory MySQL test database
                 // In practice, you would use a test MySQL instance or sqlite for testing
-                let database_url = std::env::var("TEST_DATABASE_URL")
-                    .unwrap_or_else(|_| "mysql://root:password@localhost:3306/openobserve_test".to_string());
-                
+                let database_url = std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| {
+                    "mysql://root:password@localhost:3306/openobserve_test".to_string()
+                });
+
                 let pool = MySqlPool::connect(&database_url)
                     .await
                     .expect("Failed to connect to test database");
-                
+
                 // Setup test tables
-                setup_test_tables(&pool).await.expect("Failed to setup test tables");
+                setup_test_tables(&pool)
+                    .await
+                    .expect("Failed to setup test tables");
                 pool
             })
             .await
@@ -2380,9 +2385,15 @@ mod tests {
 
     async fn cleanup_test_data(pool: &MySqlPool) {
         let _ = sqlx::query("DELETE FROM file_list").execute(pool).await;
-        let _ = sqlx::query("DELETE FROM file_list_history").execute(pool).await;
-        let _ = sqlx::query("DELETE FROM file_list_deleted").execute(pool).await;
-        let _ = sqlx::query("DELETE FROM file_list_jobs").execute(pool).await;
+        let _ = sqlx::query("DELETE FROM file_list_history")
+            .execute(pool)
+            .await;
+        let _ = sqlx::query("DELETE FROM file_list_deleted")
+            .execute(pool)
+            .await;
+        let _ = sqlx::query("DELETE FROM file_list_jobs")
+            .execute(pool)
+            .await;
         let _ = sqlx::query("DELETE FROM stream_stats").execute(pool).await;
     }
 
@@ -2392,12 +2403,15 @@ mod tests {
         assert!(!std::ptr::eq(&mysql_file_list, &MysqlFileList::new()));
     }
 
-    #[tokio::test] 
+    #[tokio::test]
     async fn test_mysql_file_list_default() {
         let default_list = MysqlFileList::default();
         let new_list = MysqlFileList::new();
         // Both should be equivalent (no internal state to compare)
-        assert_eq!(std::mem::size_of_val(&default_list), std::mem::size_of_val(&new_list));
+        assert_eq!(
+            std::mem::size_of_val(&default_list),
+            std::mem::size_of_val(&new_list)
+        );
     }
 
     #[tokio::test]
@@ -2409,13 +2423,13 @@ mod tests {
         let mysql_list = MysqlFileList::new();
         let meta = create_test_file_meta();
         let file_key = "test_org/test_stream/logs/2021/01/01/test_file.parquet";
-        
+
         // Mock the CLIENT to use our test pool
         // Note: In real implementation, you'd need to properly mock the CLIENT
         // For now, this shows the test structure
-        
+
         let result = mysql_list.add("test_account", file_key, &meta).await;
-        
+
         // This test would pass with proper CLIENT mocking
         // assert!(result.is_ok());
         // assert!(result.unwrap() > 0);
@@ -2447,7 +2461,7 @@ mod tests {
         // Test valid file key parsing
         let file_key = "org1/stream1/logs/2021/01/01/file1.parquet";
         let result = parse_file_key_columns(file_key);
-        
+
         match result {
             Ok((stream, date, file)) => {
                 assert_eq!(stream, "org1/stream1/logs");
@@ -2461,12 +2475,7 @@ mod tests {
     #[tokio::test]
     async fn test_parse_file_key_columns_invalid() {
         // Test invalid file key parsing
-        let invalid_keys = vec![
-            "",
-            "invalid",
-            "org1/stream1",
-            "org1/stream1/logs",
-        ];
+        let invalid_keys = vec!["", "invalid", "org1/stream1", "org1/stream1/logs"];
 
         for key in invalid_keys {
             let result = parse_file_key_columns(key);
@@ -2493,7 +2502,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "Requires test database setup"] 
+    #[ignore = "Requires test database setup"]
     async fn test_batch_add_empty_files() {
         let mysql_list = MysqlFileList::new();
         let empty_files: Vec<FileKey> = vec![];
@@ -2516,7 +2525,7 @@ mod tests {
                 false,
             ),
             create_test_file_key(
-                "account1", 
+                "account1",
                 "org1/stream1/logs/2021/01/01/file2.parquet",
                 false,
             ),
@@ -2546,7 +2555,7 @@ mod tests {
             ),
             create_test_file_key(
                 "account1",
-                "org1/stream1/logs/2021/01/01/file2.parquet", 
+                "org1/stream1/logs/2021/01/01/file2.parquet",
                 true, // This file is marked as deleted
             ),
         ];
@@ -2575,7 +2584,9 @@ mod tests {
         let meta = create_test_file_meta();
         let file_key = "test_org/test_stream/logs/2021/01/01/history_test.parquet";
 
-        let result = mysql_list.add_history("test_account", file_key, &meta).await;
+        let result = mysql_list
+            .add_history("test_account", file_key, &meta)
+            .await;
         // assert!(result.is_ok());
     }
 
@@ -2603,7 +2614,9 @@ mod tests {
             },
         ];
 
-        let result = mysql_list.batch_add_deleted("org1", 1609459200, &deleted_files).await;
+        let result = mysql_list
+            .batch_add_deleted("org1", 1609459200, &deleted_files)
+            .await;
         // assert!(result.is_ok());
     }
 
@@ -2612,7 +2625,9 @@ mod tests {
         let mysql_list = MysqlFileList::new();
         let empty_files: Vec<FileListDeleted> = vec![];
 
-        let result = mysql_list.batch_add_deleted("org1", 1609459200, &empty_files).await;
+        let result = mysql_list
+            .batch_add_deleted("org1", 1609459200, &empty_files)
+            .await;
         assert!(result.is_ok()); // Should handle empty list gracefully
     }
 
@@ -2630,7 +2645,9 @@ mod tests {
         );
         let invalid_ids = vec![999999999]; // Non-existent IDs
 
-        let result = mysql_list.update_dump_records(&dump_file, &invalid_ids).await;
+        let result = mysql_list
+            .update_dump_records(&dump_file, &invalid_ids)
+            .await;
         // Test should handle transaction rollback gracefully
         // assert!(result.is_err() || result.is_ok());
     }
@@ -2761,8 +2778,20 @@ mod tests {
 
         // Add some files first
         let meta = create_test_file_meta();
-        let _ = mysql_list.add("test_account", "test_org/test_stream/logs/2021/01/01/clear1.parquet", &meta).await;
-        let _ = mysql_list.add("test_account", "test_org/test_stream/logs/2021/01/01/clear2.parquet", &meta).await;
+        let _ = mysql_list
+            .add(
+                "test_account",
+                "test_org/test_stream/logs/2021/01/01/clear1.parquet",
+                &meta,
+            )
+            .await;
+        let _ = mysql_list
+            .add(
+                "test_account",
+                "test_org/test_stream/logs/2021/01/01/clear2.parquet",
+                &meta,
+            )
+            .await;
 
         // Clear all files
         let result = mysql_list.clear().await;
@@ -2790,20 +2819,26 @@ mod tests {
         let empty_files: Vec<FileKey> = vec![];
 
         // This should complete successfully without database calls
-        let result = mysql_list.inner_batch_process("file_list", &empty_files).await;
+        let result = mysql_list
+            .inner_batch_process("file_list", &empty_files)
+            .await;
         assert!(result.is_ok());
     }
 
     #[tokio::test]
     async fn test_file_key_creation_helpers() {
         // Test our test helper functions
-        let file_key = create_test_file_key("test_account", "org/stream/logs/2021/01/01/test.parquet", false);
-        
+        let file_key = create_test_file_key(
+            "test_account",
+            "org/stream/logs/2021/01/01/test.parquet",
+            false,
+        );
+
         assert_eq!(file_key.account, "test_account");
         assert_eq!(file_key.key, "org/stream/logs/2021/01/01/test.parquet");
         assert!(!file_key.deleted);
         assert_eq!(file_key.id, 0);
-        
+
         // Test meta values
         assert_eq!(file_key.meta.records, 1000);
         assert_eq!(file_key.meta.original_size, 50000);
@@ -2814,7 +2849,7 @@ mod tests {
     #[tokio::test]
     async fn test_file_meta_creation() {
         let meta = create_test_file_meta();
-        
+
         assert!(meta.min_ts > 0);
         assert!(meta.max_ts > meta.min_ts);
         assert!(meta.records > 0);
@@ -2868,14 +2903,17 @@ mod tests {
         let long_org = "a".repeat(90);
         let long_stream = "b".repeat(200);
         let long_filename = "c".repeat(400);
-        let long_key = format!("{}/{}/logs/2021/01/01/{}.parquet", long_org, long_stream, long_filename);
-        
+        let long_key = format!(
+            "{}/{}/logs/2021/01/01/{}.parquet",
+            long_org, long_stream, long_filename
+        );
+
         let result = parse_file_key_columns(&long_key);
         // Should handle long keys up to the database column limits
         match result {
             Ok((stream, date, file)) => {
                 assert!(stream.len() <= 256); // stream column limit
-                assert!(file.len() <= 496);   // file column limit
+                assert!(file.len() <= 496); // file column limit
             }
             Err(_) => {
                 // Expected for extremely long keys exceeding limits
@@ -2887,7 +2925,7 @@ mod tests {
     async fn test_unicode_in_file_keys() {
         let unicode_key = "测试组织/测试流/logs/2021/01/01/测试文件.parquet";
         let result = parse_file_key_columns(unicode_key);
-        
+
         // Should handle Unicode characters properly
         assert!(result.is_ok() || result.is_err()); // Either way is acceptable depending on implementation
     }
@@ -2896,14 +2934,18 @@ mod tests {
     async fn test_special_characters_in_file_keys() {
         let special_chars = vec![
             "org with spaces/stream/logs/2021/01/01/file.parquet",
-            "org-with-dashes/stream_with_underscores/logs/2021/01/01/file.parquet", 
+            "org-with-dashes/stream_with_underscores/logs/2021/01/01/file.parquet",
             "org.with.dots/stream/logs/2021/01/01/file-with-dashes.parquet",
         ];
 
         for key in special_chars {
             let result = parse_file_key_columns(key);
             // All these should be valid file keys
-            assert!(result.is_ok(), "Failed to parse key with special characters: {}", key);
+            assert!(
+                result.is_ok(),
+                "Failed to parse key with special characters: {}",
+                key
+            );
         }
     }
 }

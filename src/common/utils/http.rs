@@ -248,7 +248,7 @@ pub(crate) fn get_dashboard_info_from_request(
     let panel_name = query.get("panel_name").map(|s| s.to_string())?;
     let tab_id = query.get("tab_id").map(|s| s.to_string())?;
     let tab_name = query.get("tab_name").map(|s| s.to_string())?;
-    
+
     Some(DashboardInfo {
         run_id,
         panel_id,
@@ -478,7 +478,10 @@ mod tests {
     fn test_get_ts_from_request_with_key() {
         let mut query = Query::<HashMap<String, String>>(Default::default());
         query.insert("start_time".to_string(), "1640995200".to_string());
-        assert_eq!(get_ts_from_request_with_key(&query, "start_time").unwrap(), 1640995200);
+        assert_eq!(
+            get_ts_from_request_with_key(&query, "start_time").unwrap(),
+            1640995200
+        );
 
         let mut query = Query::<HashMap<String, String>>(Default::default());
         query.insert("end_time".to_string(), "invalid".to_string());
@@ -556,7 +559,7 @@ mod tests {
         assert!(trace_id.chars().all(|c| c.is_ascii_hexdigit()));
     }
 
-    #[test] 
+    #[test]
     fn test_get_or_create_trace_id_manual_parse_valid() {
         // Test manual parsing of valid traceparent
         let mut headers = HeaderMap::new();
@@ -633,10 +636,7 @@ mod tests {
         assert_eq!(get_work_group(work_groups), None);
 
         // Test multiple instances of same priority
-        let work_groups = vec![
-            Some("short".to_string()),
-            Some("short".to_string()),
-        ];
+        let work_groups = vec![Some("short".to_string()), Some("short".to_string())];
         assert_eq!(get_work_group(work_groups), Some("short".to_string()));
     }
 }

@@ -1187,13 +1187,14 @@ fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tokio::runtime::Runtime;
+
+    use super::*;
 
     #[test]
     fn test_setup_logs() {
         let _guard = setup_logs();
-        
+
         // Just verify that the guard is valid and the logs setup doesn't panic
         assert!(true);
     }
@@ -1203,7 +1204,7 @@ mod tests {
         // Test that enable_tracing handles configuration errors gracefully
         // This test verifies the function exists and can be called
         // In a real environment, tracing setup might fail due to network issues
-        
+
         // We can't easily test the actual tracing setup without mocking external services
         // But we can ensure the function signature and basic error handling work
         let result = std::panic::catch_unwind(|| {
@@ -1215,7 +1216,7 @@ mod tests {
                 let _ = enable_tracing();
             });
         });
-        
+
         assert!(result.is_ok());
     }
 
@@ -1224,7 +1225,7 @@ mod tests {
     fn test_check_ratelimit_config_valid() {
         use config::Config;
         use o2_enterprise::enterprise::common::config::O2Config;
-        
+
         let cfg = Config::default();
         let o2cfg = O2Config {
             rate_limit: o2_enterprise::enterprise::common::config::RateLimitConfig {
@@ -1234,7 +1235,7 @@ mod tests {
             },
             ..Default::default()
         };
-        
+
         let result = check_ratelimit_config(&cfg, &o2cfg);
         assert!(result.is_ok());
     }
@@ -1244,7 +1245,7 @@ mod tests {
     fn test_check_ratelimit_config_invalid_interval() {
         use config::Config;
         use o2_enterprise::enterprise::common::config::O2Config;
-        
+
         let cfg = Config::default();
         let o2cfg = O2Config {
             rate_limit: o2_enterprise::enterprise::common::config::RateLimitConfig {
@@ -1254,24 +1255,29 @@ mod tests {
             },
             ..Default::default()
         };
-        
+
         let result = check_ratelimit_config(&cfg, &o2cfg);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("greater than or equal to 2 seconds"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("greater than or equal to 2 seconds")
+        );
     }
 
     #[tokio::test]
     async fn test_socket_addr_parsing() {
         use std::net::SocketAddr;
-        
+
         // Test IPv4 socket address parsing (used in init_common_grpc_server)
         let addr: Result<SocketAddr, _> = "127.0.0.1:8080".parse();
         assert!(addr.is_ok());
-        
+
         // Test IPv6 socket address parsing (used in HTTP server)
         let addr: Result<SocketAddr, _> = "[::]:8080".parse();
         assert!(addr.is_ok());
-        
+
         // Test invalid address
         let addr: Result<SocketAddr, _> = "invalid:address".parse();
         assert!(addr.is_err());
@@ -1279,16 +1285,18 @@ mod tests {
 
     #[test]
     fn test_thread_id_atomic_operations() {
-        use std::sync::Arc;
-        use std::sync::atomic::{AtomicU16, Ordering};
-        
+        use std::sync::{
+            Arc,
+            atomic::{AtomicU16, Ordering},
+        };
+
         // Test the atomic operations used for thread ID management
         let thread_id = Arc::new(AtomicU16::new(0));
-        
+
         assert_eq!(thread_id.load(Ordering::SeqCst), 0);
         thread_id.fetch_add(1, Ordering::SeqCst);
         assert_eq!(thread_id.load(Ordering::SeqCst), 1);
-        
+
         // Test multiple increments
         for i in 2..=10 {
             thread_id.fetch_add(1, Ordering::SeqCst);
@@ -1299,10 +1307,10 @@ mod tests {
     #[test]
     fn test_compression_encoding_configuration() {
         use tonic::codec::CompressionEncoding;
-        
+
         // Test that compression encoding constants are available
         let _gzip = CompressionEncoding::Gzip;
-        
+
         // Test that we can create compression configurations
         // This tests the pattern used in gRPC service setup
         let max_size = 4 * 1024 * 1024; // 4MB as used in the actual code
@@ -1312,48 +1320,47 @@ mod tests {
 
     #[test]
     fn test_duration_calculations() {
-        use std::cmp::max;
-        use std::time::Duration;
-        
+        use std::{cmp::max, time::Duration};
+
         // Test duration calculations used in server configurations
         let keep_alive = max(1, 30); // Pattern from keep_alive configuration
         assert_eq!(keep_alive, 30);
-        
+
         let timeout = max(1, 0); // Edge case: ensure minimum of 1
         assert_eq!(timeout, 1);
-        
+
         // Test duration creation
         let duration = Duration::from_secs(keep_alive);
         assert_eq!(duration.as_secs(), 30);
     }
 
-    #[tokio::test] 
+    #[tokio::test]
     async fn test_oneshot_channel_communication() {
         use tokio::sync::oneshot;
-        
+
         // Test the oneshot channel pattern used for server coordination
         let (tx, rx) = oneshot::channel::<bool>();
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
-        
+
         // Simulate successful initialization
         let handle = tokio::spawn(async move {
             // Simulate some async work
             tokio::time::sleep(Duration::from_millis(10)).await;
             tx.send(true).unwrap();
-            
+
             // Wait for shutdown signal
             shutdown_rx.await.unwrap();
             "completed"
         });
-        
+
         // Wait for initialization
         let result = rx.await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), true);
-        
+
         // Send shutdown signal
         shutdown_tx.send(()).unwrap();
-        
+
         // Wait for completion
         let result = handle.await;
         assert!(result.is_ok());
@@ -1363,7 +1370,7 @@ mod tests {
     #[tokio::test]
     async fn test_runtime_builder_configuration() {
         use tokio::runtime::Builder;
-        
+
         // Test runtime configuration patterns used in the main function
         let rt = Builder::new_multi_thread()
             .worker_threads(2)
@@ -1371,19 +1378,19 @@ mod tests {
             .thread_name("test_runtime")
             .max_blocking_threads(4)
             .build();
-        
+
         assert!(rt.is_ok());
         let rt = rt.unwrap();
-        
+
         // Test that we can enter the runtime
         let _guard = rt.enter();
-        
+
         // Test basic async operation in the runtime
         let result = rt.block_on(async {
             tokio::time::sleep(Duration::from_millis(1)).await;
             "success"
         });
-        
+
         assert_eq!(result, "success");
     }
 
@@ -1392,15 +1399,15 @@ mod tests {
         // Test the limit calculations used in server setup
         let http_worker_num = 4;
         let http_worker_max_blocking = 8;
-        
+
         // Pattern used in script server configuration
         let total_blocking = http_worker_num * http_worker_max_blocking;
         assert_eq!(total_blocking, 32);
-        
+
         // Test bounds checking
         let keep_alive = std::cmp::max(1, 30);
         assert!(keep_alive >= 1);
-        
+
         let timeout = std::cmp::max(1, 60);
         assert!(timeout >= 1);
     }
@@ -1409,19 +1416,19 @@ mod tests {
     fn test_memory_allocator_constants() {
         // Test that the global allocator constants are defined correctly
         // This ensures the conditional compilation works
-        
+
         #[cfg(feature = "mimalloc")]
         {
             // Verify mimalloc is available when feature is enabled
             let _allocator = &GLOBAL;
         }
-        
+
         #[cfg(feature = "jemalloc")]
         {
             // Verify jemalloc is available when feature is enabled
             let _allocator = &GLOBAL;
         }
-        
+
         // Test passes if compilation succeeds
         assert!(true);
     }
@@ -1430,7 +1437,7 @@ mod tests {
     fn test_log_formatting_patterns() {
         // Test the log format string used in HTTP server setup
         let log_format = r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#;
-        
+
         assert!(log_format.contains("%a")); // Remote IP
         assert!(log_format.contains("%r")); // Request line
         assert!(log_format.contains("%s")); // Response status
@@ -1446,24 +1453,24 @@ mod tests {
         // Test telemetry event patterns used in the main function
         let event_name = "OpenObserve - Starting server";
         let stop_event = "OpenObserve - Server stopped";
-        
+
         assert!(event_name.contains("OpenObserve"));
         assert!(event_name.contains("Starting"));
         assert!(stop_event.contains("Server stopped"));
-        
+
         // Test boolean flags used in telemetry calls
         let server_start = true;
         let wait_for_send = false;
         let server_stop = true;
         let wait_for_stop = true;
-        
+
         assert!(server_start);
         assert!(!wait_for_send);
         assert!(server_stop);
         assert!(wait_for_stop);
     }
 
-    #[test] 
+    #[test]
     fn test_version_constant_availability() {
         // Test that the version constant from config is available
         let version = config::VERSION;
@@ -1474,12 +1481,12 @@ mod tests {
     #[test]
     fn test_resource_key_value_creation() {
         use opentelemetry::KeyValue;
-        
+
         // Test KeyValue creation patterns used in tracing setup
         let service_name = KeyValue::new("service.name", "test-service");
         let service_instance = KeyValue::new("service.instance", "test-instance");
         let service_version = KeyValue::new("service.version", "1.0.0");
-        
+
         assert_eq!(service_name.key.as_str(), "service.name");
         assert_eq!(service_instance.key.as_str(), "service.instance");
         assert_eq!(service_version.key.as_str(), "service.version");
@@ -1488,28 +1495,28 @@ mod tests {
     #[tokio::test]
     async fn test_signal_handling_patterns() {
         use tokio::sync::oneshot;
-        
+
         // Test the select pattern used in graceful shutdown
         let (tx1, mut rx1) = oneshot::channel::<&str>();
         let (tx2, mut rx2) = oneshot::channel::<&str>();
-        
+
         // Simulate signal reception
         tokio::spawn(async move {
             tokio::time::sleep(Duration::from_millis(10)).await;
             tx1.send("SIGTERM received").unwrap();
         });
-        
+
         tokio::spawn(async move {
             tokio::time::sleep(Duration::from_millis(20)).await;
             tx2.send("SIGINT received").unwrap();
         });
-        
+
         // Test select! pattern
         let result = tokio::select! {
             msg = &mut rx1 => msg.unwrap(),
             msg = &mut rx2 => msg.unwrap(),
         };
-        
+
         assert!(result.contains("SIG"));
         assert!(result.contains("received"));
     }

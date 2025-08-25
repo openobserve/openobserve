@@ -956,22 +956,22 @@ fn format_response(
 
 #[cfg(test)]
 mod tests {
-    use config::meta::promql::{Metadata, MetricType};
-    use serde_json::{json, Value as JsonValue};
-
-    use super::*;
+    use std::collections::HashMap;
 
     use actix_web::http::StatusCode;
+    use config::meta::promql::{Metadata, MetricType};
     use opentelemetry_proto::tonic::{
-        common::v1::{any_value::Value, AnyValue, KeyValue as OtelKeyValue},
+        common::v1::{AnyValue, KeyValue as OtelKeyValue, any_value::Value},
         metrics::v1::{
-            number_data_point::Value as NumberValue, Metric, NumberDataPoint, ResourceMetrics,
-            ScopeMetrics, AggregationTemporality, Exemplar, HistogramDataPoint
+            AggregationTemporality, Exemplar, HistogramDataPoint, Metric, NumberDataPoint,
+            ResourceMetrics, ScopeMetrics, number_data_point::Value as NumberValue,
         },
         resource::v1::Resource,
     };
     use prost::Message;
-    use std::collections::HashMap;
+    use serde_json::{Value as JsonValue, json};
+
+    use super::*;
 
     fn create_test_gauge_metric(name: &str, value: f64) -> Metric {
         Metric {
