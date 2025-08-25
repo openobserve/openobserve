@@ -124,27 +124,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, onBeforeMount } from "vue";
+import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
 import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
-import AdvancedValuesFilter from "./fields-sidebar/AdvancedValuesFilter.vue";
 import { computed } from "vue";
-
-import streamService from "@/services/stream";
-import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
-import { watch } from "vue";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   components: {
     BasicValuesFilter,
-    AdvancedValuesFilter,
   },
   emits: ["update:changeStream"],
   props: {
@@ -157,60 +150,8 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
-    const { searchObj, updatedLocalLogFilterField } = useTraces();
+    const { searchObj } = useTraces();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
-
-    const valuesSize = 5;
-
-    const fieldValues = computed(() => searchObj.data.stream.fieldValues);
-
-    let parser: any;
-
-    const importSqlParser = async () => {
-      const useSqlParser: any = await import("@/composables/useParser");
-      const { sqlParser }: any = useSqlParser.default();
-      parser = await sqlParser();
-    };
-
-    onBeforeMount(async () => {
-      await importSqlParser();
-    });
-
-    watch(
-      () => props.fieldList,
-      () => {
-        if (props.fieldList) {
-          (props.fieldList as any).forEach(
-            (field: { name: string; showValues: boolean; ftsKey: boolean }) => {
-              if (field.showValues && !field.ftsKey) {
-                fieldValues.value[field.name] = {
-                  isLoading: false,
-                  values: [],
-                  selectedValues: [],
-                  isOpen: false,
-                  size: valuesSize,
-                  searchKeyword: "",
-                };
-              }
-            },
-          );
-        }
-      },
-      {
-        deep: true,
-      },
-    );
-
-    const selectedStreamName = computed(
-      () => searchObj.data.stream.selectedStream.value,
-    );
-
-    const expandedFilters: Ref<string[]> = ref([]);
-
-    // Create a set of values including both values and selectedValues
-
-    const filtersMapper: Ref<{ [key: string]: any }> = ref({});
 
     const duration = ref({
       slider: {
@@ -223,107 +164,19 @@ export default defineComponent({
       },
     });
 
-    const getSpecialFieldsValues = (
-      name: "operation_name" | "service_name",
-    ) => {
-      let filter = "";
-
-      if (
-        name === "operation_name" &&
-        fieldValues.value["service_name"].selectedValues.length
-      ) {
-        const values = fieldValues.value["service_name"].selectedValues
-          .map((value) => value)
-          .join(",");
-        filter += `service_name=${values}`;
-      }
-
-      streamService
-        .tracesFieldValues({
-          org_identifier: store.state.selectedOrganization.identifier,
-          stream_name: searchObj.data.stream.selectedStream.value,
-          start_time: searchObj.data.datetime.startTime,
-          end_time: searchObj.data.datetime.endTime,
-          fields: [name],
-          size: fieldValues.value[name].size,
-          type: "traces",
-          filter,
-          keyword: fieldValues.value[name].searchKeyword,
-        })
-        .then((res: any) => {
-          const values: any = new Set([]);
-          fieldValues.value[name]["values"] =
-            res.data.hits
-              .find((field: any) => field.field === name)
-              ?.values.map((value: any) => {
-                values.add(value.zo_sql_key);
-                return {
-                  key: value.zo_sql_key ? value.zo_sql_key : "null",
-                  count: formatLargeNumber(value.zo_sql_num),
-                };
-              }) || [];
-
-          fieldValues.value[name].selectedValues.forEach((value: string) => {
-            if (values.has(value)) return;
-            else
-              fieldValues.value[name].values.unshift({
-                key: value,
-                count: "0",
-              });
-          });
-        })
-        .catch((e) => {
-          $q.notify({
-            type: "negative",
-            message: `Error while fetching values for ${name}`,
-          });
-        })
-        .finally(() => {
-          fieldValues.value[name]["isLoading"] = false;
+    const fnMarkerLabel = computed(() => {
+      const markers = [];
+      const diffDuration =
+        duration.value.slider.max - duration.value.slider.min;
+      const step = diffDuration / 4;
+      for (let i = 0; i < 5; i++) {
+        markers.push({
+          label: `${Math.round(duration.value.slider.min + step * i)}ms`,
+          value: duration.value.slider.min + step * i,
         });
-    };
-
-    const getFieldValues = (name: string) => {
-      fieldValues.value[name].size *= 2;
-
-      let query_context = `SELECT * FROM ${selectedStreamName.value} WHERE ${name} is not null`;
-
-      if (searchObj.data.editorValue.trim().length)
-        query_context += " AND " + searchObj.data.editorValue;
-
-      if (fieldValues.value[name].searchKeyword.trim().length)
-        query_context += ` AND ${name} ILIKE '%${fieldValues.value[name].searchKeyword}%'`;
-
-      fieldValues.value[name]["isLoading"] = true;
-
-      if (name === "service_name" || name === "operation_name") {
-        getSpecialFieldsValues(name);
-      } else {
-        streamService
-          .fieldValues({
-            org_identifier: store.state.selectedOrganization.identifier,
-            stream_name: searchObj.data.stream.selectedStream.value,
-            start_time: searchObj.data.datetime.startTime,
-            end_time: searchObj.data.datetime.endTime,
-            fields: [name],
-            size: fieldValues.value[name].size,
-            type: "traces",
-            query_context: b64EncodeUnicode(query_context),
-          })
-          .then((res: any) => {
-            updateSelectedValues(res.data.hits);
-          })
-          .catch(() => {
-            $q.notify({
-              type: "negative",
-              message: `Error while fetching values for ${name}`,
-            });
-          })
-          .finally(() => {
-            fieldValues.value[name]["isLoading"] = false;
-          });
       }
-    };
+      return markers;
+    });
 
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
@@ -352,257 +205,9 @@ export default defineComponent({
       searchObj.data.stream.addToFilter = field;
     };
 
-    function clickFieldFn(row: { name: never }, pageIndex: number) {
-      if (searchObj.data.stream.selectedFields.includes(row.name)) {
-        searchObj.data.stream.selectedFields =
-          searchObj.data.stream.selectedFields.filter(
-            (v: any) => v !== row.name,
-          );
-      } else {
-        searchObj.data.stream.selectedFields.push(row.name);
-      }
-      searchObj.organizationIdentifier =
-        store.state.selectedOrganization.identifier;
-      updatedLocalLogFilterField();
-    }
-
     const addSearchTerm = (term: string) => {
       // searchObj.meta.showDetailTab = false;
       searchObj.data.stream.addToFilter = term;
-    };
-
-    const fnMarkerLabel = computed(() => {
-      const markers = [];
-      const diffDuration =
-        duration.value.slider.max - duration.value.slider.min;
-      const step = diffDuration / 4;
-      for (let i = 0; i < 5; i++) {
-        markers.push({
-          label: `${Math.round(duration.value.slider.min + step * i)}ms`,
-          value: duration.value.slider.min + step * i,
-        });
-      }
-      return markers;
-    });
-
-    const updateQueryFilter = (
-      column: string,
-      values: string[],
-      prevValues: string[],
-    ) => {
-      try {
-        const valuesString = values
-          .map((value: string) => "'" + value + "'")
-          .join(",");
-
-        let query = `SELECT * FROM '${selectedStreamName.value}' `;
-
-        if (!searchObj.data.editorValue?.length) {
-          searchObj.data.editorValue = `${column} IN (${valuesString})`;
-        } else if (!prevValues.length) {
-          searchObj.data.editorValue += ` AND ${column} IN (${valuesString})`;
-        }
-
-        query += " WHERE " + searchObj.data.editorValue.trim();
-
-        const parsedQuery: any = parser.astify(query);
-
-        if (!values.length) {
-          parsedQuery.where = removeCondition(parsedQuery.where, column);
-        } else if (prevValues.length) {
-          modifyWhereClause(parsedQuery?.where, column, values);
-        }
-
-        // Convert the AST back to SQL query
-        let modifiedQuery = parser.sqlify(parsedQuery);
-        if (modifiedQuery) {
-          searchObj.data.editorValue = (modifiedQuery.split("WHERE")[1] || "")
-            .replace(/`/g, "")
-            .trim();
-
-          // Saving query in this variable, as while switching back from advance to basic we don't have to recreate the query from filters
-          searchObj.data.advanceFiltersQuery = searchObj.data.editorValue;
-        }
-
-        if (
-          column === "service_name" &&
-          expandedFilters.value.includes("operation_name")
-        )
-          getSpecialFieldsValues("operation_name");
-
-        filterExpandedFieldValues();
-      } catch (e) {
-        console.log("Error while creating query from filters");
-      }
-    };
-
-    const filterExpandedFieldValues = () => {
-      const fields =
-        expandedFilters.value?.filter(
-          (_value) => !["operation_name", "service_name"].includes(_value),
-        ) || [];
-
-      if (expandedFilters.value.includes("operation_name")) {
-        getSpecialFieldsValues("operation_name");
-      }
-
-      if (expandedFilters.value.includes("service_name")) {
-        getSpecialFieldsValues("service_name");
-      }
-
-      let query_context = `SELECT * FROM ${selectedStreamName.value} `;
-
-      fields.forEach((field, index) => {
-        if (index) query_context += ` AND ${field} is not null `;
-        else query_context += ` WHERE ${field} is not null `;
-      });
-
-      if (searchObj.data.editorValue) {
-        query_context += " AND " + searchObj.data.editorValue;
-      }
-
-      if (!fields.length) return;
-
-      streamService
-        .fieldValues({
-          org_identifier: store.state.selectedOrganization.identifier,
-          stream_name: searchObj.data.stream.selectedStream.value,
-          start_time: searchObj.data.datetime.startTime,
-          end_time: searchObj.data.datetime.endTime,
-          fields,
-          size: 10,
-          type: "traces",
-          query_context: b64EncodeUnicode(query_context),
-        })
-        .then((res: any) => {
-          let fieldsToUpdate = [];
-
-          fields.forEach((field) => {
-            fieldValues.value[field]["values"] = [];
-            fieldValues.value[field].size = 10;
-          });
-
-          fieldsToUpdate = fields.map((field) => ({
-            field,
-            values: [],
-          }));
-
-          fieldsToUpdate.push(...res.data.hits);
-
-          updateSelectedValues(fieldsToUpdate);
-        })
-        .catch(() => {
-          $q.notify({
-            type: "negative",
-            message: `Error while fetching values for ${name}`,
-          });
-        });
-    };
-
-    const removeCondition = (node: any, fieldName: string): any => {
-      if (!node) return null;
-
-      if (node.type === "binary_expr") {
-        if (node.left.column === fieldName) {
-          // Return null to indicate this node should be removed
-          return null;
-        }
-      }
-
-      // Recurse through AND/OR expressions
-      if (
-        node.type === "binary_expr" &&
-        (node.operator === "AND" || node.operator === "OR")
-      ) {
-        const left = removeCondition(node.left, fieldName);
-        const right = removeCondition(node.right, fieldName);
-
-        if (!left) return right;
-        if (!right) return left;
-
-        node.left = left;
-        node.right = right;
-      }
-
-      return node;
-    };
-
-    const modifyWhereClause = (
-      node: any,
-      fieldName: string,
-      newValue: any[],
-    ) => {
-      if (!node) return;
-
-      if (node.type === "binary_expr") {
-        if (node.left.column === fieldName) {
-          // Assuming the right side is a literal
-          if (fieldName === "duration" && node.operator === ">=") {
-            node.right.value = newValue[0]["min"];
-          }
-
-          if (fieldName === "duration" && node.operator === "<=") {
-            node.right.value = newValue[0]["max"];
-          }
-
-          if (node.operator === "IN") {
-            node.right.value = newValue.map((value: string) => {
-              return {
-                type: "single_quote_string",
-                value: value,
-              };
-            });
-          }
-        }
-      }
-
-      // Recurse through AND/OR expressions
-      if (
-        node.type === "binary_expr" &&
-        (node.operator === "AND" || node.operator === "OR")
-      ) {
-        modifyWhereClause(node.left, fieldName, newValue);
-        modifyWhereClause(node.right, fieldName, newValue);
-      }
-    };
-
-    const handleFilterCreator = (show: boolean, columnName: string) => {
-      if (show) {
-        expandedFilters.value.push(columnName);
-        getFieldValues(columnName);
-      } else {
-        expandedFilters.value = expandedFilters.value.filter(
-          (_column) => _column !== columnName,
-        );
-      }
-    };
-
-    // Update the values of the selected fields and add the values which are not present in the selected values
-    // Also we filter out null values from the values array
-    const updateSelectedValues = (hits: any[]) => {
-      hits.forEach((field: any) => {
-        const values: any = new Set([]);
-
-        fieldValues.value[field.field]["values"] =
-          field.values.map((value: any) => {
-            values.add(value.zo_sql_key);
-            return {
-              key: value.zo_sql_key?.toString() ? value.zo_sql_key : "null",
-              count: formatLargeNumber(value.zo_sql_num),
-            };
-          }) || [];
-
-        fieldValues.value[field.field].selectedValues.forEach(
-          (value: string) => {
-            if (values.has(value)) return;
-            else
-              fieldValues.value[field.field]["values"].unshift({
-                key: value?.toString() || "null",
-                count: "0",
-              });
-          },
-        );
-      });
     };
 
     const onStreamChange = (stream: any) => {
@@ -621,19 +226,12 @@ export default defineComponent({
       streamOptions,
       filterFieldFn,
       addToFilter,
-      clickFieldFn,
       getImageURL,
       filterStreamFn,
       addSearchTerm,
-      fieldValues,
       outlinedAdd,
       fnMarkerLabel,
       duration,
-      updateQueryFilter,
-      filtersMapper,
-      handleFilterCreator,
-      getFieldValues,
-      filterExpandedFieldValues,
       onStreamChange,
     };
   },

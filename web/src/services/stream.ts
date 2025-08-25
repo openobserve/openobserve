@@ -16,14 +16,23 @@
 import http from "./http";
 
 const stream = {
-  nameList: (org_identifier: string, type: string, schema: boolean, offset: number = -1, limit: number = -1, keyword: string = "", sort: string="", asc: boolean = false) => {
+  nameList: (
+    org_identifier: string,
+    type: string,
+    schema: boolean,
+    offset: number = -1,
+    limit: number = -1,
+    keyword: string = "",
+    sort: string = "",
+    asc: boolean = false,
+  ) => {
     let url = `/api/${org_identifier}/streams`;
 
     if (type != "") {
       url += "?type=" + type;
     }
 
-    if(offset != -1 && limit != -1) {
+    if (offset != -1 && limit != -1) {
       url += `&offset=${offset}&limit=${limit}`;
     }
 
@@ -31,7 +40,7 @@ const stream = {
       url += `&keyword=${keyword}`;
     }
 
-    if(sort != "") {
+    if (sort != "") {
       url += `&sort=${sort}&asc=${asc}`;
     }
 
@@ -57,20 +66,22 @@ const stream = {
     org_identifier: string,
     stream_name: string,
     type: string,
-    data: any
+    data: any,
   ) => {
     let url = `/api/${org_identifier}/streams/${stream_name}/settings`;
 
     if (type != "") {
       url += "?type=" + type;
     }
+
+    console.log("url", url);
     return http().put(url, data);
   },
   createStream: (
     org_identifier: string,
     stream_name: string,
     type: string,
-    data: any
+    data: any,
   ) => {
     let url = `/api/${org_identifier}/streams/${stream_name}`;
 
@@ -143,10 +154,10 @@ const stream = {
     org_identifier: string,
     stream_name: string,
     stream_type: string,
-    deleteAssociatedAlertsPipelines: boolean = true
+    deleteAssociatedAlertsPipelines: boolean = true,
   ) => {
     return http().delete(
-      `/api/${org_identifier}/streams/${stream_name}?type=${stream_type}&delete_all=${deleteAssociatedAlertsPipelines}`
+      `/api/${org_identifier}/streams/${stream_name}?type=${stream_type}&delete_all=${deleteAssociatedAlertsPipelines}`,
     );
   },
 
@@ -155,7 +166,7 @@ const stream = {
       `/api/${org_identifier}/streams/${stream_name}/delete_fields`,
       {
         fields,
-      }
+      },
     );
   },
 };

@@ -41,7 +41,7 @@ export const restHandlers = [
       const sortBy = url.searchParams.get("sort_by");
       const desc = url.searchParams.get("desc");
       const name = url.searchParams.get("name");
-      
+
       return HttpResponse.json({
         list: [
           {
@@ -68,7 +68,7 @@ export const restHandlers = [
     ({ request }) => {
       const url = new URL(request.url);
       const type = url.searchParams.get("type");
-      
+
       return HttpResponse.json({});
     },
   ),
@@ -183,8 +183,30 @@ export const restHandlers = [
       ],
     });
   }),
-
-  http.get(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/short/:id`, ({ request }) => {
-    return HttpResponse.json("http://localhost:5080/web/logs?stream_type=logs&stream=default1&from=1749120770351000&to=1749121670351000&refresh=0&defined_schemas=user_defined_schema&org_identifier=default&quick_mode=false&show_histogram=true");
-  }),
+  http.get(
+    `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/short/:id`,
+    ({ request }) => {
+      return HttpResponse.json(
+        "http://localhost:5080/web/logs?stream_type=logs&stream=default1&from=1749120770351000&to=1749121670351000&refresh=0&defined_schemas=user_defined_schema&org_identifier=default&quick_mode=false&show_histogram=true",
+      );
+    },
+  ),
+  http.get(
+    `${store.state.API_ENDPOINT}/api/:org_identifier/:stream/traces/latest`,
+    ({ request }) => {
+      return HttpResponse.json({
+        hits: [
+          {
+            trace_id: "test-trace-id",
+            start_time: 1752490492843047200,
+            end_time: 1752490493164419300,
+            service_name: [{ service_name: "test-service", count: 1 }],
+            operation_name: "test-operation",
+            duration: 321372100,
+            spans: [2, 0],
+          },
+        ],
+      });
+    },
+  ),
 ];
