@@ -326,6 +326,184 @@ describe("Variables Utils", () => {
     });
   });
 
+  describe("Additional Edge Cases and Boundary Tests", () => {
+    describe("formatInterval additional tests", () => {
+      it("should handle exactly boundary values", () => {
+        // Test exact boundary values
+        expect(formatInterval(11)).toEqual({ value: 10, unit: "ms" }); // Just over 10
+        expect(formatInterval(16)).toEqual({ value: 20, unit: "ms" }); // Just over 15
+        expect(formatInterval(151)).toEqual({ value: 200, unit: "ms" }); // Just over 150
+        expect(formatInterval(1501)).toEqual({ value: 2, unit: "s" }); // Just over 1500
+      });
+
+      it("should handle very large numbers", () => {
+        expect(formatInterval(Number.MAX_SAFE_INTEGER)).toEqual({ value: 1, unit: "y" });
+        expect(formatInterval(999999999999)).toEqual({ value: 1, unit: "y" });
+      });
+
+      it("should handle floating point numbers", () => {
+        expect(formatInterval(10.5)).toEqual({ value: 10, unit: "ms" });
+        expect(formatInterval(1500.7)).toEqual({ value: 2, unit: "s" });
+        expect(formatInterval(3600000.1)).toEqual({ value: 1, unit: "h" });
+      });
+
+      it("should handle negative numbers", () => {
+        expect(formatInterval(-5)).toEqual({ value: 1, unit: "ms" });
+        expect(formatInterval(-100)).toEqual({ value: 1, unit: "ms" });
+      });
+
+      it("should handle non-numeric inputs as best as possible", () => {
+        expect(formatInterval(null)).toEqual({ value: 1, unit: "ms" }); // null <= 10 is true
+        expect(formatInterval(undefined)).toEqual({ value: 1, unit: "y" }); // undefined comparisons fail, goes to default
+        expect(formatInterval(NaN)).toEqual({ value: 1, unit: "y" }); // NaN comparisons are all false, goes to default
+      });
+    });
+
+    describe("getTimeInSecondsBasedOnUnit additional tests", () => {
+      it("should handle floating point inputs", () => {
+        expect(getTimeInSecondsBasedOnUnit(1.5, "m")).toBe(90);
+        expect(getTimeInSecondsBasedOnUnit(2.5, "h")).toBe(9000);
+        expect(getTimeInSecondsBasedOnUnit(0.1, "d")).toBe(8640);
+      });
+
+      it("should handle very large numbers", () => {
+        expect(getTimeInSecondsBasedOnUnit(1000, "y")).toBe(7257600000);
+        expect(getTimeInSecondsBasedOnUnit(10000, "d")).toBe(864000000);
+      });
+
+      it("should handle case sensitivity in units", () => {
+        expect(getTimeInSecondsBasedOnUnit(1, "MS")).toBe(1); // Different case should return original
+        expect(getTimeInSecondsBasedOnUnit(1, "S")).toBe(1);
+        expect(getTimeInSecondsBasedOnUnit(1, "M")).toBe(1);
+      });
+
+      it("should handle null and undefined inputs", () => {
+        expect(getTimeInSecondsBasedOnUnit(null, "s")).toBe(null); // null * 1 = null  
+        expect(getTimeInSecondsBasedOnUnit(undefined, "s")).toBe(undefined); // undefined * 1 = undefined
+        expect(getTimeInSecondsBasedOnUnit(5, null)).toBe(5);
+        expect(getTimeInSecondsBasedOnUnit(5, undefined)).toBe(5);
+      });
+    });
+
+    describe("formatRateInterval additional tests", () => {
+      it("should handle very large intervals", () => {
+        expect(formatRateInterval(31536000)).toBe("365d"); // 1 year in seconds
+        expect(formatRateInterval(2592000)).toBe("30d"); // 30 days
+      });
+
+      it("should handle complex combinations", () => {
+        expect(formatRateInterval(90061)).toBe("1d1h1m1s"); // 1 day, 1 hour, 1 minute, 1 second
+        expect(formatRateInterval(93784)).toBe("1d2h3m4s"); // 1 day, 2 hours, 3 minutes, 4 seconds
+      });
+
+      it("should handle floating point inputs", () => {
+        expect(formatRateInterval(90.5)).toBe("1m30.5s"); // Floating point seconds are preserved
+        expect(formatRateInterval(3661.7)).toBe("1h1m1.699999999999818s"); // Account for floating point precision
+      });
+
+      it("should handle negative and edge case inputs", () => {
+        expect(formatRateInterval(-1)).toBe("");
+        expect(formatRateInterval(null)).toBe("");
+        expect(formatRateInterval(undefined)).toBe("");
+        expect(formatRateInterval(NaN)).toBe("");
+      });
+    });
+
+    describe("processVariableContent additional tests", () => {
+      const extendedMockData = {
+        values: [
+          { name: "region", value: "us-east-1" },
+          { name: "service", value: ["api", "web", "db", "cache"] },
+          { name: "env", value: "production" },
+          { name: "numbers", value: [1, 2, 3, 4, 5] },
+          { name: "booleans", value: [true, false] },
+          { name: "mixed", value: ["string", 123, true] },
+          { name: "special_chars", value: "test@#$%^&*()_+" },
+          { name: "unicode", value: "测试数据" },
+        ]
+      };
+
+      it("should handle numeric array values", () => {
+        const content = "SELECT * WHERE id IN (${numbers})";
+        const expected = "SELECT * WHERE id IN (1,2,3,4,5)";
+        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+      });
+
+      it("should handle boolean array values", () => {
+        const content = "SELECT * WHERE active IN (${booleans:csv})";
+        const expected = "SELECT * WHERE active IN (true,false)";
+        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+      });
+
+      it("should handle mixed type array values", () => {
+        const content = "SELECT * WHERE field IN (${mixed})";
+        const expected = "SELECT * WHERE field IN (string,123,true)";
+        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+      });
+
+      it("should handle special characters in variable values", () => {
+        const content = "SELECT * WHERE field = '${special_chars}'";
+        const expected = "SELECT * WHERE field = 'test@#$%^&*()_+'";
+        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+      });
+
+      it("should handle unicode characters", () => {
+        const content = "SELECT * WHERE field = '${unicode}'";
+        const expected = "SELECT * WHERE field = '测试数据'";
+        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+      });
+
+      it("should handle larger arrays with formatting", () => {
+        const content = "SELECT * FROM logs WHERE service IN (${service:doublequote})";
+        const expected = 'SELECT * FROM logs WHERE service IN ("api","web","db","cache")';
+        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+      });
+
+      it("should handle nested variable-like patterns that aren't variables", () => {
+        const content = "SELECT * FROM logs WHERE field LIKE '${region}' AND other = '$not_a_variable'";
+        const expected = "SELECT * FROM logs WHERE field LIKE 'us-east-1' AND other = '$not_a_variable'";
+        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+      });
+
+      it("should handle malformed variable patterns", () => {
+        const content = "SELECT * FROM logs WHERE field = '${' AND other = '}' AND valid = '${region}'";
+        const expected = "SELECT * FROM logs WHERE field = '${' AND other = '}' AND valid = 'us-east-1'";
+        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+      });
+
+      it("should handle variables in different contexts", () => {
+        const content = `
+          {
+            "query": "\${region}",
+            "filters": [
+              { "field": "service", "value": "\${service:pipe}" },
+              { "field": "env", "operator": "=", "value": "\${env}" }
+            ]
+          }
+        `;
+        const expected = `
+          {
+            "query": "us-east-1",
+            "filters": [
+              { "field": "service", "value": "api|web|db|cache" },
+              { "field": "env", "operator": "=", "value": "production" }
+            ]
+          }
+        `;
+        expect(processVariableContent(content, extendedMockData)).toBe(expected);
+      });
+
+      it("should handle variables with very long content", () => {
+        const longArray = new Array(100).fill(0).map((_, i) => `item${i}`);
+        const longData = { values: [{ name: "longlist", value: longArray }] };
+        const content = "SELECT * WHERE id IN (${longlist:csv})";
+        const result = processVariableContent(content, longData);
+        expect(result).toContain("item0,item1,item2");
+        expect(result).toContain("item99");
+      });
+    });
+  });
+
   describe("Integration Tests", () => {
     it("should work together for time-based variable processing", () => {
       const interval = 3600000; // 1 hour in ms
