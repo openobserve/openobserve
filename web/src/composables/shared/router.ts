@@ -20,7 +20,6 @@ import {
 } from "@/utils/zincutils";
 import Home from "@/views/HomeView.vue";
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
-import Tickets from "@/views/TicketsView.vue";
 import About from "@/views/About.vue";
 import MemberSubscription from "@/views/MemberSubscription.vue";
 import Error404 from "@/views/Error404.vue";
@@ -164,17 +163,6 @@ const useRoutes = () => {
       path: "streams",
       name: "logstreams",
       component: LogStream,
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    },
-    {
-      path: "tickets",
-      name: "tickets",
-      component: Tickets,
-      meta: {
-        keepAlive: true,
-      },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
