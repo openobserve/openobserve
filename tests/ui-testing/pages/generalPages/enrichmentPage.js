@@ -106,10 +106,27 @@ abc, err = get_enrichment_table_record("${fileName}", {
             await this.page.waitForLoadState('domcontentloaded');
             await this.page.waitForLoadState('networkidle', { timeout: 45000 });
             
+            // Check if we need to open the functions panel first
+            const functionsButton = this.page.locator('[data-test="logs-search-functions-btn"]');
+            try {
+                await functionsButton.waitFor({ state: 'visible', timeout: 5000 });
+                await functionsButton.click();
+                await this.page.waitForTimeout(2000); // Wait for panel to open
+            } catch (e) {
+                console.log('Functions button not found or already open');
+            }
+            
+            // Debug: Take screenshot and check page elements
+            console.log('Current URL:', await this.page.url());
+            const availableElements = await this.page.locator('*[id]').evaluateAll(
+                elements => elements.map(el => el.id).filter(id => id)
+            );
+            console.log('Available element IDs:', availableElements);
+            
             // Wait for VRL editor container with polling approach for CI reliability
             let editorReady = false;
             let attempts = 0;
-            const maxAttempts = 30; // 30 attempts with 2s intervals = 60s total
+            const maxAttempts = 20; // Reduced to 20 attempts = 40s total
             
             while (!editorReady && attempts < maxAttempts) {
                 try {
@@ -121,7 +138,11 @@ abc, err = get_enrichment_table_record("${fileName}", {
                 } catch (e) {
                     attempts++;
                     if (attempts >= maxAttempts) {
-                        throw new Error(`VRL editor not ready after ${maxAttempts * 2} seconds. Last error: ${e.message}`);
+                        // Final debug info before failing
+                        const pageContent = await this.page.content();
+                        console.log('Page HTML contains fnEditor:', pageContent.includes('fnEditor'));
+                        console.log('Page HTML contains editor:', pageContent.includes('editor'));
+                        throw new Error(`VRL editor (#fnEditor) not found after ${maxAttempts * 2} seconds. Available IDs: ${availableElements.join(', ')}`);
                     }
                     await this.page.waitForTimeout(2000);
                 }
