@@ -648,7 +648,12 @@ const useLogs = () => {
     if (!dashboardPanelData?.data) {
       return null;
     }
-    return dashboardPanelData.data;
+    
+    // Only store config object and chart type, not the entire dashboardPanelData
+    return {
+      config: dashboardPanelData.data.config || {},
+      type: dashboardPanelData.data.type || 'bar',
+    };
   };
 
   const encodeVisualizationConfig = (config: any) => {
@@ -745,14 +750,21 @@ const useLogs = () => {
       query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
     }
 
-    // Add visualization data to URL if in visualize mode and dashboardPanelData is provided
+    // Preserve visualization data in URL
+    // - If in visualize mode and panel data is provided, encode the dashboardPanelData
     if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
-      const visualizationConfig = getVisualizationConfig(dashboardPanelData);
-      if (visualizationConfig) {
-        const encodedConfig = encodeVisualizationConfig(visualizationConfig);
-        if (encodedConfig) {
-          query["visualization_data"] = encodedConfig;
+      const visualizationData = getVisualizationConfig(dashboardPanelData);
+      if (visualizationData) {
+        const encoded = encodeVisualizationConfig(visualizationData);
+        if (encoded) {
+          query["visualization_data"] = encoded;
         }
+      }
+    } else {
+      // else preserve existing visualization data from the current URL
+      const existingEncodedConfig = router.currentRoute.value?.query?.visualization_data as string | undefined;
+      if (existingEncodedConfig) {
+        query["visualization_data"] = existingEncodedConfig;
       }
     }
 
@@ -4897,19 +4909,6 @@ const useLogs = () => {
       searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
     }
 
-    // Restore visualization data if available and in visualize mode
-    if (queryParams.visualization_data && 
-        searchObj.meta.logsVisualizeToggle === "visualize" && 
-        dashboardPanelData) {
-      const restoredData = decodeVisualizationConfig(queryParams.visualization_data);
-      if (restoredData && dashboardPanelData.data) {
-        dashboardPanelData.data = {
-          ...dashboardPanelData.data,
-          ...restoredData
-        };
-      }
-    }
-
     //here we restore the fn editor state from the url query params
     if(queryParams.fn_editor) {
       searchObj.meta.showTransformEditor = queryParams.fn_editor == "true" ? true : false;
@@ -5370,13 +5369,56 @@ const useLogs = () => {
       if (parsedSQL?.with) {
         let withObj = parsedSQL.with;
         withObj.forEach((obj: any) => {
-          // Map through each "from" array in the _next object, as it can contain multiple tables
-          if (obj?.stmt?.from) {
-            obj?.stmt?.from.forEach((stream: { table: string }) => {
-              newSelectedStreams.push(stream.table);
+          // Recursively extract table names from the WITH statement with depth protection
+          const MAX_RECURSION_DEPTH = 50; // Prevent stack overflow
+          const visitedNodes = new WeakSet(); // Prevent circular references - more efficient for objects
+          
+          const extractTablesFromNode = (node: any, depth: number = 0) => {
+            if (!node || depth > MAX_RECURSION_DEPTH) {
+              if (depth > MAX_RECURSION_DEPTH) {
+                console.warn("Maximum recursion depth reached while parsing SQL query");
+              }
+              return;
             }
-            );
-          }
+            
+            // Use WeakSet for efficient circular reference detection
+            if (typeof node === 'object' && node !== null) {
+              if (visitedNodes.has(node)) {
+                return; // Skip already visited nodes
+              }
+              visitedNodes.add(node);
+            }
+            
+            // Check if current node has a from clause
+            if (node.from && Array.isArray(node.from)) {
+              node.from.forEach((stream: any) => {
+                if (stream.table) {
+                  newSelectedStreams.push(stream.table);
+                }
+                // Handle subquery in FROM clause
+                if (stream.expr && stream.expr.ast) {
+                  extractTablesFromNode(stream.expr.ast, depth + 1);
+                }
+              });
+            }
+            
+            // Check for nested subqueries in WHERE clause
+            if (node.where && node.where.right && node.where.right.ast) {
+              extractTablesFromNode(node.where.right.ast, depth + 1);
+            }
+            
+            // Check for nested subqueries in SELECT expressions
+            if (node.columns && Array.isArray(node.columns)) {
+              node.columns.forEach((col: any) => {
+                if (col.expr && col.expr.ast) {
+                  extractTablesFromNode(col.expr.ast, depth + 1);
+                }
+              });
+            }
+          };
+          
+          // Start extraction from the WITH statement
+          extractTablesFromNode(obj?.stmt);
         });
       }
       // additionally, if union is there then it will have _next object which will have the table name it should check recursuvely as user can write multiple union
