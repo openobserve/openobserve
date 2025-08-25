@@ -16,6 +16,8 @@
 use chrono::{DateTime, Datelike, Timelike};
 #[cfg(feature = "enterprise")]
 use config::META_ORG_ID;
+#[cfg(feature = "enterprise")]
+use config::spawn_pausable_job;
 use config::{
     SIZE_IN_MB,
     cluster::LOCAL_NODE,
@@ -30,8 +32,6 @@ use config::{
     },
     metrics,
 };
-#[cfg(feature = "enterprise")]
-use config::spawn_pausable_job;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::auditor;
 #[cfg(feature = "enterprise")]

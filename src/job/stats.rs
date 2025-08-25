@@ -45,9 +45,7 @@ fn file_list_update_stats() -> Option<tokio::task::JoinHandle<()>> {
         {
             match update_stats_from_file_list().await {
                 Err(e) => {
-                    log::error!(
-                        "[STATS] run update stream stats from file list error: {e}"
-                    );
+                    log::error!("[STATS] run update stream stats from file list error: {e}");
                 }
                 Ok(Some((offset, max_pk))) => {
                     log::debug!(
