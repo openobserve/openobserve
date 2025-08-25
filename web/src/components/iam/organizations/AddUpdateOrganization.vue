@@ -50,7 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="organizationData.id"
           :readonly="beingUpdated"
           :disabled="beingUpdated"
+          stack-label
+          outlined
+          filled
+          dense
           :label="t('organization.id')"
+          class="showLabelOnTop"
         />
 
         <q-input
@@ -150,15 +155,25 @@ export default defineComponent({
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
     const sanitizeInput = (val: string) => {
-      return val
+      // First decode any existing HTML entities
+      const decoded = val
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'")
+        .replace(/&amp;/g, "&"); // decode & last
+
+      // Then sanitize
+      return decoded
         .trim()
-        .replace(/&/g, "&amp;")   // escape &
-        .replace(/</g, "&lt;")    // escape <
-        .replace(/>/g, "&gt;")    // escape >
-        .replace(/"/g, "&quot;")  // escape "
-        .replace(/'/g, "&#039;")  // escape '
-        .replace(/\s+/g, " ");    // collapse multiple spaces
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;")
+        .replace(/\s+/g, " ");
     };
+
 
     return {
       t,
@@ -224,16 +239,17 @@ export default defineComponent({
 
         //here we will sanitize the input 
         this.organizationData.name = this.sanitizeInput(this.organizationData.name);
-
+        //here we will check if organizationId is there or not because we only get org id when we are updating the organization
+        //if organizationId is not there we will create a new organization else we will update the existing organization
         if (organizationId == "") {
           callOrganization = organizationService.create(this.organizationData);
         }
-        // else {
-        //   callOrganization = organizationService.update(
-        //     organizationId,
-        //     this.organizationData
-        //   );
-        // }
+        else {
+          callOrganization = organizationService.rename_organization(
+            organizationId,
+            this.organizationData.name,
+          );
+        }
 
         callOrganization
           .then((res: any) => {
@@ -277,7 +293,7 @@ export default defineComponent({
             this.$q.notify({
               type: "negative",
               message: JSON.stringify(
-                err?.response?.data["message"] || "Organization creation failed."
+                err?.response?.data["message"] || ( organizationId ? "Organization Update failed." : "Organization creation failed.")
               ),
             });
             dismiss();
