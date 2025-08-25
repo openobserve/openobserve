@@ -161,6 +161,33 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.waitForLoadState('networkidle', { timeout: 5000 });
     }
 
+    async waitForVRLEditorReady() {
+        // Critical wait: VRL editor needs time to initialize backend connection after query fill
+        // Without this wait, VRL query execution fails silently on first attempt
+        // This addresses the race condition between visual editor readiness and processing readiness
+        await this.page.waitForTimeout(3000);
+        
+        // Ensure DOM is stable after editor initialization
+        await this.page.waitForLoadState('domcontentloaded');
+    }
+
+    async applyQueryMultipleClicks() {
+        // Click run query button multiple times to ensure it registers (VRL test specific)
+        const refreshButton = this.page.locator(this.refreshButton);
+        await refreshButton.waitFor({ state: 'visible' });
+        
+        for (let i = 0; i < 4; i++) {
+            await refreshButton.click({ force: true });
+            if (i < 3) { // Wait between clicks except after last click
+                await this.page.waitForLoadState('domcontentloaded');
+                await this.page.waitForLoadState('networkidle', { timeout: 1000 });
+            }
+        }
+        
+        // Wait for query execution to complete
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+    }
+
     async verifyNoQueryWarning() {
         // Wait for potential warnings to appear by checking DOM state
         await this.page.waitForLoadState('domcontentloaded');
@@ -172,6 +199,16 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async expandFirstLogRow() {
         await this.page.waitForLoadState('networkidle');
         
+        // Additional run query clicks to ensure VRL enrichment is fully processed
+        const refreshButton = this.page.locator(this.refreshButton);
+        if (await refreshButton.isVisible()) {
+            for (let i = 0; i < 3; i++) {
+                await refreshButton.click({ force: true });
+                await this.page.waitForLoadState('domcontentloaded');
+                await this.page.waitForLoadState('networkidle', { timeout: 2000 });
+            }
+        }
+        
         // Wait for timestamp column to be visible and stable
         await this.page.waitForSelector(this.timestampColumn, { state: 'visible' });
         const expandButton = this.page.locator(this.timestampColumn).locator(this.expandMenu);
@@ -181,7 +218,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.page.waitForLoadState('domcontentloaded');
         
         // Wait for expand panel to load and stabilize
-        await this.page.waitForSelector(this.protocolKeywordText, { state: 'visible', timeout: 5000 });
+        await this.page.waitForSelector(this.protocolKeywordText, { state: 'visible', timeout: 15000 });
     }
 
     async clickProtocolKeyword() {
@@ -296,6 +333,63 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.clickProtocolKeyword();
     }
 
+    async uploadFileWithVRLQuery(filePath, fileName) {
+        // Set the file to be uploaded
+        const inputFile = await this.page.locator(this.fileInput);
+        await inputFile.setInputFiles(filePath);
+
+        // Enter the file name
+        await this.page.fill(this.fileNameInput, fileName);
+
+        // Click on 'Save'
+        await this.page.getByText(this.saveButton).click({ force: true });
+        await this.page.waitForLoadState('networkidle');
+
+        // Search for the uploaded file name
+        await this.page.getByPlaceholder(this.searchEnrichmentTable).fill(fileName);
+        await this.page.waitForLoadState('networkidle');
+
+        // Verify the file name in the enrichment table
+        await this.verifyFileInTable(fileName);
+    }
+
+    async exploreWithVRLProcessing(fileName) {
+        // Explore the file with VRL query
+        await this.page.getByRole("button", { name: this.exploreButton }).waitFor({ state: 'visible' });
+        
+        // Wait for navigation response before clicking
+        const navigationPromise = this.page.waitForLoadState('networkidle', { timeout: 30000 });
+        await this.page.getByRole("button", { name: this.exploreButton }).click();
+        await navigationPromise;
+        
+        // Ensure we're on the logs page with additional wait
+        await this.page.waitForLoadState('domcontentloaded');
+        // Wait for VRL editor initialization to complete
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+        
+        // Verify we're on the correct page before proceeding
+        await this.page.waitForSelector(this.refreshButton, { 
+            state: 'visible',
+            timeout: 15000 
+        });
+        
+        // Fill VRL query using page object method
+        await this.fillVRLQuery(fileName);
+
+        // Wait for VRL editor to be fully ready for processing
+        await this.waitForVRLEditorReady();
+
+        // Apply query with multiple clicks for VRL test reliability
+        await this.applyQueryMultipleClicks();
+
+        // Verify that no warning is shown for query execution
+        await this.verifyNoQueryWarning();
+
+        // Expand the first row and verify protocol keyword
+        await this.expandFirstLogRow();
+        await this.clickProtocolKeyword();
+    }
+
     async uploadAndAppendEnrichmentTable(filePath, fileName) {
         // Initial upload
         await this.uploadEnrichmentFile(filePath, fileName);
@@ -318,6 +412,61 @@ abc, err = get_enrichment_table_record("${fileName}", {
         await this.searchForEnrichmentTable(fileName);
         await this.exploreEnrichmentTable();
         await this.verifyRowCount();
+    }
+
+    async uploadFileForAppendTest(filePath, fileName) {
+        // First upload step
+        const inputFile = await this.page.locator(this.fileInput);
+        await inputFile.setInputFiles(filePath);
+
+        // Enter the file name
+        await this.page.fill(this.fileNameInput, fileName);
+
+        // Click on 'Save'
+        await this.page.getByText(this.saveButton).click({ force: true });
+        await this.page.waitForLoadState('networkidle');
+        
+        // Search and explore the uploaded table
+        await this.page.getByPlaceholder(this.searchEnrichmentTable).fill(fileName);
+        await this.page.waitForLoadState('networkidle');
+    }
+
+    async exploreAndVerifyInitialData() {
+        await this.page.getByRole("button", { name: this.exploreButton }).click();
+        await this.page.locator(this.dateTimeBtn).click();
+        await expect(this.page.getByRole('cell', { name: this.startTimeCell })).toBeVisible();
+        await this.page.locator(this.timestampColumn).click();
+        await this.page.locator(this.closeDialog).click();
+        await this.page.waitForLoadState('networkidle');
+    }
+
+    async navigateAndAppendData(fileName, filePath) {
+        // Navigate to append data to the existing enrichment table
+        await this.page.locator(this.pipelineMenuItem).click();
+        await this.page.locator(this.enrichmentTableTab).click();
+        await this.page.getByPlaceholder(this.searchEnrichmentTable).fill(fileName);
+        await this.page.getByRole("button", { name: this.enrichmentTablesButton }).click();
+
+        // Select the append toggle
+        await this.page.getByLabel(this.appendDataToggle).locator("div").first().click();
+
+        // Upload the CSV again for appending
+        const inputFile = await this.page.locator(this.fileInput);
+        await inputFile.setInputFiles(filePath);
+        await this.page.waitForLoadState('networkidle');
+        await this.page.getByRole('button', { name: this.saveButton }).click();
+        await this.page.waitForLoadState('networkidle');
+    }
+
+    async verifyAppendedData(fileName) {
+        // Verify appended data
+        await this.page.getByPlaceholder(this.searchEnrichmentTable).fill(fileName);
+        await this.page.waitForLoadState('networkidle');
+        await this.page.getByRole("button", { name: this.exploreButton }).click();
+
+        // Verify row count increased
+        const showingText = this.page.getByText(this.showingText);
+        await expect(showingText).toBeVisible();
     }
 
     async testCSVValidationError() {

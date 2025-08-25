@@ -64,68 +64,10 @@ test.describe("Enrichment data testcases", () => {
         let fileName = `protocols_${uuidv4()}_csv`.replace(/-/g, "_");
         testLogger.debug('Generated File Name', { fileName });
 
-        // Set the file to be uploaded
+        // Upload file with VRL processing using page object methods
         const fileContentPath = "../test-data/protocols.csv";
-        const inputFile = await page.locator('input[type="file"]');
-        await inputFile.setInputFiles(fileContentPath);
-
-        // Enter the file name
-        await page.fill(".q-input > .q-field__inner > .q-field__control", fileName);
-
-        // Click on 'Save'
-        await page.getByText("Save").click({ force: true });
-        await page.waitForLoadState('networkidle');
-
-        // Search for the uploaded file name
-        await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
-        await page.waitForLoadState('networkidle');
-
-        // Verify the file name in the enrichment table
-        await pm.enrichmentPage.verifyFileInTable(fileName);
-
-        // Explore the file with VRL query
-        await page.getByRole("button", { name: "Explore" }).waitFor({ state: 'visible' });
-        
-        // Wait for navigation response before clicking
-        const navigationPromise = page.waitForLoadState('networkidle', { timeout: 30000 });
-        await page.getByRole("button", { name: "Explore" }).click();
-        await navigationPromise;
-        
-        // Ensure we're on the logs page with additional wait
-        await page.waitForLoadState('domcontentloaded');
-        // Wait for VRL editor initialization to complete
-        await page.waitForLoadState('networkidle', { timeout: 10000 });
-        
-        // Verify we're on the correct page before proceeding
-        await page.waitForSelector('[data-test="logs-search-bar-refresh-btn"]', { 
-            state: 'visible',
-            timeout: 15000 
-        });
-        
-        // Fill VRL query using page object method
-        await pm.enrichmentPage.fillVRLQuery(fileName);
-
-        // Click run query button multiple times to ensure it registers (VRL test specific)
-        const refreshButton = page.locator('[data-test="logs-search-bar-refresh-btn"]');
-        await refreshButton.waitFor({ state: 'visible' });
-        
-        for (let i = 0; i < 4; i++) {
-            await refreshButton.click({ force: true });
-            if (i < 3) { // Wait 1 second between clicks except after last click
-                await page.waitForLoadState('domcontentloaded');
-                await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 1000)));
-            }
-        }
-        
-        // Wait for query execution to complete
-        await page.waitForLoadState('networkidle', { timeout: 10000 });
-
-        // Verify that no warning is shown for query execution
-        await pm.enrichmentPage.verifyNoQueryWarning();
-
-        // Expand the first row and verify protocol keyword
-        await pm.enrichmentPage.expandFirstLogRow();
-        await pm.enrichmentPage.clickProtocolKeyword();
+        await pm.enrichmentPage.uploadFileWithVRLQuery(fileContentPath, fileName);
+        await pm.enrichmentPage.exploreWithVRLProcessing(fileName);
 
         // Navigate back and delete the uploaded table
         await pm.enrichmentPage.navigateToEnrichmentTable();
@@ -156,56 +98,16 @@ test.describe("Enrichment data testcases", () => {
         let fileName = `append_${uuidv4()}_csv`.replace(/-/g, "_");
         testLogger.debug('Generated File Name', { fileName });
 
-        // First upload step
+        // Upload file and test append functionality using page object methods
         const fileContentPath = "../test-data/append.csv";
-        const inputFile = await page.locator('input[type="file"]');
-        await inputFile.setInputFiles(fileContentPath);
-
-        // Enter the file name
-        await page.fill(".q-input > .q-field__inner > .q-field__control", fileName);
-
-        // Click on 'Save'
-        await page.getByText("Save").click({ force: true });
-        await page.waitForLoadState('networkidle');
-        
-        // Search and explore the uploaded table
-        await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
-        await page.waitForLoadState('networkidle');
-
-        await page.getByRole("button", { name: "Explore" }).click();
-        await page.locator('[data-test="date-time-btn"]').click();
-        await expect(page.getByRole('cell', { name: 'Start time' })).toBeVisible();
-        await page.locator('[data-test="log-table-column-0-_timestamp"]').click();
-        await page.locator('[data-test="close-dialog"]').click();
-        await page.waitForLoadState('networkidle');
-
-        // Navigate to append data to the existing enrichment table
-        await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
-        await page.locator('[data-test="function-enrichment-table-tab"]').click();
-        await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
-        await page.getByRole("button", { name: "Enrichment Tables" }).click();
-
-        // Select the append toggle
-        await page.getByLabel("Append data to existing").locator("div").first().click();
-
-        // Upload the CSV again for appending
-        await inputFile.setInputFiles(fileContentPath);
-        await page.waitForLoadState('networkidle');
-        await page.getByRole('button', { name: 'Save' }).click();
-        await page.waitForLoadState('networkidle');
-        
-        // Verify appended data
-        await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
-        await page.waitForLoadState('networkidle');
-        await page.getByRole("button", { name: "Explore" }).click();
-
-        // Verify row count increased
-        const showingText = page.getByText('Showing 1 to 2 out of 2');
-        await expect(showingText).toBeVisible();
+        await pm.enrichmentPage.uploadFileForAppendTest(fileContentPath, fileName);
+        await pm.enrichmentPage.exploreAndVerifyInitialData();
+        await pm.enrichmentPage.navigateAndAppendData(fileName, fileContentPath);
+        await pm.enrichmentPage.verifyAppendedData(fileName);
 
         // Clean up - delete the enrichment table
         await pm.enrichmentPage.navigateToEnrichmentTable();
-        await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
+        await pm.enrichmentPage.searchForEnrichmentTable(fileName);
         await pm.pipelinesPage.deleteEnrichmentTableByName(fileName);
         
         testLogger.info('Enrichment table append test completed');
