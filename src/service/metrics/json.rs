@@ -505,3 +505,174 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         stream_status_map.values().map(|v| v.to_owned()).collect(),
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    fn create_test_metric_record(
+        name: &str,
+        metric_type: &str,
+        value: f64,
+        labels: Vec<(&str, &str)>,
+    ) -> json::Value {
+        let mut record = json!({
+            "__name__": name,
+            "__type__": metric_type,
+            "value": value,
+            "_timestamp": 1640995200000000i64, // 2022-01-01 00:00:00 UTC in microseconds
+        });
+
+        // Add custom labels
+        if let Some(obj) = record.as_object_mut() {
+            for (k, v) in labels {
+                obj.insert(k.to_string(), json!(v));
+            }
+        }
+
+        record
+    }
+
+    #[test]
+    fn test_create_test_metric_record() {
+        let record = create_test_metric_record(
+            "test_metric",
+            "counter",
+            42.0,
+            vec![("instance", "localhost"), ("job", "test")],
+        );
+
+        assert_eq!(record["__name__"], "test_metric");
+        assert_eq!(record["__type__"], "counter");
+        assert_eq!(record["value"], 42.0);
+        assert_eq!(record["instance"], "localhost");
+        assert_eq!(record["job"], "test");
+    }
+
+    #[test]
+    fn test_metric_record_validation() {
+        // Test valid record
+        let valid_record = create_test_metric_record("valid_metric", "gauge", 100.0, vec![]);
+        assert!(valid_record.is_object());
+        assert!(valid_record.get("__name__").is_some());
+        assert!(valid_record.get("__type__").is_some());
+        assert!(valid_record.get("value").is_some());
+
+        // Test record with custom labels
+        let labeled_record = create_test_metric_record(
+            "labeled_metric",
+            "histogram",
+            50.0,
+            vec![("env", "prod"), ("region", "us-west")],
+        );
+        assert_eq!(labeled_record["env"], "prod");
+        assert_eq!(labeled_record["region"], "us-west");
+    }
+
+    #[test]
+    fn test_metric_type_handling() {
+        // Test different metric types
+        let counter_record = create_test_metric_record("counter_metric", "counter", 1.0, vec![]);
+        let gauge_record = create_test_metric_record("gauge_metric", "gauge", 2.0, vec![]);
+        let histogram_record =
+            create_test_metric_record("histogram_metric", "histogram", 3.0, vec![]);
+        let summary_record = create_test_metric_record("summary_metric", "summary", 4.0, vec![]);
+
+        assert_eq!(counter_record["__type__"], "counter");
+        assert_eq!(gauge_record["__type__"], "gauge");
+        assert_eq!(histogram_record["__type__"], "histogram");
+        assert_eq!(summary_record["__type__"], "summary");
+    }
+
+    #[test]
+    fn test_timestamp_handling() {
+        let record = create_test_metric_record("timestamp_test", "gauge", 10.0, vec![]);
+
+        // Check that timestamp is present and is a number
+        assert!(record.get("_timestamp").is_some());
+        assert!(record["_timestamp"].is_number());
+
+        let timestamp = record["_timestamp"].as_i64().unwrap();
+        assert!(timestamp > 0);
+    }
+
+    #[test]
+    fn test_value_handling() {
+        let record = create_test_metric_record("value_test", "gauge", 99.99, vec![]);
+
+        // Check that value is present and is a number
+        assert!(record.get("value").is_some());
+        assert!(record["value"].is_number());
+
+        let value = record["value"].as_f64().unwrap();
+        assert_eq!(value, 99.99);
+    }
+
+    #[test]
+    fn test_label_handling() {
+        let labels = vec![
+            ("instance", "web-01"),
+            ("job", "webserver"),
+            ("env", "production"),
+        ];
+
+        let record = create_test_metric_record("labeled_test", "gauge", 5.0, labels.clone());
+
+        // Check that all labels are present
+        for (key, value) in labels {
+            assert_eq!(record[key], value);
+        }
+    }
+
+    #[test]
+    fn test_metric_name_formatting() {
+        // Test that metric names are properly formatted
+        let record = create_test_metric_record("http_requests_total", "counter", 1000.0, vec![]);
+        assert_eq!(record["__name__"], "http_requests_total");
+
+        let record = create_test_metric_record("cpu_usage_percent", "gauge", 75.5, vec![]);
+        assert_eq!(record["__name__"], "cpu_usage_percent");
+    }
+
+    #[test]
+    fn test_numeric_value_types() {
+        // Test different numeric value types
+        let integer_record = create_test_metric_record("int_metric", "gauge", 42.0, vec![]);
+        let float_record = create_test_metric_record("float_metric", "gauge", 1.234, vec![]);
+        let zero_record = create_test_metric_record("zero_metric", "gauge", 0.0, vec![]);
+        let negative_record = create_test_metric_record("negative_metric", "gauge", -10.5, vec![]);
+
+        assert_eq!(integer_record["value"], 42.0);
+        assert_eq!(float_record["value"], 1.234);
+        assert_eq!(zero_record["value"], 0.0);
+        assert_eq!(negative_record["value"], -10.5);
+    }
+
+    #[test]
+    fn test_metric_record_structure() {
+        let record = create_test_metric_record(
+            "test_structure",
+            "counter",
+            123.0,
+            vec![("label1", "value1"), ("label2", "value2")],
+        );
+
+        // Verify required fields
+        let required_fields = ["__name__", "__type__", "value", "_timestamp"];
+        for field in required_fields {
+            assert!(
+                record.get(field).is_some(),
+                "Missing required field: {field}"
+            );
+        }
+
+        // Verify custom labels
+        assert_eq!(record["label1"], "value1");
+        assert_eq!(record["label2"], "value2");
+
+        // Verify it's a valid JSON object
+        assert!(record.is_object());
+    }
+}

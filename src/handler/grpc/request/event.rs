@@ -572,7 +572,7 @@ mod tests {
     #[test]
     fn test_file_download_batch_creation() {
         // Test creating file download batch
-        let files_to_download = vec![
+        let files_to_download = [
             (
                 "file1".to_string(),
                 "account1".to_string(),
@@ -620,8 +620,7 @@ mod tests {
 
         // This test just ensures the logging format is valid
         let log_message = format!(
-            "[gRPC:Event] Send file: {}, total_size: {}, offset: {} took: {} ms",
-            path, total_size, offset, elapsed_ms
+            "[gRPC:Event] Send file: {path}, total_size: {total_size}, offset: {offset} took: {elapsed_ms} ms"
         );
 
         assert!(log_message.contains(path));

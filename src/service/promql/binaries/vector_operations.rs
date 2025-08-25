@@ -352,3 +352,357 @@ pub fn vector_bin_op(
         _ => vector_arithmetic_operators(expr, left, right),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+    use crate::service::promql::value::{Label, Sample};
+
+    // Helper function to create test data for vector operations
+    fn create_test_vector_data() -> Vec<InstantValue> {
+        vec![
+            create_test_instant_value(1.0, vec![("instance", "localhost"), ("job", "node")]),
+            create_test_instant_value(2.0, vec![("instance", "localhost"), ("job", "node")]),
+            create_test_instant_value(3.0, vec![("instance", "remote"), ("job", "api")]),
+        ]
+    }
+
+    fn create_test_instant_value(value: f64, labels: Vec<(&str, &str)>) -> InstantValue {
+        let labels = labels
+            .into_iter()
+            .map(|(k, v)| Arc::new(Label::new(k, v)))
+            .collect();
+        InstantValue {
+            labels,
+            sample: Sample {
+                timestamp: 1640995200000000i64,
+                value,
+            },
+        }
+    }
+
+    // Simple tests that don't require complex BinaryExpr construction
+    #[test]
+    fn test_instant_value_creation() {
+        let instant = create_test_instant_value(42.0, vec![("instance", "localhost")]);
+        assert_eq!(instant.sample.value, 42.0);
+        assert_eq!(instant.sample.timestamp, 1640995200000000i64);
+        assert_eq!(instant.labels.len(), 1);
+        assert_eq!(instant.labels[0].name, "instance");
+        assert_eq!(instant.labels[0].value, "localhost");
+    }
+
+    #[test]
+    fn test_instant_value_with_multiple_labels() {
+        let instant = create_test_instant_value(
+            100.0,
+            vec![("env", "prod"), ("region", "us-west"), ("service", "api")],
+        );
+        assert_eq!(instant.sample.value, 100.0);
+        assert_eq!(instant.labels.len(), 3);
+
+        let label_names: Vec<&str> = instant.labels.iter().map(|l| l.name.as_str()).collect();
+        assert!(label_names.contains(&"env"));
+        assert!(label_names.contains(&"region"));
+        assert!(label_names.contains(&"service"));
+    }
+
+    #[test]
+    fn test_instant_value_empty_labels() {
+        let instant = create_test_instant_value(0.0, vec![]);
+        assert_eq!(instant.sample.value, 0.0);
+        assert!(instant.labels.is_empty());
+    }
+
+    #[test]
+    fn test_instant_value_numeric_values() {
+        let test_cases = [
+            (0.0, "zero"),
+            (1.0, "positive integer"),
+            (-1.0, "negative integer"),
+            (1.234, "positive float"),
+            (-1.234, "negative float"),
+            (f64::MAX, "max value"),
+            (f64::MIN, "min value"),
+        ];
+
+        for (value, description) in test_cases {
+            let instant = create_test_instant_value(value, vec![("test", description)]);
+            assert_eq!(instant.sample.value, value, "Failed for: {description}");
+        }
+    }
+
+    #[test]
+    fn test_instant_value_timestamp_consistency() {
+        let instant1 = create_test_instant_value(1.0, vec![("a", "1")]);
+        let instant2 = create_test_instant_value(2.0, vec![("b", "2")]);
+
+        // Both should have the same timestamp
+        assert_eq!(instant1.sample.timestamp, instant2.sample.timestamp);
+        assert_eq!(instant1.sample.timestamp, 1640995200000000i64);
+    }
+
+    #[test]
+    fn test_label_creation() {
+        let labels = vec![
+            ("cpu", "0"),
+            ("mode", "idle"),
+            ("instance", "localhost:9100"),
+        ];
+        let instant = create_test_instant_value(75.5, labels.clone());
+
+        for (i, (expected_name, expected_value)) in labels.iter().enumerate() {
+            assert_eq!(instant.labels[i].name, *expected_name);
+            assert_eq!(instant.labels[i].value, *expected_value);
+        }
+    }
+
+    #[test]
+    fn test_label_modification() {
+        let mut labels = vec![
+            Arc::new(Label::new("env", "prod")),
+            Arc::new(Label::new("region", "us-west")),
+            Arc::new(Label::new("service", "api")),
+        ];
+
+        // Test label modification
+        labels[0] = Arc::new(Label::new("env", "staging"));
+        assert_eq!(labels[0].value, "staging");
+
+        // Test label filtering (simulate what vector operations do)
+        let filtered_labels: Vec<Arc<Label>> = labels
+            .into_iter()
+            .filter(|label| label.name != "env")
+            .collect();
+
+        assert_eq!(filtered_labels.len(), 2);
+        assert_eq!(filtered_labels[0].name, "region");
+        assert_eq!(filtered_labels[1].name, "service");
+    }
+
+    #[test]
+    fn test_vector_operations_parallel_processing() {
+        // Test that we can process vectors in parallel (simulating what the actual functions do)
+        let vector = vec![
+            create_test_instant_value(1.0, vec![("a", "1")]),
+            create_test_instant_value(2.0, vec![("a", "2")]),
+            create_test_instant_value(3.0, vec![("a", "3")]),
+            create_test_instant_value(4.0, vec![("a", "4")]),
+            create_test_instant_value(5.0, vec![("a", "5")]),
+        ];
+
+        // Simulate parallel processing by mapping over the vector
+        let processed: Vec<f64> = vector
+            .par_iter()
+            .map(|instant| instant.sample.value * 2.0)
+            .collect();
+
+        assert_eq!(processed.len(), 5);
+        assert_eq!(processed[0], 2.0);
+        assert_eq!(processed[1], 4.0);
+        assert_eq!(processed[2], 6.0);
+        assert_eq!(processed[3], 8.0);
+        assert_eq!(processed[4], 10.0);
+    }
+
+    #[test]
+    fn test_vector_operations_error_scenarios() {
+        // Test scenarios that could lead to errors in vector operations
+
+        // Test with very large numbers
+        let large_vector = [
+            create_test_instant_value(f64::MAX, vec![("a", "1")]),
+            create_test_instant_value(f64::MIN, vec![("a", "2")]),
+        ];
+
+        assert!(large_vector[0].sample.value.is_finite());
+        assert!(large_vector[1].sample.value.is_finite());
+
+        // Test with NaN values
+        let nan_vector = [create_test_instant_value(f64::NAN, vec![("a", "1")])];
+
+        // Should handle NaN gracefully
+        assert!(nan_vector[0].sample.value.is_nan());
+    }
+
+    #[test]
+    fn test_vector_operations_data_structures() {
+        // Test InstantValue creation and properties
+        let value =
+            create_test_instant_value(42.0, vec![("label1", "value1"), ("label2", "value2")]);
+        assert_eq!(value.sample.value, 42.0);
+        assert_eq!(value.labels.len(), 2);
+        assert_eq!(value.labels[0].name, "label1");
+        assert_eq!(value.labels[0].value, "value1");
+        assert_eq!(value.labels[1].name, "label2");
+        assert_eq!(value.labels[1].value, "value2");
+    }
+
+    #[test]
+    fn test_vector_operations_timestamp_consistency() {
+        let timestamp = 1640995200000000i64;
+        let value = create_test_instant_value(10.0, vec![("test", "value")]);
+        assert_eq!(value.sample.timestamp, timestamp);
+    }
+
+    #[test]
+    fn test_vector_operations_label_handling() {
+        let value = create_test_instant_value(5.0, vec![("a", "1"), ("b", "2"), ("c", "3")]);
+        assert_eq!(value.labels.len(), 3);
+
+        // Test label ordering and values
+        let labels = &value.labels;
+        assert_eq!(labels[0].name, "a");
+        assert_eq!(labels[0].value, "1");
+        assert_eq!(labels[1].name, "b");
+        assert_eq!(labels[1].value, "2");
+        assert_eq!(labels[2].name, "c");
+        assert_eq!(labels[2].value, "3");
+    }
+
+    #[test]
+    fn test_vector_operations_empty_labels() {
+        let value = create_test_instant_value(0.0, vec![]);
+        assert_eq!(value.labels.len(), 0);
+        assert_eq!(value.sample.value, 0.0);
+    }
+
+    #[test]
+    fn test_vector_operations_negative_values() {
+        let value = create_test_instant_value(-15.5, vec![("negative", "test")]);
+        assert_eq!(value.sample.value, -15.5);
+        assert_eq!(value.labels.len(), 1);
+        assert_eq!(value.labels[0].name, "negative");
+        assert_eq!(value.labels[0].value, "test");
+    }
+
+    #[test]
+    fn test_vector_operations_large_numbers() {
+        let value = create_test_instant_value(1e15, vec![("large", "number")]);
+        assert_eq!(value.sample.value, 1e15);
+        assert_eq!(value.labels.len(), 1);
+    }
+
+    #[test]
+    fn test_vector_operations_special_floats() {
+        let value = create_test_instant_value(f64::INFINITY, vec![("inf", "test")]);
+        assert!(value.sample.value.is_infinite());
+        assert!(value.sample.value.is_sign_positive());
+
+        let value = create_test_instant_value(f64::NEG_INFINITY, vec![("neg_inf", "test")]);
+        assert!(value.sample.value.is_infinite());
+        assert!(value.sample.value.is_sign_negative());
+
+        let value = create_test_instant_value(f64::NAN, vec![("nan", "test")]);
+        assert!(value.sample.value.is_nan());
+    }
+
+    #[test]
+    fn test_vector_operations_unicode_labels() {
+        let value =
+            create_test_instant_value(1.0, vec![("🚀", "🚀"), ("测试", "测试"), ("🎉", "🎉")]);
+        assert_eq!(value.labels.len(), 3);
+        assert_eq!(value.labels[0].name, "🚀");
+        assert_eq!(value.labels[0].value, "🚀");
+        assert_eq!(value.labels[1].name, "测试");
+        assert_eq!(value.labels[1].value, "测试");
+        assert_eq!(value.labels[2].name, "🎉");
+        assert_eq!(value.labels[2].value, "🎉");
+    }
+
+    #[test]
+    fn test_vector_operations_long_labels() {
+        let long_name = "a".repeat(1000);
+        let long_value = "b".repeat(1000);
+        let value = create_test_instant_value(1.0, vec![(&long_name, &long_value)]);
+        assert_eq!(value.labels.len(), 1);
+        assert_eq!(value.labels[0].name, long_name);
+        assert_eq!(value.labels[0].value, long_value);
+    }
+
+    #[test]
+    fn test_vector_operations_duplicate_labels() {
+        let value = create_test_instant_value(1.0, vec![("a", "1"), ("a", "2"), ("a", "3")]);
+        assert_eq!(value.labels.len(), 3);
+        // All labels should be preserved even if names are duplicate
+        assert_eq!(value.labels[0].name, "a");
+        assert_eq!(value.labels[0].value, "1");
+        assert_eq!(value.labels[1].name, "a");
+        assert_eq!(value.labels[1].value, "2");
+        assert_eq!(value.labels[2].name, "a");
+        assert_eq!(value.labels[2].value, "3");
+    }
+
+    #[test]
+    fn test_vector_operations_edge_case_values() {
+        let value = create_test_instant_value(f64::EPSILON, vec![("epsilon", "test")]);
+        assert_eq!(value.sample.value, f64::EPSILON);
+
+        let value = create_test_instant_value(f64::MIN_POSITIVE, vec![("min_positive", "test")]);
+        assert_eq!(value.sample.value, f64::MIN_POSITIVE);
+
+        let value = create_test_instant_value(f64::MAX, vec![("max", "test")]);
+        assert_eq!(value.sample.value, f64::MAX);
+    }
+
+    #[test]
+    fn test_vector_operations_vector_data() {
+        let vector_data = create_test_vector_data();
+        assert_eq!(vector_data.len(), 3);
+
+        // Test first element
+        assert_eq!(vector_data[0].sample.value, 1.0);
+        assert_eq!(vector_data[0].labels.len(), 2);
+        assert_eq!(vector_data[0].labels[0].name, "instance");
+        assert_eq!(vector_data[0].labels[0].value, "localhost");
+
+        // Test second element
+        assert_eq!(vector_data[1].sample.value, 2.0);
+        assert_eq!(vector_data[1].labels.len(), 2);
+
+        // Test third element
+        assert_eq!(vector_data[2].sample.value, 3.0);
+        assert_eq!(vector_data[2].labels.len(), 2);
+        assert_eq!(vector_data[2].labels[0].name, "instance");
+        assert_eq!(vector_data[2].labels[0].value, "remote");
+    }
+
+    #[test]
+    fn test_vector_operations_label_signatures() {
+        let value1 = create_test_instant_value(1.0, vec![("a", "1"), ("b", "2")]);
+        let value2 = create_test_instant_value(2.0, vec![("a", "1"), ("b", "2")]);
+        let value3 = create_test_instant_value(3.0, vec![("a", "1"), ("b", "3")]);
+
+        // value1 and value2 should have the same signature (same labels)
+        let sig1 = signature(&value1.labels);
+        let sig2 = signature(&value2.labels);
+        let sig3 = signature(&value3.labels);
+
+        assert_eq!(sig1, sig2);
+        assert_ne!(sig1, sig3);
+        assert_ne!(sig2, sig3);
+    }
+
+    #[test]
+    fn test_vector_operations_empty_vector() {
+        let empty_vector: Vec<InstantValue> = vec![];
+        assert_eq!(empty_vector.len(), 0);
+
+        // Test that we can create an empty vector and it doesn't panic
+        let empty_vector_with_capacity: Vec<InstantValue> = Vec::with_capacity(100);
+        assert_eq!(empty_vector_with_capacity.len(), 0);
+        assert_eq!(empty_vector_with_capacity.capacity(), 100);
+    }
+
+    #[test]
+    fn test_vector_operations_single_element() {
+        let single_element = [create_test_instant_value(42.0, vec![("single", "test")])];
+        assert_eq!(single_element.len(), 1);
+        assert_eq!(single_element[0].sample.value, 42.0);
+        assert_eq!(single_element[0].labels.len(), 1);
+        assert_eq!(single_element[0].labels[0].name, "single");
+        assert_eq!(single_element[0].labels[0].value, "test");
+    }
+}

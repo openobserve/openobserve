@@ -472,6 +472,39 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   });
   return filteredOptions;
 };
+
+// Expose methods for testing
+defineExpose({
+  sanitizeStreamName,
+  sanitizeStaticPart,
+  getStreamList,
+  updateStreams,
+  handleDynamicStreamName,
+  saveDynamicStream,
+  getLogStream,
+  openCancelDialog,
+  openDeleteDialog,
+  deleteNode,
+  saveStream,
+  filterStreams,
+  filterColumns,
+  // Expose reactive variables for testing
+  filteredStreams,
+  createNewStream,
+  isUpdating,
+  isFetchingStreams,
+  indexOptions,
+  schemaList,
+  streams,
+  usedStreams,
+  stream_name,
+  dynamic_stream_name,
+  appendData,
+  stream_type,
+  selectedNodeType,
+  filteredStreamTypes,
+  dialog
+});
 </script>
 
 <style >

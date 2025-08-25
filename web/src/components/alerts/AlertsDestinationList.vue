@@ -578,6 +578,13 @@ export default defineComponent({
       showImportDestination,
       importDestination,
       store,
+      // Expose additional methods for testing
+      getActions,
+      getTemplates,
+      updateRoute,
+      getDestinationByName,
+      resetEditingDestination,
+      selectedPerPage,
     };
   },
 });

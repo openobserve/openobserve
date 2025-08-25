@@ -46,7 +46,7 @@ use crate::service::{
         datafusion::exec::register_table,
         grpc::{
             QueryParams,
-            storage::{cache_files, filter_file_list_by_tantivy_index},
+            storage::{cache_files, tantivy_search},
         },
         index::{Condition, IndexCondition},
         match_source,
@@ -227,7 +227,7 @@ pub(crate) async fn create_context(
     let index_condition = convert_matchers_to_index_condition(&matchers, &schema, &index_fields)?;
     if !index_condition.conditions.is_empty() && cfg.common.inverted_index_enabled {
         let (idx_took, ..) =
-            filter_file_list_by_tantivy_index(query.clone(), &mut files, Some(index_condition), None)
+            tantivy_search(query.clone(), &mut files, Some(index_condition), None)
                 .await
                 .map_err(|e| {
                     log::error!(

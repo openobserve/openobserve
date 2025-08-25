@@ -28,7 +28,6 @@ use parking_lot::Mutex;
 #[derive(Debug)]
 pub struct QueryContext {
     pub trace_id: String,
-    pub parent_cx: opentelemetry::Context,
     pub node: Arc<dyn NodeInfo>,
     pub is_super: bool,
     pub is_querier: bool,
@@ -40,9 +39,8 @@ pub struct QueryContext {
 }
 
 impl QueryContext {
-    pub fn new(parent_cx: opentelemetry::Context, node: Arc<dyn NodeInfo>) -> Self {
+    pub fn new(node: Arc<dyn NodeInfo>) -> Self {
         Self {
-            parent_cx,
             node,
             is_super: false,
             is_querier: false,

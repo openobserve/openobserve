@@ -31,6 +31,7 @@ use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;
 use tonic::{Request, Response, Status, Streaming};
+use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
@@ -70,7 +71,6 @@ impl FlightService for FlightServiceImpl {
     type ListActionsStream = BoxStream<'static, Result<ActionType, Status>>;
     type DoExchangeStream = BoxStream<'static, Result<FlightData, Status>>;
 
-    #[tracing::instrument(name = "grpc:search:flight:do_get", skip_all)]
     async fn do_get(
         &self,
         request: Request<Ticket>,
@@ -81,7 +81,8 @@ impl FlightService for FlightServiceImpl {
         let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
             prop.extract(&MetadataMap(request.metadata()))
         });
-        tracing::Span::current().set_parent(parent_cx.clone());
+        let span = tracing::info_span!("grpc:search:flight:do_get");
+        span.set_parent(parent_cx);
 
         // decode ticket to RemoteExecNode
         let ticket = request.into_inner();
@@ -99,14 +100,35 @@ impl FlightService for FlightServiceImpl {
         let timeout = req.search_info.timeout as u64;
         log::info!("[trace_id {trace_id}] flight->search: do_get, timeout: {timeout}s",);
 
-        #[cfg(feature = "enterprise")]
-        if is_super_cluster && !SEARCH_SERVER.contain_key(&trace_id).await {
-            SEARCH_SERVER
-                .insert(trace_id.clone(), TaskStatus::new_follower(vec![], false))
-                .await;
-        }
+        // Note: all async should in this place, otherwise it will break tracing
+        // https://docs.rs/tracing/latest/tracing/span/struct.Span.html#in-asynchronous-code
+        let req_move = req.clone();
+        let trace_id_move = trace_id.clone();
+        let result = async move {
+            #[cfg(feature = "enterprise")]
+            if is_super_cluster && !SEARCH_SERVER.contain_key(&trace_id_move).await {
+                // this is for work_group check in super cluster follower leader
+                SEARCH_SERVER
+                    .insert(
+                        trace_id_move.clone(),
+                        TaskStatus::new_follower(vec![], false),
+                    )
+                    .await;
+            }
 
-        let result = get_ctx_and_physical_plan(&trace_id, &req).await;
+            let result = get_ctx_and_physical_plan(&trace_id_move, &req_move).await;
+
+            #[cfg(feature = "enterprise")]
+            if is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id_move).await {
+                // this is for work_group check in super cluster follower leader
+                SEARCH_SERVER.remove(&trace_id_move, false).await;
+            }
+
+            result
+        }
+        .instrument(span.clone())
+        .await;
+
         log::info!(
             "{}",
             search_inspector_fields(
@@ -122,11 +144,6 @@ impl FlightService for FlightServiceImpl {
                     .build()
             )
         );
-
-        #[cfg(feature = "enterprise")]
-        if is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id).await {
-            SEARCH_SERVER.remove(&trace_id, false).await;
-        }
 
         // prepare dataufion context
         let (ctx, physical_plan, defer, scan_stats) = match result {
@@ -197,7 +214,7 @@ impl FlightService for FlightServiceImpl {
             .with_custom_message(PreCustomMessage::ScanStatsRef(scan_stats_ref))
             .with_custom_message(PreCustomMessage::Metrics(metrics))
             .with_custom_message(PreCustomMessage::MetricsRef(metrics_ref))
-            .build(stream);
+            .build(stream, span);
 
         let stream = async_stream::stream! {
             let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));

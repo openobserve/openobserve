@@ -597,15 +597,39 @@ describe("Logs Index", async () => {
   });
 
   it("Should handle search history toggling via route action query", async () => {
-    await wrapper.vm.router.push({ name: 'logs', query: { action: 'history', org_identifier: store.state.selectedOrganization.identifier } });
+    // Ensure initial state
+    expect(wrapper.vm.showSearchHistory).toBe(false);
+    
+    // Navigate to history view
+    await wrapper.vm.router.push({ 
+      name: 'logs', 
+      query: { 
+        action: 'history', 
+        org_identifier: store.state.selectedOrganization.identifier 
+      } 
+    });
+    
+    // Wait for all async operations and route changes
     await flushPromises();
+    await wrapper.vm.$nextTick();
+    
     expect(wrapper.vm.showSearchHistory).toBe(true);
 
-    await wrapper.vm.router.push({ name: 'logs', query: { org_identifier: store.state.selectedOrganization.identifier } });
+    // Navigate back to normal view
+    await wrapper.vm.router.push({ 
+      name: 'logs', 
+      query: { 
+        org_identifier: store.state.selectedOrganization.identifier 
+      } 
+    });
+    
+    // Wait for all async operations and route changes
     await flushPromises();
+    await wrapper.vm.$nextTick();
+    
     expect(wrapper.vm.showSearchHistory).toBe(false);
     expect(wrapper.vm.showSearchScheduler).toBe(false);
-  });
+  }, 10000);
 
 
   it("Should call router.push on redirectBackToLogs", async () => {

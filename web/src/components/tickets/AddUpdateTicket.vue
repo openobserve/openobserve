@@ -319,6 +319,8 @@ export default defineComponent({
       });
     },
   },
+  // Expose methods for testing
+  expose: ['validateTicketSubject', 'validateTicketDescription', 'validateTicketComments', 'uploadAttachment', 'onRejected', 'onSubmit'],
 });
 </script>
 

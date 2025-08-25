@@ -129,7 +129,7 @@ mod tests {
         // Should contain the short ID
         assert!(short_url.contains(short_id));
         // Should contain the org identifier
-        assert!(short_url.contains(&format!("org_identifier={}", org_id)));
+        assert!(short_url.contains(&format!("org_identifier={org_id}")));
     }
 
     #[test]
