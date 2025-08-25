@@ -102,40 +102,76 @@ abc, err = get_enrichment_table_record("${fileName}", {
 .protocol_keyword = abc.keyword
 `;
         try {
+            console.log('🔍 Starting VRL editor initialization');
+            console.log('📍 Current URL:', await this.page.url());
+            
             // Wait for logs page to be fully loaded (matching original working approach)
             await this.page.waitForLoadState('domcontentloaded');
+            console.log('✅ DOM content loaded');
+            
             await this.page.waitForLoadState('networkidle', { timeout: 30000 });
+            console.log('✅ Network idle achieved');
             
             // Give extra time for VRL editor initialization in CI (like original 3s timeout)
             await this.page.waitForTimeout(5000);
+            console.log('✅ Waited 5s for editor initialization');
+            
+            // Check what elements are available
+            const allIds = await this.page.locator('*[id]').evaluateAll(
+                elements => elements.map(el => ({ id: el.id, visible: el.offsetParent !== null })).filter(item => item.id)
+            );
+            console.log('📋 Available element IDs:', allIds);
             
             // Try to click functions button if it exists to ensure VRL panel is open
             try {
                 const functionsButton = this.page.locator('[data-test="logs-search-functions-btn"]');
                 const isVisible = await functionsButton.isVisible();
+                console.log('🔘 Functions button visible:', isVisible);
                 if (isVisible) {
                     await functionsButton.click();
+                    console.log('✅ Functions button clicked');
                     await this.page.waitForTimeout(2000);
                 }
             } catch (e) {
-                // Functions button might not exist or already be open
+                console.log('⚠️ Functions button not found or error:', e.message);
             }
             
-            // Wait for VRL editor with a more generous timeout for CI
+            // Check if fnEditor exists in DOM but might not be visible
+            const editorExists = await this.page.locator(this.vrlEditor).count();
+            console.log('📝 fnEditor elements found:', editorExists);
+            
+            if (editorExists > 0) {
+                const editorVisible = await this.page.locator(this.vrlEditor).isVisible();
+                console.log('👁️ fnEditor visible:', editorVisible);
+            }
+            
+            // Check if we can even find the editor element in CI
+            const editorExists = await this.page.locator(this.vrlEditor).count();
+            if (editorExists === 0) {
+                // Take screenshot and dump page content for debugging
+                await this.page.screenshot({ path: 'debug-no-editor.png', fullPage: true });
+                const pageContent = await this.page.content();
+                console.log('❌ fnEditor not found in DOM');
+                console.log('📄 Page content contains "editor":', pageContent.includes('editor'));
+                console.log('📄 Page content contains "function":', pageContent.includes('function'));
+                throw new Error('VRL editor (#fnEditor) not found in DOM. This suggests the page did not load correctly or VRL features are disabled.');
+            }
+            
+            // Wait for VRL editor to be visible (simple approach)
+            console.log('⏳ Waiting for VRL editor to become visible...');
             await this.page.waitForSelector(this.vrlEditor, { 
                 state: 'visible',
-                timeout: 30000 
+                timeout: 60000 
             });
+            console.log('✅ VRL editor is now visible');
             
             // Wait for the textbox inside the editor to be interactive
             const textbox = this.page.locator(this.vrlEditor).getByRole('textbox');
             await textbox.waitFor({ 
                 state: 'visible',
-                timeout: 10000 
+                timeout: 15000 
             });
-            
-            // Additional wait for editor initialization
-            await this.page.waitForTimeout(1000);
+            console.log('✅ Editor textbox is ready');
             
             // Clear any existing content and fill new query
             await textbox.clear();
