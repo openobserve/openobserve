@@ -2034,7 +2034,7 @@ pub struct EnrichmentTable {
 
 #[derive(EnvConfig, Default)]
 pub struct CuckooFilter {
-    #[env_config(name = "ZO_CUCKOO_FILTER_ENABLED", default = true)]
+    #[env_config(name = "ZO_CUCKOO_FILTER_ENABLED", default = false)]
     pub enabled: bool,
 
     #[env_config(
