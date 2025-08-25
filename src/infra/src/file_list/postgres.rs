@@ -837,7 +837,6 @@ SELECT date
         Ok(ret.unwrap_or_default())
     }
 
-
     async fn get_min_date(
         &self,
         org_id: &str,
@@ -869,18 +868,6 @@ SELECT date
         Ok(ret.unwrap_or_default())
     }
 
-    async fn get_max_update_at(&self) -> Result<i64> {
-        let pool = CLIENT_RO.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["select", "file_list"])
-            .inc();
-        let ret: Option<i64> =
-            sqlx::query_scalar(r#"SELECT MAX(updated_at)::BIGINT AS num FROM file_list;"#)
-                .fetch_one(&pool)
-                .await?;
-        Ok(ret.unwrap_or_default())
-    }
-
     async fn get_min_update_at(&self) -> Result<i64> {
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
@@ -893,58 +880,36 @@ SELECT date
         Ok(ret.unwrap_or_default())
     }
 
+    async fn get_max_update_at(&self) -> Result<i64> {
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "file_list"])
+            .inc();
+        let ret: Option<i64> =
+            sqlx::query_scalar(r#"SELECT MAX(updated_at)::BIGINT AS num FROM file_list;"#)
+                .fetch_one(&pool)
+                .await?;
+        Ok(ret.unwrap_or_default())
+    }
+
     async fn clean_by_min_update_at(&self, _val: i64) -> Result<()> {
         Ok(()) // do nothing
     }
 
-    async fn stats(
-        &self,
-        org_id: &str,
-        stream_type: Option<StreamType>,
-        stream_name: Option<&str>,
-        pk_value: Option<(i64, i64)>,
-        deleted: bool,
-    ) -> Result<Vec<(String, StreamStats)>> {
-        let (field, value) = if stream_type.is_some() && stream_name.is_some() {
-            (
-                "stream",
-                format!(
-                    "{}/{}/{}",
-                    org_id,
-                    stream_type.unwrap(),
-                    stream_name.unwrap()
-                ),
-            )
-        } else {
-            ("org", org_id.to_string())
-        };
-        let file_list_stream = format!("{org_id}/file_list/");
-        let mut sql = format!(
+    async fn stats(&self, time_range: (i64, i64)) -> Result<Vec<(String, StreamStats)>> {
+        let (min, max) = time_range;
+        let sql = format!(
             r#"
 SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS file_num,
     SUM(records)::BIGINT AS records, SUM(original_size)::BIGINT AS original_size, SUM(compressed_size)::BIGINT AS compressed_size, SUM(index_size)::BIGINT AS index_size
     FROM file_list
-    WHERE {field} = '{value}' AND stream NOT LIKE '{file_list_stream}%'
+    WHERE updated_at >= {min} AND updated_at < {max}
+    GROUP BY stream
             "#
         );
-        if deleted {
-            sql = format!("{sql} AND deleted IS TRUE");
-        }
-        let sql = match pk_value {
-            None => format!("{sql} GROUP BY stream"),
-            Some((0, 0)) => format!("{sql} GROUP BY stream"),
-            Some((min, max)) => {
-                if deleted {
-                    format!("{sql} AND id <= {max} GROUP BY stream")
-                } else {
-                    format!("{sql} AND id > {min} AND id <= {max} GROUP BY stream")
-                }
-            }
-        };
         let pool = CLIENT_RO.clone();
-        let op_name = if deleted { "stats_deleted" } else { "stats" };
         DB_QUERY_NUMS
-            .with_label_values(&[op_name, "file_list"])
+            .with_label_values(&["stats", "file_list"])
             .inc();
         let start = std::time::Instant::now();
         let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
@@ -952,7 +917,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
             .await?;
         let time = start.elapsed().as_secs_f64();
         DB_QUERY_TIME
-            .with_label_values(&[op_name, "file_list"])
+            .with_label_values(&["stats", "file_list"])
             .observe(time);
         Ok(ret
             .iter()
@@ -1008,30 +973,29 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
 
     async fn set_stream_stats(
         &self,
-        org_id: &str,
         streams: &[(String, StreamStats)],
-        pk_value: Option<(i64, i64)>,
+        time_range: (i64, i64),
     ) -> Result<()> {
         let pool = CLIENT.clone();
-        let old_stats = self.get_stream_stats(org_id, None, None).await?;
-        let old_stats = old_stats.into_iter().collect::<HashMap<_, _>>();
-        let mut new_streams = Vec::new();
-        let mut update_streams = Vec::with_capacity(streams.len());
-        for (stream_key, item) in streams {
-            let mut stats = match old_stats.get(stream_key) {
-                Some(s) => s.to_owned(),
-                None => {
-                    new_streams.push(stream_key);
-                    StreamStats::default()
-                }
-            };
-            stats.format_by(item); // format stats
-            update_streams.push((stream_key, stats));
-        }
-
+        // check if stream stats exist
         let mut tx = pool.begin().await?;
-        for stream_key in new_streams {
-            let org_id = stream_key[..stream_key.find('/').unwrap()].to_string();
+        for (stream_key, _) in streams {
+            if crate::schema::STREAM_STATS_EXISTS.contains(stream_key) {
+                continue;
+            }
+            // stream stats not exist, check from stream_stats table again
+            let Some((org_id, stream_type, stream_name)) = super::parse_stream_key(stream_key)
+            else {
+                return Err(Error::Message(format!("invalid stream key: {stream_key}")));
+            };
+            let ret = self
+                .get_stream_stats(&org_id, Some(stream_type), Some(&stream_name))
+                .await?;
+            if !ret.is_empty() {
+                crate::schema::STREAM_STATS_EXISTS.insert(stream_key.clone());
+                continue;
+            }
+            // stream stats not exist, insert a new one
             DB_QUERY_NUMS
                 .with_label_values(&["insert", "stream_stats"])
                 .inc();
@@ -1054,34 +1018,33 @@ INSERT INTO stream_stats
             }
         }
         if let Err(e) = tx.commit().await {
-            log::error!("[POSTGRES] commit set stream stats error: {e}");
+            log::error!("[POSTGRES] commit insert stream stats error: {e}");
             return Err(e.into());
         }
 
-        let mut tx = pool.begin().await?;
         // update stats
-        for (stream_key, stats) in update_streams {
+        let mut tx = pool.begin().await?;
+        for (stream_key, stats) in streams {
             DB_QUERY_NUMS
                 .with_label_values(&["update", "stream_stats"])
                 .inc();
-            if
-                let Err(e) = sqlx
-                    ::query(
-                        r#"
+            if let Err(e) = sqlx::query(
+                r#"
 UPDATE stream_stats
     SET file_num = file_num + $1, min_ts = $2, max_ts = $3, records = records + $4, original_size = original_size + $5, compressed_size = compressed_size + $6, index_size = index_size + $7
     WHERE stream = $8;
-                "#
-                    )
-                    .bind(stats.file_num)
-                    .bind(stats.doc_time_min)
-                    .bind(stats.doc_time_max)
-                    .bind(stats.doc_num)
-                    .bind(stats.storage_size as i64)
-                    .bind(stats.compressed_size as i64)
-                    .bind(stats.index_size as i64)
-                    .bind(stream_key)
-                    .execute(&mut *tx).await
+                "#,
+            )
+            .bind(stats.file_num)
+            .bind(stats.doc_time_min)
+            .bind(stats.doc_time_max)
+            .bind(stats.doc_num)
+            .bind(stats.storage_size as i64)
+            .bind(stats.compressed_size as i64)
+            .bind(stats.index_size as i64)
+            .bind(stream_key)
+            .execute(&mut *tx)
+            .await
             {
                 if let Err(e) = tx.rollback().await {
                     log::error!("[POSTGRES] rollback set stream stats error: {e}");
@@ -1089,25 +1052,28 @@ UPDATE stream_stats
                 return Err(e.into());
             }
         }
-
         // delete files which already marked deleted
-        if let Some((_min_id, max_id)) = pk_value {
-            DB_QUERY_NUMS
-                .with_label_values(&["clean_deleted", "file_list"])
-                .inc();
+        let (min_ts, max_ts) = time_range;
+        DB_QUERY_NUMS
+            .with_label_values(&["clean_deleted", "file_list"])
+            .inc();
+        let start = std::time::Instant::now();
+        loop {
             let start = std::time::Instant::now();
-            let limit = config::get_config().limit.calculate_stats_step_limit;
-            loop {
-                let start = std::time::Instant::now();
-                match sqlx::query("DELETE FROM file_list WHERE id IN (SELECT id FROM file_list WHERE org = $1 AND deleted IS TRUE AND id <= $2 LIMIT $3);")
-                    .bind(org_id)
-                    .bind(max_id)
-                    .bind(limit)
-                    .execute(&mut *tx)
-                    .await
+            match sqlx::query(
+                    r#"DELETE FROM file_list WHERE deleted IS TRUE AND updated_at >= $1 AND updated_at < $2"#,
+                )
+                .bind(min_ts)
+                .bind(max_ts)
+                .execute(&mut *tx)
+                .await
                 {
                     Ok(v) => {
-                        log::debug!("[POSTGRES] delete file list rows affected: {}, took: {} ms", v.rows_affected(), start.elapsed().as_millis());
+                        log::debug!(
+                            "[POSTGRES] delete file list rows affected: {}, took: {} ms",
+                            v.rows_affected(),
+                            start.elapsed().as_millis()
+                        );
                         if v.rows_affected() == 0 {
                             break;
                         }
@@ -1121,12 +1087,11 @@ UPDATE stream_stats
                         return Err(e.into());
                     }
                 }
-            }
-            let time = start.elapsed().as_secs_f64();
-            DB_QUERY_TIME
-                .with_label_values(&["clean_deleted", "file_list"])
-                .observe(time);
         }
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["clean_deleted", "file_list"])
+            .observe(time);
 
         // commit
         if let Err(e) = tx.commit().await {

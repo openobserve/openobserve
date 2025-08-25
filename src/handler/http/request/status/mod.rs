@@ -388,10 +388,12 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
     );
 
     let file_list_num = file_list::len().await;
-    let file_list_max_id = file_list::get_max_pk_value().await.unwrap_or_default();
+    let file_list_last_update_at = file_list::get_max_update_at().await.unwrap_or_default();
+    let (last_run_stats_at, _) = db::compact::stats::get_offset().await;
+
     stats.insert(
         "FILE_LIST",
-        json::json!({"num":file_list_num,"max_id": file_list_max_id}),
+        json::json!({"num":file_list_num,"last_update_at": file_list_last_update_at, "last_run_stats_at": last_run_stats_at}),
     );
 
     let last_file_list_offset = db::compact::file_list::get_offset().await.unwrap();

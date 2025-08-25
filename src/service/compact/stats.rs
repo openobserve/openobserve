@@ -13,24 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster::LOCAL_NODE, meta::stream::StreamStats};
+use config::{
+    cluster::LOCAL_NODE,
+    meta::stream::StreamStats,
+    utils::time::{now_micros, second_micros},
+};
 use hashbrown::HashMap;
 use infra::{dist_lock, file_list as infra_file_list};
 
-use crate::{
-    common::infra::cluster::get_node_by_uuid,
-    service::{db, file_list_dump},
-};
+use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
 pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow::Error> {
-    let latest_pk = infra_file_list::get_max_pk_value()
+    let latest_update_at = infra_file_list::get_max_update_at()
         .await
-        .map_err(|e| anyhow::anyhow!("get max pk value error: {:?}", e))?;
+        .map_err(|e| anyhow::anyhow!("get latest update_at error: {:?}", e))?;
+    // set the max_ts shouldn't greater than NOW-1m to avoid the latest data duplicated calculation
+    let latest_update_at = std::cmp::min(latest_update_at, now_micros() - second_micros(60));
+
     loop {
-        let Some(offset) = update_stats_from_file_list_inner(latest_pk).await? else {
+        let Some(time_range) = update_stats_from_file_list_inner(latest_update_at).await? else {
             break;
         };
-        log::info!("keep updating stream stats from file list, offset: {offset:?} ...");
+        log::info!("keep updating stream stats from file list, time range: {time_range:?} ...");
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
     }
     log::debug!("done updating stream stats from file list");
@@ -38,7 +42,7 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
 }
 
 async fn update_stats_from_file_list_inner(
-    latest_pk: i64,
+    latest_update_at: i64,
 ) -> Result<Option<(i64, i64)>, anyhow::Error> {
     // get last offset
     let (mut offset, node) = db::compact::stats::get_offset().await;
@@ -55,60 +59,56 @@ async fn update_stats_from_file_list_inner(
         }
     }
 
+    // check if the offset is empty
+    if offset == 0 {
+        // get the min_date from file_list
+        offset = infra_file_list::get_min_update_at().await?;
+    }
+
     // apply step limit
     let step_limit = config::get_config().limit.calculate_stats_step_limit;
-    let latest_pk = std::cmp::min(offset + step_limit, latest_pk);
-    let pk_value = if offset == 0 && latest_pk == 0 {
-        None
+    let latest_update_at = std::cmp::min(offset + second_micros(step_limit), latest_update_at);
+    let time_range = if offset == 0 && latest_update_at == 0 {
+        return Ok(None);
     } else {
-        Some((offset, latest_pk))
+        (offset, latest_update_at)
     };
 
     // there is no new data to process
-    if offset == latest_pk {
+    if offset == latest_update_at {
         return Ok(None);
     }
 
     // get stats from file_list
-    let orgs = db::schema::list_organizations_from_cache().await;
-    for org_id in orgs {
-        let add_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, false)
+    let stream_stats = infra_file_list::stats(time_range)
+        .await
+        .map_err(|e| anyhow::anyhow!("get add stream stats error: {e}"))?;
+    // TODO: !!! fix file_list_dump::stats
+    // let dumped_stats = file_list_dump::stats(time_range)
+    //     .await
+    //     .map_err(|e| anyhow::anyhow!("get dumped add stream stats error: {e}"))?;
+    // dump never store deleted files, so we do not have to consider deleted here
+    let dumped_stats = Vec::new();
+    let mut stream_stats = stream_stats
+        .into_iter()
+        .collect::<HashMap<String, StreamStats>>();
+    for (stream, stats) in dumped_stats {
+        let entry = stream_stats.entry(stream).or_insert(StreamStats::default());
+        *entry = &*entry + &stats;
+    }
+    if !stream_stats.is_empty() {
+        let stream_stats = stream_stats.into_iter().collect::<Vec<_>>();
+        infra_file_list::set_stream_stats(&stream_stats, time_range)
             .await
-            .map_err(|e| anyhow::anyhow!("get add stream stats error: {e}"))?;
-        let dumped_add_stats = file_list_dump::stats(&org_id, None, None, pk_value)
-            .await
-            .map_err(|e| anyhow::anyhow!("get dumped add stream stats error: {e}"))?;
-        let del_stream_stats = infra_file_list::stats(&org_id, None, None, pk_value, true)
-            .await
-            .map_err(|e| anyhow::anyhow!("get del stream stats error: {e}"))?;
-        // dump never store deleted files, so we do not have to consider deleted here
-        let mut stream_stats = HashMap::new();
-        for (stream, stats) in add_stream_stats {
-            stream_stats.insert(stream, stats);
-        }
-        for (stream, stats) in dumped_add_stats {
-            let entry = stream_stats.entry(stream).or_insert(StreamStats::default());
-            *entry = &*entry + &stats;
-        }
-        for (stream, stats) in del_stream_stats {
-            let entry = stream_stats.entry(stream).or_insert(StreamStats::default());
-            *entry = &*entry - &stats;
-        }
-        if !stream_stats.is_empty() {
-            let stream_stats = stream_stats.into_iter().collect::<Vec<_>>();
-            infra_file_list::set_stream_stats(&org_id, &stream_stats, pk_value)
-                .await
-                .map_err(|e| anyhow::anyhow!("set stream stats error: {e}"))?;
-        }
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            .map_err(|e| anyhow::anyhow!("set stream stats error: {e}"))?;
     }
 
     // update offset
-    db::compact::stats::set_offset(latest_pk, Some(&LOCAL_NODE.uuid.clone()))
+    db::compact::stats::set_offset(latest_update_at, Some(&LOCAL_NODE.uuid.clone()))
         .await
         .map_err(|e| anyhow::anyhow!("set offset error: {e}"))?;
 
-    Ok(pk_value)
+    Ok(Some(time_range))
 }
 
 async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {

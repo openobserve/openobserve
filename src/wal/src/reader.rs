@@ -225,7 +225,7 @@ where
         // Log timing breakdown if slow
         if total_duration.as_millis() > 100 {
             log::warn!(
-                "[WAL Reader] SLOW _read_entry: {}ms total (checksum_read: {}μs, length_read: {}μs, data_setup: {}μs, decompress: {}ms, crc_verify: {}μs, validation: {}μs) - data_len: {}, compressed_len: {}",
+                "[WAL Reader] SLOW _read_entry: {}ms (checksum_read: {}μs, length_read: {}μs, data_setup: {}μs, decompress: {}ms, crc_verify: {}μs, validation: {}μs), data_len: {}, compressed_len: {}",
                 total_duration.as_millis(),
                 checksum_read_duration.as_micros(),
                 length_read_duration.as_micros(),

@@ -1289,7 +1289,7 @@ pub struct Limit {
     pub job_runtime_shutdown_timeout: u64,
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 60)] // seconds
     pub calculate_stats_interval: u64,
-    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT", default = 1000000)] // records
+    #[env_config(name = "ZO_CALCULATE_STATS_STEP_LIMIT", default = 600)] // seconds
     pub calculate_stats_step_limit: i64,
     #[env_config(name = "ZO_ACTIX_REQ_TIMEOUT", default = 5)] // seconds
     pub http_request_timeout: u64,
@@ -2240,7 +2240,10 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check for calculate stats
     if cfg.limit.calculate_stats_step_limit < 1 {
-        cfg.limit.calculate_stats_step_limit = 1000000;
+        cfg.limit.calculate_stats_step_limit = 600;
+    }
+    if cfg.limit.calculate_stats_step_limit > 86400 {
+        cfg.limit.calculate_stats_step_limit = 86400;
     }
 
     Ok(())
