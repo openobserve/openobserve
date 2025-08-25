@@ -373,46 +373,50 @@ abc, err = get_enrichment_table_record("${fileName}", {
             timeout: 15000 
         });
         
-        // DIAGNOSTIC: Check what's actually on the page in CI
-        const pageContent = await this.page.content();
-        console.log('Page HTML length:', pageContent.length);
+        // Check if VRL editor is enabled via URL parameter
+        const currentUrl = new URL(this.page.url());
+        const fnEditorParam = currentUrl.searchParams.get('fn_editor');
+        console.log('fn_editor URL parameter:', fnEditorParam);
+        
+        // If fn_editor is explicitly false, we need to enable it
+        if (fnEditorParam === 'false') {
+            console.log('VRL editor disabled via URL parameter, enabling via functions toggle');
+            
+            // Click the functions toggle to enable VRL editor
+            const functionsToggle = this.page.locator('[data-test="logs-search-functions-btn"]');
+            if (await functionsToggle.isVisible()) {
+                await functionsToggle.click();
+                await this.page.waitForLoadState('domcontentloaded');
+                console.log('Functions toggle clicked to enable VRL editor');
+            } else {
+                console.log('Functions toggle not visible');
+            }
+        }
+        
+        // Wait for VRL editor to appear after potential toggle
+        await this.page.waitForSelector(this.vrlEditor, { 
+            state: 'visible',
+            timeout: 15000 
+        });
         
         const vrlEditorExists = await this.page.locator('#fnEditor').count();
-        console.log('VRL Editor count:', vrlEditorExists);
+        console.log('VRL Editor count after toggle logic:', vrlEditorExists);
         
-        const aceScripts = await this.page.locator('script[src*="ace"]').count();
-        console.log('Ace editor scripts loaded:', aceScripts);
-        
-        const allEditors = await this.page.locator('[id*="editor"], [class*="editor"]').count();
-        console.log('All editor elements:', allEditors);
-        
-        // Check current URL
-        const currentUrl = this.page.url();
-        console.log('Current URL:', currentUrl);
-        
-        // Check if we're actually on logs page
-        const isLogsPage = currentUrl.includes('/logs');
-        console.log('Is on logs page:', isLogsPage);
-        
-        // Only proceed if editor exists
-        if (vrlEditorExists > 0) {
-            await this.fillVRLQuery(fileName);
+        // Now proceed with VRL processing
+        await this.fillVRLQuery(fileName);
 
-            // Wait for VRL editor to be fully ready for processing
-            await this.waitForVRLEditorReady();
+        // Wait for VRL editor to be fully ready for processing
+        await this.waitForVRLEditorReady();
 
-            // Apply query with multiple clicks for VRL test reliability
-            await this.applyQueryMultipleClicks();
+        // Apply query with multiple clicks for VRL test reliability
+        await this.applyQueryMultipleClicks();
 
-            // Verify that no warning is shown for query execution
-            await this.verifyNoQueryWarning();
+        // Verify that no warning is shown for query execution
+        await this.verifyNoQueryWarning();
 
-            // Expand the first row and verify protocol keyword
-            await this.expandFirstLogRow();
-            await this.clickProtocolKeyword();
-        } else {
-            throw new Error(`VRL Editor (#fnEditor) not found in CI environment. URL: ${currentUrl}, Logs page: ${isLogsPage}, HTML length: ${pageContent.length}`);
-        }
+        // Expand the first row and verify protocol keyword
+        await this.expandFirstLogRow();
+        await this.clickProtocolKeyword();
     }
 
     async uploadAndAppendEnrichmentTable(filePath, fileName) {
