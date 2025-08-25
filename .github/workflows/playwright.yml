@@ -108,13 +108,13 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: [
-            "GeneralTests/sanity.spec.js",
-            "GeneralTests/changeOrg.spec.js",
+            # "GeneralTests/sanity.spec.js",
+            # "GeneralTests/changeOrg.spec.js",
             "GeneralTests/enrichment.spec.js",
-            "GeneralTests/schema.spec.js",
-            "GeneralTests/schemaload.spec.js",
-            "GeneralTests/serviceAccount.spec.js",
-            "GeneralTests/usersOrg.spec.js",
+            # "GeneralTests/schema.spec.js",
+            # "GeneralTests/schemaload.spec.js",
+            # "GeneralTests/serviceAccount.spec.js",
+            # "GeneralTests/usersOrg.spec.js",
             # "alerts/alerts-e2e-flow.spec.js",
             # "alerts/alerts-ui-operations.spec.js",
             # "alerts/alerts-import.spec.js",

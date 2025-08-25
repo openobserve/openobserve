@@ -373,21 +373,46 @@ abc, err = get_enrichment_table_record("${fileName}", {
             timeout: 15000 
         });
         
-        // Fill VRL query using page object method
-        await this.fillVRLQuery(fileName);
+        // DIAGNOSTIC: Check what's actually on the page in CI
+        const pageContent = await this.page.content();
+        console.log('Page HTML length:', pageContent.length);
+        
+        const vrlEditorExists = await this.page.locator('#fnEditor').count();
+        console.log('VRL Editor count:', vrlEditorExists);
+        
+        const aceScripts = await this.page.locator('script[src*="ace"]').count();
+        console.log('Ace editor scripts loaded:', aceScripts);
+        
+        const allEditors = await this.page.locator('[id*="editor"], [class*="editor"]').count();
+        console.log('All editor elements:', allEditors);
+        
+        // Check current URL
+        const currentUrl = this.page.url();
+        console.log('Current URL:', currentUrl);
+        
+        // Check if we're actually on logs page
+        const isLogsPage = currentUrl.includes('/logs');
+        console.log('Is on logs page:', isLogsPage);
+        
+        // Only proceed if editor exists
+        if (vrlEditorExists > 0) {
+            await this.fillVRLQuery(fileName);
 
-        // Wait for VRL editor to be fully ready for processing
-        await this.waitForVRLEditorReady();
+            // Wait for VRL editor to be fully ready for processing
+            await this.waitForVRLEditorReady();
 
-        // Apply query with multiple clicks for VRL test reliability
-        await this.applyQueryMultipleClicks();
+            // Apply query with multiple clicks for VRL test reliability
+            await this.applyQueryMultipleClicks();
 
-        // Verify that no warning is shown for query execution
-        await this.verifyNoQueryWarning();
+            // Verify that no warning is shown for query execution
+            await this.verifyNoQueryWarning();
 
-        // Expand the first row and verify protocol keyword
-        await this.expandFirstLogRow();
-        await this.clickProtocolKeyword();
+            // Expand the first row and verify protocol keyword
+            await this.expandFirstLogRow();
+            await this.clickProtocolKeyword();
+        } else {
+            throw new Error(`VRL Editor (#fnEditor) not found in CI environment. URL: ${currentUrl}, Logs page: ${isLogsPage}, HTML length: ${pageContent.length}`);
+        }
     }
 
     async uploadAndAppendEnrichmentTable(filePath, fileName) {
