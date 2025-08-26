@@ -804,6 +804,7 @@ export default defineComponent({
             showWarningDialogToRemovePattern,
             showWarningToRemovePattern,
             handleCancelRemovePattern,
+            transformApplyAtValue,
         }
     }
 })
