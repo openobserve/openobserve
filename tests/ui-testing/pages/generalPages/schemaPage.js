@@ -250,7 +250,22 @@ class SchemaPage {
     // Switch stream in logs
     async switchStreamInLogs(fromStream, toStream) {
         testLogger.debug('Switching stream in logs', { fromStream, toStream });
+        console.log(`🔍 [CI DEBUG] Schema: Starting switchStreamInLogs from ${fromStream} to ${toStream}`);
+        
+        // Check if VRL editor is available
+        const fnEditorCount = await this.page.locator(this.schemaLocators.fnEditor).count();
+        console.log(`🔍 [CI DEBUG] Schema: VRL editor (#fnEditor) count: ${fnEditorCount}`);
+        
+        if (fnEditorCount === 0) {
+            console.error(`❌ [CI DEBUG] Schema: VRL editor not found! Current URL: ${this.page.url()}`);
+            // Take a screenshot for debugging
+            await this.page.screenshot({ path: `debug-schema-no-vrl-editor-${Date.now()}.png` });
+            throw new Error('Schema: VRL editor (#fnEditor) not found on page');
+        }
+        
+        console.log(`🔍 [CI DEBUG] Schema: Attempting to click VRL editor textbox`);
         await this.page.locator(this.schemaLocators.fnEditor).getByRole('textbox').click();
+        console.log(`🔍 [CI DEBUG] Schema: Successfully clicked VRL editor textbox`);
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).click();
         await this.page.locator(this.schemaLocators.logSearchIndexSelectStream).fill(fromStream);
         await this.page.getByText(fromStream).click();

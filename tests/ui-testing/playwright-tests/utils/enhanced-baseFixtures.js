@@ -80,6 +80,31 @@ const test = baseTest.extend({
   page: async ({ context }, use) => {
     const page = await context.newPage();
     
+    // Add console logging for CI debugging
+    if (process.env.CI) {
+      console.log(`🔍 [CI DEBUG] Creating new page in CI environment`);
+      
+      page.on('console', (msg) => {
+        if (msg.type() === 'error') {
+          console.error(`🔍 [CI DEBUG] Browser console error:`, msg.text());
+        }
+        if (msg.type() === 'warn') {
+          console.warn(`🔍 [CI DEBUG] Browser console warning:`, msg.text());
+        }
+      });
+      
+      // Capture page errors
+      page.on('pageerror', (error) => {
+        console.error(`🔍 [CI DEBUG] Page error:`, error.message);
+        console.error(`🔍 [CI DEBUG] Page error stack:`, error.stack);
+      });
+      
+      // Capture request failures
+      page.on('requestfailed', (request) => {
+        console.error(`🔍 [CI DEBUG] Request failed:`, request.url(), request.failure()?.errorText);
+      });
+    }
+    
     // Add wait helpers to page
     page.waitHelpers = waitUtils.create(page);
     

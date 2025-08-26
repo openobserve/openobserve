@@ -151,8 +151,27 @@ export class LogsPage {
     async navigateToLogs(orgIdentifier) {
         const logsUrl = '/web/logs'; // Using the same pattern as in test files
         const orgId = orgIdentifier || process.env["ORGNAME"];
+        const fullUrl = `${logsUrl}?org_identifier=${orgId}&fn_editor=true`;
+        
+        console.log(`🔍 [CI DEBUG] Navigating to logs page: ${fullUrl}`);
+        console.log(`🔍 [CI DEBUG] Environment: CI=${process.env.CI}, baseURL=${this.page.url()}`);
+        
         // Include fn_editor=true to ensure VRL editor is available for tests that need it
-        await this.page.goto(`${logsUrl}?org_identifier=${orgId}&fn_editor=true`);
+        await this.page.goto(fullUrl);
+        
+        console.log(`🔍 [CI DEBUG] Navigation completed to: ${this.page.url()}`);
+        
+        // Wait for page load and check for VRL editor
+        await this.page.waitForLoadState('domcontentloaded');
+        console.log(`🔍 [CI DEBUG] DOM content loaded`);
+        
+        // Check if VRL editor is present
+        const fnEditorExists = await this.page.locator('#fnEditor').count();
+        console.log(`🔍 [CI DEBUG] VRL editor (#fnEditor) count: ${fnEditorExists}`);
+        
+        if (fnEditorExists === 0) {
+            console.warn(`⚠️ [CI DEBUG] VRL editor not found! URL: ${this.page.url()}`);
+        }
     }
 
     async validateLogsPage() {

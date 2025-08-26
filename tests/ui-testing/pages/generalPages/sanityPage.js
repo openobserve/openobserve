@@ -206,13 +206,36 @@ export class SanityPage {
 
     // Function Methods
     async createAndDeleteFunction(functionName) {
+        console.log(`🔍 [CI DEBUG] Starting createAndDeleteFunction for: ${functionName}`);
+        
         await this.page.locator(this.refreshButton).click();
+        console.log(`🔍 [CI DEBUG] Clicked refresh button`);
+        
         await this.page.waitForLoadState('networkidle');
+        console.log(`🔍 [CI DEBUG] Page loaded (networkidle)`);
+        
+        // Check if VRL editor is available before proceeding
+        const fnEditorCount = await this.page.locator(this.fnEditor).count();
+        console.log(`🔍 [CI DEBUG] VRL editor (#fnEditor) count: ${fnEditorCount}`);
+        
+        if (fnEditorCount === 0) {
+            console.error(`❌ [CI DEBUG] VRL editor not found! Cannot proceed with function creation.`);
+            throw new Error('VRL editor (#fnEditor) not found on page');
+        }
         
         await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
+        console.log(`🔍 [CI DEBUG] Clicked function dropdown with 'save' filter`);
+        
+        console.log(`🔍 [CI DEBUG] Attempting to click VRL editor textbox`);
         await this.page.locator(this.fnEditor).getByRole('textbox').click();
+        console.log(`🔍 [CI DEBUG] Successfully clicked VRL editor textbox`);
+        
+        console.log(`🔍 [CI DEBUG] Filling VRL editor with content: .a=2`);
         await this.page.locator(this.fnEditor).locator(".cm-content").fill(".a=2");
+        console.log(`🔍 [CI DEBUG] Successfully filled VRL editor content`);
+        
         await waitUtils.smartWait(this.page, 1000, 'VRL editor content stabilization');
+        console.log(`🔍 [CI DEBUG] VRL editor content stabilized`);
         
         await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
         
@@ -243,9 +266,21 @@ export class SanityPage {
     }
 
     async createFunctionViaFunctionsPage() {
+        console.log(`🔍 [CI DEBUG] Starting createFunctionViaFunctionsPage`);
+        
+        console.log(`🔍 [CI DEBUG] Clicking pipeline menu item`);
         await this.page.locator(this.pipelineMenuItem).click();
+        console.log(`🔍 [CI DEBUG] Successfully clicked pipeline menu`);
+        
+        console.log(`🔍 [CI DEBUG] Clicking realtime tab`);
         await this.page.locator(this.realtimeTab).click();
+        console.log(`🔍 [CI DEBUG] Successfully clicked realtime tab`);
+        
+        console.log(`🔍 [CI DEBUG] Clicking function stream tab`);
         await this.page.locator(this.functionStreamTab).click();
+        console.log(`🔍 [CI DEBUG] Successfully clicked function stream tab`);
+        
+        console.log(`🔍 [CI DEBUG] Current URL after navigation: ${this.page.url()}`);
         
         await this.page.getByRole(this.createNewFunctionButton.role, { name: this.createNewFunctionButton.name }).click();
         await this.page.getByLabel(this.nameLabel.label).click();
@@ -625,20 +660,47 @@ export class SanityPage {
     }
 
     async displayResultsWhenSQLHistogramOnWithStreamSelection() {
+        console.log(`🔍 [CI DEBUG] Starting displayResultsWhenSQLHistogramOnWithStreamSelection`);
+        
         // Navigate to home and logs with waits
+        console.log(`🔍 [CI DEBUG] Waiting for home menu item to be visible`);
         await expect(this.page.locator('[data-test="menu-link-\\/-item"]')).toBeVisible({ timeout: 15000 });
+        
+        console.log(`🔍 [CI DEBUG] Clicking home menu item`);
         await this.page.locator('[data-test="menu-link-\\/-item"]').click();
         await this.page.waitForLoadState('domcontentloaded');
+        console.log(`🔍 [CI DEBUG] Successfully navigated to home`);
         
+        console.log(`🔍 [CI DEBUG] Waiting for logs menu item to be visible`);
         await expect(this.page.locator('[data-test="menu-link-\\/logs-item"]')).toBeVisible({ timeout: 15000 });
+        
+        console.log(`🔍 [CI DEBUG] Clicking logs menu item`);
         await this.page.locator('[data-test="menu-link-\\/logs-item"]').click();
         await this.page.waitForLoadState('networkidle', { timeout: 20000 });
+        console.log(`🔍 [CI DEBUG] Successfully navigated to logs. Current URL: ${this.page.url()}`);
+        
+        // Check if VRL editor is available
+        const fnEditorCount = await this.page.locator('#fnEditor').count();
+        console.log(`🔍 [CI DEBUG] VRL editor (#fnEditor) count after logs navigation: ${fnEditorCount}`);
+        
+        if (fnEditorCount === 0) {
+            console.error(`❌ [CI DEBUG] VRL editor not found after logs navigation! URL: ${this.page.url()}`);
+            await this.page.screenshot({ path: `debug-sql-histogram-no-vrl-${Date.now()}.png` });
+        }
         
         // Wait for SQL editor to be ready
         const sqlEditor = this.page.locator('#fnEditor').getByRole('textbox');
+        console.log(`🔍 [CI DEBUG] Waiting for SQL editor textbox to be visible`);
         await expect(sqlEditor).toBeVisible({ timeout: 15000 });
+        console.log(`🔍 [CI DEBUG] SQL editor textbox is visible`);
+        
+        console.log(`🔍 [CI DEBUG] Waiting for SQL editor to be editable`);
         await expect(sqlEditor).toBeEditable({ timeout: 10000 });
+        console.log(`🔍 [CI DEBUG] SQL editor is editable`);
+        
+        console.log(`🔍 [CI DEBUG] Clicking SQL editor`);
         await sqlEditor.click();
+        console.log(`🔍 [CI DEBUG] Successfully clicked SQL editor`);
         
         // Enable SQL mode with error handling
         const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2);
