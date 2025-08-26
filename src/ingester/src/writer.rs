@@ -116,16 +116,16 @@ pub async fn get_writer(
             start.elapsed().as_millis()
         );
     }
-    let mut is_exixting_writer_channel_closed = false;
+    let mut is_existing_writer_channel_closed = false;
     if let Some(w) = data {
         if !w.is_channel_closed() {
             return w.clone();
         }
-        is_exixting_writer_channel_closed = true;
+        is_existing_writer_channel_closed = true;
     }
     drop(r);
 
-    if is_exixting_writer_channel_closed {
+    if is_existing_writer_channel_closed {
         log::warn!(
             "[INGESTER:MEM:{}] Writer channel closed for {}/{}, removing from cache",
             idx,
