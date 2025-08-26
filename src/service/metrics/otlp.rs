@@ -52,7 +52,7 @@ use crate::{
         alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{
-            TriggerAlertData, check_ingestion_allowed, evaluate_trigger,
+            TriggerAlertData, evaluate_trigger,
             grpc::{get_exemplar_val, get_metric_val, get_val},
             write_file,
         },
@@ -110,17 +110,7 @@ pub async fn handle_otlp_request(
     request: ExportMetricsServiceRequest,
     req_type: OtlpRequestType,
 ) -> Result<HttpResponse, anyhow::Error> {
-    // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
-        log::error!("[METRICS:OTLP] ingestion error: {e}");
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE,
-                e,
-            )),
-        );
-    }
-
+  
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
