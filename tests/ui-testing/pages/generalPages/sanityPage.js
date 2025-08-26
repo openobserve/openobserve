@@ -179,7 +179,35 @@ export class SanityPage {
         
         const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
         await this.page.locator(deleteButtonSelector).click();
-        await this.page.locator(this.confirmButton).click();
+        
+        // Wait for confirm button to be stable before clicking
+        console.log(`🔍 [CI DEBUG] Waiting for confirm button to be stable`);
+        await this.page.waitForLoadState('domcontentloaded');
+        
+        // Use multiple strategies to click the confirm button
+        try {
+            await this.page.locator(this.confirmButton).waitFor({ state: 'visible', timeout: 10000 });
+            await this.page.locator(this.confirmButton).waitFor({ state: 'attached', timeout: 5000 });
+            
+            // Force click with retry mechanism
+            let retries = 3;
+            while (retries > 0) {
+                try {
+                    await this.page.locator(this.confirmButton).click({ timeout: 5000, force: true });
+                    console.log(`🔍 [CI DEBUG] Successfully clicked confirm button`);
+                    break;
+                } catch (error) {
+                    console.log(`🔍 [CI DEBUG] Confirm button click failed, retrying... (${retries} left)`);
+                    retries--;
+                    if (retries === 0) throw error;
+                    await this.page.waitForTimeout(1000);
+                }
+            }
+        } catch (error) {
+            console.error(`❌ [CI DEBUG] Confirm button click failed:`, error.message);
+            await this.page.screenshot({ path: `debug-confirm-button-${Date.now()}.png` });
+            throw error;
+        }
     }
 
     // Query Limit Methods
@@ -237,18 +265,25 @@ export class SanityPage {
         await waitUtils.smartWait(this.page, 1000, 'VRL editor content stabilization');
         console.log(`🔍 [CI DEBUG] VRL editor content stabilized`);
         
+        console.log(`🔍 [CI DEBUG] Clicking save button in function dropdown`);
         await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
         
         // Wait for save dialog to appear using multiple wait strategies
+        console.log(`🔍 [CI DEBUG] Waiting for save dialog to appear`);
         try {
           // First try waiting for the element to be attached to DOM
-          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'attached', timeout: 3000 });
+          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'attached', timeout: 5000 });
+          console.log(`🔍 [CI DEBUG] Save dialog attached to DOM`);
           // Then wait for it to be visible  
-          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
+          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 5000 });
+          console.log(`🔍 [CI DEBUG] Save dialog is visible`);
         } catch (error) {
           // If dialog doesn't appear, try clicking save again
+          console.log(`🔍 [CI DEBUG] Save dialog not visible, trying again`);
           await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
-          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 5000 });
+          await this.page.waitForTimeout(1000);
+          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 10000 });
+          console.log(`🔍 [CI DEBUG] Save dialog visible after retry`);
         }
         await this.page.locator(this.savedFunctionNameInput).click();
         await this.page.locator(this.savedFunctionNameInput).fill(functionName);
@@ -341,10 +376,15 @@ export class SanityPage {
         await this.page.locator(this.streamTypeDropdown).getByText("arrow_drop_down").click();
         await this.page.getByRole("option", { name: "Logs" }).click();
         
+        console.log(`🔍 [CI DEBUG] Saving stream: sanitylogstream`);
         await this.page.locator(this.saveStreamButton).click();
         await this.page.waitForLoadState('networkidle');
         
-        const isBackOnStreamsList = await this.page.locator(this.addStreamButton).isVisible({ timeout: 5000 });
+        // Wait longer for stream creation to complete
+        await this.page.waitForTimeout(3000);
+        console.log(`🔍 [CI DEBUG] Checking if back on streams list`);
+        
+        const isBackOnStreamsList = await this.page.locator(this.addStreamButton).isVisible({ timeout: 10000 });
         if (isBackOnStreamsList) {
             // Stream creation successful
         } else {
@@ -365,15 +405,21 @@ export class SanityPage {
             await this.page.waitForLoadState('domcontentloaded');
         }
         
+        console.log(`🔍 [CI DEBUG] Searching for created stream: sanitylogstream`);
         await this.page.getByPlaceholder("Search Stream").fill("sanitylogstream");
         await this.page.waitForLoadState('domcontentloaded');
         
+        // Wait a bit for search results to load
+        await this.page.waitForTimeout(2000);
+        
         const deleteButtons = this.page.getByRole(this.deleteButton.role, { name: this.deleteButton.name });
         const deleteButtonCount = await deleteButtons.count();
+        console.log(`🔍 [CI DEBUG] Delete buttons found: ${deleteButtonCount}`);
         
         if (deleteButtonCount > 0) {
+            console.log(`🔍 [CI DEBUG] Stream found, proceeding with deletion`);
             const deleteButton = deleteButtons.first();
-            await expect(deleteButton).toBeVisible({ timeout: 5000 });
+            await expect(deleteButton).toBeVisible({ timeout: 10000 });
             await deleteButton.click({ force: true });
             
             const deleteConfirmButton = this.page.getByRole(this.deleteButton.role, { name: this.deleteButton.name });
