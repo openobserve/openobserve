@@ -198,7 +198,7 @@ pub async fn check_ttl() -> Result<()> {
                 .send((WriterSignal::Rotate, vec![], false))
                 .await
             {
-                log::error!("[INGESTER:MEM:{}] writer queue rotate error: {}", r.idx, e);
+                log::error!("[INGESTER:MEM:{}] writer queue rotate error: {e}", r.idx);
             }
         }
     }
