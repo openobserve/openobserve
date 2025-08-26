@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, ref, computed, type Ref } from "vue";
+import { reactive, ref, computed, nextTick, type Ref } from "vue";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import type { SearchRequestPayload } from "@/ts/interfaces";
@@ -94,6 +94,61 @@ export const useLogsState = () => {
     searchObj.data.stream.streamType = "";
   };
 
+  const clearSearchObj = () => {
+    Object.assign(searchObj, JSON.parse(JSON.stringify(DEFAULT_LOGS_CONFIG)));
+  };
+
+  const initialLogsState = async () => {
+    const store = useStore();
+    if (store.state.logs?.isInitialized) {
+      try {
+        const state = store.getters["logs/getLogs"];
+        searchObj.organizationIdentifier = state.organizationIdentifier;
+        searchObj.config = JSON.parse(JSON.stringify(state.config));
+        searchObj.communicationMethod = state.communicationMethod;
+        
+        await nextTick();
+        
+        searchObj.meta = JSON.parse(JSON.stringify({
+          ...state.meta,
+          refreshInterval: 0,
+        }));
+        
+        searchObj.data = JSON.parse(JSON.stringify({
+          ...JSON.parse(JSON.stringify(state.data)),
+          queryResults: {},
+          sortedQueryResults: [],
+          histogram: {
+            xData: [],
+            yData: [],
+            chartParams: {
+              title: "",
+            },
+          },
+        }));
+        
+        return true;
+      } catch (error: any) {
+        console.error("Error initializing logs state:", error);
+        return false;
+      }
+    }
+    return false;
+  };
+
+  const setSelectedStreams = (streams: string[] | string) => {
+    if (typeof streams === 'string') {
+      // Handle single stream string
+      searchObj.data.stream.selectedStream = [{ name: streams, value: streams }];
+    } else if (Array.isArray(streams)) {
+      // Handle array of streams
+      searchObj.data.stream.selectedStream = streams.map(stream => ({
+        name: typeof stream === 'string' ? stream : stream.name || stream.value,
+        value: typeof stream === 'string' ? stream : stream.value || stream.name
+      }));
+    }
+  };
+
   return {
     // Reactive state
     searchObj,
@@ -111,6 +166,9 @@ export const useLogsState = () => {
     // State management functions
     resetSearchObj,
     resetStreamData,
+    clearSearchObj,
+    initialLogsState,
+    setSelectedStreams,
   };
 };
 

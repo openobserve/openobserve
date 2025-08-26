@@ -3894,11 +3894,8 @@ export default defineComponent({
       updateAutoComplete,
       handleEscKey,
       applyAction,
-      showSavedViewConfirmDialog,
       getFieldList,
       buildStreamQuery,
-      regionFilterMethod,
-      resetRegionFilter,
       updateActionSelection,
       updateEditorWidth,
     };

@@ -2273,7 +2273,6 @@ export default defineComponent({
       processHttpHistogramResults,
       searchResponseForVisualization,
       shouldUseHistogramQuery,
-      processHttpHistogramResults,
       clearSchemaCache,
     };
   },
