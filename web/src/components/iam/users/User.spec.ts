@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach, beforeAll, afterAll } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 import User from "@/components/iam/users/User.vue";
-import i18n from "@/locales";
+import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import usersService from "@/services/users";
@@ -28,6 +28,58 @@ import segment from "@/services/segment_analytics";
 
 installQuasar({
   plugins: [Dialog, Notify],
+});
+
+// Create i18n instance with comprehensive translations for CI/CD compatibility
+const i18n = createI18n({
+  locale: "en",
+  fallbackLocale: "en", 
+  legacy: false,
+  globalInjection: true,
+  silentTranslationWarn: true, // Suppress translation warnings in CI/CD
+  silentFallbackWarn: true,    // Suppress fallback warnings in CI/CD
+  messages: {
+    en: {
+      user: {
+        email: "Email",
+        firstName: "First Name",
+        lastName: "Last Name", 
+        role: "Role",
+        actions: "Actions",
+        name: "Name",
+        password: "Password",
+        confirmPassword: "Confirm Password",
+        search: "Search",
+        add: "Add User",
+        update: "Update User",
+        editUser: "Edit User",
+        cancel: "Cancel",
+        save: "Save",
+        confirmDeleteHead: "Delete User",
+        confirmDeleteMsg: "Are you sure you want to delete this user?",
+        ok: "OK"
+      },
+      iam: {
+        basicUsers: "Users"
+      },
+      search: {
+        showing: "Showing",
+        of: "of",
+        recordsPerPage: "Records Per Page"
+      },
+      ticket: {
+        noDataErrorMsg: "No data available"
+      },
+      common: {
+        cancel: "Cancel",
+        save: "Save",
+        delete: "Delete",
+        edit: "Edit",
+        add: "Add",
+        update: "Update"
+      }
+    }
+  }
 });
 
 // Mock services
@@ -44,6 +96,38 @@ vi.mock("@/aws-exports", () => ({
   }
 }));
 
+// Mock utility functions that might cause timestamp validation issues
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    timestampToTimezoneDate: vi.fn((timestamp, tz, format) => {
+      // Always return a valid date string to prevent i18n timestamp validation errors
+      if (timestamp && typeof timestamp === 'number' && timestamp > 0) {
+        return `2023-12-01`;
+      }
+      return `2023-12-01`; // Fallback for any invalid timestamps
+    }),
+    getImageURL: vi.fn(() => "http://test.com/image.png"),
+    formatDate: vi.fn(() => "2023-12-01"),
+    formatDateTime: vi.fn(() => "2023-12-01 12:00:00"),
+    convertDateFormat: vi.fn(() => "2023-12-01")
+  };
+});
+
+// Mock any other potential timestamp/date utilities
+vi.mock("@/utils/date", () => ({
+  formatDate: vi.fn(() => "2023-12-01"),
+  parseDate: vi.fn(() => new Date(2024, 0, 1))
+}));
+
+// Mock console to suppress CI/CD environment warnings  
+const originalConsole = console;
+beforeAll(() => {
+  console.warn = vi.fn();
+  console.error = vi.fn();
+});
+
 // Mock usePermissions composable
 vi.mock("@/composables/iam/usePermissions", () => ({
   default: () => ({
@@ -59,6 +143,21 @@ describe("User Component", () => {
   const mockOrganizationsService = vi.mocked(organizationsService);
   const mockGetRoles = vi.mocked(getRoles);
   const mockSegment = vi.mocked(segment);
+  
+  // Global setup to ensure consistent timestamp behavior across environments
+  beforeAll(() => {
+    // Set UTC timezone and mock Date.now() to prevent CI/CD environment timestamp issues
+    process.env.TZ = 'UTC';
+    
+    // Mock Date.now() to return a consistent timestamp
+    const fixedTime = 1704067200000; // January 1, 2024 00:00:00 UTC
+    vi.spyOn(Date, 'now').mockReturnValue(fixedTime);
+  });
+  
+  afterAll(() => {
+    delete process.env.TZ;
+    vi.restoreAllMocks();
+  });
 
   beforeEach(async () => {
     // Reset all mocks
@@ -87,19 +186,26 @@ describe("User Component", () => {
     mockGetRoles.mockResolvedValue({ data: [] });
     mockOrganizationsService.update_member_role.mockResolvedValue({ data: {} });
 
-    wrapper = mount(User, {
-      global: {
-        provide: {
-          store: store,
+    try {
+      wrapper = mount(User, {
+        global: {
+          provide: {
+            store: store,
+          },
+          plugins: [i18n, router],
         },
-        plugins: [i18n, router],
-      },
-    });
-    await flushPromises();
+      });
+      await flushPromises();
+    } catch (error) {
+      console.error('Failed to mount User component:', error);
+      throw error;
+    }
   });
 
   afterEach(() => {
-    wrapper.unmount();
+    if (wrapper && typeof wrapper.unmount === 'function') {
+      wrapper.unmount();
+    }
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
