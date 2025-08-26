@@ -1309,6 +1309,7 @@ mod tests {
     use config::meta::stream::FileMeta;
 
     use super::*;
+    use crate::service::search::grpc::QueryParams;
 
     fn create_file_key(min_ts: i64, max_ts: i64) -> FileKey {
         FileKey {
@@ -1512,5 +1513,283 @@ mod tests {
         assert_eq!(chunks[0], vec![1, 2, 3]);
         assert_eq!(chunks[1], vec![4, 5, 6]);
         assert_eq!(chunks[2], vec![7, 8]);
+    }
+
+    #[test]
+    fn test_check_inverted_index_disabled_by_config() {
+        let query = Arc::new(QueryParams {
+            trace_id: "test".to_string(),
+            org_id: "org1".to_string(),
+            stream_type: config::meta::stream::StreamType::Logs,
+            stream_name: "stream1".to_string(),
+            time_range: Some((0, 1000)),
+            work_group: None,
+            use_inverted_index: false,
+        });
+        let index_condition = Some(crate::service::search::index::IndexCondition::default());
+
+        let result = check_inverted_index(query, index_condition);
+        assert!(!result.0);
+        assert!(result.1.is_none());
+        assert!(result.2.is_none());
+    }
+
+    #[test]
+    fn test_check_inverted_index_no_condition() {
+        let query = Arc::new(QueryParams {
+            trace_id: "test".to_string(),
+            org_id: "org1".to_string(),
+            stream_type: config::meta::stream::StreamType::Logs,
+            stream_name: "stream1".to_string(),
+            time_range: Some((0, 1000)),
+            work_group: None,
+            use_inverted_index: true,
+        });
+
+        let result = check_inverted_index(query, None);
+        assert!(!result.0);
+        assert!(result.1.is_none());
+        assert!(result.2.is_none());
+    }
+
+    #[test]
+    fn test_check_inverted_index_condition_all() {
+        use crate::service::search::index::{Condition, IndexCondition};
+
+        let query = Arc::new(QueryParams {
+            trace_id: "test".to_string(),
+            org_id: "org1".to_string(),
+            stream_type: config::meta::stream::StreamType::Logs,
+            stream_name: "stream1".to_string(),
+            time_range: Some((0, 1000)),
+            work_group: None,
+            use_inverted_index: true,
+        });
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::All());
+
+        let result = check_inverted_index(query, Some(index_condition));
+        assert!(!result.0);
+        assert!(result.1.is_none());
+        assert!(result.2.is_none());
+    }
+
+    #[test]
+    fn test_check_inverted_index_positive_condition() {
+        use crate::service::search::index::{Condition, IndexCondition};
+
+        let query = Arc::new(QueryParams {
+            trace_id: "test".to_string(),
+            org_id: "org1".to_string(),
+            stream_type: config::meta::stream::StreamType::Logs,
+            stream_name: "stream1".to_string(),
+            time_range: Some((0, 1000)),
+            work_group: None,
+            use_inverted_index: true,
+        });
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+
+        let result = check_inverted_index(query, Some(index_condition));
+        assert!(result.0);
+        assert!(result.1.is_some());
+        assert!(result.2.is_none());
+    }
+
+    #[test]
+    fn test_generate_add_filter_back_condition_both_none() {
+        let mut is_add_filter_back = false;
+        let result = generate_add_filter_back_condition(None, None, &mut is_add_filter_back);
+        assert!(result.is_none());
+        assert!(!is_add_filter_back);
+    }
+
+    #[test]
+    fn test_generate_add_filter_back_condition_only_datafusion() {
+        use crate::service::search::index::{Condition, IndexCondition};
+
+        let mut datafusion_condition = IndexCondition::new();
+        datafusion_condition
+            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        let mut is_add_filter_back = false;
+
+        let result = generate_add_filter_back_condition(
+            None,
+            Some(datafusion_condition),
+            &mut is_add_filter_back,
+        );
+        assert!(result.is_some());
+        assert!(is_add_filter_back);
+    }
+
+    #[test]
+    fn test_generate_add_filter_back_condition_with_both() {
+        use crate::service::search::index::{Condition, IndexCondition};
+
+        let mut tantivy_condition = IndexCondition::new();
+        tantivy_condition
+            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+
+        let mut datafusion_condition = IndexCondition::new();
+        datafusion_condition
+            .add_condition(Condition::Equal("field2".to_string(), "value2".to_string()));
+
+        let mut is_add_filter_back = true;
+
+        let result = generate_add_filter_back_condition(
+            Some(tantivy_condition),
+            Some(datafusion_condition),
+            &mut is_add_filter_back,
+        );
+        assert!(result.is_some());
+        assert!(is_add_filter_back);
+    }
+
+    #[test]
+    fn test_generate_add_filter_back_condition_only_tantivy_no_filter_back() {
+        use crate::service::search::index::{Condition, IndexCondition};
+
+        let mut tantivy_condition = IndexCondition::new();
+        tantivy_condition
+            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        let mut is_add_filter_back = false;
+
+        let result = generate_add_filter_back_condition(
+            Some(tantivy_condition),
+            None,
+            &mut is_add_filter_back,
+        );
+        assert!(result.is_none());
+        assert!(!is_add_filter_back);
+    }
+
+    #[test]
+    fn test_generate_add_filter_back_condition_only_tantivy_with_filter_back() {
+        use crate::service::search::index::{Condition, IndexCondition};
+
+        let mut tantivy_condition = IndexCondition::new();
+        tantivy_condition
+            .add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        let mut is_add_filter_back = true;
+
+        let result = generate_add_filter_back_condition(
+            Some(tantivy_condition),
+            None,
+            &mut is_add_filter_back,
+        );
+        assert!(result.is_some());
+        assert!(is_add_filter_back);
+    }
+
+    #[test]
+    fn test_get_simple_distinct_field_none() {
+        let idx_optimize_rule = None;
+        let result = get_simple_distinct_field(&idx_optimize_rule);
+        assert_eq!(result, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_get_simple_distinct_field_simple_distinct() {
+        let idx_optimize_rule = Some(
+            config::meta::inverted_index::IndexOptimizeMode::SimpleDistinct(
+                "test_field".to_string(),
+                100,
+                false,
+            ),
+        );
+        let result = get_simple_distinct_field(&idx_optimize_rule);
+        assert_eq!(result, vec!["test_field".to_string()]);
+    }
+
+    #[test]
+    fn test_get_simple_distinct_field_other_mode() {
+        let idx_optimize_rule = Some(config::meta::inverted_index::IndexOptimizeMode::SimpleCount);
+        let result = get_simple_distinct_field(&idx_optimize_rule);
+        assert_eq!(result, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_partition_tantivy_files_simple_select_with_limit() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+            create_file_key(31, 40),
+        ];
+        let idx_optimize_mode =
+            Some(config::meta::inverted_index::IndexOptimizeMode::SimpleSelect(100, false));
+        let target_partitions = 2;
+
+        let (file_groups, limit) =
+            partition_tantivy_files(files, &idx_optimize_mode, target_partitions);
+        assert_eq!(limit, 100);
+        assert!(!file_groups.is_empty());
+    }
+
+    #[test]
+    fn test_partition_tantivy_files_simple_select_no_limit() {
+        let files = vec![create_file_key(1, 10), create_file_key(11, 20)];
+        let idx_optimize_mode =
+            Some(config::meta::inverted_index::IndexOptimizeMode::SimpleSelect(0, false));
+        let target_partitions = 2;
+
+        let (file_groups, limit) =
+            partition_tantivy_files(files, &idx_optimize_mode, target_partitions);
+        assert_eq!(limit, 0);
+        assert_eq!(file_groups.len(), 1);
+    }
+
+    #[test]
+    fn test_partition_tantivy_files_other_mode() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+            create_file_key(31, 40),
+        ];
+        let idx_optimize_mode = Some(config::meta::inverted_index::IndexOptimizeMode::SimpleCount);
+        let target_partitions = 2;
+
+        let (file_groups, limit) =
+            partition_tantivy_files(files, &idx_optimize_mode, target_partitions);
+        assert_eq!(limit, 0);
+        assert!(file_groups.len() <= 2);
+    }
+
+    #[test]
+    fn test_generate_cache_key_none_condition() {
+        let index_condition = None;
+        let idx_optimize_rule = Some(config::meta::inverted_index::IndexOptimizeMode::SimpleCount);
+        let parquet_file = &create_file_key(1, 10);
+
+        let result = generate_cache_key(&index_condition, &idx_optimize_rule, parquet_file);
+        assert_eq!(result, String::new());
+    }
+
+    #[test]
+    fn test_generate_cache_key_none_rule() {
+        use crate::service::search::index::{Condition, IndexCondition};
+
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        let idx_optimize_rule = None;
+        let parquet_file = &create_file_key(1, 10);
+
+        let result = generate_cache_key(&Some(index_condition), &idx_optimize_rule, parquet_file);
+        assert_eq!(result, String::new());
+    }
+
+    #[test]
+    fn test_generate_cache_key_valid() {
+        use crate::service::search::index::{Condition, IndexCondition};
+
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        let idx_optimize_rule = Some(config::meta::inverted_index::IndexOptimizeMode::SimpleCount);
+        let parquet_file = &create_file_key(1, 10);
+
+        let result = generate_cache_key(&Some(index_condition), &idx_optimize_rule, parquet_file);
+        assert!(!result.is_empty());
+        assert!(result.contains("file_1_10"));
     }
 }
