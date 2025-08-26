@@ -165,12 +165,44 @@ export class LogsPage {
         await this.page.waitForLoadState('domcontentloaded');
         console.log(`🔍 [CI DEBUG] DOM content loaded`);
         
-        // Check if VRL editor is present
-        const fnEditorExists = await this.page.locator('#fnEditor').count();
-        console.log(`🔍 [CI DEBUG] VRL editor (#fnEditor) count: ${fnEditorExists}`);
+        // Wait for VRL editor to be available (with retries)
+        let fnEditorExists = 0;
+        let retries = 5;
+        
+        while (fnEditorExists === 0 && retries > 0) {
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+            fnEditorExists = await this.page.locator('#fnEditor').count();
+            console.log(`🔍 [CI DEBUG] VRL editor (#fnEditor) count (attempt ${6-retries}): ${fnEditorExists}`);
+            
+            if (fnEditorExists === 0) {
+                console.log(`🔍 [CI DEBUG] VRL editor not found, waiting 2s and retrying...`);
+                await this.page.waitForTimeout(2000);
+                retries--;
+            }
+        }
         
         if (fnEditorExists === 0) {
-            console.warn(`⚠️ [CI DEBUG] VRL editor not found! URL: ${this.page.url()}`);
+            console.error(`❌ [CI DEBUG] VRL editor not found after 5 attempts! URL: ${this.page.url()}`);
+            
+            // Try reloading with explicit parameters
+            console.log(`🔍 [CI DEBUG] Attempting to reload page with VRL editor parameters`);
+            const currentUrl = new URL(this.page.url());
+            currentUrl.searchParams.set('fn_editor', 'true');
+            currentUrl.searchParams.set('vrl', 'true'); // Try alternative parameter
+            
+            await this.page.goto(currentUrl.toString());
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 });
+            
+            fnEditorExists = await this.page.locator('#fnEditor').count();
+            console.log(`🔍 [CI DEBUG] VRL editor count after reload: ${fnEditorExists}`);
+            
+            if (fnEditorExists === 0) {
+                // Take screenshot for debugging
+                await this.page.screenshot({ path: `debug-logs-no-vrl-editor-final-${Date.now()}.png` });
+                console.error(`❌ [CI DEBUG] VRL editor still not found after reload! Final URL: ${this.page.url()}`);
+            }
+        } else {
+            console.log(`✅ [CI DEBUG] VRL editor found successfully!`);
         }
     }
 
