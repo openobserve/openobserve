@@ -501,7 +501,6 @@ mod tests {
         assert!(resp.status().is_success());
     }
 
-
     async fn e2e_get_stream() {
         let auth = setup();
         let app = test::init_service(
@@ -650,13 +649,15 @@ mod tests {
             let body_str = String::from_utf8_lossy(&body);
             println!("e2e_post_function response status: {:?}", status);
             println!("e2e_post_function response body: {:?}", body_str);
-            
+
             // If function already exists, that's OK for our test
-            if status == actix_web::http::StatusCode::BAD_REQUEST && body_str.contains("Function already exist") {
+            if status == actix_web::http::StatusCode::BAD_REQUEST
+                && body_str.contains("Function already exist")
+            {
                 println!("Function already exists, continuing with test");
                 return;
             }
-            
+
             panic!("e2e_post_function failed with status: {:?}", status);
         }
         assert!(resp.status().is_success());
