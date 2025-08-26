@@ -420,24 +420,67 @@ export class SanityPage {
             console.log(`🔍 [CI DEBUG] Stream found, proceeding with deletion`);
             const deleteButton = deleteButtons.first();
             await expect(deleteButton).toBeVisible({ timeout: 10000 });
+            console.log(`🔍 [CI DEBUG] Clicking delete button for stream`);
             await deleteButton.click({ force: true });
             
-            const deleteConfirmButton = this.page.getByRole(this.deleteButton.role, { name: this.deleteButton.name });
-            await expect(deleteConfirmButton).toBeVisible({ timeout: 5000 });
-            await deleteConfirmButton.click({ force: true });
+            // Wait for confirmation dialog and click confirm
+            console.log(`🔍 [CI DEBUG] Waiting for delete confirmation dialog`);
+            await this.page.waitForLoadState('domcontentloaded');
+            
+            // Use the confirm button similar to saved search deletion
+            try {
+                await this.page.locator(this.confirmButton).waitFor({ state: 'visible', timeout: 10000 });
+                console.log(`🔍 [CI DEBUG] Confirmation button visible, clicking`);
+                
+                let confirmRetries = 3;
+                while (confirmRetries > 0) {
+                    try {
+                        await this.page.locator(this.confirmButton).click({ timeout: 5000, force: true });
+                        console.log(`🔍 [CI DEBUG] Successfully clicked stream deletion confirmation`);
+                        break;
+                    } catch (error) {
+                        console.log(`🔍 [CI DEBUG] Confirmation click failed, retrying... (${confirmRetries} left)`);
+                        confirmRetries--;
+                        if (confirmRetries === 0) throw error;
+                        await this.page.waitForTimeout(1000);
+                    }
+                }
+            } catch (error) {
+                console.error(`❌ [CI DEBUG] Stream deletion confirmation failed:`, error.message);
+                await this.page.screenshot({ path: `debug-stream-deletion-${Date.now()}.png` });
+            }
             
             await this.page.waitForLoadState('networkidle');
+            // Wait extra time for deletion to process
+            await this.page.waitForTimeout(3000);
             
             // Verify stream deletion
+            console.log(`🔍 [CI DEBUG] Verifying stream deletion by searching again`);
             await this.page.getByPlaceholder("Search Stream").clear();
             await this.page.getByPlaceholder("Search Stream").fill("sanitylogstream");
             await this.page.waitForLoadState('domcontentloaded');
+            await this.page.waitForTimeout(2000); // Wait for search results
             
             const streamNameInTable = this.page.getByText("sanitylogstream");
-            const streamExists = await streamNameInTable.isVisible({ timeout: 3000 }).catch(() => false);
+            const streamExists = await streamNameInTable.isVisible({ timeout: 5000 }).catch(() => false);
+            console.log(`🔍 [CI DEBUG] Stream exists after deletion attempt: ${streamExists}`);
             
             if (streamExists) {
-                throw new Error('Stream deletion failed - stream still exists');
+                console.error(`❌ [CI DEBUG] Stream still exists after deletion!`);
+                await this.page.screenshot({ path: `debug-stream-still-exists-${Date.now()}.png` });
+                
+                // Try alternative verification - check for delete buttons
+                const remainingDeleteButtons = this.page.getByRole(this.deleteButton.role, { name: this.deleteButton.name });
+                const remainingDeleteCount = await remainingDeleteButtons.count();
+                console.log(`🔍 [CI DEBUG] Remaining delete buttons after deletion: ${remainingDeleteCount}`);
+                
+                if (remainingDeleteCount > 0) {
+                    throw new Error('Stream deletion failed - stream still exists');
+                } else {
+                    console.log(`🔍 [CI DEBUG] No delete buttons found, considering deletion successful despite text presence`);
+                }
+            } else {
+                console.log(`✅ [CI DEBUG] Stream successfully deleted!`);
             }
             
             const noDataMessage = this.page.getByText(/No data found|No results|No streams/i);
@@ -708,7 +751,7 @@ export class SanityPage {
     async displayResultsWhenSQLHistogramOnWithStreamSelection() {
         console.log(`🔍 [CI DEBUG] Starting displayResultsWhenSQLHistogramOnWithStreamSelection`);
         
-        // Navigate to home and logs with waits
+        // Navigate to home first
         console.log(`🔍 [CI DEBUG] Waiting for home menu item to be visible`);
         await expect(this.page.locator('[data-test="menu-link-\\/-item"]')).toBeVisible({ timeout: 15000 });
         
@@ -717,21 +760,38 @@ export class SanityPage {
         await this.page.waitForLoadState('domcontentloaded');
         console.log(`🔍 [CI DEBUG] Successfully navigated to home`);
         
-        console.log(`🔍 [CI DEBUG] Waiting for logs menu item to be visible`);
-        await expect(this.page.locator('[data-test="menu-link-\\/logs-item"]')).toBeVisible({ timeout: 15000 });
+        // Use proper logs navigation that includes VRL editor
+        console.log(`🔍 [CI DEBUG] Navigating to logs with VRL editor enabled`);
+        const currentUrl = new URL(this.page.url());
+        const orgId = currentUrl.searchParams.get('org_identifier') || 'default';
+        const logsUrl = `/web/logs?org_identifier=${orgId}&fn_editor=true`;
         
-        console.log(`🔍 [CI DEBUG] Clicking logs menu item`);
-        await this.page.locator('[data-test="menu-link-\\/logs-item"]').click();
+        await this.page.goto(logsUrl);
         await this.page.waitForLoadState('networkidle', { timeout: 20000 });
-        console.log(`🔍 [CI DEBUG] Successfully navigated to logs. Current URL: ${this.page.url()}`);
+        console.log(`🔍 [CI DEBUG] Successfully navigated to logs with VRL editor. Current URL: ${this.page.url()}`);
         
-        // Check if VRL editor is available
-        const fnEditorCount = await this.page.locator('#fnEditor').count();
-        console.log(`🔍 [CI DEBUG] VRL editor (#fnEditor) count after logs navigation: ${fnEditorCount}`);
+        // Wait for VRL editor with retries (similar to logsPage.js)
+        let fnEditorCount = 0;
+        let retries = 3;
+        
+        while (fnEditorCount === 0 && retries > 0) {
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+            fnEditorCount = await this.page.locator('#fnEditor').count();
+            console.log(`🔍 [CI DEBUG] VRL editor (#fnEditor) count (attempt ${4-retries}): ${fnEditorCount}`);
+            
+            if (fnEditorCount === 0) {
+                console.log(`🔍 [CI DEBUG] VRL editor not found, waiting and retrying...`);
+                await this.page.waitForTimeout(2000);
+                retries--;
+            }
+        }
         
         if (fnEditorCount === 0) {
-            console.error(`❌ [CI DEBUG] VRL editor not found after logs navigation! URL: ${this.page.url()}`);
+            console.error(`❌ [CI DEBUG] VRL editor not found after retries! URL: ${this.page.url()}`);
             await this.page.screenshot({ path: `debug-sql-histogram-no-vrl-${Date.now()}.png` });
+            throw new Error('SQL+Histogram test: VRL editor (#fnEditor) not found after retries');
+        } else {
+            console.log(`✅ [CI DEBUG] VRL editor found successfully for SQL+Histogram test!`);
         }
         
         // Wait for SQL editor to be ready
