@@ -99,7 +99,7 @@ test.describe("Sanity Test Cases", () => {
   });
 
   // Function Tests
-  test.only("should create a function and then delete it", async ({ page }) => {
+  test("should create a function and then delete it", async ({ page }) => {
     // Generate unique function name with 4-digit alphanumeric suffix
     const generateSuffix = () => {
       const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
