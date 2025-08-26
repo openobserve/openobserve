@@ -56,6 +56,7 @@ export default defineComponent({
   components: {},
   props: {
     schemaData: Object,
+    metaData: Object,
   },
   emits: ["save"],
   setup(props: any) {
