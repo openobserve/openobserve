@@ -126,7 +126,7 @@ pub async fn data(
         .await
         {
             Ok(v) => MetaHttpResponse::json(v),
-            Err(e) => MetaHttpResponse::bad_request(e),
+            Err(e) => crate::common::utils::error_util::handle_error(e),
         },
     )
 }
@@ -169,7 +169,7 @@ pub async fn log(
         .await
         {
             Ok(v) => MetaHttpResponse::json(v),
-            Err(e) => MetaHttpResponse::bad_request(e),
+            Err(e) => crate::common::utils::error_util::handle_error(e),
         },
     )
 }
@@ -228,7 +228,7 @@ pub async fn sessionreplay(
         .await
         {
             Ok(v) => MetaHttpResponse::json(v),
-            Err(e) => MetaHttpResponse::bad_request(e),
+            Err(e) => crate::common::utils::error_util::handle_error(e),
         },
     )
 }

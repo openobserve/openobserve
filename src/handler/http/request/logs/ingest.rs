@@ -70,15 +70,7 @@ pub async fn bulk(
         Ok(v) => MetaHttpResponse::json(v),
         Err(e) => {
             log::error!("Error processing request {org_id}/_bulk: {e}");
-            if matches!(e, infra::errors::Error::ResourceError(_)) {
-                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                    http::StatusCode::SERVICE_UNAVAILABLE,
-                    e,
-                ))
-            } else {
-                HttpResponse::BadRequest()
-                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
-            }
+            crate::common::utils::error_util::handle_error(e)
         }
     };
 
@@ -144,15 +136,7 @@ pub async fn multi(
         },
         Err(e) => {
             log::error!("Error processing request {org_id}/{stream_name}/_multi: {e}");
-            if matches!(e, infra::errors::Error::ResourceError(_)) {
-                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                    http::StatusCode::SERVICE_UNAVAILABLE,
-                    e,
-                ))
-            } else {
-                HttpResponse::BadRequest()
-                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
-            }
+            crate::common::utils::error_util::handle_error(e)
         }
     };
 
@@ -218,15 +202,7 @@ pub async fn json(
         },
         Err(e) => {
             log::error!("Error processing request {org_id}/{stream_name}/_json: {e}");
-            if matches!(e, infra::errors::Error::ResourceError(_)) {
-                HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                    http::StatusCode::SERVICE_UNAVAILABLE,
-                    e,
-                ))
-            } else {
-                HttpResponse::BadRequest()
-                    .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
-            }
+            crate::common::utils::error_util::handle_error(e)
         }
     };
 
@@ -296,6 +272,12 @@ pub async fn handle_kinesis_request(
                         timestamp: request_time,
                         error_message: e.to_string().into(),
                     })
+                } else if matches!(e, infra::errors::Error::IngestionError(_)) {
+                    HttpResponse::Forbidden().json(KinesisFHIngestionResponse {
+                        request_id,
+                        timestamp: request_time,
+                        error_message: e.to_string().into(),
+                    })
                 } else {
                     HttpResponse::BadRequest().json(KinesisFHIngestionResponse {
                         request_id,
@@ -337,6 +319,9 @@ pub async fn handle_gcp_request(
                         http::StatusCode::SERVICE_UNAVAILABLE,
                         e,
                     ))
+                } else if matches!(e, infra::errors::Error::IngestionError(_)) {
+                    HttpResponse::Forbidden()
+                        .json(MetaHttpResponse::error(http::StatusCode::FORBIDDEN, e))
                 } else {
                     HttpResponse::BadRequest()
                         .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
@@ -423,6 +408,9 @@ pub async fn otlp_logs_write(
                     http::StatusCode::SERVICE_UNAVAILABLE,
                     e,
                 ))
+            } else if matches!(e, infra::errors::Error::IngestionError(_)) {
+                HttpResponse::Forbidden()
+                    .json(MetaHttpResponse::error(http::StatusCode::FORBIDDEN, e))
             } else {
                 HttpResponse::BadRequest()
                     .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
@@ -480,6 +468,8 @@ pub async fn hec(
             let res = HecResponse::from(HecStatus::Custom(e.to_string(), 400));
             if matches!(e, infra::errors::Error::ResourceError(_)) {
                 HttpResponse::ServiceUnavailable().json(res)
+            } else if matches!(e, infra::errors::Error::IngestionError(_)) {
+                HttpResponse::Forbidden().json(res)
             } else {
                 HttpResponse::BadRequest().json(res)
             }

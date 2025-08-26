@@ -100,7 +100,7 @@ pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, s
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!("[METRICS:OTLP] Error while handling http trace request: {e}");
-            Err(Error::other(e))
+            Ok(crate::common::utils::error_util::handle_error(e.into()))
         }
     }
 }
@@ -111,15 +111,7 @@ pub async fn handle_otlp_request(
     req_type: OtlpRequestType,
 ) -> Result<HttpResponse, anyhow::Error> {
     // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
-        log::error!("[METRICS:OTLP] ingestion error: {e}");
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE,
-                e,
-            )),
-        );
-    }
+    check_ingestion_allowed(org_id, StreamType::Metrics, None).await?;
 
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();

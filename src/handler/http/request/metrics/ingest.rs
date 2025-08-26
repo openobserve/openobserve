@@ -47,8 +47,7 @@ pub async fn json(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpRes
         Ok(v) => HttpResponse::Ok().json(v),
         Err(e) => {
             log::error!("Error processing request {org_id}/metrics/_json: {e}");
-            HttpResponse::BadRequest()
-                .json(MetaHttpResponse::error(http::StatusCode::BAD_REQUEST, e))
+            crate::common::utils::error_util::handle_error(e.into())
         }
     })
 }

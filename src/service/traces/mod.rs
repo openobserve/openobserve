@@ -147,12 +147,7 @@ pub async fn handle_otlp_request(
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Traces, None).await {
         log::error!("[TRACES:OTLP] ingestion error: {e}");
-        return Ok(
-            HttpResponse::ServiceUnavailable().json(MetaHttpResponse::error(
-                http::StatusCode::SERVICE_UNAVAILABLE,
-                e,
-            )),
-        );
+        return Ok(crate::common::utils::error_util::handle_error(e));
     }
 
     #[cfg(feature = "cloud")]

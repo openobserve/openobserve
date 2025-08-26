@@ -13,12 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod auth;
-mod auth_tests;
-pub mod error_util;
-pub mod functions;
-pub mod http;
-pub mod jwt;
-pub mod redirect_response;
-pub mod stream;
-pub mod zo_logger;
+use actix_web::HttpResponse;
+use infra::errors;
+
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::request::search::error_utils::map_error_to_http_response,
+};
+
+pub fn handle_error(e: infra::errors::Error) -> HttpResponse {
+    match e {
+        errors::Error::IngestionError(e) => MetaHttpResponse::forbidden(e),
+        errors::Error::ResourceError(e) => MetaHttpResponse::service_unavailable(e),
+        _ => {
+            log::error!("Error processing request: {e:?}");
+            map_error_to_http_response(&e, None)
+        }
+    }
+}
