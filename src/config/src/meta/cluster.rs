@@ -180,8 +180,8 @@ pub enum NodeStatus {
     Offline = 3,
 }
 
-impl From<u32> for NodeStatus {
-    fn from(value: u32) -> Self {
+impl From<i32> for NodeStatus {
+    fn from(value: i32) -> Self {
         match value {
             1 => NodeStatus::Prepare,
             2 => NodeStatus::Online,

@@ -131,9 +131,7 @@ async fn register() -> Result<()> {
 
     let new_node_id = generate_node_id(node_ids);
     // update local id
-    unsafe {
-        LOCAL_NODE_ID = new_node_id;
-    }
+    LOCAL_NODE_ID.store(new_node_id, Ordering::Relaxed);
 
     // 5. join the cluster
     let key = format!("/nodes/{}", LOCAL_NODE.uuid);
@@ -237,7 +235,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
             val
         }
         None => Node {
-            id: unsafe { LOCAL_NODE_ID },
+            id: LOCAL_NODE_ID.load(Ordering::Relaxed),
             uuid: LOCAL_NODE.uuid.clone(),
             name: cfg.common.instance_name.clone(),
             http_addr: format!(
@@ -275,9 +273,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
             new_node_id
         );
         // update local id
-        unsafe {
-            LOCAL_NODE_ID = new_node_id;
-        }
+        LOCAL_NODE_ID.store(new_node_id, Ordering::Relaxed);
         // reset snowflake id generator
         config::ider::reload_machine_id();
     }

@@ -15,6 +15,7 @@
 
 use std::{
     hint::spin_loop,
+    sync::atomic::Ordering,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -24,7 +25,7 @@ use rand::Rng;
 use svix_ksuid::{Ksuid, KsuidLike};
 
 static IDER: Lazy<Mutex<SnowflakeIdGenerator>> = Lazy::new(|| {
-    let machine_id = unsafe { super::cluster::LOCAL_NODE_ID };
+    let machine_id = super::cluster::LOCAL_NODE_ID.load(Ordering::Relaxed);
     log::info!("init ider with machine_id: {}", machine_id);
     Mutex::new(SnowflakeIdGenerator::new(machine_id))
 });
@@ -34,7 +35,7 @@ pub fn init() {
 }
 
 pub fn reload_machine_id() {
-    let machine_id = unsafe { super::cluster::LOCAL_NODE_ID };
+    let machine_id = super::cluster::LOCAL_NODE_ID.load(Ordering::Relaxed);
     log::info!("init ider with machine_id: {}", machine_id);
     let new_ider = SnowflakeIdGenerator::new(machine_id);
     let mut w = IDER.lock();
