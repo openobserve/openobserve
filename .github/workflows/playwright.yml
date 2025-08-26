@@ -118,17 +118,21 @@ jobs:
               "serviceAccount.spec.js",
               "usersOrg.spec.js"
             ]
-          - testfolder: "Logs"
+          - testfolder: "Logs-Core"
             browser: "chrome"
             run_files: [
               "join.spec.js",
               "logshistogram.spec.js",
               "logspage.spec.js", 
-              "logsqueries.spec.js",
               "logsquickmode.spec.js",
               "pagination.spec.js",
+              "unflattened.spec.js"
+            ]
+          - testfolder: "Logs-Queries"
+            browser: "chrome"
+            run_files: [
+              "logsqueries.spec.js",
               "secondsPrecisionAdded.spec.js",
-              "unflattened.spec.js",
               "logsqueries.cte.spec.js",
               "logsqueries.matchall.spec.js",
               "searchpartition.spec.js"
@@ -140,24 +144,32 @@ jobs:
               "alerts-ui-operations.spec.js",
               "alerts-import.spec.js"
             ]
-          - testfolder: "Dashboards"
+          - testfolder: "Dashboards-Core"
+            browser: "chrome"
+            run_files: [
+              "dashboard.spec.js",
+              "dashboard2.spec.js",
+              "dashboardtype.spec.js",
+              "dashboard-folder.spec.js",
+              "dashboard-import.spec.js"
+            ]
+          - testfolder: "Dashboards-Settings"
+            browser: "chrome"
+            run_files: [
+              "dashboard-filter.spec.js",
+              "dashboard-general-setting.spec.js",
+              "dashboard-tabs-setting.spec.js",
+              "dashboard-variables-setting.spec.js",
+              "dashboard-transpose.spec.js"
+            ]
+          - testfolder: "Dashboards-Charts"
             browser: "chrome"
             run_files: [
               "custom-charts.spec.js",
-              "dashboard.spec.js",
-              "dashboard-filter.spec.js",
-              "dashboard-folder.spec.js", 
               "dashboard-geoMap.spec.js",
-              "dashboard-general-setting.spec.js",
-              "dashboard-import.spec.js",
               "dashboard-maps.spec.js",
               "dashboard-multi-y-axis.spec.js",
-              "dashboard-tabs-setting.spec.js",
-              "dashboard-transpose.spec.js",
-              "dashboard-variables-setting.spec.js",
-              "dashboard2.spec.js",
-              "dashboardtype.spec.js",
-              "dashboard-html-chart.spec.js",
+              "dashboard-html-chart.spec.js"
               # "visualize.spec.js",
               # "visualization-vrl.spec.js"
             ]
@@ -230,10 +242,25 @@ jobs:
           echo "DEBUG: matrix.testfolder = ${{ matrix.testfolder }}"
           
           if [ -n "$FILE_LIST" ]; then
+            # Map logical folder names to actual directories
+            case "${{ matrix.testfolder }}" in
+              "Logs-Core"|"Logs-Queries")
+                ACTUAL_FOLDER="Logs"
+                ;;
+              "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts")
+                ACTUAL_FOLDER="Dashboards"
+                ;;
+              *)
+                ACTUAL_FOLDER="${{ matrix.testfolder }}"
+                ;;
+            esac
+            
+            echo "DEBUG: ACTUAL_FOLDER = $ACTUAL_FOLDER"
+            
             # Build file paths
             FILE_PATHS=""
             for file in $FILE_LIST; do
-              FILE_PATH="./playwright-tests/${{ matrix.testfolder }}/$file"
+              FILE_PATH="./playwright-tests/$ACTUAL_FOLDER/$file"
               echo "DEBUG: Will run file: $FILE_PATH"
               FILE_PATHS="$FILE_PATHS $FILE_PATH"
             done
