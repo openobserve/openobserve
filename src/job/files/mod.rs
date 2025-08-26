@@ -78,5 +78,6 @@ pub fn generate_storage_file_name(
     } else {
         format!("{}/{}", &file_name[..file_name_pos], id)
     };
-    format!("files/{stream_key}/{file_date}/{file_name}{FILE_EXT_PARQUET}")
+    let rand_str = format!("{:04x}", rand::random::<u32>() % 0x10000);
+    format!("files/{stream_key}/{file_date}/{file_name}{rand_str}{FILE_EXT_PARQUET}")
 }

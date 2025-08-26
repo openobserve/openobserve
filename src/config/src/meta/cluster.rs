@@ -80,7 +80,8 @@ impl Node {
     }
 
     pub fn is_same(&self, other: &Node) -> bool {
-        self.uuid == other.uuid
+        self.id == other.id
+            && self.uuid == other.uuid
             && self.name == other.name
             && self.http_addr == other.http_addr
             && self.grpc_addr == other.grpc_addr

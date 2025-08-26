@@ -33,6 +33,14 @@ pub fn init() {
     _ = generate();
 }
 
+pub fn reload_machine_id() {
+    let machine_id = unsafe { super::cluster::LOCAL_NODE_ID };
+    log::info!("init ider with machine_id: {}", machine_id);
+    let new_ider = SnowflakeIdGenerator::new(machine_id);
+    let mut w = IDER.lock();
+    _ = std::mem::replace(&mut *w, new_ider);
+}
+
 /// Generate a distributed unique id with snowflake.
 pub fn generate() -> String {
     IDER.lock().real_time_generate().to_string()
