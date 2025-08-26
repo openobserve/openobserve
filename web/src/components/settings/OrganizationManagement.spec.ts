@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { Quasar, Notify } from "quasar";
 import { createRouter, createWebHistory } from "vue-router";
@@ -31,7 +31,13 @@ vi.mock("@/services/organizations", () => ({
 }));
 
 vi.mock("@/utils/zincutils", () => ({
-  timestampToTimezoneDate: vi.fn((timestamp, tz, format) => `2023-12-01`),
+  timestampToTimezoneDate: vi.fn((timestamp, tz, format) => {
+    // Always return a valid date string to prevent i18n timestamp validation errors
+    if (timestamp && typeof timestamp === 'number' && timestamp > 0) {
+      return `2023-12-01`;
+    }
+    return `2023-12-01`; // Fallback for any invalid timestamps
+  }),
   getImageURL: vi.fn(() => "http://test.com/image.png")
 }));
 
@@ -60,18 +66,21 @@ const router = createRouter({
   ]
 });
 
-// Create i18n instance
+// Create i18n instance with all required translations
 const i18n = createI18n({
   locale: "en",
+  fallbackLocale: "en",
+  legacy: false,
+  globalInjection: true,
   messages: {
     en: {
       settings: {
         organizationManagement: "Organization Management",
-        searchOrgs: "Search Organizations",
+        searchOrgs: "Search Organizations", 
         paginationOrganizationLabel: "Organizations",
         org_name: "Name",
-        org_identifier: "Identifier", 
-        subscription_status: "Subscription Status",
+        org_identifier: "Identifier",
+        subscription_status: "Subscription Status", 
         created_on: "Created On",
         trial_expiry: "Trial Expiry",
         actions: "Actions",
@@ -89,6 +98,16 @@ describe("OrganizationManagement.vue", () => {
   let mockQuasarNotify: any;
   let mockGetAdminOrg: any;
   let mockExtendTrialPeriod: any;
+  
+  // Global setup to ensure consistent timestamp behavior across environments
+  beforeAll(() => {
+    // Set a global base time to prevent CI/CD environment timestamp issues
+    process.env.TZ = 'UTC';
+  });
+  
+  afterAll(() => {
+    delete process.env.TZ;
+  });
 
   beforeEach(async () => {
     // Reset all mocks
@@ -566,19 +585,21 @@ describe("OrganizationManagement.vue", () => {
   });
 
   describe("getTimestampInMicroseconds Function", () => {
+    let mockDateNow: any;
+    const fixedTime = 1704067200000; // January 1, 2024 00:00:00 UTC
+
     beforeEach(() => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(2024, 0, 1)); // January 1, 2024
+      mockDateNow = vi.spyOn(Date, 'now').mockReturnValue(fixedTime);
     });
 
     afterEach(() => {
-      vi.useRealTimers();
+      mockDateNow.mockRestore();
     });
 
     it("should calculate timestamp for 1 week", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.getTimestampInMicroseconds(1);
-      const expected = (Date.now() + 7 * 24 * 60 * 60 * 1000) * 1000;
+      const expected = (fixedTime + 7 * 24 * 60 * 60 * 1000) * 1000;
       
       expect(result).toBe(expected);
     });
@@ -586,7 +607,7 @@ describe("OrganizationManagement.vue", () => {
     it("should calculate timestamp for 2 weeks", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.getTimestampInMicroseconds(2);
-      const expected = (Date.now() + 2 * 7 * 24 * 60 * 60 * 1000) * 1000;
+      const expected = (fixedTime + 2 * 7 * 24 * 60 * 60 * 1000) * 1000;
       
       expect(result).toBe(expected);
     });
@@ -594,7 +615,7 @@ describe("OrganizationManagement.vue", () => {
     it("should calculate timestamp for 4 weeks", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.getTimestampInMicroseconds(4);
-      const expected = (Date.now() + 4 * 7 * 24 * 60 * 60 * 1000) * 1000;
+      const expected = (fixedTime + 4 * 7 * 24 * 60 * 60 * 1000) * 1000;
       
       expect(result).toBe(expected);
     });
@@ -602,7 +623,7 @@ describe("OrganizationManagement.vue", () => {
     it("should handle zero weeks", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.getTimestampInMicroseconds(0);
-      const expected = Date.now() * 1000;
+      const expected = fixedTime * 1000;
       
       expect(result).toBe(expected);
     });
@@ -610,7 +631,7 @@ describe("OrganizationManagement.vue", () => {
     it("should handle negative weeks", () => {
       wrapper = createWrapper();
       const result = wrapper.vm.getTimestampInMicroseconds(-1);
-      const expected = (Date.now() - 7 * 24 * 60 * 60 * 1000) * 1000;
+      const expected = (fixedTime - 7 * 24 * 60 * 60 * 1000) * 1000;
       
       expect(result).toBe(expected);
     });
@@ -654,20 +675,20 @@ describe("OrganizationManagement.vue", () => {
       const mockResponse = { data: true };
       mockExtendTrialPeriod.mockResolvedValue(mockResponse);
       
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(2024, 0, 1));
+      const fixedTime = 1704067200000; // January 1, 2024 00:00:00 UTC
+      const mockDateNow = vi.spyOn(Date, 'now').mockReturnValue(fixedTime);
       
       wrapper = createWrapper();
       await wrapper.vm.updateTrialPeriod("test-org", 2);
       
       const expectedPayload = {
-        new_end_date: (Date.now() + 2 * 7 * 24 * 60 * 60 * 1000) * 1000,
+        new_end_date: (fixedTime + 2 * 7 * 24 * 60 * 60 * 1000) * 1000,
         org_id: "test-org"
       };
       
       expect(mockExtendTrialPeriod).toHaveBeenCalledWith("default", expectedPayload);
       
-      vi.useRealTimers();
+      mockDateNow.mockRestore();
     });
 
     it("should show success notification", async () => {
