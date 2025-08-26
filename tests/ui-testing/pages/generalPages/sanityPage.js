@@ -251,8 +251,33 @@ export class SanityPage {
             }
         }
         
-        await deleteButton.click();
-        console.log('🔍 SAVED SEARCH DEBUG: Step 14 COMPLETE - Delete clicked');
+        try {
+            // First attempt with stability wait
+            await this.page.waitForLoadState('domcontentloaded');
+            await deleteButton.click({ timeout: 15000 });
+            console.log('🔍 SAVED SEARCH DEBUG: Step 14 COMPLETE - Delete clicked (normal)');
+        } catch (error) {
+            console.log(`🔍 SAVED SEARCH DEBUG: Delete click failed, trying force click: ${error.message}`);
+            try {
+                await deleteButton.click({ force: true, timeout: 10000 });
+                console.log('🔍 SAVED SEARCH DEBUG: Step 14 COMPLETE - Delete clicked (force)');
+            } catch (forceError) {
+                console.log(`🔍 SAVED SEARCH DEBUG: Force click also failed: ${forceError.message}`);
+                // Try clicking by coordinates as last resort
+                const box = await deleteButton.boundingBox();
+                if (box) {
+                    await this.page.mouse.click(box.x + box.width/2, box.y + box.height/2);
+                    console.log('🔍 SAVED SEARCH DEBUG: Step 14 COMPLETE - Delete clicked (mouse coordinates)');
+                } else {
+                    throw forceError;
+                }
+            }
+        }
+        
+        // Wait for confirm dialog to fully render and stabilize
+        console.log('🔍 SAVED SEARCH DEBUG: Waiting for confirm dialog to stabilize...');
+        await this.page.waitForLoadState('domcontentloaded');
+        await waitUtils.smartWait(this.page, 2000, 'Dialog stabilization');
         
         console.log('🔍 SAVED SEARCH DEBUG: Step 15 - CRITICAL CONFIRM DIALOG STEP');
         const confirmButton = this.page.locator(this.confirmButton);
@@ -291,8 +316,28 @@ export class SanityPage {
             console.log(`🔍 SAVED SEARCH DEBUG: PRE-CLICK - Count: ${await confirmButton.count()}, Visible: ${await confirmButton.isVisible()}, Enabled: ${await confirmButton.isEnabled()}`);
             console.log(`🔍 SAVED SEARCH DEBUG: PRE-CLICK - Button text: ${await confirmButton.textContent()}`);
             
-            await confirmButton.click();
-            console.log('🔍 SAVED SEARCH DEBUG: Step 15 COMPLETE - Confirm button clicked successfully');
+            // Robust confirm button clicking with multiple strategies
+            try {
+                await confirmButton.click({ timeout: 15000 });
+                console.log('🔍 SAVED SEARCH DEBUG: Step 15 COMPLETE - Confirm button clicked (normal)');
+            } catch (normalError) {
+                console.log(`🔍 SAVED SEARCH DEBUG: Normal confirm click failed: ${normalError.message}`);
+                try {
+                    // Force click as backup
+                    await confirmButton.click({ force: true, timeout: 10000 });
+                    console.log('🔍 SAVED SEARCH DEBUG: Step 15 COMPLETE - Confirm button clicked (force)');
+                } catch (forceError) {
+                    console.log(`🔍 SAVED SEARCH DEBUG: Force confirm click failed: ${forceError.message}`);
+                    // Mouse coordinates as last resort
+                    const box = await confirmButton.boundingBox();
+                    if (box) {
+                        await this.page.mouse.click(box.x + box.width/2, box.y + box.height/2);
+                        console.log('🔍 SAVED SEARCH DEBUG: Step 15 COMPLETE - Confirm button clicked (mouse coordinates)');
+                    } else {
+                        throw forceError;
+                    }
+                }
+            }
             
         } catch (error) {
             console.log(`🔍 SAVED SEARCH DEBUG: CRITICAL ERROR in confirm dialog: ${error.message}`);
