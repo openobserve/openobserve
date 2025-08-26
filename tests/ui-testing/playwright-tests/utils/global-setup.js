@@ -27,16 +27,12 @@ async function globalSetup() {
   
   try {
     testLogger.info('Performing global login authentication');
-    console.log(`🔍 [CI DEBUG] Global setup: Starting login process`);
-    console.log(`🔍 [CI DEBUG] Global setup: Environment CI=${process.env.CI}`);
     
     // Navigate to login page
-    console.log(`🔍 [CI DEBUG] Global setup: Navigating to base URL: ${process.env["ZO_BASE_URL"]}`);
     await page.goto(process.env["ZO_BASE_URL"]);
     testLogger.debug('Navigated to base URL', { url: process.env["ZO_BASE_URL"] });
     
     await page.waitForLoadState('domcontentloaded');
-    console.log(`🔍 [CI DEBUG] Global setup: Current URL after navigation: ${page.url()}`);
     
     // Handle internal user login if needed
     const internalUserButton = page.getByText('Login as internal user');

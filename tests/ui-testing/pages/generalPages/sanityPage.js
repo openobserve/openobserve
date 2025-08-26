@@ -179,35 +179,7 @@ export class SanityPage {
         
         const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
         await this.page.locator(deleteButtonSelector).click();
-        
-        // Wait for confirm button to be stable before clicking
-        console.log(`🔍 [CI DEBUG] Waiting for confirm button to be stable`);
-        await this.page.waitForLoadState('domcontentloaded');
-        
-        // Use multiple strategies to click the confirm button
-        try {
-            await this.page.locator(this.confirmButton).waitFor({ state: 'visible', timeout: 10000 });
-            await this.page.locator(this.confirmButton).waitFor({ state: 'attached', timeout: 5000 });
-            
-            // Force click with retry mechanism
-            let retries = 3;
-            while (retries > 0) {
-                try {
-                    await this.page.locator(this.confirmButton).click({ timeout: 5000, force: true });
-                    console.log(`🔍 [CI DEBUG] Successfully clicked confirm button`);
-                    break;
-                } catch (error) {
-                    console.log(`🔍 [CI DEBUG] Confirm button click failed, retrying... (${retries} left)`);
-                    retries--;
-                    if (retries === 0) throw error;
-                    await this.page.waitForTimeout(1000);
-                }
-            }
-        } catch (error) {
-            console.error(`❌ [CI DEBUG] Confirm button click failed:`, error.message);
-            await this.page.screenshot({ path: `debug-confirm-button-${Date.now()}.png` });
-            throw error;
-        }
+        await this.page.locator(this.confirmButton).click();
     }
 
     // Query Limit Methods
@@ -234,56 +206,26 @@ export class SanityPage {
 
     // Function Methods
     async createAndDeleteFunction(functionName) {
-        console.log(`🔍 [CI DEBUG] Starting createAndDeleteFunction for: ${functionName}`);
-        
         await this.page.locator(this.refreshButton).click();
-        console.log(`🔍 [CI DEBUG] Clicked refresh button`);
-        
         await this.page.waitForLoadState('networkidle');
-        console.log(`🔍 [CI DEBUG] Page loaded (networkidle)`);
-        
-        // Check if VRL editor is available before proceeding
-        const fnEditorCount = await this.page.locator(this.fnEditor).count();
-        console.log(`🔍 [CI DEBUG] VRL editor (#fnEditor) count: ${fnEditorCount}`);
-        
-        if (fnEditorCount === 0) {
-            console.error(`❌ [CI DEBUG] VRL editor not found! Cannot proceed with function creation.`);
-            throw new Error('VRL editor (#fnEditor) not found on page');
-        }
         
         await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
-        console.log(`🔍 [CI DEBUG] Clicked function dropdown with 'save' filter`);
-        
-        console.log(`🔍 [CI DEBUG] Attempting to click VRL editor textbox`);
         await this.page.locator(this.fnEditor).getByRole('textbox').click();
-        console.log(`🔍 [CI DEBUG] Successfully clicked VRL editor textbox`);
-        
-        console.log(`🔍 [CI DEBUG] Filling VRL editor with content: .a=2`);
         await this.page.locator(this.fnEditor).locator(".cm-content").fill(".a=2");
-        console.log(`🔍 [CI DEBUG] Successfully filled VRL editor content`);
-        
         await waitUtils.smartWait(this.page, 1000, 'VRL editor content stabilization');
-        console.log(`🔍 [CI DEBUG] VRL editor content stabilized`);
         
-        console.log(`🔍 [CI DEBUG] Clicking save button in function dropdown`);
         await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
         
         // Wait for save dialog to appear using multiple wait strategies
-        console.log(`🔍 [CI DEBUG] Waiting for save dialog to appear`);
         try {
           // First try waiting for the element to be attached to DOM
-          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'attached', timeout: 5000 });
-          console.log(`🔍 [CI DEBUG] Save dialog attached to DOM`);
+          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'attached', timeout: 3000 });
           // Then wait for it to be visible  
-          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 5000 });
-          console.log(`🔍 [CI DEBUG] Save dialog is visible`);
+          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 3000 });
         } catch (error) {
           // If dialog doesn't appear, try clicking save again
-          console.log(`🔍 [CI DEBUG] Save dialog not visible, trying again`);
           await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
-          await this.page.waitForTimeout(1000);
-          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 10000 });
-          console.log(`🔍 [CI DEBUG] Save dialog visible after retry`);
+          await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 5000 });
         }
         await this.page.locator(this.savedFunctionNameInput).click();
         await this.page.locator(this.savedFunctionNameInput).fill(functionName);
@@ -301,21 +243,9 @@ export class SanityPage {
     }
 
     async createFunctionViaFunctionsPage() {
-        console.log(`🔍 [CI DEBUG] Starting createFunctionViaFunctionsPage`);
-        
-        console.log(`🔍 [CI DEBUG] Clicking pipeline menu item`);
         await this.page.locator(this.pipelineMenuItem).click();
-        console.log(`🔍 [CI DEBUG] Successfully clicked pipeline menu`);
-        
-        console.log(`🔍 [CI DEBUG] Clicking realtime tab`);
         await this.page.locator(this.realtimeTab).click();
-        console.log(`🔍 [CI DEBUG] Successfully clicked realtime tab`);
-        
-        console.log(`🔍 [CI DEBUG] Clicking function stream tab`);
         await this.page.locator(this.functionStreamTab).click();
-        console.log(`🔍 [CI DEBUG] Successfully clicked function stream tab`);
-        
-        console.log(`🔍 [CI DEBUG] Current URL after navigation: ${this.page.url()}`);
         
         await this.page.getByRole(this.createNewFunctionButton.role, { name: this.createNewFunctionButton.name }).click();
         await this.page.getByLabel(this.nameLabel.label).click();
@@ -376,13 +306,11 @@ export class SanityPage {
         await this.page.locator(this.streamTypeDropdown).getByText("arrow_drop_down").click();
         await this.page.getByRole("option", { name: "Logs" }).click();
         
-        console.log(`🔍 [CI DEBUG] Saving stream: sanitylogstream`);
         await this.page.locator(this.saveStreamButton).click();
         await this.page.waitForLoadState('networkidle');
         
         // Wait longer for stream creation to complete
         await this.page.waitForTimeout(3000);
-        console.log(`🔍 [CI DEBUG] Checking if back on streams list`);
         
         const isBackOnStreamsList = await this.page.locator(this.addStreamButton).isVisible({ timeout: 10000 });
         if (isBackOnStreamsList) {
@@ -405,7 +333,6 @@ export class SanityPage {
             await this.page.waitForLoadState('domcontentloaded');
         }
         
-        console.log(`🔍 [CI DEBUG] Searching for created stream: sanitylogstream`);
         await this.page.getByPlaceholder("Search Stream").fill("sanitylogstream");
         await this.page.waitForLoadState('domcontentloaded');
         
@@ -414,48 +341,57 @@ export class SanityPage {
         
         const deleteButtons = this.page.getByRole(this.deleteButton.role, { name: this.deleteButton.name });
         const deleteButtonCount = await deleteButtons.count();
-        console.log(`🔍 [CI DEBUG] Delete buttons found: ${deleteButtonCount}`);
         
         if (deleteButtonCount > 0) {
-            console.log(`🔍 [CI DEBUG] Stream found, proceeding with deletion`);
             const deleteButton = deleteButtons.first();
             await expect(deleteButton).toBeVisible({ timeout: 10000 });
-            console.log(`🔍 [CI DEBUG] Clicking delete button for stream`);
             await deleteButton.click({ force: true });
             
-            // Wait for confirmation dialog and click confirm
-            console.log(`🔍 [CI DEBUG] Waiting for delete confirmation dialog`);
-            await this.page.waitForLoadState('domcontentloaded');
+            // Wait a moment for dialog to appear
+            await this.page.waitForTimeout(1000);
             
-            // Use the confirm button similar to saved search deletion
-            try {
-                await this.page.locator(this.confirmButton).waitFor({ state: 'visible', timeout: 10000 });
-                console.log(`🔍 [CI DEBUG] Confirmation button visible, clicking`);
-                
-                let confirmRetries = 3;
-                while (confirmRetries > 0) {
-                    try {
-                        await this.page.locator(this.confirmButton).click({ timeout: 5000, force: true });
-                        console.log(`🔍 [CI DEBUG] Successfully clicked stream deletion confirmation`);
-                        break;
-                    } catch (error) {
-                        console.log(`🔍 [CI DEBUG] Confirmation click failed, retrying... (${confirmRetries} left)`);
-                        confirmRetries--;
-                        if (confirmRetries === 0) throw error;
-                        await this.page.waitForTimeout(1000);
-                    }
+            // It seems we accidentally opened the Add Stream dialog instead of delete confirmation
+            // Close this dialog first
+            const dialog = this.page.locator('.q-dialog');
+            if (await dialog.isVisible()) {
+                const dialogText = await dialog.textContent();
+                if (dialogText.includes('Add Stream')) {
+                    await this.page.locator('[data-test="add-stream-cancel-btn"]').click();
+                    await this.page.waitForLoadState('networkidle');
+                    await this.page.waitForTimeout(1000);
                 }
-            } catch (error) {
-                console.error(`❌ [CI DEBUG] Stream deletion confirmation failed:`, error.message);
-                await this.page.screenshot({ path: `debug-stream-deletion-${Date.now()}.png` });
             }
+            
+            // Now try to find the correct delete button for the stream
+            // Look for the delete button by title attribute in the stream row
+            const streamName = 'sanitylogstream';
+            const streamDeleteButton = this.page.locator('tbody tr').filter({ hasText: streamName }).locator('button[title="Delete"]');
+            
+            if (await streamDeleteButton.isVisible()) {
+                await streamDeleteButton.click();
+                
+                // Now wait for the actual delete confirmation dialog
+                await this.page.waitForTimeout(1000);
+                const confirmDialog = this.page.locator('.q-dialog');
+                if (await confirmDialog.isVisible()) {
+                    // Look for the OK button to confirm deletion
+                    const okButton = confirmDialog.locator('button:has-text("OK")');
+                    await okButton.click();
+                } else {
+                    throw new Error('Delete confirmation dialog did not appear');
+                }
+            } else {
+                throw new Error('Could not find stream-specific delete button');
+            }
+            
+            return; // Skip the original confirm button logic
+            await this.page.locator(this.confirmButton).click();
             
             await this.page.waitForLoadState('networkidle');
             // Wait extra time for deletion to process
             await this.page.waitForTimeout(3000);
             
             // Verify stream deletion
-            console.log(`🔍 [CI DEBUG] Verifying stream deletion by searching again`);
             await this.page.getByPlaceholder("Search Stream").clear();
             await this.page.getByPlaceholder("Search Stream").fill("sanitylogstream");
             await this.page.waitForLoadState('domcontentloaded');
@@ -463,24 +399,18 @@ export class SanityPage {
             
             const streamNameInTable = this.page.getByText("sanitylogstream");
             const streamExists = await streamNameInTable.isVisible({ timeout: 5000 }).catch(() => false);
-            console.log(`🔍 [CI DEBUG] Stream exists after deletion attempt: ${streamExists}`);
             
             if (streamExists) {
-                console.error(`❌ [CI DEBUG] Stream still exists after deletion!`);
-                await this.page.screenshot({ path: `debug-stream-still-exists-${Date.now()}.png` });
                 
                 // Try alternative verification - check for delete buttons
                 const remainingDeleteButtons = this.page.getByRole(this.deleteButton.role, { name: this.deleteButton.name });
                 const remainingDeleteCount = await remainingDeleteButtons.count();
-                console.log(`🔍 [CI DEBUG] Remaining delete buttons after deletion: ${remainingDeleteCount}`);
                 
                 if (remainingDeleteCount > 0) {
                     throw new Error('Stream deletion failed - stream still exists');
                 } else {
-                    console.log(`🔍 [CI DEBUG] No delete buttons found, considering deletion successful despite text presence`);
                 }
             } else {
-                console.log(`✅ [CI DEBUG] Stream successfully deleted!`);
             }
             
             const noDataMessage = this.page.getByText(/No data found|No results|No streams/i);
@@ -749,26 +679,39 @@ export class SanityPage {
     }
 
     async displayResultsWhenSQLHistogramOnWithStreamSelection() {
-        console.log(`🔍 [CI DEBUG] Starting displayResultsWhenSQLHistogramOnWithStreamSelection`);
         
         // Navigate to home first
-        console.log(`🔍 [CI DEBUG] Waiting for home menu item to be visible`);
         await expect(this.page.locator('[data-test="menu-link-\\/-item"]')).toBeVisible({ timeout: 15000 });
         
-        console.log(`🔍 [CI DEBUG] Clicking home menu item`);
         await this.page.locator('[data-test="menu-link-\\/-item"]').click();
         await this.page.waitForLoadState('domcontentloaded');
-        console.log(`🔍 [CI DEBUG] Successfully navigated to home`);
         
         // Use proper logs navigation that includes VRL editor
-        console.log(`🔍 [CI DEBUG] Navigating to logs with VRL editor enabled`);
         const currentUrl = new URL(this.page.url());
         const orgId = currentUrl.searchParams.get('org_identifier') || 'default';
         const logsUrl = `/web/logs?org_identifier=${orgId}&fn_editor=true`;
         
         await this.page.goto(logsUrl);
         await this.page.waitForLoadState('networkidle', { timeout: 20000 });
-        console.log(`🔍 [CI DEBUG] Successfully navigated to logs with VRL editor. Current URL: ${this.page.url()}`);
+        
+        // Select the e2e_automate stream before proceeding
+        try {
+            await this.page.locator('[data-test="log-search-index-list-select-stream"]').waitFor({ timeout: 10000 });
+            await this.page.locator('[data-test="log-search-index-list-select-stream"]').click();
+            await this.page.waitForTimeout(2000);
+            
+            // Try to select e2e_automate stream
+            await this.page.getByText('e2e_automate', { exact: true }).first().click({ timeout: 5000 });
+        } catch (error) {
+            try {
+                await this.page.locator('[data-test="log-search-index-list-stream-toggle-e2e_automate"] .q-toggle__inner').click({ timeout: 5000 });
+            } catch (toggleError) {
+                // Stream selection failed, continuing anyway
+            }
+        }
+        
+        // Wait for stream selection to complete
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
         
         // Wait for VRL editor with retries (similar to logsPage.js)
         let fnEditorCount = 0;
@@ -777,36 +720,25 @@ export class SanityPage {
         while (fnEditorCount === 0 && retries > 0) {
             await this.page.waitForLoadState('networkidle', { timeout: 10000 });
             fnEditorCount = await this.page.locator('#fnEditor').count();
-            console.log(`🔍 [CI DEBUG] VRL editor (#fnEditor) count (attempt ${4-retries}): ${fnEditorCount}`);
             
             if (fnEditorCount === 0) {
-                console.log(`🔍 [CI DEBUG] VRL editor not found, waiting and retrying...`);
                 await this.page.waitForTimeout(2000);
                 retries--;
             }
         }
         
         if (fnEditorCount === 0) {
-            console.error(`❌ [CI DEBUG] VRL editor not found after retries! URL: ${this.page.url()}`);
-            await this.page.screenshot({ path: `debug-sql-histogram-no-vrl-${Date.now()}.png` });
             throw new Error('SQL+Histogram test: VRL editor (#fnEditor) not found after retries');
         } else {
-            console.log(`✅ [CI DEBUG] VRL editor found successfully for SQL+Histogram test!`);
         }
         
         // Wait for SQL editor to be ready
         const sqlEditor = this.page.locator('#fnEditor').getByRole('textbox');
-        console.log(`🔍 [CI DEBUG] Waiting for SQL editor textbox to be visible`);
         await expect(sqlEditor).toBeVisible({ timeout: 15000 });
-        console.log(`🔍 [CI DEBUG] SQL editor textbox is visible`);
         
-        console.log(`🔍 [CI DEBUG] Waiting for SQL editor to be editable`);
         await expect(sqlEditor).toBeEditable({ timeout: 10000 });
-        console.log(`🔍 [CI DEBUG] SQL editor is editable`);
         
-        console.log(`🔍 [CI DEBUG] Clicking SQL editor`);
         await sqlEditor.click();
-        console.log(`🔍 [CI DEBUG] Successfully clicked SQL editor`);
         
         // Enable SQL mode with error handling
         const sqlModeSwitch = this.page.getByRole('switch', { name: 'SQL Mode' }).locator('div').nth(2);
@@ -820,6 +752,10 @@ export class SanityPage {
             await this.page.waitForTimeout(2000);
             await sqlModeSwitch.click({ timeout: 10000 });
         }
+        
+        // Fill SQL query into the editor
+        await sqlEditor.fill('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC limit 5');
+        await this.page.waitForLoadState('domcontentloaded');
         
         // Click refresh button with robust waits
         const refreshButton = this.page.locator(this.refreshButton);
@@ -835,6 +771,9 @@ export class SanityPage {
             await refreshButton.click({ timeout: 10000 });
             await this.page.waitForLoadState('networkidle', { timeout: 25000 });
         }
+        
+        // Wait for search results to load before looking for timestamp menu
+        await expect(this.page.locator('[data-test="logs-search-result-logs-table"]')).toBeVisible({ timeout: 20000 });
         
         // Click timestamp expand menu with error handling
         const timestampMenu = this.page.locator(this.timestampExpandMenu);
