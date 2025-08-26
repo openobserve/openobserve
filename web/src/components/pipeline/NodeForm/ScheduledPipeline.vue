@@ -859,11 +859,71 @@ onMounted(async () => {
   await getStreamList();
 
   setTimeout(() => {
-    if (tab.value === 'sql' && query.value != "") {
-      const parsedQuery = parser?.parse(query.value);
-      selectedStreamName.value = parsedQuery.ast.from[0].table;
-
-      getStreamFields();
+    try {
+      if(tab.value === 'sql' && query.value != ""){
+        const parsedQuery = parser?.astify(query.value);
+        if (parsedQuery?.with) {
+            let withObj = parsedQuery.with;
+            withObj.forEach((obj: any) => {
+              // Recursively extract table names from the WITH statement with depth protection
+              const MAX_RECURSION_DEPTH = 50; // Prevent stack overflow
+              const visitedNodes = new WeakSet(); // Prevent circular references - more efficient for objects
+              
+              const extractTablesFromNode = (node: any, depth: number = 0) => {
+                if (!node || depth > MAX_RECURSION_DEPTH) {
+                  if (depth > MAX_RECURSION_DEPTH) {
+                    console.warn("Maximum recursion depth reached while parsing SQL query");
+                  }
+                  return;
+                }
+                
+                // Use WeakSet for efficient circular reference detection
+                if (typeof node === 'object' && node !== null) {
+                  if (visitedNodes.has(node)) {
+                    return; // Skip already visited nodes
+                  }
+                  visitedNodes.add(node);
+                }
+                
+                // Check if current node has a from clause
+                if (node.from && Array.isArray(node.from)) {
+                  node.from.forEach((stream: any) => {
+                    if (stream.table) {
+                      selectedStreamName.value = stream.table;
+                    }
+                    // Handle subquery in FROM clause
+                    if (stream.expr && stream.expr.ast) {
+                      extractTablesFromNode(stream.expr.ast, depth + 1);
+                    }
+                  });
+                }
+                
+                // Check for nested subqueries in WHERE clause
+                if (node.where && node.where.right && node.where.right.ast) {
+                  extractTablesFromNode(node.where.right.ast, depth + 1);
+                }
+                
+                // Check for nested subqueries in SELECT expressions
+                if (node.columns && Array.isArray(node.columns)) {
+                  node.columns.forEach((col: any) => {
+                    if (col.expr && col.expr.ast) {
+                      extractTablesFromNode(col.expr.ast, depth + 1);
+                    }
+                  });
+                }
+              };
+              
+              // Start extraction from the WITH statement
+              extractTablesFromNode(obj?.stmt);
+            });
+          }
+          else{
+          selectedStreamName.value = parsedQuery?.from[0]?.table;
+          }
+        getStreamFields();
+      }
+    } catch (error) {
+      console.log(error,'error parsing sql query');
     }
   }, 200);
 
