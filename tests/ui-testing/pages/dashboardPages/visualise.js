@@ -16,6 +16,29 @@ export default class LogsVisualise {
       .locator("#fnEditor")
       .getByRole("textbox")
       .locator("div");
+
+    // Dashboard locators
+    this.addToDashboardBtn = page.getByRole("button", {
+      name: "Add To Dashboard",
+    });
+    this.newDashboardBtn = page.locator(
+      '[data-test="dashboard-dashboard-new-add"]'
+    );
+    this.dashboardNameInput = page.locator('[data-test="add-dashboard-name"]');
+    this.dashboardSubmitBtn = page.locator(
+      '[data-test="dashboard-add-submit"]'
+    );
+    this.panelTitleInput = page.locator(
+      '[data-test="metrics-new-dashboard-panel-title"]'
+    );
+    this.updateSettingsBtn = page.locator(
+      '[data-test="metrics-schema-update-settings-button"]'
+    );
+
+    // Query editor locators
+    this.logsQueryEditor = page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox");
     //Functions
   }
   async openLogs() {
@@ -196,6 +219,13 @@ export default class LogsVisualise {
     await queryEditor.type(sqlQuery);
   }
 
+  //fill logs query editor with SQL query
+  async fillLogsQueryEditor(sqlQuery) {
+    await this.logsQueryEditor.waitFor({ state: "visible", timeout: 5000 });
+    await this.logsQueryEditor.click();
+    await this.logsQueryEditor.fill(sqlQuery);
+  }
+
   // Open the first VRL Function Editor
   async vrlFunctionEditor(vrl) {
     await this.functionEditor.first().click();
@@ -296,33 +326,31 @@ export default class LogsVisualise {
     }
   }
 
-  async addPanelToNewDashboard(page, randomDashboardName, panelName) {
-    //add to dashboard and submit it
-    await page.getByRole("button", { name: "Add To Dashboard" }).click();
-    await page
-      .locator('[data-test="dashboard-dashboard-new-add"]')
-      .waitFor({ state: "visible" });
+  async addPanelToNewDashboard(randomDashboardName, panelName) {
+    // Add to dashboard and submit it
+    await this.addToDashboardBtn.waitFor({ state: "visible", timeout: 5000 });
+    await this.addToDashboardBtn.click();
 
-    //Adding dashboard
-    await page.locator('[data-test="dashboard-dashboard-new-add"]').click();
-    await page.locator('[data-test="add-dashboard-name"]').click();
-    await page
-      .locator('[data-test="add-dashboard-name"]')
-      .fill(randomDashboardName);
-    await page.locator('[data-test="dashboard-add-submit"]').click();
+    // Wait for and click new dashboard option
+    await this.newDashboardBtn.waitFor({ state: "visible", timeout: 5000 });
+    await this.newDashboardBtn.click();
 
-    await page.waitForTimeout(3000);
-    await page
-      .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .waitFor({ state: "visible" });
-    await page
-      .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .click();
-    await page
-      .locator('[data-test="metrics-new-dashboard-panel-title"]')
-      .fill(panelName);
-    await page
-      .locator('[data-test="metrics-schema-update-settings-button"]')
-      .click();
+    // Fill dashboard name
+    await this.dashboardNameInput.waitFor({ state: "visible", timeout: 5000 });
+    await this.dashboardNameInput.click();
+    await this.dashboardNameInput.fill(randomDashboardName);
+
+    // Submit dashboard creation
+    await this.dashboardSubmitBtn.waitFor({ state: "visible", timeout: 5000 });
+    await this.dashboardSubmitBtn.click();
+
+    // Wait for panel title input to be available (replacing hardcoded timeout)
+    await this.panelTitleInput.waitFor({ state: "visible", timeout: 10000 });
+    await this.panelTitleInput.click();
+    await this.panelTitleInput.fill(panelName);
+
+    // Submit panel settings
+    await this.updateSettingsBtn.waitFor({ state: "visible", timeout: 5000 });
+    await this.updateSettingsBtn.click();
   }
 }
