@@ -25,6 +25,7 @@ use arrow_schema::{DataType, Field, Schema};
 use config::{
     FxIndexMap, TIMESTAMP_COL_NAME, get_config,
     meta::stream::StreamType,
+    spawn_pausable_job,
     utils::{json, schema::infer_json_schema_from_map, time::now_micros},
 };
 use infra::{
@@ -34,10 +35,7 @@ use infra::{
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use tokio::{
-    sync::{RwLock, mpsc},
-    time,
-};
+use tokio::sync::{RwLock, mpsc};
 
 use crate::{
     common::meta::stream::SchemaRecords,
@@ -109,7 +107,15 @@ impl Default for DistinctValues {
 
 impl DistinctValues {
     pub fn new() -> Self {
-        tokio::task::spawn(run_flush());
+        spawn_pausable_job!(
+            "distinct_values_flush",
+            get_config().limit.distinct_values_interval,
+            {
+                if let Err(e) = INSTANCE.flush().await {
+                    log::error!("[DISTINCT_VALUES] error flush data to wal: {e}");
+                }
+            }
+        );
         Self {
             channel: handle_channel(),
             shutdown: Arc::new(AtomicBool::new(false)),
@@ -335,18 +341,5 @@ impl Metadata for DistinctValues {
             i += 1;
         }
         Ok(())
-    }
-}
-
-async fn run_flush() {
-    let mut interval = time::interval(time::Duration::from_secs(
-        get_config().limit.distinct_values_interval,
-    ));
-    interval.tick().await; // trigger the first run
-    loop {
-        interval.tick().await;
-        if let Err(e) = INSTANCE.flush().await {
-            log::error!("[DISTINCT_VALUES] error flush data to wal: {e}");
-        }
     }
 }
