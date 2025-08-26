@@ -18,7 +18,7 @@ import { useStore } from "vuex";
 import { useLogsState } from "@/composables/useLogsState";
 import useFunctions from "@/composables/useFunctions";
 import useActions from "@/composables/useActions";
-import { useNotifications } from "@/composables/useNotifications";
+import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 
 interface ActionItem {

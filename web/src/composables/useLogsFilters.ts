@@ -21,9 +21,7 @@ import {
   type MultiStreamFilterParams
 } from "@/utils/logs/validators";
 import {
-  createFilterExpression,
-  formatFilterValue,
-  parseFilterCondition,
+  generateFilterExpressionByFieldType,
   type FilterExpressionParams
 } from "@/utils/logs/formatters";
 
@@ -131,12 +129,13 @@ export const useLogsFilters = () => {
     try {
       const params: FilterExpressionParams = {
         field: String(field),
-        value: fieldValue,
-        operator: action,
-        dataType: typeof fieldValue
+        fieldValue,
+        action,
+        streamResults: searchObj.data.streamResults?.list || [],
+        selectedStreams: searchObj.data.stream?.selectedStream || []
       };
 
-      return createFilterExpression(params);
+      return generateFilterExpressionByFieldType(params);
     } catch (error: any) {
       console.error("Error creating filter expression:", error);
       return "";

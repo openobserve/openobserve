@@ -23,9 +23,11 @@ import {
   type HistogramTitleParams
 } from "@/utils/logs/formatters";
 import {
-  hasAggregation,
   createSQLParserFunctions
 } from "@/utils/logs/parsers";
+import {
+  validateAggregationQuery
+} from "@/utils/logs/validators";
 
 interface ChartParams {
   title: string;
@@ -511,6 +513,18 @@ export const useLogsVisualization = () => {
     }
   };
 
+  /**
+   * Check if query has aggregation functions
+   */
+  const hasAggregation = (columns: any) => {
+    try {
+      return validateAggregationQuery({ columns }, searchObj.data.query);
+    } catch (error: any) {
+      console.error("Error checking aggregation:", error);
+      return false;
+    }
+  };
+
   return {
     // State
     histogramResults,
@@ -540,6 +554,7 @@ export const useLogsVisualization = () => {
     hasLimitQuery,
     hasDistinctQuery,
     hasWithQuery,
+    hasAggregation,
     
     // Chart configuration
     getHistogramTitle,

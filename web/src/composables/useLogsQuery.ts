@@ -20,9 +20,11 @@ import useQuery from "@/composables/useQuery";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 import { 
   createSQLParserFunctions,
-  hasAggregation,
   extractValueQuery as extractValueQueryUtil 
 } from "@/utils/logs/parsers";
+import { 
+  validateAggregationQuery 
+} from "@/utils/logs/validators";
 
 interface QueryTransformParams {
   [key: string]: any;
@@ -416,6 +418,18 @@ export const useLogsQuery = () => {
     }
   };
 
+  /**
+   * Check if query has aggregation functions
+   */
+  const hasAggregation = (columns: any) => {
+    try {
+      return validateAggregationQuery({ columns }, searchObj.data.query);
+    } catch (error: any) {
+      console.error("Error checking aggregation:", error);
+      return false;
+    }
+  };
+
   return {
     // Computed properties
     isValidQuery,
@@ -439,6 +453,7 @@ export const useLogsQuery = () => {
     getQueryStats,
     calculateQueryComplexity,
     formatQuery,
+    hasAggregation,
     
     // Specialized operations
     buildHistogramQuery,

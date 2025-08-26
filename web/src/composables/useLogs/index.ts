@@ -43,6 +43,7 @@ import { useLogsActions } from "@/composables/useLogsActions";
 import { useLogsVisualization } from "@/composables/useLogsVisualization";
 import { useLogsWebSocket } from "@/composables/useLogsWebSocket";
 import { useLogsURL } from "@/composables/useLogsURL";
+import { useLogsData } from "@/composables/useLogsData";
 
 // Import utility functions
 import {
@@ -71,9 +72,10 @@ export const useLogs = () => {
   const logsVisualization = useLogsVisualization();
   const logsWebSocket = useLogsWebSocket();
   const logsURL = useLogsURL();
+  const logsData = useLogsData();
 
   // Initialize additional dependencies
-  const { getStreams, getStreamList, loadStreamLists, getStream } = useStreams();
+  const { getStreams, getStream } = useStreams();
   const { buildQueryPayload } = useQuery();
   const { showErrorNotification } = useNotifications();
   const router = useRouter();
@@ -125,15 +127,6 @@ export const useLogs = () => {
     }
   };
 
-  const handleRunQuery = (isScheduled: boolean = false) => {
-    // Coordinate between query and WebSocket composables
-    return logsQuery.handleRunQuery(isScheduled);
-  };
-
-  const handleQueryData = (queryReq: any, resetFlag: boolean = true) => {
-    // Coordinate between query and data processing
-    return logsQuery.handleQueryData(queryReq, resetFlag);
-  };
 
   const loadLogsData = async () => {
     // Main function that loads logs data
@@ -496,8 +489,8 @@ export const useLogs = () => {
     
     // Stream operations
     getStreams,
-    getStreamList,
-    loadStreamLists,
+    getStreamList: logsData.getStreamList,
+    loadStreamLists: logsData.loadStreamLists,
     getStream,
     onStreamChange,
     updateStreams: async () => {
@@ -533,14 +526,15 @@ export const useLogs = () => {
     isWithQuery: (parsedSQL?: any) => logsQuery.isWithQuery(parsedSQL),
     hasAggregation: (parsedSQL?: any) => logsQuery.hasQueryAggregation(parsedSQL),
     validateFilterForMultiStream: logsFilters.validateFilterForMultiStream,
+    getFilterExpressionByFieldType: logsFilters.getFilterExpressionByFieldType,
     
-    // Field operations (placeholders for now)
-    extractFields: () => console.log("extractFields placeholder"),
-    extractFTSFields: () => console.log("extractFTSFields placeholder"),
+    // Field operations
+    extractFields: logsData.extractFields,
+    extractFTSFields: logsData.extractFTSFields,
     updatedLocalLogFilterField: logsFilters.updateLocalLogFilterField,
-    updateGridColumns: () => console.log("updateGridColumns placeholder"),
-    filterHitsColumns: () => console.log("filterHitsColumns placeholder"),
-    reorderSelectedFields: () => console.log("reorderSelectedFields placeholder"),
+    updateGridColumns: logsData.updateGridColumns,
+    filterHitsColumns: logsData.filterHitsColumns,
+    reorderSelectedFields: logsData.reorderSelectedFields,
     updateFieldValues,
     
     // Data operations

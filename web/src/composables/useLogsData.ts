@@ -40,7 +40,8 @@ import {
   transformLogDataUtil,
   processStreamDataUtil,
 } from "@/utils/logs/transformers";
-import { fnParsedSQL, hasAggregation } from "@/utils/logs/parsers";
+import { fnParsedSQL } from "@/utils/logs/parsers";
+import { validateAggregationQuery } from "@/utils/logs/validators";
 import { showErrorNotification } from "@/utils/common";
 
 interface StreamData {
@@ -608,6 +609,18 @@ export const useLogsData = () => {
     }
   };
 
+  /**
+   * Check if query has aggregation functions
+   */
+  const hasAggregation = (columns: any) => {
+    try {
+      return validateAggregationQuery({ columns }, searchObj.data.query);
+    } catch (error: any) {
+      console.error("Error checking aggregation:", error);
+      return false;
+    }
+  };
+
   return {
     // Stream operations
     getStreams,
@@ -635,6 +648,9 @@ export const useLogsData = () => {
     filterHitsColumns,
     updateGridColumns,
     processPostPaginationData,
+    
+    // Utility functions
+    hasAggregation,
     
     // State
     processedFieldValues,
