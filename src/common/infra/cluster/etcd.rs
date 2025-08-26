@@ -124,9 +124,7 @@ async fn register() -> Result<()> {
     }
     log::debug!("new_node_id: {:?}", new_node_id);
     // update local id
-    unsafe {
-        LOCAL_NODE_ID = new_node_id;
-    }
+    LOCAL_NODE_ID.store(new_node_id, Ordering::Relaxed);
 
     // 4. join the cluster
     let key = format!("{}nodes/{}", &cfg.etcd.prefix, LOCAL_NODE.uuid);
@@ -223,7 +221,7 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
             val
         }
         None => Node {
-            id: unsafe { LOCAL_NODE_ID },
+            id: LOCAL_NODE_ID.load(Ordering::Relaxed),
             uuid: LOCAL_NODE.uuid.clone(),
             name: cfg.common.instance_name.clone(),
             http_addr: format!(

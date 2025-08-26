@@ -15,7 +15,7 @@
 
 use std::{
     net::IpAddr,
-    sync::atomic::{AtomicU32, Ordering},
+    sync::atomic::{AtomicI32, Ordering},
 };
 
 use once_cell::sync::Lazy;
@@ -25,9 +25,9 @@ use crate::{
     meta::cluster::{Node, NodeStatus, Role, RoleGroup},
 };
 
-pub static mut LOCAL_NODE_ID: i32 = 0;
+pub static LOCAL_NODE_ID: AtomicI32 = AtomicI32::new(0);
 pub static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
-pub static LOCAL_NODE_STATUS: AtomicU32 = AtomicU32::new(NodeStatus::Prepare as _);
+pub static LOCAL_NODE_STATUS: AtomicI32 = AtomicI32::new(NodeStatus::Prepare as _);
 pub static LOCAL_NODE: Lazy<Node> = Lazy::new(load_local_node);
 
 pub fn load_local_node() -> Node {

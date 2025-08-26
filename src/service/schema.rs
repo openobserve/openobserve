@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, atomic::Ordering},
+};
 
 use anyhow::Result;
 use config::{
@@ -429,7 +432,9 @@ async fn handle_diff_schema(
     let index_all_values = stream_setting.index_all_values;
     if need_original || index_original_data {
         if let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone()) {
-            entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
+            entry.insert(SnowflakeIdGenerator::new(
+                LOCAL_NODE_ID.load(Ordering::Relaxed),
+            ));
         }
     }
     let mut w = STREAM_SETTINGS.write().await;
