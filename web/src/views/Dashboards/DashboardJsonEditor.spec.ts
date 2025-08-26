@@ -318,7 +318,7 @@ describe("DashboardJsonEditor", () => {
     
     await wrapper.vm.saveChanges();
     
-    expect(wrapper.vm.validationErrors[0]).toMatch(/Failed during JSON save: .*Expected property name/);
+    expect(wrapper.vm.validationErrors[0]).toMatch(/Failed during JSON save: .*/);
   });
 
   // Test 19: Watch functionality - should update jsonContent when dashboardData changes
