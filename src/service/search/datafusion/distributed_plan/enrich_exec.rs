@@ -26,34 +26,37 @@ use datafusion::{
         execution_plan::{Boundedness, EmissionType},
         internal_err,
         memory::MemoryStream,
+        metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet},
         stream::RecordBatchStreamAdapter,
     },
 };
 use futures::TryStreamExt;
 
 #[derive(Debug)]
-pub struct NewEnrichExec {
+pub struct EnrichExec {
     org_id: String,
     name: String,
     schema: SchemaRef, // The schema for the produced row
     partitions: usize, // Number of partitions
     cache: PlanProperties,
+    metrics: ExecutionPlanMetricsSet,
 }
 
-impl NewEnrichExec {
-    /// Create a new NewEnrichExec
+impl EnrichExec {
+    /// Create a new EnrichExec
     pub fn new(org_id: &str, name: &str, schema: SchemaRef) -> Self {
         let cache = Self::compute_properties(Arc::clone(&schema), 1);
-        NewEnrichExec {
+        EnrichExec {
             org_id: org_id.to_string(),
             name: name.to_string(),
             schema,
             partitions: 1,
             cache,
+            metrics: ExecutionPlanMetricsSet::new(),
         }
     }
 
-    /// Create a new NewEnrichExec with specified partition number
+    /// Create a new EnrichExec with specified partition number
     pub fn with_partitions(mut self, partitions: usize) -> Self {
         self.partitions = partitions;
         // Changing partitions may invalidate output partitioning, so update it:
@@ -82,7 +85,7 @@ impl NewEnrichExec {
     }
 }
 
-impl DisplayAs for NewEnrichExec {
+impl DisplayAs for EnrichExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let name_string = format!("name={:?}", self.name);
         let projection_string = format!(
@@ -94,14 +97,14 @@ impl DisplayAs for NewEnrichExec {
                 .collect::<Vec<_>>()
         );
 
-        write!(f, "NewEnrichExec: ")?;
+        write!(f, "EnrichExec: ")?;
         write!(f, "{name_string}{projection_string}")
     }
 }
 
-impl ExecutionPlan for NewEnrichExec {
+impl ExecutionPlan for EnrichExec {
     fn name(&self) -> &'static str {
-        "NewEnrichExec"
+        "EnrichExec"
     }
 
     /// Return a reference to Any that can be used for downcasting
@@ -129,7 +132,13 @@ impl ExecutionPlan for NewEnrichExec {
         _partition: usize,
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
-        let data = get_data(self.org_id.clone(), self.name.clone(), self.schema.clone());
+        let metrics = BaselineMetrics::new(&self.metrics, 0);
+        let data = get_data(
+            self.org_id.clone(),
+            self.name.clone(),
+            self.schema.clone(),
+            metrics,
+        );
         let stream = futures::stream::once(data).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(
             self.schema.clone(),
@@ -140,13 +149,19 @@ impl ExecutionPlan for NewEnrichExec {
     fn statistics(&self) -> Result<Statistics> {
         Ok(Statistics::new_unknown(&self.schema()))
     }
+
+    fn metrics(&self) -> Option<MetricsSet> {
+        Some(self.metrics.clone_inner())
+    }
 }
 
 async fn get_data(
     org_id: String,
     name: String,
     schema: SchemaRef,
+    metrics: BaselineMetrics,
 ) -> Result<SendableRecordBatchStream> {
+    let timer = metrics.elapsed_compute().timer();
     let clean_name = name.trim_matches('"');
     let data = match crate::service::db::enrichment_table::get_enrichment_data_from_db(
         &org_id, clean_name,
@@ -167,6 +182,10 @@ async fn get_data(
         Err(e) => return internal_err!("convert enrichment data from json to record batch: {e}"),
     };
 
+    // record output metrics
+    metrics.record_output(batch.num_rows());
+    timer.done();
+
     // convert data to RecordBatch
     Ok(Box::pin(MemoryStream::try_new(
         vec![batch],
@@ -185,7 +204,7 @@ mod tests {
     #[test]
     fn test_new_enrich_exec() {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
-        let exec = NewEnrichExec::new("default", "test", schema.clone());
+        let exec = EnrichExec::new("default", "test", schema.clone());
         assert_eq!(exec.org_id, "default");
         assert_eq!(exec.name, "test");
         assert_eq!(exec.partitions, 1);
