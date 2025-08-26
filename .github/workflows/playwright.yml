@@ -220,11 +220,25 @@ jobs:
           
           # Get list of files to run
           RUN_FILES='${{ toJSON(matrix.run_files) }}'
+          echo "DEBUG: RUN_FILES = $RUN_FILES"
+          echo "DEBUG: matrix.testfolder = ${{ matrix.testfolder }}"
+          
           if [ "$RUN_FILES" != "null" ] && [ "$RUN_FILES" != "[]" ]; then
-            # Convert JSON array to space-separated file patterns
-            FILE_PATTERNS=$(echo "$RUN_FILES" | jq -r '.[] | "./playwright-tests/${{ matrix.testfolder }}/" + .' | tr '\n' ' ')
-            # Run only specified files
-            npx playwright test $FILE_PATTERNS
+            # Build specific file paths
+            FILE_PATHS=""
+            echo "$RUN_FILES" | jq -r '.[]' | while read -r file; do
+              FILE_PATH="./playwright-tests/${{ matrix.testfolder }}/$file"
+              echo "DEBUG: Will run file: $FILE_PATH"
+              if [ -z "$FILE_PATHS" ]; then
+                FILE_PATHS="$FILE_PATH"
+              else
+                FILE_PATHS="$FILE_PATHS $FILE_PATH"
+              fi
+            done
+            
+            # Run all specified files at once
+            echo "DEBUG: Final command: npx playwright test $FILE_PATHS"
+            npx playwright test $(echo "$RUN_FILES" | jq -r '.[] | "./playwright-tests/${{ matrix.testfolder }}/" + .' | tr '\n' ' ')
           else
             echo "No files specified to run for ${{ matrix.testfolder }} folder"
           fi
