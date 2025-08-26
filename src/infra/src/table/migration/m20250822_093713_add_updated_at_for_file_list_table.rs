@@ -36,7 +36,8 @@ impl MigrationTrait for Migration {
     }
 }
 
-/// Set created_at and updated_at for existing rows. use the value of min_ts field to set both fields.
+/// Set created_at and updated_at for existing rows. use the value of min_ts field to set both
+/// fields.
 async fn set_updated_at_for_existing_rows(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
     // Update existing rows with created_at = min_ts and updated_at = min_ts where updated_at = 0
     let db = manager.get_connection();
@@ -78,7 +79,10 @@ async fn truncate_stream_stats_table(manager: &SchemaManager<'_>) -> Result<(), 
 
     let statement = Statement::from_string(backend, truncate_query);
     let ret = db.execute(statement).await?;
-    log::debug!("[FILE_LIST_MIGRATION] Truncated stream_stats table, affected rows: {}", ret.rows_affected());
+    log::debug!(
+        "[FILE_LIST_MIGRATION] Truncated stream_stats table, affected rows: {}",
+        ret.rows_affected()
+    );
 
     Ok(())
 }
@@ -90,11 +94,15 @@ async fn clean_compactor_offset(manager: &SchemaManager<'_>) -> Result<(), DbErr
 
     log::debug!("[FILE_LIST_MIGRATION] Cleaning compactor offset");
 
-    let delete_query = "DELETE FROM meta WHERE module='compact' AND key1='stream_stats' AND key2='offset'";
+    let delete_query =
+        "DELETE FROM meta WHERE module='compact' AND key1='stream_stats' AND key2='offset'";
 
     let statement = Statement::from_string(backend, delete_query.to_string());
     let ret = db.execute(statement).await?;
-    log::debug!("[FILE_LIST_MIGRATION] Cleaned compactor offset, affected rows: {}", ret.rows_affected());
+    log::debug!(
+        "[FILE_LIST_MIGRATION] Cleaned compactor offset, affected rows: {}",
+        ret.rows_affected()
+    );
 
     Ok(())
 }
