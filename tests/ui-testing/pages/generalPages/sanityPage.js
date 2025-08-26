@@ -203,7 +203,14 @@ export class SanityPage {
         
         const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
         await this.page.locator(deleteButtonSelector).click();
-        await this.page.locator(this.confirmButton).click();
+        
+        // Wait for confirmation dialog to appear and stabilize
+        const confirmButton = this.page.locator(this.confirmButton);
+        await expect(confirmButton).toBeVisible({ timeout: 10000 });
+        await expect(confirmButton).toBeEnabled({ timeout: 5000 });
+        await this.page.waitForLoadState('domcontentloaded');
+        
+        await confirmButton.click();
     }
 
     // Query Limit Methods
@@ -234,7 +241,14 @@ export class SanityPage {
         await this.page.waitForLoadState('networkidle');
         
         await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
-        await this.page.locator(this.fnEditor).getByRole('textbox').click();
+        
+        // Ensure VRL editor is available before interacting
+        const fnEditorTextbox = this.page.locator(this.fnEditor).getByRole('textbox');
+        await expect(fnEditorTextbox).toBeVisible({ timeout: 15000 });
+        await expect(fnEditorTextbox).toBeEditable({ timeout: 10000 });
+        await this.page.waitForLoadState('domcontentloaded');
+        
+        await fnEditorTextbox.click();
         await this.page.locator(this.fnEditor).locator(".cm-content").fill(".a=2");
         await waitUtils.smartWait(this.page, 1000, 'VRL editor content stabilization');
         

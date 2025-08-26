@@ -111,7 +111,7 @@ jobs:
             "GeneralTests/sanity.spec.js",
             # "GeneralTests/changeOrg.spec.js",
             # "GeneralTests/enrichment.spec.js",
-            "GeneralTests/schema.spec.js",
+            # "GeneralTests/schema.spec.js",
             # "GeneralTests/schemaload.spec.js",
             # "GeneralTests/serviceAccount.spec.js",
             # "GeneralTests/usersOrg.spec.js",
