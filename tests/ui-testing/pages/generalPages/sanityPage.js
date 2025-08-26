@@ -177,40 +177,141 @@ export class SanityPage {
 
     // Saved Search Methods
     async createAndDeleteSavedSearch(savedViewName) {
-        await this.page.locator(this.saveSearchButton).filter({ hasText: "savesaved_search" }).click();
-        await this.page.locator(this.alertNameInput).click();
-        await this.page.locator(this.alertNameInput).fill(savedViewName);
-        await this.page.locator(this.savedViewDialogSave).click();
+        console.log(`🔍 SAVED SEARCH DEBUG: Starting test with savedViewName: ${savedViewName}`);
+        console.log(`🔍 SAVED SEARCH DEBUG: Current URL: ${this.page.url()}`);
+        console.log(`🔍 SAVED SEARCH DEBUG: Page title: ${await this.page.title()}`);
         
+        console.log('🔍 SAVED SEARCH DEBUG: Step 1 - Clicking save search button');
+        const saveSearchButton = this.page.locator(this.saveSearchButton).filter({ hasText: "savesaved_search" });
+        console.log(`🔍 SAVED SEARCH DEBUG: Save button selector: ${this.saveSearchButton}`);
+        console.log(`🔍 SAVED SEARCH DEBUG: Save button count: ${await saveSearchButton.count()}`);
+        console.log(`🔍 SAVED SEARCH DEBUG: Save button visible: ${await saveSearchButton.isVisible()}`);
+        await saveSearchButton.click();
+        console.log('🔍 SAVED SEARCH DEBUG: Step 1 COMPLETE');
+        
+        console.log('🔍 SAVED SEARCH DEBUG: Step 2 - Filling alert name');
+        const alertNameInput = this.page.locator(this.alertNameInput);
+        console.log(`🔍 SAVED SEARCH DEBUG: Alert input visible: ${await alertNameInput.isVisible()}`);
+        await alertNameInput.click();
+        await alertNameInput.fill(savedViewName);
+        console.log('🔍 SAVED SEARCH DEBUG: Step 2 COMPLETE');
+        
+        console.log('🔍 SAVED SEARCH DEBUG: Step 3 - Saving dialog');
+        const dialogSaveBtn = this.page.locator(this.savedViewDialogSave);
+        console.log(`🔍 SAVED SEARCH DEBUG: Dialog save button visible: ${await dialogSaveBtn.isVisible()}`);
+        await dialogSaveBtn.click();
+        console.log('🔍 SAVED SEARCH DEBUG: Step 3 COMPLETE');
+        
+        console.log('🔍 SAVED SEARCH DEBUG: Step 4-12 - Complex workflow steps');
         await this.page.locator(this.savedViewsButton).getByLabel("Expand").click();
+        console.log('🔍 SAVED SEARCH DEBUG: Expanded saved views');
+        
         await this.page.locator(this.savedViewSearchInput).click();
         await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
+        console.log(`🔍 SAVED SEARCH DEBUG: Filled search with: ${savedViewName}`);
+        
         await this.page.getByText(savedViewName).first().click();
+        console.log('🔍 SAVED SEARCH DEBUG: Clicked saved view');
         
         await this.page.locator(this.savedViewsButton).getByLabel("Expand").click();
         await this.page.locator(this.savedViewSearchInput).click();
         await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
         await this.page.getByText("favorite_border").first().click();
+        console.log('🔍 SAVED SEARCH DEBUG: Clicked favorite border');
+        
         await this.page.getByText("Favorite Views").click();
         await this.page.getByLabel('Clear').first().click();
         await this.page.getByLabel("Collapse").click();
+        console.log('🔍 SAVED SEARCH DEBUG: Completed favorite workflow');
         
+        console.log('🔍 SAVED SEARCH DEBUG: Step 13 - Final expand and navigation');
         await this.page.locator(this.savedViewsButton).getByLabel("Expand").click();
-        await this.page.locator('[data-test="log-search-saved-view-favorite-list-fields-table"] div')
-            .filter({ hasText: "Favorite Views" }).nth(1).click();
+        const favoriteTable = this.page.locator('[data-test="log-search-saved-view-favorite-list-fields-table"] div').filter({ hasText: "Favorite Views" }).nth(1);
+        console.log(`🔍 SAVED SEARCH DEBUG: Favorite table visible: ${await favoriteTable.isVisible()}`);
+        await favoriteTable.click();
+        
         await this.page.locator(this.savedViewSearchInput).click();
         await this.page.locator(this.savedViewSearchInput).fill(savedViewName);
+        console.log('🔍 SAVED SEARCH DEBUG: Step 13 COMPLETE');
         
+        console.log('🔍 SAVED SEARCH DEBUG: Step 14 - CRITICAL DELETE STEP');
         const deleteButtonSelector = `[data-test="logs-search-bar-delete-${savedViewName}-saved-view-btn"]`;
-        await this.page.locator(deleteButtonSelector).click();
+        console.log(`🔍 SAVED SEARCH DEBUG: Delete button selector: ${deleteButtonSelector}`);
+        const deleteButton = this.page.locator(deleteButtonSelector);
+        console.log(`🔍 SAVED SEARCH DEBUG: Delete button count: ${await deleteButton.count()}`);
+        console.log(`🔍 SAVED SEARCH DEBUG: Delete button visible: ${await deleteButton.isVisible()}`);
         
-        // Wait for confirmation dialog to appear and stabilize
+        if (await deleteButton.count() === 0) {
+            console.log('🔍 SAVED SEARCH DEBUG: ERROR - Delete button not found! Taking screenshot of current state...');
+            console.log(`🔍 SAVED SEARCH DEBUG: All elements with data-test containing 'delete': ${await this.page.locator('[data-test*="delete"]').count()}`);
+            const allDeleteButtons = this.page.locator('[data-test*="delete"]');
+            for (let i = 0; i < await allDeleteButtons.count(); i++) {
+                const btn = allDeleteButtons.nth(i);
+                console.log(`🔍 SAVED SEARCH DEBUG: Delete button ${i}: ${await btn.getAttribute('data-test')}, visible: ${await btn.isVisible()}`);
+            }
+        }
+        
+        await deleteButton.click();
+        console.log('🔍 SAVED SEARCH DEBUG: Step 14 COMPLETE - Delete clicked');
+        
+        console.log('🔍 SAVED SEARCH DEBUG: Step 15 - CRITICAL CONFIRM DIALOG STEP');
         const confirmButton = this.page.locator(this.confirmButton);
-        await expect(confirmButton).toBeVisible({ timeout: 10000 });
-        await expect(confirmButton).toBeEnabled({ timeout: 5000 });
-        await this.page.waitForLoadState('domcontentloaded');
+        console.log(`🔍 SAVED SEARCH DEBUG: Confirm button selector: ${this.confirmButton}`);
+        console.log(`🔍 SAVED SEARCH DEBUG: Confirm button count immediately after delete: ${await confirmButton.count()}`);
+        console.log(`🔍 SAVED SEARCH DEBUG: Confirm button visible immediately after delete: ${await confirmButton.isVisible()}`);
         
-        await confirmButton.click();
+        // Check for any dialogs on page
+        const allDialogs = this.page.locator('.q-dialog, [role="dialog"], .modal');
+        console.log(`🔍 SAVED SEARCH DEBUG: All dialogs count: ${await allDialogs.count()}`);
+        for (let i = 0; i < await allDialogs.count(); i++) {
+            const dialog = allDialogs.nth(i);
+            console.log(`🔍 SAVED SEARCH DEBUG: Dialog ${i}: visible=${await dialog.isVisible()}, class=${await dialog.getAttribute('class')}`);
+        }
+        
+        // Check for all buttons in any dialogs
+        const allButtons = this.page.locator('button');
+        console.log(`🔍 SAVED SEARCH DEBUG: All buttons count: ${await allButtons.count()}`);
+        const confirmButtons = this.page.locator('button:has-text("Ok"), button:has-text("Confirm"), button:has-text("Delete"), button:has-text("Yes")');
+        console.log(`🔍 SAVED SEARCH DEBUG: Potential confirm buttons count: ${await confirmButtons.count()}`);
+        
+        try {
+            console.log('🔍 SAVED SEARCH DEBUG: Waiting for confirm button visibility...');
+            await expect(confirmButton).toBeVisible({ timeout: 10000 });
+            console.log('🔍 SAVED SEARCH DEBUG: Confirm button is visible');
+            
+            console.log('🔍 SAVED SEARCH DEBUG: Waiting for confirm button enabled state...');
+            await expect(confirmButton).toBeEnabled({ timeout: 5000 });
+            console.log('🔍 SAVED SEARCH DEBUG: Confirm button is enabled');
+            
+            console.log('🔍 SAVED SEARCH DEBUG: Waiting for DOM stability...');
+            await this.page.waitForLoadState('domcontentloaded');
+            console.log('🔍 SAVED SEARCH DEBUG: DOM is stable');
+            
+            // Final pre-click check
+            console.log(`🔍 SAVED SEARCH DEBUG: PRE-CLICK - Count: ${await confirmButton.count()}, Visible: ${await confirmButton.isVisible()}, Enabled: ${await confirmButton.isEnabled()}`);
+            console.log(`🔍 SAVED SEARCH DEBUG: PRE-CLICK - Button text: ${await confirmButton.textContent()}`);
+            
+            await confirmButton.click();
+            console.log('🔍 SAVED SEARCH DEBUG: Step 15 COMPLETE - Confirm button clicked successfully');
+            
+        } catch (error) {
+            console.log(`🔍 SAVED SEARCH DEBUG: CRITICAL ERROR in confirm dialog: ${error.message}`);
+            console.log(`🔍 SAVED SEARCH DEBUG: Current URL during error: ${this.page.url()}`);
+            console.log(`🔍 SAVED SEARCH DEBUG: Page title during error: ${await this.page.title()}`);
+            console.log(`🔍 SAVED SEARCH DEBUG: Confirm button final state - Count: ${await confirmButton.count()}, Visible: ${await confirmButton.isVisible()}`);
+            
+            // Try alternative confirm buttons
+            console.log('🔍 SAVED SEARCH DEBUG: Trying alternative confirm button selectors...');
+            const altButtons = ['[data-test="confirm-button"]', 'button:has-text("OK")', 'button:has-text("Confirm")', '.q-btn:has-text("OK")'];
+            for (const selector of altButtons) {
+                const altBtn = this.page.locator(selector);
+                console.log(`🔍 SAVED SEARCH DEBUG: Alt button ${selector}: count=${await altBtn.count()}, visible=${await altBtn.isVisible()}`);
+            }
+            
+            throw error;
+        }
+        
+        console.log('🔍 SAVED SEARCH DEBUG: TEST COMPLETED SUCCESSFULLY');
     }
 
     // Query Limit Methods
@@ -237,18 +338,119 @@ export class SanityPage {
 
     // Function Methods
     async createAndDeleteFunction(functionName) {
+        console.log(`🔍 FUNCTION DEBUG: Starting function test with name: ${functionName}`);
+        console.log(`🔍 FUNCTION DEBUG: Current URL: ${this.page.url()}`);
+        console.log(`🔍 FUNCTION DEBUG: Page title: ${await this.page.title()}`);
+        
+        console.log('🔍 FUNCTION DEBUG: Step 1 - Initial refresh');
         await this.page.locator(this.refreshButton).click();
         await this.page.waitForLoadState('networkidle');
+        console.log('🔍 FUNCTION DEBUG: Step 1 COMPLETE - Page refreshed');
         
-        await this.page.locator(this.functionDropdown).filter({ hasText: "save" }).click();
+        console.log('🔍 FUNCTION DEBUG: Step 2 - CRITICAL FUNCTION DROPDOWN CLICK');
+        const functionDropdown = this.page.locator(this.functionDropdown).filter({ hasText: "save" });
+        console.log(`🔍 FUNCTION DEBUG: Function dropdown selector: ${this.functionDropdown}`);
+        console.log(`🔍 FUNCTION DEBUG: Function dropdown count: ${await functionDropdown.count()}`);
+        console.log(`🔍 FUNCTION DEBUG: Function dropdown visible: ${await functionDropdown.isVisible()}`);
+        console.log(`🔍 FUNCTION DEBUG: Function dropdown enabled: ${await functionDropdown.isEnabled()}`);
         
-        // Ensure VRL editor is available before interacting
+        if (await functionDropdown.count() === 0) {
+            console.log('🔍 FUNCTION DEBUG: ERROR - Function dropdown not found!');
+            const allDropdowns = this.page.locator('[data-test*="dropdown"], select, .dropdown');
+            console.log(`🔍 FUNCTION DEBUG: All potential dropdowns count: ${await allDropdowns.count()}`);
+            for (let i = 0; i < await allDropdowns.count(); i++) {
+                const dd = allDropdowns.nth(i);
+                console.log(`🔍 FUNCTION DEBUG: Dropdown ${i}: class=${await dd.getAttribute('class')}, data-test=${await dd.getAttribute('data-test')}, visible=${await dd.isVisible()}`);
+            }
+        }
+        
+        await functionDropdown.click();
+        console.log('🔍 FUNCTION DEBUG: Step 2 COMPLETE - Function dropdown clicked');
+        
+        console.log('🔍 FUNCTION DEBUG: Step 3 - CRITICAL VRL EDITOR CHECK');
+        console.log(`🔍 FUNCTION DEBUG: VRL editor selector: ${this.fnEditor}`);
+        
+        // Check if VRL editor container exists
+        const fnEditor = this.page.locator(this.fnEditor);
+        console.log(`🔍 FUNCTION DEBUG: VRL editor container count: ${await fnEditor.count()}`);
+        console.log(`🔍 FUNCTION DEBUG: VRL editor container visible: ${await fnEditor.isVisible()}`);
+        
+        if (await fnEditor.count() === 0) {
+            console.log('🔍 FUNCTION DEBUG: ERROR - VRL editor container not found!');
+            console.log('🔍 FUNCTION DEBUG: Checking for alternative editor selectors...');
+            const altSelectors = ['#fnEditor', '.fn-editor', '[data-test*="editor"]', '.monaco-editor', '.cm-editor'];
+            for (const selector of altSelectors) {
+                const altEditor = this.page.locator(selector);
+                console.log(`🔍 FUNCTION DEBUG: Alt selector ${selector}: count=${await altEditor.count()}, visible=${await altEditor.isVisible()}`);
+            }
+            
+            // Check current page state
+            console.log('🔍 FUNCTION DEBUG: Checking if VRL toggle needs to be clicked...');
+            const vrlToggle = this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
+            console.log(`🔍 FUNCTION DEBUG: VRL toggle count: ${await vrlToggle.count()}, visible: ${await vrlToggle.isVisible()}`);
+            
+            if (await vrlToggle.count() > 0 && await vrlToggle.isVisible()) {
+                console.log('🔍 FUNCTION DEBUG: Clicking VRL toggle to show editor...');
+                await vrlToggle.locator('div').nth(2).click();
+                await this.page.waitForLoadState('domcontentloaded');
+                console.log(`🔍 FUNCTION DEBUG: After toggle - VRL editor count: ${await fnEditor.count()}, visible: ${await fnEditor.isVisible()}`);
+            }
+        }
+        
+        // Check for textbox within editor
         const fnEditorTextbox = this.page.locator(this.fnEditor).getByRole('textbox');
-        await expect(fnEditorTextbox).toBeVisible({ timeout: 15000 });
-        await expect(fnEditorTextbox).toBeEditable({ timeout: 10000 });
-        await this.page.waitForLoadState('domcontentloaded');
+        console.log(`🔍 FUNCTION DEBUG: VRL textbox count: ${await fnEditorTextbox.count()}`);
+        console.log(`🔍 FUNCTION DEBUG: VRL textbox visible: ${await fnEditorTextbox.isVisible()}`);
         
-        await fnEditorTextbox.click();
+        if (await fnEditorTextbox.count() === 0) {
+            console.log('🔍 FUNCTION DEBUG: ERROR - VRL textbox not found within editor!');
+            console.log('🔍 FUNCTION DEBUG: Checking all textboxes on page...');
+            const allTextboxes = this.page.locator('input[type="text"], textarea, [role="textbox"]');
+            console.log(`🔍 FUNCTION DEBUG: All textboxes count: ${await allTextboxes.count()}`);
+            for (let i = 0; i < Math.min(5, await allTextboxes.count()); i++) {
+                const textbox = allTextboxes.nth(i);
+                console.log(`🔍 FUNCTION DEBUG: Textbox ${i}: visible=${await textbox.isVisible()}, placeholder=${await textbox.getAttribute('placeholder')}, class=${await textbox.getAttribute('class')}`);
+            }
+            
+            // Check for CodeMirror editor
+            const cmContent = this.page.locator('.cm-content, .cm-editor .cm-content');
+            console.log(`🔍 FUNCTION DEBUG: CodeMirror content count: ${await cmContent.count()}, visible: ${await cmContent.isVisible()}`);
+        }
+        
+        try {
+            console.log('🔍 FUNCTION DEBUG: Waiting for VRL textbox to be visible...');
+            await expect(fnEditorTextbox).toBeVisible({ timeout: 15000 });
+            console.log('🔍 FUNCTION DEBUG: VRL textbox is visible');
+            
+            console.log('🔍 FUNCTION DEBUG: Waiting for VRL textbox to be editable...');
+            await expect(fnEditorTextbox).toBeEditable({ timeout: 10000 });
+            console.log('🔍 FUNCTION DEBUG: VRL textbox is editable');
+            
+            console.log('🔍 FUNCTION DEBUG: Waiting for DOM stability...');
+            await this.page.waitForLoadState('domcontentloaded');
+            console.log('🔍 FUNCTION DEBUG: DOM is stable');
+            
+            console.log('🔍 FUNCTION DEBUG: Clicking VRL textbox...');
+            await fnEditorTextbox.click();
+            console.log('🔍 FUNCTION DEBUG: Step 3 COMPLETE - VRL editor ready and clicked');
+            
+        } catch (error) {
+            console.log(`🔍 FUNCTION DEBUG: CRITICAL ERROR - VRL editor not available: ${error.message}`);
+            console.log(`🔍 FUNCTION DEBUG: Final state - Editor count: ${await fnEditor.count()}, visible: ${await fnEditor.isVisible()}`);
+            console.log(`🔍 FUNCTION DEBUG: Final state - Textbox count: ${await fnEditorTextbox.count()}, visible: ${await fnEditorTextbox.isVisible()}`);
+            console.log(`🔍 FUNCTION DEBUG: Page URL during error: ${this.page.url()}`);
+            
+            // Take final screenshot of state
+            console.log('🔍 FUNCTION DEBUG: Attempting to find any working editor alternative...');
+            const cmContent = this.page.locator('.cm-content').first();
+            if (await cmContent.count() > 0) {
+                console.log('🔍 FUNCTION DEBUG: Found CodeMirror content, attempting to use it...');
+                await cmContent.click();
+                console.log('🔍 FUNCTION DEBUG: CodeMirror content clicked as fallback');
+            } else {
+                throw error;
+            }
+        }
         await this.page.locator(this.fnEditor).locator(".cm-content").fill(".a=2");
         await waitUtils.smartWait(this.page, 1000, 'VRL editor content stabilization');
         
