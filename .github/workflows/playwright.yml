@@ -118,64 +118,64 @@ jobs:
               "serviceAccount.spec.js",
               "usersOrg.spec.js"
             ]
-          # - testfolder: "Logs"
-          #   run_files: [
-          #     # "join.spec.js",
-          #     # "logshistogram.spec.js",
-          #     # "logspage.spec.js", 
-          #     # "logsqueries.spec.js",
-          #     # "logsquickmode.spec.js",
-          #     # "pagination.spec.js",
-          #     # "secondsPrecisionAdded.spec.js",
-          #     # "unflattened.spec.js",
-          #     # "logsqueries.cte.spec.js",
-          #     # "logsqueries.matchall.spec.js",
-          #     # "searchpartition.spec.js"
-          #   ]
-          # - testfolder: "Alerts"
-          #   run_files: [
-          #     # "alerts-e2e-flow.spec.js",
-          #     # "alerts-ui-operations.spec.js",
-          #     # "alerts-import.spec.js"
-          #   ]
-          # - testfolder: "Dashboards"
-          #   run_files: [
-          #     # "custom-charts.spec.js",
-          #     # "dashboard.spec.js",
-          #     # "dashboard-filter.spec.js",
-          #     # "dashboard-folder.spec.js", 
-          #     # "dashboard-geoMap.spec.js",
-          #     # "dashboard-general-setting.spec.js",
-          #     # "dashboard-import.spec.js",
-          #     # "dashboard-maps.spec.js",
-          #     # "dashboard-multi-y-axis.spec.js",
-          #     # "dashboard-tabs-setting.spec.js",
-          #     # "dashboard-transpose.spec.js",
-          #     # "dashboard-variables-setting.spec.js",
-          #     # "dashboard2.spec.js",
-          #     # "dashboardtype.spec.js",
-          #     # "dashboard-html-chart.spec.js",
-          #     # "visualize.spec.js",
-          #     # "visualization-vrl.spec.js"
-          #   ]
-          # - testfolder: "Pipelines" 
-          #   run_files: [
-          #     # "pipelines.spec.js",
-          #     # "pipeline-dynamic.spec.js",
-          #     # "pipeline-core.spec.js",
-          #     # "remotepipeline.spec.js"
-          #   ]
-          # - testfolder: "Reports"
-          #   run_files: [
-          #     # "reportsUpdated.spec.js",
-          #     # "reportsUpdated2.spec.js"
-          #   ]
-          # - testfolder: "Streams"
-          #   run_files: [
-          #     # "multiselect-stream.spec.js",
-          #     # "streamname.spec.js",
-          #     # "streaming.spec.js"
-          #   ]
+          - testfolder: "Logs"
+            run_files: [
+              "join.spec.js",
+              "logshistogram.spec.js",
+              "logspage.spec.js", 
+              "logsqueries.spec.js",
+              "logsquickmode.spec.js",
+              "pagination.spec.js",
+              "secondsPrecisionAdded.spec.js",
+              "unflattened.spec.js",
+              "logsqueries.cte.spec.js",
+              "logsqueries.matchall.spec.js",
+              "searchpartition.spec.js"
+            ]
+          - testfolder: "Alerts"
+            run_files: [
+              "alerts-e2e-flow.spec.js",
+              "alerts-ui-operations.spec.js",
+              "alerts-import.spec.js"
+            ]
+          - testfolder: "Dashboards"
+            run_files: [
+              "custom-charts.spec.js",
+              "dashboard.spec.js",
+              "dashboard-filter.spec.js",
+              "dashboard-folder.spec.js", 
+              "dashboard-geoMap.spec.js",
+              "dashboard-general-setting.spec.js",
+              "dashboard-import.spec.js",
+              "dashboard-maps.spec.js",
+              "dashboard-multi-y-axis.spec.js",
+              "dashboard-tabs-setting.spec.js",
+              "dashboard-transpose.spec.js",
+              "dashboard-variables-setting.spec.js",
+              "dashboard2.spec.js",
+              "dashboardtype.spec.js",
+              "dashboard-html-chart.spec.js",
+              # "visualize.spec.js",
+              # "visualization-vrl.spec.js"
+            ]
+          - testfolder: "Pipelines" 
+            run_files: [
+              "pipelines.spec.js",
+              "pipeline-dynamic.spec.js",
+              "pipeline-core.spec.js",
+              # "remotepipeline.spec.js"
+            ]
+          - testfolder: "Reports"
+            run_files: [
+              "reportsUpdated.spec.js",
+              "reportsUpdated2.spec.js"
+            ]
+          - testfolder: "Streams"
+            run_files: [
+              "multiselect-stream.spec.js",
+              "streamname.spec.js",
+              "streaming.spec.js"
+            ]
 
     steps:
       - name: Clone the current repo
