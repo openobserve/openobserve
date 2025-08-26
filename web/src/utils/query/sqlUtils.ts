@@ -850,3 +850,6 @@ export const getStreamNameFromQuery = async (query: any) => {
     return null;
   }
 };
+
+// Export internal functions for testing
+export { formatValue, parseCondition, convertWhereToFilter, extractFilters, extractTableName };
