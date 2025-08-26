@@ -15,30 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div v-if="beingUpdated" class="text-h6">
+  <q-card class="add-service-account-dialog column full-height">
+    <q-card-section class=" q-py-md tw-w-full">
+      <div class="row items-center no-wrap q-py-sm">
+        <div class="col ">
+          <div v-if="beingUpdated" style="font-size: 18px">
             {{ t("serviceAccounts.update") }}
           </div>
-          <div v-else class="text-h6">{{ t("serviceAccounts.add") }}</div>
+          <div v-else style="font-size: 18px">{{ t("serviceAccounts.add") }}</div>
         </div>
         <div class="col-auto">
-          <q-btn
-            v-close-popup="true"
-            round
-            flat
-            icon="cancel"
-            data-test="close-button"
-            @click="
-              router.push({
-                name: 'serviceAccounts',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              })
-            "
+          <q-icon
+            data-test="add-role-close-dialog-btn"
+            name="cancel"
+            class="cursor-pointer"
+            size="20px"
+            @click="$emit('cancel:hideform')"
           />
         </div>
       </div>
@@ -76,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
           />
-          <div class="flex justify-center q-mt-lg">
+          <div class="flex justify-start">
             <q-btn
               v-close-popup="true"
               class="q-mr-md o2-secondary-button tw-h-[36px]"
@@ -256,3 +248,9 @@ export default defineComponent({
   },
 });
 </script>
+
+<style lang="scss" scoped>
+.add-service-account-dialog {
+  width: 30vw;
+}
+</style>

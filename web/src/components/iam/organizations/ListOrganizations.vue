@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
       @before-hide="hideAddOrgDialog"
     >
-      <add-update-organization @updated="updateOrganizationList" :model-value="toBeUpdatedOrganization" />
+      <add-update-organization @updated="updateOrganizationList" :model-value="toBeUpdatedOrganization" @cancel:hideform="hideAddOrgDialog" />
     </q-dialog>
   </q-page>
 </template>

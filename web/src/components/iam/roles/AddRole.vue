@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md">
+    <q-card-section class="q-py-md">
       <div data-test="add-role-section">
-        <div class="flex justify-between items-center q-px-md q-py-sm">
+        <div class="flex justify-between items-center q-py-sm">
           <div data-test="add-role-section-title" style="font-size: 18px">
             {{ t("iam.addRole") }}
           </div>
@@ -30,9 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="full-width bg-grey-4" style="height: 1px" />
+        <q-separator class="tw-w-full" />
 
-        <div class="q-px-md q-mt-md o2-input">
+        <div class=" q-mt-md o2-input">
           <div data-test="add-role-rolename-input-btn">
             <q-input
               v-model.trim="name"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-input>
           </div>
 
-          <div class="flex justify-center q-mt-lg">
+          <div class="flex justify-start q-mt-sm">
             <q-btn
               v-close-popup
               class="q-mr-md o2-secondary-button tw-h-[36px]"

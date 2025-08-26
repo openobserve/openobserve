@@ -15,30 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="add-user-dialog column full-height">
-    <q-card-section class="q-px-md q-py-md tw-w-full">
-      <div class="row items-center no-wrap">
+  <q-card class="add-user-dialog column full-height ">
+    <q-card-section class="q-py-md tw-w-full">
+      <div class="row items-center no-wrap q-py-sm">
         <div class="col">
-          <div v-if="beingUpdated" class="text-h6">
+          <div v-if="beingUpdated" style="font-size: 18px">
             {{ t("user.editUser") }}
           </div>
-          <div v-else class="text-h6">{{ t("user.add") }}</div>
+          <div v-else style="font-size: 18px">{{ t("user.add") }}</div>
         </div>
         <div class="col-auto">
-          <q-btn
-            data-test="close-user-button"
-            v-close-popup="true"
-            round
-            flat
-            icon="cancel"
-            @click="
-              router.push({
-                name: 'users',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              })
-            "
+          <q-icon
+            data-test="add-role-close-dialog-btn"
+            name="cancel"
+            class="cursor-pointer"
+            size="20px"
+            @click="$emit('cancel:hideform')"
           />
         </div>
       </div>
@@ -299,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             maxlength="100"
           />
 
-          <div class="flex justify-end q-mt-md">
+          <div class="flex justify-start ">
             <q-btn
               v-close-popup
               class="q-mr-md o2-secondary-button tw-h-[36px]"
