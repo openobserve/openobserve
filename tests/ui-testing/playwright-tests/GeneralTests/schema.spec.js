@@ -55,10 +55,8 @@ test.describe("Schema testcases", () => {
         await ingestion(page, testStreamName);
         await page.waitForLoadState('domcontentloaded');
 
-        // Navigate to logs page
-        const logsUrl = `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=automationtesting`;
-        testLogger.navigation('Navigating to logs page', { url: logsUrl });
-        await page.goto(logsUrl);
+        // Navigate to logs page with VRL editor enabled
+        await pm.logsPage.navigateToLogs('automationtesting');
         
         const allsearch = page.waitForResponse("**/api/automationtesting/_search**");
         await pm.logsPage.selectStream(testStreamName); 
@@ -90,10 +88,8 @@ test.describe("Schema testcases", () => {
         await ingestion(page, testStreamName);
         await page.waitForLoadState('domcontentloaded');
 
-        // Navigate to logs page
-        const logsUrl = `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=automationtesting`;
-        testLogger.navigation('Navigating to logs page', { url: logsUrl });
-        await page.goto(logsUrl);
+        // Navigate to logs page with VRL editor enabled
+        await pm.logsPage.navigateToLogs('automationtesting');
         
         await pm.logsPage.selectStream(testStreamName); 
         await pm.schemaPage.applyQuery();
@@ -123,10 +119,8 @@ test.describe("Schema testcases", () => {
         await ingestion(page, testStreamName);
         await page.waitForLoadState('domcontentloaded');
 
-        // Navigate to logs page
-        const logsUrl = `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=automationtesting`;
-        testLogger.navigation('Navigating to logs page', { url: logsUrl });
-        await page.goto(logsUrl);
+        // Navigate to logs page with VRL editor enabled
+        await pm.logsPage.navigateToLogs('automationtesting');
         
         await pm.logsPage.selectStream(testStreamName); 
         await pm.schemaPage.applyQuery();
