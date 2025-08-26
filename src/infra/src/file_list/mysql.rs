@@ -957,11 +957,38 @@ SELECT date
         let (min, max) = time_range;
         let sql = format!(
             r#"
-SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, CAST(COUNT(*) AS SIGNED) AS file_num,
-    CAST(SUM(records) AS SIGNED) AS records, CAST(SUM(original_size) AS SIGNED) AS original_size, CAST(SUM(compressed_size) AS SIGNED) AS compressed_size, CAST(SUM(index_size) AS SIGNED) AS index_size
-    FROM file_list
-    WHERE updated_at > {min} AND updated_at <= {max}
-    GROUP BY stream
+SELECT 
+    stream,
+    MIN(CASE WHEN deleted IS FALSE THEN min_ts END) AS min_ts,
+    MAX(CASE WHEN deleted IS FALSE THEN max_ts END) AS max_ts,
+    CAST(SUM(CASE 
+        WHEN deleted IS TRUE AND created_at <= {min} THEN -1
+        WHEN deleted IS FALSE THEN 1
+        ELSE 0
+    END) AS SIGNED) AS file_num,
+    CAST(SUM(CASE 
+        WHEN deleted IS TRUE AND created_at <= {min} THEN -records
+        WHEN deleted IS FALSE THEN records
+        ELSE 0
+    END) AS SIGNED) AS records,
+    CAST(SUM(CASE 
+        WHEN deleted IS TRUE AND created_at <= {min} THEN -original_size
+        WHEN deleted IS FALSE THEN original_size
+        ELSE 0
+    END) AS SIGNED) AS original_size,
+    CAST(SUM(CASE 
+        WHEN deleted IS TRUE AND created_at <= {min} THEN -compressed_size
+        WHEN deleted IS FALSE THEN compressed_size
+        ELSE 0
+    END) AS SIGNED) AS compressed_size,
+    CAST(SUM(CASE 
+        WHEN deleted IS TRUE AND created_at <= {min} THEN -index_size
+        WHEN deleted IS FALSE THEN index_size
+        ELSE 0
+    END) AS SIGNED) AS index_size
+FROM file_list
+WHERE updated_at > {min} AND updated_at <= {max}
+GROUP BY stream
             "#,
         );
         let pool = CLIENT_RO.clone();
@@ -1724,8 +1751,8 @@ impl MysqlFileList {
         DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
         match  sqlx::query(
             format!(r#"
-INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             "#).as_str(),
         )
         .bind(account)
@@ -1741,6 +1768,7 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
         .bind(meta.compressed_size)
         .bind(meta.index_size)
         .bind(meta.flattened)
+        .bind(now_ts)
         .bind(now_ts)
         .execute(&pool)
         .await {
@@ -1768,7 +1796,7 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
             for files in chunks {
                 let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
-                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)").as_str(),
+                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)").as_str(),
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let (stream_key, date_key, file_name) =
@@ -1787,6 +1815,7 @@ INSERT IGNORE INTO {table} (account, org, stream, date, file, deleted, min_ts, m
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
                         .push_bind(item.meta.flattened)
+                        .push_bind(now_ts)
                         .push_bind(now_ts);
                 });
                 DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
@@ -1898,6 +1927,7 @@ CREATE TABLE IF NOT EXISTS file_list
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    created_at      BIGINT not null,
     updated_at      BIGINT not null
 );
         "#,
@@ -1923,6 +1953,7 @@ CREATE TABLE IF NOT EXISTS file_list_history
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    created_at      BIGINT not null,
     updated_at      BIGINT not null
 );
         "#,

@@ -900,11 +900,38 @@ SELECT date
         let (min, max) = time_range;
         let sql = format!(
             r#"
-SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS file_num,
-    SUM(records)::BIGINT AS records, SUM(original_size)::BIGINT AS original_size, SUM(compressed_size)::BIGINT AS compressed_size, SUM(index_size)::BIGINT AS index_size
-    FROM file_list
-    WHERE updated_at > {min} AND updated_at <= {max}
-    GROUP BY stream
+SELECT 
+    stream,
+    MIN(CASE WHEN deleted IS FALSE THEN min_ts END) AS min_ts,
+    MAX(CASE WHEN deleted IS FALSE THEN max_ts END) AS max_ts,
+    SUM(CASE 
+        WHEN deleted IS TRUE AND created_at <= {min} THEN -1
+        WHEN deleted IS FALSE THEN 1
+        ELSE 0
+    END)::BIGINT AS file_num,
+    SUM(CASE 
+        WHEN deleted IS TRUE AND created_at <= {min} THEN -records
+        WHEN deleted IS FALSE THEN records
+        ELSE 0
+    END)::BIGINT AS records,
+    SUM(CASE 
+        WHEN deleted IS TRUE AND created_at <= {min} THEN -original_size
+        WHEN deleted IS FALSE THEN original_size
+        ELSE 0
+    END)::BIGINT AS original_size,
+    SUM(CASE 
+        WHEN deleted IS TRUE AND created_at <= {min} THEN -compressed_size
+        WHEN deleted IS FALSE THEN compressed_size
+        ELSE 0
+    END)::BIGINT AS compressed_size,
+    SUM(CASE 
+        WHEN deleted IS TRUE AND created_at <= {min} THEN -index_size
+        WHEN deleted IS FALSE THEN index_size
+        ELSE 0
+    END)::BIGINT AS index_size
+FROM file_list
+WHERE updated_at > {min} AND updated_at <= {max}
+GROUP BY stream
             "#
         );
         let pool = CLIENT_RO.clone();
@@ -1609,8 +1636,8 @@ impl PostgresFileList {
         let ret: std::result::Result<Option<i64>, sea_orm::SqlxError> = sqlx::query_scalar(
             format!(
                 r#"
-INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
     ON CONFLICT DO NOTHING
     RETURNING id;
                 "#
@@ -1629,6 +1656,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
             .bind(meta.compressed_size)
             .bind(meta.index_size)
             .bind(meta.flattened)
+            .bind(now_ts)
             .bind(now_ts)
             .fetch_one(&pool).await;
         match ret {
@@ -1658,7 +1686,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
             for files in chunks {
                 let now_ts = now_micros();
                 let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, updated_at)").as_str()
+                format!("INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, created_at, updated_at)").as_str()
                 );
                 query_builder.push_values(files, |mut b, item| {
                     let (stream_key, date_key, file_name) =
@@ -1677,6 +1705,7 @@ INSERT INTO {table} (account, org, stream, date, file, deleted, min_ts, max_ts, 
                         .push_bind(item.meta.compressed_size)
                         .push_bind(item.meta.index_size)
                         .push_bind(item.meta.flattened)
+                        .push_bind(now_ts)
                         .push_bind(now_ts);
                 });
                 DB_QUERY_NUMS.with_label_values(&["insert", table]).inc();
@@ -1788,6 +1817,7 @@ CREATE TABLE IF NOT EXISTS file_list
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    created_at      BIGINT not null,
     updated_at      BIGINT not null
 );
         "#,
@@ -1813,6 +1843,7 @@ CREATE TABLE IF NOT EXISTS file_list_history
     original_size   BIGINT not null,
     compressed_size BIGINT not null,
     index_size      BIGINT not null,
+    created_at      BIGINT not null,
     updated_at      BIGINT not null
 );
         "#,
