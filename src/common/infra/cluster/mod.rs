@@ -644,6 +644,23 @@ async fn set_node_status_metrics(node: &Node) {
     }
 }
 
+fn generate_node_id(mut ids: Vec<i32>) -> i32 {
+    ids.sort();
+    ids.dedup();
+    log::debug!("node_ids: {:?}", ids);
+
+    let mut new_node_id = 1;
+    for id in ids {
+        if id == new_node_id {
+            new_node_id += 1;
+        } else {
+            break;
+        }
+    }
+    log::debug!("new_node_id: {:?}", new_node_id);
+    new_node_id
+}
+
 async fn update_node_status_metrics() -> NodeMetrics {
     let node_status = get_node_metrics();
 
