@@ -99,6 +99,17 @@ import {
   type ValueQueryParams
 } from "@/utils/logs/parsers";
 import {
+  encodeVisualizationConfig,
+  decodeVisualizationConfig,
+  addTransformToQuery as addTransformToQueryUtil,
+  buildWebSocketPayload as buildWebSocketPayloadUtil,
+  generateURLQuery as generateURLQueryUtil,
+  chunkedAppend as chunkedAppendUtil,
+  type QueryTransformParams,
+  type WebSocketPayloadParams,
+  type URLQueryParams
+} from "@/utils/logs/transformers";
+import {
   convertDateToTimestamp,
   getConsumableRelativeTime,
 } from "@/utils/date";
@@ -491,102 +502,71 @@ const useLogs = () => {
     };
   };
 
-  const encodeVisualizationConfig = (config: any) => {
-    try {
-      return b64EncodeUnicode(JSON.stringify(config));
-    } catch (error) {
-      console.error("Failed to encode visualization config:", error);
-      return null;
-    }
-  };
-
-  const decodeVisualizationConfig = (encodedConfig: string) => {
-    try {
-      return JSON.parse(b64DecodeUnicode(encodedConfig) ?? "{}");
-    } catch (error) {
-      console.error("Failed to decode visualization config:", error);
-      return null;
-    }
-  };
 
   const generateURLQuery = (isShareLink: boolean = false, dashboardPanelData: any = null) => {
-    const date = searchObj.data.datetime;
-
-    const query: any = {};
-
-    if (searchObj.data.stream.streamType) {
-      query["stream_type"] = searchObj.data.stream.streamType;
-    }
-
-    if (
-      searchObj.data.stream.selectedStream.length > 0 &&
-      typeof searchObj.data.stream.selectedStream != "object"
-    ) {
-      query["stream"] = searchObj.data.stream.selectedStream.join(",");
-    } else if (
-      typeof searchObj.data.stream.selectedStream == "object" &&
-      searchObj.data.stream.selectedStream.hasOwnProperty("value")
-    ) {
-      query["stream"] = searchObj.data.stream.selectedStream.value;
-    } else {
-      query["stream"] = searchObj.data.stream.selectedStream.join(",");
-    }
-
-    if (date.type == "relative") {
-      if (isShareLink) {
-        query["from"] = date.startTime;
-        query["to"] = date.endTime;
-      } else {
-        query["period"] = date.relativeTimePeriod;
+    // Convert local state to the extracted utility's parameter format
+    const params: URLQueryParams = {
+      isShareLink,
+      dashboardPanelData,
+      streamType: searchObj.data.stream.streamType,
+      selectedStream: searchObj.data.stream.selectedStream,
+      datetime: {
+        startTime: isShareLink && searchObj.data.datetime.type === "relative" 
+          ? searchObj.data.datetime.startTime 
+          : searchObj.data.datetime.startTime,
+        endTime: isShareLink && searchObj.data.datetime.type === "relative"
+          ? searchObj.data.datetime.endTime
+          : searchObj.data.datetime.endTime,
+        type: searchObj.data.datetime.type,
+        relativeTimePeriod: searchObj.data.datetime.relativeTimePeriod
+      },
+      query: searchObj.data.query?.trim() || "",
+      sqlMode: searchObj.meta.sqlMode,
+      showTransformEditor: searchObj.meta.showTransformEditor,
+      selectedFields: searchObj.meta.useUserDefinedSchemas,
+      refreshInterval: searchObj.meta.refreshInterval,
+      resultGrid: {
+        showPagination: true,
+        rowsPerPage: searchObj.meta.resultGrid.rowsPerPage,
+        currentPage: searchObj.data.resultGrid.currentPage
+      },
+      meta: {
+        showHistogram: searchObj.meta.showHistogram,
+        showDetailTab: true,
+        resultGrid: {
+          chartInterval: "auto"
+        }
       }
-    } else if (date.type == "absolute") {
-      query["from"] = date.startTime;
-      query["to"] = date.endTime;
+    };
+
+    // Use the extracted utility and then add custom properties not covered by it
+    const query = generateURLQueryUtil(params);
+    
+    // Add properties specific to this implementation that the utility doesn't handle
+    if (searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent != "") {
+      query["functionContent"] = b64EncodeUnicode(searchObj.data.tempFunctionContent.trim());
     }
-
-    query["refresh"] = searchObj.meta.refreshInterval;
-
-    if (searchObj.data.query) {
-      query["sql_mode"] = searchObj.meta.sqlMode;
-      query["query"] = b64EncodeUnicode(searchObj.data.query.trim());
-    }
-
-    //add the function editor toggle is true or false
-    //it will help to retain the function editor state when we refresh the page
-    query["fn_editor"] = searchObj.meta.showTransformEditor;
-    if (
-      searchObj.data.transformType === "function" &&
-      searchObj.data.tempFunctionContent != ""
-    ) {
-      query["functionContent"] = b64EncodeUnicode(
-        searchObj.data.tempFunctionContent.trim(),
-      );
-    }
-
-    // TODO : Add type in query params for all types
+    
     if (searchObj.meta.pageType !== "logs") {
       query["type"] = searchObj.meta.pageType;
     }
-
-    query["defined_schemas"] = searchObj.meta.useUserDefinedSchemas;
+    
     query["org_identifier"] = store.state.selectedOrganization.identifier;
     query["quick_mode"] = searchObj.meta.quickMode;
-    query["show_histogram"] = searchObj.meta.showHistogram;
-
-    if(store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.regions?.length) {
+    
+    if (store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.regions?.length) {
       query["regions"] = searchObj.meta.regions.join(",");
     }
-
-    if(store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.clusters?.length) {
+    
+    if (store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.clusters?.length) {
       query["clusters"] = searchObj.meta.clusters.join(",");
     }
-
-    if(searchObj.meta.logsVisualizeToggle) {
+    
+    if (searchObj.meta.logsVisualizeToggle) {
       query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
     }
-
+    
     // Preserve visualization data in URL
-    // - If in visualize mode and panel data is provided, encode the dashboardPanelData
     if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
       const visualizationData = getVisualizationConfig(dashboardPanelData);
       if (visualizationData) {
@@ -596,13 +576,12 @@ const useLogs = () => {
         }
       }
     } else {
-      // else preserve existing visualization data from the current URL
       const existingEncodedConfig = router.currentRoute.value?.query?.visualization_data as string | undefined;
       if (existingEncodedConfig) {
         query["visualization_data"] = existingEncodedConfig;
       }
     }
-
+    
     return query;
   };
 
@@ -1940,15 +1919,13 @@ const useLogs = () => {
   }
 
   function addTransformToQuery(queryReq: any) {
-    if (shouldAddFunctionToSearch()) {
-      queryReq.query["query_fn"] =
-        b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
-    }
-
-    // Add action ID if it exists
-    if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
-      queryReq.query["action_id"] = searchObj.data.selectedTransform.id;
-    }
+    const params: QueryTransformParams = {
+      shouldAddFunction: shouldAddFunctionToSearch(),
+      tempFunctionContent: searchObj.data.tempFunctionContent,
+      transformType: searchObj.data.transformType as "action" | "function",
+      selectedTransform: searchObj.data.selectedTransform
+    };
+    addTransformToQueryUtil(queryReq, params);
   }
 
   function resetHistogramWithError(errorMsg: string, errorCode: number = 0) {
@@ -5042,24 +5019,16 @@ const useLogs = () => {
     type: "search" | "histogram" | "pageCount" | "values",
     meta?: any,
   ) => {
-    const { traceId } = generateTraceContext();
-    addTraceId(traceId);
-
-    const payload: {
-      queryReq: SearchRequestPayload;
-      type: "search" | "histogram" | "pageCount" | "values";
-      isPagination: boolean;
-      traceId: string;
-      org_id: string;
-      meta?: any;
-    } = {
+    const params: WebSocketPayloadParams = {
       queryReq,
-      type,
       isPagination,
-      traceId,
-      org_id: searchObj.organizationIdentifier,
-      meta,
+      type,
+      organizationIdentifier: searchObj.organizationIdentifier,
+      meta
     };
+    
+    const { payload, traceId } = buildWebSocketPayloadUtil(params);
+    addTraceId(traceId);
 
     return payload;
   };
@@ -5746,10 +5715,7 @@ const useLogs = () => {
   };
 
   const chunkedAppend = async (target: any, source: any, chunkSize = 5000) => {
-    for (let i = 0; i < source.length; i += chunkSize) {
-      target.push.apply(target, source.slice(i, i + chunkSize));
-      await new Promise(resolve => setTimeout(resolve, 0)); // Let UI update
-    }
+    await chunkedAppendUtil(target, source, chunkSize);
   };
 
   const handlePageCountResponse = (

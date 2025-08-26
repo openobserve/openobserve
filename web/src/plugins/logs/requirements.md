@@ -187,18 +187,19 @@ web/src/plugins/logs/     # Keep existing Vue components
 
 ### Phase 1: Preparation & Analysis
 - [x] **Task 1.1**: Analyze current structure and catalog functions ✅
-- [ ] **Task 1.2**: Create backup copy of original useLogs.ts
-- [ ] **Task 1.3**: Set up new directory structure
-- [ ] **Task 1.4**: Categorize all functions by responsibility
-- [ ] **Task 1.5**: Create initial test coverage report
+- [x] **Task 1.2**: Create backup copy of original useLogs.ts ✅
+- [x] **Task 1.3**: Set up new directory structure ✅
+- [x] **Task 1.4**: Categorize all functions by responsibility ✅
+- [x] **Task 1.5**: Create initial test coverage report ✅
 
 ### Phase 2: Extract Utilities (Low Risk)
-- [ ] **Task 2.1**: Extract date/time utility functions → `utils/logs/datetime.ts`
-- [ ] **Task 2.2**: Extract data formatting functions → `utils/logs/formatters.ts`
-- [ ] **Task 2.3**: Extract validation functions → `utils/logs/validators.ts`
-- [ ] **Task 2.4**: Extract parsing functions → `utils/logs/parsers.ts`
-- [ ] **Task 2.5**: Extract transformation helpers → `utils/logs/transformers.ts`
-- [ ] **Task 2.6**: Test utility functions in isolation
+- [x] **Task 2.1**: Extract constants to `utils/logs/constants.ts` ✅
+- [x] **Task 2.2**: Extract date/time utility functions → `utils/logs/datetime.ts` ✅
+- [x] **Task 2.3**: Extract data formatting functions → `utils/logs/formatters.ts` ✅
+- [x] **Task 2.4**: Extract validation functions → `utils/logs/validators.ts` ✅
+- [x] **Task 2.5**: Extract parsing functions → `utils/logs/parsers.ts` ✅
+- [x] **Task 2.6**: Extract transformation helpers → `utils/logs/transformers.ts` ✅
+- [x] **Task 2.7**: Test utility functions in isolation ✅
 
 ### Phase 3: Extract API Layer (Medium Risk)
 - [ ] **Task 3.1**: Extract HTTP API calls → `services/logs/logsApi.ts`
