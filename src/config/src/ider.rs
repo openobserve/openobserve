@@ -15,7 +15,7 @@
 
 use std::{
     hint::spin_loop,
-    sync::LazyLock,
+    sync::{LazyLock, atomic::Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -24,13 +24,21 @@ use rand::Rng;
 use svix_ksuid::{Ksuid, KsuidLike};
 
 static IDER: LazyLock<Mutex<SnowflakeIdGenerator>> = LazyLock::new(|| {
-    let machine_id = unsafe { super::cluster::LOCAL_NODE_ID };
+    let machine_id = super::cluster::LOCAL_NODE_ID.load(Ordering::Relaxed);
     log::info!("init ider with machine_id: {machine_id}");
     Mutex::new(SnowflakeIdGenerator::new(machine_id))
 });
 
 pub fn init() {
     _ = generate();
+}
+
+pub fn reload_machine_id() {
+    let machine_id = super::cluster::LOCAL_NODE_ID.load(Ordering::Relaxed);
+    log::info!("init ider with machine_id: {}", machine_id);
+    let new_ider = SnowflakeIdGenerator::new(machine_id);
+    let mut w = IDER.lock();
+    _ = std::mem::replace(&mut *w, new_ider);
 }
 
 /// Generate a distributed unique id with snowflake.
