@@ -129,23 +129,9 @@ async fn register() -> Result<()> {
     }
     drop(w);
 
-    node_ids.sort();
-    node_ids.dedup();
-    log::debug!("node_ids: {:?}", node_ids);
-
-    let mut new_node_id = 1;
-    for id in node_ids {
-        if id == new_node_id {
-            new_node_id += 1;
-        } else {
-            break;
-        }
-    }
-    log::debug!("new_node_id: {:?}", new_node_id);
+    let new_node_id = super::generate_node_id(node_ids);
     // update local id
-    unsafe {
-        LOCAL_NODE_ID = new_node_id;
-    }
+    LOCAL_NODE_ID.store(new_node_id, Ordering::Relaxed);
 
     // 5. join the cluster
     let key = format!("/nodes/{}", LOCAL_NODE.uuid);
@@ -232,7 +218,7 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
             val
         }
         None => Node {
-            id: unsafe { LOCAL_NODE_ID },
+            id: LOCAL_NODE_ID.load(Ordering::Relaxed),
             uuid: LOCAL_NODE.uuid.clone(),
             name: cfg.common.instance_name.clone(),
             http_addr: format!(
@@ -257,6 +243,23 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
             version: config::VERSION.to_string(),
         },
     };
+
+    // check node id if it is duplicated in the node list
+    let r = super::NODES.read().await;
+    let node_ids = r.values().map(|n| n.id).collect::<Vec<_>>();
+    drop(r);
+    if node_ids.iter().filter(|&v| *v == node.id).count() > 1 {
+        let new_node_id = super::generate_node_id(node_ids);
+        node.id = new_node_id;
+        log::warn!(
+            "[CLUSTER] node id is duplicated, generate new node id: {}",
+            new_node_id
+        );
+        // update local id
+        LOCAL_NODE_ID.store(new_node_id, Ordering::Relaxed);
+        // reset snowflake id generator
+        config::ider::reload_machine_id();
+    }
 
     // update node status metrics
     node.metrics = super::update_node_status_metrics().await;
