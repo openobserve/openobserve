@@ -47,6 +47,12 @@ use crate::{
 #[post("/{org_id}/ingest/metrics/_json")]
 pub async fn json(org_id: web::Path<String>, body: web::Bytes) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
+    // check system resource
+    if let Err(e) = crate::service::ingestion::check_ingestion_allowed(&org_id, config::meta::stream::StreamType::Metrics, None).await {
+        log::error!("[METRICS:OTLP] ingestion error: {e}");
+        return Ok(crate::common::utils::ingestion_error_util::handle_error(e));
+    }
+
     Ok(match metrics::json::ingest(&org_id, body).await {
         Ok(v) => HttpResponse::Ok().json(v),
         Err(e) => {
@@ -80,6 +86,12 @@ pub async fn otlp_metrics_write(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
+    // check system resource
+    if let Err(e) = crate::service::ingestion::check_ingestion_allowed(&org_id, config::meta::stream::StreamType::Metrics, None).await {
+        log::error!("[METRICS:OTLP] ingestion error: {e}");
+        return Ok(crate::common::utils::ingestion_error_util::handle_error(e));
+    }
+
     let content_type = req.headers().get("Content-Type").unwrap().to_str().unwrap();
     if content_type.eq(CONTENT_TYPE_PROTO) {
         metrics::otlp::otlp_proto(&org_id, body).await
