@@ -127,10 +127,7 @@ pub async fn get_writer(
 
     if is_existing_writer_channel_closed {
         log::warn!(
-            "[INGESTER:MEM:{}] Writer channel closed for {}/{}, removing from cache",
-            idx,
-            org_id,
-            stream_type
+            "[INGESTER:MEM:{idx}] Writer channel closed for {org_id}/{stream_type}, removing from cache",
         );
         let mut w = WRITERS[idx].write().await;
         w.remove(&key);
