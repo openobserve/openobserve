@@ -2363,7 +2363,7 @@ const useLogs = () => {
               searchObj.data.queryResults.from += res.data.from;
               searchObj.data.queryResults.scan_size += res.data.scan_size;
               searchObj.data.queryResults.took += res.data.took;
-              await chunkedAppend(searchObj.data.queryResults.hits, res.data.hits);
+              await chunkedAppendUtil(searchObj.data.queryResults.hits, res.data.hits);
             } else {
               // Replace result
               if(queryReq.query?.streaming_output) {
@@ -5644,7 +5644,7 @@ const useLogs = () => {
         // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
         // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
         if (appendResult) {
-          await chunkedAppend(searchObj.data.queryResults.hits, response.content.results.hits);
+          await chunkedAppendUtil(searchObj.data.queryResults.hits, response.content.results.hits);
 
         searchObj.data.queryResults.total += response.content.results.total;
         searchObj.data.queryResults.took += response.content.results.took;
@@ -5716,9 +5716,6 @@ const useLogs = () => {
     }
   };
 
-  const chunkedAppend = async (target: any, source: any, chunkSize = 5000) => {
-    await chunkedAppendUtil(target, source, chunkSize);
-  };
 
   const handlePageCountResponse = (
     queryReq: SearchRequestPayload,
