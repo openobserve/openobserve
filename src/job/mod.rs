@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster::LOCAL_NODE;
+use config::{cluster::LOCAL_NODE, spawn_pausable_job};
 use infra::file_list as infra_file_list;
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
@@ -42,7 +42,6 @@ mod promql;
 mod promql_self_consume;
 mod stats;
 pub(crate) mod syslog_server;
-mod telemetry;
 
 pub use file_downloader::queue_background_download;
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
@@ -107,7 +106,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]
-    tokio::task::spawn(async move { self_reporting::run_audit_publish().await });
+    if self_reporting::run_audit_publish().is_none() {
+        log::error!("Failed to run audit publish");
+    };
+    #[cfg(feature = "cloud")]
+    tokio::task::spawn(self_reporting::cloud_events::flush_cloud_events());
+
     #[cfg(feature = "enterprise")]
     {
         tokio::task::spawn(async move { db::ofga::watch().await });
@@ -129,7 +133,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // telemetry run
     if cfg.common.telemetry_enabled && LOCAL_NODE.is_querier() {
-        tokio::task::spawn(async move { telemetry::run().await });
+        spawn_pausable_job!(
+            "telemetry",
+            config::get_config().common.telemetry_heartbeat,
+            {
+                crate::common::meta::telemetry::Telemetry::new()
+                    .heart_beat("OpenObserve - heartbeat", None)
+                    .await;
+            }
+        );
     }
 
     tokio::task::spawn(async move { self_reporting::run().await });
@@ -214,12 +226,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    if LOCAL_NODE.is_querier() && get_enterprise_config().ai.enabled {
+        tokio::task::spawn(async move {
+            o2_enterprise::enterprise::ai::prompt::prompts::load_system_prompt()
+                .await
+                .expect("load system prompt failed");
+        });
+    }
     tokio::task::spawn(async move { files::run().await });
     tokio::task::spawn(async move { stats::run().await });
     tokio::task::spawn(async move { compactor::run().await });
     tokio::task::spawn(async move { flatten_compactor::run().await });
     tokio::task::spawn(async move { metrics::run().await });
-    tokio::task::spawn(async move { promql::run().await });
+    let _ = promql::run();
     tokio::task::spawn(async move { alert_manager::run().await });
     tokio::task::spawn(async move { file_downloader::run().await });
     #[cfg(feature = "enterprise")]

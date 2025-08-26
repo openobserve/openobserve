@@ -13,46 +13,41 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{cluster::LOCAL_NODE, meta::promql::ClusterLeader};
+use config::{cluster::LOCAL_NODE, meta::promql::ClusterLeader, spawn_pausable_job};
 use hashbrown::HashMap;
-use tokio::time::{self, Duration};
 
 use crate::{common::infra::config::METRIC_CLUSTER_LEADER, service::db};
 
-pub async fn run() -> Result<(), anyhow::Error> {
+pub fn run() -> Option<tokio::task::JoinHandle<()>> {
     if !LOCAL_NODE.is_ingester() {
-        return Ok(()); // not an ingester, no need to init job
+        return None; // not an ingester, no need to init job
     }
 
-    let cfg = config::get_config();
-    if !cfg.common.metrics_dedup_enabled {
-        return Ok(());
-    }
+    let mut last_leaders: HashMap<String, ClusterLeader> = HashMap::new();
 
-    let mut interval = time::interval(Duration::from_secs(cfg.limit.metrics_leader_push_interval));
-    interval.tick().await; // trigger the first run
+    Some(spawn_pausable_job!(
+        "promql_metrics_leader",
+        config::get_config().limit.metrics_leader_push_interval,
+        {
+            // only update if there's a change
+            let map = METRIC_CLUSTER_LEADER.read().await.clone();
+            for (key, value) in map.iter() {
+                if last_leaders.contains_key(key) {
+                    let last_leader = last_leaders.get(key).unwrap();
+                    if value.eq(last_leader) {
+                        continue;
+                    }
+                }
 
-    let mut last_leaders: HashMap<String, ClusterLeader> = HashMap::new(); // maintain the last state
-
-    loop {
-        interval.tick().await;
-        // only update if there's a change
-        let map = METRIC_CLUSTER_LEADER.read().await.clone();
-        for (key, value) in map.iter() {
-            if last_leaders.contains_key(key) {
-                let last_leader = last_leaders.get(key).unwrap();
-                if value.eq(last_leader) {
-                    continue;
+                let result = db::metrics::set_prom_cluster_leader(key, value).await;
+                match result {
+                    Ok(_) => {
+                        let _ = last_leaders.insert(key.to_string(), value.clone());
+                    }
+                    Err(err) => log::error!("error updating leader to db {err}"),
                 }
             }
-
-            let result = db::metrics::set_prom_cluster_leader(key, value).await;
-            match result {
-                Ok(_) => {
-                    let _ = last_leaders.insert(key.to_string(), value.clone());
-                }
-                Err(err) => log::error!("error updating leader to db {}", err),
-            }
-        }
-    }
+        },
+        pause_if: config::get_config().limit.metrics_leader_push_interval == 0 || !config::get_config().common.metrics_dedup_enabled
+    ))
 }
