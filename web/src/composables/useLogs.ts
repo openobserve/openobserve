@@ -60,6 +60,14 @@ import {
   deepCopy
 } from "@/utils/zincutils";
 import {
+  MAX_SEARCH_RETRIES,
+  SEARCH_RECONNECT_DELAY,
+  INTERVAL_MAP,
+  DEFAULT_LOGS_CONFIG,
+  DEFAULT_SEARCH_AGG_DATA,
+  DEFAULT_SEARCH_DEBUG_DATA
+} from "@/utils/logs/constants";
+import {
   convertDateToTimestamp,
   getConsumableRelativeTime,
 } from "@/utils/date";
@@ -86,220 +94,22 @@ import useStreamingSearch from "./useStreamingSearch";
 import { changeHistogramInterval } from "@/utils/query/sqlUtils";
 import useQuery from "./useQuery";
 
-const defaultObject = {
-  organizationIdentifier: "",
-  runQuery: false,
-  loading: false,
-  loadingHistogram: false,
-  loadingCounter: false,
-  loadingStream: false,
-  loadingSavedView: false,
-  shouldIgnoreWatcher: false,
-  communicationMethod: "http",
-  config: {
-    splitterModel: 20,
-    lastSplitterPosition: 0,
-    splitterLimit: [0, 40],
-    fnSplitterModel: 60,
-    fnLastSplitterPosition: 0,
-    fnSplitterLimit: [40, 100],
-    refreshTimes: [
-      [
-        { label: "5 sec", value: 5 },
-        { label: "1 min", value: 60 },
-        { label: "1 hr", value: 3600 },
-      ],
-      [
-        { label: "10 sec", value: 10 },
-        { label: "5 min", value: 300 },
-        { label: "2 hr", value: 7200 },
-      ],
-      [
-        { label: "15 sec", value: 15 },
-        { label: "15 min", value: 900 },
-        { label: "1 day", value: 86400 },
-      ],
-      [
-        { label: "30 sec", value: 30 },
-        { label: "30 min", value: 1800 },
-      ],
-    ],
-  },
-  meta: {
-    logsVisualizeToggle: "logs",
-    refreshInterval: <number>0,
-    refreshIntervalLabel: "Off",
-    refreshHistogram: false,
-    showFields: true,
-    showQuery: true,
-    showHistogram: true,
-    showDetailTab: false,
-    showTransformEditor: false, //we are making showTransformEditor false because by default function / actions editor should be hidden
-    searchApplied: false,
-    toggleSourceWrap: useLocalWrapContent()
-      ? JSON.parse(useLocalWrapContent())
-      : false,
-    histogramDirtyFlag: false,
-    logsVisualizeDirtyFlag: false,
-    sqlMode: false,
-    sqlModeManualTrigger: false,
-    quickMode: false,
-    queryEditorPlaceholderFlag: true,
-    functionEditorPlaceholderFlag: true,
-    resultGrid: {
-      rowsPerPage: 50,
-      wrapCells: false,
-      manualRemoveFields: false,
-      chartInterval: "1 second",
-      chartKeyFormat: "HH:mm:ss",
-      navigation: {
-        currentRowIndex: 0,
-      },
-      showPagination: true,
-    },
-    jobId: "",
-    jobRecords: "100",
-    scrollInfo: {},
-    pageType: "logs", // 'logs' or 'stream
-    regions: [],
-    clusters: [],
-    useUserDefinedSchemas: "user_defined_schema",
-    hasUserDefinedSchemas: false,
-    selectedTraceStream: "",
-    showSearchScheduler: false,
-    toggleFunction: false, // DEPRECATED use showTransformEditor instead
-    isActionsEnabled: false,
-    resetPlotChart: false,
-  },
-  data: {
-    query: <any>"",
-    histogramQuery: <any>"",
-    parsedQuery: {},
-    countErrorMsg: "",
-    errorMsg: "",
-    errorDetail: "",
-    errorCode: 0,
-    filterErrMsg: "",
-    missingStreamMessage: "",
-    additionalErrorMsg: "",
-    savedViewFilterFields: "",
-    hasSearchDataTimestampField: false,
-    originalDataCache: {},
-    stream: {
-      loading: false,
-      streamLists: <object[]>[],
-      selectedStream: <any>[],
-      selectedStreamFields: <any>[],
-      selectedFields: <string[]>[],
-      filterField: "",
-      addToFilter: "",
-      functions: <any>[],
-      streamType: "logs",
-      interestingFieldList: <string[]>[],
-      userDefinedSchema: <any>[],
-      expandGroupRows: <any>{},
-      expandGroupRowsFieldCount: <any>{},
-      filteredField: <any>[],
-      missingStreamMultiStreamFilter: <any>[],
-      pipelineQueryStream: <any>[],
-      selectedInterestingStreamFields: <string[]>[],
-      interestingExpandedGroupRows: <any>{},
-      interestingExpandedGroupRowsFieldCount: <any>{},
-    },
-    resultGrid: {
-      currentDateTime: new Date(),
-      currentPage: 1,
-      columns: <any>[],
-      colOrder: <any>{},
-      colSizes: <any>{},
-    },
-    histogramInterval: <any>0,
-    transforms: <any>[],
-    transformType: "function",
-    actions: <any>[],
-    selectedTransform: <any>null,
-    queryResults: <any>[],
-    sortedQueryResults: <any>[],
-    streamResults: <any>[],
-    histogram: <any>{
-      xData: [],
-      yData: [],
-      chartParams: {
-        title: "",
-        unparsed_x_data: [],
-        timezone: "",
-      },
-      errorMsg: "",
-      errorCode: 0,
-      errorDetail: "",
-    },
-    editorValue: <any>"",
-    datetime: <any>{
-      startTime: (new Date().getTime() - 900000) * 1000,
-      endTime: new Date().getTime(),
-      relativeTimePeriod: "15m",
-      type: "relative",
-      selectedDate: <any>{},
-      selectedTime: <any>{},
-      queryRangeRestrictionMsg: "",
-      queryRangeRestrictionInHour: 100000,
-    },
-    searchAround: {
-      indexTimestamp: 0,
-      size: <number>10,
-      histogramHide: false,
-    },
-    tempFunctionName: "",
-    tempFunctionContent: "",
-    tempFunctionLoading: false,
-    savedViews: <any>[],
-    customDownloadQueryObj: <any>{},
-    functionError: "",
-    searchRequestTraceIds: <string[]>[],
-    searchWebSocketTraceIds: <string[]>[],
-    isOperationCancelled: false,
-    searchRetriesCount: <{ [key: string]: number }>{},
-    actionId: null,
-  },
-};
+// Use the default configuration from constants
+const defaultObject = DEFAULT_LOGS_CONFIG;
 
-const maxSearchRetries = 2;
-const searchReconnectDelay = 1000; // 1 second
+// Import constants for search retries and delays from utils/logs/constants
 
 // TODO OK:
 // useStreamManagement for stream-related functions
 // useQueryProcessing for query-related functions
 // useDataVisualization for histogram and data display functions
 
-let searchObj: any = reactive(Object.assign({}, defaultObject));
+let searchObj: any = reactive(Object.assign({}, DEFAULT_LOGS_CONFIG));
 
 
-const searchObjDebug = reactive({
-  queryDataStartTime: 0,
-  queryDataEndTime: 0,
-  buildSearchStartTime: 0,
-  buildSearchEndTime: 0,
-  partitionStartTime: 0,
-  partitionEndTime: 0,
-  paginatedDatawithAPIStartTime: 0,
-  paginatedDatawithAPIEndTime: 0,
-  pagecountStartTime: 0,
-  pagecountEndTime: 0,
-  paginatedDataReceivedStartTime: 0,
-  paginatedDataReceivedEndTime: 0,
-  histogramStartTime: 0,
-  histogramEndTime: 0,
-  histogramProcessingStartTime: 0,
-  histogramProcessingEndTime: 0,
-  extractFieldsStartTime: 0,
-  extractFieldsEndTime: 0,
-  extractFieldsWithAPI: "",
-});
+const searchObjDebug = reactive(Object.assign({}, DEFAULT_SEARCH_DEBUG_DATA));
 
-const searchAggData = reactive({
-  total: 0,
-  hasAggregation: false,
-});
+const searchAggData = reactive(Object.assign({}, DEFAULT_SEARCH_AGG_DATA));
 
 const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
 
@@ -307,16 +117,7 @@ const streamSchemaFieldsIndexMapping = ref<{ [key: string]: number }>({});
 
 let histogramResults: any = [];
 let histogramMappedData: any = [];
-const intervalMap: any = {
-  "10 second": 10 * 1000 * 1000,
-  "15 second": 15 * 1000 * 1000,
-  "30 second": 30 * 1000 * 1000,
-  "1 minute": 60 * 1000 * 1000,
-  "5 minute": 5 * 60 * 1000 * 1000,
-  "30 minute": 30 * 60 * 1000 * 1000,
-  "1 hour": 60 * 60 * 1000 * 1000,
-  "1 day": 24 * 60 * 60 * 1000 * 1000,
-};
+// Use interval map from constants
 
 const {
   fetchQueryDataWithWebSocket,
@@ -2213,7 +2014,7 @@ const useLogs = () => {
       histogramResults = [];
       histogramMappedData = [];
       const intervalMs: any =
-        intervalMap[searchObj.meta.resultGrid.chartInterval];
+        INTERVAL_MAP[searchObj.meta.resultGrid.chartInterval];
       if (!intervalMs) {
         throw new Error("Invalid interval");
       }
