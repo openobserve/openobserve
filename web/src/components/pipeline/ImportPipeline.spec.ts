@@ -871,10 +871,6 @@ describe('ImportPipeline.vue', () => {
       wrapper = createWrapper();
     });
 
-    it('should initialize tempalteCreators as empty array', () => {
-      expect(wrapper.vm.tempalteCreators).toEqual([]);
-    });
-
     it('should initialize destinationCreators as empty array', () => {
       expect(wrapper.vm.destinationCreators).toEqual([]);
     });

@@ -259,13 +259,21 @@ describe('OtelConfig.vue', () => {
     it('should update when organization passcode changes', async () => {
       wrapper = createWrapper()
       
+      // Clear previous mock calls
+      mockB64EncodeStandard.mockClear()
+      
       // Change store state
       store.state.organizationData.organizationPasscode = 'new-passcode'
       await wrapper.vm.$nextTick()
       
-      // The computed property should reflect the new passcode
+      // Access the computed property to trigger recalculation
       const vm = wrapper.vm
-      expect(vm.accessKey).toBe('dGVzdEBleGFtcGxlLmNvbTpwYXNzY29kZQ==')
+      const accessKey = vm.accessKey
+      
+      // Verify that b64EncodeStandard is called with the updated passcode
+      expect(mockB64EncodeStandard).toHaveBeenCalledWith(
+        'test@example.com:new-passcode'
+      )
     })
 
     it('should handle empty passcode', () => {
@@ -392,20 +400,20 @@ describe('OtelConfig.vue', () => {
   })
 
   describe('Content Copy Integration', () => {
-    it('should pass gRPC config to first ContentCopy component', () => {
-      wrapper = createWrapper()
-      const contentCopyComponents = wrapper.findAllComponents({ name: 'ContentCopy' })
-      
-      const grpcContentCopy = contentCopyComponents[1]
-      expect(grpcContentCopy.props().content).toContain('otlp/openobserve')
-    })
-
-    it('should pass HTTP config to second ContentCopy component', () => {
+    it('should pass HTTP config to first ContentCopy component', () => {
       wrapper = createWrapper()
       const contentCopyComponents = wrapper.findAllComponents({ name: 'ContentCopy' })
       
       const httpContentCopy = contentCopyComponents[0]
       expect(httpContentCopy.props().content).toContain('otlphttp/openobserve')
+    })
+
+    it('should pass gRPC config to second ContentCopy component', () => {
+      wrapper = createWrapper()
+      const contentCopyComponents = wrapper.findAllComponents({ name: 'ContentCopy' })
+      
+      const grpcContentCopy = contentCopyComponents[1]
+      expect(grpcContentCopy.props().content).toContain('otlp/openobserve')
     })
   })
 

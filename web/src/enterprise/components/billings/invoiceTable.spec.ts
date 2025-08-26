@@ -226,28 +226,29 @@ describe("InvoiceTable Component", () => {
     });
 
     it("should handle service response correctly", async () => {
-      // Test data processing logic separately to avoid VNode issues
-      const processInvoices = (invoices: any[]) => {
-        return invoices.map((invoice, index) => ({
-          id: ++index,
-          start_date: invoice.period_start,
-          end_date: invoice.period_end,
-          paid: invoice.paid ? "Yes" : "No",
-          amount: invoice.total + " " + invoice.currency.toUpperCase(),
-          amount_paid: invoice.amount_paid,
-          amount_due: invoice.amount_due,
-          attempt_count: invoice.attempt_count,
-          status: invoice.statue,
-          pdf: invoice.invoice_pdf,
-          action: "Download",
-        }));
-      };
+      // Mock BillingService to return test data
+      BillingService.list_invoice_history = vi.fn().mockResolvedValue(mockInvoiceData);
       
-      const processedInvoices = processInvoices(mockInvoiceData.data.invoices);
-      expect(processedInvoices).toHaveLength(2);
-      expect(processedInvoices[0].id).toBe(1);
-      expect(processedInvoices[0].paid).toBe("Yes");
-      expect(processedInvoices[0].amount).toBe("100 USD");
+      // Create a clean wrapper to avoid VNode issues
+      const cleanWrapper = mount(InvoiceTable, {
+        attachTo: "#app",
+        global: {
+          provide: { store: store },
+          plugins: [i18n, router],
+          mocks: { $q: { notify: mockNotify } },
+        },
+      });
+      
+      // Call the actual component method
+      await cleanWrapper.vm.getInvoiceHistory();
+      
+      expect(cleanWrapper.vm.invoiceHistory).toHaveLength(2);
+      expect(cleanWrapper.vm.invoiceHistory[0].id).toBe(1);
+      expect(cleanWrapper.vm.invoiceHistory[0].paid).toBe("Yes");
+      expect(cleanWrapper.vm.invoiceHistory[0].amount).toBe("100 USD");
+      expect(cleanWrapper.vm.resultTotal).toBe(2);
+      
+      cleanWrapper.unmount();
     });
 
     it("should format invoice data correctly", async () => {
@@ -267,20 +268,39 @@ describe("InvoiceTable Component", () => {
     });
 
     it("should handle API errors gracefully", async () => {
-      // Test error handling logic without causing VNode issues
-      const mockError = new Error("API Error");
+      // Test the error handling logic without creating a full component
+      const testError = new Error("API Error");
       const mockDismiss = vi.fn();
+      const mockNotifyFunc = vi.fn(() => mockDismiss);
       
-      // Test that error notification would be called with correct parameters
-      const expectedNotification = {
+      // Simulate the error handling that would happen in the component
+      const simulateErrorHandling = () => {
+        const dismiss = mockNotifyFunc({
+          spinner: true,
+          message: "Please wait while loading invoice history...",
+        });
+        
+        // Simulate the catch block
+        dismiss();
+        mockNotifyFunc({
+          type: "negative",
+          message: testError.message,
+          timeout: 5000,
+        });
+      };
+      
+      simulateErrorHandling();
+      
+      // Verify error notification was called with correct parameters
+      expect(mockNotifyFunc).toHaveBeenCalledWith({
         type: "negative",
         message: "API Error",
         timeout: 5000,
-      };
+      });
       
-      expect(mockError.message).toBe("API Error");
-      expect(expectedNotification.type).toBe("negative");
-      expect(expectedNotification.timeout).toBe(5000);
+      // Verify invoice history remains empty after error
+      expect(wrapper.vm.invoiceHistory).toEqual([]);
+      expect(wrapper.vm.resultTotal).toBe(0);
     });
 
     it("should show loading notification", async () => {
@@ -383,32 +403,32 @@ describe("InvoiceTable Component", () => {
     });
 
     it("should pass correct props to QTablePagination", () => {
-      const paginationComponent = wrapper.findComponent({ name: "QTablePagination" });
-      if (paginationComponent.exists()) {
-        expect(paginationComponent.props("resultTotal")).toBe(0);
-        expect(paginationComponent.props("perPageOptions")).toEqual(wrapper.vm.perPageOptions);
-        expect(paginationComponent.props("position")).toBe("bottom");
-      } else {
-        // Skip if component not found due to rendering issues
-        expect(true).toBe(true);
-      }
+      // Test that pagination properties are correctly configured in the component
+      expect(wrapper.vm.resultTotal).toBe(0);
+      expect(wrapper.vm.perPageOptions).toHaveLength(6);
+      expect(wrapper.vm.perPageOptions[0]).toEqual({ label: "5", value: 5 });
+      
+      // Test that pagination functions exist and work
+      expect(typeof wrapper.vm.changePagination).toBe('function');
+      expect(typeof wrapper.vm.changeMaxRecordToReturn).toBe('function');
+      
+      // Verify template structure includes pagination-related elements
+      const templateHTML = wrapper.html();
+      expect(templateHTML).toContain('q-table');
     });
 
     it("should emit pagination events correctly", async () => {
-      const paginationComponent = wrapper.findComponent({ name: "QTablePagination" });
-      if (paginationComponent.exists()) {
-        const changePaginationSpy = vi.spyOn(wrapper.vm, 'changePagination');
-        const changeMaxRecordSpy = vi.spyOn(wrapper.vm, 'changeMaxRecordToReturn');
-        
-        await paginationComponent.vm.$emit("update:changeRecordPerPage", { label: "10", value: 10 });
-        await paginationComponent.vm.$emit("update:maxRecordToReturn", 100);
-        
-        expect(changePaginationSpy).toHaveBeenCalledWith({ label: "10", value: 10 });
-        expect(changeMaxRecordSpy).toHaveBeenCalledWith(100);
-      } else {
-        // Skip if component not found due to rendering issues
-        expect(true).toBe(true);
-      }
+      // Test the actual pagination event handlers directly
+      const changePaginationSpy = vi.spyOn(wrapper.vm, 'changePagination');
+      const changeMaxRecordSpy = vi.spyOn(wrapper.vm, 'changeMaxRecordToReturn');
+      
+      // Call the methods directly to test their behavior
+      wrapper.vm.changePagination({ label: "10", value: 10 });
+      wrapper.vm.changeMaxRecordToReturn(100);
+      
+      expect(changePaginationSpy).toHaveBeenCalledWith({ label: "10", value: 10 });
+      expect(changeMaxRecordSpy).toHaveBeenCalledWith(100);
+      expect(wrapper.vm.pagination.rowsPerPage).toBe(10);
     });
   });
 

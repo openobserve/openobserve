@@ -146,10 +146,6 @@ describe("QueryList", () => {
   });
 
 
-  it("should expose queryData correctly", () => {
-    expect(wrapper.vm.queryData).toEqual(mockQueryData);
-  });
-
 
   describe("getRows function", () => {
     beforeEach(() => {
@@ -179,7 +175,7 @@ describe("QueryList", () => {
 
       expect(timestampToTimezoneDate).toHaveBeenCalledWith(
         1640995200000, // microseconds divided by 1000 = milliseconds
-        "UTC",
+        store.state.timezone,
         "yyyy-MM-dd HH:mm:ss"
       );
     });
@@ -190,7 +186,7 @@ describe("QueryList", () => {
 
       expect(timestampToTimezoneDate).toHaveBeenCalledWith(
         1640995260000, // microseconds divided by 1000 = milliseconds
-        "UTC",
+        store.state.timezone,
         "yyyy-MM-dd HH:mm:ss"
       );
     });

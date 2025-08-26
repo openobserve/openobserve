@@ -32,6 +32,7 @@ document.body.appendChild(node);
 
 describe("SummaryList.vue", () => {
   let wrapper: any;
+  let originalStoreState: any;
   const mockRows = [
     {
       row_id: "1",
@@ -55,6 +56,9 @@ describe("SummaryList.vue", () => {
   const mockSelectedRows: any[] = [];
 
   beforeEach(async () => {
+    // Save original store state for cleanup
+    originalStoreState = JSON.parse(JSON.stringify(store.state));
+
     wrapper = mount(SummaryList, {
       attachTo: "#app",
       props: {
@@ -73,6 +77,8 @@ describe("SummaryList.vue", () => {
 
   afterEach(() => {
     wrapper?.unmount();
+    // Restore original store state to prevent side effects
+    store.replaceState(originalStoreState);
   });
 
   // Test 1: Component mounting
@@ -97,8 +103,11 @@ describe("SummaryList.vue", () => {
 
   // Test 5: Test isMetaOrg computed property
   it("should show table when isMetaOrg is true", async () => {
-    // Update store to make isMetaOrg return true
-    store.state.zoConfig.meta_org = "default";
+    // Use commit to properly update store state
+    store.commit('setConfig', {
+      ...store.state.zoConfig,
+      meta_org: "default"
+    });
     await wrapper.vm.$nextTick();
     expect(wrapper.find('[data-test="running-queries-table"]').exists()).toBe(true);
   });

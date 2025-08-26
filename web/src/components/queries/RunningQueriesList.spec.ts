@@ -84,6 +84,13 @@ describe('RunningQueriesList.vue', () => {
     });
   };
 
+  const mockQTable = (wrapper: VueWrapper<any>) => {
+    wrapper.vm.qTable = {
+      setPagination: vi.fn()
+    };
+    return wrapper.vm.qTable;
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -151,8 +158,10 @@ describe('RunningQueriesList.vue', () => {
       expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
     });
 
-    it('should initialize qTable as null initially', () => {
+    it('should initialize qTable as ref', () => {
+      // After mounting, qTable should be assigned the table component
       expect(wrapper.vm.qTable).toBeDefined();
+      expect(typeof wrapper.vm.qTable).toBe('object');
     });
   });
 
@@ -195,26 +204,6 @@ describe('RunningQueriesList.vue', () => {
         { label: "100", value: 100 }
       ];
       expect(wrapper.vm.perPageOptions).toEqual(expectedOptions);
-    });
-
-    it('should contain option for 5 items per page', () => {
-      expect(wrapper.vm.perPageOptions).toContainEqual({ label: "5", value: 5 });
-    });
-
-    it('should contain option for 10 items per page', () => {
-      expect(wrapper.vm.perPageOptions).toContainEqual({ label: "10", value: 10 });
-    });
-
-    it('should contain option for 20 items per page', () => {
-      expect(wrapper.vm.perPageOptions).toContainEqual({ label: "20", value: 20 });
-    });
-
-    it('should contain option for 50 items per page', () => {
-      expect(wrapper.vm.perPageOptions).toContainEqual({ label: "50", value: 50 });
-    });
-
-    it('should contain option for 100 items per page', () => {
-      expect(wrapper.vm.perPageOptions).toContainEqual({ label: "100", value: 100 });
     });
   });
 
@@ -347,10 +336,7 @@ describe('RunningQueriesList.vue', () => {
   describe('changePagination Function', () => {
     beforeEach(() => {
       wrapper = createWrapper();
-      // Mock the qTable setPagination method
-      wrapper.vm.qTable = {
-        setPagination: vi.fn()
-      };
+      mockQTable(wrapper);
     });
 
     it('should update selectedPerPage when called', () => {
@@ -530,12 +516,45 @@ describe('RunningQueriesList.vue', () => {
       wrapper = createWrapper();
     });
 
-    it('should define all required emits', () => {
-      const emits = wrapper.vm.$options.emits;
-      expect(emits).toContain('update:selectedRows');
-      expect(emits).toContain('delete:queries');
-      expect(emits).toContain('delete:query');
-      expect(emits).toContain('show:schema');
+    it('should emit update:selectedRows when selected rows change', async () => {
+      const checkbox = wrapper.find('[data-test="running-queries-table"] .q-checkbox');
+      await checkbox.trigger('click');
+      
+      expect(wrapper.emitted('update:selectedRows')).toBeTruthy();
+    });
+
+    it('should emit delete:query when cancel button is clicked', async () => {
+      const cancelButton = wrapper.find('[data-test="cancelQuery-btn"]');
+      await cancelButton.trigger('click');
+      
+      expect(wrapper.emitted('delete:query')).toBeTruthy();
+      expect(wrapper.emitted('delete:query')[0]).toEqual([mockRows[0]]);
+    });
+
+    it('should emit delete:queries when multiple cancel button is clicked', async () => {
+      // First select some rows to enable the button
+      await wrapper.setProps({ selectedRows: [mockRows[0]] });
+      wrapper.vm.selectedRowsModel = [mockRows[0]];
+      
+      await wrapper.vm.$nextTick();
+      
+      const multiCancelButton = wrapper.find('[data-test="qm-multiple-cancel-query-btn"]');
+      expect(multiCancelButton.exists()).toBe(true);
+      
+      // Check if button is enabled
+      expect(multiCancelButton.attributes('disabled')).toBeFalsy();
+      
+      await multiCancelButton.trigger('click');
+      
+      expect(wrapper.emitted('delete:queries')).toBeTruthy();
+    });
+
+    it('should emit show:schema when list icon is clicked', async () => {
+      const listButton = wrapper.find('[data-test="queryList-btn"]');
+      await listButton.trigger('click');
+      
+      expect(wrapper.emitted('show:schema')).toBeTruthy();
+      expect(wrapper.emitted('show:schema')[0]).toEqual([mockRows[0]]);
     });
   });
 
@@ -621,7 +640,7 @@ describe('RunningQueriesList.vue', () => {
   describe('Complex Scenarios', () => {
     it('should handle rapid pagination changes', () => {
       wrapper = createWrapper();
-      wrapper.vm.qTable = { setPagination: vi.fn() };
+      const qTable = mockQTable(wrapper);
       
       const values = [5, 10, 20, 50, 100];
       values.forEach(value => {
@@ -629,7 +648,7 @@ describe('RunningQueriesList.vue', () => {
       });
       
       expect(wrapper.vm.selectedPerPage).toBe(100);
-      expect(wrapper.vm.qTable.setPagination).toHaveBeenCalledTimes(5);
+      expect(qTable.setPagination).toHaveBeenCalledTimes(5);
     });
 
     it('should handle multiple delete operations', () => {

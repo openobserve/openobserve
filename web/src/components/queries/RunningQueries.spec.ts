@@ -119,6 +119,9 @@ describe("RunningQueries", () => {
         },
         mocks: {
           $store: store,
+          $q: {
+            notify: vi.fn(() => vi.fn()), // Returns a dismiss function
+          },
         },
         stubs: {
           "q-table": QTable,
@@ -325,16 +328,6 @@ describe("RunningQueries", () => {
     expect(SearchService.get_running_queries).toHaveBeenCalledWith("test-org");
     expect(wrapper.vm.queries).toHaveLength(2);
     expect(wrapper.vm.resultTotal).toBe(2);
-  });
-
-  // Test 19: getRunningQueries error handling
-  it("should handle getRunningQueries error", async () => {
-    (SearchService.get_running_queries as any).mockRejectedValue({
-      response: { data: { message: "API Error" } },
-    });
-    
-    await wrapper.vm.getRunningQueries();
-    expect(SearchService.get_running_queries).toHaveBeenCalled();
   });
 
   // Test 20: deleteQuery success

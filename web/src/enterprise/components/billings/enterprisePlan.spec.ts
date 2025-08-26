@@ -203,9 +203,14 @@ describe('enterprisePlan.vue', () => {
 
   // Test 21: Features are rendered in template
   it('should render features in template', () => {
-    const featuresContainer = wrapper.find('[data-test="features-container"]');
-    // Since we don't have data-test attribute, we'll check for the presence of features
+    // Test that features are properly exposed by the component
     expect(wrapper.vm.features.length).toBe(13);
+    
+    // Verify features contain expected structure
+    const firstFeature = wrapper.vm.features[0];
+    expect(firstFeature).toHaveProperty('name');
+    expect(firstFeature).toHaveProperty('price');
+    expect(firstFeature).toHaveProperty('is_parent');
   });
 
   // Test 22: Component template renders correctly
@@ -262,10 +267,9 @@ describe('enterprisePlan.vue', () => {
     });
   });
 
-  // Test 30: Component properly handles emit function in setup
-  it('should handle emit function parameter in setup', () => {
-    // This tests that the component setup accepts the emit parameter
+  // Test 30: Component uses composition API setup
+  it('should have setup function defined', () => {
+    // Verify the component uses composition API setup
     expect(wrapper.vm.$options.setup).toBeDefined();
-    // The setup function should work with both props and { emit } parameters
   });
 });
