@@ -16,23 +16,9 @@ function removeUTFCharacters(text) {
 async function applyQueryButton(page) {
   testLogger.step('Applying query button');
   
-  // Wait for API response
-  const searchPromise = page.waitHelpers.waitForApiResponse(logData.applyQuery, {
-    description: 'logs search query',
-    timeout: 30000
-  });
-  
-  // Click refresh button
-  const refreshButton = page.locator("[data-test='logs-search-bar-refresh-btn']");
-  await page.waitHelpers.waitForElementClickable(refreshButton, {
-    description: 'logs search refresh button'
-  });
-  
-  await refreshButton.click({ force: true });
-  
-  // Verify successful response
-  const response = await searchPromise;
-  expect(response.status()).toBe(200);
+  // Use page object method instead of inline locators
+  const pm = new PageManager(page);
+  await pm.sanityPage.clickRefreshButton();
   
   testLogger.debug('Query applied successfully');
 }

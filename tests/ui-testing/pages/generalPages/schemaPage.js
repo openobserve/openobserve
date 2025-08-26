@@ -484,6 +484,21 @@ class SchemaPage {
             throw error;
         }
     }
+
+    // Verification methods for POM compliance
+    async verifyNoErrorMessages() {
+        const { expect } = require('@playwright/test');
+        const errorMessage = this.page.locator(this.schemaLocators.logsSearchErrorMessage);
+        await expect(errorMessage).not.toBeVisible();
+    }
+
+    async verifyStreamsPageAccessible() {
+        const { expect } = require('@playwright/test');
+        await this.page.locator(this.schemaLocators.menuStreamItem).click();
+        const streamsPageVisible = await this.page.getByPlaceholder(this.schemaLocators.streamSearchPlaceholder).isVisible();
+        expect(streamsPageVisible).toBe(true);
+        return streamsPageVisible;
+    }
 }
 
 module.exports = SchemaPage;

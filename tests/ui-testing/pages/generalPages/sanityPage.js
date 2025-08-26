@@ -130,6 +130,30 @@ export class SanityPage {
         ).toBeVisible({ timeout: 10000 });
     }
 
+    // Refresh Button Methods  
+    async clickRefreshButton() {
+        const logData = require('../../../fixtures/log.json');
+        const { expect } = require('@playwright/test');
+        
+        // Wait for API response
+        const searchPromise = this.page.waitHelpers.waitForApiResponse(logData.applyQuery, {
+            description: 'logs search query',
+            timeout: 30000
+        });
+        
+        // Click refresh button with proper waits
+        const refreshButton = this.page.locator(this.refreshButton);
+        await this.page.waitHelpers.waitForElementClickable(refreshButton, {
+            description: 'logs search refresh button'
+        });
+        
+        await refreshButton.click({ force: true });
+        
+        // Verify successful response
+        const response = await searchPromise;
+        expect(response.status()).toBe(200);
+    }
+
     // Pagination Methods
     async displayResultTextAndPagination() {
         await this.page.locator(this.refreshButton).click();
@@ -295,13 +319,25 @@ export class SanityPage {
 
     // Stream Methods
     async createAndDeleteStream() {
+        // Generate unique stream name with 4-digit alphanumeric suffix
+        const generateSuffix = () => {
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let suffix = '';
+            for (let i = 0; i < 4; i++) {
+                suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return suffix;
+        };
+        
+        const uniqueStreamName = `sanitylogstream_${generateSuffix()}`;
+        
         await this.page.locator(this.streamsMenuItem).click();
         await this.page.waitForLoadState('domcontentloaded');
         
         await this.page.locator(this.addStreamButton).click();
         
         await expect(this.page.getByLabel("Name *")).toBeVisible({ timeout: 10000 });
-        await this.page.getByLabel("Name *").fill("sanitylogstream");
+        await this.page.getByLabel("Name *").fill(uniqueStreamName);
         
         await this.page.locator(this.streamTypeDropdown).getByText("arrow_drop_down").click();
         await this.page.getByRole("option", { name: "Logs" }).click();
@@ -309,8 +345,31 @@ export class SanityPage {
         await this.page.locator(this.saveStreamButton).click();
         await this.page.waitForLoadState('networkidle');
         
-        // Wait longer for stream creation to complete
-        await this.page.waitForTimeout(3000);
+        // Handle success notification dismissal (text might vary or auto-dismiss)
+        const successMessages = [
+            "Stream created successfully",
+            "Stream created",
+            "Success"
+        ];
+        
+        for (const message of successMessages) {
+            try {
+                await this.page.getByText(message).click({ timeout: 3000 });
+                break;
+            } catch {
+                // Continue to next message variant
+            }
+        }
+        
+        // Ensure any lingering dialogs are dismissed
+        await this.page.waitHelpers.waitForElementHidden('.q-dialog', {
+            timeout: 5000,
+            description: 'success dialog to be dismissed'
+        }).catch(() => {
+            // No dialog present, continue
+        });
+        
+        await this.page.waitForLoadState('domcontentloaded');
         
         const isBackOnStreamsList = await this.page.locator(this.addStreamButton).isVisible({ timeout: 10000 });
         if (isBackOnStreamsList) {
@@ -333,95 +392,46 @@ export class SanityPage {
             await this.page.waitForLoadState('domcontentloaded');
         }
         
-        await this.page.getByPlaceholder("Search Stream").fill("sanitylogstream");
+        await this.page.getByPlaceholder("Search Stream").fill(uniqueStreamName);
         await this.page.waitForLoadState('domcontentloaded');
         
-        // Wait a bit for search results to load
-        await this.page.waitForTimeout(2000);
+        // Wait for search to yield results - wait for the specific stream to appear in results
+        await expect(this.page.getByText(uniqueStreamName)).toBeVisible({ timeout: 10000 });
         
-        const deleteButtons = this.page.getByRole(this.deleteButton.role, { name: this.deleteButton.name });
-        const deleteButtonCount = await deleteButtons.count();
+        // Use framework's proper wait helpers to ensure no dialogs interfere
+        await this.page.waitHelpers.waitForElementHidden('.q-dialog__backdrop', {
+            timeout: 5000,
+            description: 'dialog backdrop to be dismissed'
+        }).catch(() => {
+            // No backdrop present, continue
+        });
         
-        if (deleteButtonCount > 0) {
-            const deleteButton = deleteButtons.first();
-            await expect(deleteButton).toBeVisible({ timeout: 10000 });
-            await deleteButton.click({ force: true });
-            
-            // Wait a moment for dialog to appear
-            await this.page.waitForTimeout(1000);
-            
-            // It seems we accidentally opened the Add Stream dialog instead of delete confirmation
-            // Close this dialog first
-            const dialog = this.page.locator('.q-dialog');
-            if (await dialog.isVisible()) {
-                const dialogText = await dialog.textContent();
-                if (dialogText.includes('Add Stream')) {
-                    await this.page.locator('[data-test="add-stream-cancel-btn"]').click();
-                    await this.page.waitForLoadState('networkidle');
-                    await this.page.waitForTimeout(1000);
-                }
+        // Wait for search results to load using proper wait
+        await this.page.waitForLoadState('networkidle');
+        
+        // Click delete button for the specific stream using first() to handle search results
+        await this.page.getByRole("button", { name: "Delete" }).first().click();
+        
+        // Wait for and click confirmation dialog button - try different variations
+        const confirmButtonVariants = ["Ok", "OK", "Delete", "Confirm", "Yes"];
+        let confirmClicked = false;
+        
+        for (const buttonText of confirmButtonVariants) {
+            try {
+                await expect(this.page.getByRole("button", { name: buttonText })).toBeVisible({ timeout: 3000 });
+                await this.page.getByRole("button", { name: buttonText }).click();
+                confirmClicked = true;
+                break;
+            } catch {
+                // Try next button variant
             }
-            
-            // Now try to find the correct delete button for the stream
-            // Look for the delete button by title attribute in the stream row
-            const streamName = 'sanitylogstream';
-            const streamDeleteButton = this.page.locator('tbody tr').filter({ hasText: streamName }).locator('button[title="Delete"]');
-            
-            if (await streamDeleteButton.isVisible()) {
-                await streamDeleteButton.click();
-                
-                // Now wait for the actual delete confirmation dialog
-                await this.page.waitForTimeout(1000);
-                const confirmDialog = this.page.locator('.q-dialog');
-                if (await confirmDialog.isVisible()) {
-                    // Look for the OK button to confirm deletion
-                    const okButton = confirmDialog.locator('button:has-text("OK")');
-                    await okButton.click();
-                } else {
-                    throw new Error('Delete confirmation dialog did not appear');
-                }
-            } else {
-                throw new Error('Could not find stream-specific delete button');
-            }
-            
-            return; // Skip the original confirm button logic
-            await this.page.locator(this.confirmButton).click();
-            
-            await this.page.waitForLoadState('networkidle');
-            // Wait extra time for deletion to process
-            await this.page.waitForTimeout(3000);
-            
-            // Verify stream deletion
-            await this.page.getByPlaceholder("Search Stream").clear();
-            await this.page.getByPlaceholder("Search Stream").fill("sanitylogstream");
-            await this.page.waitForLoadState('domcontentloaded');
-            await this.page.waitForTimeout(2000); // Wait for search results
-            
-            const streamNameInTable = this.page.getByText("sanitylogstream");
-            const streamExists = await streamNameInTable.isVisible({ timeout: 5000 }).catch(() => false);
-            
-            if (streamExists) {
-                
-                // Try alternative verification - check for delete buttons
-                const remainingDeleteButtons = this.page.getByRole(this.deleteButton.role, { name: this.deleteButton.name });
-                const remainingDeleteCount = await remainingDeleteButtons.count();
-                
-                if (remainingDeleteCount > 0) {
-                    throw new Error('Stream deletion failed - stream still exists');
-                } else {
-                }
-            } else {
-            }
-            
-            const noDataMessage = this.page.getByText(/No data found|No results|No streams/i);
-            const hasNoDataMessage = await noDataMessage.isVisible({ timeout: 2000 }).catch(() => false);
-            
-            if (hasNoDataMessage) {
-                console.log('Deletion verified - no streams found');
-            }
-        } else {
-            throw new Error('Stream creation failed - no streams available for deletion');
         }
+        
+        if (!confirmClicked) {
+            throw new Error('No confirmation dialog button found with variants: ' + confirmButtonVariants.join(', '));
+        }
+            
+        await this.page.waitForLoadState('networkidle');
     }
 
     // Result Summary Methods
