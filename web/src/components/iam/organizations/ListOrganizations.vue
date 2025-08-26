@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
       @before-hide="hideAddOrgDialog"
     >
-      <add-update-organization @updated="updateOrganizationList" />
+      <add-update-organization @updated="updateOrganizationList" @cancel:hideform="hideAddOrgDialog" />
     </q-dialog>
   </q-page>
 </template>

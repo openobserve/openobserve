@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
     >
       <add-service-account
-        style="width: 35vw"
+        style="width: 30vw"
         v-model="selectedUser"
         :isUpdated="isUpdated"
         @updated="addMember"
