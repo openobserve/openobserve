@@ -580,6 +580,7 @@
     "otherLabel": "Other",
     "sqlserver": "SQL Server",
     "postgres": "Postgres",
+    "oracle": "Oracle",
     "mongodb": "MongoDB",
     "redis": "Redis",
     "couchdb": "CouchDB",
