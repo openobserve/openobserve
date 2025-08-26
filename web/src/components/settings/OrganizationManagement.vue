@@ -362,6 +362,9 @@ export default defineComponent({
       toggleExtendTrialDialog,
       extendTrialDataRow,
       updateTrialPeriod,
+      getData,
+      getTimestampInMicroseconds,
+      selectedPerPage,
       filterQuery: ref(""),
       filterData(rows: string | any[], terms: string) {
         var filtered = [];
