@@ -106,9 +106,9 @@ jobs:
       options: --user root
     strategy:
       matrix:
-        browser: [chrome]
         include:
           - testfolder: "GeneralTests"
+            browser: "chrome"
             run_files: [
               "sanity.spec.js",
               "changeOrg.spec.js",
@@ -119,6 +119,7 @@ jobs:
               "usersOrg.spec.js"
             ]
           - testfolder: "Logs"
+            browser: "chrome"
             run_files: [
               "join.spec.js",
               "logshistogram.spec.js",
@@ -133,12 +134,14 @@ jobs:
               "searchpartition.spec.js"
             ]
           - testfolder: "Alerts"
+            browser: "chrome"
             run_files: [
               "alerts-e2e-flow.spec.js",
               "alerts-ui-operations.spec.js",
               "alerts-import.spec.js"
             ]
           - testfolder: "Dashboards"
+            browser: "chrome"
             run_files: [
               "custom-charts.spec.js",
               "dashboard.spec.js",
@@ -159,6 +162,7 @@ jobs:
               # "visualization-vrl.spec.js"
             ]
           - testfolder: "Pipelines" 
+            browser: "chrome"
             run_files: [
               "pipelines.spec.js",
               "pipeline-dynamic.spec.js",
@@ -166,11 +170,13 @@ jobs:
               # "remotepipeline.spec.js"
             ]
           - testfolder: "Reports"
+            browser: "chrome"
             run_files: [
               "reportsUpdated.spec.js",
               "reportsUpdated2.spec.js"
             ]
           - testfolder: "Streams"
+            browser: "chrome"
             run_files: [
               "multiselect-stream.spec.js",
               "streamname.spec.js",
