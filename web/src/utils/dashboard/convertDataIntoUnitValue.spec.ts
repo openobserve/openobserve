@@ -1034,6 +1034,7 @@ describe("Dashboard Data Conversion Utils", () => {
       const errors = validateDashboardJson(dashboard);
       expect(errors).toContain("Panel in tab tab1 is missing an ID");
     });
+
   });
 
   describe("validatePanel", () => {
@@ -1183,6 +1184,42 @@ describe("Dashboard Data Conversion Utils", () => {
       validatePanel(panelData, errors, true, []);
       expect(errors).toContain("Please enter your markdown code");
     });
+
+
+    it("should use correct label for h-bar chart", () => {
+      // This test is to hit line 1099 where h-bar type uses "X-Axis"  
+      const panelData = {
+        data: {
+          type: "h-bar",
+          queries: [{ fields: { x: [], y: [] } }]
+        },
+        layout: { currentQueryIndex: 0 }
+      };
+      const errors = [];
+      validatePanel(panelData, errors, true, []);
+      // Check that it generates an error mentioning X-Axis (proving the ternary was hit)
+      expect(errors.some(error => error.includes("X-Axis"))).toBe(true);
+    });
+
+    it("should validate custom query fields with stream selection", () => {
+      const panelData = {
+        data: {
+          type: "line",
+          queries: [{
+            fields: {
+              x: [{ column: "stream_invalid_x" }],
+              y: [{ column: "stream_invalid_y" }]
+            }
+          }]
+        },
+        layout: { currentQueryIndex: 0 }
+      };
+      const errors = [];
+      const streamFields = [{ name: "valid_stream_field" }];
+      validatePanel(panelData, errors, true, streamFields);
+      expect(errors).toContain("Please update X-Axis Selection. Current X-Axis field stream_invalid_x is invalid for selected stream");
+      expect(errors).toContain("Please update Y-Axis Selection. Current Y-Axis field stream_invalid_y is invalid for selected stream");
+    });
   });
 
   describe("validateSQLPanelFields", () => {
@@ -1305,6 +1342,164 @@ describe("Dashboard Data Conversion Utils", () => {
       expect(errors).toContain("Filter: status: Select at least 1 item from the list");
       expect(errors).toContain("Filter: count: Operator selection required");
       expect(errors).toContain("Filter: amount: Condition value required");
+    });
+    it("should handle parseRGB with invalid hex colors", () => {
+      // Test to cover lines around parseRGB function
+      const result1 = getContrastColor("#gggggg", false); // Invalid hex
+      expect(result1).toBe("#FFFFFF"); // Actually returns white for invalid colors
+      
+      const result2 = getContrastColor("#12345", false); // Too short hex
+      expect(result2).toBe("#FFFFFF"); // Actually returns white for invalid colors
+    });
+
+    it("should handle different formatDate edge cases", () => {
+      // Test more formatDate scenarios to increase coverage
+      const testDate = new Date("2023-12-25T09:05:03.123Z");
+      const result = formatDate(testDate);
+      expect(result).toContain("2023-12-25"); // Should format correctly
+    });
+
+    it("should handle percentage formatting edge cases", () => {
+      // Test percentage formatting with various values
+      expect(getUnitValue(0, "percent")).toEqual({
+        value: "0.00",
+        unit: "%"
+      });
+      
+      expect(getUnitValue(100, "percent")).toEqual({
+        value: "100.00", 
+        unit: "%"
+      });
+
+      expect(getUnitValue(0.5, "percent-1")).toEqual({
+        value: "50.00",
+        unit: "%"
+      });
+    });
+
+    it("should handle various unit edge cases", () => {
+      // Test to increase coverage on different unit paths
+      expect(getUnitValue(123, "none")).toEqual({
+        value: "123.00",
+        unit: ""
+      });
+
+      expect(getUnitValue(456, "short")).toEqual({
+        value: "456.00",
+        unit: ""
+      });
+
+      expect(getUnitValue(789, "")).toEqual({
+        value: "789.00",
+        unit: ""
+      });
+    });
+
+
+    it("should handle calculateWidthText edge cases", () => {
+      // Test calculateWidthText with various inputs
+      expect(calculateWidthText("", 12)).toBeGreaterThanOrEqual(0);
+      expect(calculateWidthText("A", 0)).toBeGreaterThanOrEqual(0);
+      expect(calculateWidthText("Test", -5)).toBeGreaterThanOrEqual(0);
+    });
+
+    it("should handle calculateOptimalFontSize edge cases", () => {
+      // Test calculateOptimalFontSize with various inputs
+      expect(calculateOptimalFontSize("", 100)).toBeGreaterThan(0);
+      expect(calculateOptimalFontSize("Test", 0)).toBeGreaterThan(0);
+      expect(calculateOptimalFontSize("Test", 1000)).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Additional Coverage Tests", () => {
+    it("should handle metric chart with X-axis field error", () => {
+      // Test to hit the metric validation path  
+      const panelData = {
+        data: {
+          type: "metric", 
+          queries: [{
+            fields: {
+              x: [{ column: "time" }], // Should not have X-axis
+              y: [{ column: "value" }]
+            }
+          }]
+        },
+        layout: { currentQueryIndex: 0 }
+      };
+      const errors = [];
+      validatePanel(panelData, errors, true, [{ name: "time" }, { name: "value" }]);
+      expect(errors).toContain("X-Axis field is not allowed for Metric chart");
+    });
+
+    it("should handle area chart validation", () => {
+      // Test to hit area chart validation
+      const panelData = {
+        data: {
+          type: "area",
+          queries: [{
+            fields: {
+              x: [],
+              y: [{ column: "value" }]
+            }
+          }]
+        },
+        layout: { currentQueryIndex: 0 }
+      };
+      const errors = [];
+      validatePanel(panelData, errors, true, [{ name: "value" }]);
+      expect(errors).toContain("Add one fields for the X-Axis");
+    });
+
+    it("should handle line chart with missing fields", () => {
+      // Test to ensure we hit the line chart validation
+      const panelData = {
+        data: {
+          type: "line",
+          queries: [{
+            fields: {
+              x: [{ column: "time" }],
+              y: [] // Missing Y fields
+            }
+          }]
+        },
+        layout: { currentQueryIndex: 0 }
+      };
+      const errors = [];
+      validatePanel(panelData, errors, true, [{ name: "time" }]);
+      expect(errors).toContain("Add at least one field for the Y-Axis");
+    });
+
+    it("should validate sankey chart fields", () => {
+      // Test sankey validation specifically
+      const panelData = {
+        type: "sankey",
+        queries: [{
+          fields: {
+            source: [{ column: "src" }],
+            target: null, // Missing target
+            value: [{ column: "val" }]
+          }
+        }]
+      };
+      const errors = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      expect(errors).toContain("Add one field for the target");
+    });
+
+    it("should handle geomap validation with missing coordinates", () => {
+      // Test geomap validation
+      const panelData = {
+        type: "geomap", 
+        queries: [{
+          fields: {
+            latitude: [{ column: "lat" }],
+            longitude: null // Missing longitude
+          }
+        }]
+      };
+      const errors = [];
+      validateSQLPanelFields(panelData, 0, "X-Axis", "Y-Axis", errors, true);
+      expect(errors).toContain("Add one field for the longitude");
     });
   });
 
