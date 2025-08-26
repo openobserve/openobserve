@@ -439,4 +439,261 @@ mod test {
         let result = as_uint32_array(results[0].column(0)).unwrap();
         assert_eq!(result.value(0), 2456);
     }
+
+    #[test]
+    fn test_validate_input_percentile_expr_valid() {
+        // Test valid float64 percentile
+        let expr: Arc<dyn datafusion::physical_plan::PhysicalExpr> = Arc::new(
+            datafusion::physical_expr::expressions::Literal::new(ScalarValue::Float64(Some(0.5))),
+        );
+        let result = validate_input_percentile_expr(&expr).unwrap();
+        assert_eq!(result, 0.5);
+
+        // Test valid float32 percentile
+        let expr: Arc<dyn datafusion::physical_plan::PhysicalExpr> = Arc::new(
+            datafusion::physical_expr::expressions::Literal::new(ScalarValue::Float32(Some(0.25))),
+        );
+        let result = validate_input_percentile_expr(&expr).unwrap();
+        assert_eq!(result, 0.25);
+
+        // Test boundary values
+        let expr: Arc<dyn datafusion::physical_plan::PhysicalExpr> = Arc::new(
+            datafusion::physical_expr::expressions::Literal::new(ScalarValue::Float64(Some(0.0))),
+        );
+        assert!(validate_input_percentile_expr(&expr).is_ok());
+
+        let expr: Arc<dyn datafusion::physical_plan::PhysicalExpr> = Arc::new(
+            datafusion::physical_expr::expressions::Literal::new(ScalarValue::Float64(Some(1.0))),
+        );
+        assert!(validate_input_percentile_expr(&expr).is_ok());
+    }
+
+    #[test]
+    fn test_validate_input_percentile_expr_invalid() {
+        // Test invalid percentile > 1.0
+        let expr: Arc<dyn datafusion::physical_plan::PhysicalExpr> = Arc::new(
+            datafusion::physical_expr::expressions::Literal::new(ScalarValue::Float64(Some(1.5))),
+        );
+        let result = validate_input_percentile_expr(&expr);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("must be between 0.0 and 1.0")
+        );
+
+        // Test invalid percentile < 0.0
+        let expr: Arc<dyn datafusion::physical_plan::PhysicalExpr> = Arc::new(
+            datafusion::physical_expr::expressions::Literal::new(ScalarValue::Float64(Some(-0.1))),
+        );
+        let result = validate_input_percentile_expr(&expr);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("must be between 0.0 and 1.0")
+        );
+
+        // Test invalid data type
+        let expr: Arc<dyn datafusion::physical_plan::PhysicalExpr> = Arc::new(
+            datafusion::physical_expr::expressions::Literal::new(ScalarValue::Int32(Some(1))),
+        );
+        let result = validate_input_percentile_expr(&expr);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("must be Float32 or Float64")
+        );
+    }
+
+    #[test]
+    fn test_convert_to_float_various_types() {
+        // Test Float64
+        let values: ArrayRef = Arc::new(Float64Array::from(vec![1.5, 2.5, 3.5]));
+        let result = PercentileContAccumulator::convert_to_float(&values).unwrap();
+        assert_eq!(result, vec![1.5, 2.5, 3.5]);
+
+        // Test Float32
+        let values: ArrayRef = Arc::new(Float32Array::from(vec![1.5f32, 2.5f32, 3.5f32]));
+        let result = PercentileContAccumulator::convert_to_float(&values).unwrap();
+        assert_eq!(result, vec![1.5, 2.5, 3.5]);
+
+        // Test Int64
+        let values: ArrayRef = Arc::new(Int64Array::from(vec![10, 20, 30]));
+        let result = PercentileContAccumulator::convert_to_float(&values).unwrap();
+        assert_eq!(result, vec![10.0, 20.0, 30.0]);
+
+        // Test UInt32
+        let values: ArrayRef = Arc::new(UInt32Array::from(vec![100u32, 200u32, 300u32]));
+        let result = PercentileContAccumulator::convert_to_float(&values).unwrap();
+        assert_eq!(result, vec![100.0, 200.0, 300.0]);
+    }
+
+    #[test]
+    fn test_percentile_cont_interpolation() {
+        // Test interpolation with simple dataset: [1, 2, 3, 4]
+        let mut acc = PercentileContAccumulator::new(0.5, DataType::Float64); // 50th percentile
+        let values: ArrayRef = Arc::new(Float64Array::from(vec![1.0, 2.0, 3.0, 4.0]));
+        acc.update_batch(&[values]).unwrap();
+
+        let result = acc.evaluate().unwrap();
+        assert_eq!(result, ScalarValue::Float64(Some(2.5))); // Median of [1,2,3,4] = (2+3)/2
+
+        // Test 25th percentile - should interpolate between 1st and 2nd values
+        let mut acc = PercentileContAccumulator::new(0.25, DataType::Float64);
+        let values: ArrayRef = Arc::new(Float64Array::from(vec![1.0, 2.0, 3.0, 4.0]));
+        acc.update_batch(&[values]).unwrap();
+
+        let result = acc.evaluate().unwrap();
+        assert_eq!(result, ScalarValue::Float64(Some(1.75))); // 25th percentile interpolation
+    }
+
+    #[test]
+    fn test_percentile_cont_boundary_cases() {
+        let mut acc = PercentileContAccumulator::new(0.0, DataType::Float64); // 0th percentile (min)
+        let values: ArrayRef = Arc::new(Float64Array::from(vec![5.0, 1.0, 3.0, 2.0, 4.0]));
+        acc.update_batch(&[values]).unwrap();
+
+        let result = acc.evaluate().unwrap();
+        assert_eq!(result, ScalarValue::Float64(Some(1.0))); // Min value
+
+        let mut acc = PercentileContAccumulator::new(1.0, DataType::Float64); // 100th percentile (max)
+        let values: ArrayRef = Arc::new(Float64Array::from(vec![5.0, 1.0, 3.0, 2.0, 4.0]));
+        acc.update_batch(&[values]).unwrap();
+
+        let result = acc.evaluate().unwrap();
+        assert_eq!(result, ScalarValue::Float64(Some(5.0))); // Max value
+    }
+
+    #[test]
+    fn test_percentile_cont_single_value() {
+        let mut acc = PercentileContAccumulator::new(0.5, DataType::Float64);
+        let values: ArrayRef = Arc::new(Float64Array::from(vec![42.0]));
+        acc.update_batch(&[values]).unwrap();
+
+        let result = acc.evaluate().unwrap();
+        assert_eq!(result, ScalarValue::Float64(Some(42.0))); // Single value = that value for any percentile
+    }
+
+    #[test]
+    fn test_percentile_cont_empty_data() {
+        let mut acc = PercentileContAccumulator::new(0.5, DataType::Float64);
+        let result = acc.evaluate().unwrap();
+        assert_eq!(result, ScalarValue::Float64(None));
+
+        // Test different return types
+        let mut acc = PercentileContAccumulator::new(0.5, DataType::Int32);
+        let result = acc.evaluate().unwrap();
+        assert_eq!(result, ScalarValue::Int32(None));
+
+        let mut acc = PercentileContAccumulator::new(0.5, DataType::UInt64);
+        let result = acc.evaluate().unwrap();
+        assert_eq!(result, ScalarValue::UInt64(None));
+    }
+
+    #[test]
+    fn test_percentile_cont_return_type_casting() {
+        // Test Int32 return type
+        let mut acc = PercentileContAccumulator::new(0.5, DataType::Int32);
+        let values: ArrayRef = Arc::new(Float64Array::from(vec![10.7, 20.3, 30.9]));
+        acc.update_batch(&[values]).unwrap();
+
+        let result = acc.evaluate().unwrap();
+        assert_eq!(result, ScalarValue::Int32(Some(20))); // Median 20.3 cast to int32
+
+        // Test UInt16 return type
+        let mut acc = PercentileContAccumulator::new(0.5, DataType::UInt16);
+        let values: ArrayRef = Arc::new(Float64Array::from(vec![100.0, 200.0, 300.0]));
+        acc.update_batch(&[values]).unwrap();
+
+        let result = acc.evaluate().unwrap();
+        assert_eq!(result, ScalarValue::UInt16(Some(200)));
+    }
+
+    #[test]
+    fn test_percentile_cont_state() {
+        let mut acc = PercentileContAccumulator::new(0.5, DataType::Float64);
+        let values: ArrayRef = Arc::new(Float64Array::from(vec![1.0, 2.0, 3.0]));
+        acc.update_batch(&[values]).unwrap();
+
+        let state = acc.state().unwrap();
+        assert_eq!(state.len(), 1);
+
+        if let ScalarValue::List(list) = &state[0] {
+            let values = list.values();
+            assert_eq!(values.len(), 3);
+        } else {
+            panic!("Expected List for state");
+        }
+    }
+
+    #[test]
+    fn test_percentile_cont_size() {
+        let mut acc = PercentileContAccumulator::new(0.5, DataType::Float64);
+        assert_eq!(acc.size(), 0);
+
+        let values: ArrayRef = Arc::new(Float64Array::from(vec![1.0, 2.0, 3.0, 4.0, 5.0]));
+        acc.update_batch(&[values]).unwrap();
+
+        assert_eq!(acc.size(), 5);
+    }
+
+    #[test]
+    fn test_percentile_cont_exact_index() {
+        // Test case where percentile calculation results in exact index (no interpolation needed)
+        let mut acc = PercentileContAccumulator::new(0.5, DataType::Float64);
+        let values: ArrayRef = Arc::new(Float64Array::from(vec![1.0, 2.0, 3.0])); // 3 values, median at index 1
+        acc.update_batch(&[values]).unwrap();
+
+        let result = acc.evaluate().unwrap();
+        assert_eq!(result, ScalarValue::Float64(Some(2.0))); // Exact middle value
+    }
+
+    #[test]
+    fn test_percentile_cont_return_type_validation() {
+        let pc = PercentileCont::new();
+
+        // Valid numeric type
+        let result = pc.return_type(&[DataType::Float64, DataType::Float64]);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), DataType::Float64);
+
+        // Invalid non-numeric type
+        let result = pc.return_type(&[DataType::Utf8, DataType::Float64]);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("requires numeric input")
+        );
+    }
+
+    #[test]
+    fn test_percentile_cont_name() {
+        let pc = PercentileCont::new();
+        assert_eq!(pc.name(), "percentile_cont");
+    }
+
+    #[test]
+    fn test_percentile_cont_debug_fmt() {
+        let pc = PercentileCont::new();
+        let debug_str = format!("{pc:?}");
+        assert!(debug_str.contains("PercentileCont"));
+        assert!(debug_str.contains("name"));
+        assert!(debug_str.contains("signature"));
+    }
+
+    #[test]
+    fn test_accumulator_debug_fmt() {
+        let acc = PercentileContAccumulator::new(0.75, DataType::Float64);
+        let debug_str = format!("{acc:?}");
+        assert!(debug_str.contains("PercentileContAccumulator"));
+        assert!(debug_str.contains("Float64"));
+        assert!(debug_str.contains("0.75"));
+    }
 }
