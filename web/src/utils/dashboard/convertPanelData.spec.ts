@@ -303,6 +303,194 @@ describe("convertPanelData", () => {
       expect(result.chartType).toBe("custom_chart");
       expect(result).toEqual({ chartType: "custom_chart" });
     });
+
+    it("should handle custom chart with empty data array but has query", async () => {
+      const panelSchema = {
+        type: "custom_chart",
+        queries: [{ query: "SELECT * FROM test" }]
+      };
+      const emptyData = [];
+
+      const result = await convertPanelData(
+        panelSchema,
+        emptyData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Falls through to default case
+      expect(result).toEqual({});
+    });
+
+    it("should handle custom chart with data array but empty first element", async () => {
+      const panelSchema = {
+        type: "custom_chart",
+        queries: [{ query: "SELECT * FROM test" }]
+      };
+      const dataWithEmptyFirstElement = [[]];
+
+      const result = await convertPanelData(
+        panelSchema,
+        dataWithEmptyFirstElement,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Falls through to default case
+      expect(result).toEqual({});
+    });
+
+    it("should handle custom chart with whitespace-only query", async () => {
+      const panelSchema = {
+        type: "custom_chart",
+        queries: [{ query: "   " }]
+      };
+      const emptyData = [];
+
+      await expect(
+        convertPanelData(
+          panelSchema,
+          emptyData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockResultMetaData,
+          mockMetadata,
+          mockChartPanelStyle,
+          mockAnnotations
+        )
+      ).rejects.toThrow("No data found");
+    });
+
+    it("should handle custom chart with missing queries", async () => {
+      const panelSchema = {
+        type: "custom_chart"
+      };
+      const emptyData = [];
+
+      const result = await convertPanelData(
+        panelSchema,
+        emptyData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Falls through to default case
+      expect(result).toEqual({});
+    });
+
+    it("should handle custom chart with empty queries array", async () => {
+      const panelSchema = {
+        type: "custom_chart",
+        queries: []
+      };
+      const emptyData = [];
+
+      const result = await convertPanelData(
+        panelSchema,
+        emptyData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Falls through to default case
+      expect(result).toEqual({});
+    });
+
+    it("should handle custom chart with string result from JavaScript", async () => {
+      const panelSchema = {
+        type: "custom_chart",
+        queries: [{ query: "SELECT * FROM test" }]
+      };
+
+      const { runJavaScriptCode } = await import("./convertCustomChartData");
+      vi.mocked(runJavaScriptCode).mockResolvedValueOnce("string result");
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(result.chartType).toBe("custom_chart");
+      expect(result).toEqual({ chartType: "custom_chart" });
+    });
+
+    it("should handle custom chart with number result from JavaScript", async () => {
+      const panelSchema = {
+        type: "custom_chart",
+        queries: [{ query: "SELECT * FROM test" }]
+      };
+
+      const { runJavaScriptCode } = await import("./convertCustomChartData");
+      vi.mocked(runJavaScriptCode).mockResolvedValueOnce(123);
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(result.chartType).toBe("custom_chart");
+      expect(result).toEqual({ chartType: "custom_chart" });
+    });
+
+    it("should handle custom chart with boolean result from JavaScript", async () => {
+      const panelSchema = {
+        type: "custom_chart",
+        queries: [{ query: "SELECT * FROM test" }]
+      };
+
+      const { runJavaScriptCode } = await import("./convertCustomChartData");
+      vi.mocked(runJavaScriptCode).mockResolvedValueOnce(false);
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(result.chartType).toBe("custom_chart");
+      expect(result).toEqual({ chartType: "custom_chart" });
+    });
   });
 
   describe("Default Case", () => {
@@ -476,6 +664,226 @@ describe("convertPanelData", () => {
 
       expect(convertMultiSQLData).toHaveBeenCalled();
       expect(convertPromQLData).toHaveBeenCalled();
+    });
+  });
+
+  describe("Edge Cases and Additional Coverage", () => {
+    it("should handle panel schema with null type", async () => {
+      const panelSchema = {
+        type: null,
+        queries: [{ query: "SELECT * FROM test" }]
+      };
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(result).toEqual({});
+    });
+
+    it("should handle panel schema with undefined type", async () => {
+      const panelSchema = {
+        queries: [{ query: "SELECT * FROM test" }]
+      };
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(result).toEqual({});
+    });
+
+    it("should handle empty panel schema", async () => {
+      const panelSchema = {};
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(result).toEqual({});
+    });
+
+    it("should handle null panel schema", async () => {
+      await expect(
+        convertPanelData(
+          null,
+          mockData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          mockResultMetaData,
+          mockMetadata,
+          mockChartPanelStyle,
+          mockAnnotations
+        )
+      ).rejects.toThrow("Cannot read properties of null (reading 'type')");
+    });
+
+    it("should handle SQL charts without queryType specified", async () => {
+      const panelSchema = {
+        type: "line",
+        queries: [{ query: "SELECT * FROM test" }]
+      };
+
+      const { convertMultiSQLData } = await import("./convertSQLData");
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(convertMultiSQLData).toHaveBeenCalled();
+      expect(result.chartType).toBe("line");
+    });
+
+    it("should handle PromQL charts with explicit stream type", async () => {
+      const panelSchema = {
+        type: "gauge",
+        queryType: "promql",
+        fields: { stream_type: "metrics" },
+        queries: [{ query: "up" }]
+      };
+
+      const { convertPromQLData } = await import("./convertPromQLData");
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(convertPromQLData).toHaveBeenCalled();
+      expect(result.chartType).toBe("gauge");
+    });
+
+    it("should handle custom chart with undefined result from JavaScript", async () => {
+      const panelSchema = {
+        type: "custom_chart",
+        queries: [{ query: "SELECT * FROM test" }]
+      };
+
+      const { runJavaScriptCode } = await import("./convertCustomChartData");
+      vi.mocked(runJavaScriptCode).mockResolvedValueOnce(undefined);
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(result.chartType).toBe("custom_chart");
+      expect(result).toEqual({ chartType: "custom_chart" });
+    });
+
+    it("should handle custom chart with array result from JavaScript", async () => {
+      const panelSchema = {
+        type: "custom_chart",
+        queries: [{ query: "SELECT * FROM test" }]
+      };
+
+      const arrayResult = [1, 2, 3];
+      const { runJavaScriptCode } = await import("./convertCustomChartData");
+      vi.mocked(runJavaScriptCode).mockResolvedValueOnce(arrayResult);
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      expect(result.chartType).toBe("custom_chart");
+      expect(result).toEqual({ chartType: "custom_chart", 0: 1, 1: 2, 2: 3 });
+    });
+
+    it("should handle mixed case chart types", async () => {
+      const panelSchema = {
+        type: "Area",
+        queryType: "sql",
+        queries: [{ query: "SELECT * FROM test" }]
+      };
+
+      const result = await convertPanelData(
+        panelSchema,
+        mockData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations
+      );
+
+      // Should fall to default case since "Area" != "area"
+      expect(result).toEqual({});
+    });
+
+    it("should handle all parameters with null/undefined values", async () => {
+      const panelSchema = {
+        type: "table",
+        queries: [{ query: "SELECT * FROM test" }]
+      };
+
+      const result = await convertPanelData(
+        panelSchema,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      );
+
+      expect(result.chartType).toBe("table");
     });
   });
 });
