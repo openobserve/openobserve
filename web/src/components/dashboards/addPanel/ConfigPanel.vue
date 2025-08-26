@@ -316,6 +316,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="space"></div>
 
+      <q-select
+        v-if="
+          dashboardPanelData.data.type != 'table' &&
+          dashboardPanelData.data.type != 'heatmap' &&
+          dashboardPanelData.data.type != 'metric' &&
+          dashboardPanelData.data.type != 'gauge' &&
+          dashboardPanelData.data.type != 'geomap' &&
+          dashboardPanelData.data.config.show_legends &&
+          dashboardPanelData.data.type != 'sankey' &&
+          dashboardPanelData.data.type != 'maps'
+        "
+        outlined
+        v-model="dashboardPanelData.data.config.legends_scrollable"
+        :options="legendsScrollableOptions"
+        dense
+        label="Legends Scrollable"
+        class="showLabelOnTop"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.legends_scrollable ?? 'Plain'
+        }`"
+        data-test="dashboard-config-legends-scrollable"
+      >
+      </q-select>
+
+      <div class="space"></div>
+
       <div class="input-container">
         <q-input
           v-if="
@@ -1820,6 +1848,17 @@ export default defineComponent({
         value: "bottom",
       },
     ];
+
+    const legendsScrollableOptions = [
+      {
+        label: "Plain",
+        value: null,
+      },
+      {
+        label: "Scroll",
+        value: "scroll",
+      },
+    ];
     const unitOptions = [
       {
         label: t("dashboard.default"),
@@ -2135,6 +2174,7 @@ export default defineComponent({
       layerTypeOptions,
       symbolOptions,
       legendsPositionOptions,
+      legendsScrollableOptions,
       unitOptions,
       labelPositionOptions,
       showSymbol,

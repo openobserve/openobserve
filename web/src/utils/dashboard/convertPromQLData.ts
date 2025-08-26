@@ -157,7 +157,7 @@ export const convertPromQLData = async (
 
   const legendConfig: any = {
     show: panelSchema.config?.show_legends,
-    type: "scroll",
+    type: panelSchema.config?.legends_scrollable,
     orient: legendPosition,
     padding: [10, 20, 10, 10],
     tooltip: {

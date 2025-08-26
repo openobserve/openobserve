@@ -597,7 +597,7 @@ export const convertSQLData = async (
 
   const legendConfig: any = {
     show: panelSchema.config?.show_legends,
-    type: "scroll",
+    type: panelSchema.config?.legends_scrollable,
     orient: legendPosition,
     padding: [10, 20, 10, 10],
     tooltip: {
@@ -1639,8 +1639,8 @@ export const convertSQLData = async (
         panelSchema.type == "line" || panelSchema.type == "area"
           ? { opacity: 0.8 }
           : panelSchema.type == "bar"
-          ? { barMinHeight: 1 }
-          : {},
+            ? { barMinHeight: 1 }
+            : {},
       );
 
       if (
