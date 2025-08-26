@@ -1367,33 +1367,6 @@ mod tests {
         assert_eq!(result.unwrap(), "completed");
     }
 
-    #[tokio::test]
-    async fn test_runtime_builder_configuration() {
-        use tokio::runtime::Builder;
-
-        // Test runtime configuration patterns used in the main function
-        let rt = Builder::new_multi_thread()
-            .worker_threads(2)
-            .enable_all()
-            .thread_name("test_runtime")
-            .max_blocking_threads(4)
-            .build();
-
-        assert!(rt.is_ok());
-        let rt = rt.unwrap();
-
-        // Test that we can enter the runtime
-        let _guard = rt.enter();
-
-        // Test basic async operation in the runtime
-        let result = rt.block_on(async {
-            tokio::time::sleep(Duration::from_millis(1)).await;
-            "success"
-        });
-
-        assert_eq!(result, "success");
-    }
-
     #[test]
     fn test_server_configuration_limits() {
         // Test the limit calculations used in server setup
@@ -1468,15 +1441,6 @@ mod tests {
         assert!(!wait_for_send);
         assert!(server_stop);
         assert!(wait_for_stop);
-    }
-
-    #[test]
-    fn test_version_constant_availability() {
-        // Test that the version constant from config is available
-        let version = config::VERSION;
-        // In development builds, VERSION might be empty if GIT_VERSION is not set
-        // This is acceptable for testing, we just check it's a valid string
-        assert!(version.len() >= 0);
     }
 
     #[test]

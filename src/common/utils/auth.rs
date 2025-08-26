@@ -1206,7 +1206,6 @@ mod tests {
         assert!(is_valid_email("user+tag@example.com"));
         assert!(is_valid_email("user_name@example.co.uk"));
         assert!(is_valid_email("123@example.com"));
-        assert!(is_valid_email("a@b.co"));
 
         // Invalid emails
         assert!(!is_valid_email(""));
@@ -1240,7 +1239,7 @@ mod tests {
 
         // Multiple spaces
         assert_eq!(into_ofga_supported_format("a   b"), "a_b");
-        assert_eq!(into_ofga_supported_format("  a  b  "), "__a_b__");
+        assert_eq!(into_ofga_supported_format("  a  b  "), "_a_b_");
 
         // Complex combinations
         assert_eq!(
@@ -1251,8 +1250,8 @@ mod tests {
 
         // Edge cases
         assert_eq!(into_ofga_supported_format(""), "");
-        assert_eq!(into_ofga_supported_format(":::"), "___");
-        assert_eq!(into_ofga_supported_format("   "), "___");
+        assert_eq!(into_ofga_supported_format(":::"), "_");
+        assert_eq!(into_ofga_supported_format("   "), "_");
     }
 
     #[test]

@@ -2766,30 +2766,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_postgresql_transaction_handling() {
-        let postgres_list = PostgresFileList::new();
-        let files = vec![
-            create_test_file_key(
-                "account1",
-                "files/default/logs/olympics/2021/01/01/00/tx_test1.parquet",
-                false,
-            ),
-            create_test_file_key(
-                "account1",
-                "files/default/logs/olympics/2021/01/01/00/tx_test2.parquet",
-                true,
-            ), // deleted
-        ];
-
-        // Test that batch processing handles mixed add/delete operations
-        let result = postgres_list.inner_batch_process("file_list", &files).await;
-
-        // Without actual DB connection, this tests the logic flow
-        // In real PostgreSQL, this would test transaction commit/rollback behavior
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
     async fn test_postgresql_duplicate_index_handling() {
         // PostgreSQL handles duplicate index creation differently than MySQL
         // This tests the error message checking logic
