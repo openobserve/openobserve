@@ -1,5 +1,6 @@
 //logs visualise page object
 //Methods: openLogs, openVisualiseTab, logsApplyQueryButton, Visualize run query button, setRelative, searchAndAddField, showQueryToggle, enableSQLMode, streamIndexList, logsSelectStream, logsToggle, selectChartType, removeField, chartRender, backToLogs, openQueryEditor, fillQueryEditor
+import { expect } from "@playwright/test";
 export default class LogsVisualise {
   constructor(page) {
     this.page = page;
@@ -208,15 +209,120 @@ export default class LogsVisualise {
     const cancelBtn = this.page.locator(
       '[data-test="logs-search-bar-visualize-cancel-btn"]'
     );
-
     await runBtn.waitFor({ state: "visible" });
-    // Click "Run query"
     await runBtn.click();
-
-    // Wait for "Run query" to reappear (query is finished)
     await runBtn.waitFor({ state: "visible" });
-
     // Optional: small buffer to ensure UI is stable
     await this.page.waitForTimeout(300);
+  }
+
+  // Helper function to check for dashboard errors
+  async checkDashboardErrors(page, chartTypeName) {
+    const dashboardErrorContainer = page.locator(
+      '[data-test="dashboard-error"]'
+    );
+    const errorContainerExists = await dashboardErrorContainer.count();
+
+    if (errorContainerExists === 0) {
+      return { hasErrors: false, errors: [] };
+    }
+
+    const isErrorVisible = await dashboardErrorContainer.first().isVisible();
+    if (!isErrorVisible) {
+      return { hasErrors: false, errors: [] };
+    }
+
+    const errors = [];
+
+    // Check for error indicator text
+    const errorText = page
+      .locator('[data-test="dashboard-error"]')
+      .getByText(/Errors \(\d+\)/);
+    const errorTextCount = await errorText.count();
+
+    if (errorTextCount > 0) {
+      const errorTextContent = await errorText.first().textContent();
+      errors.push(`Error indicator: ${errorTextContent}`);
+    }
+
+    // Check for error list items
+    const errorListItems = page.locator('[data-test="dashboard-error"] ul li');
+    const errorListCount = await errorListItems.count();
+
+    if (errorListCount > 0) {
+      for (let i = 0; i < errorListCount; i++) {
+        const errorItem = errorListItems.nth(i);
+        const errorItemText = await errorItem.textContent();
+        if (errorItemText && errorItemText.trim().length > 0) {
+          errors.push(`Error ${i + 1}: ${errorItemText.trim()}`);
+        }
+      }
+    }
+
+    return {
+      hasErrors: errors.length > 0,
+      errors,
+      errorTextCount,
+      errorListCount,
+    };
+  }
+
+  async verifyChartRenders(page) {
+    const chartRenderer = page.locator(
+      '[data-test="chart-renderer"], [data-test="dashboard-panel-table"]'
+    );
+    const chartExists = await chartRenderer.count();
+
+    if (chartExists > 0) {
+      // Check if the chart is visible without using expect in page object
+      const isVisible = await chartRenderer.first().isVisible();
+      if (!isVisible) {
+        throw new Error("Chart renderer is present but not visible");
+      }
+    }
+
+    return chartExists > 0;
+  }
+
+  // Helper function to verify chart type selection
+  async verifyChartTypeSelected(page, chartType, shouldBeSelected = true) {
+    const selector = `[data-test="selected-chart-${chartType}-item"]`;
+    const locator = page.locator(selector).locator("..");
+
+    if (shouldBeSelected) {
+      await expect(locator).toHaveClass(/bg-grey-[35]/);
+    } else {
+      await expect(locator).not.toHaveClass(/bg-grey-[35]/);
+    }
+  }
+
+  async addPanelToNewDashboard(page, randomDashboardName, panelName) {
+    //add to dashboard and submit it
+    await page.getByRole("button", { name: "Add To Dashboard" }).click();
+    await page
+      .locator('[data-test="dashboard-dashboard-new-add"]')
+      .waitFor({ state: "visible" });
+
+    //Adding dashboard
+    await page.locator('[data-test="dashboard-dashboard-new-add"]').click();
+    await page.locator('[data-test="add-dashboard-name"]').click();
+    await page
+      .locator('[data-test="add-dashboard-name"]')
+      .fill(randomDashboardName);
+    await page.locator('[data-test="dashboard-add-submit"]').click();
+
+    await page.waitForTimeout(3000);
+    await page
+      .locator('[data-test="metrics-new-dashboard-panel-title"]')
+      .waitFor({ state: "visible" });
+    await page
+      .locator('[data-test="metrics-new-dashboard-panel-title"]')
+      .click();
+    await page
+      .locator('[data-test="metrics-new-dashboard-panel-title"]')
+      .fill(panelName);
+    await page
+      .locator('[data-test="metrics-schema-update-settings-button"]')
+      .click();
   }
 }

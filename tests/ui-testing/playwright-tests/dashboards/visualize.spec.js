@@ -6,6 +6,13 @@ import PageManager from "../../pages/page-manager";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 
+//Dashboard name
+const randomDashboardName =
+  "Dashboard_" + Math.random().toString(36).substr(2, 9);
+
+// Panel name
+const panelName = "Panel_" + Math.random().toString(36).substr(2, 9);
+
 test.describe.configure({ mode: "parallel" });
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
   await page.waitForTimeout(4000);
@@ -37,7 +44,7 @@ const largeDatasetSqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_i
   WHERE kubernetes_namespace_name IS NOT NULL 
   GROUP BY x_axis_1, breakdown_1`;
 
-const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1"  FROM "${STREAM_NAME}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC`;
+const histogramQuery = `SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1"  FROM "${STREAM_NAME}"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC `;
 
 test.describe("logs testcases", () => {
   test.beforeEach(async ({ page }) => {
@@ -53,7 +60,7 @@ test.describe("logs testcases", () => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
 
-    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
+    // await selectStreamAndStreamTypeForLogs(page, logData.Stream);
     await pm.logsVisualise.logsApplyQueryButton();
   });
 
@@ -368,48 +375,6 @@ test.describe("logs testcases", () => {
     await expect(page.locator(".cm-line").first()).toBeEmpty();
   });
 
-  test.skip("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
-    page,
-  }) => {
-    // Instantiate PageManager with the current page
-    const pm = new PageManager(page);
-
-    // Open the logs page, fill the query editor, and apply a relative time and Apply the query
-    await pm.logsVisualise.openLogs();
-
-    const sqlQuery = `SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", 
-    count(kubernetes_container_hash) as "y_axis_1", 
-    count(kubernetes_container_name) as "y_axis_2", 
-    count(kubernetes_host) as "y_axis_3", 
-    count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", 
-    count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", 
-    count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", 
-    count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", 
-    count(kubernetes_labels_prometheus) as "y_axis_8", 
-    kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1"  
-    FROM "e2e_automate" 
-    WHERE kubernetes_namespace_name IS NOT NULL 
-    GROUP BY x_axis_1, breakdown_1`;
-
-    await pm.logsVisualise.fillQueryEditor(sqlQuery);
-    await pm.logsVisualise.setRelative("6", "w");
-    await pm.logsVisualise.logsApplyQueryButton();
-
-    // Enable SQL mode
-    await pm.logsVisualise.enableSQLMode();
-    await pm.logsVisualise.logsApplyQueryButton();
-
-    // Open the visualization tab
-    await pm.logsVisualise.openVisualiseTab();
-
-    // Check for any error messages or indicators
-    const errorMessage = page.locator('[data-test="error-message"]'); // Update the selector based on your app's error message display
-    const errorCount = await errorMessage.count();
-
-    // Assert that no error messages are displayed
-    await expect(errorCount).toBe(0);
-  });
-
   test.skip("Ensure that switching between logs to visualize and back again results in the dropdown appearing blank, and the row is correctly handled.", async ({
     page,
   }) => {
@@ -687,7 +652,7 @@ LIMIT 100`;
   });
   ///////////////////////////////////////////////
 
-  test("1should handle large datasets and complex SQL queries without showing an error on the chart", async ({
+  test("should handle large datasets and complex SQL queries without showing an error on the chart", async ({
     page,
   }) => {
     const pm = new PageManager(page);
@@ -808,10 +773,10 @@ LIMIT 100`;
     page,
   }) => {
     // Extract stream name from the SQL query dynamically
-    const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
-    const expectedStreamName = streamNameMatch
-      ? streamNameMatch[1]
-      : STREAM_NAME;
+    // const streamNameMatch = largeDatasetSqlQuery.match(/FROM\s+"([^"]+)"/);
+    // const expectedStreamName = streamNameMatch
+    //   ? streamNameMatch[1]
+    //   : STREAM_NAME;
 
     const pm = new PageManager(page);
     // const logsVisualise = new LogsVisualise(page);
@@ -865,5 +830,226 @@ LIMIT 100`;
     await expect(
       page.locator('[data-test="dashboard-panel-table"]').first()
     ).toBeVisible();
+  });
+
+  test("should not show dashboard errors when changing chart types with aggregation query", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox")
+      .click();
+
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox")
+      .fill(largeDatasetSqlQuery);
+
+    // Apply the time filter and refresh the search
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // await pm.logsVisualise.enableSQLMode();
+    await pm.logsVisualise.openVisualiseTab();
+    await page.waitForTimeout(2000);
+
+    // Define chart types to test
+    const chartTypes = [
+      { selector: '[data-test="selected-chart-table-item"]', name: "Table" },
+      { selector: '[data-test="selected-chart-line-item"]', name: "Line" },
+      { selector: '[data-test="selected-chart-bar-item"]', name: "Bar" },
+      { selector: '[data-test="selected-chart-area-item"]', name: "Area" },
+      {
+        selector: '[data-test="selected-chart-scatter-item"]',
+        name: "Scatter",
+      },
+      { selector: '[data-test="selected-chart-pie-item"]', name: "Pie" },
+    ];
+
+    // Test each chart type
+    for (const chartType of chartTypes) {
+      console.log(`Testing chart type: ${chartType.name}`);
+
+      // Select the chart type
+      await page.locator(chartType.selector).click();
+      await page.waitForTimeout(1000);
+
+      // Wait for chart to load
+      await page.waitForTimeout(3000);
+
+      // Check for dashboard errors
+      const errorResult = await pm.logsVisualise.checkDashboardErrors(
+        page,
+        chartType.name
+      );
+
+      if (errorResult.hasErrors) {
+        console.log(`Dashboard error found for ${chartType.name} chart:`);
+        errorResult.errors.forEach((error, index) => {
+          console.log(`  ${index + 1}. ${error}`);
+        });
+
+        // Fail the test with detailed error information
+        expect(errorResult.errorTextCount).toBe(0);
+        expect(errorResult.errorListCount).toBe(0);
+      } else {
+        console.log(`${chartType.name} chart: No dashboard errors found`);
+      }
+
+      // Verify the chart renders successfully
+      const chartRendered = await pm.logsVisualise.verifyChartRenders(page);
+      expect(chartRendered).toBe(true);
+    }
+
+    console.log("All chart types tested successfully without dashboard errors");
+  });
+
+  test("should set line chart as default when using histogram query", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox")
+      .click();
+
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox")
+      .fill(histogramQuery);
+
+    // Apply the time filter and refresh the search
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // await pm.logsVisualise.enableSQLMode();
+    await pm.logsVisualise.openVisualiseTab();
+    await page.waitForTimeout(2000);
+
+    // Verify line chart is selected as default for histogram queries
+    await pm.logsVisualise.verifyChartTypeSelected(page, "line", true);
+
+    // Verify table chart is NOT selected for histogram queries
+    await pm.logsVisualise.verifyChartTypeSelected(page, "table", false);
+
+    // Verify chart canvas renders successfully
+    await expect(
+      page.locator('[data-test="chart-renderer"] canvas').last()
+    ).toBeVisible();
+
+    // Verify chart renders without errors
+    const chartRendered = await pm.logsVisualise.verifyChartRenders(page);
+    expect(chartRendered).toBe(true);
+  });
+
+  test("Should display the correct query in the dashboard when saved from a Table chart.", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox")
+      .click();
+
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox")
+      .fill(largeDatasetSqlQuery);
+
+    // Apply the time filter and refresh the search
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
+
+    // await pm.logsVisualise.enableSQLMode();
+    await pm.logsVisualise.openVisualiseTab();
+
+    await page.waitForTimeout(2000);
+
+    await pm.logsVisualise.addPanelToNewDashboard(
+      page,
+      randomDashboardName,
+      panelName
+    );
+
+    // Wait for visualization to load
+    await page.waitForTimeout(2000);
+
+    await page
+      .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')
+      .click();
+    await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
+
+    await page.waitForTimeout(2000);
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT kubernetes_annotations_kubectl_kubernetes_io_default_container as "x_axis_1", count(kubernetes_container_hash) as "y_axis_1", count(kubernetes_container_name) as "y_axis_2", count(kubernetes_host) as "y_axis_3", count(kubernetes_labels_app_kubernetes_io_instance) as "y_axis_4", count(kubernetes_labels_app_kubernetes_io_name) as "y_axis_5", count(kubernetes_labels_app_kubernetes_io_version) as "y_axis_6", count(kubernetes_labels_operator_prometheus_io_name) as "y_axis_7", count(kubernetes_labels_prometheus) as "y_axis_8", kubernetes_labels_statefulset_kubernetes_io_pod_name as "breakdown_1" FROM "e2e_automate" WHERE kubernetes_namespace_name IS NOT NULL GROUP BY x_axis_1, breakdown_1',
+        })
+        .first()
+    ).toBeVisible();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await deleteDashboard(page, randomDashboardName);
+  });
+
+  test("should display the correct query in the dashboard when saved from a Line chart.", async ({
+    page,
+  }) => {
+    const pm = new PageManager(page);
+
+    await pm.logsVisualise.openLogs();
+
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox")
+      .click();
+
+    await page
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByRole("textbox")
+      .fill(histogramQuery);
+
+    // Apply the time filter and refresh the search
+    await pm.logsVisualise.setRelative("6", "w");
+    await pm.logsVisualise.logsApplyQueryButton();
+    await pm.logsVisualise.openVisualiseTab();
+
+    await page.waitForTimeout(2000);
+
+    await pm.logsVisualise.addPanelToNewDashboard(
+      page,
+      randomDashboardName,
+      panelName
+    );
+
+    await page.waitForTimeout(2000);
+    await page
+      .locator('[data-test="dashboard-edit-panel-' + panelName + '-dropdown"]')
+      .click();
+    await page.locator('[data-test="dashboard-query-inspector-panel"]').click();
+
+    await page.waitForTimeout(2000);
+    await expect(
+      page
+        .getByRole("cell", {
+          name: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_namespace_name) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+        })
+        .first()
+    ).toBeVisible();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
+
+    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await deleteDashboard(page, randomDashboardName);
   });
 });
