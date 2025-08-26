@@ -127,8 +127,10 @@ import useNotifications from "@/composables/useNotifications";
 import useStreams from "@/composables/useStreams";
 import useWebSocket from "@/composables/useWebSocket";
 
-import searchService from "@/services/search";
-import savedviewsService from "@/services/saved_views";
+// Import new API services
+import logsApi from "@/services/logs/logsApi";
+import savedViewsApi from "@/services/logs/savedViewsApi";
+// Keep original services for non-extracted methods
 import config from "@/aws-exports";
 import useSearchWebSocket from "./useSearchWebSocket";
 import useActions from "./useActions";
@@ -911,7 +913,7 @@ const useLogs = () => {
           // for visualization, will require to set histogram interval to fill missing values
           searchObj.data.queryResults.visualization_histogram_interval = null;
 
-          await searchService
+          await logsApi
             .partition({
               org_identifier: searchObj.organizationIdentifier,
               query: partitionQueryReq,
@@ -1873,8 +1875,8 @@ const useLogs = () => {
       }
               searchObj.data.queryResults.subpage = 1;
             if (searchObj.meta.jobId == "" ) {
-              searchService
-              .schedule_search(
+              logsApi
+              .scheduleSearch(
               {
                 org_identifier: searchObj.organizationIdentifier,
                 query: queryReq,
@@ -2010,7 +2012,7 @@ const useLogs = () => {
         const { traceparent, traceId } = generateTraceContext();
         addTraceId(traceId);
 
-        searchService
+        logsApi
           .search(
             {
               org_identifier: searchObj.organizationIdentifier,
@@ -2223,12 +2225,12 @@ const useLogs = () => {
       
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
-      //here we are deciding search because when we have jobID present (search schedule job ) then we need to call get_scheduled_search_result
+      //here we are deciding search because when we have jobID present (search schedule job ) then we need to call getScheduledSearchResult
       //else we will call search
-      const decideSearch = searchObj.meta.jobId
-        ? "get_scheduled_search_result"
-        : "search";
-      searchService[decideSearch](
+      const searchCall = searchObj.meta.jobId
+        ? logsApi.getScheduledSearchResult
+        : logsApi.search;
+      searchCall(
           {
             org_identifier: searchObj.organizationIdentifier,
             query: queryReq,
@@ -2697,7 +2699,7 @@ const useLogs = () => {
         const { traceparent, traceId } = generateTraceContext();
         addTraceId(traceId);
         queryReq.query.size = -1;
-        searchService
+        logsApi
           .search(
             {
               org_identifier: searchObj.organizationIdentifier,
@@ -3980,8 +3982,8 @@ const useLogs = () => {
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
 
-      searchService
-        .search_around({
+      logsApi
+        .searchAround({
           org_identifier: searchObj.organizationIdentifier,
           index: streamName,
           key: obj.key,
@@ -3991,11 +3993,11 @@ const useLogs = () => {
           query_fn: query_fn,
           stream_type: searchObj.data.stream.streamType,
           regions: searchObj.meta.hasOwnProperty("regions")
-            ? searchObj.meta.regions.join(",")
-            : "",
+            ? searchObj.meta.regions
+            : [],
           clusters: searchObj.meta.hasOwnProperty("clusters")
-            ? searchObj.meta.clusters.join(",")
-            : "",
+            ? searchObj.meta.clusters
+            : [],
           action_id,
           is_multistream:
             searchObj.data.stream.selectedStream.length > 1 ? true : false,
@@ -4390,7 +4392,7 @@ const useLogs = () => {
     try {
       searchObj.loadingSavedView = true;
       const favoriteViews: any = [];
-      savedviewsService
+      savedViewsApi
         .get(store.state.selectedOrganization.identifier)
         .then((res) => {
           searchObj.loadingSavedView = false;
@@ -4509,7 +4511,7 @@ const useLogs = () => {
   };
 
   const getRegionInfo = () => {
-    searchService.get_regions().then((res) => {
+    logsApi.getRegions().then((res) => {
       const clusterData = [];
       let regionObj: any = {};
       const apiData = res.data;
@@ -4579,8 +4581,8 @@ const useLogs = () => {
 
         searchObj.data.isOperationCancelled = true;
 
-        searchService
-          .delete_running_queries(
+        logsApi
+          .cancelRunningQueries(
             store.state.selectedOrganization.identifier,
             searchObj.data.searchRequestTraceIds,
           )
