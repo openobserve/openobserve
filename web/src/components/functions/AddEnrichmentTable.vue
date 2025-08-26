@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-mx-md q-my-md">
+  <div class="q-px-md q-py-md"
+  :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  >
     <div class="row items-center no-wrap">
       <div class="col">
         <div v-if="isUpdating" class="text-h6">
@@ -71,11 +73,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <pre class="q-py-md showLabelOnTop text-bold text-h7">{{
+        <pre v-if="compilationErr" class="q-py-md showLabelOnTop text-bold text-h7">{{
           compilationErr
         }}</pre>
 
-        <div class="flex justify-center q-mt-lg">
+        <div class="flex justify-center">
           <q-btn
             v-close-popup
             class="q-mr-md o2-secondary-button tw-h-[36px]"
