@@ -381,7 +381,25 @@ export class SanityPage {
             const altSelectors = ['#fnEditor', '.fn-editor', '[data-test*="editor"]', '.monaco-editor', '.cm-editor'];
             for (const selector of altSelectors) {
                 const altEditor = this.page.locator(selector);
-                console.log(`🔍 FUNCTION DEBUG: Alt selector ${selector}: count=${await altEditor.count()}, visible=${await altEditor.isVisible()}`);
+                const count = await altEditor.count();
+                console.log(`🔍 FUNCTION DEBUG: Alt selector ${selector}: count=${count}`);
+                
+                // Handle multiple matches by checking each one individually
+                if (count > 0) {
+                    if (count === 1) {
+                        console.log(`🔍 FUNCTION DEBUG: Alt selector ${selector}: visible=${await altEditor.isVisible()}`);
+                    } else {
+                        console.log(`🔍 FUNCTION DEBUG: Alt selector ${selector}: multiple matches (${count}), checking each:`);
+                        for (let i = 0; i < count; i++) {
+                            const element = altEditor.nth(i);
+                            try {
+                                console.log(`🔍 FUNCTION DEBUG: Alt selector ${selector}[${i}]: visible=${await element.isVisible()}, data-test=${await element.getAttribute('data-test')}`);
+                            } catch (error) {
+                                console.log(`🔍 FUNCTION DEBUG: Alt selector ${selector}[${i}]: error checking visibility - ${error.message}`);
+                            }
+                        }
+                    }
+                }
             }
             
             // Check current page state
