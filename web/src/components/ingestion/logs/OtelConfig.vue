@@ -66,6 +66,14 @@ const getOtelHttpConfig = computed(() => {
       Authorization: Basic ${accessKey.value}
       stream-name: default`;
 });
+
+defineExpose({
+  endpoint,
+  ingestionURL,
+  accessKey,
+  getOtelGrpcConfig,
+  getOtelHttpConfig
+});
 </script>
 
 <style scoped></style>

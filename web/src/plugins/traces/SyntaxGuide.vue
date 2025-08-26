@@ -24,8 +24,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="sqlmode ? 'sql-mode' : 'normal-mode'"
     :label="t('search.syntaxGuideLabel')"
     icon="help"
+    :aria-label="t('search.syntaxGuideLabel')"
   >
-    <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
+    <q-menu
+      data-test="syntax-guide-menu"
+      class="syntax-guide-menu"
+      :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
+    >
       <q-card flat v-if="!sqlmode">
         <q-card-section class="syntax-guide-title">
           <div class="label">{{ t("search.syntaxGuideLabel") }}</div>
@@ -87,8 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li>
                   For full text search of value 'error' use
                   <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    match_all('error')</span
+                    >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                 </li>
                 <li>

@@ -62,6 +62,7 @@ const store = createStore({
       user_defined_schemas_enabled: true,
       super_cluster_enabled: false,
       query_on_stream_selection: false,
+      meta_org: "default",
       default_functions: [
         {
           name: "match_all",

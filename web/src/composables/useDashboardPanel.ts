@@ -23,7 +23,7 @@ import {
   b64EncodeUnicode,
   isStreamingEnabled,
 } from "@/utils/zincutils";
-import { extractFields } from "@/utils/query/sqlUtils";
+import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
 import { validatePanel } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
 import queryService from "@/services/search";
@@ -3054,7 +3054,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   }
 
   // This function parses the custom query and generates the errors and custom fields
-  const updateQueryValue = (shouldSkipCustomQueryFields: boolean = false) => {
+  const updateQueryValue = async (shouldSkipCustomQueryFields: boolean = false) => {
     // store the query in the dashboard panel data
     // dashboardPanelData.meta.editorValue = value;
     // dashboardPanelData.data.query = value;
@@ -3155,22 +3155,22 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
         // update the existing x and y axis fields
         updateXYFieldsOnCustomQueryChange(oldCustomQueryFields);
-      } else {
+      } else if (!shouldSkipCustomQueryFields) {
         dashboardPanelData.meta.errors.queryErrors.push("Invalid Columns");
       }
 
-      if (dashboardPanelData.meta.parsedQuery.from?.length > 0) {
+      const currentQuery =
+      dashboardPanelData.data.queries[
+        dashboardPanelData.layout.currentQueryIndex
+      ];
+
+      const tableName = await getStreamNameFromQuery(currentQuery?.query ?? "");
+
+      if (tableName) {
         const streamFound = dashboardPanelData.meta.stream.streamResults.find(
           (it: any) =>
-            it.name == dashboardPanelData.meta.parsedQuery.from[0].table,
+            it.name == tableName,
         );
-
-        const currentQuery =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ];
-
-        const tableName = dashboardPanelData.meta.parsedQuery.from?.[0]?.table;
 
         if (streamFound) {
           if (currentQuery.fields.stream != streamFound.name) {
@@ -3178,14 +3178,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           }
         } else if (isDummyStreamName(tableName)) {
           // nothing to do as the stream is dummy
-        } else {
-          let parsedQuery;
-          try {
-            parsedQuery = parser.astify(currentQuery?.query);
-          } catch (e) {
-            // exit if not able to parse query
-            return;
-          }
         }
       }
     }
@@ -3201,7 +3193,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].customQuery, // Only watch for custom query mode changes
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
-    (newVal, oldVal) => {
+    async (newVal, oldVal) => {
 
       // if pageKey is logs, then return
       // because custom query fields will be extracted from the query using the result schema api
@@ -3223,7 +3215,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ) {
         // Call the updateQueryValue function
         // will skip custom query fields extraction for logs page
-        if (parser) updateQueryValue(pageKey == "logs" ? true : false);
+        if (parser) await updateQueryValue(pageKey == "logs" ? true : false);
       } else if (customQueryChanged) {
         // Only clear lists when switching modes
         // auto query mode selected

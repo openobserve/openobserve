@@ -75,6 +75,9 @@ const useAiChat = () => {
         fetchAiChat,
         registerAiChatHandler,
         removeAiChatHandler,
+        getContext,
+        getFormattedContext,
+        tryToJson,
     }
 };
 

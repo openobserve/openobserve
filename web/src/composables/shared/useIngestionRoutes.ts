@@ -47,6 +47,7 @@ import WindowsConfig from "@/components/ingestion/recommended/WindowsConfig.vue"
 import DatabaseConfig from "@/components/ingestion/Database.vue";
 import SqlServer from "@/components/ingestion/databases/SqlServer.vue";
 import Postgres from "@/components/ingestion/databases/Postgres.vue";
+import Oracle from "@/components/ingestion/databases/Oracle.vue";
 import MongoDB from '@/components/ingestion/databases/MongoDB.vue';
 import Redis from '@/components/ingestion/databases/Redis.vue';
 import CouchDB from '@/components/ingestion/databases/CouchDB.vue';
@@ -401,6 +402,14 @@ const useIngestionRoutes = () => {
               path: "mysql",
               name: "mysql",
               component: MySQL,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "oracle",
+              name: "oracle",
+              component: Oracle,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
