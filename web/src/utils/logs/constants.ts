@@ -233,7 +233,7 @@ export const DEFAULT_LOGS_CONFIG = {
 export const DEFAULT_SEARCH_AGG_DATA = {
   total: 0,
   hasAggregation: false,
-} as const;
+};
 
 /**
  * Default debug object for performance monitoring
@@ -258,7 +258,7 @@ export const DEFAULT_SEARCH_DEBUG_DATA = {
   extractFieldsStartTime: 0,
   extractFieldsEndTime: 0,
   extractFieldsWithAPI: "",
-} as const;
+};
 
 // Type definitions for constants
 export type IntervalMapKey = keyof typeof INTERVAL_MAP;

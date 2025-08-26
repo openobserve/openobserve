@@ -68,6 +68,37 @@ import {
   DEFAULT_SEARCH_DEBUG_DATA
 } from "@/utils/logs/constants";
 import {
+  extractTimestamps,
+  getCurrentTimestamp,
+  formatTimePeriod,
+  isValidTimePeriod
+} from "@/utils/logs/datetime";
+import {
+  generateHistogramTitle,
+  generateFilterExpressionByFieldType,
+  type HistogramTitleParams,
+  type FilterExpressionParams
+} from "@/utils/logs/formatters";
+import {
+  validateLimitQuery,
+  validateDistinctQuery,
+  validateWithQuery,
+  validateAggregationQuery,
+  validateMultiStreamFilter,
+  type MultiStreamFilterParams
+} from "@/utils/logs/validators";
+import {
+  createSQLParserFunctions,
+  extractFilterColumns,
+  isTimestampASC,
+  cleanBinaryExpression,
+  extractValueQuery,
+  isNonAggregatedSQLMode,
+  parseNonSQLQuery,
+  quoteFieldNames,
+  type ValueQueryParams
+} from "@/utils/logs/parsers";
+import {
   convertDateToTimestamp,
   getConsumableRelativeTime,
 } from "@/utils/date";
@@ -140,6 +171,7 @@ const useLogs = () => {
   const { getAllActions } = useActions();
 
   let parser: null | Parser = new Parser();
+  const { parseSQL: fnParsedSQL, unparseSQL: fnUnparsedSQL } = createSQLParserFunctions(parser);
 
   const { showErrorNotification } = useNotifications();
   const { getStreams, getStream, getMultiStreams, isStreamExists, isStreamFetched } = useStreams();
@@ -155,7 +187,7 @@ const useLogs = () => {
     if (router.currentRoute.value.query?.quick_mode == "true") {
       searchObj.meta.quickMode = true;
     }
-    extractValueQuery();
+    extractValueQueryLocal();
   });
 
   onBeforeUnmount(() => {
@@ -586,81 +618,25 @@ const useLogs = () => {
     router.push({ query });
   };
 
-  function extractFilterColumns(expression: any) {
-    const columns: any[] = [];
-
-    function traverse(node: {
-      type: string;
-      column: any;
-      left: any;
-      right: any;
-      args: { type: string; value: any[] };
-    }) {
-      if (node.type === "column_ref") {
-        columns.push(node.column);
-      } else if (node.type === "binary_expr") {
-        traverse(node.left);
-        traverse(node.right);
-      } else if (node.type === "function") {
-        // Function expressions might contain columns as arguments
-        if (node.args && node.args.type === "expr_list") {
-          node.args.value.forEach((arg: any) => traverse(arg));
-        }
-      }
-    }
-
-    traverse(expression);
-    return columns;
-  }
 
   const validateFilterForMultiStream = () => {
-    const filterCondition = searchObj.data.query;
-    const parsedSQL: any = fnParsedSQL(
-      "select * from stream where " + filterCondition,
-    );
-    searchObj.data.stream.filteredField = extractFilterColumns(
-      parsedSQL?.where,
-    );
+    const params: MultiStreamFilterParams = {
+      filterCondition: searchObj.data.query,
+      selectedStreamFields: searchObj.data.stream.selectedStreamFields,
+      selectedStream: searchObj.data.stream.selectedStream,
+      fnParsedSQL,
+      extractFilterColumns
+    };
 
-    searchObj.data.filterErrMsg = "";
-    searchObj.data.missingStreamMessage = "";
-    searchObj.data.stream.missingStreamMultiStreamFilter = [];
-    for (const fieldObj of searchObj.data.stream.filteredField) {
-      const fieldName = fieldObj.expr.value;
-      const filteredFields: any =
-        searchObj.data.stream.selectedStreamFields.filter(
-          (field: any) => field.name === fieldName,
-        );
-      if (filteredFields.length > 0) {
-        const streamsCount = filteredFields[0].streams.length;
-        const allStreamsEqual = filteredFields.every(
-          (field: any) => field.streams.length === streamsCount,
-        );
-        if (!allStreamsEqual) {
-          searchObj.data.filterErrMsg += `Field '${fieldName}' exists in different number of streams.\n`;
-        }
-      } else {
-        searchObj.data.filterErrMsg += `Field '${fieldName}' does not exist in the one or more stream.\n`;
-      }
+    const result = validateMultiStreamFilter(params);
+    
+    // Update the reactive state objects with the validation results
+    searchObj.data.filterErrMsg = result.errorMessage;
+    searchObj.data.missingStreamMessage = result.missingStreamMessage;
+    searchObj.data.stream.missingStreamMultiStreamFilter = result.missingStreamMultiStreamFilter;
+    searchObj.data.stream.filteredField = result.filteredField;
 
-      const fieldStreams: any = searchObj.data.stream.selectedStreamFields
-        .filter((field: any) => field.name === fieldName)
-        .map((field: any) => field.streams)
-        .flat();
-
-      searchObj.data.stream.missingStreamMultiStreamFilter =
-        searchObj.data.stream.selectedStream.filter(
-          (stream: any) => !fieldStreams.includes(stream),
-        );
-
-      if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
-        searchObj.data.missingStreamMessage = `One or more filter fields do not exist in "${searchObj.data.stream.missingStreamMultiStreamFilter.join(
-          ", ",
-        )}", hence no search is performed in the mentioned stream.\n`;
-      }
-    }
-
-    return searchObj.data.filterErrMsg === "" ? true : false;
+    return result.isValid;
   };
 
   function buildSearch() {
@@ -709,7 +685,7 @@ const useLogs = () => {
 
       if (searchObj.meta.sqlMode) {
         searchObj.data.query = processedQuery;
-        const parsedSQL: any = fnParsedSQL();
+        const parsedSQL: any = fnParsedSQL(searchObj.data.query);
         
         // Validate SQL query
         if (parsedSQL !== undefined) {
@@ -855,15 +831,15 @@ const useLogs = () => {
   }
 
   const isLimitQuery = (parsedSQL: any = null) => {
-    return parsedSQL?.limit && parsedSQL?.limit.value?.length > 0;
+    return validateLimitQuery(parsedSQL);
   };
 
   const isDistinctQuery = (parsedSQL: any = null) => {
-    return parsedSQL?.distinct?.type === "DISTINCT";
+    return validateDistinctQuery(parsedSQL);
   };
 
   const isWithQuery = (parsedSQL: any = null) => {
-    return parsedSQL?.with && parsedSQL?.with?.length > 0;
+    return validateWithQuery(parsedSQL);
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -883,7 +859,7 @@ const useLogs = () => {
         errorDetail: "",
       };
 
-      const parsedSQL: any = fnParsedSQL();
+      const parsedSQL: any = fnParsedSQL(searchObj.data.query);
 
       // if (searchObj.meta.sqlMode && parsedSQL == undefined) {
       //   searchObj.data.queryResults.error =
@@ -1208,7 +1184,7 @@ const useLogs = () => {
         let from = 0;
         let lastPage = 0;
 
-        const parsedSQL: any = fnParsedSQL();
+        const parsedSQL: any = fnParsedSQL(searchObj.data.query);
 
         if (
           (searchObj.data.queryResults.aggs !== undefined &&
@@ -1621,7 +1597,7 @@ const useLogs = () => {
         await getPaginatedData(queryReq);
         if(!isPagination && searchObj.meta.refreshInterval == 0 && searchObj.data.queryResults.hits.length > 0) searchObj.meta.resetPlotChart = true;
         searchObjDebug["paginatedDatawithAPIEndTime"] = performance.now();
-        const parsedSQL: any = fnParsedSQL();
+        const parsedSQL: any = fnParsedSQL(searchObj.data.query);
 
         if (
           (searchObj.data.queryResults.aggs == undefined &&
@@ -1666,7 +1642,7 @@ const useLogs = () => {
               searchObj.data.histogram.errorDetail = "";
               searchObj.loadingHistogram = true;
 
-              const parsedSQL: any = fnParsedSQL();
+              const parsedSQL: any = fnParsedSQL(searchObj.data.query);
               searchObj.data.queryResults.aggs = [];
 
               const partitions = JSON.parse(
@@ -1676,7 +1652,7 @@ const useLogs = () => {
               );
 
               // is _timestamp orderby ASC then reverse the partition array
-              if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
+              if (isTimestampASC(parsedSQL?.orderby, store.state.zoConfig.timestamp_column) && partitions.length > 1) {
                 partitions.reverse();
               }
 
@@ -1813,7 +1789,7 @@ const useLogs = () => {
             searchObj.data.histogram.errorDetail = "";
             searchObj.loadingHistogram = true;
 
-            const parsedSQL: any = fnParsedSQL();
+            const parsedSQL: any = fnParsedSQL(searchObj.data.query);
             searchObj.data.queryResults.aggs = [];
 
             const partitions = JSON.parse(
@@ -1823,7 +1799,7 @@ const useLogs = () => {
             );
 
             // is _timestamp orderby ASC then reverse the partition array
-            if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
+            if (isTimestampASC(parsedSQL?.orderby, store.state.zoConfig.timestamp_column) && partitions.length > 1) {
               partitions.reverse();
             }
 
@@ -1990,21 +1966,6 @@ const useLogs = () => {
     };
   }
 
-  function isTimestampASC(orderby: any) {
-    if (orderby) {
-      for (const order of orderby) {
-        if (
-          order.expr &&
-          order.expr.column === store.state.zoConfig.timestamp_column
-        ) {
-          if (order.type && order.type === "ASC") {
-            return true;
-          }
-        }
-      }
-    }
-    return false;
-  }
 
   function generateHistogramSkeleton() {
     if (
@@ -2050,62 +2011,9 @@ const useLogs = () => {
   }
 
   function hasAggregation(columns: any) {
-    if (columns) {
-      for (const column of columns) {
-        if (column.expr && column.expr.type === "aggr_func") {
-          return true; // Found aggregation function or non-null groupby property
-        }
-      }
-    }
-
-    if(searchObj.data.query.toLowerCase().includes("group by")) {
-      return true;
-    }
-
-    return false; // No aggregation function or non-null groupby property found
+    return validateAggregationQuery({ columns }, searchObj.data.query);
   }
 
-  const fnParsedSQL = (queryString: string = "") => {
-    try {
-      queryString = queryString || searchObj.data.query;
-      const filteredQuery = queryString
-        .split("\n")
-        .filter((line: string) => !line.trim().startsWith("--"))
-        .join("\n");
-
-      const parsedQuery: any = parser?.astify(filteredQuery);
-      return parsedQuery || {
-        columns: [],
-        from: [],
-        orderby: null,
-        limit: null,
-        groupby: null,
-        where: null,
-      };
-
-      // return convertPostgreToMySql(parser.astify(filteredQuery));
-    } catch (e: any) {
-      return {
-        columns: [],
-        from: [],
-        orderby: null,
-        limit: null,
-        groupby: null,
-        where: null,
-      };
-    }
-  };
-
-  // TODO OK : Replace backticks with double quotes, as stream name from sqlify is coming with backticks
-  const fnUnparsedSQL = (parsedObj: any) => {
-    try {
-      const sql = parser?.sqlify(parsedObj);
-      return sql || "";
-    } catch (e: any) {
-      console.info(`Error while unparsing SQL : ${e.message}`);
-      return "";
-    }
-  };
 
   const getPageCount = async (queryReq: any) => {
     return new Promise((resolve, reject) => {
@@ -2836,7 +2744,7 @@ const useLogs = () => {
             // copy converted_histogram_query to queryResults
             searchObj.data.queryResults.converted_histogram_query = res?.data?.converted_histogram_query ?? "";
 
-            const parsedSQL: any = fnParsedSQL();
+            const parsedSQL: any = fnParsedSQL(searchObj.data.query);
             const partitions = JSON.parse(
               JSON.stringify(
                 searchObj.data.queryResults.partitionDetail.partitions,
@@ -2844,7 +2752,7 @@ const useLogs = () => {
             );
 
             // is _timestamp orderby ASC then reverse the partition array
-            if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
+            if (isTimestampASC(parsedSQL?.orderby, store.state.zoConfig.timestamp_column) && partitions.length > 1) {
               partitions.reverse();
             }
 
@@ -3706,7 +3614,7 @@ const useLogs = () => {
         selectedFields = [...new Set(searchObj.data.stream.selectedFields)];
       }
 
-      const parsedSQL: any = fnParsedSQL();
+      const parsedSQL: any = fnParsedSQL(searchObj.data.query);
 
       // By default when no fields are selected. Timestamp and Source will be visible. If user selects field, then only selected fields will be visible in table
       // In SQL and Quick mode.
@@ -3903,98 +3811,34 @@ const useLogs = () => {
     return max;
   };
 
+  // Helper function to build histogram title using the new formatter
   function getHistogramTitle() {
-    try {
-      const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
-      const startCount =
-        currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
-      let endCount;
-
-      let totalCount = Math.max(
-        searchObj.data.queryResults.hits?.length,
-        searchObj.data.queryResults.total,
-      );
-
-      if (!searchObj.meta.resultGrid.showPagination) {
-        endCount = searchObj.data.queryResults.hits?.length;
-        totalCount = searchObj.data.queryResults.hits?.length;
-      } else {
-        endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
-        if (
-          currentPage >=
-          (searchObj.communicationMethod === "ws" || searchObj.communicationMethod === "streaming" || searchObj.meta.jobId != ""
-            ? searchObj.data.queryResults?.pagination?.length
-            : searchObj.data.queryResults.partitionDetail?.paginations
-                ?.length || 0) -
-            1
-        ) {
-          endCount = Math.min(
-            startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
-            totalCount,
-          );
-        } else {
-          endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
-        }
-      }
-
-      if (searchObj.meta.sqlMode && searchAggData.hasAggregation) {
-        totalCount = searchAggData.total;
-      }
-
-      if (isNaN(totalCount)) {
-        totalCount = 0;
-      }
-
-      if (isNaN(endCount)) {
-        endCount = 0;
-      }
-
-      let plusSign: string = "";
-      if (
-        searchObj.data.queryResults?.partitionDetail?.partitions?.length > 1 &&
-        endCount < totalCount &&
-        searchObj.meta.showHistogram == false
-      ) {
-        plusSign = "+";
-      }
-
-      if (
-        (searchObj.communicationMethod === "ws" || searchObj.communicationMethod === "streaming") &&
-        endCount < totalCount &&
-        !searchObj.meta.showHistogram
-      ) {
-        plusSign = "+";
-      }
-
-      const scanSizeLabel =
-        searchObj.data.queryResults.result_cache_ratio !== undefined &&
-        searchObj.data.queryResults.result_cache_ratio > 0
-          ? "Delta Scan Size"
-          : "Scan Size";
-
-      const title =
-        "Showing " +
-        startCount +
-        " to " +
-        endCount +
-        " out of " +
-        totalCount.toLocaleString() +
-        plusSign +
-        " events in " +
-        searchObj.data.queryResults.took +
-        " ms. (" +
-        scanSizeLabel +
-        ": " +
-        formatSizeFromMB(searchObj.data.queryResults.scan_size) +
-        plusSign +
-        ")";
-      return title;
-    } catch (e: any) {
-      console.log("Error while generating histogram title", e);
-      notificationMsg.value = "Error while generating histogram title.";
-      return "";
-    }
+    const params: HistogramTitleParams = {
+      currentPage: searchObj.data.resultGrid.currentPage,
+      rowsPerPage: searchObj.meta.resultGrid.rowsPerPage,
+      totalCount: Math.max(
+        searchObj.data.queryResults.hits?.length || 0,
+        searchObj.data.queryResults.total || 0
+      ),
+      hitsLength: searchObj.data.queryResults.hits?.length || 0,
+      showPagination: searchObj.meta.resultGrid.showPagination,
+      communicationMethod: searchObj.communicationMethod,
+      jobId: searchObj.meta.jobId,
+      paginationLength: searchObj.data.queryResults?.pagination?.length || 0,
+      partitionPaginationLength: searchObj.data.queryResults.partitionDetail?.paginations?.length || 0,
+      sqlMode: searchObj.meta.sqlMode,
+      aggregationTotal: searchAggData.total,
+      hasAggregation: searchAggData.hasAggregation,
+      partitionCount: searchObj.data.queryResults?.partitionDetail?.partitions?.length || 1,
+      showHistogram: searchObj.meta.showHistogram,
+      took: searchObj.data.queryResults.took || 0,
+      scanSize: searchObj.data.queryResults.scan_size || 0,
+      resultCacheRatio: searchObj.data.queryResults.result_cache_ratio
+    };
+    
+    return generateHistogramTitle(params);
   }
+
 
   function generateHistogramData() {
     try {
@@ -4005,7 +3849,7 @@ const useLogs = () => {
       const yData: number[] = [];
       let hasAggregationFlag = false;
 
-      const parsedSQL: any = fnParsedSQL();
+      const parsedSQL: any = fnParsedSQL(searchObj.data.query);
       if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
         hasAggregationFlag = hasAggregation(parsedSQL.columns);
       }
@@ -4401,47 +4245,7 @@ const useLogs = () => {
     }
   };
 
-  function extractTimestamps(period: string) {
-    const currentTime = new Date();
-    let fromTimestamp, toTimestamp;
-
-    switch (period.slice(-1)) {
-      case "s":
-        fromTimestamp = currentTime.getTime() - parseInt(period) * 1000; // 1 second = 1000 milliseconds
-        toTimestamp = currentTime.getTime();
-        break;
-      case "m":
-        fromTimestamp = currentTime.getTime() - parseInt(period) * 60000; // 1 minute = 60000 milliseconds
-        toTimestamp = currentTime.getTime();
-        break;
-      case "h":
-        fromTimestamp = currentTime.getTime() - parseInt(period) * 3600000; // 1 hour = 3600000 milliseconds
-        toTimestamp = currentTime.getTime();
-        break;
-      case "d":
-        fromTimestamp = currentTime.getTime() - parseInt(period) * 86400000; // 1 day = 86400000 milliseconds
-        toTimestamp = currentTime.getTime();
-        break;
-      case "w":
-        fromTimestamp = currentTime.getTime() - parseInt(period) * 604800000; // 1 week = 604800000 milliseconds
-        toTimestamp = currentTime.getTime();
-        break;
-      case "M":
-        const currentMonth = currentTime.getMonth();
-        const currentYear = currentTime.getFullYear();
-        const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-        const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-        const fromDate = new Date(prevYear, prevMonth, 1);
-        fromTimestamp = fromDate.getTime();
-        toTimestamp = currentTime.getTime();
-        break;
-      default:
-        console.error("Invalid period format!");
-        return;
-    }
-
-    return { from: fromTimestamp, to: toTimestamp };
-  }
+  // extractTimestamps function moved to @/utils/logs/datetime
 
   const restoreUrlQueryParams = async (dashboardPanelData: any = null) => {
     searchObj.shouldIgnoreWatcher = true;
@@ -4875,72 +4679,27 @@ const useLogs = () => {
     return selectedFields;
   };
 
+  // Helper function to build filter expression using the new formatter
   const getFilterExpressionByFieldType = (
     field: string | number,
     field_value: string | number | boolean,
     action: string,
   ) => {
-    let operator = action == "include" ? "=" : "!=";
-    try {
-      let fieldType: string = "utf8";
-
-      const getStreamFieldTypes = (stream: any) => {
-        if (!stream.schema) return {};
-        return Object.fromEntries(
-          stream.schema.map((schema: any) => [schema.name, schema.type]),
-        );
-      };
-
-      const fieldTypeList = searchObj.data.streamResults.list
-        .filter((stream: any) =>
-          searchObj.data.stream.selectedStream.includes(stream.name),
-        )
-        .reduce(
-          (acc: any, stream: any) => ({
-            ...acc,
-            ...getStreamFieldTypes(stream),
-          }),
-          {},
-        );
-
-      if (Object.hasOwn(fieldTypeList, field)) {
-        fieldType = fieldTypeList[field];
-      }
-
-      if (
-        field_value === "null" ||
-        field_value === "" ||
-        field_value === null
-      ) {
-        operator = action == "include" ? "is" : "is not";
-        field_value = "null";
-      }
-      let expression =
-        field_value == "null"
-          ? `${field} ${operator} ${field_value}`
-          : `${field} ${operator} '${field_value}'`;
-
-      const isNumericType = (type: string) =>
-        ["int64", "float64"].includes(type.toLowerCase());
-      const isBooleanType = (type: string) => type.toLowerCase() === "boolean";
-
-      if (isNumericType(fieldType)) {
-        expression = `${field} ${operator} ${field_value}`;
-      } else if (isBooleanType(fieldType)) {
-        operator = action == "include" ? "is" : "is not";
-        expression = `${field} ${operator} ${field_value}`;
-      }
-
-      return expression;
-    } catch (e: any) {
-      console.log("Error while getting filter expression by field type", e);
-      return `${field} ${operator} '${field_value}'`;
-    }
+    const params: FilterExpressionParams = {
+      field,
+      fieldValue: field_value,
+      action,
+      streamResults: searchObj.data.streamResults.list || [],
+      selectedStreams: searchObj.data.stream.selectedStream || []
+    };
+    
+    return generateFilterExpressionByFieldType(params);
   };
+
 
   const setSelectedStreams = (value: string) => {
     try {
-      const parsedSQL = fnParsedSQL();
+      const parsedSQL = fnParsedSQL(searchObj.data.query);
 
       if (!Object.hasOwn(parsedSQL, "from") || parsedSQL?.from == null || parsedSQL?.from?.length == 0) {
         console.info("Failed to parse SQL query:", value);
@@ -5079,142 +4838,18 @@ const useLogs = () => {
    * 
    * @returns 
    */
-  const extractValueQuery = () => {
-    try {
-      if (searchObj.meta.sqlMode == false || searchObj.data.query == "") {
-        return {};
-      }
-
-      const orgQuery: string = searchObj.data.query
-        .split("\n")
-        .filter((line: string) => !line.trim().startsWith("--"))
-        .join("\n");
-      const outputQueries: any = {};
-      const parsedSQL = fnParsedSQL(orgQuery);
-
-      let query = `select * from INDEX_NAME`;
-      const newParsedSQL = fnParsedSQL(query);
-      if (
-        Object.hasOwn(parsedSQL, "from") &&
-        parsedSQL.from.length <= 1 &&
-        parsedSQL._next == null
-      ) {
-        newParsedSQL.where = parsedSQL.where;
-
-        query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
-        outputQueries[parsedSQL.from[0].table] = query.replace(
-          "INDEX_NAME",
-          "[INDEX_NAME]",
-        );
-      } else {
-        // parse join queries & union queries
-        if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 1) {
-          parsedSQL.where = cleanBinaryExpression(parsedSQL.where);
-          // parse join queries and make where null
-          searchObj.data.stream.selectedStream.forEach((stream: string) => {
-            newParsedSQL.where = null;
-
-            query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
-            outputQueries[stream] = query.replace("INDEX_NAME", "[INDEX_NAME]");
-          });
-        } else if (parsedSQL._next != null) {
-          //parse union queries
-          if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from) {
-            let query = `select * from INDEX_NAME`;
-            const newParsedSQL = fnParsedSQL(query);
-
-            newParsedSQL.where = parsedSQL.where;
-
-            query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
-            outputQueries[parsedSQL.from[0].table] = query.replace(
-              "INDEX_NAME",
-              "[INDEX_NAME]",
-            );
-          }
-
-          let nextTable = parsedSQL._next;
-          let depth = 0;
-          const MAX_DEPTH = 100;
-          while (nextTable && depth++ < MAX_DEPTH) {
-            // Map through each "from" array in the _next object, as it can contain multiple tables
-            if (nextTable.from) {
-              let query = "select * from INDEX_NAME";
-              const newParsedSQL = fnParsedSQL(query);
-
-              newParsedSQL.where = nextTable.where;
-
-              query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
-              outputQueries[nextTable.from[0].table] = query.replace(
-                "INDEX_NAME",
-                "[INDEX_NAME]",
-              );
-            }
-            nextTable = nextTable._next;
-          }
-          if (depth >= MAX_DEPTH) {
-            throw new Error("Maximum query depth exceeded");
-          }
-        }
-      }
-      return outputQueries;
-    } catch (error) {
-      console.error("Error in extractValueQuery:", error);
-      throw error;
-    }
+  const extractValueQueryLocal = () => {
+    const params: ValueQueryParams = {
+      sqlMode: searchObj.meta.sqlMode,
+      query: searchObj.data.query,
+      selectedStreams: searchObj.data.stream.selectedStream,
+      parseSQL: fnParsedSQL,
+      unparseSQL: fnUnparsedSQL
+    };
+    return extractValueQuery(params);
   };
 
-  const cleanBinaryExpression = (node: any): any => {
-    if (!node) return null;
 
-    switch (node.type) {
-      case "binary_expr": {
-        const left: any = cleanBinaryExpression(node.left);
-        const right: any = cleanBinaryExpression(node.right);
-
-        // Remove the operator and keep only the non-null side if the other side is a field-only reference
-        if (left && isFieldOnly(left) && isFieldOnly(right)) {
-          return null; // Ignore this condition entirely if both sides are fields
-        } else if (!left) {
-          return right; // Only the right side remains, so return it
-        } else if (!right) {
-          return left; // Only the left side remains, so return it
-        }
-
-        // Return the expression if both sides are valid
-        return {
-          type: "binary_expr",
-          operator: node.operator,
-          left: left,
-          right: right,
-        };
-      }
-
-      case "column_ref":
-        return {
-          type: "column_ref",
-          table: node.table || null,
-          column:
-            node.column && node.column.expr
-              ? node.column.expr.value
-              : node.column,
-        };
-
-      case "single_quote_string":
-      case "number":
-        return {
-          type: node.type,
-          value: node.value,
-        };
-
-      default:
-        return node;
-    }
-  };
-
-  // Helper function to check if a node is a field-only reference (column_ref without literal)
-  function isFieldOnly(node: any): boolean {
-    return node && node.type === "column_ref";
-  }
 
   const getQueryReq = (isPagination: boolean) => {
     if (!isPagination) {
@@ -5314,7 +4949,7 @@ const useLogs = () => {
         searchObj.meta.resultGrid.rowsPerPage;
       queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
-      const parsedSQL: any = fnParsedSQL();
+      const parsedSQL: any = fnParsedSQL(searchObj.data.query);
 
       searchObj.meta.resultGrid.showPagination = true;
 
@@ -5370,7 +5005,7 @@ const useLogs = () => {
 
       const payload = buildWebSocketPayload(queryReq, isPagination, "search");
       
-      if(shouldGetPageCount(queryReq, fnParsedSQL()) && searchObj.meta.refreshInterval == 0) {
+      if(shouldGetPageCount(queryReq, fnParsedSQL(searchObj.data.query)) && searchObj.meta.refreshInterval == 0) {
         queryReq.query.size = queryReq.query.size + 1;
       }
 
@@ -5663,9 +5298,9 @@ const useLogs = () => {
     }
 
     if(searchObj.meta.refreshInterval == 0) {
-      if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total === payload.queryReq.query.size)) {
+      if(shouldGetPageCount(payload.queryReq, fnParsedSQL(searchObj.data.query)) && (response.content.results.total === payload.queryReq.query.size)) {
         searchObj.data.queryResults.pageCountTotal = payload.queryReq.query.size * searchObj.data.resultGrid.currentPage;
-      } else if(shouldGetPageCount(payload.queryReq, fnParsedSQL()) && (response.content.results.total != payload.queryReq.query.size)){
+      } else if(shouldGetPageCount(payload.queryReq, fnParsedSQL(searchObj.data.query)) && (response.content.results.total != payload.queryReq.query.size)){
         searchObj.data.queryResults.pageCountTotal = (payload.queryReq.query.size * Math.max(searchObj.data.resultGrid.currentPage-1,0)) + response.content.results.total;
       }
     }
@@ -5685,9 +5320,9 @@ const useLogs = () => {
 
   const updatePageCountTotal = (queryReq: SearchRequestPayload, currentHits: number, total: any) => {
     try {
-      if(shouldGetPageCount(queryReq, fnParsedSQL()) && (total === queryReq.query.size)) {
+      if(shouldGetPageCount(queryReq, fnParsedSQL(searchObj.data.query)) && (total === queryReq.query.size)) {
         searchObj.data.queryResults.pageCountTotal = (searchObj.meta.resultGrid.rowsPerPage * searchObj.data.resultGrid.currentPage) + 1;
-      } else if(shouldGetPageCount(queryReq, fnParsedSQL()) && (total !== queryReq.query.size)){
+      } else if(shouldGetPageCount(queryReq, fnParsedSQL(searchObj.data.query)) && (total !== queryReq.query.size)){
         searchObj.data.queryResults.pageCountTotal = ((searchObj.meta.resultGrid.rowsPerPage) * Math.max(searchObj.data.resultGrid.currentPage-1,0)) + currentHits;
       }
     } catch(e: any) {
@@ -5697,7 +5332,7 @@ const useLogs = () => {
 
   const trimPageCountExtraHit = (queryReq: SearchRequestPayload, total: any) => {
     try{
-      if(shouldGetPageCount(queryReq, fnParsedSQL()) && (total === queryReq.query.size)) {
+      if(shouldGetPageCount(queryReq, fnParsedSQL(searchObj.data.query)) && (total === queryReq.query.size)) {
         searchObj.data.queryResults.hits = searchObj.data.queryResults.hits.slice(0, searchObj.data.queryResults.hits.length- 1);
       }
     } catch(e: any) {
@@ -5998,7 +5633,7 @@ const useLogs = () => {
   }
 
   const handleAggregation = (queryReq: SearchRequestPayload, response: any) => {
-    const parsedSQL = fnParsedSQL();
+    const parsedSQL = fnParsedSQL(searchObj.data.query);
 
     if (searchObj.meta.sqlMode) {
       if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
@@ -6268,7 +5903,7 @@ const useLogs = () => {
   }
 
   const processHistogramRequest = async (queryReq: SearchRequestPayload) => {
-    const parsedSQL: any = fnParsedSQL();
+    const parsedSQL: any = fnParsedSQL(searchObj.data.query);
 
     if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == true) {
       const errMsg = "Histogram is not available for multi-stream SQL mode search.";
