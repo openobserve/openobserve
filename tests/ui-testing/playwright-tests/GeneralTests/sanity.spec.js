@@ -99,8 +99,20 @@ test.describe("Sanity Test Cases", () => {
   });
 
   // Function Tests
-  test("should create a function and then delete it", async ({ page }) => {
-    await pm.sanityPage.createAndDeleteFunction("e2eautomatefunctions");
+  test.only("should create a function and then delete it", async ({ page }) => {
+    // Generate unique function name with 4-digit alphanumeric suffix
+    const generateSuffix = () => {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      let suffix = '';
+      for (let i = 0; i < 4; i++) {
+        suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return suffix;
+    };
+    
+    const uniqueFunctionName = `e2eautomatefunctions_${generateSuffix()}`;
+    
+    await pm.sanityPage.createAndDeleteFunction(uniqueFunctionName);
   });
 
   test("should create functions via functions page and delete it", async ({ page }) => {

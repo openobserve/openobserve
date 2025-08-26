@@ -723,23 +723,22 @@ export class SanityPage {
         // Wait for stream selection to complete
         await this.page.waitForLoadState('networkidle', { timeout: 10000 });
         
-        // Wait for VRL editor with retries (similar to logsPage.js)
-        let fnEditorCount = 0;
-        let retries = 3;
+        // Check if VRL editor is visible, if not click the toggle
+        const fnEditor = this.page.locator('#fnEditor');
+        const isFnEditorVisible = await fnEditor.isVisible();
         
-        while (fnEditorCount === 0 && retries > 0) {
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 });
-            fnEditorCount = await this.page.locator('#fnEditor').count();
+        if (!isFnEditorVisible) {
+            // Click VRL toggle button only if editor is not displayed
+            await this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn"] div').nth(2).click();
             
-            if (fnEditorCount === 0) {
-                await this.page.waitForTimeout(2000);
-                retries--;
-            }
+            // Wait for VRL editor to appear after toggle
+            await expect(fnEditor).toBeVisible({ timeout: 15000 });
         }
         
+        // Verify VRL editor is now available
+        const fnEditorCount = await this.page.locator('#fnEditor').count();
         if (fnEditorCount === 0) {
-            throw new Error('SQL+Histogram test: VRL editor (#fnEditor) not found after retries');
-        } else {
+            throw new Error('SQL+Histogram test: VRL editor (#fnEditor) not found after toggle');
         }
         
         // Wait for SQL editor to be ready
