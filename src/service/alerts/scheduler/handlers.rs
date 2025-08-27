@@ -1419,9 +1419,40 @@ async fn handle_derived_stream_triggers(
                                     let (_, results): (Vec<_>, Vec<_>) =
                                         stream_pl_results.into_iter().unzip();
                                     json_data_by_stream
-                                        .entry(stream_params)
+                                        .entry(stream_params.clone())
                                         .or_default()
                                         .extend(results);
+                                    
+                                    // Report pipeline destination usage for scheduled pipeline
+                                    let data_size = json_data_by_stream
+                                        .get(&stream_params)
+                                        .map(|records| {
+                                            records.iter()
+                                                .map(|record| record.to_string().len() as f64)
+                                                .sum::<f64>() / config::SIZE_IN_MB
+                                        })
+                                        .unwrap_or(0.0);
+                                    
+                                    if data_size > 0.0 {
+                                        let mut req_stats = config::meta::self_reporting::usage::RequestStats::default();
+                                        req_stats.size = data_size;
+                                        req_stats.records = json_data_by_stream
+                                            .get(&stream_params)
+                                            .map(|records| records.len() as i64)
+                                            .unwrap_or(0);
+                                        req_stats.response_time = 0.0;
+                                        
+                                        crate::service::self_reporting::report_request_usage_stats(
+                                            req_stats,
+                                            org_id,
+                                            &stream_params.stream_name,
+                                            stream_params.stream_type,
+                                            config::meta::self_reporting::usage::UsageType::Pipeline,
+                                            0, // No additional functions beyond pipeline
+                                            current_time,
+                                        )
+                                        .await;
+                                    }
                                 }
                             }
                         }
