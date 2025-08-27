@@ -13,9 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::organization::OrganizationType;
+use std::sync::Arc;
+
 #[cfg(feature = "cloud")]
 use config::utils::time::day_micros;
+use config::{RwAHashMap, meta::organization::OrganizationType};
+use hashbrown::HashMap;
+use once_cell::sync::Lazy;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Schema, Set, entity::prelude::Expr,
@@ -30,7 +34,10 @@ use crate::{
     errors::{self, DbError, Error},
 };
 
-#[derive(Debug)]
+static CACHE: Lazy<Arc<RwAHashMap<String, OrganizationRecord>>> =
+    Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
+
+#[derive(Debug, Clone)]
 pub struct OrganizationRecord {
     pub identifier: String,
     pub org_name: String,
@@ -127,6 +134,16 @@ pub async fn add(
         trial_ends_at: Set(now + day_micros(15)),
     };
 
+    let org = OrganizationRecord {
+        identifier: org_id.to_string(),
+        org_name: org_name.to_string(),
+        org_type: org_type.into(),
+        created_at: now,
+        updated_at: now,
+        #[cfg(feature = "cloud")]
+        trial_ends_at: now + day_micros(15),
+    };
+
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
@@ -135,6 +152,10 @@ pub async fn add(
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    {
+        let mut cache = CACHE.write().await;
+        cache.insert(org_id.to_string(), org);
+    }
 
     Ok(())
 }
@@ -144,17 +165,24 @@ pub async fn set_trial_period_end(org_id: &str, new_end: i64) -> Result<(), erro
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
 
+    let update_time = chrono::Utc::now().timestamp_micros();
+
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::update_many()
         .col_expr(Column::TrialEndsAt, Expr::value(new_end))
-        .col_expr(
-            Column::UpdatedAt,
-            Expr::value(chrono::Utc::now().timestamp_micros()),
-        )
+        .col_expr(Column::UpdatedAt, Expr::value(update_time))
         .filter(Column::Identifier.eq(org_id))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    {
+        let mut cache = CACHE.write().await;
+        if let Some(v) = cache.get_mut(org_id) {
+            v.updated_at = update_time;
+            v.trial_ends_at = new_end;
+        }
+    }
 
     Ok(())
 }
@@ -162,6 +190,8 @@ pub async fn set_trial_period_end(org_id: &str, new_end: i64) -> Result<(), erro
 pub async fn rename(org_id: &str, new_name: &str) -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;
+
+    let update_time = chrono::Utc::now().timestamp_micros();
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::update_many()
@@ -174,6 +204,13 @@ pub async fn rename(org_id: &str, new_name: &str) -> Result<(), errors::Error> {
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    {
+        let mut cache = CACHE.write().await;
+        if let Some(v) = cache.get_mut(org_id) {
+            v.updated_at = update_time;
+            v.org_name = new_name.to_string();
+        }
+    }
 
     Ok(())
 }
@@ -189,11 +226,22 @@ pub async fn remove(org_id: &str) -> Result<(), errors::Error> {
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
+    {
+        let mut cache = CACHE.write().await;
+        cache.remove_entry(org_id);
+    }
+
     Ok(())
 }
 
 pub async fn get(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    {
+        let cache = CACHE.read().await;
+        if let Some(v) = cache.get(org_id) {
+            return Ok(v.clone());
+        }
+    }
     let record = Entity::find()
         .filter(Column::Identifier.eq(org_id))
         .one(client)
@@ -202,6 +250,12 @@ pub async fn get(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
         .ok_or_else(|| {
             Error::DbError(DbError::SeaORMError("Organization not found".to_string()))
         })?;
+
+    let org = OrganizationRecord::from(record.clone());
+    {
+        let mut cache = CACHE.write().await;
+        cache.insert(org_id.to_string(), org);
+    }
 
     Ok(OrganizationRecord::from(record))
 }
@@ -279,10 +333,17 @@ pub async fn batch_remove(org_ids: Vec<String>) -> Result<(), errors::Error> {
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::delete_many()
-        .filter(Column::Identifier.is_in(org_ids))
+        .filter(Column::Identifier.is_in(org_ids.clone()))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    {
+        let mut cache = CACHE.write().await;
+        for id in &org_ids {
+            cache.remove_entry(id);
+        }
+    }
 
     Ok(())
 }
