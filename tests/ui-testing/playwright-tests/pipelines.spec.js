@@ -358,7 +358,7 @@ test.describe("Pipeline testcases", () => {
       .locator('div').filter({ hasText: /^Stream Type \*$/ }).first().click();
     await page.getByLabel('Stream Type *').click();
     await page.waitForTimeout(1000);
-    await page.locator('[data-test="scheduled-pipeline-sql-editor"] .cm-content').click();
+    await page.locator('[data-test="scheduled-pipeline-sql-editor"] .monaco-editor').click();
     // Click on the editor to type the query
     // await page.locator(".cm-lines").first().click();
     const sqlQuery = 'select * from "default"';
@@ -372,8 +372,8 @@ test.describe("Pipeline testcases", () => {
 
     // Check if the query exists in the editor (using `hasText` to ensure it's typed)
     const queryTyped = await page
-      .locator(".cm-content")
-      .locator(".cm-line")
+      .locator(".monaco-editor")
+      .locator(".view-lines")
       .filter({ hasText: sqlQuery })
       .count();
 
@@ -413,7 +413,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole("img", { name: "Function", exact: true }).click();
     await pipelinePage.toggleCreateFunction();
     await pipelinePage.enterFunctionName(randomFunctionName);
-    await page.locator('[data-test="logs-vrl-function-editor"] .cm-content').click();    // Type the function text with a delay to ensure each character registers
+    await page.locator('[data-test="logs-vrl-function-editor"] .monaco-editor').click();    // Type the function text with a delay to ensure each character registers
     await page.keyboard.type(".a=41", { delay: 100 });
     await page.keyboard.press("Enter");
     await page.keyboard.type(".", { delay: 100 });

@@ -28,6 +28,7 @@ import visualizer from "rollup-plugin-visualizer";
 import "dotenv/config";
 
 import istanbul from "vite-plugin-istanbul";
+import monacoEditorPlugin from "vite-plugin-monaco-editor";
 
 // Load environment variables from the appropriate .env file
 if (process.env.NODE_ENV === "production") {
@@ -64,6 +65,21 @@ const enterpriseResolverPlugin = {
   },
 };
 
+function monacoEditorTestResolver() {
+  return {
+    name: "monaco-editor-test-resolver",
+    enforce: "post",
+    resolveId(id: string) {
+      if (id === "monaco-editor") {
+        return {
+          id: "monaco-editor/esm/vs/editor/editor.api",
+        };
+      }
+      return null;
+    },
+  };
+}
+
 // let filePath = path.resolve(process.cwd(), "src");
 // if (process.env.VITE_OPENOBSERVE_CLOUD === "true") {
 // const filePath = path.resolve(process.cwd(), "src/enterprise");
@@ -94,8 +110,8 @@ export default defineConfig({
     }),
     quasar({
       sassVariables: fileURLToPath(
-        new URL('src/styles/quasar-variables.sass', import.meta.url)
-      )
+        new URL("src/styles/quasar-variables.sass", import.meta.url),
+      ),
     }),
     process.env.VITE_COVERAGE === "true" &&
       istanbul({
@@ -107,7 +123,10 @@ export default defineConfig({
       }),
     enterpriseResolverPlugin,
     vueJsx(),
-    isTesting,
+    (monacoEditorPlugin as any).default({
+      customDistPath: () => path.resolve(__dirname, "dist/monacoeditorwork"),
+    }),
+    isTesting && monacoEditorTestResolver(),
   ].filter(Boolean),
   resolve: {
     alias: {
@@ -144,15 +163,21 @@ export default defineConfig({
             "@openobserve/browser-rum",
           ],
           "o2cs-date-fns": ["date-fns", "date-fns-tz"],
-          "codemirror": ["codemirror", "@codemirror/state", "@codemirror/lang-sql", "@codemirror/lang-json", "@codemirror/lang-javascript", "@codemirror/lang-markdown", "@codemirror/autocomplete", "@codemirror/view", "@codemirror/commands", "@codemirror/language", "@codemirror/search", "@replit/codemirror-indentation-markers", "js-beautify", "sql-formatter", "acorn", "escodegen"],
-          "moment": ["moment", "moment-timezone"],
-          "lodash": ["lodash-es"],
-          "echarts": ["echarts/core", "echarts/renderers", "echarts/components", "echarts/features", "echarts/charts"],
-          "luxon": ["luxon"],
-          "marked": ["marked"],
-          "jszip": ["jszip"],
-          "leaflet": ["leaflet"],
-          "gridstack": ["gridstack"],
+          "monaco-editor": ["monaco-editor"],
+          moment: ["moment", "moment-timezone"],
+          lodash: ["lodash-es"],
+          echarts: [
+            "echarts/core",
+            "echarts/renderers",
+            "echarts/components",
+            "echarts/features",
+            "echarts/charts",
+          ],
+          luxon: ["luxon"],
+          marked: ["marked"],
+          jszip: ["jszip"],
+          leaflet: ["leaflet"],
+          gridstack: ["gridstack"],
           "flag-icons": ["flag-icons"],
           "highlight.js": ["highlight.js"],
         },
@@ -165,7 +190,7 @@ export default defineConfig({
             return `assets/${name}.v1.js`;
           }
 
-          if (name.includes("codemirror")) {
+          if (name.includes("monaco-editor")) {
             return `assets/${name}.v1.js`;
           }
 

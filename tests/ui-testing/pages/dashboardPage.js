@@ -180,9 +180,9 @@ async addCustomChart(page, pictorialJSON) {
   await this.page.waitForSelector('[data-test="selected-chart-custom_chart-item"]');
   await this.page.locator('[data-test="selected-chart-custom_chart-item"]').click();
   
-  await this.page.waitForSelector('[data-test="dashboard-markdown-editor-query-editor"] .cm-content');
+  await this.page.waitForSelector('[data-test="dashboard-markdown-editor-query-editor"] .monaco-editor');
 
-  await this.page.locator('[data-test="dashboard-markdown-editor-query-editor"] .cm-content').click();
+  await this.page.locator('[data-test="dashboard-markdown-editor-query-editor"] .monaco-editor').click();
 
   const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
 

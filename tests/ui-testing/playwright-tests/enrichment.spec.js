@@ -216,7 +216,7 @@ test.describe("Enrichment data testcases", () => {
     // Explore the file
     await page.getByRole("button", { name: "Explore" }).click();
     await page.waitForTimeout(3000);
-    await page.locator('#fnEditor').getByRole('textbox')
+    await page.locator('#fnEditor').locator('.inputarea')
       .fill(`
 abc, err = get_enrichment_table_record("${fileName}", {
   "protocol_number": to_string!(.protocol_number)
