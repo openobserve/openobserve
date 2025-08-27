@@ -69,7 +69,7 @@ async fn update_stats_from_file_list_inner(
     }
 
     // apply step limit
-    let step_limit = config::get_config().limit.calculate_stats_step_limit;
+    let step_limit = config::get_config().limit.calculate_stats_step_limit_secs;
     // if the offset is 0, we use min_update_at to calculate the latest_update_at
     // otherwise, we use the offset + step_limit to calculate the latest_update_at
     let min_update_at = if offset == 0 {
