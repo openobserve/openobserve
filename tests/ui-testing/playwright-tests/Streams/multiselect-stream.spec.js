@@ -1,78 +1,24 @@
-import { test, expect } from "../baseFixtures.js";
-import logData from "../../fixtures/log.json";
-import PageManager from '../../pages/page-manager.js';
+const { test, expect } = require('../utils/enhanced-baseFixtures.js');
+const logData = require("../../fixtures/log.json");
+const PageManager = require('../../pages/page-manager.js');
+const { getHeaders, getIngestionUrl, sendRequest } = require('../../utils/apiUtils.js');
 
 test.describe.configure({ mode: "parallel" });
 
-
-async function login(page) {
-  await page.goto(process.env["ZO_BASE_URL"]);
-  await page.waitForTimeout(1000);
-  if (await page.getByText('Login as internal user').isVisible()) {
-    await page.getByText('Login as internal user').click();
-}
- 
-  await page
-    .locator('[data-cy="login-user-id"]')
-    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-  await page.locator("label").filter({ hasText: "Password *" }).click();
-  await page
-    .locator('[data-cy="login-password"]')
-    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-  await page.locator('[data-cy="login-sign-in"]').click();
-}
-
-
-const getHeaders = () => {
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString("base64");
-
-  return {
-    Authorization: `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-};
-
-const getIngestionUrl = (orgId, streamName) => {
-  return `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`;
-};
-
-const sendRequest = async (page, url, payload, headers) => {
-  return await page.evaluate(
-    async ({ url, headers, payload }) => {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(payload),
-      });
-      return await response.json();
-    },
-    { url, headers, payload }
-  );
-};
-
 test.describe("Stream multiselect testcases", () => {
-  let pageManager;
+  let pm;
+  
   function removeUTFCharacters(text) {
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
 
   async function applyQueryButton(page) {
-    const search = page.waitForResponse(logData.applyQuery);
-    await page.waitForTimeout(3000);
-    await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
-      force: true,
-    });
-    await expect.poll(async () => (await search).status()).toBe(200);
+    const pm = new PageManager(page);
+    await pm.logsPage.applyQueryButton(logData.logsUrl);
   }
 
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    pageManager = new PageManager(page);
-    
-
-    await page.waitForTimeout(5000);
+    pm = new PageManager(page);
 
     const orgId = process.env["ORGNAME"];
     const streamNames = ["e2e_automate", "e2e_stream1"];
@@ -80,28 +26,21 @@ test.describe("Stream multiselect testcases", () => {
 
     for (const streamName of streamNames) {
       const ingestionUrl = getIngestionUrl(orgId, streamName);
-
-      // Payload data
       const payload = {
         level: "info",
         job: "test",
         log: "test message for openobserve",
         e2e: "1",
       };
-
       const response = await sendRequest(page, ingestionUrl, payload, headers);
       console.log(`Response from ${streamName}:`, response);
     }
 
-    await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
-    const allsearch = page.waitForResponse("**/api/default/_search**");
-    await pageManager.logsPage.selectStream("e2e_automate"); 
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await pm.logsPage.selectStream("e2e_automate"); 
     await applyQueryButton(page);
-    await pageManager.logsPage.clickQuickModeToggle();
-    await page.locator('[data-test="logs-all-fields-btn"]').click();
-
+    await pm.logsPage.clickQuickModeToggle();
+    await pm.logsPage.clickAllFieldsButton();
   });
 
 
