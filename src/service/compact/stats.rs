@@ -150,18 +150,20 @@ mod tests {
     async fn setup() {
         infra::db::init().await.unwrap();
         // setup the offset
-        _ = db::compact::stats::set_offset(1024, Some(&LOCAL_NODE.uuid.clone())).await;
+        _ = db::compact::stats::set_offset(1755705600000000, Some(&LOCAL_NODE.uuid.clone())).await;
     }
 
     #[tokio::test]
     async fn test_update_stats_from_file_list() {
         setup().await;
-        let latest_pk = 1002000;
-        let ret = update_stats_from_file_list_inner(latest_pk).await.unwrap();
-        assert_eq!(ret, Some((1024, 1001024)));
-        let ret = update_stats_from_file_list_inner(latest_pk).await.unwrap();
-        assert_eq!(ret, Some((1001024, 1002000)));
-        let ret = update_stats_from_file_list_inner(latest_pk).await.unwrap();
+        let latest_updated_at = 1755706810000000;
+        let ret = update_stats_from_file_list_inner(latest_updated_at).await.unwrap();
+        assert_eq!(ret, Some((1755705600000000, 1755706200000000)));
+        let ret = update_stats_from_file_list_inner(latest_updated_at).await.unwrap();
+        assert_eq!(ret, Some((1755706200000000, 1755706800000000)));
+        let ret = update_stats_from_file_list_inner(latest_updated_at).await.unwrap();
+        assert_eq!(ret, Some((1755706800000000, 1755706810000000)));
+        let ret = update_stats_from_file_list_inner(latest_updated_at).await.unwrap();
         assert_eq!(ret, None);
     }
 }
