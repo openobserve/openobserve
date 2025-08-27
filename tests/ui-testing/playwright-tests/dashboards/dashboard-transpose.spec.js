@@ -88,9 +88,13 @@ test.describe("dashboard UI testcases", () => {
     await validateTableDataBeforeAndAfterTranspose(page);
 
     // Helper function to validate table data before and after transposing
-    // Helper function to dynamically transpose data and validate it
     async function validateTableDataBeforeAndAfterTranspose(page) {
-      // Step 1: Capture headers and initial data from the table
+      // Step 1: Wait for table to load and capture headers and initial data
+      await page.waitForSelector('[data-test="dashboard-panel-table"]', {
+        timeout: 10000,
+      });
+      await page.waitForTimeout(2000); // Allow table to fully render
+
       const headers = await page.$$eval(
         '[data-test="dashboard-panel-table"] thead tr th',
         (headerCells) =>
@@ -111,6 +115,9 @@ test.describe("dashboard UI testcases", () => {
             .filter((row) => row.length > 0 && row.some((cell) => cell !== ""))
       );
 
+      console.log("Initial headers:", headers);
+      console.log("Initial data:", initialData);
+
       // Step 2: Perform transpose by simulating the transpose button click
       await page
         .locator('[data-test="dashboard-config-table_transpose"] div')
@@ -118,39 +125,100 @@ test.describe("dashboard UI testcases", () => {
         .click();
       await page.locator('[data-test="dashboard-apply"]').click();
 
-      // Step 3: Capture transposed data from the table
-      const transposedData = await page.$$eval(
-        '[data-test="dashboard-panel-table"] tr',
-        (rows) =>
-          rows
-            .map((row) =>
-              Array.from(row.querySelectorAll("td"), (cell) =>
-                cell.textContent.trim()
-              )
-            )
-            .filter((row) => row.length > 0 && row.some((cell) => cell !== ""))
-      );
+      // Step 3: Wait for table to re-render after transpose and capture transposed data
+      await page.waitForTimeout(3000); // Wait for table to re-render
 
-      // Step 4: Flatten `initialData` by pairing each namespace header with its value, excluding the empty namespace
+      // Check if table exists after transpose
+      const tableExists =
+        (await page.locator('[data-test="dashboard-panel-table"]').count()) > 0;
+      console.log("Table exists after transpose:", tableExists);
+
+      let transposedData = [];
+      if (tableExists) {
+        // Try to capture both thead and tbody rows for transposed table
+        transposedData = await page.$$eval(
+          '[data-test="dashboard-panel-table"] tbody tr',
+          (rows) =>
+            rows
+              .map((row) =>
+                Array.from(row.querySelectorAll("td"), (cell) =>
+                  cell.textContent.trim()
+                )
+              )
+              .filter(
+                (row) => row.length > 0 && row.some((cell) => cell !== "")
+              )
+        );
+
+        // If tbody doesn't have data, try to get all table rows
+        if (transposedData.length === 0) {
+          transposedData = await page.$$eval(
+            '[data-test="dashboard-panel-table"] tr',
+            (rows) =>
+              rows
+                .map((row) =>
+                  Array.from(row.querySelectorAll("td"), (cell) =>
+                    cell.textContent.trim()
+                  )
+                )
+                .filter(
+                  (row) => row.length > 0 && row.some((cell) => cell !== "")
+                )
+          );
+        }
+      }
+
+      console.log("Transposed data:", transposedData);
+
+      // Step 4: Flatten `initialData` by pairing each header with its value, excluding the first column
       const flattenedInitialData = headers
         .slice(1)
-        .map((namespace, index) => [namespace, initialData[0][index + 1]]);
+        .map((namespace, index) => [
+          namespace,
+          initialData[0] ? initialData[0][index + 1] : "",
+        ]);
 
-      // Step 5: Sort both `flattenedInitialData` and `transposedData` for comparison
-      const sortedFlattenedInitialData = flattenedInitialData.sort((a, b) =>
-        a[0].localeCompare(b[0])
-      );
-      const sortedTransposedData = transposedData.sort((a, b) =>
-        a[0].localeCompare(b[0])
-      );
+      console.log("Flattened initial data:", flattenedInitialData);
 
-      console.log(
-        JSON.parse(JSON.stringify(sortedFlattenedInitialData)),
-        JSON.parse(JSON.stringify(sortedTransposedData))
-      );
+      // Step 5: Sort both arrays for comparison (only if transposedData is not empty)
+      if (transposedData.length > 0) {
+        const sortedFlattenedInitialData = flattenedInitialData.sort((a, b) =>
+          a[0].localeCompare(b[0])
+        );
+        const sortedTransposedData = transposedData.sort((a, b) =>
+          a[0].localeCompare(b[0])
+        );
 
-      // Step 6: Directly compare sorted arrays
-      expect(sortedTransposedData).toEqual(sortedFlattenedInitialData);
+        console.log(
+          "Sorted flattened initial data:",
+          sortedFlattenedInitialData
+        );
+        console.log("Sorted transposed data:", sortedTransposedData);
+
+        // Step 6: Compare sorted arrays
+        expect(sortedTransposedData).toEqual(sortedFlattenedInitialData);
+      } else {
+        // If no transposed data captured, log the table structure for debugging
+        const tableHTML = await page
+          .locator('[data-test="dashboard-panel-table"]')
+          .innerHTML();
+        console.log("Table HTML after transpose:", tableHTML);
+
+        // Try alternative approach - check if table structure changed
+        const allTableCells = await page.$$eval(
+          '[data-test="dashboard-panel-table"] *',
+          (elements) =>
+            elements.map((el) => ({
+              tag: el.tagName,
+              text: el.textContent?.trim(),
+            }))
+        );
+        console.log("All table elements:", allTableCells);
+
+        throw new Error(
+          "No transposed data captured. Check table structure after transpose."
+        );
+      }
     }
 
     // Save the panel
