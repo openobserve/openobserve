@@ -243,12 +243,18 @@ pub fn get_work_group(work_group_set: Vec<Option<String>>) -> Option<String> {
 pub(crate) fn get_dashboard_info_from_request(
     query: &Query<HashMap<String, String>>,
 ) -> Option<DashboardInfo> {
+    let run_id = query.get("run_id").map(|s| s.to_string())?;
+    let panel_id = query.get("panel_id").map(|s| s.to_string())?;
+    let panel_name = query.get("panel_name").map(|s| s.to_string())?;
+    let tab_id = query.get("tab_id").map(|s| s.to_string())?;
+    let tab_name = query.get("tab_name").map(|s| s.to_string())?;
+
     Some(DashboardInfo {
-        run_id: query.get("run_id").map(|s| s.to_string())?,
-        panel_id: query.get("panel_id").map(|s| s.to_string())?,
-        panel_name: query.get("panel_name").map(|s| s.to_string())?,
-        tab_id: query.get("tab_id").map(|s| s.to_string())?,
-        tab_name: query.get("tab_name").map(|s| s.to_string())?,
+        run_id,
+        panel_id,
+        panel_name,
+        tab_id,
+        tab_name,
     })
 }
 
@@ -448,5 +454,189 @@ mod tests {
 
         let work_groups = vec![None];
         assert_eq!(get_work_group(work_groups), None);
+    }
+
+    #[test]
+    fn test_get_enable_align_histogram_from_request() {
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("enable_align_histogram".to_string(), "true".to_string());
+        assert!(get_enable_align_histogram_from_request(&query));
+
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("enable_align_histogram".to_string(), "false".to_string());
+        assert!(!get_enable_align_histogram_from_request(&query));
+
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("enable_align_histogram".to_string(), "invalid".to_string());
+        assert!(!get_enable_align_histogram_from_request(&query));
+
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert!(!get_enable_align_histogram_from_request(&query));
+    }
+
+    #[test]
+    fn test_get_ts_from_request_with_key() {
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("start_time".to_string(), "1640995200".to_string());
+        assert_eq!(
+            get_ts_from_request_with_key(&query, "start_time").unwrap(),
+            1640995200
+        );
+
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("end_time".to_string(), "invalid".to_string());
+        assert!(get_ts_from_request_with_key(&query, "end_time").is_err());
+
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert!(get_ts_from_request_with_key(&query, "missing_key").is_err());
+    }
+
+    #[test]
+    fn test_get_is_ui_histogram_from_request() {
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("is_ui_histogram".to_string(), "true".to_string());
+        assert!(get_is_ui_histogram_from_request(&query));
+
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("is_ui_histogram".to_string(), "FALSE".to_string());
+        assert!(!get_is_ui_histogram_from_request(&query));
+
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("is_ui_histogram".to_string(), "invalid".to_string());
+        assert!(!get_is_ui_histogram_from_request(&query));
+
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert!(!get_is_ui_histogram_from_request(&query));
+    }
+
+    #[test]
+    fn test_get_is_multi_stream_search_from_request() {
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("is_multi_stream_search".to_string(), "TRUE".to_string());
+        assert!(get_is_multi_stream_search_from_request(&query));
+
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("is_multi_stream_search".to_string(), "false".to_string());
+        assert!(!get_is_multi_stream_search_from_request(&query));
+
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert!(!get_is_multi_stream_search_from_request(&query));
+    }
+
+    #[test]
+    fn test_get_dashboard_info_from_request() {
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("run_id".to_string(), "run123".to_string());
+        query.insert("panel_id".to_string(), "panel456".to_string());
+        query.insert("panel_name".to_string(), "Test Panel".to_string());
+        query.insert("tab_id".to_string(), "tab789".to_string());
+        query.insert("tab_name".to_string(), "Test Tab".to_string());
+
+        let dashboard_info = get_dashboard_info_from_request(&query).unwrap();
+        assert_eq!(dashboard_info.run_id, "run123".to_string());
+        assert_eq!(dashboard_info.panel_id, "panel456".to_string());
+        assert_eq!(dashboard_info.panel_name, "Test Panel".to_string());
+        assert_eq!(dashboard_info.tab_id, "tab789".to_string());
+        assert_eq!(dashboard_info.tab_name, "Test Tab".to_string());
+
+        // Test partial data - missing run_id should return None
+        let mut query = Query::<HashMap<String, String>>(Default::default());
+        query.insert("panel_id".to_string(), "panel456".to_string());
+        assert_eq!(get_dashboard_info_from_request(&query), None);
+
+        let query = Query::<HashMap<String, String>>(Default::default());
+        assert_eq!(get_dashboard_info_from_request(&query), None);
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_new_generation() {
+        // Test when no traceparent header is present and span is none
+        let headers = HeaderMap::new();
+        let span = tracing::Span::none();
+        let trace_id = get_or_create_trace_id(&headers, &span);
+        // Should generate a new trace ID (32 characters hex)
+        assert_eq!(trace_id.len(), 32);
+        assert!(trace_id.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_manual_parse_valid() {
+        // Test manual parsing of valid traceparent
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("traceparent"),
+            HeaderValue::from_static("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"),
+        );
+        let span = tracing::Span::none();
+        let trace_id = get_or_create_trace_id(&headers, &span);
+        assert_eq!(trace_id, "4bf92f3577b34da6a3ce929d0e0e4736");
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_manual_parse_invalid() {
+        // Test manual parsing of invalid traceparent (all zeros)
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("traceparent"),
+            HeaderValue::from_static("00-00000000000000000000000000000000-0000000000000000-01"),
+        );
+        let span = tracing::Span::none();
+        let trace_id = get_or_create_trace_id(&headers, &span);
+        // Should generate new trace ID when all zeros detected
+        assert_ne!(trace_id, "00000000000000000000000000000000");
+        assert_eq!(trace_id.len(), 32);
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_malformed_traceparent() {
+        // Test malformed traceparent header
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("traceparent"),
+            HeaderValue::from_static("invalid-format"),
+        );
+        let span = tracing::Span::none();
+        let trace_id = get_or_create_trace_id(&headers, &span);
+        // Should generate new trace ID for malformed header
+        assert_eq!(trace_id.len(), 32);
+        assert!(trace_id.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_search_event_types_comprehensive() {
+        // Test all supported search event types
+        let test_cases = vec![
+            ("ui", Some(SearchEventType::UI)),
+            ("dashboards", Some(SearchEventType::Dashboards)),
+            ("reports", Some(SearchEventType::Reports)),
+            ("alerts", Some(SearchEventType::Alerts)),
+            ("rum", Some(SearchEventType::RUM)),
+            ("values", Some(SearchEventType::Values)),
+        ];
+
+        for (search_type, expected) in test_cases {
+            let mut query = Query::<HashMap<String, String>>(Default::default());
+            query.insert("search_type".to_string(), search_type.to_string());
+            assert_eq!(get_search_type_from_request(&query).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn test_work_group_priority() {
+        // Test that "long" has priority over "short"
+        let work_groups = vec![
+            Some("short".to_string()),
+            Some("other".to_string()),
+            Some("long".to_string()),
+        ];
+        assert_eq!(get_work_group(work_groups), Some("long".to_string()));
+
+        // Test empty vector
+        let work_groups: Vec<Option<String>> = vec![];
+        assert_eq!(get_work_group(work_groups), None);
+
+        // Test multiple instances of same priority
+        let work_groups = vec![Some("short".to_string()), Some("short".to_string())];
+        assert_eq!(get_work_group(work_groups), Some("short".to_string()));
     }
 }

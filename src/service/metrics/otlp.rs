@@ -956,6 +956,8 @@ fn format_response(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use config::meta::promql::{Metadata, MetricType};
     use opentelemetry_proto::tonic::metrics::v1::{
         AggregationTemporality, Exemplar, HistogramDataPoint, Metric, NumberDataPoint,
