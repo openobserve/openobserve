@@ -287,7 +287,7 @@ impl RwFile {
                 expired
             }
         } else {
-            time_now.timestamp() + cfg.limit.max_dashboard_series as i64
+            time_now.timestamp() + cfg.limit.max_file_retention_time as i64
         };
 
         RwFile {
