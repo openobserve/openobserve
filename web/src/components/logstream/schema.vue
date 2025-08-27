@@ -1787,28 +1787,20 @@ export default defineComponent({
   //so instead of directly showing the value of the index_type we will add the values of fulltextsearchkey and secondaryindexkey if it is set by the env
   //and if it is not set by the env then we will not add the values of fulltextsearchkey and secondaryindexkey becuase those will be already there and we don't want to show them twice
   const computedIndexType = (props) => {
-    return computed({
-      get() {
-        let keysToBeDisplayed = props.row.index_type || [];
-        // return the actual index_type value from the row
-        //merge env fts and secondary index keys
-        //check for the props.row.name is in the env fts and secondary index keys
-        if (store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1
-          ) {
-          keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "fullTextSearchKey"])];
-        }
-        if (store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1
+    return computed(() => {
+      let keysToBeDisplayed = props.row.index_type || [];
+      // return the actual index_type value from the row
+      //merge env fts and secondary index keys
+      //check for the props.row.name is in the env fts and secondary index keys
+      if (store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1
         ) {
-          keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "secondaryIndexKey"])];
-        }
-        return keysToBeDisplayed || []
-      },
-      //this is not needed but we are keeping it here for future reference
-      set(value) {
-        // update only row value (don't overwrite env)
-        props.row.index_type = value
-        markFormDirty(props.row.name, 'fts');
+        keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "fullTextSearchKey"])];
       }
+      if (store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1
+      ) {
+        keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "secondaryIndexKey"])];
+      }
+      return keysToBeDisplayed || []
     })
   };
   //this function is used to check if the option is present in the default env
