@@ -361,8 +361,6 @@ test.describe("logs testcases", () => {
 
     // Test each chart type
     for (const chartType of chartTypes) {
-      // console.log(`Testing chart type: ${chartType.name}`);
-
       // Select the chart type
       await page.locator(chartType.selector).click();
       await page.waitForTimeout(1000);
@@ -377,16 +375,12 @@ test.describe("logs testcases", () => {
       );
 
       if (errorResult.hasErrors) {
-        // console.log(`Dashboard error found for ${chartType.name} chart:`);
-        errorResult.errors.forEach((error, index) => {
-          // console.log(`  ${index + 1}. ${error}`);
-        });
+        errorResult.errors.forEach((error, index) => {});
 
         // Fail the test with detailed error information
         expect(errorResult.errorTextCount).toBe(0);
         expect(errorResult.errorListCount).toBe(0);
       } else {
-        // console.log(`${chartType.name} chart: No dashboard errors found`);
       }
 
       // Verify the chart renders successfully
