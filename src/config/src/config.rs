@@ -2169,6 +2169,10 @@ pub fn init() -> Config {
         panic!("nats config error: {e}");
     }
 
+    if let Err(e) = check_cuckoo_filter_config(&mut cfg) {
+        panic!("cuckoo filter config error: {e}");
+    }
+
     cfg
 }
 
@@ -2426,10 +2430,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.common.default_hec_stream.is_empty() {
         cfg.common.default_hec_stream = "_hec".to_string();
-    }
-
-    if cfg.cuckoo_filter.enabled && cfg.cuckoo_filter.dir.is_empty() {
-        cfg.cuckoo_filter.dir = format!("{}cuckoo_filter/", cfg.common.data_dir);
     }
 
     Ok(())
@@ -2987,6 +2987,14 @@ fn check_nats_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.nats.queue_max_size = 2048; // 2GB
     }
     cfg.nats.queue_max_size *= 1024 * 1024; // convert to bytes
+    Ok(())
+}
+
+fn check_cuckoo_filter_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.cuckoo_filter.enabled && cfg.cuckoo_filter.dir.is_empty() {
+        cfg.cuckoo_filter.dir = format!("{}cuckoo_filter/", cfg.common.data_dir);
+    }
+
     Ok(())
 }
 
