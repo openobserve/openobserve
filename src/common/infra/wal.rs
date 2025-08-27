@@ -282,12 +282,12 @@ impl RwFile {
             if expired > time_end_day {
                 // if the file expired time is tomorrow, it should be deleted at 23:59:59 +
                 // 10min
-                time_end_day + cfg.limit.cache_delay_secs as i64
+                time_end_day + cfg.limit.max_file_retention_time as i64
             } else {
                 expired
             }
         } else {
-            time_now.timestamp() + cfg.limit.cache_delay_secs as i64
+            time_now.timestamp() + cfg.limit.max_dashboard_series as i64
         };
 
         RwFile {

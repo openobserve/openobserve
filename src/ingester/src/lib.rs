@@ -76,7 +76,7 @@ pub async fn init() -> errors::Result<()> {
     tokio::task::spawn(async move {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(
-                config::get_config().limit.cache_delay_secs as u64,
+                config::get_config().limit.max_file_retention_time,
             ))
             .await;
             // check memtable ttl

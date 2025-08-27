@@ -213,7 +213,9 @@ async fn search_in_cluster(
         req_query.start = worker_start;
         req_query.end = min(end, worker_start + worker_dt);
         // if the end time is within the last 3 retention time, we need to fetch wal data
-        if req_query.end >= now_micros() - second_micros(cfg.limit.cache_delay_secs as i64 * 3) {
+        if req_query.end
+            >= now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3)
+        {
             req.need_wal = true;
         }
         let req_need_wal = req.need_wal;
