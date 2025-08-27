@@ -1943,7 +1943,7 @@ export default defineComponent({
         const allFieldsHaveAlias = allSelectionFieldsHaveAlias(finalQuery);
         if (!allFieldsHaveAlias) {
           showAliasErrorForVisualization(
-            "All fields must have alias to visualize, please add alias to all fields",
+            "Fields using aggregation functions must have aliases to visualize.",
           );
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;

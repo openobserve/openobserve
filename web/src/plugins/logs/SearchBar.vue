@@ -3491,7 +3491,7 @@ export default defineComponent({
         // validate sql query that all fields have alias
         if (!allSelectionFieldsHaveAlias(logsPageQuery)) {
           showErrorNotification(
-            "All fields must have alias in query to visualize",
+            "Fields using aggregation functions must have aliases to visualize.",
           );
           return;
         }
