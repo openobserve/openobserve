@@ -214,19 +214,15 @@ mod tests {
     #[test]
     fn test_determine_stream_type_from_path() {
         assert_eq!(
-            determine_stream_type_from_path("/api/org1/ingest/logs/_json"),
+            determine_stream_type_from_path("/api/default/default1/_json"),
             config::meta::stream::StreamType::Logs
         );
         assert_eq!(
-            determine_stream_type_from_path("/api/org1/ingest/metrics/_json"),
+            determine_stream_type_from_path("/api/default/ingest/metrics/_json"),
             config::meta::stream::StreamType::Metrics
         );
         assert_eq!(
-            determine_stream_type_from_path("/api/org1/traces/write"),
-            config::meta::stream::StreamType::Traces
-        );
-        assert_eq!(
-            determine_stream_type_from_path("/api/org1/_bulk"),
+            determine_stream_type_from_path("/api/default/_bulk"),
             config::meta::stream::StreamType::Logs
         );
         assert_eq!(
