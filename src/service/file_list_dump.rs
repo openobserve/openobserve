@@ -49,12 +49,13 @@ async fn get_dump_files_in_range(
     org: &str,
     stream: Option<&str>,
     range: (i64, i64),
-    min_id: Option<i64>,
+    min_updated_at: Option<i64>,
 ) -> Result<Vec<FileRecord>, errors::Error> {
     let start = round_down_to_hour(range.0);
     let end = round_down_to_hour(range.1) + hour_micros(1);
 
-    let list = infra::file_list::get_entries_in_range(org, stream, start, end, min_id).await?;
+    let list =
+        infra::file_list::get_entries_in_range(org, stream, start, end, min_updated_at).await?;
     let list = list
         .into_iter()
         .filter(|f| {
@@ -85,6 +86,8 @@ fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
     get_col!(original_size_col, "original_size", Int64Array, rb);
     get_col!(compressed_size_col, "compressed_size", Int64Array, rb);
     get_col!(index_size_col, "index_size", Int64Array, rb);
+    get_col!(created_at_col, "created_at", Int64Array, rb);
+    get_col!(updated_at_col, "updated_at", Int64Array, rb);
     let mut ret = Vec::with_capacity(rb.num_rows());
     for idx in 0..rb.num_rows() {
         let t = FileRecord {
@@ -102,6 +105,8 @@ fn record_batch_to_file_record(rb: RecordBatch) -> Vec<FileRecord> {
             original_size: original_size_col.value(idx),
             compressed_size: compressed_size_col.value(idx),
             index_size: index_size_col.value(idx),
+            created_at: created_at_col.value(idx),
+            updated_at: updated_at_col.value(idx),
         };
         ret.push(t);
     }
@@ -375,32 +380,27 @@ pub async fn delete_in_time_range(
 }
 
 // we never store deleted file in dump, so we never have to consider deleted in this
-pub async fn stats(
-    org_id: &str,
-    stream_type: Option<StreamType>,
-    stream_name: Option<&str>,
-    pk_value: Option<(i64, i64)>,
-) -> Result<Vec<(String, StreamStats)>, errors::Error> {
-    let stream_types = match stream_type {
-        Some(stype) => vec![stype],
-        None => ALL_STREAM_TYPES.to_vec(),
-    };
+pub async fn stats(time_range: (i64, i64)) -> Result<Vec<(String, StreamStats)>, errors::Error> {
+    if !get_config().common.file_list_dump_enabled {
+        return Ok(vec![]);
+    }
 
     let mut ret = HashMap::new();
-    for stream_type in stream_types {
-        if stream_type == StreamType::Filelist {
-            continue;
-        }
-        let stream_names = match stream_name {
-            Some(name) => vec![name.to_string()],
-            None => crate::service::db::schema::list_streams_from_cache(org_id, stream_type).await,
-        };
-        for stream_name in stream_names {
-            let stats = stats_inner(org_id, stream_type, &stream_name, pk_value).await?;
-            ret.extend(stats);
-            log::debug!(
-                "[FILE_LIST_DUMP] stats for {org_id}/{stream_type}/{stream_name}: pk: {pk_value:?}",
-            );
+    let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+    for org_id in orgs {
+        for stream_type in ALL_STREAM_TYPES {
+            if stream_type == StreamType::Filelist || stream_type == StreamType::Index {
+                continue;
+            }
+            let stream_names =
+                crate::service::db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            for stream_name in stream_names {
+                let stats = stats_inner(&org_id, stream_type, &stream_name, time_range).await?;
+                ret.extend(stats);
+                log::debug!(
+                    "[FILE_LIST_DUMP] stats for {org_id}/{stream_type}/{stream_name}: time_range: {time_range:?}",
+                );
+            }
         }
     }
     Ok(ret.into_iter().collect())
@@ -410,7 +410,7 @@ async fn stats_inner(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    pk_value: Option<(i64, i64)>,
+    time_range: (i64, i64),
 ) -> Result<Vec<(String, StreamStats)>, errors::Error> {
     let cfg = get_config();
 
@@ -420,22 +420,18 @@ async fn stats_inner(
         return Ok(vec![]);
     }
 
-    // we can be sure that file with id x will always be dumped in a dump file with id > x
-    // because file dump is taken after original file entry, and id always increases
-    let min_id = match pk_value {
-        Some((min, _)) => Some(min),
-        _ => None,
-    };
-
     let stream_key = format!(
         "{org_id}/{}/{org_id}_{stream_type}_{stream_name}",
         StreamType::Filelist
     );
+    let (min_ts, max_ts) = time_range;
+
+    // here need to improve, it always scan all the data of this stream
     let dump_files = get_dump_files_in_range(
         org_id,
         Some(&stream_key),
         (0, Utc::now().timestamp_micros()),
-        min_id,
+        Some(min_ts),
     )
     .await?;
 
@@ -455,13 +451,7 @@ FROM file_list
 WHERE {field} = '{value}'
         "#
     );
-    let sql = match pk_value {
-        None => format!("{sql} GROUP BY stream"),
-        Some((0, 0)) => format!("{sql} GROUP BY stream"),
-        Some((min, max)) => {
-            format!("{sql} AND id > {min} AND id <= {max} GROUP BY stream")
-        }
-    };
+    let sql = format!("{sql} AND updated_at > {min_ts} AND updated_at <= {max_ts} GROUP BY stream");
 
     let task_id = tokio::task::try_id()
         .map(|id| id.to_string())

@@ -15,13 +15,16 @@
 
 use config::{
     cluster::LOCAL_NODE,
-    meta::stream::StreamStats,
+    meta::stream::{StreamStats, StreamType},
     utils::time::{now_micros, second_micros},
 };
 use hashbrown::HashMap;
 use infra::{dist_lock, file_list as infra_file_list};
 
-use crate::{common::infra::cluster::get_node_by_uuid, service::db};
+use crate::{
+    common::infra::cluster::get_node_by_uuid,
+    service::{db, file_list_dump},
+};
 
 pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow::Error> {
     let latest_update_at = infra_file_list::get_max_update_at()
@@ -87,12 +90,11 @@ async fn update_stats_from_file_list_inner(
     let stream_stats = infra_file_list::stats(time_range)
         .await
         .map_err(|e| anyhow::anyhow!("get add stream stats error: {e}"))?;
-    // TODO: !!! fix file_list_dump::stats
-    // let dumped_stats = file_list_dump::stats(time_range)
-    //     .await
-    //     .map_err(|e| anyhow::anyhow!("get dumped add stream stats error: {e}"))?;
+    // get stats from file_list_dump
     // dump never store deleted files, so we do not have to consider deleted here
-    let dumped_stats = Vec::new();
+    let dumped_stats = file_list_dump::stats(time_range)
+        .await
+        .map_err(|e| anyhow::anyhow!("get dumped add stream stats error: {e}"))?;
     let mut stream_stats = stream_stats
         .into_iter()
         .collect::<HashMap<String, StreamStats>>();
@@ -100,6 +102,10 @@ async fn update_stats_from_file_list_inner(
         let entry = stream_stats.entry(stream).or_insert(StreamStats::default());
         *entry = &*entry + &stats;
     }
+    // remove file_list_dump streams from stream_stats
+    let filter_key = format!("/{}/", StreamType::Filelist);
+    stream_stats.retain(|stream, _| !stream.contains(&filter_key));
+
     if !stream_stats.is_empty() {
         let stream_stats = stream_stats.into_iter().collect::<Vec<_>>();
         infra_file_list::set_stream_stats(&stream_stats, time_range)

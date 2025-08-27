@@ -1280,7 +1280,7 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         stream: Option<&str>,
         time_start: i64,
         time_end: i64,
-        min_id: Option<i64>,
+        min_updated_at: Option<i64>,
     ) -> Result<Vec<super::FileRecord>> {
         if time_start == 0 && time_end == 0 {
             return Ok(Vec::new());
@@ -1311,8 +1311,8 @@ SELECT stream, max(id) as id, COUNT(*) AS num
                 Some(stream) => format!("{sql} AND stream = '{stream}'"),
                 None => sql.to_string(),
             };
-            let sql = match min_id {
-                Some(id) => format!("{sql} AND id >= {id}"),
+            let sql = match min_updated_at {
+                Some(updated_at) => format!("{sql} AND updated_at >= {updated_at}"),
                 None => sql,
             };
             tasks.push(tokio::task::spawn(async move {

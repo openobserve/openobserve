@@ -178,7 +178,7 @@ pub trait FileList: Sync + Send + 'static {
         stream: Option<&str>,
         start_time: i64,
         end_time: i64,
-        min_id: Option<i64>,
+        min_updated_at: Option<i64>,
     ) -> Result<Vec<FileRecord>>;
     async fn get_pending_dump_jobs(&self) -> Result<Vec<(i64, String, String, i64)>>;
     async fn set_job_dumped_status(&self, id: i64, dumped: bool) -> Result<()>;
@@ -496,10 +496,10 @@ pub async fn get_entries_in_range(
     stream: Option<&str>,
     start_time: i64,
     end_time: i64,
-    min_id: Option<i64>,
+    min_updated_at: Option<i64>,
 ) -> Result<Vec<FileRecord>> {
     CLIENT
-        .get_entries_in_range(org, stream, start_time, end_time, min_id)
+        .get_entries_in_range(org, stream, start_time, end_time, min_updated_at)
         .await
 }
 
@@ -589,6 +589,10 @@ pub struct FileRecord {
     pub index_size: i64,
     #[sqlx(default)]
     pub flattened: bool,
+    #[sqlx(default)]
+    pub created_at: i64,
+    #[sqlx(default)]
+    pub updated_at: i64,
 }
 
 impl From<&FileRecord> for FileKey {
