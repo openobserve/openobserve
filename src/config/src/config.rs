@@ -1160,7 +1160,7 @@ pub struct Limit {
     pub req_json_limit: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
-    #[env_config(name = "ZO_CACHE_DELAY_SECS", default = 600)] // seconds
+    #[env_config(name = "ZO_CACHE_DELAY_SECS", default = 300)] // seconds
     pub cache_delay_secs: u64,
     // MB, per log file size limit on disk
     #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
