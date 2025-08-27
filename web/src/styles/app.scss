@@ -691,13 +691,14 @@
 
 .o2-toggle-button-sm-light{
   .q-toggle__track{
-    background-color: #EBECF0;
+    background-color: #acbbf3;
+    border: 1px solid #D3D5DB !important;
     opacity: 100%;
   }
   .q-toggle__thumb:after{
   }
   .q-toggle__inner--truthy{
-    color: #ffffff;
+    color: #ffffff !important;
     .q-toggle__track{
       background-color: #575FC5;
     }
@@ -706,22 +707,22 @@
 
 .o2-toggle-button-sm-dark{
   .q-toggle__track{
-    background-color: #2B2D30;
+    background-color: #2f415e;
+    border: 1px solid #6F737A !important;
     opacity: 100%;
   }
   .q-toggle__thumb:after{
   }
   .q-toggle__inner--truthy{
-    color: #ffffff;
+    color: #ffffff !important;
     .q-toggle__track{
       background-color: #6B76E3;
     }
-    }
+    } 
 }
 
 //q-toggle in large size
 .o2-toggle-button-lg{
-
   .q-toggle__track{
     height: 24px;
     border-radius: 16px;
@@ -744,7 +745,6 @@
       left: 3.8px;
     }
   }
-
 }
 
 .o2-toggle-button-lg-light{
@@ -778,3 +778,4 @@
     }
     }
 }
+

@@ -34,7 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="row q-col-gutter-sm q-px-lg q-my-sm">
           <q-toggle
             data-test="create-stream-toggle"
-            class="q-mb-sm"
+            class="q-mb-sm tw-h-[36px] o2-toggle-button-lg tw-mr-3 -tw-ml-4"
+            size="lg"
+            :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
             :label="'Create new Destination'"
             v-model="createNewDestination"
           />
@@ -232,14 +234,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div v-if="createNewDestination" class="col-12 q-py-sm">
-              <div class="q-py-sm">
                 <q-toggle
                   data-test="add-destination-skip-tls-verify-toggle"
-                  class="q-mt-sm"
+                  class=" tw-h-[36px] o2-toggle-button-lg tw-mr-3 -tw-ml-4"
+                  size="lg"
+                  :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
                   v-model="formData.skip_tls_verify"
                   :label="t('alert_destinations.skip_tls_verify')"
                 />
-              </div>
             </div>
             <div class="flex justify-start">
               <q-btn

@@ -16,12 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="q-pt-md"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+    :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white', !isInPipeline ? 'q-pt-md' : '']"
   >
     <div class="add-stream-header row items-center no-wrap q-px-md">
       <div class="col">
-        <div class="text-body1 text-bold" data-test="add-stream-title">
+        <div style="font-size: 18px" data-test="add-stream-title">
           {{ t("logStream.add") }}
         </div>
       </div>
@@ -35,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <q-separator class="q-my-md" />
+    <q-separator class="" />
     <div class="q-px-md o2-input add-stream-inputs">
       <q-form @submit="saveStream">
         <div data-test="add-stream-name-input">
@@ -98,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @remove="removeField"
         />
 
-        <div class="flex justify-end q-mt-sm">
+        <div class="flex justify-end q-mt-md">
           <q-btn
             v-close-popup="true"
             data-test="add-stream-cancel-btn"
