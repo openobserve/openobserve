@@ -47,10 +47,10 @@ use crate::{
             functions,
             http::{
                 get_dashboard_info_from_request, get_enable_align_histogram_from_request,
-                get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request, get_work_group,
+                get_is_multi_stream_search_from_request, get_is_refresh_cache_from_request,
+                get_is_ui_histogram_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
             },
             stream::get_settings_max_query_range,
         },
@@ -170,6 +170,7 @@ async fn can_use_distinct_stream(
         ("org_id" = String, Path, description = "Organization name"),
         ("is_ui_histogram" = bool, Query, description = "Whether to return histogram data for UI"),
         ("is_multi_stream_search" = bool, Query, description = "Indicate is search is for multi stream"),
+        ("is_refresh_cache" = bool, Query, description = "Indicates that the query should not use the cache for processing but also needs to refresh the cache once the query is completed"),
     ),
     request_body(content = SearchRequest, description = "Search query", content_type = "application/json", example = json!({
         "query": {
@@ -259,6 +260,12 @@ pub async fn search(
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
     let is_ui_histogram = get_is_ui_histogram_from_request(&query);
     let is_multi_stream_search = get_is_multi_stream_search_from_request(&query);
+    let is_refresh_cache = get_is_refresh_cache_from_request(&query);
+    let use_cache = if is_refresh_cache {
+        false
+    } else {
+        get_use_cache_from_request(&query)
+    };
 
     let dashboard_info = get_dashboard_info_from_request(&query);
 
@@ -273,7 +280,7 @@ pub async fn search(
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&req.query.sql) {
         req.query.sql = sql;
     };
-    req.use_cache = get_use_cache_from_request(&query);
+    req.use_cache = use_cache;
 
     // get stream name
     let stream_names = match resolve_stream_names(&req.query.sql) {
