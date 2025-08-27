@@ -142,7 +142,7 @@ pub async fn generate_job_by_stream(
     // max_file_retention_time
     if offset >= time_now_hour
         || time_now.timestamp_micros() - offset
-            <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
+            <= Duration::try_seconds(cfg.limit.cache_delay_secs as i64)
                 .unwrap()
                 .num_microseconds()
                 .unwrap()
@@ -351,7 +351,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     // max_file_retention_time
     if offset >= time_now_day
         || time_now.timestamp_micros() - offset
-            <= Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
+            <= Duration::try_seconds(cfg.limit.cache_delay_secs as i64)
                 .unwrap()
                 .num_microseconds()
                 .unwrap()

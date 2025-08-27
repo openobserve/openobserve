@@ -529,7 +529,7 @@ impl Writer {
             && (compressed_size + data_size > cfg.limit.max_file_size_on_disk
                 || uncompressed_size + data_size > cfg.limit.max_file_size_on_disk
                 || self.created_at.load(Ordering::Relaxed)
-                    + Duration::try_seconds(cfg.limit.max_file_retention_time as i64)
+                    + Duration::try_seconds(cfg.limit.cache_delay_secs as i64)
                         .unwrap()
                         .num_microseconds()
                         .unwrap()
