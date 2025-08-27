@@ -114,10 +114,6 @@ test.describe("dashboard UI testcases", () => {
             )
             .filter((row) => row.length > 0 && row.some((cell) => cell !== ""))
       );
-
-      console.log("Initial headers:", headers);
-      console.log("Initial data:", initialData);
-
       // Step 2: Perform transpose by simulating the transpose button click
       await page
         .locator('[data-test="dashboard-config-table_transpose"] div')
@@ -131,8 +127,6 @@ test.describe("dashboard UI testcases", () => {
       // Check if table exists after transpose
       const tableExists =
         (await page.locator('[data-test="dashboard-panel-table"]').count()) > 0;
-      console.log("Table exists after transpose:", tableExists);
-
       let transposedData = [];
       if (tableExists) {
         // Try to capture both thead and tbody rows for transposed table
@@ -168,8 +162,6 @@ test.describe("dashboard UI testcases", () => {
         }
       }
 
-      console.log("Transposed data:", transposedData);
-
       // Step 4: Flatten `initialData` by pairing each header with its value, excluding the first column
       const flattenedInitialData = headers
         .slice(1)
@@ -177,9 +169,6 @@ test.describe("dashboard UI testcases", () => {
           namespace,
           initialData[0] ? initialData[0][index + 1] : "",
         ]);
-
-      console.log("Flattened initial data:", flattenedInitialData);
-
       // Step 5: Sort both arrays for comparison (only if transposedData is not empty)
       if (transposedData.length > 0) {
         const sortedFlattenedInitialData = flattenedInitialData.sort((a, b) =>
@@ -188,21 +177,13 @@ test.describe("dashboard UI testcases", () => {
         const sortedTransposedData = transposedData.sort((a, b) =>
           a[0].localeCompare(b[0])
         );
-
-        console.log(
-          "Sorted flattened initial data:",
-          sortedFlattenedInitialData
-        );
-        console.log("Sorted transposed data:", sortedTransposedData);
-
         // Step 6: Compare sorted arrays
         expect(sortedTransposedData).toEqual(sortedFlattenedInitialData);
       } else {
-        // If no transposed data captured, log the table structure for debugging
+        // If no transposed data captured, log the table structure for debuggin
         const tableHTML = await page
           .locator('[data-test="dashboard-panel-table"]')
           .innerHTML();
-        console.log("Table HTML after transpose:", tableHTML);
 
         // Try alternative approach - check if table structure changed
         const allTableCells = await page.$$eval(
@@ -213,8 +194,6 @@ test.describe("dashboard UI testcases", () => {
               text: el.textContent?.trim(),
             }))
         );
-        console.log("All table elements:", allTableCells);
-
         throw new Error(
           "No transposed data captured. Check table structure after transpose."
         );
