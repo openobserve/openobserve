@@ -959,10 +959,8 @@ mod tests {
     use std::collections::HashMap;
 
     use config::meta::promql::{Metadata, MetricType};
-    use opentelemetry_proto::tonic::{
-        metrics::v1::{
-            AggregationTemporality, Exemplar, HistogramDataPoint, Metric, NumberDataPoint,
-        },
+    use opentelemetry_proto::tonic::metrics::v1::{
+        AggregationTemporality, Exemplar, HistogramDataPoint, Metric, NumberDataPoint,
     };
     use serde_json::json;
 
