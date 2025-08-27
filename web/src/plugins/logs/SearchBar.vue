@@ -1621,6 +1621,8 @@ export default defineComponent({
       getJobData,
       routeToSearchSchedule,
       isActionsEnabled,
+      getVisualizationConfig,
+      encodeVisualizationConfig,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -2590,6 +2592,33 @@ export default defineComponent({
               extractedObj.meta.scrollInfo = {};
               searchObj.value = mergeDeep(searchObj, extractedObj);
               searchObj.shouldIgnoreWatcher = true;
+
+              // Restore visualization data if available and switch to visualize mode
+              if (extractedObj.data.visualizationData) {
+
+                // Restore visualization config to dashboardPanelData
+                if (extractedObj.data.visualizationData.config) {
+                  dashboardPanelData.data.config = extractedObj.data.visualizationData.config;
+                }
+                if (extractedObj.data.visualizationData.type) {
+                  dashboardPanelData.data.type = extractedObj.data.visualizationData.type;
+                }
+
+                // Sync visualization data to URL
+                const visualizationData = getVisualizationConfig(dashboardPanelData);
+                if (visualizationData) {
+                  const encoded = encodeVisualizationConfig(visualizationData);
+                  if (encoded) {
+                    const currentQuery = { ...router.currentRoute.value.query };
+                    currentQuery.visualization_data = encoded;
+
+                    await router.replace({
+                      name: router.currentRoute.value.name,
+                      query: currentQuery
+                    });
+                  }
+                }
+              }
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
@@ -2675,6 +2704,34 @@ export default defineComponent({
 
               searchObj.value = mergeDeep(searchObj, extractedObj);
               searchObj.data.streamResults = {};
+
+              // Restore visualization data if available and switch to visualize mode
+              if (extractedObj.data.visualizationData) {
+
+                // Restore visualization config to dashboardPanelData
+                if (extractedObj.data.visualizationData.config) {
+                  dashboardPanelData.data.config = extractedObj.data.visualizationData.config;
+                }
+                if (extractedObj.data.visualizationData.type) {
+                  dashboardPanelData.data.type = extractedObj.data.visualizationData.type;
+                }
+
+                // Sync visualization data to URL
+                const visualizationData = getVisualizationConfig(dashboardPanelData);
+                if (visualizationData) {
+                  const encoded = encodeVisualizationConfig(visualizationData);
+                  if (encoded) {
+                    const currentQuery = { ...router.currentRoute.value.query };
+                    currentQuery.visualization_data = encoded;
+                    currentQuery.logs_visualize_toggle = "visualize";
+
+                    await router.replace({
+                      name: router.currentRoute.value.name,
+                      query: currentQuery
+                    });
+                  }
+                }
+              }
 
               const streamData = await getStreams(
                 searchObj.data.stream.streamType,
@@ -2915,6 +2972,14 @@ export default defineComponent({
         delete savedSearchObj.value;
 
         delete savedSearchObj.data.parsedQuery;
+
+        // Include visualization data if in visualization mode
+        if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
+          const visualizationData = getVisualizationConfig(dashboardPanelData);
+          if (visualizationData) {
+            savedSearchObj.data.visualizationData = visualizationData;
+          }
+        }
 
         return savedSearchObj;
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
