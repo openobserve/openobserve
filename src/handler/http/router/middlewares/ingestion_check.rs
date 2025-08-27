@@ -80,19 +80,14 @@ where
         let service = Rc::clone(&self.service);
 
         Box::pin(async move {
-            let start_time = std::time::Instant::now();
-
             // Get the path and check if it's an ingestion endpoint
             let path = req.path();
             let method = req.method();
 
-
             // Check if this is a POST request to an ingestion endpoint
             if method == actix_web::http::Method::POST && is_ingestion_endpoint(path) {
-
                 // Extract org_id from the path
                 if let Some(org_id) = extract_org_id_from_path(path) {
-
                     // Determine stream type from path
                     let stream_type = determine_stream_type_from_path(path);
 
@@ -114,10 +109,8 @@ where
                     match check_result {
                         Ok(Ok(_)) => {
                             // Quota check passed, continue with the request
-                            let handler_start = std::time::Instant::now();
-                            let result = service.call(req).await;
-                            let handler_duration = handler_start.elapsed();
-                            result
+
+                            service.call(req).await
                         }
                         Ok(Err(e)) => {
                             // Quota check failed, return error
@@ -142,27 +135,17 @@ where
                                 org_id,
                                 quota_check_duration
                             );
-                            let handler_start = std::time::Instant::now();
-                            let result = service.call(req).await;
-                            let handler_duration = handler_start.elapsed();
-                            result
+                            service.call(req).await
                         }
                     }
                 } else {
                     // Could not extract org_id, let the request proceed (will likely fail in
                     // handler)
-                    let handler_start = std::time::Instant::now();
-                    let result = service.call(req).await;
-                    let handler_duration = handler_start.elapsed();
-                    result
+                    service.call(req).await
                 }
             } else {
                 // Not an ingestion endpoint, proceed normally
-                let handler_start = std::time::Instant::now();
-                let result = service.call(req).await;
-                let handler_duration = handler_start.elapsed();
-                let total_duration = start_time.elapsed();
-                result
+                service.call(req).await
             }
         })
     }
@@ -171,7 +154,6 @@ where
 /// Check if the given path is an ingestion endpoint
 fn is_ingestion_endpoint(path: &str) -> bool {
     let path_segments: Vec<&str> = path.split('/').collect();
-
 
     // Look for ingestion endpoint patterns in the path
     // Paths typically look like: /api/{org_id}/[ingest/]logs/_json,
@@ -189,7 +171,6 @@ fn is_ingestion_endpoint(path: &str) -> bool {
 /// Expected path format: /api/{org_id}/...
 fn extract_org_id_from_path(path: &str) -> Option<String> {
     let path_segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
-
 
     // Path should be: [api, org_id, ...]
     if path_segments.len() >= 2 && path_segments[0] == "api" {
