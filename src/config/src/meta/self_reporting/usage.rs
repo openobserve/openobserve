@@ -155,6 +155,8 @@ pub enum UsageEvent {
     Ingestion,
     Search,
     Functions,
+    Pipeline,
+    RemotePipeline,
     Other,
 }
 
@@ -164,6 +166,8 @@ impl std::fmt::Display for UsageEvent {
             UsageEvent::Ingestion => write!(f, "Ingestion"),
             UsageEvent::Search => write!(f, "Search"),
             UsageEvent::Functions => write!(f, "Functions"),
+            UsageEvent::Pipeline => write!(f, "Pipeline"),
+            UsageEvent::RemotePipeline => write!(f, "RemotePipeline"),
             UsageEvent::Other => write!(f, "Other"),
         }
     }
@@ -177,6 +181,10 @@ impl From<UsageType> for UsageEvent {
             UsageEvent::Search
         } else if usage.is_function() {
             UsageEvent::Functions
+        } else if usage.is_pipeline() {
+            UsageEvent::Pipeline
+        } else if usage.is_remote_pipeline() {
+            UsageEvent::RemotePipeline
         } else {
             UsageEvent::Other
         }
@@ -223,6 +231,10 @@ pub enum UsageType {
     SearchHistory,
     #[serde(rename = "functions")]
     Functions,
+    #[serde(rename = "pipeline")]
+    Pipeline,
+    #[serde(rename = "remote_pipeline")]
+    RemotePipeline,
     #[serde(rename = "data_retention")]
     Retention,
     #[serde(rename = "syslog")]
@@ -267,6 +279,14 @@ impl UsageType {
     pub fn is_function(&self) -> bool {
         matches!(self, UsageType::Functions)
     }
+
+    pub fn is_pipeline(&self) -> bool {
+        matches!(self, UsageType::Pipeline)
+    }
+
+    pub fn is_remote_pipeline(&self) -> bool {
+        matches!(self, UsageType::RemotePipeline)
+    }
 }
 
 impl std::fmt::Display for UsageType {
@@ -291,6 +311,8 @@ impl std::fmt::Display for UsageType {
             UsageType::SearchTopNValues => write!(f, "/_values"),
             UsageType::SearchHistory => write!(f, "/_search_history"),
             UsageType::Functions => write!(f, "functions"),
+            UsageType::Pipeline => write!(f, "pipeline"),
+            UsageType::RemotePipeline => write!(f, "remote_pipeline"),
             UsageType::Retention => write!(f, "data_retention"),
             UsageType::Syslog => write!(f, "syslog"),
             UsageType::EnrichmentTable => write!(f, "enrichment_table"),
