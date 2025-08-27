@@ -958,18 +958,13 @@ fn format_response(
 mod tests {
     use std::collections::HashMap;
 
-    use actix_web::http::StatusCode;
     use config::meta::promql::{Metadata, MetricType};
     use opentelemetry_proto::tonic::{
-        common::v1::{AnyValue, KeyValue as OtelKeyValue, any_value::Value},
         metrics::v1::{
             AggregationTemporality, Exemplar, HistogramDataPoint, Metric, NumberDataPoint,
-            ResourceMetrics, ScopeMetrics, number_data_point::Value as NumberValue,
         },
-        resource::v1::Resource,
     };
-    use prost::Message;
-    use serde_json::{Value as JsonValue, json};
+    use serde_json::json;
 
     use super::*;
 
