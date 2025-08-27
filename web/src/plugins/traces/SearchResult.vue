@@ -17,10 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="col column overflow-hidden">
-    <div class="search-list" style="width: 100%">
+  <div data-test="traces-search-result" class="col column overflow-hidden">
+    <div
+      data-test="traces-search-result-list"
+      class="search-list"
+      style="width: 100%"
+    >
       <ChartRenderer
-        data-test="logs-search-result-bar-chart"
+        data-test="traces-search-result-bar-chart"
         id="traces_scatter_chart"
         :data="plotChart"
         style="height: 150px"
@@ -28,12 +32,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="onChartClick"
       />
 
-      <div class="text-subtitle1 text-bold q-pt-sm q-px-sm">
-        {{ searchObj.data.queryResults?.hits?.length }} Traces
+      <div
+        data-test="traces-search-result-count"
+        class="text-subtitle1 text-bold q-pt-sm q-px-sm"
+      >
+        {{ searchObj.data.queryResults?.hits?.length || 0 }} Traces
       </div>
 
       <q-virtual-scroll
         id="tracesSearchGridComponent"
+        data-test="traces-search-result-virtual-scroll"
         style="height: 400px"
         :items="searchObj.data.queryResults.hits"
         class="traces-table-container"
@@ -45,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :virtual-scroll-slice-ratio-before="10"
         @virtual-scroll="onScroll"
       >
-        <q-item :key="index" dense>
+        <q-item data-test="traces-search-result-item" :key="index" dense>
           <TraceBlock
             :item="item"
             :index="index"
@@ -169,10 +177,6 @@ export default defineComponent({
       }
     };
 
-    const changeMaxRecordToReturn = (val: any) => {
-      // searchObj.meta.resultGrid.pagination.rowsPerPage = val;
-    };
-
     const expandRowDetail = (props: any) => {
       router.push({
         name: "traceDetails",
@@ -196,15 +200,6 @@ export default defineComponent({
       }
     };
 
-    const navigateRowDetail = (isNext: boolean, isPrev: boolean) => {
-      const newIndex = getRowIndex(
-        isNext,
-        isPrev,
-        Number(searchObj.meta.resultGrid.navigation.currentRowIndex),
-      );
-      searchObj.meta.resultGrid.navigation.currentRowIndex = newIndex;
-    };
-
     const addSearchTerm = (term: string) => {
       // searchObj.meta.showDetailTab = false;
       searchObj.data.stream.addToFilter = term;
@@ -212,23 +207,6 @@ export default defineComponent({
 
     const removeSearchTerm = (term: string) => {
       emit("remove:searchTerm", term);
-    };
-
-    const closeTraceDetails = () => {
-      const query = JSON.parse(JSON.stringify(router.currentRoute.value.query));
-      delete query.trace_id;
-      if (query.span_id) delete query.span_id;
-
-      router.push({
-        query: {
-          ...query,
-        },
-      });
-      setTimeout(() => {
-        searchObj.meta.showTraceDetails = false;
-        searchObj.data.traceDetails.showSpanDetails = false;
-        searchObj.data.traceDetails.selectedSpanId = null;
-      }, 100);
     };
 
     const onChartClick = (data: any) => {
@@ -246,12 +224,11 @@ export default defineComponent({
       addSearchTerm,
       removeSearchTerm,
       expandRowDetail,
-      changeMaxRecordToReturn,
-      navigateRowDetail,
       totalHeight,
       reDrawChart,
       getImageURL,
       onChartClick,
+      getRowIndex,
     };
   },
 });

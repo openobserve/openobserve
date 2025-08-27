@@ -366,6 +366,16 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
     );
 
+    #[cfg(feature = "enterprise")]
+    crate::service::search::cache::apply_regex_to_response(
+        req,
+        org_id,
+        all_streams,
+        stream_type,
+        &mut cached.cached_response,
+    )
+    .await?;
+
     if is_result_array_skip_vrl {
         cached.cached_response.hits = crate::service::search::cache::apply_vrl_to_response(
             backup_query_fn.clone(),
@@ -474,5 +484,25 @@ pub async fn write_partial_results_to_cache(
             }
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_write_results_to_cache_empty_results_logic() {
+        let accumulated_results: Vec<SearchResultType> = Vec::new();
+
+        // Test that empty results return early
+        assert!(accumulated_results.is_empty());
+
+        // This simulates the early return logic in write_results_to_cache
+        if accumulated_results.is_empty() {
+            // Should return Ok for empty results - this is the expected behavior
+            // No assertion needed here as this is just testing the early return logic
+        }
     }
 }

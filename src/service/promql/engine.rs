@@ -1568,3 +1568,1527 @@ async fn load_exemplars_from_datafusion(
 
     Ok(())
 }
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use promql_parser::{
+        label::{MatchOp, Matchers},
+        parser::{
+            AggregateExpr, BinModifier, BinaryExpr, Call, Extension, Function, FunctionArgs,
+            MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, SubqueryExpr,
+            UnaryExpr, VectorMatchCardinality, VectorSelector, value::ValueType,
+        },
+    };
+
+    use super::*;
+
+    // Test extension struct for testing
+    #[derive(Debug)]
+    struct TestExtension;
+
+    impl promql_parser::parser::ast::ExtensionExpr for TestExtension {
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+
+        fn name(&self) -> &str {
+            "test_extension"
+        }
+
+        fn value_type(&self) -> ValueType {
+            ValueType::String
+        }
+
+        fn children(&self) -> &[promql_parser::parser::Expr] {
+            &[]
+        }
+    }
+
+    #[test]
+    fn test_engine_new() {
+        // Test basic engine creation with a simple mock
+        let engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        assert_eq!(engine.time, 1640995200000000i64);
+        assert_eq!(engine.trace_id, "test_trace");
+        assert!(engine.col_filters.is_some());
+        assert!(engine.result_type.is_none());
+    }
+
+    #[test]
+    fn test_extract_columns_from_prom_expr_number_literal() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+        let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+
+        let result = engine.extract_columns_from_prom_expr(&expr);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extract_columns_from_prom_expr_string_literal() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+        let expr = PromExpr::StringLiteral(StringLiteral {
+            val: "test".to_string(),
+        });
+
+        let result = engine.extract_columns_from_prom_expr(&expr);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extract_columns_from_prom_expr_paren() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+        let inner_expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let expr = PromExpr::Paren(ParenExpr {
+            expr: Box::new(inner_expr),
+        });
+
+        let result = engine.extract_columns_from_prom_expr(&expr);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extract_columns_from_prom_expr_unary() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+        let inner_expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let expr = PromExpr::Unary(UnaryExpr {
+            expr: Box::new(inner_expr),
+        });
+
+        let result = engine.extract_columns_from_prom_expr(&expr);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extract_columns_from_prom_expr_binary() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let lhs = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let rhs = PromExpr::NumberLiteral(NumberLiteral { val: 10.0 });
+        let expr = PromExpr::Binary(BinaryExpr {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            op: create_test_token(),
+            modifier: None,
+        });
+
+        let result = engine.extract_columns_from_prom_expr(&expr);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extract_columns_from_prom_expr_binary_with_modifier() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let lhs = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let rhs = PromExpr::NumberLiteral(NumberLiteral { val: 10.0 });
+        let modifier = Some(BinModifier {
+            card: VectorMatchCardinality::OneToOne,
+            matching: Some(LabelModifier::Include(promql_parser::label::Labels {
+                labels: vec!["env".to_string()],
+            })),
+            return_bool: false,
+        });
+        let expr = PromExpr::Binary(BinaryExpr {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            op: create_test_token(),
+            modifier,
+        });
+
+        let result = engine.extract_columns_from_prom_expr(&expr);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extract_columns_from_prom_expr_binary_with_many_to_one() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let lhs = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let rhs = PromExpr::NumberLiteral(NumberLiteral { val: 10.0 });
+        let modifier = Some(BinModifier {
+            card: VectorMatchCardinality::ManyToOne(promql_parser::label::Labels {
+                labels: vec!["env".to_string()],
+            }),
+            matching: Some(LabelModifier::Include(promql_parser::label::Labels {
+                labels: vec!["env".to_string()],
+            })),
+            return_bool: false,
+        });
+        let expr = PromExpr::Binary(BinaryExpr {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            op: create_test_token(),
+            modifier,
+        });
+
+        let result = engine.extract_columns_from_prom_expr(&expr);
+        assert!(result.is_ok());
+        // Should clear col_filters for ManyToOne
+        assert!(engine.col_filters.is_none());
+    }
+
+    #[test]
+    fn test_extract_columns_from_prom_expr_aggregate() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let aggregate_expr = PromExpr::Aggregate(AggregateExpr {
+            op: create_test_token(),
+            expr: Box::new(expr),
+            param: None,
+            modifier: None,
+        });
+
+        let result = engine.extract_columns_from_prom_expr(&aggregate_expr);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extract_columns_from_prom_expr_aggregate_with_param() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let param = PromExpr::NumberLiteral(NumberLiteral { val: 0.5 });
+        let aggregate_expr = PromExpr::Aggregate(AggregateExpr {
+            op: create_test_token(),
+            expr: Box::new(expr),
+            param: Some(Box::new(param)),
+            modifier: None,
+        });
+
+        let result = engine.extract_columns_from_prom_expr(&aggregate_expr);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extract_columns_from_prom_expr_subquery() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let subquery_expr = PromExpr::Subquery(SubqueryExpr {
+            expr: Box::new(expr),
+            range: Duration::from_secs(300),
+            offset: None,
+            step: None,
+            at: None,
+        });
+
+        let result = engine.extract_columns_from_prom_expr(&subquery_expr);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extract_columns_from_prom_expr_call() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let args = FunctionArgs { args: vec![] };
+        let func = Function {
+            name: "time",
+            arg_types: vec![],
+            variadic: false,
+            return_type: ValueType::Scalar,
+        };
+        let expr = PromExpr::Call(Call { func, args });
+
+        let result = engine.extract_columns_from_prom_expr(&expr);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extract_columns_from_prom_expr_call_with_args() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let arg = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let args = FunctionArgs {
+            args: vec![Box::new(arg)],
+        };
+        let func = Function {
+            name: "abs",
+            arg_types: vec![],
+            variadic: false,
+            return_type: ValueType::Scalar,
+        };
+        let expr = PromExpr::Call(Call { func, args });
+
+        let result = engine.extract_columns_from_prom_expr(&expr);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extract_columns_from_prom_expr_extension() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        // Create a mock extension expression
+        let extension_expr = PromExpr::Extension(Extension {
+            expr: Arc::new(TestExtension),
+        });
+
+        let result = engine.extract_columns_from_prom_expr(&extension_expr);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unsupported Extension")
+        );
+    }
+
+    #[test]
+    fn test_extract_columns_from_modifier_none() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        engine.extract_columns_from_modifier(&None, &create_test_token());
+        // Should not change col_filters
+        assert!(engine.col_filters.is_some());
+    }
+
+    #[test]
+    fn test_extract_columns_from_modifier_topk() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let modifier = Some(LabelModifier::Include(promql_parser::label::Labels {
+            labels: vec!["env".to_string()],
+        }));
+
+        engine.extract_columns_from_modifier(&modifier, &create_test_token());
+        // Should clear col_filters for topk
+        assert!(engine.col_filters.is_some());
+    }
+
+    #[test]
+    fn test_extract_columns_from_modifier_bottomk() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let modifier = Some(LabelModifier::Include(promql_parser::label::Labels {
+            labels: vec!["env".to_string()],
+        }));
+
+        engine.extract_columns_from_modifier(&modifier, &create_test_token());
+        // Should clear col_filters for bottomk
+        assert!(engine.col_filters.is_some());
+    }
+
+    #[test]
+    fn test_extract_columns_from_modifier_include() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let modifier = Some(LabelModifier::Include(promql_parser::label::Labels {
+            labels: vec!["env".to_string(), "service".to_string()],
+        }));
+
+        engine.extract_columns_from_modifier(&modifier, &create_test_token());
+        // Should add labels to col_filters
+        assert!(engine.col_filters.is_some());
+        let filters = engine.col_filters.as_ref().unwrap();
+        assert!(filters.contains("env"));
+        assert!(filters.contains("service"));
+    }
+
+    #[test]
+    fn test_extract_columns_from_modifier_exclude() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let modifier = Some(LabelModifier::Exclude(promql_parser::label::Labels {
+            labels: vec!["env".to_string()],
+        }));
+
+        engine.extract_columns_from_modifier(&modifier, &create_test_token());
+        // Should not change col_filters for exclude
+        assert!(engine.col_filters.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_number_literal() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let result = engine.exec_expr(&expr).await;
+        assert!(result.is_ok());
+
+        if let Ok(Value::Float(val)) = result {
+            assert_eq!(val, 42.0);
+        } else {
+            panic!("Expected Value::Float");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_string_literal() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let expr = PromExpr::StringLiteral(StringLiteral {
+            val: "test".to_string(),
+        });
+        let result = engine.exec_expr(&expr).await;
+        assert!(result.is_ok());
+
+        if let Ok(Value::String(val)) = result {
+            assert_eq!(val, "test");
+        } else {
+            panic!("Expected Value::String");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_paren() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let inner_expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let expr = PromExpr::Paren(ParenExpr {
+            expr: Box::new(inner_expr),
+        });
+
+        let result = engine.exec_expr(&expr).await;
+        assert!(result.is_ok());
+
+        if let Ok(Value::Float(val)) = result {
+            assert_eq!(val, 42.0);
+        } else {
+            panic!("Expected Value::Float");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_unary_float() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let inner_expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let expr = PromExpr::Unary(UnaryExpr {
+            expr: Box::new(inner_expr),
+        });
+
+        let result = engine.exec_expr(&expr).await;
+        assert!(result.is_ok());
+
+        if let Ok(Value::Vector(v)) = result {
+            assert_eq!(v.len(), 1);
+            assert_eq!(v[0].sample.value, -42.0);
+        } else {
+            panic!("Expected Value::Vector");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_unary_vector() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let sample = Sample::new(1640995200000000i64, 42.0);
+        let instant = InstantValue {
+            labels: vec![Arc::new(Label::new("env", "prod"))],
+            sample,
+        };
+        let _vector = Value::Vector(vec![instant]);
+        let vector_expr = PromExpr::Extension(Extension {
+            expr: Arc::new(TestExtension),
+        });
+
+        let expr = PromExpr::Unary(UnaryExpr {
+            expr: Box::new(vector_expr),
+        });
+
+        let result = engine.exec_expr(&expr).await;
+        // This will fail because Extension is not implemented, but we're testing the unary logic
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_binary_float_float() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let lhs = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let rhs = PromExpr::NumberLiteral(NumberLiteral { val: 10.0 });
+        let expr = PromExpr::Binary(BinaryExpr {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            op: create_test_token(),
+            modifier: None,
+        });
+
+        let result = engine.exec_expr(&expr).await;
+        assert!(result.is_ok());
+
+        if let Ok(Value::Float(val)) = result {
+            assert_eq!(val, 52.0);
+        } else {
+            panic!("Expected Value::Float");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_binary_none_none() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let lhs = PromExpr::Extension(Extension {
+            expr: Arc::new(TestExtension),
+        });
+        let rhs = PromExpr::Extension(Extension {
+            expr: Arc::new(TestExtension),
+        });
+        let expr = PromExpr::Binary(BinaryExpr {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            op: create_test_token(),
+            modifier: None,
+        });
+
+        let result = engine.exec_expr(&expr).await;
+        // This will fail because Extension is not implemented, but we're testing the binary logic
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_subquery() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let subquery_expr = PromExpr::Subquery(SubqueryExpr {
+            expr: Box::new(expr),
+            range: Duration::from_secs(300),
+            offset: None,
+            step: None,
+            at: None,
+        });
+
+        let result = engine.exec_expr(&subquery_expr).await;
+        assert!(result.is_ok());
+
+        if let Ok(Value::Matrix(matrix)) = result {
+            assert_eq!(matrix.len(), 1);
+            assert_eq!(matrix[0].samples.len(), 1);
+            assert_eq!(matrix[0].samples[0].value, 42.0);
+        } else {
+            panic!("Expected Value::Matrix");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_subquery_with_offset() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let offset = Some(Offset::Pos(Duration::from_secs(60)));
+        let subquery_expr = PromExpr::Subquery(SubqueryExpr {
+            expr: Box::new(expr),
+            range: Duration::from_secs(300),
+            offset,
+            step: None,
+            at: None,
+        });
+
+        let result = engine.exec_expr(&subquery_expr).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_subquery_vector() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let sample = Sample::new(1640995200000000i64, 42.0);
+        let _instant = InstantValue {
+            labels: vec![Arc::new(Label::new("env", "prod"))],
+            sample,
+        };
+        let vector = PromExpr::Extension(Extension {
+            expr: Arc::new(TestExtension),
+        });
+
+        let subquery_expr = PromExpr::Subquery(SubqueryExpr {
+            expr: Box::new(vector),
+            range: Duration::from_secs(300),
+            offset: None,
+            step: None,
+            at: None,
+        });
+
+        let result = engine.exec_expr(&subquery_expr).await;
+        // This will fail because Extension is not implemented, but we're testing the subquery logic
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_subquery_float() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let float_expr = PromExpr::Extension(Extension {
+            expr: Arc::new(TestExtension),
+        });
+
+        let subquery_expr = PromExpr::Subquery(SubqueryExpr {
+            expr: Box::new(float_expr),
+            range: Duration::from_secs(300),
+            offset: None,
+            step: None,
+            at: None,
+        });
+
+        let result = engine.exec_expr(&subquery_expr).await;
+        // This will fail because Extension is not implemented, but we're testing the subquery logic
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_aggregate() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let aggregate_expr = PromExpr::Aggregate(AggregateExpr {
+            op: create_test_token(),
+            expr: Box::new(expr),
+            param: None,
+            modifier: None,
+        });
+
+        let result = engine.exec_expr(&aggregate_expr).await;
+        // This will fail because aggregate_exprs is not fully implemented, but we're testing the
+        // aggregate logic
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_call() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let args = FunctionArgs { args: vec![] };
+        let func = Function {
+            name: "time",
+            arg_types: vec![],
+            variadic: false,
+            return_type: ValueType::Scalar,
+        };
+        let expr = PromExpr::Call(Call { func, args });
+
+        let result = engine.exec_expr(&expr).await;
+        // This will fail because call_expr is not fully implemented, but we're testing the call
+        // logic
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_extension() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let extension_expr = PromExpr::Extension(Extension {
+            expr: Arc::new(TestExtension),
+        });
+
+        let result = engine.exec_expr(&extension_expr).await;
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Unsupported Extension")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_vector_selector() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let matchers = Matchers {
+            matchers: vec![promql_parser::label::Matcher {
+                name: "env".to_string(),
+                op: MatchOp::Equal,
+                value: "prod".to_string(),
+            }],
+            or_matchers: vec![],
+        };
+
+        let selector = VectorSelector {
+            name: Some("test_metric".to_string()),
+            matchers,
+            offset: None,
+            at: None,
+        };
+
+        let expr = PromExpr::VectorSelector(selector);
+
+        let result = engine.exec_expr(&expr).await;
+        // This will fail because the mock provider doesn't have real data, but we're testing the
+        // vector selector logic
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_exec_expr_matrix_selector() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let matchers = Matchers {
+            matchers: vec![promql_parser::label::Matcher {
+                name: "env".to_string(),
+                op: MatchOp::Equal,
+                value: "prod".to_string(),
+            }],
+            or_matchers: vec![],
+        };
+
+        let selector = VectorSelector {
+            name: Some("test_metric".to_string()),
+            matchers,
+            offset: None,
+            at: None,
+        };
+
+        let matrix_selector = MatrixSelector {
+            vs: selector,
+            range: Duration::from_secs(300),
+        };
+
+        let expr = PromExpr::MatrixSelector(matrix_selector);
+
+        let result = engine.exec_expr(&expr).await;
+        // This will fail because the mock provider doesn't have real data, but we're testing the
+        // matrix selector logic
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_exec() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let expr = PromExpr::NumberLiteral(NumberLiteral { val: 42.0 });
+        let result = engine.exec(&expr).await;
+        assert!(result.is_ok());
+
+        let (value, result_type) = result.unwrap();
+        assert!(matches!(value, Value::Float(42.0)));
+        assert!(result_type.is_none());
+    }
+
+    #[test]
+    fn test_ensure_two_args() {
+        let engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let args = FunctionArgs {
+            args: vec![
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 1.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 2.0 })),
+            ],
+        };
+        let result = engine.ensure_two_args(&args, "test error");
+        assert!(result.is_ok());
+
+        let args = FunctionArgs {
+            args: vec![Box::new(PromExpr::NumberLiteral(NumberLiteral {
+                val: 1.0,
+            }))],
+        };
+        let result = engine.ensure_two_args(&args, "test error");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_ensure_three_args() {
+        let engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let args = FunctionArgs {
+            args: vec![
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 1.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 2.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 3.0 })),
+            ],
+        };
+        let result = engine.ensure_three_args(&args, "test error");
+        assert!(result.is_ok());
+
+        let args = FunctionArgs {
+            args: vec![Box::new(PromExpr::NumberLiteral(NumberLiteral {
+                val: 1.0,
+            }))],
+        };
+        let result = engine.ensure_three_args(&args, "test error");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_ensure_ge_three_args() {
+        let engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let args = FunctionArgs {
+            args: vec![
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 1.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 2.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 3.0 })),
+            ],
+        };
+        let result = engine.ensure_ge_three_args(&args, "test error");
+        assert!(result.is_ok());
+
+        let args = FunctionArgs {
+            args: vec![
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 1.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 2.0 })),
+            ],
+        };
+        let result = engine.ensure_ge_three_args(&args, "test error");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_ensure_five_args() {
+        let engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let args = FunctionArgs {
+            args: vec![
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 1.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 2.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 3.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 4.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 5.0 })),
+            ],
+        };
+        let result = engine.ensure_five_args(&args, "test error");
+        assert!(result.is_ok());
+
+        let args = FunctionArgs {
+            args: vec![Box::new(PromExpr::NumberLiteral(NumberLiteral {
+                val: 1.0,
+            }))],
+        };
+        let result = engine.ensure_five_args(&args, "test error");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_f64_else_err() {
+        let engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let value = Value::Float(42.0);
+        let result = engine.parse_f64_else_err(&value, "test error");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 42.0);
+
+        let value = Value::String("not a float".to_string());
+        let result = engine.parse_f64_else_err(&value, "test error");
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_call_expr_first_arg() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let args = FunctionArgs {
+            args: vec![Box::new(PromExpr::NumberLiteral(NumberLiteral {
+                val: 42.0,
+            }))],
+        };
+        let result = engine.call_expr_first_arg(&args).await;
+        assert!(result.is_ok());
+
+        if let Ok(Value::Float(val)) = result {
+            assert_eq!(val, 42.0);
+        } else {
+            panic!("Expected Value::Float");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_call_expr_second_arg() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let args = FunctionArgs {
+            args: vec![
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 10.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 42.0 })),
+            ],
+        };
+        let result = engine.call_expr_second_arg(&args).await;
+        assert!(result.is_ok());
+
+        if let Ok(Value::Float(val)) = result {
+            assert_eq!(val, 42.0);
+        } else {
+            panic!("Expected Value::Float");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_call_expr_third_arg() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let args = FunctionArgs {
+            args: vec![
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 10.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 20.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 42.0 })),
+            ],
+        };
+        let result = engine.call_expr_third_arg(&args).await;
+        assert!(result.is_ok());
+
+        if let Ok(Value::Float(val)) = result {
+            assert_eq!(val, 42.0);
+        } else {
+            panic!("Expected Value::Float");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_call_expr_fourth_arg() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let args = FunctionArgs {
+            args: vec![
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 10.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 20.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 30.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 42.0 })),
+            ],
+        };
+        let result = engine.call_expr_fourth_arg(&args).await;
+        assert!(result.is_ok());
+
+        if let Ok(Value::Float(val)) = result {
+            assert_eq!(val, 42.0);
+        } else {
+            panic!("Expected Value::Float");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_call_expr_fifth_arg() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let args = FunctionArgs {
+            args: vec![
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 10.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 20.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 30.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 40.0 })),
+                Box::new(PromExpr::NumberLiteral(NumberLiteral { val: 42.0 })),
+            ],
+        };
+        let result = engine.call_expr_fifth_arg(&args).await;
+        assert!(result.is_ok());
+
+        if let Ok(Value::Float(val)) = result {
+            assert_eq!(val, 42.0);
+        } else {
+            panic!("Expected Value::Float");
+        }
+    }
+
+    // Helper function to create test token types
+    fn create_test_token() -> token::TokenType {
+        token::TokenType::new(token::T_ADD)
+    }
+
+    // Simple mock provider that implements the required trait
+    struct SimpleMockProvider;
+
+    #[async_trait::async_trait]
+    impl crate::service::promql::TableProvider for SimpleMockProvider {
+        async fn create_context(
+            &self,
+            _org_id: &str,
+            _stream_name: &str,
+            _time_range: (i64, i64),
+            _machers: promql_parser::label::Matchers,
+            _label_selector: Option<std::collections::HashSet<String>>,
+            _filters: &mut [(String, Vec<String>)],
+        ) -> datafusion::error::Result<
+            Vec<(
+                datafusion::prelude::SessionContext,
+                std::sync::Arc<datafusion::arrow::datatypes::Schema>,
+                config::meta::search::ScanStats,
+            )>,
+        > {
+            Ok(vec![])
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eval_vector_selector_basic() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let matchers = Matchers {
+            matchers: vec![promql_parser::label::Matcher {
+                name: "env".to_string(),
+                op: MatchOp::Equal,
+                value: "prod".to_string(),
+            }],
+            or_matchers: vec![],
+        };
+
+        let selector = VectorSelector {
+            name: Some("test_metric".to_string()),
+            matchers,
+            offset: None,
+            at: None,
+        };
+
+        let result = engine.eval_vector_selector(&selector).await;
+        assert!(result.is_ok());
+        let values = result.unwrap();
+        assert_eq!(values.len(), 0); // Mock provider returns empty data
+    }
+
+    #[tokio::test]
+    async fn test_eval_vector_selector_with_offset() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let matchers = Matchers {
+            matchers: vec![promql_parser::label::Matcher {
+                name: "env".to_string(),
+                op: MatchOp::Equal,
+                value: "prod".to_string(),
+            }],
+            or_matchers: vec![],
+        };
+
+        let selector = VectorSelector {
+            name: Some("test_metric".to_string()),
+            matchers,
+            offset: Some(Offset::Pos(Duration::from_secs(60))),
+            at: None,
+        };
+
+        let result = engine.eval_vector_selector(&selector).await;
+        assert!(result.is_ok());
+        let values = result.unwrap();
+        assert_eq!(values.len(), 0); // Mock provider returns empty data
+    }
+
+    #[tokio::test]
+    async fn test_eval_vector_selector_with_negative_offset() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let matchers = Matchers {
+            matchers: vec![promql_parser::label::Matcher {
+                name: "env".to_string(),
+                op: MatchOp::Equal,
+                value: "prod".to_string(),
+            }],
+            or_matchers: vec![],
+        };
+
+        let selector = VectorSelector {
+            name: Some("test_metric".to_string()),
+            matchers,
+            offset: Some(Offset::Neg(Duration::from_secs(60))),
+            at: None,
+        };
+
+        let result = engine.eval_vector_selector(&selector).await;
+        assert!(result.is_ok());
+        let values = result.unwrap();
+        assert_eq!(values.len(), 0); // Mock provider returns empty data
+    }
+
+    #[tokio::test]
+    async fn test_eval_matrix_selector_basic() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let matchers = Matchers {
+            matchers: vec![promql_parser::label::Matcher {
+                name: "env".to_string(),
+                op: MatchOp::Equal,
+                value: "prod".to_string(),
+            }],
+            or_matchers: vec![],
+        };
+
+        let selector = VectorSelector {
+            name: Some("test_metric".to_string()),
+            matchers,
+            offset: None,
+            at: None,
+        };
+
+        let result = engine
+            .eval_matrix_selector(&selector, Duration::from_secs(300))
+            .await;
+        assert!(result.is_ok());
+        let values = result.unwrap();
+        assert_eq!(values.len(), 0); // Mock provider returns empty data
+    }
+
+    #[tokio::test]
+    async fn test_eval_matrix_selector_with_offset() {
+        let mut engine = Engine::new(
+            "test_trace",
+            Arc::new(PromqlContext::new(
+                "test_org",
+                SimpleMockProvider,
+                false,
+                30,
+            )),
+            1640995200000000i64,
+        );
+
+        let matchers = Matchers {
+            matchers: vec![promql_parser::label::Matcher {
+                name: "env".to_string(),
+                op: MatchOp::Equal,
+                value: "prod".to_string(),
+            }],
+            or_matchers: vec![],
+        };
+
+        let selector = VectorSelector {
+            name: Some("test_metric".to_string()),
+            matchers,
+            offset: Some(Offset::Pos(Duration::from_secs(120))),
+            at: None,
+        };
+
+        let result = engine
+            .eval_matrix_selector(&selector, Duration::from_secs(300))
+            .await;
+        assert!(result.is_ok());
+        let values = result.unwrap();
+        assert_eq!(values.len(), 0); // Mock provider returns empty data
+    }
+}

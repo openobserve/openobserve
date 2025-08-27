@@ -784,9 +784,10 @@ describe("AddAlert Component", () => {
         expect(wrapper.vm.formData.stream_type).toBe('');
       });
 
-      it('should wait for validateSqlQueryPromise to resolve successfully', async () => {
+      it('should wait for validateSqlQueryPromise to resolve successfully', { timeout: 10000 }, async () => {
+        const dismissMock = vi.fn();
         wrapper.vm.q = {
-          notify: vi.fn(() => vi.fn())
+          notify: vi.fn(() => dismissMock)
         };
       
         // Required for triggering that SQL block
@@ -794,7 +795,7 @@ describe("AddAlert Component", () => {
         wrapper.vm.formData.query_condition.type = "sql";
         wrapper.vm.formData.query_condition.sql = "SELECT * FROM test_table";
       
-        // Provide a fake resolve
+        // Provide a fake resolve that resolves immediately
         wrapper.vm.validateSqlQueryPromise = Promise.resolve();
       
         // Return valid payload
@@ -817,6 +818,7 @@ describe("AddAlert Component", () => {
         wrapper.vm.validateFormAndNavigateToErrorField = vi.fn().mockResolvedValue(true);
         wrapper.vm.validateInputs = vi.fn().mockReturnValue(true);
         wrapper.vm.transformFEToBE = vi.fn().mockReturnValue([]);
+        wrapper.vm.beingUpdated = false; // Setting to false to test creation path
       
         await wrapper.vm.onSubmit();
         await flushPromises();

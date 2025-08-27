@@ -62,12 +62,14 @@ export default defineComponent({
      X-Prometheus-Remote-Write-Version = "0.1.0"
      Authorization = "Basic [BASIC_PASSCODE]"`;
 
+    // Expose for testing
     return {
       store,
       config,
       endpoint,
       content,
       getImageURL,
+      ingestionURL,
     };
   },
 });

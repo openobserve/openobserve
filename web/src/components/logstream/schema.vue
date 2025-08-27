@@ -442,7 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :disable="isEnvironmentSettings(props.row)"
                       v-model="props.row.index_type"
-                      :options="streamIndexType"
+                      :options="isEnvironmentSettings(props.row) ? streamIndexTypeEnv : streamIndexType"
                       :popup-content-style="{ textTransform: 'capitalize' }"
                       color="input-border"
                       bg-color="input-bg"
@@ -888,11 +888,14 @@ export default defineComponent({
       return "Other Fields";
     });
 
+    const streamIndexTypeEnv = [
+      { label: "Full text search (Environment setting)", value: "fullTextSearchKeyEnv" },
+      { label: "Secondary index (Environment setting)", value: "secondaryIndexKeyEnv" },
+    ];
+
     const streamIndexType = [
       { label: "Full text search", value: "fullTextSearchKey" },
       { label: "Secondary index", value: "secondaryIndexKey" },
-      { label: "Full text search (Environment setting)", value: "fullTextSearchKeyEnv" },
-      { label: "Secondary index (Environment setting)", value: "secondaryIndexKeyEnv" },
       { label: "Bloom filter", value: "bloomFilterKey" },
       { label: "KeyValue partition", value: "keyPartition" },
       { label: "Prefix partition", value: "prefixPartition" },
@@ -1807,6 +1810,7 @@ export default defineComponent({
       markFormDirty,
       formDirtyFlag,
       streamIndexType,
+      streamIndexTypeEnv,
       disableOptions,
       loadingState,
       filterFieldFn,
@@ -1857,6 +1861,13 @@ export default defineComponent({
       handleRemovePattern,
       handleUpdateAppliedPattern,
       isEnvironmentSettings,
+      getFieldIndices,
+      setSchema,
+      formatDate,
+      convertUnixToQuasarFormat,
+      computedSchemaFieldsName,
+      groupPatternAssociationsByField,
+      ungroupPatternAssociations,
     };
   },
   created() {

@@ -14,7 +14,7 @@ keywords = [
     "open-source",
     "opensource",
 ]
-license = "AGPL-3.0-only"
+license = "AGPL-3.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
 version = "0.15.0"
@@ -257,9 +257,9 @@ cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
 cron = "0.15"
 dashmap = { version = "6.1", features = ["serde"] }
-datafusion = "49"
-datafusion-proto = "49"
-datafusion-functions-aggregate-common = "49"
+datafusion = "49.0.2"
+datafusion-proto = "49.0.2"
+datafusion-functions-aggregate-common = "49.0.2"
 datafusion-functions-json = "0.49.0"
 expect-test = "1.4"
 arrow = { version = "55.2.0", features = ["ipc_compression", "prettyprint"] }

@@ -783,9 +783,11 @@ export default defineComponent({
     // watch the stream type and load the stream list
     watch(
       () =>
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream_type,
+        [
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream_type,
+        ],
       async () => {
         loadStreamsListBasedOnType();
       },

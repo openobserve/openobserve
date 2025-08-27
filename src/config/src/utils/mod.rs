@@ -25,6 +25,7 @@ pub mod inverted_index;
 pub mod json;
 pub mod md5;
 pub mod parquet;
+pub mod pausable_job;
 pub mod prom_json_encoder;
 pub mod query_select_utils;
 pub mod rand;

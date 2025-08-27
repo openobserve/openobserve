@@ -1415,6 +1415,10 @@ export default defineComponent({
       organizationDataList,
       userSelectedOrgId,
       updateOrgId,
+      // Exposed validation functions for testing
+      validateAlertInputs,
+      checkDestinationInList,
+      checkAlertsInList,
     };
   },
   components: {

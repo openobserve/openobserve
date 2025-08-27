@@ -824,6 +824,7 @@ export default {
       tracesStreams,
       setViewTraceBtn,
       getOriginalData,
+      getTracesStreams,
       addOrRemoveLabel,
       sendToAiChat,
       getBtnLogo,

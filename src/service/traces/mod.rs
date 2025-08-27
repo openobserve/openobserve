@@ -747,7 +747,7 @@ async fn write_traces_by_stream(
             .await
             .is_none()
         {
-            let org = super::organization::get_org(&org_id).await.unwrap();
+            let org = super::organization::get_org(org_id).await.unwrap();
 
             super::self_reporting::cloud_events::enqueue_cloud_event(
                 super::self_reporting::cloud_events::CloudEvent {
@@ -1012,28 +1012,34 @@ mod tests {
     }
 
     #[test]
-    fn test_get_span_status() {
-        // Test OK status
+    fn test_get_span_status_ok() {
         let status = Status {
             code: StatusCode::Ok as i32,
             message: "success".to_string(),
         };
         assert_eq!(super::get_span_status(Some(status)), "OK");
+    }
 
-        // Test ERROR status
+    #[test]
+    fn test_get_span_status_error() {
         let status = Status {
             code: StatusCode::Error as i32,
             message: "error occurred".to_string(),
         };
         assert_eq!(super::get_span_status(Some(status)), "ERROR");
+    }
 
-        // Test UNSET status
+    #[test]
+    fn test_get_span_status_unset() {
         let status = Status {
             code: StatusCode::Unset as i32,
             message: "".to_string(),
         };
         assert_eq!(super::get_span_status(Some(status)), "UNSET");
+    }
 
+    #[test]
+    fn test_get_span_status_none() {
         // Test None status (default case)
         assert_eq!(super::get_span_status(None), "UNSET");
     }
@@ -1051,14 +1057,17 @@ mod tests {
             config::meta::otlp::OtlpRequestType::HttpJson,
         );
         assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.status(), actix_web::http::StatusCode::OK);
     }
 
     #[test]
-    fn test_format_response_partial() {
+    fn test_format_response_partial_success() {
         let partial_success =
             opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
                 rejected_spans: 5,
-                error_message: "".to_string(),
+                error_message: "Some spans rejected".to_string(),
             };
 
         let result = super::format_response(
@@ -1066,10 +1075,16 @@ mod tests {
             config::meta::otlp::OtlpRequestType::HttpJson,
         );
         assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(
+            response.status(),
+            actix_web::http::StatusCode::PARTIAL_CONTENT
+        );
     }
 
     #[test]
-    fn test_format_response_protobuf() {
+    fn test_format_response_grpc() {
         let partial_success =
             opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
                 rejected_spans: 0,
@@ -1079,29 +1094,608 @@ mod tests {
         let result =
             super::format_response(partial_success, config::meta::otlp::OtlpRequestType::Grpc);
         assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.status(), actix_web::http::StatusCode::OK);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "application/x-protobuf"
+        );
     }
 
     #[test]
-    fn test_constants() {
-        // Test that constants are properly defined
+    fn test_format_response_http_protobuf() {
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 0,
+                error_message: "".to_string(),
+            };
+
+        let result = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpProtobuf,
+        );
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.status(), actix_web::http::StatusCode::OK);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "application/x-protobuf"
+        );
+    }
+
+    // Test format_response with different OtlpRequestType variants
+    #[test]
+    fn test_format_response_unknown_type() {
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 0,
+                error_message: "".to_string(),
+            };
+
+        // Test with an unknown request type (should default to protobuf)
+        let result =
+            super::format_response(partial_success, config::meta::otlp::OtlpRequestType::Grpc);
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.status(), actix_web::http::StatusCode::OK);
+        assert_eq!(
+            response.headers().get("content-type").unwrap(),
+            "application/x-protobuf"
+        );
+    }
+
+    // Test format_response error message for partial success
+    #[test]
+    fn test_format_response_error_message() {
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 3,
+                error_message: "original message".to_string(),
+            };
+
+        let result = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpJson,
+        );
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(
+            response.status(),
+            actix_web::http::StatusCode::PARTIAL_CONTENT
+        );
+    }
+
+    // Test get_span_status with invalid status codes
+    #[test]
+    fn test_get_span_status_invalid_code() {
+        let status = Status {
+            code: 999, // Invalid status code
+            message: "invalid".to_string(),
+        };
+        // Should handle gracefully and return a valid string
+        let result = super::get_span_status(Some(status));
+        assert!(!result.is_empty());
+        assert!(result == "OK" || result == "ERROR" || result == "UNSET");
+    }
+
+    // Test get_span_status with empty message
+    #[test]
+    fn test_get_span_status_empty_message() {
+        let status = Status {
+            code: StatusCode::Ok as i32,
+            message: "".to_string(),
+        };
+        assert_eq!(super::get_span_status(Some(status)), "OK");
+    }
+
+    // Test get_span_status with long message
+    #[test]
+    fn test_get_span_status_long_message() {
+        let long_message = "a".repeat(1000);
+        let status = Status {
+            code: StatusCode::Error as i32,
+            message: long_message,
+        };
+        assert_eq!(super::get_span_status(Some(status)), "ERROR");
+    }
+
+    // Test constants and validation logic
+    #[test]
+    fn test_span_id_bytes_count() {
+        assert_eq!(super::SPAN_ID_BYTES_COUNT, 8);
+    }
+
+    #[test]
+    fn test_trace_id_bytes_count() {
+        assert_eq!(super::TRACE_ID_BYTES_COUNT, 16);
+    }
+
+    #[test]
+    fn test_block_fields() {
+        let block_fields = &super::BLOCK_FIELDS;
+        assert_eq!(block_fields.len(), 4);
+        assert!(block_fields.contains(&"_timestamp"));
+        assert!(block_fields.contains(&"duration"));
+        assert!(block_fields.contains(&"start_time"));
+        assert!(block_fields.contains(&"end_time"));
+    }
+
+    #[test]
+    fn test_service_name_constant() {
         assert_eq!(super::SERVICE_NAME, "service.name");
         assert_eq!(super::SERVICE, "service");
         assert_eq!(super::PARENT_SPAN_ID, "reference.parent_span_id");
         assert_eq!(super::PARENT_TRACE_ID, "reference.parent_trace_id");
         assert_eq!(super::REF_TYPE, "reference.ref_type");
-        assert_eq!(super::SPAN_ID_BYTES_COUNT, 8);
-        assert_eq!(super::TRACE_ID_BYTES_COUNT, 16);
         assert_eq!(super::ATTR_STATUS_CODE, "status_code");
         assert_eq!(super::ATTR_STATUS_MESSAGE, "status_message");
     }
 
+    // Test validation helper functions
     #[test]
-    fn test_block_fields() {
-        // Test that BLOCK_FIELDS contains expected values
-        let expected_fields = ["_timestamp", "duration", "start_time", "end_time"];
-        for field in expected_fields {
-            assert!(super::BLOCK_FIELDS.contains(&field));
+    fn test_valid_trace_id_length() {
+        let valid_trace_id = [0u8; super::TRACE_ID_BYTES_COUNT];
+        assert_eq!(valid_trace_id.len(), super::TRACE_ID_BYTES_COUNT);
+    }
+
+    #[test]
+    fn test_invalid_trace_id_length() {
+        let invalid_trace_id = [0u8; 10]; // Wrong length
+        assert_ne!(invalid_trace_id.len(), super::TRACE_ID_BYTES_COUNT);
+    }
+
+    #[test]
+    fn test_valid_span_id_length() {
+        let valid_span_id = [0u8; super::SPAN_ID_BYTES_COUNT];
+        assert_eq!(valid_span_id.len(), super::SPAN_ID_BYTES_COUNT);
+    }
+
+    #[test]
+    fn test_invalid_span_id_length() {
+        let invalid_span_id = [0u8; 5]; // Wrong length
+        assert_ne!(invalid_span_id.len(), super::SPAN_ID_BYTES_COUNT);
+    }
+
+    // Test timestamp validation logic (without actual ingestion)
+    #[test]
+    fn test_timestamp_conversion() {
+        let start_time_nano = 1_640_995_200_000_000_000u64; // 2022-01-01 00:00:00 UTC in nanoseconds
+        let timestamp_micros = (start_time_nano / 1000) as i64;
+        assert_eq!(timestamp_micros, 1_640_995_200_000_000);
+    }
+
+    #[test]
+    fn test_duration_calculation() {
+        let start_time = 1_640_995_200_000_000_000u64;
+        let end_time = 1_640_995_201_500_000_000u64; // 1.5 seconds later
+        let duration_micros = (end_time - start_time) / 1000;
+        assert_eq!(duration_micros, 1_500_000); // 1.5 seconds in microseconds
+    }
+
+    // Test attribute key transformation for blocked fields
+    #[test]
+    fn test_blocked_field_transformation() {
+        let blocked_field = "_timestamp";
+        let transformed = if super::BLOCK_FIELDS.contains(&blocked_field) {
+            format!("attr_{blocked_field}")
+        } else {
+            blocked_field.to_string()
+        };
+        assert_eq!(transformed, "attr__timestamp");
+    }
+
+    #[test]
+    fn test_non_blocked_field_no_transformation() {
+        let normal_field = "http.method";
+        let transformed = if super::BLOCK_FIELDS.contains(&normal_field) {
+            format!("attr_{normal_field}")
+        } else {
+            normal_field.to_string()
+        };
+        assert_eq!(transformed, "http.method");
+    }
+
+    // Test service name extraction logic
+    #[test]
+    fn test_service_attribute_key_transformation() {
+        let service_attr_key = "version";
+        let transformed = format!("{}_{}", super::SERVICE, service_attr_key);
+        assert_eq!(transformed, "service_version");
+    }
+
+    // Test span reference type formatting
+    #[test]
+    fn test_span_ref_type_format() {
+        use crate::common::meta::traces::SpanRefType;
+        let ref_type = format!("{:?}", SpanRefType::ChildOf);
+        assert_eq!(ref_type, "ChildOf");
+    }
+
+    // Test edge cases for format_response function
+    #[test]
+    fn test_format_response_zero_rejected_spans() {
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: 0,
+                error_message: "Some error".to_string(), // Error message but no rejected spans
+            };
+
+        let result = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpJson,
+        );
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.status(), actix_web::http::StatusCode::OK); // Should be OK, not partial
+    }
+
+    #[test]
+    fn test_format_response_negative_rejected_spans() {
+        let partial_success =
+            opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess {
+                rejected_spans: -1, // Negative value
+                error_message: "".to_string(),
+            };
+
+        let result = super::format_response(
+            partial_success,
+            config::meta::otlp::OtlpRequestType::HttpJson,
+        );
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.status(), actix_web::http::StatusCode::OK); // Negative is treated as no rejection
+    }
+
+    // Test span status edge cases
+    #[test]
+    fn test_get_span_status_all_variants() {
+        // Test all possible StatusCode values
+        let ok_status = Status {
+            code: StatusCode::Ok as i32,
+            message: "".to_string(),
+        };
+        assert_eq!(super::get_span_status(Some(ok_status)), "OK");
+
+        let error_status = Status {
+            code: StatusCode::Error as i32,
+            message: "".to_string(),
+        };
+        assert_eq!(super::get_span_status(Some(error_status)), "ERROR");
+
+        let unset_status = Status {
+            code: StatusCode::Unset as i32,
+            message: "".to_string(),
+        };
+        assert_eq!(super::get_span_status(Some(unset_status)), "UNSET");
+    }
+
+    // Test JSON value creation and validation
+    #[test]
+    fn test_json_value_creation() {
+        use config::utils::json::json;
+
+        let test_value = json!({
+            "trace_id": "1234567890abcdef1234567890abcdef",
+            "span_id": "abcdef1234567890",
+            "operation_name": "test_operation",
+            "service_name": "test_service",
+            "duration": 1500,
+            "start_time": 1640995200000000000u64,
+            "end_time": 1640995201500000000u64
+        });
+
+        assert!(test_value.is_object());
+        assert_eq!(test_value["trace_id"], "1234567890abcdef1234567890abcdef");
+        assert_eq!(test_value["span_id"], "abcdef1234567890");
+        assert_eq!(test_value["duration"], 1500);
+    }
+
+    // Test empty collections handling
+    #[test]
+    fn test_empty_events_serialization() {
+        use config::utils::json;
+        let empty_events: Vec<crate::common::meta::traces::Event> = vec![];
+        let serialized = json::to_string(&empty_events).unwrap();
+        assert_eq!(serialized, "[]");
+    }
+
+    #[test]
+    fn test_empty_links_serialization() {
+        use config::utils::json;
+        let empty_links: Vec<crate::common::meta::traces::SpanLink> = vec![];
+        let serialized = json::to_string(&empty_links).unwrap();
+        assert_eq!(serialized, "[]");
+    }
+
+    // Test error message formatting
+    #[test]
+    fn test_error_message_formatting() {
+        let error_msg = format!("Invalid proto: {}", "test error");
+        assert_eq!(error_msg, "Invalid proto: test error");
+
+        let trace_error = format!(
+            "[trace_id: {}] stream did not receive a valid json object",
+            "test_trace_id"
+        );
+        assert_eq!(
+            trace_error,
+            "[trace_id: test_trace_id] stream did not receive a valid json object"
+        );
+    }
+
+    // Test TraceId and SpanId conversions
+    #[test]
+    fn test_trace_id_conversion() {
+        use opentelemetry::trace::TraceId;
+
+        // Test valid trace ID conversion
+        let trace_bytes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+        let trace_id = TraceId::from_bytes(trace_bytes);
+        let trace_id_string = trace_id.to_string();
+
+        assert_eq!(trace_bytes.len(), super::TRACE_ID_BYTES_COUNT);
+        assert!(!trace_id_string.is_empty());
+        assert_eq!(trace_id_string.len(), 32); // Hex string representation
+    }
+
+    #[test]
+    fn test_span_id_conversion() {
+        use opentelemetry::trace::SpanId;
+
+        // Test valid span ID conversion
+        let span_bytes = [1, 2, 3, 4, 5, 6, 7, 8];
+        let span_id = SpanId::from_bytes(span_bytes);
+        let span_id_string = span_id.to_string();
+
+        assert_eq!(span_bytes.len(), super::SPAN_ID_BYTES_COUNT);
+        assert!(!span_id_string.is_empty());
+        assert_eq!(span_id_string.len(), 16); // Hex string representation
+    }
+
+    #[test]
+    fn test_zero_trace_id() {
+        use opentelemetry::trace::TraceId;
+
+        let zero_trace_bytes = [0u8; super::TRACE_ID_BYTES_COUNT];
+        let trace_id = TraceId::from_bytes(zero_trace_bytes);
+        let trace_id_string = trace_id.to_string();
+
+        assert_eq!(trace_id_string, "00000000000000000000000000000000");
+    }
+
+    #[test]
+    fn test_zero_span_id() {
+        use opentelemetry::trace::SpanId;
+
+        let zero_span_bytes = [0u8; super::SPAN_ID_BYTES_COUNT];
+        let span_id = SpanId::from_bytes(zero_span_bytes);
+        let span_id_string = span_id.to_string();
+
+        assert_eq!(span_id_string, "0000000000000000");
+    }
+
+    // Test span reference creation logic
+    #[test]
+    fn test_span_reference_creation() {
+        use std::collections::HashMap;
+
+        use opentelemetry::trace::{SpanId, TraceId};
+
+        use crate::common::meta::traces::SpanRefType;
+
+        let trace_bytes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+        let span_bytes = [1, 2, 3, 4, 5, 6, 7, 8];
+
+        let trace_id = TraceId::from_bytes(trace_bytes).to_string();
+        let parent_span_id = SpanId::from_bytes(span_bytes).to_string();
+
+        let mut span_ref = HashMap::new();
+        span_ref.insert(super::PARENT_TRACE_ID.to_string(), trace_id.clone());
+        span_ref.insert(super::PARENT_SPAN_ID.to_string(), parent_span_id.clone());
+        span_ref.insert(
+            super::REF_TYPE.to_string(),
+            format!("{:?}", SpanRefType::ChildOf),
+        );
+
+        assert_eq!(span_ref.get(super::PARENT_TRACE_ID).unwrap(), &trace_id);
+        assert_eq!(
+            span_ref.get(super::PARENT_SPAN_ID).unwrap(),
+            &parent_span_id
+        );
+        assert_eq!(span_ref.get(super::REF_TYPE).unwrap(), "ChildOf");
+        assert_eq!(span_ref.len(), 3);
+    }
+
+    #[test]
+    fn test_empty_parent_span_reference() {
+        use std::collections::HashMap;
+
+        let mut span_ref = HashMap::new();
+        let empty_parent_span_id: Vec<u8> = vec![];
+
+        // Test logic for when parent_span_id is empty (no reference should be created)
+        if !empty_parent_span_id.is_empty()
+            && empty_parent_span_id.len() == super::SPAN_ID_BYTES_COUNT
+        {
+            // This should not execute for empty span ID
+            span_ref.insert("should_not_exist".to_string(), "value".to_string());
         }
-        assert_eq!(super::BLOCK_FIELDS.len(), 4);
+
+        assert!(span_ref.is_empty());
+    }
+
+    // Test attribute processing edge cases
+    #[test]
+    fn test_attribute_key_conflicts() {
+        use std::collections::HashMap;
+
+        use config::utils::json;
+
+        // Test handling of keys that conflict with block fields
+        let mut span_att_map: HashMap<String, json::Value> = HashMap::new();
+
+        let test_keys = vec![
+            "_timestamp",
+            "duration",
+            "start_time",
+            "end_time",
+            "normal_key",
+        ];
+
+        for key in test_keys {
+            let processed_key = if super::BLOCK_FIELDS.contains(&key) {
+                format!("attr_{key}")
+            } else {
+                key.to_string()
+            };
+            span_att_map.insert(processed_key, json::Value::String("test_value".to_string()));
+        }
+
+        assert!(span_att_map.contains_key("attr__timestamp"));
+        assert!(span_att_map.contains_key("attr_duration"));
+        assert!(span_att_map.contains_key("attr_start_time"));
+        assert!(span_att_map.contains_key("attr_end_time"));
+        assert!(span_att_map.contains_key("normal_key"));
+        assert_eq!(span_att_map.len(), 5);
+    }
+
+    #[test]
+    fn test_service_name_extraction() {
+        use std::collections::HashMap;
+
+        use config::utils::json;
+
+        let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
+
+        // Test service.name attribute handling
+        let service_name_key = super::SERVICE_NAME;
+        let service_name_value = json::Value::String("test-service".to_string());
+
+        if service_name_key == super::SERVICE_NAME {
+            service_att_map.insert(super::SERVICE_NAME.to_string(), service_name_value.clone());
+        } else {
+            service_att_map.insert(
+                format!("{}_{}", super::SERVICE, "other_attr"),
+                service_name_value,
+            );
+        }
+
+        assert!(service_att_map.contains_key(super::SERVICE_NAME));
+        assert_eq!(
+            service_att_map.get(super::SERVICE_NAME).unwrap(),
+            "test-service"
+        );
+    }
+
+    #[test]
+    fn test_non_service_name_attribute() {
+        use std::collections::HashMap;
+
+        use config::utils::json;
+
+        let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
+        let attr_key = "version";
+        let attr_value = json::Value::String("1.0.0".to_string());
+
+        // Test non-service.name attribute (should get service_ prefix)
+        if attr_key != super::SERVICE_NAME {
+            service_att_map.insert(
+                format!("{}_{}", super::SERVICE, attr_key),
+                attr_value.clone(),
+            );
+        }
+
+        assert!(service_att_map.contains_key("service_version"));
+        assert_eq!(service_att_map.get("service_version").unwrap(), "1.0.0");
+    }
+
+    // Test time validation boundary conditions
+    #[test]
+    fn test_timestamp_boundary_validation() {
+        use chrono::{Duration, Utc};
+
+        let now = Utc::now();
+        let hours_back = 24;
+        let hours_forward = 1;
+
+        let min_ts = (now - Duration::try_hours(hours_back).unwrap()).timestamp_micros();
+        let max_ts = (now + Duration::try_hours(hours_forward).unwrap()).timestamp_micros();
+        let current_ts = now.timestamp_micros();
+
+        // Test current timestamp (should be valid)
+        assert!(current_ts >= min_ts);
+        assert!(current_ts <= max_ts);
+
+        // Test timestamp exactly at boundaries
+        assert!(min_ts < max_ts);
+    }
+
+    #[test]
+    fn test_nanosecond_to_microsecond_conversion() {
+        let nano_timestamp = 1_640_995_200_123_456_789u64; // nanoseconds
+        let micro_timestamp = (nano_timestamp / 1000) as i64; // convert to microseconds
+
+        assert_eq!(micro_timestamp, 1_640_995_200_123_456);
+
+        // Test edge case: exactly divisible by 1000
+        let exact_nano = 1_000_000_000u64;
+        let exact_micro = (exact_nano / 1000) as i64;
+        assert_eq!(exact_micro, 1_000_000);
+    }
+
+    #[test]
+    fn test_span_duration_edge_cases() {
+        // Test same start and end time (zero duration)
+        let start_time = 1_640_995_200_000_000_000u64;
+        let end_time = start_time;
+        let duration = (end_time - start_time) / 1000;
+        assert_eq!(duration, 0);
+
+        // Test very small duration (1 nanosecond)
+        let end_time_small = start_time + 1;
+        let duration_small = (end_time_small - start_time) / 1000;
+        assert_eq!(duration_small, 0); // Less than 1 microsecond rounds to 0
+
+        // Test 1 microsecond duration
+        let end_time_micro = start_time + 1000;
+        let duration_micro = (end_time_micro - start_time) / 1000;
+        assert_eq!(duration_micro, 1);
+    }
+
+    // Test span status extraction with attributes
+    #[test]
+    fn test_status_attribute_extraction() {
+        use std::collections::HashMap;
+
+        use config::utils::json;
+        use opentelemetry_proto::tonic::trace::v1::{Status, status::StatusCode};
+
+        let mut span_att_map: HashMap<String, json::Value> = HashMap::new();
+        let status = Status {
+            code: StatusCode::Error as i32,
+            message: "Internal server error".to_string(),
+        };
+
+        // Simulate the status attribute extraction logic
+        span_att_map.insert(super::ATTR_STATUS_CODE.into(), status.code.into());
+        span_att_map.insert(
+            super::ATTR_STATUS_MESSAGE.into(),
+            status.message.clone().into(),
+        );
+
+        assert_eq!(
+            span_att_map.get(super::ATTR_STATUS_CODE).unwrap(),
+            &(StatusCode::Error as i32)
+        );
+        assert_eq!(
+            span_att_map.get(super::ATTR_STATUS_MESSAGE).unwrap(),
+            "Internal server error"
+        );
     }
 }

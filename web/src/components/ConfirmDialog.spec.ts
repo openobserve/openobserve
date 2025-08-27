@@ -43,6 +43,23 @@ describe("ConfirmDialog", async () => {
       },
       global: {
         plugins: [i18n],
+        stubs: {
+          'q-dialog': {
+            template: '<div class="q-dialog"><slot /></div>'
+          },
+          'q-card': {
+            template: '<div class="q-card"><slot /></div>'
+          },
+          'q-card-section': {
+            template: '<div class="q-card-section"><slot /></div>'
+          },
+          'q-card-actions': {
+            template: '<div class="q-card-actions"><slot /></div>'
+          },
+          'q-btn': {
+            template: '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']"><slot /></button>'
+          }
+        }
       },
     });
   });
@@ -60,5 +77,49 @@ describe("ConfirmDialog", async () => {
     const documentWrapper = new DOMWrapper(document.body);
     const dialog = documentWrapper.find(".q-dialog");
     expect(dialog.exists()).toBeTruthy();
+  });
+
+  it("should display title and message", () => {
+    expect(wrapper.text()).toContain("Dialog Title");
+    expect(wrapper.text()).toContain("Dialog Message");
+  });
+
+  it("should emit update:ok when confirm button is clicked", async () => {
+    const confirmButton = wrapper.find('[data-test="confirm-button"]');
+    expect(confirmButton.exists()).toBe(true);
+    await confirmButton.trigger("click");
+    expect(wrapper.emitted("update:ok")).toBeTruthy();
+    expect(wrapper.emitted("update:ok").length).toBeGreaterThan(0);
+  });
+
+  it("should emit update:cancel when cancel button is clicked", async () => {
+    const cancelButton = wrapper.find('[data-test="cancel-button"]');
+    expect(cancelButton.exists()).toBe(true);
+    await cancelButton.trigger("click");
+    expect(wrapper.emitted("update:cancel")).toBeTruthy();
+    expect(wrapper.emitted("update:cancel").length).toBeGreaterThan(0);
+  });
+
+  it("should expose onCancel and onConfirm functions", () => {
+    expect(typeof wrapper.vm.onCancel).toBe("function");
+    expect(typeof wrapper.vm.onConfirm).toBe("function");
+  });
+
+  it("should have correct component name", () => {
+    expect(wrapper.vm.$options.name).toBe("ConfirmDialog");
+  });
+
+  it("should call onCancel method", () => {
+    const onCancelSpy = vi.spyOn(wrapper.vm, 'onCancel');
+    wrapper.vm.onCancel();
+    expect(onCancelSpy).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted("update:cancel")).toBeTruthy();
+  });
+
+  it("should call onConfirm method", () => {
+    const onConfirmSpy = vi.spyOn(wrapper.vm, 'onConfirm');
+    wrapper.vm.onConfirm();
+    expect(onConfirmSpy).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted("update:ok")).toBeTruthy();
   });
 });

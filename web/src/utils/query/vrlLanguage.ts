@@ -2,6 +2,12 @@ import { LanguageSupport, StreamLanguage } from '@codemirror/language'
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { tags as t } from '@lezer/highlight'
 
+// VRL keywords for testing and language definition
+export const vrlKeywords = [
+  "if", "else", "for", "while", "loop", "break", "continue", "return",
+  "let", "in", "as", "use", "impl", "type", "abort", "until", "then", "self", "std"
+];
+
 // VRL language definition using StreamLanguage
 export const vrlLanguage = StreamLanguage.define({
   name: 'vrl',
@@ -42,10 +48,7 @@ export const vrlLanguage = StreamLanguage.define({
     // Keywords
     // if (stream.match(/(?<![a-zA-Z0-9_])(if|else|for|while|loop|break|continue|return|let|in|as|use|impl|type|abort|until|then|self|std)(?![a-zA-Z0-9_])/)) return 'keyword'
        // List of keywords
-    const keywords = [
-        "if", "else", "for", "while", "loop", "break", "continue", "return",
-        "let", "in", "as", "use", "impl", "type", "abort", "until", "then", "self", "std"
-    ];
+    const keywords = vrlKeywords;
 
     // In your tokenizer:
     if (stream.match(/[a-zA-Z_][\w]*/)) {

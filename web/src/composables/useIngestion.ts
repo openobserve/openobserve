@@ -52,6 +52,7 @@ const useIngestion = () => {
     aerospike: "https://short.openobserve.ai/database/aerospike",
     dynamoDB: "https://short.openobserve.ai/database/dynamodb",
     databricks: "https://short.openobserve.ai/databricks",
+    oracle: "https://openobserve.ai/docs/integration/database/oracle/",
   };
 
   const securityContent = `HTTP Endpoint: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/[STREAM_NAME]/_json

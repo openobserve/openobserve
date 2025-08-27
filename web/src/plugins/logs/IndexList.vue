@@ -2026,6 +2026,17 @@ export default defineComponent({
       handleSearchReset,
       showOnlyInterestingFields,
       showUserDefinedSchemaToggle,
+      // Additional functions exposed for testing
+      resetFields,
+      sendSearchMessage,
+      handleSearchClose,
+      handleSearchError,
+      fetchValuesWithWebsocket,
+      initializeWebSocketConnection,
+      cancelValueApi,
+      getValuesPartition,
+      streamList,
+      hasUserDefinedSchemas,
     };
   },
 });
