@@ -1785,7 +1785,11 @@ async fn permitted_alerts(
 
 #[cfg(test)]
 mod tests {
+    use arrow_schema::DataType;
+    use serde_json::json;
+
     use super::*;
+    use crate::service::alerts::{Condition, build_expr};
 
     #[test]
     fn test_format_variable_value() {
@@ -1898,5 +1902,17 @@ mod tests {
         let new_cron_exp = update_cron_expression(cron_exp, now);
         let updated = format!("{now} */10 2 * * * *");
         assert_eq!(new_cron_exp, updated);
+    }
+
+    #[tokio::test]
+    async fn test_contains_operator_sql() {
+        let condition = Condition {
+            column: "auth_username".to_string(),
+            operator: Operator::Contains,
+            value: json!("enrique"),
+            ignore_case: false,
+        };
+        let sql = build_expr(&condition, "", &DataType::Utf8).unwrap();
+        assert_eq!(sql, "str_match(\"auth_username\", 'enrique')");
     }
 }

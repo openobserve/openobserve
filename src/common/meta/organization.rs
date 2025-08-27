@@ -150,7 +150,7 @@ pub struct OrgSummary {
     pub total_dashboards: i64,
 }
 
-#[derive(Default, Serialize, Deserialize, ToSchema)]
+#[derive(Default, Clone, Serialize, Deserialize, ToSchema)]
 pub struct StreamSummary {
     pub num_streams: i64,
     pub total_records: i64,
@@ -159,7 +159,7 @@ pub struct StreamSummary {
     pub total_index_size: f64,
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Serialize, Deserialize, ToSchema)]
 pub struct PipelineSummary {
     pub num_realtime: i64,
     pub num_scheduled: i64,
@@ -178,7 +178,7 @@ pub enum IngestionTokensContainer {
     RumToken(RumIngestionToken),
 }
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, ToSchema, Clone)]
 pub struct IngestionPasscode {
     pub passcode: String,
     pub user: String,
@@ -189,7 +189,7 @@ pub struct PasscodeResponse {
     pub data: IngestionPasscode,
 }
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, ToSchema, Clone)]
 pub struct RumIngestionToken {
     pub user: String,
     pub rum_token: Option<String>,
@@ -516,5 +516,587 @@ mod tests {
 
         assert_eq!(record.status, InviteStatus::Pending);
         assert!(record.is_external);
+    }
+
+    #[test]
+    fn test_organization_creation() {
+        let org = Organization {
+            identifier: "test-org-123".to_string(),
+            name: "Test Organization".to_string(),
+            org_type: "premium".to_string(),
+        };
+
+        assert_eq!(org.identifier, "test-org-123");
+        assert_eq!(org.name, "Test Organization");
+        assert_eq!(org.org_type, "premium");
+    }
+
+    #[test]
+    fn test_organization_default_values() {
+        let org = Organization {
+            identifier: Default::default(),
+            name: "Test Org".to_string(),
+            org_type: Default::default(),
+        };
+
+        assert_eq!(org.identifier, "");
+        assert_eq!(org.name, "Test Org");
+        assert_eq!(org.org_type, "");
+    }
+
+    #[test]
+    fn test_org_rename_body() {
+        let rename_req = OrgRenameBody {
+            new_name: "New Organization Name".to_string(),
+        };
+
+        assert_eq!(rename_req.new_name, "New Organization Name");
+    }
+
+    #[test]
+    fn test_org_role_mapping() {
+        let mapping = OrgRoleMapping {
+            org_id: "org-123".to_string(),
+            org_name: "Test Org".to_string(),
+            role: UserRole::Admin,
+        };
+
+        assert_eq!(mapping.org_id, "org-123");
+        assert_eq!(mapping.org_name, "Test Org");
+        assert_eq!(mapping.role, UserRole::Admin);
+    }
+
+    #[test]
+    fn test_org_user() {
+        let user = OrgUser {
+            first_name: "John".to_string(),
+            last_name: "Doe".to_string(),
+            email: "john.doe@example.com".to_string(),
+        };
+
+        assert_eq!(user.first_name, "John");
+        assert_eq!(user.last_name, "Doe");
+        assert_eq!(user.email, "john.doe@example.com");
+    }
+
+    #[test]
+    fn test_org_details() {
+        let user = OrgUser {
+            first_name: "Jane".to_string(),
+            last_name: "Smith".to_string(),
+            email: "jane.smith@example.com".to_string(),
+        };
+
+        let org_details = OrgDetails {
+            id: 42,
+            identifier: "org-42".to_string(),
+            name: "Test Organization".to_string(),
+            user_email: "admin@example.com".to_string(),
+            ingest_threshold: 1000000,
+            search_threshold: 500000,
+            org_type: "enterprise".to_string(),
+            user_obj: user.clone(),
+            plan: 2,
+        };
+
+        assert_eq!(org_details.id, 42);
+        assert_eq!(org_details.identifier, "org-42");
+        assert_eq!(org_details.name, "Test Organization");
+        assert_eq!(org_details.user_email, "admin@example.com");
+        assert_eq!(org_details.ingest_threshold, 1000000);
+        assert_eq!(org_details.search_threshold, 500000);
+        assert_eq!(org_details.org_type, "enterprise");
+        assert_eq!(org_details.user_obj.email, user.email);
+        assert_eq!(org_details.plan, 2);
+    }
+
+    #[test]
+    fn test_all_org_list_details() {
+        let details = AllOrgListDetails {
+            id: 123,
+            identifier: "org-123".to_string(),
+            name: "Test Org List".to_string(),
+            created_at: 1640995200,
+            updated_at: 1640995260,
+            org_type: "standard".to_string(),
+            plan: 1,
+            trial_expires_at: Some(1641081600),
+        };
+
+        assert_eq!(details.id, 123);
+        assert_eq!(details.identifier, "org-123");
+        assert_eq!(details.name, "Test Org List");
+        assert_eq!(details.created_at, 1640995200);
+        assert_eq!(details.updated_at, 1640995260);
+        assert_eq!(details.org_type, "standard");
+        assert_eq!(details.plan, 1);
+        assert_eq!(details.trial_expires_at, Some(1641081600));
+    }
+
+    #[test]
+    fn test_all_org_list_details_default_plan() {
+        let details = AllOrgListDetails {
+            id: 123,
+            identifier: "org-123".to_string(),
+            name: "Test Org".to_string(),
+            created_at: 1640995200,
+            updated_at: 1640995260,
+            org_type: "standard".to_string(),
+            plan: Default::default(),
+            trial_expires_at: None,
+        };
+
+        assert_eq!(details.plan, 0);
+        assert_eq!(details.trial_expires_at, None);
+    }
+
+    #[test]
+    fn test_organization_response() {
+        let user = OrgUser {
+            first_name: "Test".to_string(),
+            last_name: "User".to_string(),
+            email: "test@example.com".to_string(),
+        };
+
+        let org_details = OrgDetails {
+            id: 1,
+            identifier: "org-1".to_string(),
+            name: "Org One".to_string(),
+            user_email: "admin1@example.com".to_string(),
+            ingest_threshold: THRESHOLD,
+            search_threshold: THRESHOLD,
+            org_type: "basic".to_string(),
+            user_obj: user,
+            plan: 0,
+        };
+
+        let response = OrganizationResponse {
+            data: vec![org_details],
+        };
+
+        assert_eq!(response.data.len(), 1);
+        assert_eq!(response.data[0].identifier, "org-1");
+        assert_eq!(response.data[0].ingest_threshold, THRESHOLD);
+    }
+
+    #[test]
+    fn test_all_organization_response() {
+        let details1 = AllOrgListDetails {
+            id: 1,
+            identifier: "org-1".to_string(),
+            name: "Org One".to_string(),
+            created_at: 1640995200,
+            updated_at: 1640995260,
+            org_type: "basic".to_string(),
+            plan: 0,
+            trial_expires_at: None,
+        };
+
+        let details2 = AllOrgListDetails {
+            id: 2,
+            identifier: "org-2".to_string(),
+            name: "Org Two".to_string(),
+            created_at: 1640995300,
+            updated_at: 1640995360,
+            org_type: "premium".to_string(),
+            plan: 1,
+            trial_expires_at: Some(1641081600),
+        };
+
+        let response = AllOrganizationResponse {
+            data: vec![details1, details2],
+        };
+
+        assert_eq!(response.data.len(), 2);
+        assert_eq!(response.data[0].name, "Org One");
+        assert_eq!(response.data[1].name, "Org Two");
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_extend_trial_period_request() {
+        let request = ExtendTrialPeriodRequest {
+            org_id: "org-trial".to_string(),
+            new_end_date: 1641081600,
+        };
+
+        assert_eq!(request.org_id, "org-trial");
+        assert_eq!(request.new_end_date, 1641081600);
+    }
+
+    #[test]
+    fn test_org_summary() {
+        let stream_summary = StreamSummary {
+            num_streams: 10,
+            total_records: 1000000,
+            total_storage_size: 1024.0 * 1024.0 * 100.0, // 100MB
+            total_compressed_size: 1024.0 * 1024.0 * 25.0, // 25MB
+            total_index_size: 1024.0 * 1024.0 * 5.0,     // 5MB
+        };
+
+        let pipeline_summary = PipelineSummary {
+            num_realtime: 5,
+            num_scheduled: 3,
+        };
+
+        let alert_summary = AlertSummary {
+            num_realtime: 12,
+            num_scheduled: 8,
+        };
+
+        let summary = OrgSummary {
+            streams: stream_summary,
+            pipelines: pipeline_summary,
+            alerts: alert_summary,
+            total_functions: 25,
+            total_dashboards: 15,
+        };
+
+        assert_eq!(summary.streams.num_streams, 10);
+        assert_eq!(summary.streams.total_records, 1000000);
+        assert_eq!(summary.pipelines.num_realtime, 5);
+        assert_eq!(summary.pipelines.num_scheduled, 3);
+        assert_eq!(summary.alerts.num_realtime, 12);
+        assert_eq!(summary.alerts.num_scheduled, 8);
+        assert_eq!(summary.total_functions, 25);
+        assert_eq!(summary.total_dashboards, 15);
+    }
+
+    #[test]
+    fn test_stream_summary_default() {
+        let summary = StreamSummary::default();
+        assert_eq!(summary.num_streams, 0);
+        assert_eq!(summary.total_records, 0);
+        assert_eq!(summary.total_storage_size, 0.0);
+        assert_eq!(summary.total_compressed_size, 0.0);
+        assert_eq!(summary.total_index_size, 0.0);
+    }
+
+    #[test]
+    fn test_pipeline_summary() {
+        let summary = PipelineSummary {
+            num_realtime: 7,
+            num_scheduled: 4,
+        };
+
+        assert_eq!(summary.num_realtime, 7);
+        assert_eq!(summary.num_scheduled, 4);
+    }
+
+    #[test]
+    fn test_alert_summary() {
+        let summary = AlertSummary {
+            num_realtime: 20,
+            num_scheduled: 15,
+        };
+
+        assert_eq!(summary.num_realtime, 20);
+        assert_eq!(summary.num_scheduled, 15);
+    }
+
+    #[test]
+    fn test_ingestion_passcode() {
+        let passcode = IngestionPasscode {
+            passcode: "secret123".to_string(),
+            user: "admin@example.com".to_string(),
+        };
+
+        assert_eq!(passcode.passcode, "secret123");
+        assert_eq!(passcode.user, "admin@example.com");
+    }
+
+    #[test]
+    fn test_passcode_response() {
+        let passcode = IngestionPasscode {
+            passcode: "token456".to_string(),
+            user: "user@example.com".to_string(),
+        };
+
+        let response = PasscodeResponse {
+            data: passcode.clone(),
+        };
+
+        assert_eq!(response.data.passcode, "token456");
+        assert_eq!(response.data.user, "user@example.com");
+    }
+
+    #[test]
+    fn test_rum_ingestion_token() {
+        let token = RumIngestionToken {
+            user: "rum_user@example.com".to_string(),
+            rum_token: Some("rum_token_123".to_string()),
+        };
+
+        assert_eq!(token.user, "rum_user@example.com");
+        assert_eq!(token.rum_token, Some("rum_token_123".to_string()));
+    }
+
+    #[test]
+    fn test_rum_ingestion_token_none() {
+        let token = RumIngestionToken {
+            user: "rum_user@example.com".to_string(),
+            rum_token: None,
+        };
+
+        assert_eq!(token.user, "rum_user@example.com");
+        assert_eq!(token.rum_token, None);
+    }
+
+    #[test]
+    fn test_rum_ingestion_response() {
+        let token = RumIngestionToken {
+            user: "rum_user@example.com".to_string(),
+            rum_token: Some("rum_secret".to_string()),
+        };
+
+        let response = RumIngestionResponse {
+            data: token.clone(),
+        };
+
+        assert_eq!(response.data.user, "rum_user@example.com");
+        assert_eq!(response.data.rum_token, Some("rum_secret".to_string()));
+    }
+
+    #[test]
+    fn test_organization_setting_payload_all_none() {
+        let payload = OrganizationSettingPayload {
+            scrape_interval: None,
+            trace_id_field_name: None,
+            span_id_field_name: None,
+            toggle_ingestion_logs: None,
+            streaming_aggregation_enabled: None,
+            enable_streaming_search: None,
+            min_auto_refresh_interval: None,
+        };
+
+        assert_eq!(payload.scrape_interval, None);
+        assert_eq!(payload.trace_id_field_name, None);
+        assert_eq!(payload.span_id_field_name, None);
+        assert_eq!(payload.toggle_ingestion_logs, None);
+        assert_eq!(payload.streaming_aggregation_enabled, None);
+        assert_eq!(payload.enable_streaming_search, None);
+        assert_eq!(payload.min_auto_refresh_interval, None);
+    }
+
+    #[test]
+    fn test_organization_setting_payload_with_values() {
+        let payload = OrganizationSettingPayload {
+            scrape_interval: Some(30),
+            trace_id_field_name: Some("custom_trace_id".to_string()),
+            span_id_field_name: Some("custom_span_id".to_string()),
+            toggle_ingestion_logs: Some(true),
+            streaming_aggregation_enabled: Some(false),
+            enable_streaming_search: Some(true),
+            min_auto_refresh_interval: Some(10),
+        };
+
+        assert_eq!(payload.scrape_interval, Some(30));
+        assert_eq!(
+            payload.trace_id_field_name,
+            Some("custom_trace_id".to_string())
+        );
+        assert_eq!(
+            payload.span_id_field_name,
+            Some("custom_span_id".to_string())
+        );
+        assert_eq!(payload.toggle_ingestion_logs, Some(true));
+        assert_eq!(payload.streaming_aggregation_enabled, Some(false));
+        assert_eq!(payload.enable_streaming_search, Some(true));
+        assert_eq!(payload.min_auto_refresh_interval, Some(10));
+    }
+
+    #[test]
+    fn test_organization_setting_with_trial_expiry() {
+        let mut setting = OrganizationSetting::default();
+        setting.free_trial_expiry = Some(1641081600);
+
+        assert_eq!(setting.free_trial_expiry, Some(1641081600));
+        assert_eq!(setting.trace_id_field_name, "trace_id");
+        assert_eq!(setting.span_id_field_name, "span_id");
+    }
+
+    #[test]
+    fn test_organization_setting_response() {
+        let setting = OrganizationSetting::default();
+        let response = OrganizationSettingResponse {
+            data: setting.clone(),
+        };
+
+        assert_eq!(
+            response.data.trace_id_field_name,
+            setting.trace_id_field_name
+        );
+        assert_eq!(response.data.span_id_field_name, setting.span_id_field_name);
+    }
+
+    #[test]
+    fn test_node_list_request_default() {
+        let request = NodeListRequest::default();
+        assert!(request.regions.is_empty());
+    }
+
+    #[test]
+    fn test_node_list_request_with_regions() {
+        let request = NodeListRequest {
+            regions: vec!["us-east-1".to_string(), "us-west-2".to_string()],
+        };
+
+        assert_eq!(request.regions.len(), 2);
+        assert!(request.regions.contains(&"us-east-1".to_string()));
+        assert!(request.regions.contains(&"us-west-2".to_string()));
+    }
+
+    #[test]
+    fn test_region_info_default() {
+        let region_info: RegionInfo<Vec<Node>> = RegionInfo::default();
+        assert!(region_info.clusters.is_empty());
+    }
+
+    #[test]
+    fn test_node_list_response_multiple_regions() {
+        let node1 = Node {
+            name: "node-1".to_string(),
+            ..Default::default()
+        };
+
+        let node2 = Node {
+            name: "node-2".to_string(),
+            ..Default::default()
+        };
+
+        let mut response = NodeListResponse::new();
+        response.add_node(
+            node1.clone(),
+            "us-east".to_string(),
+            "cluster-a".to_string(),
+        );
+        response.add_node(
+            node2.clone(),
+            "eu-west".to_string(),
+            "cluster-b".to_string(),
+        );
+
+        assert_eq!(response.regions.len(), 2);
+        assert!(response.regions.contains_key("us-east"));
+        assert!(response.regions.contains_key("eu-west"));
+
+        let us_nodes = &response
+            .regions
+            .get("us-east")
+            .unwrap()
+            .clusters
+            .get("cluster-a")
+            .unwrap();
+        assert_eq!(us_nodes.len(), 1);
+        assert_eq!(us_nodes[0].name, "node-1");
+
+        let eu_nodes = &response
+            .regions
+            .get("eu-west")
+            .unwrap()
+            .clusters
+            .get("cluster-b")
+            .unwrap();
+        assert_eq!(eu_nodes.len(), 1);
+        assert_eq!(eu_nodes[0].name, "node-2");
+    }
+
+    #[test]
+    fn test_cluster_info_default() {
+        let info = ClusterInfo::default();
+        assert_eq!(info.pending_jobs, 0);
+    }
+
+    #[test]
+    fn test_cluster_info_with_jobs() {
+        let info = ClusterInfo { pending_jobs: 42 };
+        assert_eq!(info.pending_jobs, 42);
+    }
+
+    #[test]
+    fn test_cluster_info_response_default() {
+        let response = ClusterInfoResponse::default();
+        assert!(response.regions.is_empty());
+    }
+
+    #[test]
+    fn test_cluster_info_response_multiple_clusters() {
+        let mut response = ClusterInfoResponse::default();
+
+        let info1 = ClusterInfo { pending_jobs: 5 };
+        let info2 = ClusterInfo { pending_jobs: 10 };
+
+        response.add_cluster_info(
+            info1.clone(),
+            "cluster-1".to_string(),
+            "us-east".to_string(),
+        );
+        response.add_cluster_info(
+            info2.clone(),
+            "cluster-2".to_string(),
+            "us-east".to_string(),
+        );
+
+        assert_eq!(response.regions.len(), 1);
+        let region = response.regions.get("us-east").unwrap();
+        assert_eq!(region.clusters.len(), 2);
+        assert_eq!(region.clusters.get("cluster-1").unwrap().pending_jobs, 5);
+        assert_eq!(region.clusters.get("cluster-2").unwrap().pending_jobs, 10);
+    }
+
+    #[test]
+    fn test_constants() {
+        assert_eq!(DEFAULT_ORG, "default");
+        assert_eq!(CUSTOM, "custom");
+        assert_eq!(USER_DEFAULT, "user_default");
+        assert_eq!(THRESHOLD, 9383939382);
+    }
+
+    #[test]
+    fn test_serialization_deserialization() {
+        let org = Organization {
+            identifier: "test-org".to_string(),
+            name: "Test Organization".to_string(),
+            org_type: "enterprise".to_string(),
+        };
+
+        // Test serialization
+        let json = serde_json::to_string(&org).expect("Failed to serialize");
+        assert!(!json.is_empty());
+
+        // Test deserialization
+        let deserialized: Organization =
+            serde_json::from_str(&json).expect("Failed to deserialize");
+        assert_eq!(deserialized.identifier, org.identifier);
+        assert_eq!(deserialized.name, org.name);
+        assert_eq!(deserialized.org_type, org.org_type);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_organization_invite_response_data_default() {
+        let data = OrganizationInviteResponseData::default();
+        assert_eq!(data.valid_members, None);
+        assert_eq!(data.existing_members, None);
+        assert_eq!(data.invalid_email, None);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_organization_invite_response() {
+        let data = OrganizationInviteResponseData {
+            valid_members: Some(vec!["user1@example.com".to_string()]),
+            existing_members: None,
+            invalid_email: None,
+        };
+
+        let response = OrganizationInviteResponse {
+            data,
+            message: "Invitation sent successfully".to_string(),
+        };
+
+        assert_eq!(response.message, "Invitation sent successfully");
+        assert!(response.data.valid_members.is_some());
+        assert_eq!(response.data.valid_members.as_ref().unwrap().len(), 1);
     }
 }

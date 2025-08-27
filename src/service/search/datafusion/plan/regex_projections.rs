@@ -163,7 +163,7 @@ mod tests {
         let parsed = get_sql(sql).await;
         let res = get_columns_from_projections(parsed).await.unwrap();
         let mappings = res.get("default").unwrap();
-        assert!(mappings.len() >= 1);
+        assert!(!mappings.is_empty());
         let namespace_mapping = mappings
             .iter()
             .find(|m| m.output_field == "namespace")
@@ -190,14 +190,12 @@ mod tests {
         assert!(
             mappings
                 .iter()
-                .find(|m| m.source_columns.contains("k8s_namespace_name"))
-                .is_some()
+                .any(|m| m.source_columns.contains("k8s_namespace_name"))
         );
         assert!(
             mappings
                 .iter()
-                .find(|m| m.source_columns.contains("floatvalue"))
-                .is_some()
+                .any(|m| m.source_columns.contains("floatvalue"))
         );
     }
 
@@ -208,7 +206,7 @@ mod tests {
         let res = get_columns_from_projections(parsed).await.unwrap();
         let mappings = res.get("default").unwrap();
 
-        assert!(mappings.len() >= 1);
+        assert!(!mappings.is_empty());
 
         let mapping = mappings
             .iter()
@@ -224,7 +222,7 @@ mod tests {
         let res = get_columns_from_projections(parsed).await.unwrap();
         let mappings = res.get("default").unwrap();
 
-        assert!(mappings.len() >= 1);
+        assert!(!mappings.is_empty());
 
         let mapping = mappings
             .iter()
@@ -247,23 +245,16 @@ mod tests {
 
         assert!(mappings.len() >= 2);
 
+        assert!(mappings.iter().any(|m| m.output_field == "full_name"));
         assert!(
             mappings
                 .iter()
-                .find(|m| m.output_field == "full_name")
-                .is_some()
+                .any(|m| m.source_columns.contains("k8s_namespace_name"))
         );
         assert!(
             mappings
                 .iter()
-                .find(|m| m.source_columns.contains("k8s_namespace_name"))
-                .is_some()
-        );
-        assert!(
-            mappings
-                .iter()
-                .find(|m| m.source_columns.contains("k8s_pod_name"))
-                .is_some()
+                .any(|m| m.source_columns.contains("k8s_pod_name"))
         );
     }
 
@@ -278,15 +269,9 @@ mod tests {
         assert!(
             mappings
                 .iter()
-                .find(|m| m.output_field == "k8s_namespace_name")
-                .is_some()
+                .any(|m| m.output_field == "k8s_namespace_name")
         );
-        assert!(
-            mappings
-                .iter()
-                .find(|m| m.output_field == "k8s_pod_name")
-                .is_some()
-        );
+        assert!(mappings.iter().any(|m| m.output_field == "k8s_pod_name"));
     }
 
     #[tokio::test]
@@ -312,16 +297,10 @@ mod tests {
         assert!(
             mappings
                 .iter()
-                .find(|m| m.output_field == "k8s_namespace_name")
-                .is_some()
+                .any(|m| m.output_field == "k8s_namespace_name")
         );
 
-        assert!(
-            mappings
-                .iter()
-                .find(|m| m.output_field == "count")
-                .is_some()
-        );
+        assert!(mappings.iter().any(|m| m.output_field == "count"));
     }
 
     #[tokio::test]
@@ -344,16 +323,10 @@ mod tests {
         assert!(
             mappings
                 .iter()
-                .find(|m| m.source_columns.contains("k8s_namespace_name"))
-                .is_some()
+                .any(|m| m.source_columns.contains("k8s_namespace_name"))
         );
 
-        assert!(
-            mappings
-                .iter()
-                .find(|m| m.output_field == "total_count")
-                .is_some()
-        );
+        assert!(mappings.iter().any(|m| m.output_field == "total_count"));
     }
 
     #[tokio::test]
@@ -368,21 +341,15 @@ mod tests {
         let res = get_columns_from_projections(parsed).await.unwrap();
         let mappings = res.get("default").unwrap();
 
-        assert!(mappings.len() >= 1);
+        assert!(!mappings.is_empty());
 
         assert!(
             mappings
                 .iter()
-                .find(|m| m.source_columns.contains("k8s_namespace_name"))
-                .is_some()
+                .any(|m| m.source_columns.contains("k8s_namespace_name"))
         );
 
-        assert!(
-            mappings
-                .iter()
-                .find(|m| m.output_field == "max_value")
-                .is_some()
-        );
+        assert!(mappings.iter().any(|m| m.output_field == "max_value"));
     }
 
     #[tokio::test]
@@ -405,7 +372,7 @@ mod tests {
         let res = get_columns_from_projections(parsed).await.unwrap();
         let mappings = res.get("default").unwrap();
 
-        assert!(mappings.len() >= 1);
+        assert!(!mappings.is_empty());
 
         let namespace_mapping = mappings
             .iter()
@@ -439,13 +406,8 @@ mod tests {
         let parsed = get_sql(sql).await;
         let res = get_columns_from_projections(parsed).await.unwrap();
         let mappings = res.get("default").unwrap();
-        assert!(mappings.len() >= 1);
-        assert!(
-            mappings
-                .iter()
-                .find(|m| m.output_field == "max_value")
-                .is_some()
-        );
+        assert!(!mappings.is_empty());
+        assert!(mappings.iter().any(|m| m.output_field == "max_value"));
 
         let mappings = res.get("t2").unwrap();
         assert!(mappings.len() >= 2);
@@ -453,15 +415,9 @@ mod tests {
         assert!(
             mappings
                 .iter()
-                .find(|m| m.output_field == "k8s_namespace_name")
-                .is_some()
+                .any(|m| m.output_field == "k8s_namespace_name")
         );
-        assert!(
-            mappings
-                .iter()
-                .find(|m| m.output_field == "k8s_pod_name")
-                .is_some()
-        );
+        assert!(mappings.iter().any(|m| m.output_field == "k8s_pod_name"));
     }
 
     #[tokio::test]
@@ -496,12 +452,7 @@ mod tests {
                 .contains("k8s_namespace_name")
         );
 
-        assert!(
-            mappings
-                .iter()
-                .find(|m| m.output_field == "count")
-                .is_some()
-        );
+        assert!(mappings.iter().any(|m| m.output_field == "count"));
     }
 
     #[tokio::test]
@@ -511,7 +462,7 @@ mod tests {
         let res = get_columns_from_projections(parsed).await.unwrap();
         let mappings = res.get("default").unwrap();
 
-        assert!(mappings.len() >= 1);
+        assert!(!mappings.is_empty());
 
         let direct_mapping = mappings
             .iter()
@@ -554,29 +505,17 @@ mod tests {
         assert!(
             default_mappings
                 .iter()
-                .find(|m| m.source_columns.contains("k8s_namespace_name"))
-                .is_some()
+                .any(|m| m.source_columns.contains("k8s_namespace_name"))
         );
-        assert!(
-            default_mappings
-                .iter()
-                .find(|m| m.output_field == "k1")
-                .is_some()
-        );
+        assert!(default_mappings.iter().any(|m| m.output_field == "k1"));
 
         let t2_mappings = grouped_mappings.get("t2").unwrap();
         assert!(
             t2_mappings
                 .iter()
-                .find(|m| m.source_columns.contains("k8s_namespace_name"))
-                .is_some()
+                .any(|m| m.source_columns.contains("k8s_namespace_name"))
         );
-        assert!(
-            t2_mappings
-                .iter()
-                .find(|m| m.output_field == "k2")
-                .is_some()
-        );
+        assert!(t2_mappings.iter().any(|m| m.output_field == "k2"));
     }
 
     #[tokio::test]
@@ -593,8 +532,7 @@ mod tests {
         assert!(
             mappings
                 .iter()
-                .find(|m| m.output_field == "k8s_namespace_name")
-                .is_some()
+                .any(|m| m.output_field == "k8s_namespace_name")
         );
     }
 }

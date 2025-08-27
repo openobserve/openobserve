@@ -824,6 +824,20 @@ export default defineComponent({
       selectedSearchType,
       filterUserQueries,
       summaryRows,
+      // Additional functions for testing
+      getRunningQueriesSummary,
+      getCurrentTime,
+      localTimeToMicroseconds,
+      getDuration,
+      queryRange,
+      getDurationInSeconds,
+      getGroupedQueryRange,
+      baseFilteredQueries,
+      searchTypeFiltered,
+      fieldFiltered,
+      filteredRows,
+      filterQueryBySearchTypeTab,
+      filterQueryCriteria,
     };
   },
 });

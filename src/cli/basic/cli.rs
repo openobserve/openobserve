@@ -399,6 +399,14 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         "parse-id" => {
             let id = command.get_one::<String>("id").unwrap();
             println!("id: {id}");
+            // Snowflake IDs are expected to be 19 digits. If the input ID is longer,
+            // we truncate to the first 19 digits to ensure correct parsing; any extra digits are
+            // ignored.
+            let id = if id.len() > 19 {
+                id[..19].to_string()
+            } else {
+                id.to_string()
+            };
             let id = id.parse::<i64>().unwrap();
             let ts = config::ider::to_timestamp_millis(id);
             println!("timestamp: {ts}");

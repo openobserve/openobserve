@@ -226,7 +226,7 @@ describe("Database Component", () => {
       await wrapper.vm.$nextTick();
       
       // Should show all tabs again
-      expect(wrapper.vm.filteredList.length).toBe(11); // Total number of database tabs
+      expect(wrapper.vm.filteredList.length).toBe(12); // Total number of database tabs
     });
 
     it("should be case insensitive", async () => {
@@ -550,7 +550,7 @@ describe("Database Component", () => {
       await wrapper.vm.$nextTick();
       
       const allTabs = wrapper.vm.filteredList;
-      expect(allTabs.length).toBe(11);
+      expect(allTabs.length).toBe(12);
     });
 
     it("should filter based on label content", async () => {
@@ -715,7 +715,7 @@ describe("Database Component", () => {
     it("should expose databaseTabs array", () => {
       expect(wrapper.vm.databaseTabs).toBeDefined();
       expect(Array.isArray(wrapper.vm.databaseTabs)).toBe(true);
-      expect(wrapper.vm.databaseTabs.length).toBe(11);
+      expect(wrapper.vm.databaseTabs.length).toBe(12);
     });
 
     it("should have databaseTabs with consistent structure", () => {

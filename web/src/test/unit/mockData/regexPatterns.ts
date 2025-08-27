@@ -13,24 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use tokio::time;
-
-use crate::common::meta::telemetry::Telemetry;
-
-pub async fn run() -> Result<(), anyhow::Error> {
-    let cfg = config::get_config();
-    if !cfg.common.telemetry_enabled {
-        return Ok(());
+export const regexPatterns = {
+  patterns: [
+    {
+      id: "pattern-1",
+      name: "Email Pattern",
+      pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+      description: "Matches email addresses",
+      created_at: 1640995200, // 2022-01-01
+      updated_at: 1640995200
+    },
+    {
+      id: "pattern-2", 
+      name: "IP Address Pattern",
+      pattern: "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$",
+      description: "Matches IPv4 addresses",
+      created_at: 1640995300,
+      updated_at: 1640995300
     }
+  ]
+};
 
-    let mut interval = time::interval(time::Duration::from_secs(
-        (cfg.common.telemetry_heartbeat).try_into().unwrap(),
-    ));
-    interval.tick().await;
-    loop {
-        interval.tick().await;
-        Telemetry::new()
-            .heart_beat("OpenObserve - heartbeat", None)
-            .await;
-    }
-}
+export const testResults = {
+  results: ["test@example.com", "user@domain.org"]
+};
+
+export default regexPatterns;
