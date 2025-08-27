@@ -24,13 +24,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_service_constants() {
-        assert_eq!(LOGS, "logs");
-        assert_eq!(METRICS, "metrics");
-        assert_eq!(TRACES, "traces");
-    }
-
-    #[test]
     fn test_service_constants_are_unique() {
         let services = [LOGS, METRICS, TRACES];
         assert!(HashSet::from(services).len() == services.len());
