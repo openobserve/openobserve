@@ -27,6 +27,12 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
     let latest_update_at = infra_file_list::get_max_update_at()
         .await
         .map_err(|e| anyhow::anyhow!("get latest update_at error: {:?}", e))?;
+
+    // no data in file_list
+    if latest_update_at == 0 {
+        return Ok(None);
+    }
+
     // set the max_ts shouldn't greater than NOW-1m to avoid the latest data duplicated calculation
     let latest_update_at = std::cmp::min(latest_update_at, now_micros() - second_micros(60));
 
@@ -59,20 +65,17 @@ async fn update_stats_from_file_list_inner(
         }
     }
 
-    // check if the offset is empty
-    if offset == 0 {
-        // get the min_date from file_list
-        offset = infra_file_list::get_min_update_at().await?;
-    }
+    // check min_update_at
+    let min_update_at = if offset == 0 {
+        infra_file_list::get_min_update_at().await?
+    } else {
+        offset
+    };
 
     // apply step limit
     let step_limit = config::get_config().limit.calculate_stats_step_limit;
-    let latest_update_at = std::cmp::min(offset + second_micros(step_limit), latest_update_at);
-    let time_range = if offset == 0 && latest_update_at == 0 {
-        return Ok(None);
-    } else {
-        (offset, latest_update_at)
-    };
+    let latest_update_at =
+        std::cmp::min(min_update_at + second_micros(step_limit), latest_update_at);
 
     // there is no new data to process
     if offset == latest_update_at {
@@ -80,6 +83,7 @@ async fn update_stats_from_file_list_inner(
     }
 
     // get stats from file_list
+    let time_range = (offset, latest_update_at);
     let stream_stats = infra_file_list::stats(time_range)
         .await
         .map_err(|e| anyhow::anyhow!("get add stream stats error: {e}"))?;

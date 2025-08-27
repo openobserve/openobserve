@@ -1714,7 +1714,11 @@ CREATE TABLE IF NOT EXISTS stream_stats
     )
     .await?;
 
-    // create column updated_at for version >= 0.14.7
+    // create column created_at and updated_at for version >= 0.14.7
+    let column = "created_at";
+    let data_type = "BIGINT default 0 not null";
+    add_column(&client, "file_list", column, data_type).await?;
+    add_column(&client, "file_list_history", column, data_type).await?;
     let column = "updated_at";
     let data_type = "BIGINT default 0 not null";
     add_column(&client, "file_list", column, data_type).await?;
