@@ -45,7 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw-flex tw-items-center">
         <q-toggle
           data-test="create-function-toggle"
-          class="q-mb-sm tw-inline-block"
+          class="q-mb-sm tw-inline-block tw-h-[36px] o2-toggle-button-lg"
+          size="lg"
+          :class="[store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light', !createNewFunction ? '-tw-ml-4' : '']"
           :label="isUpdating ? 'Edit function' : 'Create new function'"
           v-model="createNewFunction"
         />
@@ -111,7 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-toggle
             data-test="associate-function-after-flattening-toggle"
-            class="q-mb-sm"
+            class="q-mb-sm tw-h-[36px] o2-toggle-button-lg tw-mr-3 -tw-ml-4"
+            size="lg"
+            :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
             :label="t('pipeline.flatteningLbl')"
             v-model="afterFlattening"
           />

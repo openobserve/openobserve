@@ -30,9 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div   class="stream-routing-container full-width q-py-md">
       <q-toggle
-      v-if="selectedNodeType == 'input'"
+        v-if="selectedNodeType == 'input'"
         data-test="create-stream-toggle"
-        class="q-mb-sm"
+        class="q-mb-sm tw-mr-3 tw-h-[36px] o2-toggle-button-lg"
+        size="lg"
+        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
         :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
         v-model="createNewStream"
       />
