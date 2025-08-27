@@ -54,7 +54,7 @@ test.describe("dashboard UI testcases", () => {
     await deleteDashboard(page, randomDashboardName);
   });
 
-  test.skip("should display the correct data before and after transposing in the table chart", async ({
+  test("should display the correct data before and after transposing in the table chart", async ({
     page,
   }) => {
     const pm = new PageManager(page);
@@ -142,6 +142,11 @@ test.describe("dashboard UI testcases", () => {
       );
       const sortedTransposedData = transposedData.sort((a, b) =>
         a[0].localeCompare(b[0])
+      );
+
+      console.log(
+        JSON.parse(JSON.stringify(sortedFlattenedInitialData)),
+        JSON.parse(JSON.stringify(sortedTransposedData))
       );
 
       // Step 6: Directly compare sorted arrays
