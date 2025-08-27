@@ -17,7 +17,11 @@ use std::str::FromStr;
 
 use async_recursion::async_recursion;
 use chrono::Utc;
-use config::{get_config, meta::search::Response, utils::json};
+use config::{
+    get_config,
+    meta::search::Response,
+    utils::{json, time::second_micros},
+};
 use infra::cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta};
 
 use super::{cacher::get_results, sort_response};
@@ -135,7 +139,7 @@ async fn recursive_process_multiple_metas(
 
         // Calculate delta time range to fetch the delta data using search query
         let cfg = get_config();
-        let discard_duration = cfg.limit.cache_delay_secs * 1000 * 1000;
+        let discard_duration = second_micros(cfg.limit.cache_delay_secs);
 
         let cache_duration = matching_cache_meta.end_time - matching_cache_meta.start_time;
         if
