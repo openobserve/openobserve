@@ -19,7 +19,7 @@ import { useLogsState } from "@/composables/useLogsState";
 import useWebSocket from "@/composables/useWebSocket";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useStreamingSearch from "@/composables/useStreamingSearch";
-import { useNotifications } from "@/composables/useNotifications";
+import useNotifications from "@/composables/useNotifications";
 import {
   isWebSocketEnabled,
   isStreamingEnabled,

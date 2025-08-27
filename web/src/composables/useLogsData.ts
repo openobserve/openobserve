@@ -36,13 +36,14 @@ import {
   formatTimestampUtil,
 } from "@/utils/logs/datetime";
 import {
-  chunkedAppendUtil,
-  transformLogDataUtil,
+  chunkedAppend,
   processStreamDataUtil,
+  transformLogDataUtil,
 } from "@/utils/logs/transformers";
-import { fnParsedSQL } from "@/utils/logs/parsers";
+import { createSQLParserFunctions } from "@/utils/logs/parsers";
+import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { validateAggregationQuery } from "@/utils/logs/validators";
-import { showErrorNotification } from "@/utils/common";
+import useNotifications from "@/composables/useNotifications";
 
 interface StreamData {
   [key: string]: any;
@@ -60,12 +61,24 @@ export const useLogsData = () => {
   const store = useStore();
   const router = useRouter();
   const { updateFieldKeywords } = useSqlSuggestions();
+  const { showErrorNotification } = useNotifications();
   const { 
     searchObj, 
     searchAggData, 
     fieldValues,
     streamSchemaFieldsIndexMapping 
   } = useLogsState();
+
+  // Initialize SQL parser
+  let parser: any = null;
+  try {
+    parser = new Parser();
+  } catch (error) {
+    console.warn("Parser initialization failed:", error);
+  }
+  
+  // Create SQL parser functions
+  const { parseSQL: fnParsedSQL } = createSQLParserFunctions(parser);
 
   // Field values reference for autocomplete
   const processedFieldValues = ref<FieldData>({});
@@ -325,7 +338,7 @@ export const useLogsData = () => {
       
       if (isPagination || appendResult) {
         // Append to existing results
-        await chunkedAppendUtil(searchObj.data.queryResults.hits, hits);
+        await chunkedAppend(searchObj.data.queryResults.hits, hits);
       } else {
         // Replace results
         searchObj.data.queryResults.hits = hits;

@@ -392,3 +392,66 @@ export function groupBy<T>(array: T[], keyFn: (item: T) => string): Record<strin
     return groups;
   }, {} as Record<string, T[]>);
 }
+
+/**
+ * Process stream data from API response
+ * 
+ * @param streamList - Raw stream list from API
+ * @returns Processed stream data with label/value pairs
+ * 
+ * @example
+ * ```typescript
+ * const rawStreams = [{ name: "app-logs" }, { name: "error-logs" }];
+ * const processed = processStreamDataUtil(rawStreams);
+ * // Returns: [{ name: "app-logs", label: "app-logs", value: "app-logs" }, ...]
+ * ```
+ */
+export function processStreamDataUtil(streamList: any[]): any[] {
+  try {
+    if (!Array.isArray(streamList)) {
+      return [];
+    }
+    
+    return streamList.map(stream => ({
+      ...stream,
+      label: stream.name || stream.label || 'Unknown',
+      value: stream.name || stream.value || stream.label || 'unknown'
+    }));
+  } catch (error) {
+    console.error("Error processing stream data:", error);
+    return [];
+  }
+}
+
+/**
+ * Transform log data for histogram visualization
+ * 
+ * @param aggregationData - Raw aggregation data from search response
+ * @returns Transformed data suitable for histogram rendering
+ * 
+ * @example
+ * ```typescript
+ * const rawAggs = [{ zo_sql_key: 1640995200000, zo_sql_num: "42" }];
+ * const transformed = transformLogDataUtil(rawAggs);
+ * // Returns: [{ key: 1640995200000, count: 42, timestamp: 1640995200000 }]
+ * ```
+ */
+export function transformLogDataUtil(aggregationData: any): any[] {
+  try {
+    if (!aggregationData || !Array.isArray(aggregationData)) {
+      return [];
+    }
+    
+    return aggregationData.map(item => ({
+      key: item.zo_sql_key,
+      count: parseInt(item.zo_sql_num || 0, 10),
+      timestamp: item.zo_sql_key,
+      // Keep original data for compatibility
+      zo_sql_key: item.zo_sql_key,
+      zo_sql_num: item.zo_sql_num
+    }));
+  } catch (error) {
+    console.error("Error transforming log data:", error);
+    return [];
+  }
+}

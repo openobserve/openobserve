@@ -57,7 +57,7 @@ import {
 // Import services (these will be used internally by the composables)
 import useStreams from "@/composables/useStreams";
 import useQuery from "@/composables/useQuery";
-import { default as useNotifications } from "@/composables/useNotifications";
+import useNotifications from "@/composables/useNotifications";
 
 /**
  * Main useLogs composable that combines all the refactored modules
