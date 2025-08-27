@@ -91,28 +91,19 @@ where
                     // Determine stream type from path
                     let stream_type = determine_stream_type_from_path(path);
 
-                    // Perform ingestion quota check with timeout to prevent hanging
-                    let quota_check_start = std::time::Instant::now();
-
-                    let check_result = tokio::time::timeout(
-                        std::time::Duration::from_millis(500), // Increased to 500ms for debugging
-                        crate::service::ingestion::check_ingestion_allowed(
-                            &org_id,
-                            stream_type,
-                            None,
-                        ),
+                    match crate::service::ingestion::check_ingestion_allowed(
+                        &org_id,
+                        stream_type,
+                        None,
                     )
-                    .await;
-
-                    let quota_check_duration = quota_check_start.elapsed();
-
-                    match check_result {
-                        Ok(Ok(_)) => {
+                    .await
+                    {
+                        Ok(_) => {
                             // Quota check passed, continue with the request
 
                             service.call(req).await
                         }
-                        Ok(Err(e)) => {
+                        Err(e) => {
                             // Quota check failed, return error
                             log::error!("[INGESTION_MIDDLEWARE] Quota check failed: {e}");
 
@@ -127,15 +118,6 @@ where
                             } else {
                                 Err(actix_web::error::ErrorInternalServerError(e))
                             }
-                        }
-                        Err(_timeout) => {
-                            // Timeout occurred, log and allow request through
-                            log::warn!(
-                                "[INGESTION_MIDDLEWARE] Quota check timed out for org: {} after {:?}, allowing request",
-                                org_id,
-                                quota_check_duration
-                            );
-                            service.call(req).await
                         }
                     }
                 } else {
