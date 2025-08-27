@@ -545,6 +545,8 @@ mod tests {
             Field::new("original_size", DataType::Int64, false),
             Field::new("compressed_size", DataType::Int64, false),
             Field::new("index_size", DataType::Int64, false),
+            Field::new("created_at", DataType::Int64, false),
+            Field::new("updated_at", DataType::Int64, false),
         ]));
 
         let id_array = Arc::new(Int64Array::from(vec![1, 2, 3]));
@@ -569,6 +571,8 @@ mod tests {
         let original_size_array = Arc::new(Int64Array::from(vec![1000, 2000, 3000]));
         let compressed_size_array = Arc::new(Int64Array::from(vec![500, 1000, 1500]));
         let index_size_array = Arc::new(Int64Array::from(vec![50, 100, 150]));
+        let created_at_array = Arc::new(Int64Array::from(vec![1000, 2000, 3000]));
+        let updated_at_array = Arc::new(Int64Array::from(vec![1100, 2100, 3100]));
 
         RecordBatch::try_new(
             schema,
@@ -587,6 +591,8 @@ mod tests {
                 original_size_array,
                 compressed_size_array,
                 index_size_array,
+                created_at_array,
+                updated_at_array,
             ],
         )
         .unwrap()
@@ -639,6 +645,8 @@ mod tests {
             Field::new("original_size", DataType::Int64, false),
             Field::new("compressed_size", DataType::Int64, false),
             Field::new("index_size", DataType::Int64, false),
+            Field::new("created_at", DataType::Int64, false),
+            Field::new("updated_at", DataType::Int64, false),
         ]));
 
         let rb = RecordBatch::try_new(
@@ -662,6 +670,8 @@ mod tests {
                 Arc::new(Int64Array::from(vec![1000, 1000, 2000])),
                 Arc::new(Int64Array::from(vec![500, 500, 1000])),
                 Arc::new(Int64Array::from(vec![50, 50, 100])),
+                Arc::new(Int64Array::from(vec![1000, 1000, 2000])),
+                Arc::new(Int64Array::from(vec![1100, 1100, 2100])),
             ],
         )
         .unwrap();
@@ -814,6 +824,8 @@ mod tests {
             Field::new("original_size", DataType::Int64, false),
             Field::new("compressed_size", DataType::Int64, false),
             Field::new("index_size", DataType::Int64, false),
+            Field::new("created_at", DataType::Int64, false),
+            Field::new("updated_at", DataType::Int64, false),
         ]));
 
         let empty_rb = RecordBatch::try_new(
@@ -827,6 +839,8 @@ mod tests {
                 Arc::new(StringArray::from(Vec::<String>::new())),
                 Arc::new(BooleanArray::from(Vec::<bool>::new())),
                 Arc::new(BooleanArray::from(Vec::<bool>::new())),
+                Arc::new(Int64Array::from(Vec::<i64>::new())),
+                Arc::new(Int64Array::from(Vec::<i64>::new())),
                 Arc::new(Int64Array::from(Vec::<i64>::new())),
                 Arc::new(Int64Array::from(Vec::<i64>::new())),
                 Arc::new(Int64Array::from(Vec::<i64>::new())),
