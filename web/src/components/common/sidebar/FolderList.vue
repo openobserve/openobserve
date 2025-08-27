@@ -17,9 +17,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-    <div class="text-bold q-px-md q-pt-sm">
+    <div class="text-bold q-px-sm  q-py-sm tw-flex tw-items-center tw-justify-between tw-gap-2">
        Folders
+       <div>
+        <q-btn
+          class="text-bold o2-secondary-button  tw-w-full tw-h-[28px] tw-w-[32px]"
+          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          no-caps
+          style="min-width: 0px !important; min-height: 0px !important;"
+          flat
+          @click.stop="addFolder"
+          data-test="dashboard-new-folder-btn"
+        >
+        <q-icon name="add" size="xs" />
+      </q-btn>
+       </div>
+
     </div>
+    <q-separator class="tw-mb-1 tw-mt-[3px]" size="2px"></q-separator>
     <div class="folders-tabs">
     <!-- Search Input -->
     <div style="width: 100%;" class="flex folder-item q-py-xs">
@@ -31,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="Search Folder"
           style="width: 100%;"
           clearable
-          class="o2-search-input tw-mx-1"
+          class="o2-search-input tw-mx-1 q-px-xs"
           :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
         >
           <template #prepend>
@@ -112,17 +127,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="row full-width  q-pb-xs"
         style="position: sticky; bottom: 0px"
     >
-      <q-btn
-          class="text-bold o2-secondary-button tw-mx-1 tw-w-full"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          no-caps
-          flat
-          label="New Folder"
-          @click.stop="addFolder"
-          data-test="dashboard-new-folder-btn"
-          icon="add"
-        >
-      </q-btn>
     </div>
 
       <q-dialog
