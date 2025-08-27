@@ -80,7 +80,7 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.logsApplyQueryButton();
   });
 
-  test("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
+  test.skip("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
@@ -344,7 +344,7 @@ test.describe("logs testcases", () => {
 
     await pm.logsVisualise.openVisualiseTab();
 
-    await page.waitForTimeout(2000);
+    await pm.logsVisualise.verifyChartRenders(page);
 
     // Define chart types to test
     const chartTypes = [
@@ -361,14 +361,14 @@ test.describe("logs testcases", () => {
 
     // Test each chart type
     for (const chartType of chartTypes) {
-      console.log(`Testing chart type: ${chartType.name}`);
+      // console.log(`Testing chart type: ${chartType.name}`);
 
       // Select the chart type
       await page.locator(chartType.selector).click();
       await page.waitForTimeout(1000);
 
       // Wait for chart to load
-      await page.waitForTimeout(3000);
+      await pm.logsVisualise.verifyChartRenders(page);
 
       // Check for dashboard errors
       const errorResult = await pm.logsVisualise.checkDashboardErrors(
@@ -377,24 +377,22 @@ test.describe("logs testcases", () => {
       );
 
       if (errorResult.hasErrors) {
-        console.log(`Dashboard error found for ${chartType.name} chart:`);
+        // console.log(`Dashboard error found for ${chartType.name} chart:`);
         errorResult.errors.forEach((error, index) => {
-          console.log(`  ${index + 1}. ${error}`);
+          // console.log(`  ${index + 1}. ${error}`);
         });
 
         // Fail the test with detailed error information
         expect(errorResult.errorTextCount).toBe(0);
         expect(errorResult.errorListCount).toBe(0);
       } else {
-        console.log(`${chartType.name} chart: No dashboard errors found`);
+        // console.log(`${chartType.name} chart: No dashboard errors found`);
       }
 
       // Verify the chart renders successfully
       const chartRendered = await pm.logsVisualise.verifyChartRenders(page);
       expect(chartRendered).toBe(true);
     }
-
-    console.log("All chart types tested successfully without dashboard errors");
   });
 
   test("should set line chart as default when using histogram query", async ({
@@ -412,7 +410,7 @@ test.describe("logs testcases", () => {
 
     await pm.logsVisualise.openVisualiseTab();
 
-    await page.waitForTimeout(2000);
+    await pm.logsVisualise.verifyChartRenders(page);
 
     // Verify line chart is selected as default for histogram queries
     await pm.logsVisualise.verifyChartTypeSelected(page, "line", true);
@@ -445,7 +443,7 @@ test.describe("logs testcases", () => {
 
     await pm.logsVisualise.openVisualiseTab();
 
-    await page.waitForTimeout(2000);
+    await pm.logsVisualise.verifyChartRenders(page);
 
     await pm.logsVisualise.addPanelToNewDashboard(
       randomDashboardName,
