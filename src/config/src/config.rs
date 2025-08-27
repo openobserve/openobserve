@@ -1073,12 +1073,6 @@ pub struct Common {
     )]
     pub result_cache_selection_strategy: String,
     #[env_config(
-        name = "ZO_RESULT_CACHE_DISCARD_DURATION",
-        default = 60,
-        help = "Discard data of last n seconds from cached results"
-    )]
-    pub result_cache_discard_duration: i64,
-    #[env_config(
         name = "ZO_METRICS_CACHE_ENABLED",
         default = true,
         help = "Enable result cache for PromQL metrics queries"
