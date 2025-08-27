@@ -157,13 +157,21 @@ mod tests {
     async fn test_update_stats_from_file_list() {
         setup().await;
         let latest_updated_at = 1755706810000000;
-        let ret = update_stats_from_file_list_inner(latest_updated_at).await.unwrap();
+        let ret = update_stats_from_file_list_inner(latest_updated_at)
+            .await
+            .unwrap();
         assert_eq!(ret, Some((1755705600000000, 1755706200000000)));
-        let ret = update_stats_from_file_list_inner(latest_updated_at).await.unwrap();
+        let ret = update_stats_from_file_list_inner(latest_updated_at)
+            .await
+            .unwrap();
         assert_eq!(ret, Some((1755706200000000, 1755706800000000)));
-        let ret = update_stats_from_file_list_inner(latest_updated_at).await.unwrap();
+        let ret = update_stats_from_file_list_inner(latest_updated_at)
+            .await
+            .unwrap();
         assert_eq!(ret, Some((1755706800000000, 1755706810000000)));
-        let ret = update_stats_from_file_list_inner(latest_updated_at).await.unwrap();
+        let ret = update_stats_from_file_list_inner(latest_updated_at)
+            .await
+            .unwrap();
         assert_eq!(ret, None);
     }
 }
