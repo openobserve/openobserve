@@ -1156,8 +1156,6 @@ pub struct Limit {
     pub req_payload_limit: usize,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
-    #[env_config(name = "ZO_CACHE_DELAY_SECS", default = 300)] // seconds
-    pub cache_delay_secs: i64,
     // MB, per log file size limit on disk
     #[env_config(name = "ZO_MAX_FILE_SIZE_ON_DISK", default = 256)]
     pub max_file_size_on_disk: usize,
@@ -1491,6 +1489,8 @@ pub struct Limit {
         default = true
     )]
     pub histogram_enabled: bool,
+    #[env_config(name = "ZO_CACHE_DELAY_SECS", default = 300)] // seconds
+    pub cache_delay_secs: i64,
 }
 
 #[derive(EnvConfig, Default)]
