@@ -202,7 +202,7 @@ describe("useIngestion Composable Comprehensive Coverage", () => {
     it("should have correct number of database documentation URLs", () => {
       const result = useIngestion();
       const docURLs = result.databaseDocURLs;
-      expect(Object.keys(docURLs)).toHaveLength(14);
+      expect(Object.keys(docURLs)).toHaveLength(15);
     });
   });
 

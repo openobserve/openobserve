@@ -788,7 +788,7 @@ fn build_expr(
                 }
                 Operator::LessThan => format!("\"{field_alias}\" < '{val}'"),
                 Operator::LessThanEquals => format!("\"{field_alias}\" <= '{val}'"),
-                Operator::Contains => format!("str_match(\"{field_alias}\", '%{val}%')"),
+                Operator::Contains => format!("str_match(\"{field_alias}\", '{val}')"),
                 Operator::NotContains => {
                     format!("\"{field_alias}\" NOT LIKE '%{val}%'")
                 }

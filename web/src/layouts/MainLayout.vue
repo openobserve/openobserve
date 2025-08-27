@@ -1426,7 +1426,12 @@ export default defineComponent({
       userClickedOrg,
       searchQuery,
       filteredOrganizations,
-      rowsPerPage
+      rowsPerPage,
+      verifyStreamExist,
+      filterMenus,
+      updateActionsMenu,
+      getConfig,
+      setRumUser
     };
   },
   computed: {

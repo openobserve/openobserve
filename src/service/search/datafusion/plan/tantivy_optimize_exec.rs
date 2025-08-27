@@ -32,6 +32,7 @@ use datafusion::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
         memory::MemoryStream,
+        metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet},
         stream::RecordBatchStreamAdapter,
     },
 };
@@ -50,6 +51,7 @@ pub struct TantivyOptimizeExec {
     index_condition: Option<IndexCondition>, // The condition to filter the rows
     cache: PlanProperties,                   // Cached properties of this plan
     index_optimize_mode: IndexOptimizeMode,  // Type of query the ttv index optimizes
+    metrics: ExecutionPlanMetricsSet,
 }
 
 impl TantivyOptimizeExec {
@@ -69,6 +71,7 @@ impl TantivyOptimizeExec {
             index_condition,
             cache,
             index_optimize_mode,
+            metrics: ExecutionPlanMetricsSet::new(),
         }
     }
 
@@ -138,12 +141,14 @@ impl ExecutionPlan for TantivyOptimizeExec {
             );
         }
 
+        let metrics = BaselineMetrics::new(&self.metrics, partition);
         let fut = adapt_tantivy_result(
             self.query.clone(),
             self.file_list.clone(),
             self.index_condition.clone(),
             self.schema.clone(),
             self.index_optimize_mode.clone(),
+            metrics,
         );
         let stream = futures::stream::once(fut).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(
@@ -155,6 +160,10 @@ impl ExecutionPlan for TantivyOptimizeExec {
     fn statistics(&self) -> Result<Statistics> {
         Ok(Statistics::new_unknown(&self.schema))
     }
+
+    fn metrics(&self) -> Option<MetricsSet> {
+        Some(self.metrics.clone_inner())
+    }
 }
 
 async fn adapt_tantivy_result(
@@ -163,7 +172,9 @@ async fn adapt_tantivy_result(
     index_condition: Option<IndexCondition>,
     schema: SchemaRef,
     idx_optimize_mode: IndexOptimizeMode,
+    metrics: BaselineMetrics,
 ) -> Result<SendableRecordBatchStream> {
+    let timer = metrics.elapsed_compute().timer();
     let (idx_took, error, result) = tantivy_search(
         query.clone(),
         &mut file_list,
@@ -226,6 +237,10 @@ async fn adapt_tantivy_result(
             })
         })
         .collect::<Result<Vec<_>>>()?;
+
+    // record output metrics
+    metrics.record_output(record_batches.iter().map(|b| b.num_rows()).sum());
+    timer.done();
 
     Ok(Box::pin(MemoryStream::try_new(
         record_batches,

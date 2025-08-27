@@ -1331,7 +1331,7 @@ pub struct Limit {
     #[env_config(name = "ZO_SEARCH_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds
     pub search_job_scheduler_interval: i64,
     #[env_config(
-        name = "ZO_SEARCH_JOB_RUM_TIMEOUT",
+        name = "ZO_SEARCH_JOB_RUN_TIMEOUT",
         default = 600, // seconds
         help = "Timeout for update check"
     )]

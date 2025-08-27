@@ -27,7 +27,7 @@ use datafusion::{
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
-        metrics::{ExecutionPlanMetricsSet, MetricsSet},
+        metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet},
         stream::RecordBatchStreamAdapter,
     },
 };
@@ -186,6 +186,7 @@ impl ExecutionPlan for RemoteScanExec {
         partition: usize,
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
+        let baseline_metrics = BaselineMetrics::new(&self.metrics, partition);
         let fut = get_remote_batch(
             self.remote_scan_node.clone(),
             partition,
@@ -194,6 +195,7 @@ impl ExecutionPlan for RemoteScanExec {
             self.scan_stats(),
             self.partial_err(),
             self.cluster_metrics(),
+            baseline_metrics,
         );
         let stream = futures::stream::once(fut).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(
@@ -211,6 +213,7 @@ impl ExecutionPlan for RemoteScanExec {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn get_remote_batch(
     remote_scan_node: RemoteScanNode,
     partition: usize,
@@ -219,6 +222,7 @@ async fn get_remote_batch(
     scan_stats: Arc<Mutex<ScanStats>>,
     partial_err: Arc<Mutex<String>>,
     cluster_metrics: Arc<Mutex<Vec<Metrics>>>,
+    metrics: BaselineMetrics,
 ) -> Result<SendableRecordBatchStream> {
     let start = std::time::Instant::now();
     let cfg = config::get_config();
@@ -324,7 +328,7 @@ async fn get_remote_batch(
         .with_cluster_metrics(cluster_metrics)
         .with_start_time(start);
 
-    let mut stream = FlightDecoderStream::new(stream, schema.clone(), query_context);
+    let mut stream = FlightDecoderStream::new(stream, schema.clone(), metrics, query_context);
     let stream = async_stream::stream! {
         let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(timeout));
         pin_mut!(timeout);
