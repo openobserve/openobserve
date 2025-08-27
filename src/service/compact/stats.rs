@@ -68,15 +68,15 @@ async fn update_stats_from_file_list_inner(
         }
     }
 
-    // check min_update_at
+    // apply step limit
+    let step_limit = config::get_config().limit.calculate_stats_step_limit;
+    // if the offset is 0, we use min_update_at to calculate the latest_update_at
+    // otherwise, we use the offset + step_limit to calculate the latest_update_at
     let min_update_at = if offset == 0 {
         infra_file_list::get_min_update_at().await?
     } else {
         offset
     };
-
-    // apply step limit
-    let step_limit = config::get_config().limit.calculate_stats_step_limit;
     let latest_update_at =
         std::cmp::min(min_update_at + second_micros(step_limit), latest_update_at);
 

@@ -46,7 +46,7 @@ pub static STREAM_SETTINGS: Lazy<RwAHashMap<String, StreamSettings>> = Lazy::new
 /// SnowflakeIdGenerator::generate() requires a &mut
 pub static STREAM_RECORD_ID_GENERATOR: Lazy<RwHashMap<String, SnowflakeIdGenerator>> =
     Lazy::new(Default::default);
-/// Cache if the stream stats is exists, used for calculate stats
+/// Cache if the stream stats exist, used for calculating stats
 pub static STREAM_STATS_EXISTS: Lazy<RwHashSet<String>> = Lazy::new(Default::default);
 
 // atomic version of cache
