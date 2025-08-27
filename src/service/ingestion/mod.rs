@@ -402,6 +402,7 @@ pub async fn write_file(
     Ok(req_stats)
 }
 
+#[inline(always)]
 pub async fn check_ingestion_allowed(
     org_id: &str,
     stream_type: StreamType,

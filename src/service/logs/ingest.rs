@@ -54,7 +54,6 @@ use crate::{
     },
     service::{
         format_stream_name, get_formatted_stream_name,
-        ingestion::check_ingestion_allowed,
         logs::bulk::TRANSFORM_FAILED,
         schema::{get_future_discard_error, get_upto_discard_error},
     },
@@ -84,9 +83,6 @@ pub async fn ingest(
     } else {
         format_stream_name(in_stream_name)
     };
-
-    // check system resource
-    check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
 
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
         .timestamp_micros();

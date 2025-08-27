@@ -110,7 +110,6 @@ pub async fn handle_otlp_request(
     request: ExportMetricsServiceRequest,
     req_type: OtlpRequestType,
 ) -> Result<HttpResponse, anyhow::Error> {
-  
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
