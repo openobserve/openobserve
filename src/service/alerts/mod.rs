@@ -126,6 +126,7 @@ impl QueryConditionExt for QueryCondition {
                     // CustomQuery is only used by Alerts' triggers.
                     return Ok(eval_results);
                 };
+                
                 build_sql(org_id, stream_name, stream_type, self, v).await?
             }
             QueryType::SQL => {
@@ -686,13 +687,21 @@ async fn build_sql(
     conditions: &ConditionList,
 ) -> Result<String, anyhow::Error> {
     let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    let where_sql = conditions
-        .to_sql(&schema)
-        .await
-        .map_err(|err| anyhow::anyhow!("Error building SQL on stream {stream_name}: {err}"))?;
+    let where_sql = if conditions.len().await == 0 {
+        "".to_string()
+    } else {
+        conditions
+            .to_sql(&schema)
+            .await
+            .map_err(|err| anyhow::anyhow!("Error building SQL on stream {stream_name}: {err}"))?
+    };
     if query_condition.aggregation.is_none() {
-        return Ok(format!("SELECT * FROM \"{stream_name}\" WHERE {where_sql}"));
-    }
+        if where_sql.is_empty() {
+            return Ok(format!("SELECT * FROM \"{stream_name}\""));
+        } else {
+            return Ok(format!("SELECT * FROM \"{stream_name}\" WHERE {where_sql}"));
+        }
+    };
 
     // handle aggregation
     let mut sql = String::new();
@@ -742,22 +751,30 @@ async fn build_sql(
     if let Some(group) = agg.group_by.as_ref()
         && !group.is_empty()
     {
-        sql = format!(
-            "SELECT {}, {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\"  WHERE {} GROUP BY {} HAVING {}",
-            group.join(", "),
-            func_expr,
-            TIMESTAMP_COL_NAME,
-            TIMESTAMP_COL_NAME,
-            stream_name,
-            where_sql,
-            group.join(", "),
-            having_expr
-        );
+        sql = if where_sql.is_empty() {
+            format!(
+                "SELECT {}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"   GROUP BY {} HAVING {having_expr}",
+                group.join(", "),
+                group.join(", "),
+            )
+        } else {
+            format!(
+                "SELECT {}, {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"  WHERE {where_sql} GROUP BY {} HAVING {having_expr}",
+                group.join(", "),
+                group.join(", ")
+            )
+        }
     }
     if sql.is_empty() {
-        sql = format!(
-            "SELECT {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"  {where_sql} HAVING {having_expr}"
-        );
+        sql = if where_sql.is_empty() {
+            format!(
+                "SELECT {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"  HAVING {having_expr}"
+            )
+        } else {
+            format!(
+                "SELECT {func_expr} AS alert_agg_value, MIN({TIMESTAMP_COL_NAME}) as zo_sql_min_time, MAX({TIMESTAMP_COL_NAME}) AS zo_sql_max_time FROM \"{stream_name}\"  WHERE {where_sql} HAVING {having_expr}"
+            )
+        }
     }
     Ok(sql)
 }
