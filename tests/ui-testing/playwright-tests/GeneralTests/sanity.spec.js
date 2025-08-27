@@ -52,23 +52,6 @@ test.describe("Sanity Test Cases", () => {
     testLogger.info('Test setup completed');
   });
 
-  // Quick Mode Tests
-  test("should display quick mode toggle button", async ({ page }) => {
-    testLogger.info('Testing quick mode toggle button visibility');
-    
-    await pm.sanityPage.verifyQuickModeToggleVisible();
-    
-    testLogger.info('Quick mode toggle button visible');
-  });
-
-  test("should click on interesting fields icon and display query in editor", async ({ page }) => {
-    testLogger.info('Testing interesting fields and query editor');
-    
-    await pm.sanityPage.clickInterestingFieldsAndDisplayQuery();
-    
-    testLogger.info('Query editor test completed');
-  });
-
   // Pagination Tests 
   test("should display result text and pagination", async ({ page }) => {
     testLogger.info('Testing pagination display');

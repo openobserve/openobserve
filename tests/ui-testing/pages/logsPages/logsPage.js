@@ -766,6 +766,52 @@ export class LogsPage {
         }
     }
 
+    async clickRunQueryButtonAndVerifyStreamingResponse() {
+        console.log("[DEBUG] Setting up response listener before clicking run query button");
+        const searchPromise = this.page.waitForResponse(response => {
+            const url = response.url();
+            const method = response.request().method();
+            console.log(`[DEBUG] Response: ${method} ${url}`);
+            return url.includes('/api/default/_search') && method === 'POST';
+        });
+        
+        await this.clickRunQueryButton();
+        
+        const searchResponse = await searchPromise;
+        console.log(`[DEBUG] Search response status: ${searchResponse.status()}`);
+        expect(searchResponse.status()).toBe(200);
+        
+        // Check if this is a streaming response (SSE format) or JSON response
+        const responseUrl = searchResponse.url();
+        if (responseUrl.includes('_search_stream')) {
+            console.log("[DEBUG] Received streaming response (SSE format)");
+            const responseText = await searchResponse.text();
+            console.log("[DEBUG] Streaming response text (first 200 chars):", responseText.substring(0, 200));
+            expect(responseText).toBeDefined();
+            expect(responseText.length).toBeGreaterThan(0);
+        } else {
+            console.log("[DEBUG] Received JSON response");
+            const searchData = await searchResponse.json();
+            console.log("[DEBUG] Search response data:", JSON.stringify(searchData, null, 2));
+            console.log("[DEBUG] searchData type:", typeof searchData);
+            console.log("[DEBUG] searchData keys:", Object.keys(searchData || {}));
+            expect(searchData).toBeDefined();
+            
+            // Check if this is a partition response or regular search response
+            if (searchData.partitions) {
+                console.log("[DEBUG] Received partition response (non-streaming mode)");
+                expect(searchData.partitions).toBeDefined();
+                expect(searchData.histogram_interval).toBeDefined();
+            } else if (searchData.hits) {
+                console.log("[DEBUG] Received regular search response");
+                expect(searchData.hits).toBeDefined();
+            } else {
+                console.log("[DEBUG] Unexpected response structure:", JSON.stringify(searchData, null, 2));
+                throw new Error(`Unexpected response structure: ${JSON.stringify(searchData)}`);
+            }
+        }
+    }
+
     // Explore and results methods
     async clickExplore() {
         try {
@@ -1855,5 +1901,17 @@ export class LogsPage {
 
     async clickAllFieldsButton() {
         return await this.page.locator('[data-test="logs-all-fields-btn"]').click();
+    }
+
+    async enableQuickModeIfDisabled() {
+        // Enable quick mode toggle if it's not already enabled
+        const toggleButton = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
+        if (toggleButton) {
+            // Evaluate the class attribute to determine if the toggle is in the off state
+            const isSwitchedOff = await toggleButton.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
+            if (isSwitchedOff) {
+                await toggleButton.click();
+            }
+        }
     }
 } 
