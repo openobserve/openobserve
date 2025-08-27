@@ -447,9 +447,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           props.row.name == allFieldsName
                         )
                       "
-                      :disable="isEnvironmentSettings(props.row)"
-                      v-model="props.row.index_type"
-                      :options="isEnvironmentSettings(props.row) ? streamIndexTypeEnv : streamIndexType"
+                      :model-value="computedIndexType(props).value"
+                      :options="streamIndexType"
+                      option-label="label"
+                      option-value="value"
                       :popup-content-style="{ textTransform: 'capitalize' }"
                       color="input-border"
                       bg-color="input-bg"
@@ -469,19 +470,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       filled
                       dense
                       style="min-width: 300px; max-width: 300px"
-                      @update:model-value="
-                        isEnvironmentSettings(props.row) == false
-                          ? markFormDirty(props.row.name, 'fts')
-                          : null
-                      "
-                    />
-                    <q-tooltip
-                      v-if="isEnvironmentSettings(props.row)"
-                      style="font-size: 14px; width: 250px"
-                    >
-                      This is a predefined environment setting and cannot be
-                      changed.
-                    </q-tooltip>
+                      @update:model-value="val => updateIndexType(props, val)"
+                      >
+                      <template v-slot:option="scope">
+                      <q-item style="margin: 0px !important; border-radius: 0px !important;" v-bind="scope.itemProps" :disable="disableOptions(props.row, scope.opt)">
+                        <q-item-section>
+                          <q-item-label>
+                            {{ scope.opt.label }}
+                          </q-item-label>
+                        </q-item-section>
+                        <q-tooltip class="tw-text-[12px] tw-w-[200px]" v-if="checkIfOptionPresentInDefaultEnv(props.row.name, scope.opt) == true">
+                          This is a predefined environment setting and cannot be changed.
+                        </q-tooltip>
+                      </q-item>
+                    </template>
+
+                    </q-select>
                   </q-td>
                 </template>
 
@@ -796,16 +800,6 @@ export default defineComponent({
       { label: "All", value: 0 },
     ];
 
-    const isEnvironmentSettings = computed(() => {
-      return (row: any) => {
-        if (!row || !row.index_type) return false;
-        return (
-          row?.index_type?.includes("fullTextSearchKeyEnv") ||
-          row?.index_type?.includes("secondaryIndexKeyEnv")
-        );
-      };
-    });
-
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
@@ -868,11 +862,6 @@ export default defineComponent({
       }
       return "Other Fields";
     });
-
-    const streamIndexTypeEnv = [
-      { label: "Full text search (Environment setting)", value: "fullTextSearchKeyEnv" },
-      { label: "Secondary index (Environment setting)", value: "secondaryIndexKeyEnv" },
-    ];
 
     const streamIndexType = [
       { label: "Full text search", value: "fullTextSearchKey" },
@@ -971,26 +960,10 @@ export default defineComponent({
       }
 
       if (
-        !settings?.full_text_search_keys.includes(property.name) &&
-        store.state.zoConfig.default_fts_keys.includes(property.name)
-      ) {
-        fieldIndices.push("fullTextSearchKeyEnv");
-      }
-
-      if (
         settings.index_fields.length > 0 &&
         settings.index_fields.includes(property.name)
       ) {
         fieldIndices.push("secondaryIndexKey");
-      }
-
-      if (
-        !settings?.index_fields.includes(property.name) &&
-        store.state.zoConfig.default_secondary_index_fields.includes(
-          property.name,
-        )
-      ) {
-        fieldIndices.push("secondaryIndexKeyEnv");
       }
 
       if (
@@ -1109,6 +1082,7 @@ export default defineComponent({
         schemaMapping.add(property.name);
 
         fieldIndices = getFieldIndices(property, streamResponse.settings);
+
 
         property.index_type = [...fieldIndices];
 
@@ -1396,7 +1370,21 @@ export default defineComponent({
         option.value.includes("hashPartition")
       )
         return true;
-
+      //handle if fulltextsearchkey or secondaryindexkey is selected by env then we need to disable the option
+      if (
+        store.state.zoConfig.default_fts_keys.includes(schema.name) &&
+        option.value.includes("fullTextSearchKey")
+      )
+      {
+        return true;
+      }
+      if (
+        store.state.zoConfig.default_secondary_index_fields.includes(schema.name) &&
+        option.value.includes("secondaryIndexKey")
+      )
+      {
+        return true;
+      }
       return false;
     };
 
@@ -1677,6 +1665,69 @@ export default defineComponent({
       formDirtyFlag.value = true;
       onSubmit();
     };
+    //this is used to compute the index_type value based on the env
+    //so instead of directly showing the value of the index_type we will add the values of fulltextsearchkey and secondaryindexkey if it is set by the env
+    //and if it is not set by the env then we will not add the values of fulltextsearchkey and secondaryindexkey becuase those will be already there and we don't want to show them twice
+    const computedIndexType = (props) => {
+      return computed({
+        get() {
+          let keysToBeDisplayed = props.row.index_type || [];
+          // return the actual index_type value from the row
+          //merge env fts and secondary index keys
+          //check for the props.row.name is in the env fts and secondary index keys
+          if (store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1
+           ) {
+            keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "fullTextSearchKey"])];
+          }
+          if (store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1
+          ) {
+            keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "secondaryIndexKey"])];
+          }
+          return keysToBeDisplayed || []
+        },
+        //this is not needed but we are keeping it here for future reference
+        set(value) {
+          // update only row value (don't overwrite env)
+          props.row.index_type = value
+          markFormDirty(props.row.name, 'fts');
+        }
+      })
+    }
+    //this function is used to check if the option is present in the default env
+    //if present then we will return true else false
+    //this is used to show the tooltip in the q-select for disabled options
+    //why there are disabled
+    const checkIfOptionPresentInDefaultEnv = (name, option) => {
+      if (store.state.zoConfig.default_fts_keys.indexOf(name) > -1 && option.value == "fullTextSearchKey") {
+        return true;
+      }
+      if (store.state.zoConfig.default_secondary_index_fields.indexOf(name) > -1 && option.value == "secondaryIndexKey") {
+        return true;
+    }
+    return false;
+  };
+//this is used to upate the model value of the index_type
+  const updateIndexType = (props, value) => {
+    props.row.index_type = filterValueBasedOnEnv(props, value ?? []);
+    markFormDirty(props.row.name, 'fts');
+  }
+  //this function is used while we update the index_type value so if the value is set by the env then we need to remove it from the value because 
+  //we don't give access to the user to change the value of the env set by the env
+  //and if it is empty then we will return empty array 
+  //if the value is not empty then we will remove the value if it is set by the env
+  const filterValueBasedOnEnv = (props, value) => {
+    if(value.length == 0){
+      return [];
+    }
+    let filteredValue = value;
+    if (store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1 && value.includes("fullTextSearchKey")) {
+      filteredValue = value.filter(item => item !== "fullTextSearchKey");
+    }
+    if (store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1 && value.includes("secondaryIndexKey")) {
+      filteredValue = value.filter(item => item !== "secondaryIndexKey");
+    }
+    return filteredValue;
+  }
 
     return {
       t,
@@ -1704,7 +1755,6 @@ export default defineComponent({
       markFormDirty,
       formDirtyFlag,
       streamIndexType,
-      streamIndexTypeEnv,
       disableOptions,
       loadingState,
       filterFieldFn,
@@ -1747,8 +1797,10 @@ export default defineComponent({
       redDaysList,
       deleteDates,
       IsdeleteBtnVisible,
-      isEnvironmentSettings,
       showStoreOriginalDataToggle,
+      computedIndexType,
+      checkIfOptionPresentInDefaultEnv,
+      updateIndexType,
     };
   },
   created() {
