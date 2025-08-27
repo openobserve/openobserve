@@ -33,6 +33,7 @@
 import { computed } from "vue";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 
 // Import all refactored composables
@@ -58,6 +59,7 @@ import {
 import useStreams from "@/composables/useStreams";
 import useQuery from "@/composables/useQuery";
 import useNotifications from "@/composables/useNotifications";
+import savedViewsApi from "@/services/logs/savedViewsApi";
 
 /**
  * Main useLogs composable that combines all the refactored modules
@@ -80,6 +82,7 @@ export const useLogs = () => {
   const { showErrorNotification } = useNotifications();
   const router = useRouter();
   const $q = useQuasar();
+  const store = useStore();
 
   // Initialize parser (maintaining original pattern)
   let parser: any = null;
@@ -129,13 +132,23 @@ export const useLogs = () => {
 
 
   const loadLogsData = async () => {
-    // Main function that loads logs data
-    // Implementation will coordinate between multiple composables
+    // Main function that loads logs data and initializes streams
     try {
       searchObj.loading = true;
       
-      // This is a placeholder - actual implementation would use
-      // the refactored composables to load data
+      // Reset functions and load functions/actions
+      logsActions.resetFunctions();
+      await logsActions.getFunctions();
+      
+      if (logsActions.isActionsEnabled.value) {
+        await logsActions.getActions();
+      }
+
+      // Load streams and populate dropdown
+      await logsData.getStreamList(true);
+      
+      // Extract fields for the selected streams
+      await logsData.extractFields();
       
       searchObj.loading = false;
     } catch (error: any) {
@@ -299,9 +312,9 @@ export const useLogs = () => {
     try {
       // Reset functions
       logsActions.resetFunctions();
-      await getStreamList();
+      await logsData.getStreamList();
       await logsActions.getFunctions();
-      await logsFilters.extractFields();
+      await logsData.extractFields();
       await getJobData();
       refreshData();
     } catch (error: any) {
@@ -494,19 +507,23 @@ export const useLogs = () => {
     getStream,
     onStreamChange,
     updateStreams: async () => {
-      if (searchObj.data.streamResults?.list?.length) {
+      try {
         const streamType = searchObj.data.stream.streamType || "logs";
-        const streams: any = await getStreams(streamType, false);
-        searchObj.data.streamResults["list"] = streams.list;
         
-        searchObj.data.stream.streamLists = [];
-        streams.list.map((item: any) => {
-          const itemObj = {
-            label: item.name,
-            value: item.name,
-          };
-          searchObj.data.stream.streamLists.push(itemObj);
-        });
+        // Use getStreamList to load and populate streams properly
+        await logsData.getStreamList(false);
+        
+        // Alternative: if we need to use getStreams from useStreams composable
+        // const streams: any = await getStreams(streamType, false);
+        // if (streams && streams.list) {
+        //   searchObj.data.streamResults = streams.list;
+        //   searchObj.data.stream.streamLists = streams.list.map((item: any) => ({
+        //     label: item.name,
+        //     value: item.name,
+        //   }));
+        // }
+      } catch (error: any) {
+        console.error("Error updating streams:", error);
       }
     },
     
@@ -586,7 +603,25 @@ export const useLogs = () => {
     // Utility functions
     extractTimestamps: () => console.log("extractTimestamps placeholder"),
     extractValueQuery: logsURL.extractValueQueryLocal,
-    getSavedViews: () => console.log("getSavedViews placeholder"),
+    getSavedViews: async () => {
+      try {
+        searchObj.loadingSavedView = true;
+        const favoriteViews: any = [];
+        savedViewsApi
+          .get(store.state.selectedOrganization.identifier)
+          .then((res) => {
+            searchObj.loadingSavedView = false;
+            searchObj.data.savedViews = res.data.views;
+          })
+          .catch((err) => {
+            searchObj.loadingSavedView = false;
+            console.log(err);
+          });
+      } catch (e: any) {
+        searchObj.loadingSavedView = false;
+        console.log("Error while getting saved views", e);
+      }
+    },
     getRegionInfo,
     enableRefreshInterval: logsURL.enableRefreshInterval,
     

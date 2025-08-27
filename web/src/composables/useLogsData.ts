@@ -160,13 +160,14 @@ export const useLogsData = () => {
           });
         }
 
-        searchObj.data.stream.streamLists = response.data.list;
+        // Transform API response to include label/value properties for UI
+        searchObj.data.stream.streamLists = processStreamDataUtil(response.data.list);
         
         if (selectStream && searchObj.data.stream.streamLists.length > 0) {
           if (searchObj.data.stream.selectedStream.length === 0) {
             searchObj.data.stream.selectedStream.push({
-              label: searchObj.data.stream.streamLists[0].name,
-              value: searchObj.data.stream.streamLists[0].name,
+              label: searchObj.data.stream.streamLists[0].label,
+              value: searchObj.data.stream.streamLists[0].value,
             });
           }
         }

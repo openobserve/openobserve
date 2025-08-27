@@ -814,6 +814,9 @@ export default defineComponent({
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleMultiStreamSelection() {
+      if (this.searchObj.data.stream.selectedStream.length === 0) {
+        this.searchObj.data.stream.selectedFields = [];
+      }
       this.onStreamChange("");
     },
     handleSingleStreamSelect(opt: any) {
