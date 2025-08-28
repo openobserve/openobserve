@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-sidebar-collapse-btn"
       />
     </div>
-    <q-separator style="margin-top: -1px" />
+    <q-separator style="margin-top: -1px; flex-shrink: 0;" />
     <div class="sidebar-content scroll" v-if="isOpen">
       <slot></slot>
     </div>
@@ -85,6 +85,9 @@ export default defineComponent({
   position: relative;
   width: 50px;
   height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar.open {
@@ -108,6 +111,7 @@ export default defineComponent({
   justify-content: space-between;
   height: 60px;
   padding: 0 10px;
+  flex-shrink: 0;
 }
 
 .collapsed-icon {
@@ -133,7 +137,8 @@ export default defineComponent({
 
 .sidebar-content {
   padding: 0px 10px;
-  height: calc(100vh - 176px);
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 </style>
