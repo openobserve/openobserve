@@ -73,7 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <q-btn
-          class="bg-secondary rounded text-white"
+          class="o2-primary-button tw-h-[36px]"
+          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          flat
           no-caps
           :title="t('rum.getStartedTitle')"
           @click="getStarted"
