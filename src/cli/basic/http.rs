@@ -329,7 +329,7 @@ async fn request(
     let url = format!("{}{}", local.http_addr, url);
     let user = cfg.auth.root_user_email.clone();
     let password = cfg.auth.root_user_password.clone();
-    let cookie = cfg.auth.root_user_cookie.clone();
+    let cookie = cfg.auth.cli_user_cookie.clone();
     let mut req = client.request(method, url);
     if cookie.is_empty() {
         req = req.basic_auth(user, Some(password));
