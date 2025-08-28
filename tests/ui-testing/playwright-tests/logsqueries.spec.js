@@ -276,6 +276,8 @@ test.describe("Logs Queries testcases", () => {
   });
 
   test("should display values API text successfully and error to not be displayed", async ({ page }) => {
+    // click on quick mode toggle to enable it
+    await page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] div').nth(2).click();
     // click on all fields button
     await page.locator('[data-test="logs-all-fields-btn"]').click();
     await page.waitForTimeout(2000);
@@ -285,6 +287,7 @@ test.describe("Logs Queries testcases", () => {
     await expect(errorMessage).not.toBeVisible();
     await page.getByText('ziox-ingester-').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.getByRole('button', { name: 'Expand "kubernetes_pod_name"' }).click();
     await page.getByRole('button', { name: 'Collapse "kubernetes_pod_name"' }).click();
     await page.getByRole('button', { name: 'Expand "kubernetes_pod_name"' }).click();
     const targetElement = page.locator('[data-test="logs-search-subfield-add-kubernetes_pod_name-ziox-ingester-0"]').getByText('ziox-ingester-');
