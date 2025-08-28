@@ -45,10 +45,7 @@ use crate::{
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{
         format_stream_name,
-        ingestion::{
-            check_ingestion_allowed,
-            grpc::{get_val, get_val_with_type_retained},
-        },
+        ingestion::grpc::{get_val, get_val_with_type_retained},
         logs::bulk::TRANSFORM_FAILED,
         schema::{get_future_discard_error, get_upto_discard_error},
     },
@@ -67,7 +64,6 @@ pub async fn handle_request(
 
     // check stream
     let stream_name = in_stream_name.map_or_else(|| "default".to_owned(), format_stream_name);
-    check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
 
     let cfg = get_config();
     let log_ingestion_errors = ingestion_log_enabled().await;

@@ -55,7 +55,7 @@ use crate::{
     service::{
         alerts::alert::AlertExt,
         db, format_stream_name,
-        ingestion::{TriggerAlertData, check_ingestion_allowed, evaluate_trigger, write_file},
+        ingestion::{TriggerAlertData, evaluate_trigger, write_file},
         pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
         search as search_service,
@@ -67,9 +67,6 @@ pub async fn remote_write(
     org_id: &str,
     body: web::Bytes,
 ) -> std::result::Result<(), anyhow::Error> {
-    // check system resource
-    check_ingestion_allowed(org_id, StreamType::Metrics, None).await?;
-
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 

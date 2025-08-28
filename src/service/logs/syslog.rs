@@ -48,12 +48,8 @@ use crate::{
             syslog::SyslogRoute,
         },
     },
-    handler::http::{
-        request::search::error_utils::map_error_to_http_response, router::ERROR_HEADER,
-    },
-    service::{
-        format_stream_name, ingestion::check_ingestion_allowed, logs::bulk::TRANSFORM_FAILED,
-    },
+    handler::http::router::ERROR_HEADER,
+    service::{format_stream_name, logs::bulk::TRANSFORM_FAILED},
 };
 
 #[allow(deprecated)]
@@ -86,10 +82,6 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
 
     // check stream
     let stream_name = format_stream_name(in_stream_name);
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await {
-        log::error!("Syslogs ingestion error: {e}");
-        return Ok(map_error_to_http_response(&e, None));
-    };
 
     let cfg = get_config();
     let min_ts = (Utc::now() - Duration::try_hours(cfg.limit.ingest_allowed_upto).unwrap())
