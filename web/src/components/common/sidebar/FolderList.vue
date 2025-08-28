@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             @click.stop="addFolder"
             data-test="dashboard-new-folder-btn"
+            title="Add Folder"
           >
           <q-icon name="add" size="xs" />
         </q-btn>
