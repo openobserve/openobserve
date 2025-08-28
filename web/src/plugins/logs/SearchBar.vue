@@ -1621,6 +1621,8 @@ export default defineComponent({
       getJobData,
       routeToSearchSchedule,
       isActionsEnabled,
+      getVisualizationConfig,
+      encodeVisualizationConfig,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -2483,6 +2485,34 @@ export default defineComponent({
       savedViewDropdownModel.value = false;
     };
 
+    // Common function to restore visualization data and sync to URL
+    const restoreVisualizationData = async (visualizationData) => {
+      if (!visualizationData) return;
+
+      // Restore visualization config to dashboardPanelData
+      if (visualizationData.config) {
+        dashboardPanelData.data.config = visualizationData.config;
+      }
+      if (visualizationData.type) {
+        dashboardPanelData.data.type = visualizationData.type;
+      }
+
+      // Sync visualization data to URL
+      const currentVisualizationData = getVisualizationConfig(dashboardPanelData);
+      if (currentVisualizationData) {
+        const encoded = encodeVisualizationConfig(currentVisualizationData);
+        if (encoded) {
+          const currentQuery = { ...router.currentRoute.value.query };
+          currentQuery.visualization_data = encoded;
+
+          await router.replace({
+            name: router.currentRoute.value.name,
+            query: currentQuery
+          });
+        }
+      }
+    };
+
     const applySavedView = async (item) => {
       await cancelQuery();
       searchObj.shouldIgnoreWatcher = true;
@@ -2590,6 +2620,11 @@ export default defineComponent({
               extractedObj.meta.scrollInfo = {};
               searchObj.value = mergeDeep(searchObj, extractedObj);
               searchObj.shouldIgnoreWatcher = true;
+
+              // Restore visualization data if available
+              if (extractedObj.data.visualizationData) {
+                await restoreVisualizationData(extractedObj.data.visualizationData);
+              }
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
@@ -2675,6 +2710,11 @@ export default defineComponent({
 
               searchObj.value = mergeDeep(searchObj, extractedObj);
               searchObj.data.streamResults = {};
+
+              // Restore visualization data if available
+              if (extractedObj.data.visualizationData) {
+                await restoreVisualizationData(extractedObj.data.visualizationData);
+              }
 
               const streamData = await getStreams(
                 searchObj.data.stream.streamType,
@@ -2915,6 +2955,14 @@ export default defineComponent({
         delete savedSearchObj.value;
 
         delete savedSearchObj.data.parsedQuery;
+
+        // Include visualization data if in visualization mode
+        if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
+          const visualizationData = getVisualizationConfig(dashboardPanelData);
+          if (visualizationData) {
+            savedSearchObj.data.visualizationData = visualizationData;
+          }
+        }
 
         return savedSearchObj;
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
@@ -3426,7 +3474,7 @@ export default defineComponent({
         // validate sql query that all fields have alias
         if (!allSelectionFieldsHaveAlias(logsPageQuery)) {
           showErrorNotification(
-            "All fields must have alias in query to visualize",
+            "Fields using aggregation functions must have aliases to visualize.",
           );
           return;
         }
