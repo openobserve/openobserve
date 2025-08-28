@@ -54,6 +54,7 @@ use crate::service::{
             exec::{DataFusionContextBuilder, register_udf},
             table_provider::{enrich_table::EnrichTable, uniontable::NewUnionTable},
         },
+        grpc::QueryParams,
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         match_file,
@@ -116,17 +117,13 @@ pub async fn search(
     // check if we are allowed to search
     if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
         return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(format!(
-            "stream [{}] is being deleted",
-            &stream_name
+            "stream [{stream_name}] is being deleted"
         ))));
     }
 
     log::info!(
-        "[trace_id {trace_id}] flight->search: part_id: {}, stream: {}/{}/{}",
-        req.query_identifier.partition,
-        org_id,
-        stream_type,
-        stream_name,
+        "[trace_id {trace_id}] flight->search: part_id: {}, stream: {org_id}/{stream_type}/{stream_name}",
+        req.query_identifier.partition
     );
 
     // construct latest schema map
@@ -159,7 +156,7 @@ pub async fn search(
         })
         .collect::<Vec<_>>();
 
-    let query_params = Arc::new(super::QueryParams {
+    let query_params = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),
         org_id: org_id.clone(),
         stream_type,
