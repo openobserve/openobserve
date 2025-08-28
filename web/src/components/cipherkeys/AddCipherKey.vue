@@ -14,8 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
-    <div class="row items-center no-wrap q-mx-md q-my-sm">
+  <q-page class="q-pa-none" style="min-height: inherit;">
+    <div class="row items-center no-wrap q-mx-md q-pt-sm">
       <div class="flex items-center">
         <div
           class="flex justify-center items-center q-mr-md cursor-pointer"
@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="addCipherKeyFormRef"
       @submit="onSubmit"
     >
+    <div style="height: calc(100vh - 170px); overflow: auto">
       <div class="row">
         <div class="col-4 o2-input flex q-mx-md q-mt-md">
           <q-input
@@ -132,9 +133,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-btn
               data-test="add-report-step1-continue-btn"
               @click="validateForm(2)"
-              color="secondary"
-              label="Continue"
+              class="o2-primary-button tw-h-[36px]"
+              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+              flat
               no-caps
+              :label="'Continue'"
             />
           </q-stepper-navigation>
         </q-step>
@@ -147,20 +150,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="step > 2"
         >
           <add-encryption-mechanism v-model:formData="formData" />
-          <q-stepper-navigation>
+          <q-stepper-navigation class="q-pa-none">
             <q-btn
               data-test="add-cipher-key-step2-back-btn"
               flat
               @click="step = 1"
-              color="primary"
+              class="o2-secondary-button tw-h-[36px] q-mb-sm"
+              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
               :label="t('common.back')"
-              class="q-ml-sm"
               no-caps
             />
           </q-stepper-navigation>
         </q-step>
       </q-stepper>
-      <div class="flex justify-start q-px-md q-py-sm full-width">
+    </div>
+      <div class="flex justify-end q-px-md q-py-md full-width "
+      style="position: sticky; bottom: 0px; z-index: 2"
+      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+      :style="{
+        'box-shadow':
+          store.state.theme === 'dark'
+            ? 'rgb(45 45 45) 0px -4px 7px 0px'
+            : 'rgb(240 240 240) 0px -4px 7px 0px',
+      }">
         <q-btn
           data-test="add-cipher-key-cancel-btn"
           class="q-mr-md o2-secondary-button tw-h-[36px]"
