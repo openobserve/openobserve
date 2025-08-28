@@ -344,8 +344,6 @@ use crate::{common::meta, handler::http::request};
             meta::ingestion::BulkResponseItem,
             meta::ingestion::ShardResponse,
             meta::ingestion::BulkResponseError,
-            meta::syslog::SyslogRoute,
-            meta::syslog::SyslogRoutes,
             config::meta::promql::Metadata,
             config::meta::promql::MetricType,
             // Functions
