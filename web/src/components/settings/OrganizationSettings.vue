@@ -68,18 +68,15 @@
         data-test="add-toggle-ingestion-btn"
         v-model="toggleIngestionLogs"
         :label="t('settings.toggleIngestionLogsLabel')"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-md showLabelOnTop"
         stack-label
-        outlined
-        filled
-        dense
+        class="q-mt-sm o2-toggle-button-lg tw-mr-3 -tw-ml-4"
+        size="lg"
+        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
       >
       </q-toggle>
     </div>
 
-    <div class="flex justify-start q-mt-lg">
+    <div class="flex justify-start q-mt-md">
       <q-btn
         data-test="add-alert-cancel-btn"
         v-close-popup="true"
