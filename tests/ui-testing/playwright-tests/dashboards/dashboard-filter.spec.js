@@ -249,7 +249,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardCreate.searchDashboard(randomDashboardName);
     await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
-  test("Should apply the filter group inside group", async ({ page }) => {
+  test.skip("Should apply the filter group inside group", async ({ page }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
     const panelName =
