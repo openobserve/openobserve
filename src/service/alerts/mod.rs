@@ -221,6 +221,14 @@ impl QueryConditionExt for QueryCondition {
         // SQL may contain multiple stream names, check for each stream
         // if the query period is greater than the max query range
         for stream in stream_names.iter() {
+            if let None =
+                infra::schema::get_stream_schema_from_cache(org_id, stream, stream_type).await
+            {
+                return Err(anyhow::anyhow!(
+                    "Stream \"{stream}\" not found in schema, skipping alert evaluation"
+                ));
+            };
+
             if let Some(settings) = infra::schema::get_settings(org_id, stream, stream_type).await {
                 let max_query_range = settings.max_query_range;
                 if max_query_range > 0 && trigger_condition.period > max_query_range * 60 {
